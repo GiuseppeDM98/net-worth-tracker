@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllAssets, updateAssetPrice } from '@/lib/services/assetService';
+import { adminDb } from '@/lib/firebase/admin';
 import {
   getMultipleQuotes,
   shouldUpdatePrice,
@@ -7,7 +7,7 @@ import {
 
 export async function POST(request: NextRequest) {
   try {
-    // Get user ID from request (you'll need to implement auth middleware)
+    // Get user ID from request
     const body = await request.json();
     const { userId, assetIds } = body;
 
@@ -18,14 +18,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get all assets or filtered by assetIds
-    const allAssets = await getAllAssets(userId);
+    // Get all assets using Firebase Admin SDK
+    const assetsRef = adminDb.collection('assets');
+    const snapshot = await assetsRef.where('userId', '==', userId).get();
+
+    if (snapshot.empty) {
+      return NextResponse.json({
+        updated: 0,
+        failed: [],
+        message: 'No assets found',
+      });
+    }
+
+    const allAssets = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    // Filter by assetIds if provided
     const assetsToUpdate = assetIds
-      ? allAssets.filter((asset) => assetIds.includes(asset.id))
+      ? allAssets.filter((asset: any) => assetIds.includes(asset.id))
       : allAssets;
 
     // Filter assets that need price updates
-    const updatableAssets = assetsToUpdate.filter((asset) =>
+    const updatableAssets = assetsToUpdate.filter((asset: any) =>
       shouldUpdatePrice(asset.type, asset.subCategory)
     );
 
@@ -38,28 +54,35 @@ export async function POST(request: NextRequest) {
     }
 
     // Extract unique tickers
-    const tickers = [...new Set(updatableAssets.map((asset) => asset.ticker))];
+    const tickers = [
+      ...new Set(updatableAssets.map((asset: any) => asset.ticker)),
+    ];
 
     // Fetch quotes from Yahoo Finance
     const quotes = await getMultipleQuotes(tickers);
 
-    // Update asset prices
+    // Update asset prices using Admin SDK
     const updated: string[] = [];
     const failed: string[] = [];
 
     for (const asset of updatableAssets) {
-      const quote = quotes.get(asset.ticker);
+      const quote = quotes.get((asset as any).ticker);
 
       if (quote && quote.price !== null && quote.price > 0) {
         try {
-          await updateAssetPrice(asset.id, quote.price);
-          updated.push(asset.ticker);
+          const assetRef = adminDb.collection('assets').doc((asset as any).id);
+          await assetRef.update({
+            currentPrice: quote.price,
+            lastPriceUpdate: new Date(),
+            updatedAt: new Date(),
+          });
+          updated.push((asset as any).ticker);
         } catch (error) {
-          console.error(`Failed to update ${asset.ticker}:`, error);
-          failed.push(asset.ticker);
+          console.error(`Failed to update ${(asset as any).ticker}:`, error);
+          failed.push((asset as any).ticker);
         }
       } else {
-        failed.push(asset.ticker);
+        failed.push((asset as any).ticker);
       }
     }
 
@@ -71,7 +94,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error updating prices:', error);
     return NextResponse.json(
-      { error: 'Failed to update prices' },
+      { error: 'Failed to update prices', details: (error as Error).message },
       { status: 500 }
     );
   }
