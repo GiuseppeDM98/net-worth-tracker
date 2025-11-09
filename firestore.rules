@@ -1,0 +1,75 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function: verifica se l'utente è autenticato
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function: verifica se l'utente è il proprietario
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Helper function: verifica se i dati hanno il campo userId corretto
+    function hasValidUserId() {
+      return request.resource.data.userId == request.auth.uid;
+    }
+
+    // Collezione users - ogni utente può leggere e scrivere solo i propri dati
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId);
+    }
+
+    // Collezione assets - ogni utente può gestire solo i propri asset
+    match /assets/{assetId} {
+      // Lettura: solo se è il proprietario
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+
+      // Creazione: solo se autenticato e il userId corrisponde
+      allow create: if isAuthenticated() && hasValidUserId();
+
+      // Aggiornamento: solo se è il proprietario e non cambia il userId
+      allow update: if isOwner(resource.data.userId) &&
+                       request.resource.data.userId == resource.data.userId;
+
+      // Cancellazione: solo se è il proprietario
+      allow delete: if isOwner(resource.data.userId);
+    }
+
+    // Collezione monthly-snapshots - snapshot mensili del patrimonio
+    match /monthly-snapshots/{snapshotId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && hasValidUserId();
+      allow update: if isOwner(resource.data.userId) &&
+                       request.resource.data.userId == resource.data.userId;
+      allow delete: if isOwner(resource.data.userId);
+    }
+
+    // Collezione price-history - storico prezzi (può essere condiviso tra utenti)
+    match /price-history/{priceId} {
+      // Lettura pubblica per tutti gli utenti autenticati
+      allow read: if isAuthenticated();
+
+      // Solo il sistema (admin SDK) può scrivere
+      allow write: if false;
+    }
+
+    // Collezione portfolios - se hai portafogli separati
+    match /portfolios/{portfolioId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && hasValidUserId();
+      allow update: if isOwner(resource.data.userId) &&
+                       request.resource.data.userId == resource.data.userId;
+      allow delete: if isOwner(resource.data.userId);
+    }
+
+    // Blocca tutto il resto per sicurezza
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
