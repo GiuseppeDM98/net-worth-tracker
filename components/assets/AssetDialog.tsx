@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
 import { Asset, AssetFormData, AssetType, AssetClass } from '@/types/assets';
 import { createAsset, updateAsset } from '@/lib/services/assetService';
+import { getQuote, shouldUpdatePrice } from '@/lib/services/yahooFinanceService';
 import {
   Dialog,
   DialogContent,
@@ -34,8 +35,6 @@ const assetSchema = z.object({
   exchange: z.string().optional(),
   currency: z.string().default('EUR'),
   quantity: z.number().positive('Quantità deve essere positiva'),
-  averageCost: z.number().optional(),
-  currentPrice: z.number().positive('Prezzo deve essere positivo'),
 });
 
 type AssetFormValues = z.infer<typeof assetSchema>;
@@ -78,6 +77,7 @@ const subCategories = [
 
 export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
   const { user } = useAuth();
+  const [fetchingPrice, setFetchingPrice] = useState(false);
   const {
     register,
     handleSubmit,
@@ -90,12 +90,12 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
     defaultValues: {
       currency: 'EUR',
       quantity: 0,
-      currentPrice: 0,
     },
   });
 
   const selectedType = watch('type');
   const selectedAssetClass = watch('assetClass');
+  const selectedSubCategory = watch('subCategory');
 
   useEffect(() => {
     if (asset) {
@@ -108,8 +108,6 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         exchange: asset.exchange || '',
         currency: asset.currency,
         quantity: asset.quantity,
-        averageCost: asset.averageCost || undefined,
-        currentPrice: asset.currentPrice,
       });
     } else {
       reset({
@@ -121,8 +119,6 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         exchange: '',
         currency: 'EUR',
         quantity: 0,
-        averageCost: undefined,
-        currentPrice: 0,
       });
     }
   }, [asset, reset]);
@@ -131,6 +127,27 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
     if (!user) return;
 
     try {
+      setFetchingPrice(true);
+
+      // Determine current price
+      let currentPrice = 1; // Default for cash and fixed-price assets
+
+      // Check if we need to fetch price from Yahoo Finance
+      if (shouldUpdatePrice(data.type, data.subCategory)) {
+        const quote = await getQuote(data.ticker);
+
+        if (quote.price && quote.price > 0) {
+          currentPrice = quote.price;
+          toast.success(`Prezzo recuperato: ${currentPrice.toFixed(2)} ${quote.currency}`);
+        } else {
+          toast.error(
+            `Impossibile recuperare il prezzo per ${data.ticker}. Inserisci manualmente il prezzo nella tabella.`
+          );
+          // Use a placeholder price of 0 to indicate it needs manual update
+          currentPrice = 0;
+        }
+      }
+
       const formData: AssetFormData = {
         ticker: data.ticker,
         name: data.name,
@@ -140,11 +157,14 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         exchange: data.exchange || undefined,
         currency: data.currency,
         quantity: data.quantity,
-        averageCost: data.averageCost || undefined,
-        currentPrice: data.currentPrice,
+        currentPrice,
       };
 
       if (asset) {
+        // When editing, keep the existing price if we're not fetching a new one
+        if (!shouldUpdatePrice(data.type, data.subCategory)) {
+          formData.currentPrice = asset.currentPrice;
+        }
         await updateAsset(asset.id, formData);
         toast.success('Asset aggiornato con successo');
       } else {
@@ -156,6 +176,8 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
     } catch (error) {
       console.error('Error saving asset:', error);
       toast.error('Errore nel salvataggio dell\'asset');
+    } finally {
+      setFetchingPrice(false);
     }
   };
 
@@ -302,39 +324,21 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="averageCost">Costo Medio</Label>
-              <Input
-                id="averageCost"
-                type="number"
-                step="0.01"
-                {...register('averageCost', { valueAsNumber: true })}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="currentPrice">Prezzo Corrente *</Label>
-              <Input
-                id="currentPrice"
-                type="number"
-                step="0.01"
-                {...register('currentPrice', { valueAsNumber: true })}
-              />
-              {errors.currentPrice && (
-                <p className="text-sm text-red-500">
-                  {errors.currentPrice.message}
-                </p>
-              )}
-            </div>
+          <div className="rounded-lg bg-blue-50 p-3">
+            <p className="text-sm text-blue-800">
+              <strong>Nota:</strong> Il prezzo corrente verrà recuperato automaticamente da Yahoo Finance.
+              {selectedType === 'cash' && ' Per asset di tipo liquidità, il prezzo sarà impostato a 1.'}
+              {selectedType === 'realestate' && ' Per immobili, il prezzo deve essere aggiornato manualmente.'}
+              {selectedSubCategory === 'Private Equity' && ' Per Private Equity, il prezzo deve essere aggiornato manualmente.'}
+            </p>
           </div>
 
           <div className="flex justify-end gap-2 pt-4">
             <Button type="button" variant="outline" onClick={onClose}>
               Annulla
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Salvataggio...' : asset ? 'Aggiorna' : 'Crea'}
+            <Button type="submit" disabled={isSubmitting || fetchingPrice}>
+              {fetchingPrice ? 'Recupero prezzo...' : isSubmitting ? 'Salvataggio...' : asset ? 'Aggiorna' : 'Crea'}
             </Button>
           </div>
         </form>
