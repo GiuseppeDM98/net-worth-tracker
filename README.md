@@ -36,10 +36,10 @@ The app prioritizes:
   - Asset name
   - Asset type and class categorization
   - Quantity held
-  - Average cost (optional, for performance tracking)
-  - Current market price
+  - Current market price (automatically fetched from Yahoo Finance)
   - Last price update timestamp
   - Currency (default EUR, multi-currency support)
+- **Automatic Price Fetching**: Prices are automatically retrieved from Yahoo Finance when adding new assets (no manual entry required)
 
 ### 2. Automated Price Updates
 - **Yahoo Finance Integration**: Real-time price fetching for publicly traded securities
@@ -92,14 +92,16 @@ Summary metrics displayed prominently:
 - **Asset Count**: Total number of holdings
 - **Month-over-Month Change**: Growth/decline from previous month (when available)
 
-### 6. Historical Tracking (Future Enhancement)
+### 6. Historical Tracking
 Monthly snapshot system for long-term analysis:
 - **Monthly Snapshots**: Automatic capture of portfolio state at month-end
-- **Net Worth Timeline**: Line chart showing total value over time
-- **Liquid vs Illiquid**: Track separately for liquidity planning
-- **Asset Class Evolution**: Stacked area chart showing composition changes
-- **Year-over-Year Growth**: Annual comparison metrics
-- **Export Capability**: Download historical data as CSV/Excel
+- **Net Worth Timeline**: Line chart showing total value over time (Total & Liquid)
+- **Asset Distribution**: Pie chart showing current portfolio composition
+- **Current vs Target Visualization**: Visual comparison of asset class allocation against targets
+- **Recent Snapshots Grid**: Display of last 6 monthly snapshots
+- **Export Capability**: Download historical data as CSV
+
+**Note**: Currently implemented with basic historical tracking. Additional features (stacked area charts, year-over-year growth) can be added as needed.
 
 ### 7. FIRE Progress Tracker (Future Enhancement)
 Financial Independence planning tools:
@@ -117,7 +119,7 @@ Financial Independence planning tools:
 - **Backend**: Next.js API Routes (serverless functions)
 - **Database**: Firebase Firestore (NoSQL document database)
 - **Authentication**: Firebase Authentication (email/password + OAuth)
-- **Price Data**: yahoo-finance2 (npm package)
+- **Price Data**: yahoo-finance2 v3+ (npm package with YahooFinance instance API)
 - **Charts**: Recharts (React charting library)
 - **Deployment**: Vercel (automatic deployments from Git)
 - **Form Management**: react-hook-form + zod (validation)
@@ -149,10 +151,9 @@ assets/
       - type: "stock" | "etf" | "bond" | "crypto" | "commodity" | "cash" | "realestate"
       - assetClass: "equity" | "bonds" | "crypto" | "realestate" | "cash" | "commodity"
       - subCategory: string (optional)
-      - exchange: string
+      - exchange: string (optional)
       - currency: string
       - quantity: number
-      - averageCost: number (optional)
       - currentPrice: number
       - lastPriceUpdate: timestamp
       - createdAt: timestamp
@@ -236,17 +237,25 @@ monthlySnapshots/
 
 #### `/api/prices/update`
 - **Method**: POST
-- **Auth**: Required (Firebase token)
-- **Body**: `{ assetIds?: string[] }` (optional, defaults to all user assets)
-- **Response**: `{ updated: number, failed: string[], prices: Map<string, number> }`
+- **Auth**: Required (userId in request body)
+- **Body**: `{ userId: string, assetIds?: string[] }` (assetIds optional, defaults to all user assets)
+- **Response**: `{ updated: number, failed: string[], message: string }`
+- **Implementation**: Uses Firebase Admin SDK for server-side operations
 - **Logic**:
-  1. Verify user authentication
-  2. Fetch assets from Firestore (filter by assetIds if provided)
-  3. Extract unique tickers
-  4. Call `yahooFinanceService.getMultipleQuotes(tickers)`
-  5. Update each asset's `currentPrice` and `lastPriceUpdate`
-  6. Save to `priceHistory` collection
-  7. Return results with any failures
+  1. Verify userId provided
+  2. Fetch assets from Firestore using Admin SDK
+  3. Filter assets that need price updates (excludes cash, real estate, private equity)
+  4. Extract unique tickers
+  5. Call `yahooFinanceService.getMultipleQuotes(tickers)` (uses YahooFinance v3+ instance)
+  6. Update each asset's `currentPrice` and `lastPriceUpdate` using Admin SDK
+  7. Return results with count of updated/failed tickers
+
+#### `/api/prices/quote`
+- **Method**: GET
+- **Query Params**: `ticker` (required)
+- **Response**: `{ ticker: string, price: number | null, currency: string, error?: string }`
+- **Implementation**: Server-side only (yahoo-finance2 requires Node.js environment)
+- **Logic**: Fetches single quote from Yahoo Finance and returns price data
 
 #### `/api/portfolio/calculate` (Future)
 - **Method**: GET
@@ -272,17 +281,19 @@ app/
 │   ├── page.tsx                # Overview (charts, summary)
 │   ├── layout.tsx              # Sidebar navigation
 │   ├── assets/
-│   │   └── page.tsx            # Asset table, CRUD operations
+│   │   └── page.tsx            # Asset table, CRUD operations ✅
 │   ├── allocation/
-│   │   ├── page.tsx            # Current vs target comparison
-│   │   └── settings/page.tsx  # Edit allocation targets
-│   ├── history/page.tsx        # Historical charts (future)
+│   │   └── page.tsx            # Current vs target comparison ✅
+│   ├── history/page.tsx        # Historical charts ✅
+│   ├── settings/page.tsx       # Edit allocation targets ✅
 │   └── fire/page.tsx           # FIRE tracker (future)
 └── api/
-    ├── prices/update/route.ts
+    ├── prices/
+    │   ├── update/route.ts     # Batch price update ✅
+    │   └── quote/route.ts      # Single quote fetch ✅
     └── portfolio/
-        ├── calculate/route.ts
-        └── snapshot/route.ts
+        ├── calculate/route.ts  # (future)
+        └── snapshot/route.ts   # (future)
 ```
 
 #### Component Hierarchy
@@ -307,41 +318,57 @@ Layout
 
 #### Reusable Components
 - `SummaryCard`: Metric display with optional trend indicator
-- `AssetTable`: Sortable table with actions (edit/delete)
-- `AssetDialog`: Form for adding/editing assets
-- `AllocationTable`: Display allocation with differences
-- `AssetClassPie`: Pie chart for asset class distribution
-- `AssetDistributionPie`: Pie chart for individual assets
-- `UpdatePricesButton`: Trigger manual price updates
+- `AssetTable`: Sortable table with actions (edit/delete) ✅
+- `AssetDialog`: Form for adding/editing assets with automatic price fetching ✅
+- `AllocationTable`: Display allocation with differences ✅
+- `AssetClassPie`: Pie chart for asset class distribution (Recharts) ✅
+- `AssetDistributionPie`: Pie chart for individual assets (Recharts) ✅
+- `UpdatePricesButton`: Trigger manual price updates ✅
 - `LoadingSpinner`: Generic loading indicator
 - `LoadingSkeleton`: Skeleton screens for tables/cards
 
 ### Service Layer
 
-#### `assetService.ts`
-- `getAllAssets(userId)`: Fetch all user assets
+#### `assetService.ts` ✅
+- `getAllAssets(userId)`: Fetch all user assets (Client SDK)
 - `getAssetById(assetId)`: Fetch single asset
-- `createAsset(userId, assetData)`: Add new asset
+- `createAsset(userId, assetData)`: Add new asset with automatic price
 - `updateAsset(assetId, updates)`: Modify existing asset
 - `deleteAsset(assetId)`: Remove asset
 - `updateAssetPrice(assetId, price)`: Update price and timestamp
+- `calculateAssetValue(asset)`: Calculate total value of asset
+- `calculateTotalValue(assets)`: Calculate portfolio total value
+- `calculateLiquidNetWorth(assets)`: Exclude illiquid assets
 
-#### `yahooFinanceService.ts`
+#### `yahooFinanceService.ts` ✅
+- **Implementation**: Uses `YahooFinance` instance (v3+ API)
 - `getQuote(ticker)`: Fetch single ticker price
-- `getMultipleQuotes(tickers)`: Batch fetch (more efficient)
+- `getMultipleQuotes(tickers)`: Batch fetch (more efficient, parallel execution)
 - `validateTicker(ticker)`: Check if ticker exists
 - `searchTicker(query)`: Search for tickers by name/symbol
+- `shouldUpdatePrice(type, subCategory)`: Determine if asset needs price updates
 
-#### `assetAllocationService.ts`
-- `getTargets(userId)`: Fetch user's allocation targets
+#### `assetAllocationService.ts` ✅
+- `getTargets(userId)`: Fetch user's allocation targets from Firestore
 - `setTargets(userId, targets)`: Save allocation targets
-- `calculateCurrentAllocation(assets)`: Compute current state
-- `compareAllocations(current, targets)`: Generate rebalancing actions
+- `calculateCurrentAllocation(assets)`: Compute current allocation by asset class and sub-category
+- `compareAllocations(current, targets)`: Generate rebalancing actions (COMPRA/VENDI/OK)
+- `getDefaultTargets()`: Return default allocation template
 
-#### `chartService.ts`
-- `prepareAssetDistributionData(assets)`: Format for pie chart
-- `prepareAssetClassDistributionData(assets)`: Aggregate by class
-- `calculatePercentages(assets)`: Convert values to percentages
+#### `snapshotService.ts` ✅
+- `createSnapshot(userId, assets, year?, month?)`: Create monthly portfolio snapshot
+- `getUserSnapshots(userId)`: Fetch all snapshots for a user
+- `getSnapshotsInRange(userId, startYear, startMonth, endYear, endMonth)`: Fetch snapshots in date range
+- `getLatestSnapshot(userId)`: Get most recent snapshot
+- `calculateMonthlyChange(currentNetWorth, previousSnapshot)`: Calculate month-over-month change
+
+#### `chartService.ts` ✅
+- `prepareAssetDistributionData(assets)`: Format for asset pie chart (top 10 + others)
+- `prepareAssetClassDistributionData(assets)`: Aggregate by class for pie chart
+- `prepareNetWorthHistoryData(snapshots)`: Format historical data for line charts
+- `formatCurrency(value)`: Italian currency formatting (€1.234,56)
+- `formatPercentage(value, decimals)`: Italian percentage formatting (12,34%)
+- `formatNumber(value, decimals)`: Italian number formatting
 
 ## User Workflow Examples
 
@@ -366,22 +393,25 @@ Layout
 8. Return to **"Allocation"** to verify closer to targets
 
 ### Adding a New Investment
-1. User purchases new ETF: ARKK (high-risk equity)
+1. User purchases new ETF: VWCE (all-world equity)
 2. Navigate to **"Assets"** page
 3. Click **"Add Asset"** button
 4. Fill form:
-   - Ticker: `ARKK` (US exchange, no suffix needed)
-   - Name: ARK Innovation ETF
+   - Ticker: `VWCE.DE` (XETRA exchange)
+   - Name: Vanguard FTSE All-World
    - Type: ETF
    - Asset Class: Equity
-   - Sub-category: High Risk
-   - Exchange: NYSE
-   - Currency: USD (will be converted to EUR)
-   - Quantity: 10
-   - Average Cost: €45.00
-5. Click **"Save"** → Asset appears in table
-6. Click **"Update Prices"** → Current price fetched from Yahoo Finance
-7. Total value calculated: 10 × current_price
+   - Sub-category: All-World
+   - Exchange: XETRA (optional)
+   - Currency: EUR
+   - Quantity: 15
+5. Click **"Crea"** → System automatically fetches current price from Yahoo Finance
+6. Success notification shows: "Prezzo recuperato: €108.50 EUR"
+7. Asset appears in table with:
+   - Quantity: 15
+   - Current Price: €108.50
+   - Total Value: €1,627.50
+   - Last Update: Current timestamp
 
 ### Rebalancing Portfolio
 1. User notices **Allocation** page shows significant deviations
@@ -592,31 +622,42 @@ Create `vercel.json`:
 - Add in Vercel dashboard
 - Configure DNS (automatic with Vercel nameservers)
 
-## Future Roadmap
+## Implementation Status & Roadmap
 
-### Phase 2: Historical Analysis
-- [ ] Monthly snapshot creation (automated)
-- [ ] Net worth timeline chart
-- [ ] Liquid vs illiquid split chart
+### Phase 1: Core Features ✅ COMPLETED
+- [x] Asset management (CRUD operations)
+- [x] Automatic price fetching from Yahoo Finance v3+
+- [x] Asset allocation tracking and comparison
+- [x] Settings page for allocation targets
+- [x] Basic historical tracking with snapshots
+- [x] Net worth timeline chart
+- [x] Asset distribution visualization
+- [x] Current vs target allocation comparison
+- [x] CSV export functionality
+
+### Phase 2: Enhanced Historical Analysis
+- [ ] Automated monthly snapshot creation (Cron job)
 - [ ] Year-over-year growth metrics
 - [ ] Asset class evolution chart (stacked area)
+- [ ] Performance tracking over time
+- [ ] Advanced filtering and date range selection
 
-### Phase 3: FIRE Tracking
+### Phase 3: FIRE Tracking (Future)
 - [ ] FIRE target configuration
 - [ ] Years to FIRE calculator
 - [ ] Withdrawal rate calculator (4% rule)
 - [ ] Scenario modeling (different savings rates)
 - [ ] Progress visualization
 
-### Phase 4: Advanced Features
+### Phase 4: Advanced Features (Future)
 - [ ] CSV/Excel import for bulk asset additions
 - [ ] PDF export of portfolio reports
 - [ ] Email notifications (monthly summary)
-- [ ] Multi-currency support (full)
+- [ ] Multi-currency support (full conversion)
 - [ ] Budget tracking integration
 - [ ] Tax reporting (capital gains, dividends)
 
-### Phase 5: Portfolio Analysis
+### Phase 5: Portfolio Analysis (Future)
 - [ ] Performance metrics (ROI, IRR)
 - [ ] Risk metrics (Sharpe ratio, volatility)
 - [ ] Correlation analysis
@@ -625,11 +666,32 @@ Create `vercel.json`:
 
 ## Support & Maintenance
 
-### Common Issues
-1. **Ticker not found**: Verify format (US tickers no suffix, EU needs .DE/.L/.MI)
-2. **Prices not updating**: Check Yahoo Finance API status, verify network
-3. **Allocation doesn't sum to 100%**: Rounding errors, use 2 decimal places max
-4. **Charts not loading**: Check Recharts version, verify data format
+### Common Issues & Solutions
+
+1. **Ticker not found on Yahoo Finance**
+   - **Solution**: Verify ticker format. US stocks: `AAPL`, EU stocks need exchange suffix: `VWCE.DE` (XETRA), `BMW.DE`, `NESN.SW` (Swiss), etc.
+   - The system will show error message and allow manual price entry later
+
+2. **Error: "Module not found: Can't resolve 'child_process'"**
+   - **Cause**: yahoo-finance2 library imported in client component
+   - **Solution**: Already fixed - uses `/api/prices/quote` server route instead
+
+3. **Error: "Call const yahooFinance = new YahooFinance() first"**
+   - **Cause**: yahoo-finance2 v3+ requires YahooFinance instance
+   - **Solution**: Already fixed - uses `new YahooFinance()` singleton instance
+
+4. **500 Error when updating prices**
+   - **Cause**: Missing Firebase Admin SDK credentials or using Client SDK in API routes
+   - **Solution**: Verify `.env.local` has `FIREBASE_ADMIN_*` variables configured correctly
+
+5. **Allocation doesn't sum to 100%**
+   - **Issue**: Rounding errors or incorrect target percentages
+   - **Solution**: Settings page validates totals and shows error if not exactly 100%
+
+6. **Charts not loading**
+   - **Check**: Recharts is installed (`npm list recharts`)
+   - **Check**: Data format matches expected structure
+   - **Check**: Browser console for specific errors
 
 ### Debugging
 - **Firebase Console**: View raw database documents
@@ -653,6 +715,28 @@ Private project - All rights reserved
 
 ---
 
-**Version**: 1.0.0 (MVP)  
-**Last Updated**: November 2025  
-**Status**: In Development
+## Technical Notes
+
+### Yahoo Finance v3+ Migration
+This project uses `yahoo-finance2` v3.x which requires creating a YahooFinance instance:
+```typescript
+import { YahooFinance } from 'yahoo-finance2';
+const yahooFinance = new YahooFinance();
+```
+
+### Firebase Architecture
+- **Client SDK** (`firebase/firestore`): Used in React components for real-time data binding
+- **Admin SDK** (`firebase-admin/firestore`): Used in API routes for server-side operations
+- API routes MUST use Admin SDK to avoid authentication and permission issues
+
+### API Route Pattern
+All price fetching goes through server-side API routes to avoid importing Node.js modules in client components:
+```
+Client Component → fetch('/api/prices/quote') → Server Route → Yahoo Finance API
+```
+
+---
+
+**Version**: 1.0.0 (MVP - Core Features Complete)
+**Last Updated**: November 2025
+**Status**: ✅ Phase 1 Complete - Ready for Use
