@@ -1,4 +1,4 @@
-import { YahooFinance } from 'yahoo-finance2';
+import YahooFinance from 'yahoo-finance2';
 
 // Create YahooFinance instance (required in v3+)
 const yahooFinance = new YahooFinance();
