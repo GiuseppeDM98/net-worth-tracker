@@ -7,7 +7,6 @@ import * as z from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
 import { Asset, AssetFormData, AssetType, AssetClass } from '@/types/assets';
 import { createAsset, updateAsset } from '@/lib/services/assetService';
-import { getQuote, shouldUpdatePrice } from '@/lib/services/yahooFinanceService';
 import {
   Dialog,
   DialogContent,
@@ -25,6 +24,23 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
+
+/**
+ * Helper to check if asset type requires price updates
+ */
+function shouldUpdatePrice(assetType: string, subCategory?: string): boolean {
+  // Real estate and private equity have fixed valuations
+  if (assetType === 'realestate' || subCategory === 'Private Equity') {
+    return false;
+  }
+
+  // Cash always has price = 1
+  if (assetType === 'cash') {
+    return false;
+  }
+
+  return true;
+}
 
 const assetSchema = z.object({
   ticker: z.string().min(1, 'Ticker è obbligatorio'),
@@ -134,16 +150,29 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
 
       // Check if we need to fetch price from Yahoo Finance
       if (shouldUpdatePrice(data.type, data.subCategory)) {
-        const quote = await getQuote(data.ticker);
-
-        if (quote.price && quote.price > 0) {
-          currentPrice = quote.price;
-          toast.success(`Prezzo recuperato: ${currentPrice.toFixed(2)} ${quote.currency}`);
-        } else {
-          toast.error(
-            `Impossibile recuperare il prezzo per ${data.ticker}. Inserisci manualmente il prezzo nella tabella.`
+        try {
+          const response = await fetch(
+            `/api/prices/quote?ticker=${encodeURIComponent(data.ticker)}`
           );
-          // Use a placeholder price of 0 to indicate it needs manual update
+          const quote = await response.json();
+
+          if (quote.price && quote.price > 0) {
+            currentPrice = quote.price;
+            toast.success(
+              `Prezzo recuperato: ${currentPrice.toFixed(2)} ${quote.currency}`
+            );
+          } else {
+            toast.error(
+              `Impossibile recuperare il prezzo per ${data.ticker}. Inserisci manualmente il prezzo nella tabella.`
+            );
+            // Use a placeholder price of 0 to indicate it needs manual update
+            currentPrice = 0;
+          }
+        } catch (error) {
+          console.error('Error fetching quote:', error);
+          toast.error(
+            `Errore nel recupero del prezzo per ${data.ticker}. Inserisci manualmente il prezzo nella tabella.`
+          );
           currentPrice = 0;
         }
       }
@@ -175,7 +204,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
       onClose();
     } catch (error) {
       console.error('Error saving asset:', error);
-      toast.error('Errore nel salvataggio dell\'asset');
+      toast.error("Errore nel salvataggio dell'asset");
     } finally {
       setFetchingPrice(false);
     }
