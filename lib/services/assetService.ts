@@ -17,6 +17,20 @@ import { Asset, AssetFormData } from '@/types/assets';
 const ASSETS_COLLECTION = 'assets';
 
 /**
+ * Remove undefined fields from an object to prevent Firebase errors
+ */
+function removeUndefinedFields<T extends Record<string, any>>(obj: T): Partial<T> {
+  const cleaned: Partial<T> = {};
+  Object.keys(obj).forEach((key) => {
+    const value = obj[key];
+    if (value !== undefined) {
+      cleaned[key as keyof T] = value;
+    }
+  });
+  return cleaned;
+}
+
+/**
  * Get all assets for a specific user
  */
 export async function getAllAssets(userId: string): Promise<Asset[]> {
@@ -79,13 +93,16 @@ export async function createAsset(
     const now = Timestamp.now();
     const assetsRef = collection(db, ASSETS_COLLECTION);
 
-    const docRef = await addDoc(assetsRef, {
+    // Remove undefined fields to prevent Firebase errors
+    const cleanedData = removeUndefinedFields({
       ...assetData,
       userId,
       lastPriceUpdate: now,
       createdAt: now,
       updatedAt: now,
     });
+
+    const docRef = await addDoc(assetsRef, cleanedData);
 
     return docRef.id;
   } catch (error) {
@@ -104,10 +121,13 @@ export async function updateAsset(
   try {
     const assetRef = doc(db, ASSETS_COLLECTION, assetId);
 
-    await updateDoc(assetRef, {
+    // Remove undefined fields to prevent Firebase errors
+    const cleanedUpdates = removeUndefinedFields({
       ...updates,
       updatedAt: Timestamp.now(),
     });
+
+    await updateDoc(assetRef, cleanedUpdates);
   } catch (error) {
     console.error('Error updating asset:', error);
     throw new Error('Failed to update asset');
