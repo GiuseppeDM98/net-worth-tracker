@@ -42,6 +42,8 @@ export interface SubCategoryConfig {
 export interface AssetAllocationTarget {
   [assetClass: string]: {
     targetPercentage: number;
+    useFixedAmount?: boolean;
+    fixedAmount?: number;
     subCategoryConfig?: SubCategoryConfig;
     subTargets?: {
       [subCategory: string]: number;

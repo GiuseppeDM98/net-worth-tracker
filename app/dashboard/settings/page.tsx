@@ -61,6 +61,8 @@ export default function SettingsPage() {
   const [userAge, setUserAge] = useState<number | undefined>(undefined);
   const [riskFreeRate, setRiskFreeRate] = useState<number | undefined>(undefined);
   const [autoCalculate, setAutoCalculate] = useState(false);
+  const [cashUseFixedAmount, setCashUseFixedAmount] = useState(false);
+  const [cashFixedAmount, setCashFixedAmount] = useState<number>(0);
   const [assetClassStates, setAssetClassStates] = useState<
     Record<AssetClass, AssetClassState>
   >({} as Record<AssetClass, AssetClassState>);
@@ -84,11 +86,18 @@ export default function SettingsPage() {
       );
 
       // Calculate bonds percentage: 100 - sum of all other asset classes
+      // (excluding cash if using fixed amount)
       const otherAssetClasses = assetClasses.filter(
         (ac) => ac !== 'equity' && ac !== 'bonds'
       );
       const otherTotal = otherAssetClasses.reduce(
-        (sum, ac) => sum + (assetClassStates[ac]?.targetPercentage || 0),
+        (sum, ac) => {
+          // Exclude cash from percentage total if using fixed amount
+          if (ac === 'cash' && cashUseFixedAmount) {
+            return sum;
+          }
+          return sum + (assetClassStates[ac]?.targetPercentage || 0);
+        },
         0
       );
       const bondsPercentage = roundToTwoDecimals(
@@ -126,7 +135,13 @@ export default function SettingsPage() {
         (ac) => ac !== 'equity' && ac !== 'bonds'
       );
       const otherTotal = otherAssetClasses.reduce(
-        (sum, ac) => sum + (assetClassStates[ac]?.targetPercentage || 0),
+        (sum, ac) => {
+          // Exclude cash from percentage total if using fixed amount
+          if (ac === 'cash' && cashUseFixedAmount) {
+            return sum;
+          }
+          return sum + (assetClassStates[ac]?.targetPercentage || 0);
+        },
         0
       );
       const bondsPercentage = roundToTwoDecimals(
@@ -149,6 +164,7 @@ export default function SettingsPage() {
     assetClassStates.realestate?.targetPercentage,
     assetClassStates.cash?.targetPercentage,
     assetClassStates.commodity?.targetPercentage,
+    cashUseFixedAmount,
   ]);
 
   const loadTargets = async () => {
@@ -167,6 +183,13 @@ export default function SettingsPage() {
           settingsData.userAge !== undefined &&
           settingsData.riskFreeRate !== undefined
         );
+      }
+
+      // Load cash fixed amount settings if available
+      const cashTargetData = targets['cash'];
+      if (cashTargetData) {
+        setCashUseFixedAmount(cashTargetData.useFixedAmount || false);
+        setCashFixedAmount(cashTargetData.fixedAmount || 0);
       }
 
       const states: Record<AssetClass, AssetClassState> = {} as Record<
@@ -204,8 +227,13 @@ export default function SettingsPage() {
 
   const calculateTotal = () => {
     return assetClasses.reduce(
-      (sum, assetClass) =>
-        sum + (assetClassStates[assetClass]?.targetPercentage || 0),
+      (sum, assetClass) => {
+        // Exclude cash from percentage total if using fixed amount
+        if (assetClass === 'cash' && cashUseFixedAmount) {
+          return sum;
+        }
+        return sum + (assetClassStates[assetClass]?.targetPercentage || 0);
+      },
       0
     );
   };
@@ -276,6 +304,10 @@ export default function SettingsPage() {
         const state = assetClassStates[assetClass];
         targets[assetClass] = {
           targetPercentage: state.targetPercentage,
+          ...(assetClass === 'cash' && {
+            useFixedAmount: cashUseFixedAmount,
+            fixedAmount: cashFixedAmount,
+          }),
           subCategoryConfig: {
             enabled: state.subCategoryEnabled,
             // Sync categories array with actual subcategory names from subTargets
@@ -337,6 +369,12 @@ export default function SettingsPage() {
     });
 
     setAssetClassStates(states);
+
+    // Reset cash fixed amount settings to defaults
+    const cashDefaults = defaults['cash'];
+    setCashUseFixedAmount(cashDefaults?.useFixedAmount || false);
+    setCashFixedAmount(cashDefaults?.fixedAmount || 0);
+
     toast.info('Target ripristinati ai valori predefiniti');
   };
 
@@ -553,6 +591,7 @@ export default function SettingsPage() {
               }`}
             >
               Totale: {formatPercentage(total)}
+              {cashUseFixedAmount && ' (escl. liquidità fissa)'}
               {!isValidTotal && ' (deve essere 100%)'}
             </div>
           </div>
@@ -561,6 +600,7 @@ export default function SettingsPage() {
           <div className="grid gap-6 md:grid-cols-2">
             {assetClasses.map((assetClass) => {
               const isAutoCalculated = autoCalculate && (assetClass === 'equity' || assetClass === 'bonds');
+              const isCash = assetClass === 'cash';
               return (
                 <div key={assetClass} className="space-y-2">
                   <Label htmlFor={assetClass}>
@@ -569,23 +609,45 @@ export default function SettingsPage() {
                       <span className="ml-2 text-xs text-blue-600">(Calcolato automaticamente)</span>
                     )}
                   </Label>
+                  {isCash && (
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="cashFixedToggle"
+                        checked={cashUseFixedAmount}
+                        onCheckedChange={setCashUseFixedAmount}
+                      />
+                      <Label htmlFor="cashFixedToggle" className="text-sm">
+                        Valore fisso in €
+                      </Label>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2">
                     <Input
                       id={assetClass}
                       type="number"
                       step="0.01"
                       min="0"
-                      max="100"
-                      value={assetClassStates[assetClass]?.targetPercentage || 0}
-                      onChange={(e) =>
-                        updateAssetClassState(assetClass, {
-                          targetPercentage: roundToTwoDecimals(parseFloat(e.target.value) || 0),
-                        })
+                      max={isCash && cashUseFixedAmount ? undefined : "100"}
+                      value={
+                        isCash && cashUseFixedAmount
+                          ? cashFixedAmount
+                          : assetClassStates[assetClass]?.targetPercentage || 0
                       }
+                      onChange={(e) => {
+                        if (isCash && cashUseFixedAmount) {
+                          setCashFixedAmount(parseFloat(e.target.value) || 0);
+                        } else {
+                          updateAssetClassState(assetClass, {
+                            targetPercentage: roundToTwoDecimals(parseFloat(e.target.value) || 0),
+                          });
+                        }
+                      }}
                       disabled={isAutoCalculated}
                       className={isAutoCalculated ? 'bg-gray-100' : ''}
                     />
-                    <span className="text-sm text-gray-600">%</span>
+                    <span className="text-sm text-gray-600">
+                      {isCash && cashUseFixedAmount ? '€' : '%'}
+                    </span>
                   </div>
                 </div>
               );
@@ -736,6 +798,11 @@ export default function SettingsPage() {
           <li>
             • Il totale delle allocazioni delle asset class deve essere
             esattamente 100%
+          </li>
+          <li>
+            • La liquidità può essere impostata come valore fisso in euro. In questo caso,
+            le percentuali delle altre asset class si applicheranno al patrimonio rimanente
+            (totale - liquidità fissa)
           </li>
           <li>
             • Per ogni asset class con sotto-categorie abilitate, il totale
