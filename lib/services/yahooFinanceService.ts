@@ -99,9 +99,9 @@ export async function searchTicker(
     return results.quotes
       .filter((quote) => quote.symbol && quote.shortname)
       .map((quote) => ({
-        symbol: quote.symbol || '',
-        name: quote.shortname || quote.longname || '',
-        exchange: quote.exchange || '',
+        symbol: (quote.symbol || '') as string,
+        name: (quote.shortname || quote.longname || '') as string,
+        exchange: (quote.exchange || '') as string,
       }))
       .slice(0, 10); // Limit to top 10 results
   } catch (error) {

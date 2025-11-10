@@ -216,8 +216,8 @@ export default function HistoryPage() {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, percentage }) =>
-                      percentage > 5 ? `${name} ${formatPercentage(percentage)}` : ''
+                    label={({ name, percent }: any) =>
+                      percent > 5 ? `${name} ${formatPercentage(percent)}` : ''
                     }
                     outerRadius={80}
                     fill="#8884d8"
