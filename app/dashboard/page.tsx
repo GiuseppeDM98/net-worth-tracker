@@ -89,6 +89,11 @@ export default function DashboardPage() {
       setCreatingSnapshot(true);
       setShowConfirmDialog(false);
 
+      // Show loading toast
+      toast.loading('Aggiornamento prezzi e creazione snapshot...', {
+        id: 'snapshot-creation',
+      });
+
       const response = await fetch('/api/portfolio/snapshot', {
         method: 'POST',
         headers: {
@@ -101,6 +106,9 @@ export default function DashboardPage() {
 
       const result = await response.json();
 
+      // Dismiss loading toast
+      toast.dismiss('snapshot-creation');
+
       if (result.success) {
         toast.success(result.message);
       } else {
@@ -108,6 +116,7 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.error('Error creating snapshot:', error);
+      toast.dismiss('snapshot-creation');
       toast.error('Errore nella creazione dello snapshot');
     } finally {
       setCreatingSnapshot(false);

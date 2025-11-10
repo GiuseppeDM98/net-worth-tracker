@@ -8,6 +8,7 @@ import {
   calculateLiquidNetWorth,
 } from '@/lib/services/assetService';
 import { calculateCurrentAllocation } from '@/lib/services/assetAllocationService';
+import { updateUserAssetPrices } from '@/lib/helpers/priceUpdater';
 
 const SNAPSHOTS_COLLECTION = 'monthly-snapshots';
 
@@ -30,6 +31,16 @@ export async function POST(request: NextRequest) {
         { error: 'User ID is required' },
         { status: 401 }
       );
+    }
+
+    // Update asset prices before creating snapshot
+    console.log(`Updating prices for user ${userId}...`);
+    try {
+      const priceUpdateResult = await updateUserAssetPrices(userId);
+      console.log(`Price update result: ${priceUpdateResult.message}`);
+    } catch (error) {
+      console.error('Error updating prices:', error);
+      // Continue anyway - we'll use existing prices
     }
 
     // Get all assets for the user using Firebase Admin SDK
