@@ -49,6 +49,12 @@ export interface AssetAllocationTarget {
   };
 }
 
+export interface AssetAllocationSettings {
+  userAge?: number;
+  riskFreeRate?: number;
+  targets: AssetAllocationTarget;
+}
+
 export interface AllocationResult {
   byAssetClass: {
     [assetClass: string]: {
