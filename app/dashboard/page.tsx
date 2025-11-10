@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Asset } from '@/types/assets';
+import { Asset, MonthlySnapshot } from '@/types/assets';
 import {
   getAllAssets,
   calculateTotalValue,
@@ -13,14 +13,28 @@ import {
   prepareAssetClassDistributionData,
   prepareAssetDistributionData,
 } from '@/lib/services/chartService';
+import { getUserSnapshots } from '@/lib/services/snapshotService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PieChart as PieChartComponent } from '@/components/ui/pie-chart';
-import { Wallet, TrendingUp, PieChart, DollarSign } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Wallet, TrendingUp, PieChart, DollarSign, Camera } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
+  const [creatingSnapshot, setCreatingSnapshot] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [existingSnapshot, setExistingSnapshot] = useState<MonthlySnapshot | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -42,6 +56,74 @@ export default function DashboardPage() {
     }
   };
 
+  const handleCreateSnapshot = async () => {
+    if (!user) return;
+
+    // Check if snapshot for current month already exists
+    try {
+      const snapshots = await getUserSnapshots(user.uid);
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
+
+      const existing = snapshots.find(
+        (s) => s.year === currentYear && s.month === currentMonth
+      );
+
+      if (existing) {
+        setExistingSnapshot(existing);
+        setShowConfirmDialog(true);
+      } else {
+        await createSnapshot();
+      }
+    } catch (error) {
+      console.error('Error checking existing snapshots:', error);
+      toast.error('Errore nel controllo degli snapshot esistenti');
+    }
+  };
+
+  const createSnapshot = async () => {
+    if (!user) return;
+
+    try {
+      setCreatingSnapshot(true);
+      setShowConfirmDialog(false);
+
+      // Show loading toast
+      toast.loading('Aggiornamento prezzi e creazione snapshot...', {
+        id: 'snapshot-creation',
+      });
+
+      const response = await fetch('/api/portfolio/snapshot', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.uid,
+        }),
+      });
+
+      const result = await response.json();
+
+      // Dismiss loading toast
+      toast.dismiss('snapshot-creation');
+
+      if (result.success) {
+        toast.success(result.message);
+      } else {
+        toast.error(result.error || 'Errore nella creazione dello snapshot');
+      }
+    } catch (error) {
+      console.error('Error creating snapshot:', error);
+      toast.dismiss('snapshot-creation');
+      toast.error('Errore nella creazione dello snapshot');
+    } finally {
+      setCreatingSnapshot(false);
+      setExistingSnapshot(null);
+    }
+  };
+
   const totalValue = calculateTotalValue(assets);
   const liquidNetWorth = calculateLiquidNetWorth(assets);
   const assetCount = assets.length;
@@ -60,11 +142,21 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="mt-2 text-gray-600">
-          Panoramica del tuo portafoglio di investimenti
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+          <p className="mt-2 text-gray-600">
+            Panoramica del tuo portafoglio di investimenti
+          </p>
+        </div>
+        <Button
+          onClick={handleCreateSnapshot}
+          disabled={creatingSnapshot || assetCount === 0}
+          variant="default"
+        >
+          <Camera className="mr-2 h-4 w-4" />
+          {creatingSnapshot ? 'Creazione...' : 'Crea Snapshot'}
+        </Button>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -140,6 +232,36 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Confirm Dialog */}
+      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Snapshot già esistente</DialogTitle>
+            <DialogDescription>
+              Esiste già uno snapshot per questo mese (
+              {existingSnapshot &&
+                `${String(existingSnapshot.month).padStart(2, '0')}/${existingSnapshot.year}`}
+              ). Vuoi sovrascriverlo con i dati attuali?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowConfirmDialog(false)}
+              disabled={creatingSnapshot}
+            >
+              Annulla
+            </Button>
+            <Button
+              onClick={createSnapshot}
+              disabled={creatingSnapshot}
+            >
+              {creatingSnapshot ? 'Creazione...' : 'Sovrascrivi'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
