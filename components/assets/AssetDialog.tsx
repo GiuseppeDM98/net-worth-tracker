@@ -52,6 +52,7 @@ const assetSchema = z.object({
   exchange: z.string().optional(),
   currency: z.string().min(1, 'Valuta è obbligatoria'),
   quantity: z.number().positive('Quantità deve essere positiva'),
+  manualPrice: z.number().positive('Il prezzo deve essere positivo').optional().or(z.nan()),
 });
 
 type AssetFormValues = z.infer<typeof assetSchema>;
@@ -137,6 +138,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         exchange: asset.exchange || '',
         currency: asset.currency,
         quantity: asset.quantity,
+        manualPrice: asset.currentPrice > 0 ? asset.currentPrice : undefined,
       });
     } else {
       reset({
@@ -148,6 +150,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         exchange: '',
         currency: 'EUR',
         quantity: 0,
+        manualPrice: undefined,
       });
     }
   }, [asset, reset]);
@@ -184,8 +187,13 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
       // Determine current price
       let currentPrice = 1; // Default for cash and fixed-price assets
 
+      // Check if manual price is provided
+      if (data.manualPrice && !isNaN(data.manualPrice) && data.manualPrice > 0) {
+        currentPrice = data.manualPrice;
+        toast.success(`Prezzo manuale impostato: ${currentPrice.toFixed(2)} ${data.currency}`);
+      }
       // Check if we need to fetch price from Yahoo Finance
-      if (shouldUpdatePrice(data.type, data.subCategory)) {
+      else if (shouldUpdatePrice(data.type, data.subCategory)) {
         try {
           const response = await fetch(
             `/api/prices/quote?ticker=${encodeURIComponent(data.ticker)}`
@@ -199,7 +207,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
             );
           } else {
             toast.error(
-              `Impossibile recuperare il prezzo per ${data.ticker}. Inserisci manualmente il prezzo nella tabella.`
+              `Impossibile recuperare il prezzo per ${data.ticker}. Puoi inserire manualmente il prezzo nel campo apposito.`
             );
             // Use a placeholder price of 0 to indicate it needs manual update
             currentPrice = 0;
@@ -207,7 +215,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         } catch (error) {
           console.error('Error fetching quote:', error);
           toast.error(
-            `Errore nel recupero del prezzo per ${data.ticker}. Inserisci manualmente il prezzo nella tabella.`
+            `Errore nel recupero del prezzo per ${data.ticker}. Puoi inserire manualmente il prezzo nel campo apposito.`
           );
           currentPrice = 0;
         }
@@ -394,12 +402,32 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
             </div>
           </div>
 
+          {shouldUpdatePrice(selectedType, selectedSubCategory) && (
+            <div className="space-y-2">
+              <Label htmlFor="manualPrice">Prezzo Manuale (opzionale)</Label>
+              <Input
+                id="manualPrice"
+                type="number"
+                step="0.01"
+                {...register('manualPrice', { valueAsNumber: true })}
+                placeholder="Lascia vuoto per recupero automatico da Yahoo Finance"
+              />
+              {errors.manualPrice && (
+                <p className="text-sm text-red-500">{errors.manualPrice.message}</p>
+              )}
+              <p className="text-xs text-gray-500">
+                Se inserisci un prezzo manuale, questo verrà utilizzato al posto del recupero automatico da Yahoo Finance.
+              </p>
+            </div>
+          )}
+
           <div className="rounded-lg bg-blue-50 p-3">
             <p className="text-sm text-blue-800">
-              <strong>Nota:</strong> Il prezzo corrente verrà recuperato automaticamente da Yahoo Finance.
+              <strong>Nota:</strong>
               {selectedType === 'cash' && ' Per asset di tipo liquidità, il prezzo sarà impostato a 1.'}
               {selectedType === 'realestate' && ' Per immobili, il prezzo deve essere aggiornato manualmente.'}
               {selectedSubCategory === 'Private Equity' && ' Per Private Equity, il prezzo deve essere aggiornato manualmente.'}
+              {shouldUpdatePrice(selectedType, selectedSubCategory) && ' Puoi inserire un prezzo manuale nel campo apposito, oppure il prezzo verrà recuperato automaticamente da Yahoo Finance. In caso di errore nel recupero automatico, potrai sempre impostare il prezzo manualmente.'}
             </p>
           </div>
 
