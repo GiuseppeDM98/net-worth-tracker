@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Timestamp } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { Asset, MonthlySnapshot } from '@/types/assets';
 import {
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
       byAssetClass: allocation.byAssetClass,
       byAsset,
       assetAllocation,
-      createdAt: adminDb.Timestamp.now(),
+      createdAt: Timestamp.now(),
     };
 
     // Save snapshot
