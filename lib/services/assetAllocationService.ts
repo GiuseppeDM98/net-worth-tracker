@@ -140,6 +140,17 @@ export function compareAllocations(
     };
   }
 
+  // Check if cash is using fixed amount
+  const cashTarget = targets['cash'];
+  const useCashFixedAmount = cashTarget?.useFixedAmount || false;
+  const cashFixedAmount = useCashFixedAmount ? (cashTarget?.fixedAmount || 0) : 0;
+
+  // Calculate remaining value (total - fixed cash)
+  // This is the value on which other asset classes percentages will be applied
+  const remainingValue = useCashFixedAmount
+    ? Math.max(0, current.totalValue - cashFixedAmount)
+    : current.totalValue;
+
   const byAssetClass: AllocationResult['byAssetClass'] = {};
   const bySubCategory: AllocationResult['bySubCategory'] = {};
 
@@ -147,9 +158,33 @@ export function compareAllocations(
   Object.keys(targets).forEach((assetClass) => {
     const targetData = targets[assetClass];
     const currentValue = current.byAssetClass[assetClass] || 0;
-    const currentPercentage = (currentValue / current.totalValue) * 100;
-    const targetPercentage = targetData.targetPercentage;
-    const targetValue = (current.totalValue * targetPercentage) / 100;
+    const currentPercentage = current.totalValue > 0
+      ? (currentValue / current.totalValue) * 100
+      : 0;
+
+    let targetValue: number;
+    let targetPercentage: number;
+
+    // Special handling for cash if using fixed amount
+    if (assetClass === 'cash' && targetData.useFixedAmount) {
+      // For fixed cash, target value is the fixed amount
+      targetValue = targetData.fixedAmount || 0;
+      // Target percentage is calculated as fixed amount / total value
+      targetPercentage = current.totalValue > 0
+        ? (targetValue / current.totalValue) * 100
+        : 0;
+    } else {
+      // For other asset classes:
+      // - If cash is fixed, apply percentage to remaining value
+      // - Otherwise, apply percentage to total value (normal behavior)
+      const baseValue = useCashFixedAmount ? remainingValue : current.totalValue;
+      targetValue = (baseValue * targetData.targetPercentage) / 100;
+      // Target percentage shown is relative to total value
+      targetPercentage = current.totalValue > 0
+        ? (targetValue / current.totalValue) * 100
+        : targetData.targetPercentage;
+    }
+
     const difference = currentPercentage - targetPercentage;
     const differenceValue = currentValue - targetValue;
 
@@ -268,6 +303,8 @@ export function getDefaultTargets(): AssetAllocationTarget {
     },
     cash: {
       targetPercentage: 2,
+      useFixedAmount: false,
+      fixedAmount: 0,
       subCategoryConfig: {
         enabled: false,
         categories: DEFAULT_SUB_CATEGORIES.cash,
