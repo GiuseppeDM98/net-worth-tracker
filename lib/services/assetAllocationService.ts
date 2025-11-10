@@ -1,17 +1,17 @@
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
-import { Asset, AssetAllocationTarget, AllocationResult } from '@/types/assets';
+import { Asset, AssetAllocationTarget, AssetAllocationSettings, AllocationResult } from '@/types/assets';
 import { calculateAssetValue, calculateTotalValue } from './assetService';
 import { DEFAULT_SUB_CATEGORIES, DEFAULT_EQUITY_SUB_TARGETS } from '@/lib/constants/defaultSubCategories';
 
 const ALLOCATION_TARGETS_COLLECTION = 'assetAllocationTargets';
 
 /**
- * Get allocation targets for a user
+ * Get allocation settings for a user (includes targets, age, and risk-free rate)
  */
-export async function getTargets(
+export async function getSettings(
   userId: string
-): Promise<AssetAllocationTarget | null> {
+): Promise<AssetAllocationSettings | null> {
   try {
     const targetRef = doc(db, ALLOCATION_TARGETS_COLLECTION, userId);
     const targetDoc = await getDoc(targetRef);
@@ -20,32 +20,61 @@ export async function getTargets(
       return null;
     }
 
-    return targetDoc.data().targets as AssetAllocationTarget;
+    const data = targetDoc.data();
+
+    // Support both old format (only targets) and new format (with userAge and riskFreeRate)
+    return {
+      userAge: data.userAge,
+      riskFreeRate: data.riskFreeRate,
+      targets: data.targets as AssetAllocationTarget,
+    };
   } catch (error) {
-    console.error('Error getting allocation targets:', error);
-    throw new Error('Failed to fetch allocation targets');
+    console.error('Error getting allocation settings:', error);
+    throw new Error('Failed to fetch allocation settings');
   }
 }
 
 /**
- * Set allocation targets for a user
+ * Get allocation targets for a user (legacy function for backward compatibility)
  */
-export async function setTargets(
+export async function getTargets(
+  userId: string
+): Promise<AssetAllocationTarget | null> {
+  const settings = await getSettings(userId);
+  return settings ? settings.targets : null;
+}
+
+/**
+ * Set allocation settings for a user (includes targets, age, and risk-free rate)
+ */
+export async function setSettings(
   userId: string,
-  targets: AssetAllocationTarget
+  settings: AssetAllocationSettings
 ): Promise<void> {
   try {
     const targetRef = doc(db, ALLOCATION_TARGETS_COLLECTION, userId);
 
     await setDoc(targetRef, {
       userId,
-      targets,
+      userAge: settings.userAge,
+      riskFreeRate: settings.riskFreeRate,
+      targets: settings.targets,
       updatedAt: Timestamp.now(),
     });
   } catch (error) {
-    console.error('Error setting allocation targets:', error);
-    throw new Error('Failed to save allocation targets');
+    console.error('Error setting allocation settings:', error);
+    throw new Error('Failed to save allocation settings');
   }
+}
+
+/**
+ * Set allocation targets for a user (legacy function for backward compatibility)
+ */
+export async function setTargets(
+  userId: string,
+  targets: AssetAllocationTarget
+): Promise<void> {
+  await setSettings(userId, { targets });
 }
 
 /**
@@ -188,6 +217,19 @@ export function compareAllocations(
     bySubCategory,
     totalValue: current.totalValue,
   };
+}
+
+/**
+ * Calculate equity percentage based on age and risk-free rate
+ * Formula: 125 - age - (riskFreeRate * 5)
+ */
+export function calculateEquityPercentage(
+  userAge: number,
+  riskFreeRate: number
+): number {
+  const percentage = 125 - userAge - (riskFreeRate * 5);
+  // Ensure percentage is between 0 and 100
+  return Math.max(0, Math.min(100, percentage));
 }
 
 /**

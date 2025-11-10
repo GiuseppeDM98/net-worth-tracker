@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
-  getTargets,
-  setTargets,
+  getSettings,
+  setSettings,
   getDefaultTargets,
+  calculateEquityPercentage,
 } from '@/lib/services/assetAllocationService';
 import { AssetAllocationTarget, AssetClass } from '@/types/assets';
 import { formatPercentage } from '@/lib/services/chartService';
@@ -52,6 +53,9 @@ export default function SettingsPage() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [userAge, setUserAge] = useState<number | undefined>(undefined);
+  const [riskFreeRate, setRiskFreeRate] = useState<number | undefined>(undefined);
+  const [autoCalculate, setAutoCalculate] = useState(false);
   const [assetClassStates, setAssetClassStates] = useState<
     Record<AssetClass, AssetClassState>
   >({} as Record<AssetClass, AssetClassState>);
@@ -62,13 +66,95 @@ export default function SettingsPage() {
     }
   }, [user]);
 
+  // Auto-calculate equity and bonds percentages when age or risk-free rate changes
+  useEffect(() => {
+    if (
+      autoCalculate &&
+      userAge !== undefined &&
+      riskFreeRate !== undefined &&
+      Object.keys(assetClassStates).length > 0
+    ) {
+      const equityPercentage = calculateEquityPercentage(userAge, riskFreeRate);
+
+      // Calculate bonds percentage: 100 - sum of all other asset classes
+      const otherAssetClasses = assetClasses.filter(
+        (ac) => ac !== 'equity' && ac !== 'bonds'
+      );
+      const otherTotal = otherAssetClasses.reduce(
+        (sum, ac) => sum + (assetClassStates[ac]?.targetPercentage || 0),
+        0
+      );
+      const bondsPercentage = Math.max(0, 100 - equityPercentage - otherTotal);
+
+      // Update equity and bonds percentages
+      setAssetClassStates((prev) => ({
+        ...prev,
+        equity: {
+          ...prev.equity,
+          targetPercentage: equityPercentage,
+        },
+        bonds: {
+          ...prev.bonds,
+          targetPercentage: bondsPercentage,
+        },
+      }));
+    }
+  }, [userAge, riskFreeRate, autoCalculate]);
+
+  // Recalculate bonds when other asset classes change (excluding equity and bonds)
+  useEffect(() => {
+    if (
+      autoCalculate &&
+      userAge !== undefined &&
+      riskFreeRate !== undefined &&
+      Object.keys(assetClassStates).length > 0
+    ) {
+      const equityPercentage = calculateEquityPercentage(userAge, riskFreeRate);
+
+      const otherAssetClasses = assetClasses.filter(
+        (ac) => ac !== 'equity' && ac !== 'bonds'
+      );
+      const otherTotal = otherAssetClasses.reduce(
+        (sum, ac) => sum + (assetClassStates[ac]?.targetPercentage || 0),
+        0
+      );
+      const bondsPercentage = Math.max(0, 100 - equityPercentage - otherTotal);
+
+      // Only update if bonds percentage has changed
+      if (assetClassStates.bonds?.targetPercentage !== bondsPercentage) {
+        setAssetClassStates((prev) => ({
+          ...prev,
+          bonds: {
+            ...prev.bonds,
+            targetPercentage: bondsPercentage,
+          },
+        }));
+      }
+    }
+  }, [
+    assetClassStates.crypto?.targetPercentage,
+    assetClassStates.realestate?.targetPercentage,
+    assetClassStates.cash?.targetPercentage,
+    assetClassStates.commodity?.targetPercentage,
+  ]);
+
   const loadTargets = async () => {
     if (!user) return;
 
     try {
       setLoading(true);
-      const targetsData = await getTargets(user.uid);
-      const targets = targetsData || getDefaultTargets();
+      const settingsData = await getSettings(user.uid);
+      const targets = settingsData?.targets || getDefaultTargets();
+
+      // Load user age and risk-free rate if available
+      if (settingsData) {
+        setUserAge(settingsData.userAge);
+        setRiskFreeRate(settingsData.riskFreeRate);
+        setAutoCalculate(
+          settingsData.userAge !== undefined &&
+          settingsData.riskFreeRate !== undefined
+        );
+      }
 
       const states: Record<AssetClass, AssetClassState> = {} as Record<
         AssetClass,
@@ -197,8 +283,12 @@ export default function SettingsPage() {
         }
       });
 
-      await setTargets(user.uid, targets);
-      toast.success('Target salvati con successo');
+      await setSettings(user.uid, {
+        userAge,
+        riskFreeRate,
+        targets,
+      });
+      toast.success('Impostazioni salvate con successo');
     } catch (error) {
       console.error('Error saving targets:', error);
       toast.error('Errore nel salvataggio dei target');
@@ -357,6 +447,88 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* User Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Impostazioni Utente</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="userAge">Età (anni)</Label>
+                <Input
+                  id="userAge"
+                  type="number"
+                  min="0"
+                  max="120"
+                  value={userAge || ''}
+                  onChange={(e) => {
+                    const value = e.target.value ? parseInt(e.target.value) : undefined;
+                    setUserAge(value);
+                  }}
+                  placeholder="Inserisci la tua età"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="riskFreeRate">
+                  Tasso Risk-Free Rate (%)
+                </Label>
+                <Input
+                  id="riskFreeRate"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={riskFreeRate || ''}
+                  onChange={(e) => {
+                    const value = e.target.value ? parseFloat(e.target.value) : undefined;
+                    setRiskFreeRate(value);
+                  }}
+                  placeholder="Es: 3.5"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Switch
+                id="autoCalculate"
+                checked={autoCalculate}
+                onCheckedChange={setAutoCalculate}
+                disabled={userAge === undefined || riskFreeRate === undefined}
+              />
+              <Label htmlFor="autoCalculate" className="text-sm">
+                Calcola automaticamente % Azioni e Obbligazioni
+              </Label>
+            </div>
+
+            {autoCalculate && userAge !== undefined && riskFreeRate !== undefined && (
+              <div className="rounded-lg bg-blue-50 p-4">
+                <p className="text-sm text-blue-900">
+                  <strong>Formula applicata:</strong> 125 - {userAge} - ({riskFreeRate} × 5) ={' '}
+                  <strong>{calculateEquityPercentage(userAge, riskFreeRate).toFixed(1)}% Azioni</strong>
+                </p>
+                <p className="mt-1 text-sm text-blue-800">
+                  La percentuale di Obbligazioni sarà calcolata come: 100% - (somma delle altre asset class)
+                </p>
+              </div>
+            )}
+
+            <p className="text-sm text-gray-600">
+              <strong>Nota:</strong> Il tasso risk-free può essere recuperato da{' '}
+              <a
+                href="https://www.investing.com/rates-bonds/italy-10-year-bond-yield"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline"
+              >
+                BTP 10 anni Italia su Investing.com
+              </a>
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Asset Class Targets */}
       <Card>
         <CardHeader>
@@ -374,29 +546,37 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-6 md:grid-cols-2">
-            {assetClasses.map((assetClass) => (
-              <div key={assetClass} className="space-y-2">
-                <Label htmlFor={assetClass}>
-                  {assetClassLabels[assetClass]}
-                </Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id={assetClass}
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    max="100"
-                    value={assetClassStates[assetClass]?.targetPercentage || 0}
-                    onChange={(e) =>
-                      updateAssetClassState(assetClass, {
-                        targetPercentage: parseFloat(e.target.value) || 0,
-                      })
-                    }
-                  />
-                  <span className="text-sm text-gray-600">%</span>
+            {assetClasses.map((assetClass) => {
+              const isAutoCalculated = autoCalculate && (assetClass === 'equity' || assetClass === 'bonds');
+              return (
+                <div key={assetClass} className="space-y-2">
+                  <Label htmlFor={assetClass}>
+                    {assetClassLabels[assetClass]}
+                    {isAutoCalculated && (
+                      <span className="ml-2 text-xs text-blue-600">(Calcolato automaticamente)</span>
+                    )}
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id={assetClass}
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                      value={assetClassStates[assetClass]?.targetPercentage || 0}
+                      onChange={(e) =>
+                        updateAssetClassState(assetClass, {
+                          targetPercentage: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      disabled={isAutoCalculated}
+                      className={isAutoCalculated ? 'bg-gray-100' : ''}
+                    />
+                    <span className="text-sm text-gray-600">%</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </CardContent>
       </Card>
