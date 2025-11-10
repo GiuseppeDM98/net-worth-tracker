@@ -7,44 +7,54 @@ import {
   setTargets,
   getDefaultTargets,
 } from '@/lib/services/assetAllocationService';
-import { AssetAllocationTarget } from '@/types/assets';
+import { AssetAllocationTarget, AssetClass } from '@/types/assets';
 import { formatPercentage } from '@/lib/services/chartService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Save, RotateCcw, Plus, Trash2 } from 'lucide-react';
+import { Save, RotateCcw, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
+import { Switch } from '@/components/ui/switch';
 
 interface SubTarget {
   name: string;
   percentage: number;
 }
 
+interface AssetClassState {
+  targetPercentage: number;
+  subCategoryEnabled: boolean;
+  categories: string[];
+  subTargets: SubTarget[];
+  expanded: boolean;
+}
+
+const assetClassLabels: Record<AssetClass, string> = {
+  equity: 'Azioni (Equity)',
+  bonds: 'Obbligazioni (Bonds)',
+  crypto: 'Criptovalute (Crypto)',
+  realestate: 'Immobili (Real Estate)',
+  cash: 'Liquidità (Cash)',
+  commodity: 'Materie Prime (Commodity)',
+};
+
+const assetClasses: AssetClass[] = [
+  'equity',
+  'bonds',
+  'crypto',
+  'realestate',
+  'cash',
+  'commodity',
+];
+
 export default function SettingsPage() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
-  // Asset class targets
-  const [equityTarget, setEquityTarget] = useState(70);
-  const [bondsTarget, setBondsTarget] = useState(20);
-  const [cryptoTarget, setCryptoTarget] = useState(3);
-  const [realEstateTarget, setRealEstateTarget] = useState(5);
-  const [cashTarget, setCashTarget] = useState(2);
-  const [commodityTarget, setCommodityTarget] = useState(0);
-
-  // Sub-targets for equity
-  const [equitySubTargets, setEquitySubTargets] = useState<SubTarget[]>([
-    { name: 'All-World', percentage: 40 },
-    { name: 'Momentum', percentage: 10 },
-    { name: 'Quality', percentage: 10 },
-    { name: 'Value', percentage: 10 },
-    { name: 'Pension', percentage: 15 },
-    { name: 'Private Equity', percentage: 5 },
-    { name: 'High Risk', percentage: 5 },
-    { name: 'Single Stocks', percentage: 5 },
-  ]);
+  const [assetClassStates, setAssetClassStates] = useState<
+    Record<AssetClass, AssetClassState>
+  >({} as Record<AssetClass, AssetClassState>);
 
   useEffect(() => {
     if (user) {
@@ -60,21 +70,31 @@ export default function SettingsPage() {
       const targetsData = await getTargets(user.uid);
       const targets = targetsData || getDefaultTargets();
 
-      // Set asset class targets
-      setEquityTarget(targets.equity?.targetPercentage || 70);
-      setBondsTarget(targets.bonds?.targetPercentage || 20);
-      setCryptoTarget(targets.crypto?.targetPercentage || 3);
-      setRealEstateTarget(targets.realestate?.targetPercentage || 5);
-      setCashTarget(targets.cash?.targetPercentage || 2);
-      setCommodityTarget(targets.commodity?.targetPercentage || 0);
+      const states: Record<AssetClass, AssetClassState> = {} as Record<
+        AssetClass,
+        AssetClassState
+      >;
 
-      // Set equity sub-targets
-      if (targets.equity?.subTargets) {
-        const subTargets = Object.entries(targets.equity.subTargets).map(
-          ([name, percentage]) => ({ name, percentage })
-        );
-        setEquitySubTargets(subTargets);
-      }
+      assetClasses.forEach((assetClass) => {
+        const targetData = targets[assetClass];
+        const subCategoryConfig = targetData?.subCategoryConfig;
+        const subTargets = targetData?.subTargets;
+
+        states[assetClass] = {
+          targetPercentage: targetData?.targetPercentage || 0,
+          subCategoryEnabled: subCategoryConfig?.enabled || false,
+          categories: subCategoryConfig?.categories || [],
+          subTargets: subTargets
+            ? Object.entries(subTargets).map(([name, percentage]) => ({
+                name,
+                percentage,
+              }))
+            : [],
+          expanded: assetClass === 'equity', // Solo equity espanso di default
+        };
+      });
+
+      setAssetClassStates(states);
     } catch (error) {
       console.error('Error loading targets:', error);
       toast.error('Errore nel caricamento dei target');
@@ -84,18 +104,20 @@ export default function SettingsPage() {
   };
 
   const calculateTotal = () => {
-    return (
-      equityTarget +
-      bondsTarget +
-      cryptoTarget +
-      realEstateTarget +
-      cashTarget +
-      commodityTarget
+    return assetClasses.reduce(
+      (sum, assetClass) =>
+        sum + (assetClassStates[assetClass]?.targetPercentage || 0),
+      0
     );
   };
 
-  const calculateSubTargetTotal = () => {
-    return equitySubTargets.reduce((sum, target) => sum + target.percentage, 0);
+  const calculateSubTargetTotal = (assetClass: AssetClass) => {
+    return (
+      assetClassStates[assetClass]?.subTargets.reduce(
+        (sum, target) => sum + target.percentage,
+        0
+      ) || 0
+    );
   };
 
   const handleSave = async () => {
@@ -109,46 +131,71 @@ export default function SettingsPage() {
       return;
     }
 
-    const subTotal = calculateSubTargetTotal();
-    if (Math.abs(subTotal - 100) > 0.01) {
-      toast.error(
-        `Il totale delle sotto-categorie equity deve essere 100%. Attualmente è ${formatPercentage(
-          subTotal
-        )}`
-      );
-      return;
+    // Validate sub-targets for each enabled asset class
+    for (const assetClass of assetClasses) {
+      const state = assetClassStates[assetClass];
+      if (state.subCategoryEnabled) {
+        const subTotal = calculateSubTargetTotal(assetClass);
+        if (Math.abs(subTotal - 100) > 0.01) {
+          toast.error(
+            `Il totale delle sotto-categorie ${assetClassLabels[assetClass]} deve essere 100%. Attualmente è ${formatPercentage(
+              subTotal
+            )}`
+          );
+          return;
+        }
+
+        // Check for empty names
+        const hasEmptyNames = state.subTargets.some(
+          (target) => !target.name.trim()
+        );
+        if (hasEmptyNames) {
+          toast.error(
+            `Tutte le sotto-categorie di ${assetClassLabels[assetClass]} devono avere un nome`
+          );
+          return;
+        }
+
+        // Check for duplicates
+        const names = state.subTargets.map((t) => t.name.trim().toLowerCase());
+        const hasDuplicates = names.length !== new Set(names).size;
+        if (hasDuplicates) {
+          toast.error(
+            `Le sotto-categorie di ${assetClassLabels[assetClass]} non possono avere nomi duplicati`
+          );
+          return;
+        }
+      }
     }
 
     try {
       setSaving(true);
 
-      const targets: AssetAllocationTarget = {
-        equity: {
-          targetPercentage: equityTarget,
-          subTargets: equitySubTargets.reduce(
+      const targets: AssetAllocationTarget = {};
+
+      assetClasses.forEach((assetClass) => {
+        const state = assetClassStates[assetClass];
+        targets[assetClass] = {
+          targetPercentage: state.targetPercentage,
+          subCategoryConfig: {
+            enabled: state.subCategoryEnabled,
+            // Sync categories array with actual subcategory names from subTargets
+            categories: state.subCategoryEnabled && state.subTargets.length > 0
+              ? state.subTargets.map(t => t.name)
+              : state.categories,
+          },
+        };
+
+        if (state.subCategoryEnabled && state.subTargets.length > 0) {
+          targets[assetClass].subTargets = state.subTargets.reduce(
             (acc, target) => {
               acc[target.name] = target.percentage;
               return acc;
             },
             {} as { [key: string]: number }
-          ),
-        },
-        bonds: {
-          targetPercentage: bondsTarget,
-        },
-        crypto: {
-          targetPercentage: cryptoTarget,
-        },
-        realestate: {
-          targetPercentage: realEstateTarget,
-        },
-        cash: {
-          targetPercentage: cashTarget,
-        },
-        commodity: {
-          targetPercentage: commodityTarget,
-        },
-      };
+          );
+        }
+      });
 
       await setTargets(user.uid, targets);
       toast.success('Target salvati con successo');
@@ -162,44 +209,120 @@ export default function SettingsPage() {
 
   const handleReset = () => {
     const defaults = getDefaultTargets();
-    setEquityTarget(defaults.equity.targetPercentage);
-    setBondsTarget(defaults.bonds.targetPercentage);
-    setCryptoTarget(defaults.crypto.targetPercentage);
-    setRealEstateTarget(defaults.realestate.targetPercentage);
-    setCashTarget(defaults.cash.targetPercentage);
-    setCommodityTarget(defaults.commodity.targetPercentage);
+    const states: Record<AssetClass, AssetClassState> = {} as Record<
+      AssetClass,
+      AssetClassState
+    >;
 
-    if (defaults.equity.subTargets) {
-      const subTargets = Object.entries(defaults.equity.subTargets).map(
-        ([name, percentage]) => ({ name, percentage })
-      );
-      setEquitySubTargets(subTargets);
-    }
+    assetClasses.forEach((assetClass) => {
+      const targetData = defaults[assetClass];
+      const subCategoryConfig = targetData?.subCategoryConfig;
+      const subTargets = targetData?.subTargets;
 
+      states[assetClass] = {
+        targetPercentage: targetData?.targetPercentage || 0,
+        subCategoryEnabled: subCategoryConfig?.enabled || false,
+        categories: subCategoryConfig?.categories || [],
+        subTargets: subTargets
+          ? Object.entries(subTargets).map(([name, percentage]) => ({
+              name,
+              percentage,
+            }))
+          : [],
+        expanded: assetClass === 'equity',
+      };
+    });
+
+    setAssetClassStates(states);
     toast.info('Target ripristinati ai valori predefiniti');
   };
 
-  const handleAddSubTarget = () => {
-    setEquitySubTargets([...equitySubTargets, { name: '', percentage: 0 }]);
+  const updateAssetClassState = (
+    assetClass: AssetClass,
+    updates: Partial<AssetClassState>
+  ) => {
+    setAssetClassStates((prev) => ({
+      ...prev,
+      [assetClass]: {
+        ...prev[assetClass],
+        ...updates,
+      },
+    }));
   };
 
-  const handleRemoveSubTarget = (index: number) => {
-    const newSubTargets = equitySubTargets.filter((_, i) => i !== index);
-    setEquitySubTargets(newSubTargets);
+  const handleToggleSubCategories = (assetClass: AssetClass, enabled: boolean) => {
+    const state = assetClassStates[assetClass];
+
+    if (enabled && state.subTargets.length === 0) {
+      // Initialize with default categories if enabling for the first time
+      const subTargets = state.categories.map((name) => ({
+        name,
+        percentage: 0,
+      }));
+      updateAssetClassState(assetClass, {
+        subCategoryEnabled: enabled,
+        subTargets,
+      });
+    } else {
+      updateAssetClassState(assetClass, { subCategoryEnabled: enabled });
+    }
+  };
+
+  const handleAddSubTarget = (assetClass: AssetClass) => {
+    const state = assetClassStates[assetClass];
+    updateAssetClassState(assetClass, {
+      subTargets: [...state.subTargets, { name: '', percentage: 0 }],
+    });
+  };
+
+  const handleRemoveSubTarget = (assetClass: AssetClass, index: number) => {
+    const state = assetClassStates[assetClass];
+    const newSubTargets = state.subTargets.filter((_, i) => i !== index);
+    updateAssetClassState(assetClass, { subTargets: newSubTargets });
   };
 
   const handleSubTargetChange = (
+    assetClass: AssetClass,
     index: number,
     field: 'name' | 'percentage',
     value: string | number
   ) => {
-    const newSubTargets = [...equitySubTargets];
+    const state = assetClassStates[assetClass];
+    const newSubTargets = [...state.subTargets];
     if (field === 'name') {
       newSubTargets[index].name = value as string;
     } else {
       newSubTargets[index].percentage = value as number;
     }
-    setEquitySubTargets(newSubTargets);
+    updateAssetClassState(assetClass, { subTargets: newSubTargets });
+  };
+
+  const handleAddCategory = (assetClass: AssetClass, categoryName: string) => {
+    const state = assetClassStates[assetClass];
+    if (!categoryName.trim()) return;
+
+    const trimmedName = categoryName.trim();
+    if (state.categories.includes(trimmedName)) {
+      toast.error('Questa categoria esiste già');
+      return;
+    }
+
+    updateAssetClassState(assetClass, {
+      categories: [...state.categories, trimmedName],
+    });
+  };
+
+  const handleRemoveCategory = (assetClass: AssetClass, categoryName: string) => {
+    const state = assetClassStates[assetClass];
+    const newCategories = state.categories.filter((c) => c !== categoryName);
+
+    // Also remove from subTargets if present
+    const newSubTargets = state.subTargets.filter((t) => t.name !== categoryName);
+
+    updateAssetClassState(assetClass, {
+      categories: newCategories,
+      subTargets: newSubTargets,
+    });
   };
 
   if (loading) {
@@ -211,9 +334,7 @@ export default function SettingsPage() {
   }
 
   const total = calculateTotal();
-  const subTotal = calculateSubTargetTotal();
   const isValidTotal = Math.abs(total - 100) < 0.01;
-  const isValidSubTotal = Math.abs(subTotal - 100) < 0.01;
 
   return (
     <div className="space-y-6">
@@ -253,195 +374,187 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-6 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="equity">Azioni (Equity)</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="equity"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="100"
-                  value={equityTarget}
-                  onChange={(e) => setEquityTarget(parseFloat(e.target.value))}
-                />
-                <span className="text-sm text-gray-600">%</span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="bonds">Obbligazioni (Bonds)</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="bonds"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="100"
-                  value={bondsTarget}
-                  onChange={(e) => setBondsTarget(parseFloat(e.target.value))}
-                />
-                <span className="text-sm text-gray-600">%</span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="crypto">Criptovalute (Crypto)</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="crypto"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="100"
-                  value={cryptoTarget}
-                  onChange={(e) => setCryptoTarget(parseFloat(e.target.value))}
-                />
-                <span className="text-sm text-gray-600">%</span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="realestate">Immobili (Real Estate)</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="realestate"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="100"
-                  value={realEstateTarget}
-                  onChange={(e) =>
-                    setRealEstateTarget(parseFloat(e.target.value))
-                  }
-                />
-                <span className="text-sm text-gray-600">%</span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="cash">Liquidità (Cash)</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="cash"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="100"
-                  value={cashTarget}
-                  onChange={(e) => setCashTarget(parseFloat(e.target.value))}
-                />
-                <span className="text-sm text-gray-600">%</span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="commodity">Materie Prime (Commodity)</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="commodity"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="100"
-                  value={commodityTarget}
-                  onChange={(e) =>
-                    setCommodityTarget(parseFloat(e.target.value))
-                  }
-                />
-                <span className="text-sm text-gray-600">%</span>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Equity Sub-Targets */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Sotto-Categorie Equity</CardTitle>
-            <div className="flex items-center gap-4">
-              <div
-                className={`text-sm font-semibold ${
-                  isValidSubTotal ? 'text-green-600' : 'text-red-600'
-                }`}
-              >
-                Totale: {formatPercentage(subTotal)}
-                {!isValidSubTotal && ' (deve essere 100%)'}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleAddSubTarget}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Aggiungi
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {equitySubTargets.map((target, index) => (
-              <div key={index} className="flex items-center gap-3">
-                <div className="flex-1">
-                  <Input
-                    placeholder="Nome sotto-categoria"
-                    value={target.name}
-                    onChange={(e) =>
-                      handleSubTargetChange(index, 'name', e.target.value)
-                    }
-                  />
-                </div>
+            {assetClasses.map((assetClass) => (
+              <div key={assetClass} className="space-y-2">
+                <Label htmlFor={assetClass}>
+                  {assetClassLabels[assetClass]}
+                </Label>
                 <div className="flex items-center gap-2">
                   <Input
+                    id={assetClass}
                     type="number"
                     step="0.1"
                     min="0"
                     max="100"
-                    className="w-24"
-                    value={target.percentage}
+                    value={assetClassStates[assetClass]?.targetPercentage || 0}
                     onChange={(e) =>
-                      handleSubTargetChange(
-                        index,
-                        'percentage',
-                        parseFloat(e.target.value)
-                      )
+                      updateAssetClassState(assetClass, {
+                        targetPercentage: parseFloat(e.target.value) || 0,
+                      })
                     }
                   />
                   <span className="text-sm text-gray-600">%</span>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleRemoveSubTarget(index)}
-                >
-                  <Trash2 className="h-4 w-4 text-red-500" />
-                </Button>
               </div>
             ))}
           </div>
-          <p className="mt-4 text-sm text-gray-600">
-            Le percentuali delle sotto-categorie sono relative al totale della
-            classe asset Equity ({formatPercentage(equityTarget)})
-          </p>
         </CardContent>
       </Card>
+
+      {/* Sub-Categories for each Asset Class */}
+      {assetClasses.map((assetClass) => {
+        const state = assetClassStates[assetClass];
+        if (!state) return null;
+
+        const subTotal = calculateSubTargetTotal(assetClass);
+        const isValidSubTotal = Math.abs(subTotal - 100) < 0.01;
+
+        return (
+          <Card key={`sub-${assetClass}`}>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      updateAssetClassState(assetClass, {
+                        expanded: !state.expanded,
+                      })
+                    }
+                  >
+                    {state.expanded ? (
+                      <ChevronUp className="h-4 w-4" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" />
+                    )}
+                  </Button>
+                  <CardTitle>
+                    Sotto-Categorie {assetClassLabels[assetClass]}
+                  </CardTitle>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor={`toggle-${assetClass}`} className="text-sm">
+                      Abilita
+                    </Label>
+                    <Switch
+                      id={`toggle-${assetClass}`}
+                      checked={state.subCategoryEnabled}
+                      onCheckedChange={(checked: boolean) =>
+                        handleToggleSubCategories(assetClass, checked)
+                      }
+                    />
+                  </div>
+                  {state.subCategoryEnabled && (
+                    <div
+                      className={`text-sm font-semibold ${
+                        isValidSubTotal ? 'text-green-600' : 'text-red-600'
+                      }`}
+                    >
+                      Totale: {formatPercentage(subTotal)}
+                      {!isValidSubTotal && ' (deve essere 100%)'}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            {state.expanded && state.subCategoryEnabled && (
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Sub-Targets */}
+                  <div className="space-y-3">
+                    {state.subTargets.map((target, index) => (
+                      <div key={index} className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <Input
+                            placeholder="Nome sotto-categoria"
+                            value={target.name}
+                            onChange={(e) =>
+                              handleSubTargetChange(
+                                assetClass,
+                                index,
+                                'name',
+                                e.target.value
+                              )
+                            }
+                            list={`${assetClass}-categories`}
+                          />
+                          <datalist id={`${assetClass}-categories`}>
+                            {state.categories.map((cat) => (
+                              <option key={cat} value={cat} />
+                            ))}
+                          </datalist>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="100"
+                            className="w-24"
+                            value={target.percentage}
+                            onChange={(e) =>
+                              handleSubTargetChange(
+                                assetClass,
+                                index,
+                                'percentage',
+                                parseFloat(e.target.value) || 0
+                              )
+                            }
+                          />
+                          <span className="text-sm text-gray-600">%</span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveSubTarget(assetClass, index)}
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleAddSubTarget(assetClass)}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Aggiungi Sotto-Categoria
+                  </Button>
+
+                  <p className="text-sm text-gray-600">
+                    Le percentuali delle sotto-categorie sono relative al totale
+                    della classe asset {assetClassLabels[assetClass]} (
+                    {formatPercentage(state.targetPercentage)})
+                  </p>
+                </div>
+              </CardContent>
+            )}
+          </Card>
+        );
+      })}
 
       <div className="rounded-lg bg-blue-50 p-4">
         <h3 className="font-semibold text-blue-900">Note</h3>
         <ul className="mt-2 space-y-1 text-sm text-blue-800">
           <li>
-            • Il totale delle allocazioni delle asset class deve essere esattamente
-            100%
+            • Il totale delle allocazioni delle asset class deve essere
+            esattamente 100%
           </li>
           <li>
-            • Il totale delle sotto-categorie equity deve essere esattamente 100%
+            • Per ogni asset class con sotto-categorie abilitate, il totale
+            delle sotto-categorie deve essere esattamente 100%
           </li>
           <li>
             • Le sotto-categorie sono espresse come percentuale della loro asset
             class di appartenenza
+          </li>
+          <li>
+            • Usa il toggle &quot;Abilita&quot; per attivare/disattivare le sotto-categorie
+            per ciascuna asset class
           </li>
           <li>
             • I cambiamenti saranno applicati immediatamente alla pagina

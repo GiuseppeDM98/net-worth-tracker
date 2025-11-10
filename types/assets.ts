@@ -34,9 +34,15 @@ export interface AssetFormData {
   currentPrice: number;
 }
 
+export interface SubCategoryConfig {
+  enabled: boolean;
+  categories: string[];
+}
+
 export interface AssetAllocationTarget {
   [assetClass: string]: {
     targetPercentage: number;
+    subCategoryConfig?: SubCategoryConfig;
     subTargets?: {
       [subCategory: string]: number;
     };

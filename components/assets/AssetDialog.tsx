@@ -5,8 +5,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
-import { Asset, AssetFormData, AssetType, AssetClass } from '@/types/assets';
+import { Asset, AssetFormData, AssetType, AssetClass, AssetAllocationTarget } from '@/types/assets';
 import { createAsset, updateAsset } from '@/lib/services/assetService';
+import { getTargets } from '@/lib/services/assetAllocationService';
 import {
   Dialog,
   DialogContent,
@@ -49,7 +50,7 @@ const assetSchema = z.object({
   assetClass: z.enum(['equity', 'bonds', 'crypto', 'realestate', 'cash', 'commodity']),
   subCategory: z.string().optional(),
   exchange: z.string().optional(),
-  currency: z.string().default('EUR'),
+  currency: z.string().min(1, 'Valuta è obbligatoria'),
   quantity: z.number().positive('Quantità deve essere positiva'),
 });
 
@@ -80,20 +81,11 @@ const assetClasses: { value: AssetClass; label: string }[] = [
   { value: 'commodity', label: 'Materie Prime' },
 ];
 
-const subCategories = [
-  'All-World',
-  'Momentum',
-  'Quality',
-  'Value',
-  'Pension',
-  'Private Equity',
-  'High Risk',
-  'Single Stocks',
-];
-
 export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
   const { user } = useAuth();
   const [fetchingPrice, setFetchingPrice] = useState(false);
+  const [allocationTargets, setAllocationTargets] = useState<AssetAllocationTarget | null>(null);
+  const [loadingTargets, setLoadingTargets] = useState(false);
   const {
     register,
     handleSubmit,
@@ -112,6 +104,27 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
   const selectedType = watch('type');
   const selectedAssetClass = watch('assetClass');
   const selectedSubCategory = watch('subCategory');
+
+  // Load allocation targets when dialog opens
+  useEffect(() => {
+    if (open && user) {
+      loadAllocationTargets();
+    }
+  }, [open, user]);
+
+  const loadAllocationTargets = async () => {
+    if (!user) return;
+
+    try {
+      setLoadingTargets(true);
+      const targets = await getTargets(user.uid);
+      setAllocationTargets(targets);
+    } catch (error) {
+      console.error('Error loading allocation targets:', error);
+    } finally {
+      setLoadingTargets(false);
+    }
+  };
 
   useEffect(() => {
     if (asset) {
@@ -139,8 +152,31 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
     }
   }, [asset, reset]);
 
+  // Get available sub-categories for the selected asset class
+  const availableSubCategories = (): string[] => {
+    if (!selectedAssetClass || !allocationTargets) return [];
+
+    const assetClassConfig = allocationTargets[selectedAssetClass];
+    if (!assetClassConfig?.subCategoryConfig?.enabled) return [];
+
+    return assetClassConfig.subCategoryConfig.categories || [];
+  };
+
+  const isSubCategoryEnabled = (): boolean => {
+    if (!selectedAssetClass || !allocationTargets) return false;
+
+    const assetClassConfig = allocationTargets[selectedAssetClass];
+    return assetClassConfig?.subCategoryConfig?.enabled || false;
+  };
+
   const onSubmit = async (data: AssetFormValues) => {
     if (!user) return;
+
+    // Validate that sub-category is provided if enabled for the asset class
+    if (isSubCategoryEnabled() && !data.subCategory) {
+      toast.error('La sotto-categoria è obbligatoria per questa classe di asset');
+      return;
+    }
 
     try {
       setFetchingPrice(true);
@@ -297,24 +333,29 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="subCategory">Sotto-categoria</Label>
-              <Select
-                value={watch('subCategory')}
-                onValueChange={(value) => setValue('subCategory', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleziona sotto-categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  {subCategories.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {isSubCategoryEnabled() && (
+              <div className="space-y-2">
+                <Label htmlFor="subCategory">
+                  Sotto-categoria
+                  {isSubCategoryEnabled() && availableSubCategories().length > 0 && ' *'}
+                </Label>
+                <Select
+                  value={watch('subCategory')}
+                  onValueChange={(value) => setValue('subCategory', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleziona sotto-categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableSubCategories().map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="exchange">Exchange</Label>

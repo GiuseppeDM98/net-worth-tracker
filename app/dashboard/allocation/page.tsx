@@ -91,6 +91,47 @@ export default function AllocationPage() {
     return 'text-orange-600';
   };
 
+  const assetClassLabels: Record<string, string> = {
+    equity: 'Azioni (Equity)',
+    bonds: 'Obbligazioni (Bonds)',
+    crypto: 'Criptovalute (Crypto)',
+    realestate: 'Immobili (Real Estate)',
+    cash: 'Liquidità (Cash)',
+    commodity: 'Materie Prime (Commodity)',
+  };
+
+  // Group sub-categories by asset class
+  const getSubCategoriesByAssetClass = () => {
+    if (!targets || !allocation) return {};
+
+    const grouped: Record<
+      string,
+      Record<string, AllocationResult['bySubCategory'][string]>
+    > = {};
+
+    // Iterate through asset classes that have sub-targets
+    Object.entries(targets).forEach(([assetClass, targetData]) => {
+      if (targetData.subTargets) {
+        grouped[assetClass] = {};
+
+        // Get all sub-categories for this asset class
+        Object.keys(targetData.subTargets).forEach((subCategory) => {
+          if (allocation.bySubCategory[subCategory]) {
+            grouped[assetClass][subCategory] =
+              allocation.bySubCategory[subCategory];
+          }
+        });
+
+        // Remove asset class if no sub-categories have data
+        if (Object.keys(grouped[assetClass]).length === 0) {
+          delete grouped[assetClass];
+        }
+      }
+    });
+
+    return grouped;
+  };
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -209,82 +250,86 @@ export default function AllocationPage() {
         </CardContent>
       </Card>
 
-      {/* Sub-Category Allocation */}
-      {Object.keys(allocation.bySubCategory).length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Allocazione per Sotto-Categoria</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Sotto-Categoria</TableHead>
-                    <TableHead className="text-right">Corrente %</TableHead>
-                    <TableHead className="text-right">Corrente €</TableHead>
-                    <TableHead className="text-right">Target %</TableHead>
-                    <TableHead className="text-right">Target €</TableHead>
-                    <TableHead className="text-right">Differenza %</TableHead>
-                    <TableHead className="text-right">Differenza €</TableHead>
-                    <TableHead className="text-center">Azione</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {Object.entries(allocation.bySubCategory).map(
-                    ([subCategory, data]) => (
-                      <TableRow key={subCategory}>
-                        <TableCell className="font-medium">
-                          {subCategory}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatPercentage(data.currentPercentage)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(data.currentValue)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatPercentage(data.targetPercentage)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(data.targetValue)}
-                        </TableCell>
-                        <TableCell
-                          className={`text-right font-semibold ${getDifferenceColor(
-                            data.difference
-                          )}`}
-                        >
-                          {data.difference > 0 ? '+' : ''}
-                          {formatPercentage(data.difference)}
-                        </TableCell>
-                        <TableCell
-                          className={`text-right font-semibold ${getDifferenceColor(
-                            data.difference
-                          )}`}
-                        >
-                          {data.differenceValue > 0 ? '+' : ''}
-                          {formatCurrency(data.differenceValue)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center justify-center">
-                            <span
-                              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${getActionColor(
-                                data.action
-                              )}`}
-                            >
-                              {getActionIcon(data.action)}
-                              {data.action}
-                            </span>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Sub-Category Allocation - One card per asset class */}
+      {Object.entries(getSubCategoriesByAssetClass()).map(
+        ([assetClass, subCategories]) => (
+          <Card key={`sub-${assetClass}`}>
+            <CardHeader>
+              <CardTitle>
+                Allocazione Sotto-Categoria {assetClassLabels[assetClass]}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Sotto-Categoria</TableHead>
+                      <TableHead className="text-right">Corrente %</TableHead>
+                      <TableHead className="text-right">Corrente €</TableHead>
+                      <TableHead className="text-right">Target %</TableHead>
+                      <TableHead className="text-right">Target €</TableHead>
+                      <TableHead className="text-right">Differenza %</TableHead>
+                      <TableHead className="text-right">Differenza €</TableHead>
+                      <TableHead className="text-center">Azione</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Object.entries(subCategories).map(
+                      ([subCategory, data]) => (
+                        <TableRow key={subCategory}>
+                          <TableCell className="font-medium">
+                            {subCategory}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatPercentage(data.currentPercentage)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatCurrency(data.currentValue)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatPercentage(data.targetPercentage)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatCurrency(data.targetValue)}
+                          </TableCell>
+                          <TableCell
+                            className={`text-right font-semibold ${getDifferenceColor(
+                              data.difference
+                            )}`}
+                          >
+                            {data.difference > 0 ? '+' : ''}
+                            {formatPercentage(data.difference)}
+                          </TableCell>
+                          <TableCell
+                            className={`text-right font-semibold ${getDifferenceColor(
+                              data.difference
+                            )}`}
+                          >
+                            {data.differenceValue > 0 ? '+' : ''}
+                            {formatCurrency(data.differenceValue)}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-center">
+                              <span
+                                className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${getActionColor(
+                                  data.action
+                                )}`}
+                              >
+                                {getActionIcon(data.action)}
+                                {data.action}
+                              </span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        )
       )}
 
       <div className="rounded-lg bg-blue-50 p-4">

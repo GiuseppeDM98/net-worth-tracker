@@ -2,6 +2,7 @@ import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { Asset, AssetAllocationTarget, AllocationResult } from '@/types/assets';
 import { calculateAssetValue, calculateTotalValue } from './assetService';
+import { DEFAULT_SUB_CATEGORIES, DEFAULT_EQUITY_SUB_TARGETS } from '@/lib/constants/defaultSubCategories';
 
 const ALLOCATION_TARGETS_COLLECTION = 'assetAllocationTargets';
 
@@ -37,6 +38,7 @@ export async function setTargets(
     const targetRef = doc(db, ALLOCATION_TARGETS_COLLECTION, userId);
 
     await setDoc(targetRef, {
+      userId,
       targets,
       updatedAt: Timestamp.now(),
     });
@@ -195,31 +197,46 @@ export function getDefaultTargets(): AssetAllocationTarget {
   return {
     equity: {
       targetPercentage: 70,
-      subTargets: {
-        'All-World': 40,
-        'Momentum': 10,
-        'Quality': 10,
-        'Value': 10,
-        'Pension': 15,
-        'Private Equity': 5,
-        'High Risk': 5,
-        'Single Stocks': 5,
+      subCategoryConfig: {
+        enabled: true,
+        categories: DEFAULT_SUB_CATEGORIES.equity,
       },
+      subTargets: DEFAULT_EQUITY_SUB_TARGETS,
     },
     bonds: {
       targetPercentage: 20,
+      subCategoryConfig: {
+        enabled: false,
+        categories: DEFAULT_SUB_CATEGORIES.bonds,
+      },
     },
     crypto: {
       targetPercentage: 3,
+      subCategoryConfig: {
+        enabled: false,
+        categories: DEFAULT_SUB_CATEGORIES.crypto,
+      },
     },
     realestate: {
       targetPercentage: 5,
+      subCategoryConfig: {
+        enabled: false,
+        categories: DEFAULT_SUB_CATEGORIES.realestate,
+      },
     },
     cash: {
       targetPercentage: 2,
+      subCategoryConfig: {
+        enabled: false,
+        categories: DEFAULT_SUB_CATEGORIES.cash,
+      },
     },
     commodity: {
       targetPercentage: 0,
+      subCategoryConfig: {
+        enabled: false,
+        categories: DEFAULT_SUB_CATEGORIES.commodity,
+      },
     },
   };
 }
