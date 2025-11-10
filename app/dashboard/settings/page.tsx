@@ -49,6 +49,11 @@ const assetClasses: AssetClass[] = [
   'commodity',
 ];
 
+// Helper function to round to 2 decimal places
+const roundToTwoDecimals = (value: number): number => {
+  return Math.round(value * 100) / 100;
+};
+
 export default function SettingsPage() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -74,7 +79,9 @@ export default function SettingsPage() {
       riskFreeRate !== undefined &&
       Object.keys(assetClassStates).length > 0
     ) {
-      const equityPercentage = calculateEquityPercentage(userAge, riskFreeRate);
+      const equityPercentage = roundToTwoDecimals(
+        calculateEquityPercentage(userAge, riskFreeRate)
+      );
 
       // Calculate bonds percentage: 100 - sum of all other asset classes
       const otherAssetClasses = assetClasses.filter(
@@ -84,7 +91,9 @@ export default function SettingsPage() {
         (sum, ac) => sum + (assetClassStates[ac]?.targetPercentage || 0),
         0
       );
-      const bondsPercentage = Math.max(0, 100 - equityPercentage - otherTotal);
+      const bondsPercentage = roundToTwoDecimals(
+        Math.max(0, 100 - equityPercentage - otherTotal)
+      );
 
       // Update equity and bonds percentages
       setAssetClassStates((prev) => ({
@@ -109,7 +118,9 @@ export default function SettingsPage() {
       riskFreeRate !== undefined &&
       Object.keys(assetClassStates).length > 0
     ) {
-      const equityPercentage = calculateEquityPercentage(userAge, riskFreeRate);
+      const equityPercentage = roundToTwoDecimals(
+        calculateEquityPercentage(userAge, riskFreeRate)
+      );
 
       const otherAssetClasses = assetClasses.filter(
         (ac) => ac !== 'equity' && ac !== 'bonds'
@@ -118,7 +129,9 @@ export default function SettingsPage() {
         (sum, ac) => sum + (assetClassStates[ac]?.targetPercentage || 0),
         0
       );
-      const bondsPercentage = Math.max(0, 100 - equityPercentage - otherTotal);
+      const bondsPercentage = roundToTwoDecimals(
+        Math.max(0, 100 - equityPercentage - otherTotal)
+      );
 
       // Only update if bonds percentage has changed
       if (assetClassStates.bonds?.targetPercentage !== bondsPercentage) {
@@ -506,7 +519,7 @@ export default function SettingsPage() {
               <div className="rounded-lg bg-blue-50 p-4">
                 <p className="text-sm text-blue-900">
                   <strong>Formula applicata:</strong> 125 - {userAge} - ({riskFreeRate} × 5) ={' '}
-                  <strong>{calculateEquityPercentage(userAge, riskFreeRate).toFixed(1)}% Azioni</strong>
+                  <strong>{calculateEquityPercentage(userAge, riskFreeRate).toFixed(2)}% Azioni</strong>
                 </p>
                 <p className="mt-1 text-sm text-blue-800">
                   La percentuale di Obbligazioni sarà calcolata come: 100% - (somma delle altre asset class)
@@ -560,13 +573,13 @@ export default function SettingsPage() {
                     <Input
                       id={assetClass}
                       type="number"
-                      step="0.1"
+                      step="0.01"
                       min="0"
                       max="100"
                       value={assetClassStates[assetClass]?.targetPercentage || 0}
                       onChange={(e) =>
                         updateAssetClassState(assetClass, {
-                          targetPercentage: parseFloat(e.target.value) || 0,
+                          targetPercentage: roundToTwoDecimals(parseFloat(e.target.value) || 0),
                         })
                       }
                       disabled={isAutoCalculated}
@@ -669,7 +682,7 @@ export default function SettingsPage() {
                         <div className="flex items-center gap-2">
                           <Input
                             type="number"
-                            step="0.1"
+                            step="0.01"
                             min="0"
                             max="100"
                             className="w-24"
@@ -679,7 +692,7 @@ export default function SettingsPage() {
                                 assetClass,
                                 index,
                                 'percentage',
-                                parseFloat(e.target.value) || 0
+                                roundToTwoDecimals(parseFloat(e.target.value) || 0)
                               )
                             }
                           />
