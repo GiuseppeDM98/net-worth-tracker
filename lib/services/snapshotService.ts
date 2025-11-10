@@ -17,7 +17,7 @@ import {
 } from './assetService';
 import { calculateCurrentAllocation } from './assetAllocationService';
 
-const SNAPSHOTS_COLLECTION = 'monthlySnapshots';
+const SNAPSHOTS_COLLECTION = 'monthly-snapshots';
 
 /**
  * Create a monthly snapshot from current assets
