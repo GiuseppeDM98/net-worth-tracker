@@ -599,6 +599,11 @@ match /priceHistory/{document} {
 }
 ```
 
+### Se da visual studio ricevi errore durante npm install, run questo
+```bash
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
+```
+
 ### Environment Variables
 Set in Vercel dashboard (Settings → Environment Variables):
 - `NEXT_PUBLIC_FIREBASE_API_KEY`
