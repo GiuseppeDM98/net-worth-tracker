@@ -67,6 +67,15 @@ service cloud.firestore {
       allow delete: if isOwner(resource.data.userId);
     }
 
+    // Collezione assetAllocationTargets - target di allocazione asset
+    match /assetAllocationTargets/{targetId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && hasValidUserId();
+      allow update: if isOwner(resource.data.userId) &&
+                       request.resource.data.userId == resource.data.userId;
+      allow delete: if isOwner(resource.data.userId);
+    }
+
     // Blocca tutto il resto per sicurezza
     match /{document=**} {
       allow read, write: if false;

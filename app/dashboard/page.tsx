@@ -1,9 +1,54 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Asset } from '@/types/assets';
+import {
+  getAllAssets,
+  calculateTotalValue,
+  calculateLiquidNetWorth,
+} from '@/lib/services/assetService';
+import { formatCurrency } from '@/lib/services/chartService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Wallet, TrendingUp, PieChart, DollarSign } from 'lucide-react';
 
 export default function DashboardPage() {
+  const { user } = useAuth();
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user) {
+      loadAssets();
+    }
+  }, [user]);
+
+  const loadAssets = async () => {
+    if (!user) return;
+
+    try {
+      setLoading(true);
+      const data = await getAllAssets(user.uid);
+      setAssets(data);
+    } catch (error) {
+      console.error('Error loading assets:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const totalValue = calculateTotalValue(assets);
+  const liquidNetWorth = calculateLiquidNetWorth(assets);
+  const assetCount = assets.length;
+
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="text-gray-500">Caricamento...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -20,9 +65,9 @@ export default function DashboardPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">€0,00</div>
+            <div className="text-2xl font-bold">{formatCurrency(totalValue)}</div>
             <p className="text-xs text-muted-foreground">
-              Aggiungi assets per iniziare
+              {assetCount === 0 ? 'Aggiungi assets per iniziare' : `${assetCount} asset${assetCount !== 1 ? 's' : ''}`}
             </p>
           </CardContent>
         </Card>
@@ -33,9 +78,9 @@ export default function DashboardPage() {
             <Wallet className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">€0,00</div>
+            <div className="text-2xl font-bold">{formatCurrency(liquidNetWorth)}</div>
             <p className="text-xs text-muted-foreground">
-              Escluso immobili
+              Escluso immobili e private equity
             </p>
           </CardContent>
         </Card>
@@ -46,9 +91,9 @@ export default function DashboardPage() {
             <PieChart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">0</div>
+            <div className="text-2xl font-bold">{assetCount}</div>
             <p className="text-xs text-muted-foreground">
-              Nessun asset presente
+              {assetCount === 0 ? 'Nessun asset presente' : 'Asset in portafoglio'}
             </p>
           </CardContent>
         </Card>
