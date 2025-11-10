@@ -8,8 +8,13 @@ import {
   calculateTotalValue,
   calculateLiquidNetWorth,
 } from '@/lib/services/assetService';
-import { formatCurrency } from '@/lib/services/chartService';
+import {
+  formatCurrency,
+  prepareAssetClassDistributionData,
+  prepareAssetDistributionData,
+} from '@/lib/services/chartService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PieChart as PieChartComponent } from '@/components/ui/pie-chart';
 import { Wallet, TrendingUp, PieChart, DollarSign } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -40,6 +45,10 @@ export default function DashboardPage() {
   const totalValue = calculateTotalValue(assets);
   const liquidNetWorth = calculateLiquidNetWorth(assets);
   const assetCount = assets.length;
+
+  // Prepare chart data
+  const assetClassData = prepareAssetClassDistributionData(assets);
+  const assetData = prepareAssetDistributionData(assets);
 
   if (loading) {
     return (
@@ -118,9 +127,7 @@ export default function DashboardPage() {
             <CardTitle>Distribuzione per Asset Class</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex h-64 items-center justify-center text-gray-500">
-              Nessun dato disponibile. Aggiungi assets per visualizzare il grafico.
-            </div>
+            <PieChartComponent data={assetClassData} />
           </CardContent>
         </Card>
 
@@ -129,9 +136,7 @@ export default function DashboardPage() {
             <CardTitle>Distribuzione per Asset</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex h-64 items-center justify-center text-gray-500">
-              Nessun dato disponibile. Aggiungi assets per visualizzare il grafico.
-            </div>
+            <PieChartComponent data={assetData} />
           </CardContent>
         </Card>
       </div>
