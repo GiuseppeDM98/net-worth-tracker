@@ -18,14 +18,15 @@ const ASSETS_COLLECTION = 'assets';
 
 /**
  * Define asset class ordering priority
+ * Order: Azioni → Obbligazioni → Commodities → Real Estate → Cash → Crypto
  */
-const ASSET_CLASS_ORDER: Record<string, number> = {
+export const ASSET_CLASS_ORDER: Record<string, number> = {
   equity: 1,
   bonds: 2,
-  realestate: 3,
-  crypto: 4,
-  commodity: 5,
-  cash: 6,
+  commodity: 3,
+  realestate: 4,
+  cash: 5,
+  crypto: 6,
 };
 
 /**

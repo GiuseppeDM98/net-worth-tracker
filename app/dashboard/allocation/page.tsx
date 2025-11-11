@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
-import { getAllAssets } from '@/lib/services/assetService';
+import { getAllAssets, ASSET_CLASS_ORDER } from '@/lib/services/assetService';
 import {
   getTargets,
   compareAllocations,
@@ -192,8 +192,13 @@ export default function AllocationPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {Object.entries(allocation.byAssetClass).map(
-                    ([assetClass, data]) => (
+                  {Object.entries(allocation.byAssetClass)
+                    .sort(([a], [b]) => {
+                      const orderA = ASSET_CLASS_ORDER[a] || 999;
+                      const orderB = ASSET_CLASS_ORDER[b] || 999;
+                      return orderA - orderB;
+                    })
+                    .map(([assetClass, data]) => (
                       <TableRow key={assetClass}>
                         <TableCell className="font-medium">
                           {assetClassLabels[assetClass] || assetClass}
@@ -249,8 +254,13 @@ export default function AllocationPage() {
       </Card>
 
       {/* Sub-Category Allocation - One card per asset class */}
-      {Object.entries(getSubCategoriesByAssetClass()).map(
-        ([assetClass, subCategories]) => (
+      {Object.entries(getSubCategoriesByAssetClass())
+        .sort(([a], [b]) => {
+          const orderA = ASSET_CLASS_ORDER[a] || 999;
+          const orderB = ASSET_CLASS_ORDER[b] || 999;
+          return orderA - orderB;
+        })
+        .map(([assetClass, subCategories]) => (
           <Card key={`sub-${assetClass}`}>
             <CardHeader>
               <CardTitle>
@@ -273,8 +283,9 @@ export default function AllocationPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {Object.entries(subCategories).map(
-                      ([subCategory, data]) => (
+                    {Object.entries(subCategories)
+                      .sort(([a], [b]) => a.localeCompare(b))
+                      .map(([subCategory, data]) => (
                         <TableRow key={subCategory}>
                           <TableCell className="font-medium">
                             {subCategory}
