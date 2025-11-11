@@ -617,7 +617,7 @@ Create `vercel.json`:
 {
   "crons": [{
     "path": "/api/prices/update",
-    "schedule": "0 22 30,31 * *"  // 10 PM on 30th and 31st of every month
+    "schedule": "0 20 28-31 * *"  // 10 PM on 30th and 31st of every month
   }]
 }
 ```
