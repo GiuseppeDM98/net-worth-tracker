@@ -101,6 +101,7 @@ export default function AllocationPage() {
   };
 
   // Group sub-categories by asset class
+  // Le chiavi in bySubCategory sono nel formato "assetClass:subCategory"
   const getSubCategoriesByAssetClass = () => {
     if (!targets || !allocation) return {};
 
@@ -109,23 +110,20 @@ export default function AllocationPage() {
       Record<string, AllocationResult['bySubCategory'][string]>
     > = {};
 
-    // Iterate through asset classes that have sub-targets
-    Object.entries(targets).forEach(([assetClass, targetData]) => {
-      if (targetData.subTargets) {
-        grouped[assetClass] = {};
+    // Iterate through all subcategory entries
+    Object.entries(allocation.bySubCategory).forEach(([key, data]) => {
+      // Parse the composite key "assetClass:subCategory"
+      const parts = key.split(':');
+      if (parts.length === 2) {
+        const [assetClass, subCategory] = parts;
 
-        // Get all sub-categories for this asset class
-        Object.keys(targetData.subTargets).forEach((subCategory) => {
-          if (allocation.bySubCategory[subCategory]) {
-            grouped[assetClass][subCategory] =
-              allocation.bySubCategory[subCategory];
-          }
-        });
-
-        // Remove asset class if no sub-categories have data
-        if (Object.keys(grouped[assetClass]).length === 0) {
-          delete grouped[assetClass];
+        // Initialize asset class group if needed
+        if (!grouped[assetClass]) {
+          grouped[assetClass] = {};
         }
+
+        // Add subcategory to its asset class group
+        grouped[assetClass][subCategory] = data;
       }
     });
 
