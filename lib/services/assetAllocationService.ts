@@ -79,6 +79,7 @@ export async function setTargets(
 
 /**
  * Calculate current allocation from assets
+ * Gestisce anche asset con composizione (es. fondi pensione misti)
  */
 export function calculateCurrentAllocation(assets: Asset[]): {
   byAssetClass: { [assetClass: string]: number };
@@ -101,18 +102,41 @@ export function calculateCurrentAllocation(assets: Asset[]): {
   assets.forEach((asset) => {
     const value = calculateAssetValue(asset);
 
-    // Aggregate by asset class
-    if (!byAssetClass[asset.assetClass]) {
-      byAssetClass[asset.assetClass] = 0;
-    }
-    byAssetClass[asset.assetClass] += value;
+    // Se l'asset ha una composizione, distribuisci il valore tra le asset class
+    if (asset.composition && asset.composition.length > 0) {
+      asset.composition.forEach((comp) => {
+        const compValue = (value * comp.percentage) / 100;
 
-    // Aggregate by sub-category if present
-    if (asset.subCategory) {
-      if (!bySubCategory[asset.subCategory]) {
-        bySubCategory[asset.subCategory] = 0;
+        // Aggregate by asset class
+        if (!byAssetClass[comp.assetClass]) {
+          byAssetClass[comp.assetClass] = 0;
+        }
+        byAssetClass[comp.assetClass] += compValue;
+      });
+
+      // Per le sottocategorie, usa l'asset class principale e la subCategory dell'asset
+      if (asset.subCategory) {
+        if (!bySubCategory[asset.subCategory]) {
+          bySubCategory[asset.subCategory] = 0;
+        }
+        bySubCategory[asset.subCategory] += value;
       }
-      bySubCategory[asset.subCategory] += value;
+    } else {
+      // Asset semplice (senza composizione) - comportamento normale
+
+      // Aggregate by asset class
+      if (!byAssetClass[asset.assetClass]) {
+        byAssetClass[asset.assetClass] = 0;
+      }
+      byAssetClass[asset.assetClass] += value;
+
+      // Aggregate by sub-category if present
+      if (asset.subCategory) {
+        if (!bySubCategory[asset.subCategory]) {
+          bySubCategory[asset.subCategory] = 0;
+        }
+        bySubCategory[asset.subCategory] += value;
+      }
     }
   });
 
@@ -265,6 +289,62 @@ export function calculateEquityPercentage(
   const percentage = 125 - userAge - (riskFreeRate * 5);
   // Ensure percentage is between 0 and 100
   return Math.max(0, Math.min(100, percentage));
+}
+
+/**
+ * Add a new subcategory to an asset class
+ * La sottocategoria viene inizializzata con 0% target
+ */
+export async function addSubCategory(
+  userId: string,
+  assetClass: string,
+  subCategoryName: string
+): Promise<void> {
+  try {
+    // Carica le settings attuali
+    const settings = await getSettings(userId);
+
+    if (!settings) {
+      throw new Error('Settings not found. Please configure allocation targets first.');
+    }
+
+    // Verifica che l'asset class esista
+    if (!settings.targets[assetClass]) {
+      throw new Error(`Asset class ${assetClass} not found in targets`);
+    }
+
+    // Inizializza subCategoryConfig se non esiste
+    if (!settings.targets[assetClass].subCategoryConfig) {
+      settings.targets[assetClass].subCategoryConfig = {
+        enabled: true,
+        categories: [],
+      };
+    }
+
+    // Inizializza subTargets se non esiste
+    if (!settings.targets[assetClass].subTargets) {
+      settings.targets[assetClass].subTargets = {};
+    }
+
+    // Verifica che la sottocategoria non esista già
+    const existingCategories = settings.targets[assetClass].subCategoryConfig!.categories;
+    if (existingCategories.includes(subCategoryName)) {
+      throw new Error(`Subcategory ${subCategoryName} already exists in ${assetClass}`);
+    }
+
+    // Aggiungi la nuova sottocategoria
+    settings.targets[assetClass].subCategoryConfig!.categories.push(subCategoryName);
+    settings.targets[assetClass].subCategoryConfig!.enabled = true;
+
+    // Inizializza il target a 0%
+    settings.targets[assetClass].subTargets![subCategoryName] = 0;
+
+    // Salva le settings aggiornate
+    await setSettings(userId, settings);
+  } catch (error) {
+    console.error('Error adding subcategory:', error);
+    throw error;
+  }
 }
 
 /**

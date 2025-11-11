@@ -3,6 +3,11 @@ import { Timestamp } from 'firebase/firestore';
 export type AssetType = 'stock' | 'etf' | 'bond' | 'crypto' | 'commodity' | 'cash' | 'realestate';
 export type AssetClass = 'equity' | 'bonds' | 'crypto' | 'realestate' | 'cash' | 'commodity';
 
+export interface AssetComposition {
+  assetClass: AssetClass;
+  percentage: number;
+}
+
 export interface Asset {
   id: string;
   userId: string;
@@ -16,6 +21,8 @@ export interface Asset {
   quantity: number;
   averageCost?: number;
   currentPrice: number;
+  isLiquid?: boolean; // Default: true - indica se l'asset è liquido o illiquido
+  composition?: AssetComposition[]; // Per asset composti (es. fondi pensione)
   lastPriceUpdate: Date | Timestamp;
   createdAt: Date | Timestamp;
   updatedAt: Date | Timestamp;
@@ -32,6 +39,8 @@ export interface AssetFormData {
   quantity: number;
   averageCost?: number;
   currentPrice: number;
+  isLiquid?: boolean;
+  composition?: AssetComposition[];
 }
 
 export interface SubCategoryConfig {
@@ -103,6 +112,7 @@ export interface MonthlySnapshot {
   month: number;
   totalNetWorth: number;
   liquidNetWorth: number;
+  illiquidNetWorth: number; // Nuovo campo per tracciare separatamente gli illiquidi
   byAssetClass: {
     [assetClass: string]: number;
   };

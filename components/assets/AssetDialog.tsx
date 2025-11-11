@@ -5,9 +5,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
-import { Asset, AssetFormData, AssetType, AssetClass, AssetAllocationTarget } from '@/types/assets';
+import { Asset, AssetFormData, AssetType, AssetClass, AssetAllocationTarget, AssetComposition } from '@/types/assets';
 import { createAsset, updateAsset } from '@/lib/services/assetService';
-import { getTargets } from '@/lib/services/assetAllocationService';
+import { getTargets, addSubCategory } from '@/lib/services/assetAllocationService';
 import {
   Dialog,
   DialogContent,
@@ -25,6 +25,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { Plus, X } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 
 /**
  * Helper to check if asset type requires price updates
@@ -53,6 +55,8 @@ const assetSchema = z.object({
   currency: z.string().min(1, 'Valuta è obbligatoria'),
   quantity: z.number().positive('Quantità deve essere positiva'),
   manualPrice: z.number().positive('Il prezzo deve essere positivo').optional().or(z.nan()),
+  isLiquid: z.boolean().optional(),
+  isComposite: z.boolean().optional(),
 });
 
 type AssetFormValues = z.infer<typeof assetSchema>;
@@ -87,6 +91,11 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
   const [fetchingPrice, setFetchingPrice] = useState(false);
   const [allocationTargets, setAllocationTargets] = useState<AssetAllocationTarget | null>(null);
   const [loadingTargets, setLoadingTargets] = useState(false);
+  const [showNewSubCategory, setShowNewSubCategory] = useState(false);
+  const [newSubCategoryName, setNewSubCategoryName] = useState('');
+  const [isAddingSubCategory, setIsAddingSubCategory] = useState(false);
+  const [composition, setComposition] = useState<AssetComposition[]>([]);
+  const [isComposite, setIsComposite] = useState(false);
   const {
     register,
     handleSubmit,
@@ -99,12 +108,39 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
     defaultValues: {
       currency: 'EUR',
       quantity: 0,
+      isLiquid: true,
+      isComposite: false,
     },
   });
 
   const selectedType = watch('type');
   const selectedAssetClass = watch('assetClass');
   const selectedSubCategory = watch('subCategory');
+  const watchIsLiquid = watch('isLiquid');
+  const watchIsComposite = watch('isComposite');
+
+  // Determina il default per isLiquid basato sull'asset class
+  useEffect(() => {
+    if (selectedAssetClass) {
+      // Default intelligente per isLiquid
+      const defaultIsLiquid =
+        selectedAssetClass !== 'realestate' &&
+        selectedSubCategory !== 'Private Equity';
+
+      // Imposta solo se non è già stato impostato dall'utente
+      if (watchIsLiquid === undefined) {
+        setValue('isLiquid', defaultIsLiquid);
+      }
+    }
+  }, [selectedAssetClass, selectedSubCategory, watchIsLiquid, setValue]);
+
+  // Gestisci il toggle della composizione
+  useEffect(() => {
+    setIsComposite(watchIsComposite || false);
+    if (!watchIsComposite) {
+      setComposition([]);
+    }
+  }, [watchIsComposite]);
 
   // Load allocation targets when dialog opens
   useEffect(() => {
@@ -129,6 +165,11 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
 
   useEffect(() => {
     if (asset) {
+      // Determine default for isLiquid if not set
+      const defaultIsLiquid = asset.isLiquid !== undefined
+        ? asset.isLiquid
+        : (asset.assetClass !== 'realestate' && asset.subCategory !== 'Private Equity');
+
       reset({
         ticker: asset.ticker,
         name: asset.name,
@@ -139,7 +180,17 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         currency: asset.currency,
         quantity: asset.quantity,
         manualPrice: asset.currentPrice > 0 ? asset.currentPrice : undefined,
+        isLiquid: defaultIsLiquid,
+        isComposite: !!(asset.composition && asset.composition.length > 0),
       });
+
+      if (asset.composition && asset.composition.length > 0) {
+        setComposition(asset.composition);
+        setIsComposite(true);
+      } else {
+        setComposition([]);
+        setIsComposite(false);
+      }
     } else {
       reset({
         ticker: '',
@@ -151,7 +202,11 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         currency: 'EUR',
         quantity: 0,
         manualPrice: undefined,
+        isLiquid: true,
+        isComposite: false,
       });
+      setComposition([]);
+      setIsComposite(false);
     }
   }, [asset, reset]);
 
@@ -172,12 +227,72 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
     return assetClassConfig?.subCategoryConfig?.enabled || false;
   };
 
+  const handleAddSubCategory = async () => {
+    if (!user || !selectedAssetClass || !newSubCategoryName.trim()) {
+      toast.error('Inserisci un nome per la sottocategoria');
+      return;
+    }
+
+    try {
+      setIsAddingSubCategory(true);
+      await addSubCategory(user.uid, selectedAssetClass, newSubCategoryName.trim());
+      toast.success(`Sottocategoria "${newSubCategoryName}" creata con successo!`);
+
+      // Ricarica i targets per ottenere la nuova sottocategoria
+      await loadAllocationTargets();
+
+      // Seleziona automaticamente la nuova sottocategoria
+      setValue('subCategory', newSubCategoryName.trim());
+
+      // Reset
+      setNewSubCategoryName('');
+      setShowNewSubCategory(false);
+    } catch (error: any) {
+      console.error('Error adding subcategory:', error);
+      toast.error(error.message || 'Errore nella creazione della sottocategoria');
+    } finally {
+      setIsAddingSubCategory(false);
+    }
+  };
+
+  const addCompositionEntry = () => {
+    setComposition([...composition, { assetClass: 'equity', percentage: 0 }]);
+  };
+
+  const removeCompositionEntry = (index: number) => {
+    setComposition(composition.filter((_, i) => i !== index));
+  };
+
+  const updateCompositionEntry = (index: number, field: 'assetClass' | 'percentage', value: any) => {
+    const updated = [...composition];
+    updated[index] = { ...updated[index], [field]: value };
+    setComposition(updated);
+  };
+
+  const validateComposition = (): boolean => {
+    if (!isComposite || composition.length === 0) return true;
+
+    const totalPercentage = composition.reduce((sum, comp) => sum + comp.percentage, 0);
+
+    if (Math.abs(totalPercentage - 100) > 0.01) {
+      toast.error(`La somma delle percentuali deve essere 100% (attuale: ${totalPercentage.toFixed(2)}%)`);
+      return false;
+    }
+
+    return true;
+  };
+
   const onSubmit = async (data: AssetFormValues) => {
     if (!user) return;
 
     // Validate that sub-category is provided if enabled for the asset class
     if (isSubCategoryEnabled() && !data.subCategory) {
       toast.error('La sotto-categoria è obbligatoria per questa classe di asset');
+      return;
+    }
+
+    // Validate composition if enabled
+    if (isComposite && !validateComposition()) {
       return;
     }
 
@@ -231,6 +346,8 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         currency: data.currency,
         quantity: data.quantity,
         currentPrice,
+        isLiquid: data.isLiquid,
+        composition: isComposite && composition.length > 0 ? composition : undefined,
       };
 
       if (asset) {
@@ -343,25 +460,72 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
           <div className="grid grid-cols-2 gap-4">
             {isSubCategoryEnabled() && (
               <div className="space-y-2">
-                <Label htmlFor="subCategory">
-                  Sotto-categoria
-                  {isSubCategoryEnabled() && availableSubCategories().length > 0 && ' *'}
-                </Label>
-                <Select
-                  value={watch('subCategory')}
-                  onValueChange={(value) => setValue('subCategory', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleziona sotto-categoria" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableSubCategories().map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        {cat}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="subCategory">
+                    Sotto-categoria
+                    {isSubCategoryEnabled() && availableSubCategories().length > 0 && ' *'}
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowNewSubCategory(!showNewSubCategory)}
+                    className="h-7 px-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {showNewSubCategory ? (
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Nuova sottocategoria"
+                      value={newSubCategoryName}
+                      onChange={(e) => setNewSubCategoryName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddSubCategory();
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleAddSubCategory}
+                      disabled={isAddingSubCategory || !newSubCategoryName.trim()}
+                    >
+                      {isAddingSubCategory ? 'Creazione...' : 'Crea'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setShowNewSubCategory(false);
+                        setNewSubCategoryName('');
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <Select
+                    value={watch('subCategory')}
+                    onValueChange={(value) => setValue('subCategory', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleziona sotto-categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableSubCategories().map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             )}
 
@@ -400,6 +564,112 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                 <p className="text-sm text-red-500">{errors.quantity.message}</p>
               )}
             </div>
+          </div>
+
+          {/* Liquidità */}
+          <div className="space-y-2 rounded-lg border p-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="isLiquid">Asset Liquido</Label>
+                <p className="text-xs text-gray-500">
+                  Indica se questo asset può essere convertito rapidamente in contanti
+                </p>
+              </div>
+              <Switch
+                id="isLiquid"
+                checked={watch('isLiquid')}
+                onCheckedChange={(checked) => setValue('isLiquid', checked)}
+              />
+            </div>
+          </div>
+
+          {/* Composizione */}
+          <div className="space-y-2 rounded-lg border p-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="isComposite">Asset Composto</Label>
+                <p className="text-xs text-gray-500">
+                  Es. fondo pensione con mix di azioni e obbligazioni
+                </p>
+              </div>
+              <Switch
+                id="isComposite"
+                checked={watch('isComposite')}
+                onCheckedChange={(checked) => setValue('isComposite', checked)}
+              />
+            </div>
+
+            {isComposite && (
+              <div className="mt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Composizione Percentuale</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addCompositionEntry}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Aggiungi
+                  </Button>
+                </div>
+
+                {composition.map((comp, index) => (
+                  <div key={index} className="flex gap-2 items-start">
+                    <div className="flex-1">
+                      <Select
+                        value={comp.assetClass}
+                        onValueChange={(value) =>
+                          updateCompositionEntry(index, 'assetClass', value as AssetClass)
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Classe Asset" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {assetClasses.map((ac) => (
+                            <SelectItem key={ac.value} value={ac.value}>
+                              {ac.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="w-24">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        placeholder="%"
+                        value={comp.percentage || ''}
+                        onChange={(e) =>
+                          updateCompositionEntry(
+                            index,
+                            'percentage',
+                            parseFloat(e.target.value) || 0
+                          )
+                        }
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeCompositionEntry(index)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+
+                {composition.length > 0 && (
+                  <p className="text-xs text-gray-500">
+                    Totale: {composition.reduce((sum, c) => sum + c.percentage, 0).toFixed(2)}% (deve essere 100%)
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {shouldUpdatePrice(selectedType, selectedSubCategory) && (

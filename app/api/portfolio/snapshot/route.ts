@@ -6,6 +6,7 @@ import {
   calculateAssetValue,
   calculateTotalValue,
   calculateLiquidNetWorth,
+  calculateIlliquidNetWorth,
 } from '@/lib/services/assetService';
 import { calculateCurrentAllocation } from '@/lib/services/assetAllocationService';
 import { updateUserAssetPrices } from '@/lib/helpers/priceUpdater';
@@ -67,6 +68,7 @@ export async function POST(request: NextRequest) {
 
     const totalNetWorth = calculateTotalValue(assets);
     const liquidNetWorth = calculateLiquidNetWorth(assets);
+    const illiquidNetWorth = calculateIlliquidNetWorth(assets);
     const allocation = calculateCurrentAllocation(assets);
 
     // Convert allocation values to percentages
@@ -105,6 +107,7 @@ export async function POST(request: NextRequest) {
       month: snapshotMonth,
       totalNetWorth,
       liquidNetWorth,
+      illiquidNetWorth,
       byAssetClass: allocation.byAssetClass,
       byAsset,
       assetAllocation,
