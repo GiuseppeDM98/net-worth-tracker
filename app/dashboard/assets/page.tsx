@@ -10,6 +10,7 @@ import {
   calculateTotalValue,
 } from '@/lib/services/assetService';
 import { formatCurrency, formatNumber } from '@/lib/services/chartService';
+import { getAssetClassColor } from '@/lib/constants/colors';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -116,6 +117,24 @@ export default function AssetsPage() {
 
   const totalValue = calculateTotalValue(assets);
 
+  // Helper function to check if asset requires manual price update
+  const requiresManualPricing = (asset: Asset) => {
+    // If autoUpdatePrice is explicitly set to false
+    if (asset.autoUpdatePrice === false) {
+      return true;
+    }
+    // Types that don't support automatic updates
+    const manualTypes = ['realestate', 'cash'];
+    if (manualTypes.includes(asset.type)) {
+      return true;
+    }
+    // Private Equity subcategory
+    if (asset.subCategory === 'Private Equity') {
+      return true;
+    }
+    return false;
+  };
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -183,16 +202,30 @@ export default function AssetsPage() {
                       asset.lastPriceUpdate instanceof Date
                         ? asset.lastPriceUpdate
                         : new Date();
+                    const isManualPrice = requiresManualPricing(asset);
+                    const assetClassColor = getAssetClassColor(asset.assetClass);
 
                     return (
-                      <TableRow key={asset.id}>
+                      <TableRow
+                        key={asset.id}
+                        className={isManualPrice ? 'bg-amber-50' : ''}
+                      >
                         <TableCell className="font-medium">
                           {asset.name}
                         </TableCell>
                         <TableCell>{asset.ticker}</TableCell>
                         <TableCell className="capitalize">{asset.type}</TableCell>
                         <TableCell className="capitalize">
-                          {asset.assetClass}
+                          <span
+                            className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium"
+                            style={{
+                              backgroundColor: `${assetClassColor}20`,
+                              color: assetClassColor,
+                              border: `1px solid ${assetClassColor}40`
+                            }}
+                          >
+                            {asset.assetClass}
+                          </span>
                         </TableCell>
                         <TableCell className="text-right">
                           {formatNumber(asset.quantity, 4)}

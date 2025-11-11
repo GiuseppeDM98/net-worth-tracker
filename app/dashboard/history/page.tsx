@@ -43,6 +43,7 @@ export default function HistoryPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [targets, setTargets] = useState<AssetAllocationTarget | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showLiquidityPercentage, setShowLiquidityPercentage] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -109,6 +110,16 @@ export default function HistoryPage() {
   const netWorthHistory = prepareNetWorthHistoryData(snapshots);
   const assetDistribution = prepareAssetDistributionData(assets);
 
+  // Prepare liquidity data with percentages
+  const liquidityHistory = netWorthHistory.map((item) => {
+    const total = item.liquidNetWorth + item.illiquidNetWorth;
+    return {
+      ...item,
+      liquidPercentage: total > 0 ? (item.liquidNetWorth / total) * 100 : 0,
+      illiquidPercentage: total > 0 ? (item.illiquidNetWorth / total) * 100 : 0,
+    };
+  });
+
   // Prepare current vs target data
   const allocation = compareAllocations(
     assets,
@@ -164,10 +175,11 @@ export default function HistoryPage() {
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={400}>
-              <LineChart data={netWorthHistory}>
+              <LineChart data={netWorthHistory} margin={{ left: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis
+                  width={80}
                   tickFormatter={(value) =>
                     formatCurrency(value).replace(/,00$/, '')
                   }
@@ -210,7 +222,16 @@ export default function HistoryPage() {
       {/* Liquidity Evolution Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>Evoluzione Liquidità vs Illiquidità</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Evoluzione Liquidità vs Illiquidità</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowLiquidityPercentage(!showLiquidityPercentage)}
+            >
+              {showLiquidityPercentage ? '€ Valori Assoluti' : '% Percentuali'}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {netWorthHistory.length === 0 ? (
@@ -219,36 +240,44 @@ export default function HistoryPage() {
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={400}>
-              <AreaChart data={netWorthHistory}>
+              <AreaChart data={liquidityHistory} margin={{ left: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis
+                  width={80}
                   tickFormatter={(value) =>
-                    formatCurrency(value).replace(/,00$/, '')
+                    showLiquidityPercentage
+                      ? `${value.toFixed(0)}%`
+                      : formatCurrency(value).replace(/,00$/, '')
                   }
+                  domain={showLiquidityPercentage ? [0, 100] : undefined}
                 />
                 <Tooltip
-                  formatter={(value: number) => formatCurrency(value)}
+                  formatter={(value: number) =>
+                    showLiquidityPercentage
+                      ? `${value.toFixed(2)}%`
+                      : formatCurrency(value)
+                  }
                   labelStyle={{ color: '#000' }}
                 />
                 <Legend />
                 <Area
                   type="monotone"
-                  dataKey="liquidNetWorth"
-                  stackId="1"
-                  stroke="#10B981"
-                  fill="#10B981"
-                  fillOpacity={0.6}
-                  name="Liquido"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="illiquidNetWorth"
+                  dataKey={showLiquidityPercentage ? "illiquidPercentage" : "illiquidNetWorth"}
                   stackId="1"
                   stroke="#F59E0B"
                   fill="#F59E0B"
                   fillOpacity={0.6}
                   name="Illiquido"
+                />
+                <Area
+                  type="monotone"
+                  dataKey={showLiquidityPercentage ? "liquidPercentage" : "liquidNetWorth"}
+                  stackId="1"
+                  stroke="#10B981"
+                  fill="#10B981"
+                  fillOpacity={0.6}
+                  name="Liquido"
                 />
               </AreaChart>
             </ResponsiveContainer>

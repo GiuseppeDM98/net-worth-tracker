@@ -40,13 +40,14 @@ const assetClassLabels: Record<AssetClass, string> = {
   commodity: 'Materie Prime (Commodity)',
 };
 
+// Order: Azioni → Obbligazioni → Commodities → Real Estate → Cash → Crypto
 const assetClasses: AssetClass[] = [
   'equity',
   'bonds',
-  'crypto',
+  'commodity',
   'realestate',
   'cash',
-  'commodity',
+  'crypto',
 ];
 
 // Helper function to round to 2 decimal places
@@ -719,8 +720,11 @@ export default function SettingsPage() {
                 <div className="space-y-4">
                   {/* Sub-Targets */}
                   <div className="space-y-3">
-                    {state.subTargets.map((target, index) => (
-                      <div key={index} className="flex items-center gap-3">
+                    {state.subTargets
+                      .map((target, originalIndex) => ({ target, originalIndex }))
+                      .sort((a, b) => a.target.name.localeCompare(b.target.name))
+                      .map(({ target, originalIndex }) => (
+                        <div key={originalIndex} className="flex items-center gap-3">
                         <div className="flex-1">
                           <Input
                             placeholder="Nome sotto-categoria"
@@ -728,7 +732,7 @@ export default function SettingsPage() {
                             onChange={(e) =>
                               handleSubTargetChange(
                                 assetClass,
-                                index,
+                                originalIndex,
                                 'name',
                                 e.target.value
                               )
@@ -752,7 +756,7 @@ export default function SettingsPage() {
                             onChange={(e) =>
                               handleSubTargetChange(
                                 assetClass,
-                                index,
+                                originalIndex,
                                 'percentage',
                                 roundToTwoDecimals(parseFloat(e.target.value) || 0)
                               )
@@ -763,7 +767,7 @@ export default function SettingsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleRemoveSubTarget(assetClass, index)}
+                          onClick={() => handleRemoveSubTarget(assetClass, originalIndex)}
                         >
                           <Trash2 className="h-4 w-4 text-red-500" />
                         </Button>
