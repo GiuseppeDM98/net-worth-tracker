@@ -6,6 +6,7 @@ export type AssetClass = 'equity' | 'bonds' | 'crypto' | 'realestate' | 'cash' |
 export interface AssetComposition {
   assetClass: AssetClass;
   percentage: number;
+  subCategory?: string; // Sottocategoria specifica per questa componente dell'asset composto
 }
 
 export interface Asset {

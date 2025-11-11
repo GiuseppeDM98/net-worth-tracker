@@ -274,10 +274,20 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
     setComposition(composition.filter((_, i) => i !== index));
   };
 
-  const updateCompositionEntry = (index: number, field: 'assetClass' | 'percentage', value: any) => {
+  const updateCompositionEntry = (index: number, field: 'assetClass' | 'percentage' | 'subCategory', value: any) => {
     const updated = [...composition];
     updated[index] = { ...updated[index], [field]: value };
     setComposition(updated);
+  };
+
+  // Get available sub-categories for a specific asset class in composition
+  const getAvailableSubCategoriesForAssetClass = (assetClass: AssetClass): string[] => {
+    if (!allocationTargets) return [];
+
+    const assetClassConfig = allocationTargets[assetClass];
+    if (!assetClassConfig?.subCategoryConfig?.enabled) return [];
+
+    return assetClassConfig.subCategoryConfig.categories || [];
   };
 
   const validateComposition = (): boolean => {
@@ -643,54 +653,82 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                   </Button>
                 </div>
 
-                {composition.map((comp, index) => (
-                  <div key={index} className="flex gap-2 items-start">
-                    <div className="flex-1">
-                      <Select
-                        value={comp.assetClass}
-                        onValueChange={(value) =>
-                          updateCompositionEntry(index, 'assetClass', value as AssetClass)
-                        }
+                {composition.map((comp, index) => {
+                  const subCategoriesForAssetClass = getAvailableSubCategoriesForAssetClass(comp.assetClass);
+                  const hasSubCategories = subCategoriesForAssetClass.length > 0;
+
+                  return (
+                    <div key={index} className="flex gap-2 items-start">
+                      <div className="flex-1">
+                        <Select
+                          value={comp.assetClass}
+                          onValueChange={(value) => {
+                            updateCompositionEntry(index, 'assetClass', value as AssetClass);
+                            // Reset subCategory when asset class changes
+                            updateCompositionEntry(index, 'subCategory', undefined);
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Classe Asset" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {assetClasses.map((ac) => (
+                              <SelectItem key={ac.value} value={ac.value}>
+                                {ac.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {hasSubCategories && (
+                        <div className="flex-1">
+                          <Select
+                            value={comp.subCategory || ''}
+                            onValueChange={(value) =>
+                              updateCompositionEntry(index, 'subCategory', value || undefined)
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Sottocategoria" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {subCategoriesForAssetClass.map((cat) => (
+                                <SelectItem key={cat} value={cat}>
+                                  {cat}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      <div className="w-24">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max="100"
+                          placeholder="%"
+                          value={comp.percentage || ''}
+                          onChange={(e) =>
+                            updateCompositionEntry(
+                              index,
+                              'percentage',
+                              parseFloat(e.target.value) || 0
+                            )
+                          }
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeCompositionEntry(index)}
                       >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Classe Asset" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {assetClasses.map((ac) => (
-                            <SelectItem key={ac.value} value={ac.value}>
-                              {ac.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        <X className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <div className="w-24">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="100"
-                        placeholder="%"
-                        value={comp.percentage || ''}
-                        onChange={(e) =>
-                          updateCompositionEntry(
-                            index,
-                            'percentage',
-                            parseFloat(e.target.value) || 0
-                          )
-                        }
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeCompositionEntry(index)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {composition.length > 0 && (
                   <p className="text-xs text-gray-500">

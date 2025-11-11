@@ -112,15 +112,16 @@ export function calculateCurrentAllocation(assets: Asset[]): {
           byAssetClass[comp.assetClass] = 0;
         }
         byAssetClass[comp.assetClass] += compValue;
-      });
 
-      // Per le sottocategorie, usa l'asset class principale e la subCategory dell'asset
-      if (asset.subCategory) {
-        if (!bySubCategory[asset.subCategory]) {
-          bySubCategory[asset.subCategory] = 0;
+        // Aggregate by sub-category if present in composition
+        // Ogni componente può avere la sua sottocategoria specifica
+        if (comp.subCategory) {
+          if (!bySubCategory[comp.subCategory]) {
+            bySubCategory[comp.subCategory] = 0;
+          }
+          bySubCategory[comp.subCategory] += compValue;
         }
-        bySubCategory[asset.subCategory] += value;
-      }
+      });
     } else {
       // Asset semplice (senza composizione) - comportamento normale
 
