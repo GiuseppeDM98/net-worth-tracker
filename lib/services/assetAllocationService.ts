@@ -115,11 +115,13 @@ export function calculateCurrentAllocation(assets: Asset[]): {
 
         // Aggregate by sub-category if present in composition
         // Ogni componente può avere la sua sottocategoria specifica
+        // Usa chiave composta "assetClass:subCategory" per evitare collisioni
         if (comp.subCategory) {
-          if (!bySubCategory[comp.subCategory]) {
-            bySubCategory[comp.subCategory] = 0;
+          const subCategoryKey = `${comp.assetClass}:${comp.subCategory}`;
+          if (!bySubCategory[subCategoryKey]) {
+            bySubCategory[subCategoryKey] = 0;
           }
-          bySubCategory[comp.subCategory] += compValue;
+          bySubCategory[subCategoryKey] += compValue;
         }
       });
     } else {
@@ -132,11 +134,13 @@ export function calculateCurrentAllocation(assets: Asset[]): {
       byAssetClass[asset.assetClass] += value;
 
       // Aggregate by sub-category if present
+      // Usa chiave composta "assetClass:subCategory" per evitare collisioni
       if (asset.subCategory) {
-        if (!bySubCategory[asset.subCategory]) {
-          bySubCategory[asset.subCategory] = 0;
+        const subCategoryKey = `${asset.assetClass}:${asset.subCategory}`;
+        if (!bySubCategory[subCategoryKey]) {
+          bySubCategory[subCategoryKey] = 0;
         }
-        bySubCategory[asset.subCategory] += value;
+        bySubCategory[subCategoryKey] += value;
       }
     }
   });
@@ -239,7 +243,9 @@ export function compareAllocations(
 
       Object.keys(targetData.subTargets).forEach((subCategory) => {
         const subTargetPercentage = targetData.subTargets![subCategory];
-        const subCurrentValue = current.bySubCategory[subCategory] || 0;
+        // Usa chiave composta "assetClass:subCategory"
+        const subCategoryKey = `${assetClass}:${subCategory}`;
+        const subCurrentValue = current.bySubCategory[subCategoryKey] || 0;
 
         // Sub-category percentage is relative to its asset class
         const subCurrentPercentage =
@@ -259,7 +265,7 @@ export function compareAllocations(
           subAction = 'OK';
         }
 
-        bySubCategory[subCategory] = {
+        bySubCategory[subCategoryKey] = {
           currentPercentage: subCurrentPercentage,
           currentValue: subCurrentValue,
           targetPercentage: subTargetPercentage,
