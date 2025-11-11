@@ -44,6 +44,8 @@ export default function HistoryPage() {
   const [targets, setTargets] = useState<AssetAllocationTarget | null>(null);
   const [loading, setLoading] = useState(true);
   const [showLiquidityPercentage, setShowLiquidityPercentage] = useState(false);
+  const [showNetWorthLabels, setShowNetWorthLabels] = useState(false);
+  const [showLiquidityLabels, setShowLiquidityLabels] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -165,7 +167,16 @@ export default function HistoryPage() {
       {/* Net Worth History Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>Evoluzione Patrimonio Netto</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Evoluzione Patrimonio Netto</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowNetWorthLabels(!showNetWorthLabels)}
+            >
+              {showNetWorthLabels ? 'Nascondi Valori' : 'Mostra Valori'}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {netWorthHistory.length === 0 ? (
@@ -196,6 +207,17 @@ export default function HistoryPage() {
                   strokeWidth={2}
                   name="Patrimonio Totale"
                   dot={{ r: 4 }}
+                  label={
+                    showNetWorthLabels
+                      ? {
+                          position: 'top',
+                          fill: '#3B82F6',
+                          fontSize: 11,
+                          content: ({ value }: any) =>
+                            formatCurrency(value).replace(/,00$/, ''),
+                        }
+                      : false
+                  }
                 />
                 <Line
                   type="monotone"
@@ -204,6 +226,17 @@ export default function HistoryPage() {
                   strokeWidth={2}
                   name="Patrimonio Liquido"
                   dot={{ r: 4 }}
+                  label={
+                    showNetWorthLabels
+                      ? {
+                          position: 'top',
+                          fill: '#10B981',
+                          fontSize: 11,
+                          content: ({ value }: any) =>
+                            formatCurrency(value).replace(/,00$/, ''),
+                        }
+                      : false
+                  }
                 />
                 <Line
                   type="monotone"
@@ -212,6 +245,17 @@ export default function HistoryPage() {
                   strokeWidth={2}
                   name="Patrimonio Illiquido"
                   dot={{ r: 4 }}
+                  label={
+                    showNetWorthLabels
+                      ? {
+                          position: 'bottom',
+                          fill: '#F59E0B',
+                          fontSize: 11,
+                          content: ({ value }: any) =>
+                            formatCurrency(value).replace(/,00$/, ''),
+                        }
+                      : false
+                  }
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -224,13 +268,22 @@ export default function HistoryPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Evoluzione Liquidità vs Illiquidità</CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowLiquidityPercentage(!showLiquidityPercentage)}
-            >
-              {showLiquidityPercentage ? '€ Valori Assoluti' : '% Percentuali'}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowLiquidityPercentage(!showLiquidityPercentage)}
+              >
+                {showLiquidityPercentage ? '€ Valori Assoluti' : '% Percentuali'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowLiquidityLabels(!showLiquidityLabels)}
+              >
+                {showLiquidityLabels ? 'Nascondi Valori' : 'Mostra Valori'}
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -269,6 +322,19 @@ export default function HistoryPage() {
                   fill="#F59E0B"
                   fillOpacity={0.6}
                   name="Illiquido"
+                  label={
+                    showLiquidityLabels
+                      ? {
+                          position: 'bottom',
+                          fill: '#F59E0B',
+                          fontSize: 11,
+                          content: ({ value }: any) =>
+                            showLiquidityPercentage
+                              ? `${value.toFixed(1)}%`
+                              : formatCurrency(value).replace(/,00$/, ''),
+                        }
+                      : false
+                  }
                 />
                 <Area
                   type="monotone"
@@ -278,6 +344,19 @@ export default function HistoryPage() {
                   fill="#10B981"
                   fillOpacity={0.6}
                   name="Liquido"
+                  label={
+                    showLiquidityLabels
+                      ? {
+                          position: 'top',
+                          fill: '#10B981',
+                          fontSize: 11,
+                          content: ({ value }: any) =>
+                            showLiquidityPercentage
+                              ? `${value.toFixed(1)}%`
+                              : formatCurrency(value).replace(/,00$/, ''),
+                        }
+                      : false
+                  }
                 />
               </AreaChart>
             </ResponsiveContainer>
