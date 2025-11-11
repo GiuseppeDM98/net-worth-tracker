@@ -1,32 +1,26 @@
 import { Asset, PieChartData, MonthlySnapshot } from '@/types/assets';
 import { calculateAssetValue, calculateTotalValue } from './assetService';
+import { calculateCurrentAllocation } from './assetAllocationService';
 import { getAssetClassColor, getChartColor } from '@/lib/constants/colors';
 
 /**
  * Prepare data for asset class distribution pie chart
+ * Usa calculateCurrentAllocation per gestire correttamente gli asset composti
  */
 export function prepareAssetClassDistributionData(
   assets: Asset[]
 ): PieChartData[] {
-  const totalValue = calculateTotalValue(assets);
+  const allocation = calculateCurrentAllocation(assets);
+  const totalValue = allocation.totalValue;
 
   if (totalValue === 0) {
     return [];
   }
 
-  // Aggregate by asset class
-  const byAssetClass = new Map<string, number>();
-
-  assets.forEach((asset) => {
-    const value = calculateAssetValue(asset);
-    const current = byAssetClass.get(asset.assetClass) || 0;
-    byAssetClass.set(asset.assetClass, current + value);
-  });
-
   // Convert to chart data format
   const chartData: PieChartData[] = [];
 
-  byAssetClass.forEach((value, assetClass) => {
+  Object.entries(allocation.byAssetClass).forEach(([assetClass, value]) => {
     const percentage = (value / totalValue) * 100;
     chartData.push({
       name: getAssetClassName(assetClass),
