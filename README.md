@@ -622,6 +622,43 @@ Create `vercel.json`:
 }
 ```
 
+#### Modifica Schedule Cron Job
+
+Il cron job degli snapshot mensili è configurabile modificando il file `vercel.json` nella root del progetto.
+
+**Schedule attuale**: Esegue ogni giorno alle 13:00 UTC
+```json
+{
+  "crons": [
+    {
+      "path": "/api/cron/monthly-snapshot",
+      "schedule": "0 13 * * *"
+    }
+  ]
+}
+```
+
+**Come modificare l'orario**:
+
+Il formato del campo `schedule` segue la sintassi cron standard: `minuto ora giorno mese giorno_settimana`
+
+Esempi comuni:
+- **Ogni giorno alle 13:00**: `0 13 * * *`
+- **Fine mese (28-31) alle 20:00**: `0 20 28-31 * *`
+- **Primo del mese alle 00:00**: `0 0 1 * *`
+- **Ultimo del mese alle 23:00**: `0 23 L * *` (Nota: Vercel potrebbe non supportare `L`)
+
+**Nota importante**:
+- Gli orari sono in UTC (UTC+0)
+- Per l'Italia: UTC+1 in inverno, UTC+2 in estate
+- Esempio: per eseguire alle 14:00 ora italiana invernale, usa `0 13 * * *` (13:00 UTC)
+
+**Dopo la modifica**:
+1. Salva il file `vercel.json`
+2. Committa e pusha su Git
+3. Vercel rileggerà automaticamente la configurazione al prossimo deploy
+4. Verifica nella dashboard Vercel → Settings → Cron Jobs che il nuovo schedule sia attivo
+
 ### Custom Domain (Optional)
 - Register domain (e.g., `portfolio.example.com`)
 - Add in Vercel dashboard

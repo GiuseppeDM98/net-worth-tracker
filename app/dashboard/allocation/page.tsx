@@ -197,8 +197,8 @@ export default function AllocationPage() {
                   {Object.entries(allocation.byAssetClass).map(
                     ([assetClass, data]) => (
                       <TableRow key={assetClass}>
-                        <TableCell className="font-medium capitalize">
-                          {assetClass}
+                        <TableCell className="font-medium">
+                          {assetClassLabels[assetClass] || assetClass}
                         </TableCell>
                         <TableCell className="text-right">
                           {formatPercentage(data.currentPercentage)}

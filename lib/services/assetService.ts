@@ -17,6 +17,18 @@ import { Asset, AssetFormData } from '@/types/assets';
 const ASSETS_COLLECTION = 'assets';
 
 /**
+ * Define asset class ordering priority
+ */
+const ASSET_CLASS_ORDER: Record<string, number> = {
+  equity: 1,
+  bonds: 2,
+  realestate: 3,
+  crypto: 4,
+  commodity: 5,
+  cash: 6,
+};
+
+/**
  * Remove undefined fields from an object to prevent Firebase errors
  */
 function removeUndefinedFields<T extends Record<string, any>>(obj: T): Partial<T> {
@@ -32,25 +44,39 @@ function removeUndefinedFields<T extends Record<string, any>>(obj: T): Partial<T
 
 /**
  * Get all assets for a specific user
+ * Assets are sorted by asset class (equity, bonds, realestate, crypto, commodity, cash)
+ * and then by name within each class
  */
 export async function getAllAssets(userId: string): Promise<Asset[]> {
   try {
     const assetsRef = collection(db, ASSETS_COLLECTION);
     const q = query(
       assetsRef,
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc')
+      where('userId', '==', userId)
     );
 
     const querySnapshot = await getDocs(q);
 
-    return querySnapshot.docs.map(doc => ({
+    const assets = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
       lastPriceUpdate: doc.data().lastPriceUpdate?.toDate() || new Date(),
       createdAt: doc.data().createdAt?.toDate() || new Date(),
       updatedAt: doc.data().updatedAt?.toDate() || new Date(),
     })) as Asset[];
+
+    // Sort by asset class first, then by name
+    return assets.sort((a, b) => {
+      const orderA = ASSET_CLASS_ORDER[a.assetClass] || 999;
+      const orderB = ASSET_CLASS_ORDER[b.assetClass] || 999;
+
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+
+      // If same asset class, sort by name
+      return a.name.localeCompare(b.name);
+    });
   } catch (error) {
     console.error('Error getting assets:', error);
     throw new Error('Failed to fetch assets');

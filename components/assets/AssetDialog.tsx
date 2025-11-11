@@ -56,6 +56,7 @@ const assetSchema = z.object({
   quantity: z.number().positive('Quantità deve essere positiva'),
   manualPrice: z.number().positive('Il prezzo deve essere positivo').optional().or(z.nan()),
   isLiquid: z.boolean().optional(),
+  autoUpdatePrice: z.boolean().optional(),
   isComposite: z.boolean().optional(),
 });
 
@@ -109,6 +110,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
       currency: 'EUR',
       quantity: 0,
       isLiquid: true,
+      autoUpdatePrice: true,
       isComposite: false,
     },
   });
@@ -117,9 +119,10 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
   const selectedAssetClass = watch('assetClass');
   const selectedSubCategory = watch('subCategory');
   const watchIsLiquid = watch('isLiquid');
+  const watchAutoUpdatePrice = watch('autoUpdatePrice');
   const watchIsComposite = watch('isComposite');
 
-  // Determina il default per isLiquid basato sull'asset class
+  // Determina il default per isLiquid e autoUpdatePrice basato sull'asset class
   useEffect(() => {
     if (selectedAssetClass) {
       // Default intelligente per isLiquid
@@ -127,12 +130,18 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         selectedAssetClass !== 'realestate' &&
         selectedSubCategory !== 'Private Equity';
 
+      // Default intelligente per autoUpdatePrice
+      const defaultAutoUpdatePrice = shouldUpdatePrice(selectedType, selectedSubCategory);
+
       // Imposta solo se non è già stato impostato dall'utente
       if (watchIsLiquid === undefined) {
         setValue('isLiquid', defaultIsLiquid);
       }
+      if (watchAutoUpdatePrice === undefined) {
+        setValue('autoUpdatePrice', defaultAutoUpdatePrice);
+      }
     }
-  }, [selectedAssetClass, selectedSubCategory, watchIsLiquid, setValue]);
+  }, [selectedAssetClass, selectedSubCategory, selectedType, watchIsLiquid, watchAutoUpdatePrice, setValue]);
 
   // Gestisci il toggle della composizione
   useEffect(() => {
@@ -181,6 +190,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         quantity: asset.quantity,
         manualPrice: asset.currentPrice > 0 ? asset.currentPrice : undefined,
         isLiquid: defaultIsLiquid,
+        autoUpdatePrice: asset.autoUpdatePrice !== undefined ? asset.autoUpdatePrice : shouldUpdatePrice(asset.type, asset.subCategory),
         isComposite: !!(asset.composition && asset.composition.length > 0),
       });
 
@@ -203,6 +213,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         quantity: 0,
         manualPrice: undefined,
         isLiquid: true,
+        autoUpdatePrice: true,
         isComposite: false,
       });
       setComposition([]);
@@ -347,6 +358,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         quantity: data.quantity,
         currentPrice,
         isLiquid: data.isLiquid,
+        autoUpdatePrice: data.autoUpdatePrice,
         composition: isComposite && composition.length > 0 ? composition : undefined,
       };
 
@@ -579,6 +591,23 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                 id="isLiquid"
                 checked={watch('isLiquid')}
                 onCheckedChange={(checked) => setValue('isLiquid', checked)}
+              />
+            </div>
+          </div>
+
+          {/* Aggiornamento Automatico Prezzo */}
+          <div className="space-y-2 rounded-lg border p-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="autoUpdatePrice">Aggiornamento Automatico Prezzo</Label>
+                <p className="text-xs text-gray-500">
+                  Indica se il prezzo deve essere aggiornato automaticamente da Yahoo Finance
+                </p>
+              </div>
+              <Switch
+                id="autoUpdatePrice"
+                checked={watch('autoUpdatePrice')}
+                onCheckedChange={(checked) => setValue('autoUpdatePrice', checked)}
               />
             </div>
           </div>

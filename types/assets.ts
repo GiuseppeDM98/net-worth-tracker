@@ -22,6 +22,7 @@ export interface Asset {
   averageCost?: number;
   currentPrice: number;
   isLiquid?: boolean; // Default: true - indica se l'asset è liquido o illiquido
+  autoUpdatePrice?: boolean; // Default: true - indica se il prezzo deve essere aggiornato automaticamente via Yahoo Finance
   composition?: AssetComposition[]; // Per asset composti (es. fondi pensione)
   lastPriceUpdate: Date | Timestamp;
   createdAt: Date | Timestamp;
@@ -40,6 +41,7 @@ export interface AssetFormData {
   averageCost?: number;
   currentPrice: number;
   isLiquid?: boolean;
+  autoUpdatePrice?: boolean;
   composition?: AssetComposition[];
 }
 
