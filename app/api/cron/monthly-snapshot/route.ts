@@ -12,36 +12,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if today is the last day of the month in Europe/Rome timezone
-    const now = new Date();
-    const romeTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Rome' }));
-    const romeHour = romeTime.getHours();
-
-    // Check if it's between 22:00 and 22:59
-    if (romeHour !== 22) {
-      return NextResponse.json({
-        success: false,
-        message: `Not the correct hour. Current time in Rome: ${romeHour}:${romeTime.getMinutes()}`,
-        executed: false,
-      });
-    }
-
-    // Check if it's the last day of the month
-    const currentDay = romeTime.getDate();
-    const lastDayOfMonth = new Date(
-      romeTime.getFullYear(),
-      romeTime.getMonth() + 1,
-      0
-    ).getDate();
-
-    if (currentDay !== lastDayOfMonth) {
-      return NextResponse.json({
-        success: false,
-        message: `Not the last day of month. Current day: ${currentDay}, Last day: ${lastDayOfMonth}`,
-        executed: false,
-      });
-    }
-
     // Get all users
     const usersRef = adminDb.collection('users');
     const usersSnapshot = await usersRef.get();
@@ -104,7 +74,6 @@ export async function GET(request: NextRequest) {
       success: true,
       message: `Monthly snapshots job completed`,
       timestamp: new Date().toISOString(),
-      romeTime: romeTime.toISOString(),
       snapshotsCreated: results.length,
       errors: errors.length,
       results,
