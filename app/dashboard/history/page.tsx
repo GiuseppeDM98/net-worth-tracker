@@ -137,6 +137,111 @@ export default function HistoryPage() {
     })
   );
 
+  // Custom label render functions for charts
+  const renderNetWorthLabelTotal = (props: any) => {
+    const { x, y, value } = props;
+    const text = formatCurrency(value).replace(/,00$/, '');
+    const padding = 6;
+    const textWidth = text.length * 7; // Approximate width
+
+    return (
+      <g>
+        <rect
+          x={x - textWidth / 2 - padding}
+          y={y - 20}
+          width={textWidth + padding * 2}
+          height={20}
+          fill="white"
+          stroke="#3B82F6"
+          strokeWidth={1.5}
+          rx={4}
+          opacity={0.95}
+        />
+        <text
+          x={x}
+          y={y - 6}
+          fill="#1F2937"
+          fontSize={12}
+          textAnchor="middle"
+          fontWeight="600"
+        >
+          {text}
+        </text>
+      </g>
+    );
+  };
+
+
+  const renderLiquidityLabelIlliquid = (props: any) => {
+    const { x, y, value } = props;
+    const text = showLiquidityPercentage
+      ? `${value.toFixed(1)}%`
+      : formatCurrency(value).replace(/,00$/, '');
+    const padding = 6;
+    const textWidth = text.length * 7;
+
+    return (
+      <g>
+        <rect
+          x={x - textWidth / 2 - padding}
+          y={y - 10}
+          width={textWidth + padding * 2}
+          height={20}
+          fill="white"
+          stroke="#F59E0B"
+          strokeWidth={1.5}
+          rx={4}
+          opacity={0.95}
+        />
+        <text
+          x={x}
+          y={y + 4}
+          fill="#1F2937"
+          fontSize={12}
+          textAnchor="middle"
+          fontWeight="600"
+        >
+          {text}
+        </text>
+      </g>
+    );
+  };
+
+  const renderLiquidityLabelLiquid = (props: any) => {
+    const { x, y, value } = props;
+    const text = showLiquidityPercentage
+      ? `${value.toFixed(1)}%`
+      : formatCurrency(value).replace(/,00$/, '');
+    const padding = 6;
+    const textWidth = text.length * 7;
+
+    return (
+      <g>
+        <rect
+          x={x - textWidth / 2 - padding}
+          y={y - 20}
+          width={textWidth + padding * 2}
+          height={20}
+          fill="white"
+          stroke="#10B981"
+          strokeWidth={1.5}
+          rx={4}
+          opacity={0.95}
+        />
+        <text
+          x={x}
+          y={y - 6}
+          fill="#1F2937"
+          fontSize={12}
+          textAnchor="middle"
+          fontWeight="600"
+        >
+          {text}
+        </text>
+      </g>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -194,6 +299,7 @@ export default function HistoryPage() {
                   tickFormatter={(value) =>
                     formatCurrency(value).replace(/,00$/, '')
                   }
+                  domain={[(dataMin: number) => dataMin * 0.95, (dataMax: number) => dataMax * 1.05]}
                 />
                 <Tooltip
                   formatter={(value: number) => formatCurrency(value)}
@@ -207,55 +313,8 @@ export default function HistoryPage() {
                   strokeWidth={2}
                   name="Patrimonio Totale"
                   dot={{ r: 4 }}
-                  label={
-                    showNetWorthLabels
-                      ? {
-                          position: 'top',
-                          fill: '#3B82F6',
-                          fontSize: 11,
-                          content: ({ value }: any) =>
-                            formatCurrency(value).replace(/,00$/, ''),
-                        }
-                      : false
-                  }
-                />
-                <Line
-                  type="monotone"
-                  dataKey="liquidNetWorth"
-                  stroke="#10B981"
-                  strokeWidth={2}
-                  name="Patrimonio Liquido"
-                  dot={{ r: 4 }}
-                  label={
-                    showNetWorthLabels
-                      ? {
-                          position: 'top',
-                          fill: '#10B981',
-                          fontSize: 11,
-                          content: ({ value }: any) =>
-                            formatCurrency(value).replace(/,00$/, ''),
-                        }
-                      : false
-                  }
-                />
-                <Line
-                  type="monotone"
-                  dataKey="illiquidNetWorth"
-                  stroke="#F59E0B"
-                  strokeWidth={2}
-                  name="Patrimonio Illiquido"
-                  dot={{ r: 4 }}
-                  label={
-                    showNetWorthLabels
-                      ? {
-                          position: 'bottom',
-                          fill: '#F59E0B',
-                          fontSize: 11,
-                          content: ({ value }: any) =>
-                            formatCurrency(value).replace(/,00$/, ''),
-                        }
-                      : false
-                  }
+                  isAnimationActive={false}
+                  label={showNetWorthLabels ? renderNetWorthLabelTotal : false}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -293,72 +352,79 @@ export default function HistoryPage() {
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={400}>
-              <AreaChart data={liquidityHistory} margin={{ left: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis
-                  width={80}
-                  tickFormatter={(value) =>
-                    showLiquidityPercentage
-                      ? `${value.toFixed(0)}%`
-                      : formatCurrency(value).replace(/,00$/, '')
-                  }
-                  domain={showLiquidityPercentage ? [0, 100] : undefined}
-                />
-                <Tooltip
-                  formatter={(value: number) =>
-                    showLiquidityPercentage
-                      ? `${value.toFixed(2)}%`
-                      : formatCurrency(value)
-                  }
-                  labelStyle={{ color: '#000' }}
-                />
-                <Legend />
-                <Area
-                  type="monotone"
-                  dataKey={showLiquidityPercentage ? "illiquidPercentage" : "illiquidNetWorth"}
-                  stackId="1"
-                  stroke="#F59E0B"
-                  fill="#F59E0B"
-                  fillOpacity={0.6}
-                  name="Illiquido"
-                  label={
-                    showLiquidityLabels
-                      ? {
-                          position: 'bottom',
-                          fill: '#F59E0B',
-                          fontSize: 11,
-                          content: ({ value }: any) =>
-                            showLiquidityPercentage
-                              ? `${value.toFixed(1)}%`
-                              : formatCurrency(value).replace(/,00$/, ''),
-                        }
-                      : false
-                  }
-                />
-                <Area
-                  type="monotone"
-                  dataKey={showLiquidityPercentage ? "liquidPercentage" : "liquidNetWorth"}
-                  stackId="1"
-                  stroke="#10B981"
-                  fill="#10B981"
-                  fillOpacity={0.6}
-                  name="Liquido"
-                  label={
-                    showLiquidityLabels
-                      ? {
-                          position: 'top',
-                          fill: '#10B981',
-                          fontSize: 11,
-                          content: ({ value }: any) =>
-                            showLiquidityPercentage
-                              ? `${value.toFixed(1)}%`
-                              : formatCurrency(value).replace(/,00$/, ''),
-                        }
-                      : false
-                  }
-                />
-              </AreaChart>
+              {showLiquidityPercentage ? (
+                // Percentage mode: Use LineChart with separate lines
+                <LineChart data={liquidityHistory} margin={{ left: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis
+                    width={80}
+                    tickFormatter={(value) => `${value.toFixed(0)}%`}
+                    domain={[0, 100]}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => `${value.toFixed(2)}%`}
+                    labelStyle={{ color: '#000' }}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="liquidPercentage"
+                    stroke="#10B981"
+                    strokeWidth={2}
+                    name="Liquido"
+                    dot={{ r: 4 }}
+                    isAnimationActive={false}
+                    label={showLiquidityLabels ? renderLiquidityLabelLiquid : false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="illiquidPercentage"
+                    stroke="#F59E0B"
+                    strokeWidth={2}
+                    name="Illiquido"
+                    dot={{ r: 4 }}
+                    isAnimationActive={false}
+                    label={showLiquidityLabels ? renderLiquidityLabelIlliquid : false}
+                  />
+                </LineChart>
+              ) : (
+                // Absolute values mode: Use AreaChart with overlapping areas (no stack)
+                <AreaChart data={liquidityHistory} margin={{ left: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis
+                    width={80}
+                    tickFormatter={(value) => formatCurrency(value).replace(/,00$/, '')}
+                    domain={[(dataMin: number) => dataMin * 0.95, (dataMax: number) => dataMax * 1.05]}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => formatCurrency(value)}
+                    labelStyle={{ color: '#000' }}
+                  />
+                  <Legend />
+                  <Area
+                    type="monotone"
+                    dataKey="liquidNetWorth"
+                    stroke="#10B981"
+                    fill="#10B981"
+                    fillOpacity={0.6}
+                    name="Liquido"
+                    isAnimationActive={false}
+                    label={showLiquidityLabels ? renderLiquidityLabelLiquid : false}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="illiquidNetWorth"
+                    stroke="#F59E0B"
+                    fill="#F59E0B"
+                    fillOpacity={0.6}
+                    name="Illiquido"
+                    isAnimationActive={false}
+                    label={showLiquidityLabels ? renderLiquidityLabelIlliquid : false}
+                  />
+                </AreaChart>
+              )}
             </ResponsiveContainer>
           )}
         </CardContent>
