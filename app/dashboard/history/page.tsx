@@ -23,6 +23,8 @@ import { toast } from 'sonner';
 import {
   LineChart,
   Line,
+  AreaChart,
+  Area,
   PieChart,
   Pie,
   Cell,
@@ -77,11 +79,12 @@ export default function HistoryPage() {
     }
 
     // Create CSV content
-    const headers = ['Data', 'Patrimonio Totale', 'Patrimonio Liquido'];
+    const headers = ['Data', 'Patrimonio Totale', 'Patrimonio Liquido', 'Patrimonio Illiquido'];
     const rows = snapshots.map((snapshot) => [
       `${String(snapshot.month).padStart(2, '0')}/${snapshot.year}`,
       snapshot.totalNetWorth,
       snapshot.liquidNetWorth,
+      snapshot.illiquidNetWorth || 0,
     ]);
 
     const csvContent = [
@@ -190,7 +193,64 @@ export default function HistoryPage() {
                   name="Patrimonio Liquido"
                   dot={{ r: 4 }}
                 />
+                <Line
+                  type="monotone"
+                  dataKey="illiquidNetWorth"
+                  stroke="#F59E0B"
+                  strokeWidth={2}
+                  name="Patrimonio Illiquido"
+                  dot={{ r: 4 }}
+                />
               </LineChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Liquidity Evolution Chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Evoluzione Liquidità vs Illiquidità</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {netWorthHistory.length === 0 ? (
+            <div className="flex h-64 items-center justify-center text-gray-500">
+              Nessuno storico disponibile.
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={400}>
+              <AreaChart data={netWorthHistory}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis
+                  tickFormatter={(value) =>
+                    formatCurrency(value).replace(/,00$/, '')
+                  }
+                />
+                <Tooltip
+                  formatter={(value: number) => formatCurrency(value)}
+                  labelStyle={{ color: '#000' }}
+                />
+                <Legend />
+                <Area
+                  type="monotone"
+                  dataKey="liquidNetWorth"
+                  stackId="1"
+                  stroke="#10B981"
+                  fill="#10B981"
+                  fillOpacity={0.6}
+                  name="Liquido"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="illiquidNetWorth"
+                  stackId="1"
+                  stroke="#F59E0B"
+                  fill="#F59E0B"
+                  fillOpacity={0.6}
+                  name="Illiquido"
+                />
+              </AreaChart>
             </ResponsiveContainer>
           )}
         </CardContent>

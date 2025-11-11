@@ -183,13 +183,41 @@ export function calculateTotalValue(assets: Asset[]): number {
 }
 
 /**
- * Calculate liquid net worth (excluding real estate and private equity)
+ * Calculate liquid net worth
+ * Se isLiquid è definito, usa quel valore
+ * Altrimenti usa la logica legacy (esclude real estate e private equity)
  */
 export function calculateLiquidNetWorth(assets: Asset[]): number {
   return assets
-    .filter(asset =>
-      asset.assetClass !== 'realestate' &&
-      asset.subCategory !== 'Private Equity'
-    )
+    .filter(asset => {
+      // Se isLiquid è definito esplicitamente, usa quel valore
+      if (asset.isLiquid !== undefined) {
+        return asset.isLiquid === true;
+      }
+      // Altrimenti usa la logica legacy per retrocompatibilità
+      return (
+        asset.assetClass !== 'realestate' &&
+        asset.subCategory !== 'Private Equity'
+      );
+    })
+    .reduce((total, asset) => total + calculateAssetValue(asset), 0);
+}
+
+/**
+ * Calculate illiquid net worth
+ */
+export function calculateIlliquidNetWorth(assets: Asset[]): number {
+  return assets
+    .filter(asset => {
+      // Se isLiquid è definito esplicitamente, usa quel valore
+      if (asset.isLiquid !== undefined) {
+        return asset.isLiquid === false;
+      }
+      // Altrimenti usa la logica legacy per retrocompatibilità
+      return (
+        asset.assetClass === 'realestate' ||
+        asset.subCategory === 'Private Equity'
+      );
+    })
     .reduce((total, asset) => total + calculateAssetValue(asset), 0);
 }

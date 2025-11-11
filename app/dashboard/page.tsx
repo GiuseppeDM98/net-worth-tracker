@@ -7,6 +7,7 @@ import {
   getAllAssets,
   calculateTotalValue,
   calculateLiquidNetWorth,
+  calculateIlliquidNetWorth,
 } from '@/lib/services/assetService';
 import {
   formatCurrency,
@@ -126,11 +127,28 @@ export default function DashboardPage() {
 
   const totalValue = calculateTotalValue(assets);
   const liquidNetWorth = calculateLiquidNetWorth(assets);
+  const illiquidNetWorth = calculateIlliquidNetWorth(assets);
   const assetCount = assets.length;
 
   // Prepare chart data
   const assetClassData = prepareAssetClassDistributionData(assets);
   const assetData = prepareAssetDistributionData(assets);
+
+  // Prepare liquidity chart data
+  const liquidityData = [
+    {
+      name: 'Liquido',
+      value: liquidNetWorth,
+      percentage: totalValue > 0 ? (liquidNetWorth / totalValue) * 100 : 0,
+      color: '#10b981', // green
+    },
+    {
+      name: 'Illiquido',
+      value: illiquidNetWorth,
+      percentage: totalValue > 0 ? (illiquidNetWorth / totalValue) * 100 : 0,
+      color: '#f59e0b', // amber
+    },
+  ];
 
   if (loading) {
     return (
@@ -229,6 +247,18 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <PieChartComponent data={assetData} />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Liquidity Chart */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Liquidità Portfolio</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PieChartComponent data={liquidityData} />
           </CardContent>
         </Card>
       </div>
