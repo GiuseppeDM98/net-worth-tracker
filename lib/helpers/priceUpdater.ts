@@ -36,9 +36,17 @@ export async function updateUserAssetPrices(
     }));
 
     // Filter assets that need price updates
-    const updatableAssets = allAssets.filter((asset: any) =>
-      shouldUpdatePrice(asset.type, asset.subCategory)
-    );
+    // Check both the asset type/subcategory AND the autoUpdatePrice flag
+    const updatableAssets = allAssets.filter((asset: any) => {
+      // First check if the asset type supports price updates (e.g., not cash, realestate)
+      const typeSupportsUpdate = shouldUpdatePrice(asset.type, asset.subCategory);
+
+      // Then check if the user wants automatic updates for this specific asset
+      // If autoUpdatePrice is undefined (old assets), default to true
+      const wantsAutoUpdate = asset.autoUpdatePrice !== false;
+
+      return typeSupportsUpdate && wantsAutoUpdate;
+    });
 
     if (updatableAssets.length === 0) {
       return {
