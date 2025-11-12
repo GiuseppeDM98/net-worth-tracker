@@ -59,7 +59,7 @@ export function prepareAssetDistributionData(assets: Asset[]): PieChartData[] {
   const others = assetValues.slice(10);
 
   const chartData: PieChartData[] = top10.map((asset, index) => ({
-    name: `${asset.name} (${asset.ticker})`,
+    name: asset.ticker,
     value: asset.value,
     percentage: (asset.value / totalValue) * 100,
     color: getChartColor(index),

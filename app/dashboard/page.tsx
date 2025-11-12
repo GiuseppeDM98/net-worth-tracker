@@ -198,9 +198,6 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(liquidNetWorth)}</div>
-            <p className="text-xs text-muted-foreground">
-              Escluso immobili e private equity
-            </p>
           </CardContent>
         </Card>
 

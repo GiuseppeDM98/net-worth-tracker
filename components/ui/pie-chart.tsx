@@ -18,14 +18,14 @@ export function PieChart({ data }: PieChartProps) {
   }
 
   return (
-    <ResponsiveContainer width="100%" height={300}>
+    <ResponsiveContainer width="100%" height={350}>
       <RechartsPC>
         <Pie
           data={data as any}
-          cx="50%"
+          cx="40%"
           cy="50%"
           labelLine={false}
-          label={(entry: any) => `${entry.name}: ${(entry.percentage as number).toFixed(1)}%`}
+          label={(entry: any) => entry.percentage >= 5 ? `${entry.name}: ${(entry.percentage as number).toFixed(1)}%` : ''}
           outerRadius={80}
           fill="#8884d8"
           dataKey="value"
@@ -43,8 +43,9 @@ export function PieChart({ data }: PieChartProps) {
           }}
         />
         <Legend
-          verticalAlign="bottom"
-          height={36}
+          layout="vertical"
+          align="right"
+          verticalAlign="middle"
           formatter={(value, entry: any) => {
             const item = data.find((d) => d.name === value);
             if (item) {
