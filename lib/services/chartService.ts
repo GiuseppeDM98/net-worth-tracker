@@ -101,6 +101,57 @@ export function prepareNetWorthHistoryData(snapshots: MonthlySnapshot[]): {
 }
 
 /**
+ * Prepare data for asset class history chart
+ */
+export function prepareAssetClassHistoryData(snapshots: MonthlySnapshot[]): {
+  date: string;
+  equity: number;
+  bonds: number;
+  crypto: number;
+  realestate: number;
+  cash: number;
+  commodity: number;
+  equityPercentage: number;
+  bondsPercentage: number;
+  cryptoPercentage: number;
+  realestatePercentage: number;
+  cashPercentage: number;
+  commodityPercentage: number;
+  month: number;
+  year: number;
+}[] {
+  return snapshots.map((snapshot) => {
+    const total = snapshot.totalNetWorth;
+    const byAssetClass = snapshot.byAssetClass || {};
+
+    const equity = byAssetClass.equity || 0;
+    const bonds = byAssetClass.bonds || 0;
+    const crypto = byAssetClass.crypto || 0;
+    const realestate = byAssetClass.realestate || 0;
+    const cash = byAssetClass.cash || 0;
+    const commodity = byAssetClass.commodity || 0;
+
+    return {
+      date: `${String(snapshot.month).padStart(2, '0')}/${snapshot.year}`,
+      equity,
+      bonds,
+      crypto,
+      realestate,
+      cash,
+      commodity,
+      equityPercentage: total > 0 ? (equity / total) * 100 : 0,
+      bondsPercentage: total > 0 ? (bonds / total) * 100 : 0,
+      cryptoPercentage: total > 0 ? (crypto / total) * 100 : 0,
+      realestatePercentage: total > 0 ? (realestate / total) * 100 : 0,
+      cashPercentage: total > 0 ? (cash / total) * 100 : 0,
+      commodityPercentage: total > 0 ? (commodity / total) * 100 : 0,
+      month: snapshot.month,
+      year: snapshot.year,
+    };
+  });
+}
+
+/**
  * Get Italian name for asset class
  */
 function getAssetClassName(assetClass: string): string {

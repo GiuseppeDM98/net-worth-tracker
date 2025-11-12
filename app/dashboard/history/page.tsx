@@ -12,6 +12,7 @@ import {
 import {
   prepareNetWorthHistoryData,
   prepareAssetDistributionData,
+  prepareAssetClassHistoryData,
   formatCurrency,
   formatPercentage,
 } from '@/lib/services/chartService';
@@ -43,6 +44,8 @@ export default function HistoryPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [targets, setTargets] = useState<AssetAllocationTarget | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showAssetClassPercentage, setShowAssetClassPercentage] = useState(false);
+  const [showAssetClassLabels, setShowAssetClassLabels] = useState(false);
   const [showLiquidityPercentage, setShowLiquidityPercentage] = useState(false);
   const [showNetWorthLabels, setShowNetWorthLabels] = useState(false);
   const [showLiquidityLabels, setShowLiquidityLabels] = useState(false);
@@ -111,6 +114,7 @@ export default function HistoryPage() {
 
   const netWorthHistory = prepareNetWorthHistoryData(snapshots);
   const assetDistribution = prepareAssetDistributionData(assets);
+  const assetClassHistory = prepareAssetClassHistoryData(snapshots);
 
   // Prepare liquidity data with percentages
   const liquidityHistory = netWorthHistory.map((item) => {
@@ -242,6 +246,51 @@ export default function HistoryPage() {
     );
   };
 
+  // Asset Class Label Renderers
+  const renderAssetClassLabel = (color: string, offsetY: number = -10) => (props: any) => {
+    const { x, y, value } = props;
+    if (!value || value === 0) return null;
+
+    const text = showAssetClassPercentage
+      ? `${value.toFixed(1)}%`
+      : formatCurrency(value).replace(/,00$/, '');
+    const padding = 6;
+    const textWidth = text.length * 7;
+
+    return (
+      <g>
+        <rect
+          x={x - textWidth / 2 - padding}
+          y={y + offsetY}
+          width={textWidth + padding * 2}
+          height={20}
+          fill="white"
+          stroke={color}
+          strokeWidth={1.5}
+          rx={4}
+          opacity={0.95}
+        />
+        <text
+          x={x}
+          y={y + offsetY + 14}
+          fill="#1F2937"
+          fontSize={12}
+          textAnchor="middle"
+          fontWeight="600"
+        >
+          {text}
+        </text>
+      </g>
+    );
+  };
+
+  const renderEquityLabel = renderAssetClassLabel('#3B82F6', -10);
+  const renderBondsLabel = renderAssetClassLabel('#EF4444', -10);
+  const renderCryptoLabel = renderAssetClassLabel('#F59E0B', -10);
+  const renderRealEstateLabel = renderAssetClassLabel('#10B981', -10);
+  const renderCashLabel = renderAssetClassLabel('#6B7280', -10);
+  const renderCommodityLabel = renderAssetClassLabel('#92400E', -10);
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -317,6 +366,193 @@ export default function HistoryPage() {
                   label={showNetWorthLabels ? renderNetWorthLabelTotal : false}
                 />
               </LineChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Asset Class Evolution Chart */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Patrimonio Netto per Asset Class</CardTitle>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAssetClassPercentage(!showAssetClassPercentage)}
+              >
+                {showAssetClassPercentage ? '€ Valori Assoluti' : '% Percentuali'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAssetClassLabels(!showAssetClassLabels)}
+              >
+                {showAssetClassLabels ? 'Nascondi Valori' : 'Mostra Valori'}
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {assetClassHistory.length === 0 ? (
+            <div className="flex h-64 items-center justify-center text-gray-500">
+              Nessuno storico disponibile.
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={400}>
+              {showAssetClassPercentage ? (
+                // Percentage mode: Use LineChart with separate lines
+                <LineChart data={assetClassHistory} margin={{ left: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis
+                    width={80}
+                    tickFormatter={(value) => `${value.toFixed(0)}%`}
+                    domain={[0, 100]}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => `${value.toFixed(2)}%`}
+                    labelStyle={{ color: '#000' }}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="equityPercentage"
+                    stroke="#3B82F6"
+                    strokeWidth={2}
+                    name="Azioni"
+                    dot={{ r: 4 }}
+                    isAnimationActive={false}
+                    label={showAssetClassLabels ? renderEquityLabel : false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="bondsPercentage"
+                    stroke="#EF4444"
+                    strokeWidth={2}
+                    name="Obbligazioni"
+                    dot={{ r: 4 }}
+                    isAnimationActive={false}
+                    label={showAssetClassLabels ? renderBondsLabel : false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="cryptoPercentage"
+                    stroke="#F59E0B"
+                    strokeWidth={2}
+                    name="Criptovalute"
+                    dot={{ r: 4 }}
+                    isAnimationActive={false}
+                    label={showAssetClassLabels ? renderCryptoLabel : false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="realestatePercentage"
+                    stroke="#10B981"
+                    strokeWidth={2}
+                    name="Immobili"
+                    dot={{ r: 4 }}
+                    isAnimationActive={false}
+                    label={showAssetClassLabels ? renderRealEstateLabel : false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="cashPercentage"
+                    stroke="#6B7280"
+                    strokeWidth={2}
+                    name="Liquidità"
+                    dot={{ r: 4 }}
+                    isAnimationActive={false}
+                    label={showAssetClassLabels ? renderCashLabel : false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="commodityPercentage"
+                    stroke="#92400E"
+                    strokeWidth={2}
+                    name="Materie Prime"
+                    dot={{ r: 4 }}
+                    isAnimationActive={false}
+                    label={showAssetClassLabels ? renderCommodityLabel : false}
+                  />
+                </LineChart>
+              ) : (
+                // Absolute values mode: Use Stacked AreaChart
+                <AreaChart data={assetClassHistory} margin={{ left: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis
+                    width={80}
+                    tickFormatter={(value) => formatCurrency(value).replace(/,00$/, '')}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => formatCurrency(value)}
+                    labelStyle={{ color: '#000' }}
+                  />
+                  <Legend />
+                  <Area
+                    type="monotone"
+                    dataKey="equity"
+                    stroke="#3B82F6"
+                    fill="#3B82F6"
+                    fillOpacity={0.8}
+                    name="Azioni"
+                    isAnimationActive={false}
+                    label={showAssetClassLabels ? renderEquityLabel : false}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="bonds"
+                    stroke="#EF4444"
+                    fill="#EF4444"
+                    fillOpacity={0.8}
+                    name="Obbligazioni"
+                    isAnimationActive={false}
+                    label={showAssetClassLabels ? renderBondsLabel : false}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="crypto"
+                    stroke="#F59E0B"
+                    fill="#F59E0B"
+                    fillOpacity={0.8}
+                    name="Criptovalute"
+                    isAnimationActive={false}
+                    label={showAssetClassLabels ? renderCryptoLabel : false}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="realestate"
+                    stroke="#10B981"
+                    fill="#10B981"
+                    fillOpacity={0.8}
+                    name="Immobili"
+                    isAnimationActive={false}
+                    label={showAssetClassLabels ? renderRealEstateLabel : false}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="cash"
+                    stroke="#6B7280"
+                    fill="#6B7280"
+                    fillOpacity={0.8}
+                    name="Liquidità"
+                    isAnimationActive={false}
+                    label={showAssetClassLabels ? renderCashLabel : false}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="commodity"
+                    stroke="#92400E"
+                    fill="#92400E"
+                    fillOpacity={0.8}
+                    name="Materie Prime"
+                    isAnimationActive={false}
+                    label={showAssetClassLabels ? renderCommodityLabel : false}
+                  />
+                </AreaChart>
+              )}
             </ResponsiveContainer>
           )}
         </CardContent>
