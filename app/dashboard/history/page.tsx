@@ -21,14 +21,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import { toast } from 'sonner';
+import { PieChart as PieChartComponent } from '@/components/ui/pie-chart';
 import {
   LineChart,
   Line,
   AreaChart,
   Area,
-  PieChart,
-  Pie,
-  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -45,10 +43,7 @@ export default function HistoryPage() {
   const [targets, setTargets] = useState<AssetAllocationTarget | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAssetClassPercentage, setShowAssetClassPercentage] = useState(false);
-  const [showAssetClassLabels, setShowAssetClassLabels] = useState(false);
   const [showLiquidityPercentage, setShowLiquidityPercentage] = useState(false);
-  const [showNetWorthLabels, setShowNetWorthLabels] = useState(false);
-  const [showLiquidityLabels, setShowLiquidityLabels] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -321,16 +316,7 @@ export default function HistoryPage() {
       {/* Net Worth History Chart */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Evoluzione Patrimonio Netto</CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowNetWorthLabels(!showNetWorthLabels)}
-            >
-              {showNetWorthLabels ? 'Nascondi Valori' : 'Mostra Valori'}
-            </Button>
-          </div>
+          <CardTitle>Evoluzione Patrimonio Netto</CardTitle>
         </CardHeader>
         <CardContent>
           {netWorthHistory.length === 0 ? (
@@ -363,7 +349,7 @@ export default function HistoryPage() {
                   name="Patrimonio Totale"
                   dot={{ r: 4 }}
                   isAnimationActive={false}
-                  label={showNetWorthLabels ? renderNetWorthLabelTotal : false}
+                  label={false}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -376,22 +362,13 @@ export default function HistoryPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Patrimonio Netto per Asset Class</CardTitle>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAssetClassPercentage(!showAssetClassPercentage)}
-              >
-                {showAssetClassPercentage ? '€ Valori Assoluti' : '% Percentuali'}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAssetClassLabels(!showAssetClassLabels)}
-              >
-                {showAssetClassLabels ? 'Nascondi Valori' : 'Mostra Valori'}
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAssetClassPercentage(!showAssetClassPercentage)}
+            >
+              {showAssetClassPercentage ? '€ Valori Assoluti' : '% Percentuali'}
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -424,7 +401,7 @@ export default function HistoryPage() {
                     name="Azioni"
                     dot={{ r: 4 }}
                     isAnimationActive={false}
-                    label={showAssetClassLabels ? renderEquityLabel : false}
+                    label={false}
                   />
                   <Line
                     type="monotone"
@@ -434,7 +411,7 @@ export default function HistoryPage() {
                     name="Obbligazioni"
                     dot={{ r: 4 }}
                     isAnimationActive={false}
-                    label={showAssetClassLabels ? renderBondsLabel : false}
+                    label={false}
                   />
                   <Line
                     type="monotone"
@@ -444,7 +421,7 @@ export default function HistoryPage() {
                     name="Criptovalute"
                     dot={{ r: 4 }}
                     isAnimationActive={false}
-                    label={showAssetClassLabels ? renderCryptoLabel : false}
+                    label={false}
                   />
                   <Line
                     type="monotone"
@@ -454,7 +431,7 @@ export default function HistoryPage() {
                     name="Immobili"
                     dot={{ r: 4 }}
                     isAnimationActive={false}
-                    label={showAssetClassLabels ? renderRealEstateLabel : false}
+                    label={false}
                   />
                   <Line
                     type="monotone"
@@ -464,7 +441,7 @@ export default function HistoryPage() {
                     name="Liquidità"
                     dot={{ r: 4 }}
                     isAnimationActive={false}
-                    label={showAssetClassLabels ? renderCashLabel : false}
+                    label={false}
                   />
                   <Line
                     type="monotone"
@@ -474,7 +451,7 @@ export default function HistoryPage() {
                     name="Materie Prime"
                     dot={{ r: 4 }}
                     isAnimationActive={false}
-                    label={showAssetClassLabels ? renderCommodityLabel : false}
+                    label={false}
                   />
                 </LineChart>
               ) : (
@@ -499,7 +476,7 @@ export default function HistoryPage() {
                     fillOpacity={0.8}
                     name="Azioni"
                     isAnimationActive={false}
-                    label={showAssetClassLabels ? renderEquityLabel : false}
+                    label={false}
                   />
                   <Area
                     type="monotone"
@@ -509,7 +486,7 @@ export default function HistoryPage() {
                     fillOpacity={0.8}
                     name="Obbligazioni"
                     isAnimationActive={false}
-                    label={showAssetClassLabels ? renderBondsLabel : false}
+                    label={false}
                   />
                   <Area
                     type="monotone"
@@ -519,7 +496,7 @@ export default function HistoryPage() {
                     fillOpacity={0.8}
                     name="Criptovalute"
                     isAnimationActive={false}
-                    label={showAssetClassLabels ? renderCryptoLabel : false}
+                    label={false}
                   />
                   <Area
                     type="monotone"
@@ -529,7 +506,7 @@ export default function HistoryPage() {
                     fillOpacity={0.8}
                     name="Immobili"
                     isAnimationActive={false}
-                    label={showAssetClassLabels ? renderRealEstateLabel : false}
+                    label={false}
                   />
                   <Area
                     type="monotone"
@@ -539,7 +516,7 @@ export default function HistoryPage() {
                     fillOpacity={0.8}
                     name="Liquidità"
                     isAnimationActive={false}
-                    label={showAssetClassLabels ? renderCashLabel : false}
+                    label={false}
                   />
                   <Area
                     type="monotone"
@@ -549,7 +526,7 @@ export default function HistoryPage() {
                     fillOpacity={0.8}
                     name="Materie Prime"
                     isAnimationActive={false}
-                    label={showAssetClassLabels ? renderCommodityLabel : false}
+                    label={false}
                   />
                 </AreaChart>
               )}
@@ -563,22 +540,13 @@ export default function HistoryPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Evoluzione Liquidità vs Illiquidità</CardTitle>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowLiquidityPercentage(!showLiquidityPercentage)}
-              >
-                {showLiquidityPercentage ? '€ Valori Assoluti' : '% Percentuali'}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowLiquidityLabels(!showLiquidityLabels)}
-              >
-                {showLiquidityLabels ? 'Nascondi Valori' : 'Mostra Valori'}
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowLiquidityPercentage(!showLiquidityPercentage)}
+            >
+              {showLiquidityPercentage ? '€ Valori Assoluti' : '% Percentuali'}
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -611,7 +579,7 @@ export default function HistoryPage() {
                     name="Liquido"
                     dot={{ r: 4 }}
                     isAnimationActive={false}
-                    label={showLiquidityLabels ? renderLiquidityLabelLiquid : false}
+                    label={false}
                   />
                   <Line
                     type="monotone"
@@ -621,7 +589,7 @@ export default function HistoryPage() {
                     name="Illiquido"
                     dot={{ r: 4 }}
                     isAnimationActive={false}
-                    label={showLiquidityLabels ? renderLiquidityLabelIlliquid : false}
+                    label={false}
                   />
                 </LineChart>
               ) : (
@@ -647,7 +615,7 @@ export default function HistoryPage() {
                     fillOpacity={0.6}
                     name="Liquido"
                     isAnimationActive={false}
-                    label={showLiquidityLabels ? renderLiquidityLabelLiquid : false}
+                    label={false}
                   />
                   <Area
                     type="monotone"
@@ -657,7 +625,7 @@ export default function HistoryPage() {
                     fillOpacity={0.6}
                     name="Illiquido"
                     isAnimationActive={false}
-                    label={showLiquidityLabels ? renderLiquidityLabelIlliquid : false}
+                    label={false}
                   />
                 </AreaChart>
               )}
@@ -679,30 +647,7 @@ export default function HistoryPage() {
                 distribuzione.
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={assetDistribution}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }: any) =>
-                      percent > 5 ? `${name} ${formatPercentage(percent)}` : ''
-                    }
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {assetDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
-                  />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
+              <PieChartComponent data={assetDistribution} />
             )}
           </CardContent>
         </Card>

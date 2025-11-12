@@ -14,7 +14,7 @@ import {
   prepareAssetClassDistributionData,
   prepareAssetDistributionData,
 } from '@/lib/services/chartService';
-import { getUserSnapshots } from '@/lib/services/snapshotService';
+import { getUserSnapshots, calculateMonthlyChange } from '@/lib/services/snapshotService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PieChart as PieChartComponent } from '@/components/ui/pie-chart';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,10 @@ export default function DashboardPage() {
   const [creatingSnapshot, setCreatingSnapshot] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [existingSnapshot, setExistingSnapshot] = useState<MonthlySnapshot | null>(null);
+  const [monthlyVariation, setMonthlyVariation] = useState<{
+    value: number;
+    percentage: number;
+  } | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -50,6 +54,45 @@ export default function DashboardPage() {
       setLoading(true);
       const data = await getAllAssets(user.uid);
       setAssets(data);
+
+      // Calculate monthly variation
+      const snapshots = await getUserSnapshots(user.uid);
+      if (snapshots.length > 0) {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth() + 1;
+
+        // Check if a snapshot exists for the current month
+        const currentMonthSnapshot = snapshots.find(
+          (s) => s.year === currentYear && s.month === currentMonth
+        );
+
+        let currentNetWorth: number;
+        let previousSnapshot: MonthlySnapshot | null;
+
+        if (currentMonthSnapshot) {
+          // Use the current month's snapshot
+          currentNetWorth = currentMonthSnapshot.totalNetWorth;
+          // Previous month is the second-to-last snapshot
+          previousSnapshot = snapshots.length > 1
+            ? snapshots[snapshots.length - 2]
+            : null;
+        } else {
+          // No current month snapshot, use live portfolio value
+          currentNetWorth = calculateTotalValue(data);
+          // Previous month is the most recent snapshot
+          previousSnapshot = snapshots[snapshots.length - 1];
+        }
+
+        if (previousSnapshot) {
+          const variation = calculateMonthlyChange(currentNetWorth, previousSnapshot);
+          setMonthlyVariation(variation);
+        } else {
+          setMonthlyVariation(null);
+        }
+      } else {
+        setMonthlyVariation(null);
+      }
     } catch (error) {
       console.error('Error loading assets:', error);
     } finally {
@@ -220,10 +263,27 @@ export default function DashboardPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">-</div>
-            <p className="text-xs text-muted-foreground">
-              Dati non disponibili
-            </p>
+            {monthlyVariation ? (
+              <>
+                <div className={`text-2xl font-bold ${
+                  monthlyVariation.value >= 0 ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {monthlyVariation.value >= 0 ? '+' : ''}{formatCurrency(monthlyVariation.value)}
+                </div>
+                <p className={`text-xs ${
+                  monthlyVariation.percentage >= 0 ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {monthlyVariation.percentage >= 0 ? '+' : ''}{monthlyVariation.percentage.toFixed(2)}%
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">-</div>
+                <p className="text-xs text-muted-foreground">
+                  Dati non disponibili
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

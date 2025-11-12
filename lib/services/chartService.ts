@@ -91,7 +91,7 @@ export function prepareNetWorthHistoryData(snapshots: MonthlySnapshot[]): {
   year: number;
 }[] {
   return snapshots.map((snapshot) => ({
-    date: `${String(snapshot.month).padStart(2, '0')}/${snapshot.year}`,
+    date: `${String(snapshot.month).padStart(2, '0')}/${String(snapshot.year).slice(-2)}`,
     totalNetWorth: snapshot.totalNetWorth,
     liquidNetWorth: snapshot.liquidNetWorth,
     illiquidNetWorth: snapshot.illiquidNetWorth || 0, // default 0 per retrocompatibilità
@@ -132,7 +132,7 @@ export function prepareAssetClassHistoryData(snapshots: MonthlySnapshot[]): {
     const commodity = byAssetClass.commodity || 0;
 
     return {
-      date: `${String(snapshot.month).padStart(2, '0')}/${snapshot.year}`,
+      date: `${String(snapshot.month).padStart(2, '0')}/${String(snapshot.year).slice(-2)}`,
       equity,
       bonds,
       crypto,
