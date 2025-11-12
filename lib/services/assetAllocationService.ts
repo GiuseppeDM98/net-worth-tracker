@@ -239,7 +239,8 @@ export function compareAllocations(
 
     // Compare sub-categories if they exist
     if (targetData.subTargets) {
-      const assetClassTotal = currentValue;
+      const assetClassCurrentTotal = currentValue;
+      const assetClassTargetTotal = targetValue;
 
       Object.keys(targetData.subTargets).forEach((subCategory) => {
         const subTargetPercentage = targetData.subTargets![subCategory];
@@ -247,12 +248,12 @@ export function compareAllocations(
         const subCategoryKey = `${assetClass}:${subCategory}`;
         const subCurrentValue = current.bySubCategory[subCategoryKey] || 0;
 
-        // Sub-category percentage is relative to its asset class
+        // Sub-category percentage is relative to its asset class current value
         const subCurrentPercentage =
-          assetClassTotal > 0 ? (subCurrentValue / assetClassTotal) * 100 : 0;
+          assetClassCurrentTotal > 0 ? (subCurrentValue / assetClassCurrentTotal) * 100 : 0;
 
-        // Target value is percentage of the asset class total
-        const subTargetValue = (assetClassTotal * subTargetPercentage) / 100;
+        // Target value is percentage of the asset class target value
+        const subTargetValue = (assetClassTargetTotal * subTargetPercentage) / 100;
         const subDifference = subCurrentPercentage - subTargetPercentage;
         const subDifferenceValue = subCurrentValue - subTargetValue;
 
