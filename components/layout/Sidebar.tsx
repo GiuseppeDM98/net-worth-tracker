@@ -13,18 +13,19 @@ import {
   BarChart3,
 } from 'lucide-react';
 
-const navigation = [
-  { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Assets', href: '/dashboard/assets', icon: Wallet },
-  { name: 'Allocation', href: '/dashboard/allocation', icon: PieChart },
-  { name: 'History', href: '/dashboard/history', icon: History },
-  { name: 'Tracciamento Spese', href: '/dashboard/expenses', icon: Receipt },
-  { name: 'Grafici Spese', href: '/dashboard/expense-charts', icon: BarChart3 },
-  { name: 'Settings', href: '/dashboard/settings', icon: Settings },
-];
-
 export function Sidebar() {
   const pathname = usePathname();
+  const currentYear = new Date().getFullYear();
+
+  const navigation = [
+    { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Assets', href: '/dashboard/assets', icon: Wallet },
+    { name: 'Allocation', href: '/dashboard/allocation', icon: PieChart },
+    { name: 'History', href: '/dashboard/history', icon: History },
+    { name: 'Tracciamento Spese', href: '/dashboard/expenses', icon: Receipt },
+    { name: `Grafici Spese ${currentYear}`, href: '/dashboard/expense-charts', icon: BarChart3 },
+    { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+  ];
 
   return (
     <div className="flex h-full w-64 flex-col bg-gray-900 text-white">
