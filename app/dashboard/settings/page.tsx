@@ -14,9 +14,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Save, RotateCcw, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Save, RotateCcw, Plus, Trash2, ChevronDown, ChevronUp, Edit, Receipt } from 'lucide-react';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
+import { ExpenseCategory, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
+import { getAllCategories, deleteCategory } from '@/lib/services/expenseCategoryService';
+import { CategoryManagementDialog } from '@/components/expenses/CategoryManagementDialog';
 
 interface SubTarget {
   name: string;
@@ -68,9 +71,16 @@ export default function SettingsPage() {
     Record<AssetClass, AssetClassState>
   >({} as Record<AssetClass, AssetClassState>);
 
+  // Expense categories state
+  const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<ExpenseCategory | null>(null);
+
   useEffect(() => {
     if (user) {
       loadTargets();
+      loadExpenseCategories();
     }
   }, [user]);
 
@@ -224,6 +234,59 @@ export default function SettingsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadExpenseCategories = async () => {
+    if (!user) return;
+
+    try {
+      setLoadingCategories(true);
+      const categories = await getAllCategories(user.uid);
+      setExpenseCategories(categories);
+    } catch (error) {
+      console.error('Error loading expense categories:', error);
+      toast.error('Errore nel caricamento delle categorie spese');
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
+
+  const handleAddExpenseCategory = () => {
+    setEditingCategory(null);
+    setCategoryDialogOpen(true);
+  };
+
+  const handleEditExpenseCategory = (category: ExpenseCategory) => {
+    setEditingCategory(category);
+    setCategoryDialogOpen(true);
+  };
+
+  const handleDeleteExpenseCategory = async (categoryId: string, categoryName: string) => {
+    if (!window.confirm(`Sei sicuro di voler eliminare la categoria "${categoryName}"?`)) {
+      return;
+    }
+
+    try {
+      await deleteCategory(categoryId);
+      toast.success('Categoria eliminata con successo');
+      await loadExpenseCategories();
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      toast.error('Errore nell\'eliminazione della categoria');
+    }
+  };
+
+  const handleExpenseCategoryDialogClose = () => {
+    setCategoryDialogOpen(false);
+    setEditingCategory(null);
+  };
+
+  const handleExpenseCategorySuccess = async () => {
+    await loadExpenseCategories();
+  };
+
+  const getCategoriesByType = (type: ExpenseType): ExpenseCategory[] => {
+    return expenseCategories.filter(cat => cat.type === type);
   };
 
   const calculateTotal = () => {
@@ -826,6 +889,94 @@ export default function SettingsPage() {
           </li>
         </ul>
       </div>
+
+      {/* Expense Categories Management Section */}
+      <Card className="mt-8">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Receipt className="h-5 w-5" />
+              <CardTitle>Impostazioni Tracciamento Spese</CardTitle>
+            </div>
+            <Button onClick={handleAddExpenseCategory} size="sm">
+              <Plus className="mr-2 h-4 w-4" />
+              Nuova Categoria
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loadingCategories ? (
+            <p className="text-sm text-muted-foreground">Caricamento categorie...</p>
+          ) : (
+            <div className="space-y-6">
+              {/* Categories by type */}
+              {(['income', 'fixed', 'variable', 'debt'] as ExpenseType[]).map((type) => {
+                const categories = getCategoriesByType(type);
+                return (
+                  <div key={type} className="space-y-3">
+                    <h3 className="font-semibold text-sm text-gray-700 border-b pb-2">
+                      {EXPENSE_TYPE_LABELS[type]}
+                    </h3>
+                    {categories.length === 0 ? (
+                      <p className="text-sm text-muted-foreground italic pl-4">
+                        Nessuna categoria creata
+                      </p>
+                    ) : (
+                      <div className="grid gap-2">
+                        {categories.map((category) => (
+                          <div
+                            key={category.id}
+                            className="flex items-center justify-between p-3 bg-muted rounded-md hover:bg-muted/80 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="w-3 h-3 rounded-full border border-gray-300"
+                                style={{ backgroundColor: category.color || '#3b82f6' }}
+                              />
+                              <div>
+                                <p className="font-medium text-sm">{category.name}</p>
+                                {category.subCategories && category.subCategories.length > 0 && (
+                                  <p className="text-xs text-muted-foreground">
+                                    {category.subCategories.length} sotto-{category.subCategories.length === 1 ? 'categoria' : 'categorie'}: {category.subCategories.map(sub => sub.name).join(', ')}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditExpenseCategory(category)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteExpenseCategory(category.id, category.name)}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Category Management Dialog */}
+      <CategoryManagementDialog
+        open={categoryDialogOpen}
+        onClose={handleExpenseCategoryDialogClose}
+        category={editingCategory}
+        onSuccess={handleExpenseCategorySuccess}
+      />
     </div>
   );
 }

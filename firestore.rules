@@ -76,6 +76,38 @@ service cloud.firestore {
       allow delete: if isOwner(resource.data.userId);
     }
 
+    // Collezione expenses - tracciamento spese ed entrate
+    match /expenses/{expenseId} {
+      // Lettura: solo se è il proprietario
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+
+      // Creazione: solo se autenticato e il userId corrisponde
+      allow create: if isAuthenticated() && hasValidUserId();
+
+      // Aggiornamento: solo se è il proprietario e non cambia il userId
+      allow update: if isOwner(resource.data.userId) &&
+                       request.resource.data.userId == resource.data.userId;
+
+      // Cancellazione: solo se è il proprietario
+      allow delete: if isOwner(resource.data.userId);
+    }
+
+    // Collezione expenseCategories - categorie per le spese
+    match /expenseCategories/{categoryId} {
+      // Lettura: solo se è il proprietario
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+
+      // Creazione: solo se autenticato e il userId corrisponde
+      allow create: if isAuthenticated() && hasValidUserId();
+
+      // Aggiornamento: solo se è il proprietario e non cambia il userId
+      allow update: if isOwner(resource.data.userId) &&
+                       request.resource.data.userId == resource.data.userId;
+
+      // Cancellazione: solo se è il proprietario
+      allow delete: if isOwner(resource.data.userId);
+    }
+
     // Blocca tutto il resto per sicurezza
     match /{document=**} {
       allow read, write: if false;
