@@ -357,11 +357,12 @@ export async function addSubCategory(
 
 /**
  * Get default allocation targets for a new user
+ * Default: 60% equity, 40% bonds
  */
 export function getDefaultTargets(): AssetAllocationTarget {
   return {
     equity: {
-      targetPercentage: 70,
+      targetPercentage: 60,
       subCategoryConfig: {
         enabled: true,
         categories: DEFAULT_SUB_CATEGORIES.equity,
@@ -369,28 +370,28 @@ export function getDefaultTargets(): AssetAllocationTarget {
       subTargets: DEFAULT_EQUITY_SUB_TARGETS,
     },
     bonds: {
-      targetPercentage: 20,
+      targetPercentage: 40,
       subCategoryConfig: {
         enabled: false,
         categories: DEFAULT_SUB_CATEGORIES.bonds,
       },
     },
     crypto: {
-      targetPercentage: 3,
+      targetPercentage: 0,
       subCategoryConfig: {
         enabled: false,
         categories: DEFAULT_SUB_CATEGORIES.crypto,
       },
     },
     realestate: {
-      targetPercentage: 5,
+      targetPercentage: 0,
       subCategoryConfig: {
         enabled: false,
         categories: DEFAULT_SUB_CATEGORIES.realestate,
       },
     },
     cash: {
-      targetPercentage: 2,
+      targetPercentage: 0,
       useFixedAmount: false,
       fixedAmount: 0,
       subCategoryConfig: {

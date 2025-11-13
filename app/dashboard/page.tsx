@@ -14,7 +14,7 @@ import {
   prepareAssetClassDistributionData,
   prepareAssetDistributionData,
 } from '@/lib/services/chartService';
-import { getUserSnapshots, calculateMonthlyChange } from '@/lib/services/snapshotService';
+import { getUserSnapshots, calculateMonthlyChange, calculateYearlyChange } from '@/lib/services/snapshotService';
 import { getExpenseStats } from '@/lib/services/expenseService';
 import { ExpenseStats } from '@/types/expenses';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -39,6 +39,10 @@ export default function DashboardPage() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [existingSnapshot, setExistingSnapshot] = useState<MonthlySnapshot | null>(null);
   const [monthlyVariation, setMonthlyVariation] = useState<{
+    value: number;
+    percentage: number;
+  } | null>(null);
+  const [yearlyVariation, setYearlyVariation] = useState<{
     value: number;
     percentage: number;
   } | null>(null);
@@ -95,8 +99,13 @@ export default function DashboardPage() {
         } else {
           setMonthlyVariation(null);
         }
+
+        // Calculate yearly variation (YTD - Year to Date)
+        const yearlyVariationData = calculateYearlyChange(currentNetWorth, snapshots);
+        setYearlyVariation(yearlyVariationData);
       } else {
         setMonthlyVariation(null);
+        setYearlyVariation(null);
       }
     } catch (error) {
       console.error('Error loading assets:', error);
@@ -241,7 +250,7 @@ export default function DashboardPage() {
         </Button>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Patrimonio Totale</CardTitle>
@@ -277,7 +286,10 @@ export default function DashboardPage() {
             </p>
           </CardContent>
         </Card>
+      </div>
 
+      {/* Variazioni Cards */}
+      <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Variazione Mensile</CardTitle>
@@ -295,6 +307,36 @@ export default function DashboardPage() {
                   monthlyVariation.percentage >= 0 ? 'text-green-600' : 'text-red-600'
                 }`}>
                   {monthlyVariation.percentage >= 0 ? '+' : ''}{monthlyVariation.percentage.toFixed(2)}%
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">-</div>
+                <p className="text-xs text-muted-foreground">
+                  Dati non disponibili
+                </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Variazione Annuale (YTD)</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {yearlyVariation ? (
+              <>
+                <div className={`text-2xl font-bold ${
+                  yearlyVariation.value >= 0 ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {yearlyVariation.value >= 0 ? '+' : ''}{formatCurrency(yearlyVariation.value)}
+                </div>
+                <p className={`text-xs ${
+                  yearlyVariation.percentage >= 0 ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {yearlyVariation.percentage >= 0 ? '+' : ''}{yearlyVariation.percentage.toFixed(2)}%
                 </p>
               </>
             ) : (

@@ -228,7 +228,7 @@ export default function AssetsPage() {
                           </span>
                         </TableCell>
                         <TableCell className="text-right">
-                          {formatNumber(asset.quantity, 4)}
+                          {formatNumber(asset.quantity, 2)}
                         </TableCell>
                         <TableCell className="text-right">
                           {formatCurrency(asset.currentPrice)}
