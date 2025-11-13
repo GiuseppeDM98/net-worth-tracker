@@ -332,11 +332,11 @@ export default function HistoryPage() {
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={400}>
-              <LineChart data={netWorthHistory} margin={{ left: 20 }}>
+              <LineChart data={netWorthHistory} margin={{ left: 50 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis
-                  width={80}
+                  width={100}
                   tickFormatter={(value) =>
                     formatCurrency(value).replace(/,00$/, '')
                   }
@@ -386,11 +386,11 @@ export default function HistoryPage() {
             <ResponsiveContainer width="100%" height={400}>
               {showAssetClassPercentage ? (
                 // Percentage mode: Use LineChart with separate lines
-                <LineChart data={assetClassHistory} margin={{ left: 20 }}>
+                <LineChart data={assetClassHistory} margin={{ left: 50 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis
-                    width={80}
+                    width={100}
                     tickFormatter={(value) => `${value.toFixed(0)}%`}
                     domain={[0, 100]}
                   />
@@ -462,11 +462,11 @@ export default function HistoryPage() {
                 </LineChart>
               ) : (
                 // Absolute values mode: Use Stacked AreaChart
-                <AreaChart data={assetClassHistory} margin={{ left: 20 }}>
+                <AreaChart data={assetClassHistory} margin={{ left: 50 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis
-                    width={80}
+                    width={100}
                     tickFormatter={(value) => formatCurrency(value).replace(/,00$/, '')}
                   />
                   <Tooltip
@@ -564,11 +564,11 @@ export default function HistoryPage() {
             <ResponsiveContainer width="100%" height={400}>
               {showLiquidityPercentage ? (
                 // Percentage mode: Use LineChart with separate lines
-                <LineChart data={liquidityHistory} margin={{ left: 20 }}>
+                <LineChart data={liquidityHistory} margin={{ left: 50 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis
-                    width={80}
+                    width={100}
                     tickFormatter={(value) => `${value.toFixed(0)}%`}
                     domain={[0, 100]}
                   />
@@ -600,11 +600,11 @@ export default function HistoryPage() {
                 </LineChart>
               ) : (
                 // Absolute values mode: Use AreaChart with overlapping areas (no stack)
-                <AreaChart data={liquidityHistory} margin={{ left: 20 }}>
+                <AreaChart data={liquidityHistory} margin={{ left: 50 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis
-                    width={80}
+                    width={100}
                     tickFormatter={(value) => formatCurrency(value).replace(/,00$/, '')}
                     domain={[(dataMin: number) => dataMin * 0.95, (dataMax: number) => dataMax * 1.05]}
                   />
@@ -661,11 +661,11 @@ export default function HistoryPage() {
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={400}>
-              <BarChart data={yoyVariationData} margin={{ left: 20 }}>
+              <BarChart data={yoyVariationData} margin={{ left: 50 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="year" />
                 <YAxis
-                  width={80}
+                  width={100}
                   tickFormatter={(value) =>
                     showYoYPercentage
                       ? `${value.toFixed(0)}%`
