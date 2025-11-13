@@ -385,16 +385,16 @@ export default function ExpenseChartsPage() {
       <div className="grid gap-6 md:grid-cols-2">
         {/* Expenses by Category */}
         {expensesByCategoryData.length > 0 && (
-          <Card>
+          <Card className="md:col-span-2">
             <CardHeader>
               <CardTitle>Spese per Categoria</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
+              <ResponsiveContainer width="100%" height={500}>
                 <RechartsPC>
                   <Pie
                     data={expensesByCategoryData as any}
-                    cx="40%"
+                    cx="50%"
                     cy="50%"
                     labelLine={false}
                     label={(entry: any) =>
@@ -402,7 +402,7 @@ export default function ExpenseChartsPage() {
                         ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
                         : ''
                     }
-                    outerRadius={80}
+                    outerRadius={140}
                     fill="#8884d8"
                     dataKey="value"
                   >
@@ -438,16 +438,16 @@ export default function ExpenseChartsPage() {
 
         {/* Income by Category */}
         {incomeByCategoryData.length > 0 && (
-          <Card>
+          <Card className="md:col-span-2">
             <CardHeader>
               <CardTitle>Entrate per Categoria</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
+              <ResponsiveContainer width="100%" height={500}>
                 <RechartsPC>
                   <Pie
                     data={incomeByCategoryData as any}
-                    cx="40%"
+                    cx="50%"
                     cy="50%"
                     labelLine={false}
                     label={(entry: any) =>
@@ -455,7 +455,7 @@ export default function ExpenseChartsPage() {
                         ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
                         : ''
                     }
-                    outerRadius={80}
+                    outerRadius={140}
                     fill="#8884d8"
                     dataKey="value"
                   >
@@ -491,16 +491,16 @@ export default function ExpenseChartsPage() {
 
         {/* Expenses by Type */}
         {expensesByTypeData.length > 0 && (
-          <Card>
+          <Card className="md:col-span-2">
             <CardHeader>
               <CardTitle>Spese per Tipo</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
+              <ResponsiveContainer width="100%" height={500}>
                 <RechartsPC>
                   <Pie
                     data={expensesByTypeData as any}
-                    cx="40%"
+                    cx="50%"
                     cy="50%"
                     labelLine={false}
                     label={(entry: any) =>
@@ -508,7 +508,7 @@ export default function ExpenseChartsPage() {
                         ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
                         : ''
                     }
-                    outerRadius={80}
+                    outerRadius={140}
                     fill="#8884d8"
                     dataKey="value"
                   >

@@ -369,7 +369,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <Card>
+        <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle>Distribuzione per Asset Class</CardTitle>
           </CardHeader>
@@ -378,7 +378,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle>Distribuzione per Asset</CardTitle>
           </CardHeader>
@@ -390,7 +390,7 @@ export default function DashboardPage() {
 
       {/* Liquidity Chart */}
       <div className="grid gap-6 md:grid-cols-2">
-        <Card>
+        <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle>Liquidità Portfolio</CardTitle>
           </CardHeader>
