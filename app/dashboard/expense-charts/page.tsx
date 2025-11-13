@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { getAllExpenses, calculateTotalIncome, calculateTotalExpenses } from '@/lib/services/expenseService';
+import { Timestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -161,7 +162,7 @@ export default function ExpenseChartsPage() {
     const monthlyMap = new Map<string, { income: number; expenses: number }>();
 
     expenses.forEach(expense => {
-      const date = expense.date instanceof Date ? expense.date : new Date(expense.date);
+      const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
       const current = monthlyMap.get(monthKey) || { income: 0, expenses: 0 };

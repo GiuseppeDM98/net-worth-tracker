@@ -14,6 +14,7 @@ import {
 } from '@/types/expenses';
 import { createExpense, updateExpense } from '@/lib/services/expenseService';
 import { getAllCategories } from '@/lib/services/expenseCategoryService';
+import { Timestamp } from 'firebase/firestore';
 import {
   Dialog,
   DialogContent,
@@ -130,7 +131,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
         subCategoryId: expense.subCategoryId || '',
         amount: Math.abs(expense.amount),
         currency: expense.currency,
-        date: expense.date instanceof Date ? expense.date : new Date(expense.date),
+        date: expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate(),
         notes: expense.notes || '',
         isRecurring: expense.isRecurring || false,
         recurringDay: expense.recurringDay,

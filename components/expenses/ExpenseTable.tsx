@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { deleteExpense, deleteRecurringExpenses } from '@/lib/services/expenseService';
+import { Timestamp } from 'firebase/firestore';
 import {
   Table,
   TableBody,
@@ -33,8 +34,8 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
     }).format(Math.abs(amount));
   };
 
-  const formatDate = (date: Date | string): string => {
-    const dateObj = date instanceof Date ? date : new Date(date);
+  const formatDate = (date: Date | string | Timestamp): string => {
+    const dateObj = date instanceof Date ? date : (date instanceof Timestamp ? date.toDate() : new Date(date));
     return format(dateObj, 'dd/MM/yyyy', { locale: it });
   };
 
@@ -148,7 +149,7 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
                 <div className="flex items-center gap-1">
                   {formatDate(expense.date)}
                   {expense.isRecurring && (
-                    <Calendar className="h-3 w-3 text-muted-foreground" title="Voce ricorrente" />
+                    <Calendar className="h-3 w-3 text-muted-foreground" aria-label="Voce ricorrente" />
                   )}
                 </div>
               </TableCell>
