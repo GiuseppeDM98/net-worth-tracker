@@ -27,6 +27,20 @@ import { AssetDialog } from '@/components/assets/AssetDialog';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 
+// Helper function to format asset class and type names
+const formatAssetName = (name: string): string => {
+  const nameMap: Record<string, string> = {
+    realestate: 'Real Estate',
+    equity: 'Equity',
+    bonds: 'Bonds',
+    crypto: 'Crypto',
+    cash: 'Cash',
+    commodity: 'Commodity',
+  };
+
+  return nameMap[name.toLowerCase()] || name.charAt(0).toUpperCase() + name.slice(1);
+};
+
 export default function AssetsPage() {
   const { user } = useAuth();
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -214,8 +228,8 @@ export default function AssetsPage() {
                           {asset.name}
                         </TableCell>
                         <TableCell>{asset.ticker}</TableCell>
-                        <TableCell className="capitalize">{asset.type}</TableCell>
-                        <TableCell className="capitalize">
+                        <TableCell>{formatAssetName(asset.type)}</TableCell>
+                        <TableCell>
                           <span
                             className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium"
                             style={{
@@ -224,11 +238,11 @@ export default function AssetsPage() {
                               border: `1px solid ${assetClassColor}40`
                             }}
                           >
-                            {asset.assetClass}
+                            {formatAssetName(asset.assetClass)}
                           </span>
                         </TableCell>
                         <TableCell className="text-right">
-                          {formatNumber(asset.quantity, 4)}
+                          {formatNumber(asset.quantity, 2)}
                         </TableCell>
                         <TableCell className="text-right">
                           {formatCurrency(asset.currentPrice)}

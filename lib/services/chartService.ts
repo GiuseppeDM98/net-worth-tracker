@@ -197,3 +197,63 @@ export function formatNumber(value: number, decimals: number = 2): string {
     maximumFractionDigits: decimals,
   }).format(value);
 }
+
+/**
+ * Prepare data for YoY (Year over Year) variation chart
+ * Compares first snapshot of each year with last snapshot of the same year
+ */
+export function prepareYoYVariationData(snapshots: MonthlySnapshot[]): {
+  year: string;
+  variation: number;
+  variationPercentage: number;
+  startValue: number;
+  endValue: number;
+}[] {
+  if (snapshots.length === 0) {
+    return [];
+  }
+
+  // Group snapshots by year
+  const snapshotsByYear = new Map<number, MonthlySnapshot[]>();
+
+  snapshots.forEach((snapshot) => {
+    if (!snapshotsByYear.has(snapshot.year)) {
+      snapshotsByYear.set(snapshot.year, []);
+    }
+    snapshotsByYear.get(snapshot.year)!.push(snapshot);
+  });
+
+  // Calculate YoY variation for each year
+  const yoyData: {
+    year: string;
+    variation: number;
+    variationPercentage: number;
+    startValue: number;
+    endValue: number;
+  }[] = [];
+
+  Array.from(snapshotsByYear.entries())
+    .sort((a, b) => a[0] - b[0]) // Sort by year
+    .forEach(([year, yearSnapshots]) => {
+      // Sort snapshots by month to get first and last
+      yearSnapshots.sort((a, b) => a.month - b.month);
+
+      const firstSnapshot = yearSnapshots[0];
+      const lastSnapshot = yearSnapshots[yearSnapshots.length - 1];
+
+      const startValue = firstSnapshot.totalNetWorth;
+      const endValue = lastSnapshot.totalNetWorth;
+      const variation = endValue - startValue;
+      const variationPercentage = startValue > 0 ? (variation / startValue) * 100 : 0;
+
+      yoyData.push({
+        year: year.toString(),
+        variation,
+        variationPercentage,
+        startValue,
+        endValue,
+      });
+    });
+
+  return yoyData;
+}

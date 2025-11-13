@@ -13,6 +13,7 @@ import {
   prepareNetWorthHistoryData,
   prepareAssetDistributionData,
   prepareAssetClassHistoryData,
+  prepareYoYVariationData,
   formatCurrency,
   formatPercentage,
 } from '@/lib/services/chartService';
@@ -27,12 +28,15 @@ import {
   Line,
   AreaChart,
   Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
+  Cell,
 } from 'recharts';
 import { getAssetClassColor } from '@/lib/constants/colors';
 
@@ -44,6 +48,7 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [showAssetClassPercentage, setShowAssetClassPercentage] = useState(false);
   const [showLiquidityPercentage, setShowLiquidityPercentage] = useState(false);
+  const [showYoYPercentage, setShowYoYPercentage] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -110,6 +115,7 @@ export default function HistoryPage() {
   const netWorthHistory = prepareNetWorthHistoryData(snapshots);
   const assetDistribution = prepareAssetDistributionData(assets);
   const assetClassHistory = prepareAssetClassHistoryData(snapshots);
+  const yoyVariationData = prepareYoYVariationData(snapshots);
 
   // Prepare liquidity data with percentages
   const liquidityHistory = netWorthHistory.map((item) => {
@@ -326,11 +332,11 @@ export default function HistoryPage() {
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={400}>
-              <LineChart data={netWorthHistory} margin={{ left: 20 }}>
+              <LineChart data={netWorthHistory} margin={{ left: 50 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis
-                  width={80}
+                  width={100}
                   tickFormatter={(value) =>
                     formatCurrency(value).replace(/,00$/, '')
                   }
@@ -380,11 +386,11 @@ export default function HistoryPage() {
             <ResponsiveContainer width="100%" height={400}>
               {showAssetClassPercentage ? (
                 // Percentage mode: Use LineChart with separate lines
-                <LineChart data={assetClassHistory} margin={{ left: 20 }}>
+                <LineChart data={assetClassHistory} margin={{ left: 50 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis
-                    width={80}
+                    width={100}
                     tickFormatter={(value) => `${value.toFixed(0)}%`}
                     domain={[0, 100]}
                   />
@@ -456,11 +462,11 @@ export default function HistoryPage() {
                 </LineChart>
               ) : (
                 // Absolute values mode: Use Stacked AreaChart
-                <AreaChart data={assetClassHistory} margin={{ left: 20 }}>
+                <AreaChart data={assetClassHistory} margin={{ left: 50 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis
-                    width={80}
+                    width={100}
                     tickFormatter={(value) => formatCurrency(value).replace(/,00$/, '')}
                   />
                   <Tooltip
@@ -558,11 +564,11 @@ export default function HistoryPage() {
             <ResponsiveContainer width="100%" height={400}>
               {showLiquidityPercentage ? (
                 // Percentage mode: Use LineChart with separate lines
-                <LineChart data={liquidityHistory} margin={{ left: 20 }}>
+                <LineChart data={liquidityHistory} margin={{ left: 50 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis
-                    width={80}
+                    width={100}
                     tickFormatter={(value) => `${value.toFixed(0)}%`}
                     domain={[0, 100]}
                   />
@@ -594,11 +600,11 @@ export default function HistoryPage() {
                 </LineChart>
               ) : (
                 // Absolute values mode: Use AreaChart with overlapping areas (no stack)
-                <AreaChart data={liquidityHistory} margin={{ left: 20 }}>
+                <AreaChart data={liquidityHistory} margin={{ left: 50 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis
-                    width={80}
+                    width={100}
                     tickFormatter={(value) => formatCurrency(value).replace(/,00$/, '')}
                     domain={[(dataMin: number) => dataMin * 0.95, (dataMax: number) => dataMax * 1.05]}
                   />
@@ -629,6 +635,68 @@ export default function HistoryPage() {
                   />
                 </AreaChart>
               )}
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* YoY Variation Chart */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Storico YoY</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowYoYPercentage(!showYoYPercentage)}
+            >
+              {showYoYPercentage ? '€ Valori Assoluti' : '% Percentuali'}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {yoyVariationData.length === 0 ? (
+            <div className="flex h-64 items-center justify-center text-gray-500">
+              Nessuno storico disponibile.
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={400}>
+              <BarChart data={yoyVariationData} margin={{ left: 50 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="year" />
+                <YAxis
+                  width={100}
+                  tickFormatter={(value) =>
+                    showYoYPercentage
+                      ? `${value.toFixed(0)}%`
+                      : formatCurrency(value).replace(/,00$/, '')
+                  }
+                />
+                <Tooltip
+                  formatter={(value: number, name: string) => {
+                    if (name === 'Variazione') {
+                      return showYoYPercentage
+                        ? `${value.toFixed(2)}%`
+                        : formatCurrency(value);
+                    }
+                    return formatCurrency(value);
+                  }}
+                  labelStyle={{ color: '#000' }}
+                />
+                <Legend />
+                <Bar
+                  dataKey={showYoYPercentage ? 'variationPercentage' : 'variation'}
+                  name="Variazione"
+                  isAnimationActive={false}
+                >
+                  {yoyVariationData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={entry.variation >= 0 ? '#10B981' : '#EF4444'}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
             </ResponsiveContainer>
           )}
         </CardContent>

@@ -179,3 +179,33 @@ export function calculateMonthlyChange(
 
   return { value, percentage };
 }
+
+/**
+ * Calculate year-to-date change
+ * Compares current net worth with the first snapshot of the current year
+ */
+export function calculateYearlyChange(
+  currentNetWorth: number,
+  snapshots: MonthlySnapshot[]
+): {
+  value: number;
+  percentage: number;
+} | null {
+  if (snapshots.length === 0) {
+    return null;
+  }
+
+  const currentYear = new Date().getFullYear();
+
+  // Find the first snapshot of the current year
+  const firstSnapshotOfYear = snapshots.find(s => s.year === currentYear);
+
+  if (!firstSnapshotOfYear || firstSnapshotOfYear.totalNetWorth === 0) {
+    return null;
+  }
+
+  const value = currentNetWorth - firstSnapshotOfYear.totalNetWorth;
+  const percentage = (value / firstSnapshotOfYear.totalNetWorth) * 100;
+
+  return { value, percentage };
+}

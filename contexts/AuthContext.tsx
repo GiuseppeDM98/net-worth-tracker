@@ -13,6 +13,7 @@ import {
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase/config';
 import { User } from '@/types/assets';
+import { getDefaultTargets, setSettings } from '@/lib/services/assetAllocationService';
 
 interface AuthContextType {
   user: User | null;
@@ -65,6 +66,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             displayName: firebaseUser.displayName || '',
             createdAt: new Date(),
           });
+
+          // Set default asset allocation (60% equity, 40% bonds)
+          await setSettings(firebaseUser.uid, {
+            targets: getDefaultTargets(),
+          });
         }
       } else {
         setUser(null);
@@ -87,6 +93,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email: firebaseUser.email,
       displayName: displayName || '',
       createdAt: new Date(),
+    });
+
+    // Set default asset allocation (60% equity, 40% bonds)
+    await setSettings(firebaseUser.uid, {
+      targets: getDefaultTargets(),
     });
   };
 
