@@ -24,6 +24,7 @@ export function Sidebar() {
     { name: 'History', href: '/dashboard/history', icon: History },
     { name: 'Tracciamento Spese', href: '/dashboard/expenses', icon: Receipt },
     { name: `Grafici Spese ${currentYear}`, href: '/dashboard/expense-charts', icon: BarChart3 },
+    { name: 'Grafici Spese Totale', href: '/dashboard/expense-charts-total', icon: BarChart3 },
     { name: 'Settings', href: '/dashboard/settings', icon: Settings },
   ];
 
