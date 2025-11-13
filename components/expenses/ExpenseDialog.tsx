@@ -13,8 +13,9 @@ import {
   ExpenseCategory
 } from '@/types/expenses';
 import { createExpense, updateExpense } from '@/lib/services/expenseService';
-import { getAllCategories } from '@/lib/services/expenseCategoryService';
+import { getAllCategories, addSubCategory } from '@/lib/services/expenseCategoryService';
 import { Timestamp } from 'firebase/firestore';
+import { CategoryManagementDialog } from '@/components/expenses/CategoryManagementDialog';
 import {
   Dialog,
   DialogContent,
@@ -35,6 +36,7 @@ import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
+import { Plus } from 'lucide-react';
 
 const expenseSchema = z.object({
   type: z.enum(['fixed', 'variable', 'debt', 'income']),
@@ -44,6 +46,7 @@ const expenseSchema = z.object({
   currency: z.string().min(1, 'Valuta è obbligatoria'),
   date: z.date(),
   notes: z.string().optional(),
+  link: z.string().url('Inserisci un URL valido').optional().or(z.literal('')),
   isRecurring: z.boolean().optional(),
   recurringDay: z.number().min(1).max(31).optional(),
   recurringMonths: z.number().min(1).max(120).optional(),
@@ -69,6 +72,10 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
   const { user } = useAuth();
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [newSubCategoryName, setNewSubCategoryName] = useState('');
+  const [addingSubCategory, setAddingSubCategory] = useState(false);
+  const [showSubCategoryInput, setShowSubCategoryInput] = useState(false);
 
   const {
     register,
@@ -133,6 +140,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
         currency: expense.currency,
         date: expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate(),
         notes: expense.notes || '',
+        link: expense.link || '',
         isRecurring: expense.isRecurring || false,
         recurringDay: expense.recurringDay,
         recurringMonths: 1,
@@ -146,6 +154,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
         currency: 'EUR',
         date: new Date(),
         notes: '',
+        link: '',
         isRecurring: false,
         recurringDay: new Date().getDate(),
         recurringMonths: 12,
@@ -171,6 +180,46 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
   const getAvailableSubCategories = () => {
     const category = getSelectedCategory();
     return category?.subCategories || [];
+  };
+
+  const handleCategoryCreated = async () => {
+    // Reload categories after creating a new one
+    await loadCategories();
+  };
+
+  const handleAddSubCategory = async () => {
+    if (!newSubCategoryName.trim()) {
+      toast.error('Inserisci un nome per la sotto-categoria');
+      return;
+    }
+
+    if (!selectedCategoryId) {
+      toast.error('Seleziona prima una categoria');
+      return;
+    }
+
+    const category = getSelectedCategory();
+    if (!category) return;
+
+    // Check if subcategory already exists
+    if (category.subCategories.some(sub => sub.name.toLowerCase() === newSubCategoryName.trim().toLowerCase())) {
+      toast.error('Questa sotto-categoria esiste già');
+      return;
+    }
+
+    try {
+      setAddingSubCategory(true);
+      await addSubCategory(selectedCategoryId, newSubCategoryName.trim());
+      await loadCategories(); // Reload to get the updated category with new subcategory
+      setNewSubCategoryName('');
+      setShowSubCategoryInput(false);
+      toast.success('Sotto-categoria aggiunta con successo');
+    } catch (error) {
+      console.error('Error adding subcategory:', error);
+      toast.error('Errore nell\'aggiunta della sotto-categoria');
+    } finally {
+      setAddingSubCategory(false);
+    }
   };
 
   const onSubmit = async (data: ExpenseFormValues) => {
@@ -204,6 +253,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
         currency: data.currency,
         date: data.date,
         notes: data.notes,
+        link: data.link,
         isRecurring: data.type === 'debt' ? data.isRecurring : false,
         recurringDay: data.isRecurring ? data.recurringDay : undefined,
         recurringMonths: data.isRecurring ? data.recurringMonths : undefined,
@@ -293,40 +343,50 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
             <Label htmlFor="categoryId">Categoria *</Label>
             {loadingCategories ? (
               <p className="text-sm text-muted-foreground">Caricamento...</p>
-            ) : availableCategories.length === 0 ? (
-              <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3">
-                <p className="text-sm text-yellow-800">
-                  Nessuna categoria disponibile per questo tipo di voce.
-                  <br />
-                  Crea prima una categoria nelle Impostazioni.
-                </p>
-              </div>
             ) : (
               <>
-                <Select
-                  value={watch('categoryId')}
-                  onValueChange={(value) => {
-                    setValue('categoryId', value);
-                    setValue('subCategoryId', '');
-                  }}
-                >
-                  <SelectTrigger id="categoryId">
-                    <SelectValue placeholder="Seleziona categoria" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableCategories.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-3 h-3 rounded-full border border-gray-300"
-                            style={{ backgroundColor: category.color || '#3b82f6' }}
-                          />
-                          <span>{category.name}</span>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={watch('categoryId')}
+                    onValueChange={(value) => {
+                      setValue('categoryId', value);
+                      setValue('subCategoryId', '');
+                      setShowSubCategoryInput(false);
+                    }}
+                  >
+                    <SelectTrigger id="categoryId" className="flex-1">
+                      <SelectValue placeholder="Seleziona categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableCategories.length === 0 ? (
+                        <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                          Nessuna categoria disponibile
                         </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      ) : (
+                        availableCategories.map((category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full border border-gray-300"
+                                style={{ backgroundColor: category.color || '#3b82f6' }}
+                              />
+                              <span>{category.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setCategoryDialogOpen(true)}
+                    title="Crea nuova categoria"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
                 {errors.categoryId && (
                   <p className="text-sm text-red-500">{errors.categoryId.message}</p>
                 )}
@@ -334,25 +394,86 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
             )}
           </div>
 
-          {/* Sotto-categoria (se disponibile) */}
-          {availableSubCategories.length > 0 && (
+          {/* Sotto-categoria (se categoria selezionata) */}
+          {selectedCategoryId && (
             <div className="space-y-2">
               <Label htmlFor="subCategoryId">Sotto-categoria (opzionale)</Label>
-              <Select
-                value={watch('subCategoryId') || undefined}
-                onValueChange={(value) => setValue('subCategoryId', value || undefined)}
-              >
-                <SelectTrigger id="subCategoryId">
-                  <SelectValue placeholder="Seleziona sotto-categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableSubCategories.map((subCategory) => (
-                    <SelectItem key={subCategory.id} value={subCategory.id}>
-                      {subCategory.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {availableSubCategories.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={watch('subCategoryId') || undefined}
+                    onValueChange={(value) => setValue('subCategoryId', value || undefined)}
+                  >
+                    <SelectTrigger id="subCategoryId" className="flex-1">
+                      <SelectValue placeholder="Seleziona sotto-categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableSubCategories.map((subCategory) => (
+                        <SelectItem key={subCategory.id} value={subCategory.id}>
+                          {subCategory.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setShowSubCategoryInput(true)}
+                    title="Aggiungi nuova sotto-categoria"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+
+              {/* Input per aggiungere nuova sotto-categoria */}
+              {(showSubCategoryInput || availableSubCategories.length === 0) && (
+                <div className="space-y-2 p-3 bg-muted rounded-md">
+                  <p className="text-sm font-medium">Aggiungi sotto-categoria</p>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Nome sotto-categoria"
+                      value={newSubCategoryName}
+                      onChange={(e) => setNewSubCategoryName(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddSubCategory();
+                        }
+                      }}
+                      disabled={addingSubCategory}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={handleAddSubCategory}
+                      disabled={addingSubCategory}
+                      title="Aggiungi"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                    {availableSubCategories.length > 0 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setShowSubCategoryInput(false);
+                          setNewSubCategoryName('');
+                        }}
+                        disabled={addingSubCategory}
+                      >
+                        Annulla
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Premi Invio o clicca + per aggiungere
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -412,6 +533,24 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
               placeholder="es. Spesa supermercato Conad"
               className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             />
+          </div>
+
+          {/* Link */}
+          <div className="space-y-2">
+            <Label htmlFor="link">Link (opzionale)</Label>
+            <Input
+              id="link"
+              type="url"
+              {...register('link')}
+              placeholder="es. https://www.amazon.it/ordini/..."
+              className={errors.link ? 'border-red-500' : ''}
+            />
+            {errors.link && (
+              <p className="text-sm text-red-500">{errors.link.message}</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Aggiungi un link per tenere traccia di ordini, ricevute, ecc.
+            </p>
           </div>
 
           {/* Ricorrenza (solo per debiti) */}
@@ -484,7 +623,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
             >
               Annulla
             </Button>
-            <Button type="submit" disabled={isSubmitting || availableCategories.length === 0}>
+            <Button type="submit" disabled={isSubmitting}>
               {isSubmitting
                 ? 'Salvataggio...'
                 : expense
@@ -494,6 +633,14 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
           </div>
         </form>
       </DialogContent>
+
+      {/* Category Management Dialog */}
+      <CategoryManagementDialog
+        open={categoryDialogOpen}
+        onClose={() => setCategoryDialogOpen(false)}
+        onSuccess={handleCategoryCreated}
+        initialType={selectedType}
+      />
     </Dialog>
   );
 }

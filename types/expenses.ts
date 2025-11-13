@@ -46,6 +46,7 @@ export interface Expense {
   currency: string;
   date: Date | Timestamp;
   notes?: string;
+  link?: string; // Optional link (e.g., Amazon order, receipt, etc.)
   isRecurring?: boolean; // For debts with monthly recurrence
   recurringDay?: number; // Day of month for recurring expenses (1-31)
   recurringParentId?: string; // Reference to parent recurring expense
@@ -61,6 +62,7 @@ export interface ExpenseFormData {
   currency: string;
   date: Date;
   notes?: string;
+  link?: string;
   isRecurring?: boolean;
   recurringDay?: number;
   recurringMonths?: number; // Number of months to create recurring expenses

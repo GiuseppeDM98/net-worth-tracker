@@ -13,7 +13,12 @@ import {
   BarChart3,
 } from 'lucide-react';
 
-export function Sidebar() {
+interface SidebarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const currentYear = new Date().getFullYear();
 
@@ -23,22 +28,46 @@ export function Sidebar() {
     { name: 'Allocation', href: '/dashboard/allocation', icon: PieChart },
     { name: 'History', href: '/dashboard/history', icon: History },
     { name: 'Tracciamento Spese', href: '/dashboard/expenses', icon: Receipt },
-    { name: `Grafici Spese ${currentYear}`, href: '/dashboard/expense-charts', icon: BarChart3 },
+    { name: `Cashflow ${currentYear}`, href: '/dashboard/expense-charts', icon: BarChart3 },
+    { name: 'Cashflow Totale', href: '/dashboard/expense-charts-total', icon: BarChart3 },
     { name: 'Settings', href: '/dashboard/settings', icon: Settings },
   ];
 
+  const handleLinkClick = () => {
+    // Close sidebar on mobile after navigation
+    if (onClose && window.innerWidth < 768) {
+      onClose();
+    }
+  };
+
   return (
-    <div className="flex h-full w-64 flex-col bg-gray-900 text-white">
-      <div className="flex h-16 items-center px-6">
+    <div
+      className={cn(
+        'flex h-full w-64 flex-col bg-gray-900 text-white transition-transform duration-300 ease-in-out',
+        // Mobile: fixed position, slide in/out
+        'fixed inset-y-0 left-0 z-50 md:relative md:translate-x-0',
+        // Hide by default on mobile, show when open
+        isOpen ? 'translate-x-0' : '-translate-x-full'
+      )}
+    >
+      {/* Desktop header (hidden on mobile since we show it in the hamburger menu bar) */}
+      <div className="hidden md:flex h-16 items-center px-6">
         <h1 className="text-xl font-bold">Portfolio Tracker</h1>
       </div>
-      <nav className="flex-1 space-y-1 px-3 py-4">
+
+      {/* Mobile header */}
+      <div className="flex md:hidden h-16 items-center px-6 border-b border-gray-800">
+        <h1 className="text-xl font-bold">Portfolio Tracker</h1>
+      </div>
+
+      <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
         {navigation.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
           return (
             <Link
               key={item.name}
               href={item.href}
+              onClick={handleLinkClick}
               className={cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                 isActive
