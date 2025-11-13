@@ -233,7 +233,7 @@ export default function ExpenseChartsPage() {
         const { sortKey, ...rest } = values;
         return { month, sortKey, ...rest };
       })
-      .sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+      .sort((a, b) => (a.sortKey as string).localeCompare(b.sortKey as string));
 
     return { data, colors: typeColors };
   };
@@ -280,7 +280,7 @@ export default function ExpenseChartsPage() {
         const { sortKey, ...rest } = values;
         return { month, sortKey, ...rest };
       })
-      .sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+      .sort((a, b) => (a.sortKey as string).localeCompare(b.sortKey as string));
 
     return { data, categories: [...top5Categories, 'Altro'] };
   };
@@ -327,7 +327,7 @@ export default function ExpenseChartsPage() {
         const { sortKey, ...rest } = values;
         return { month, sortKey, ...rest };
       })
-      .sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+      .sort((a, b) => (a.sortKey as string).localeCompare(b.sortKey as string));
 
     return { data, categories: [...top5Categories, 'Altro'] };
   };
