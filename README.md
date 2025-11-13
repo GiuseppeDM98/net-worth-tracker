@@ -78,6 +78,7 @@ Portfolio allocation tracking with two-level hierarchy:
 - **Single Stocks**: Individual company holdings (Ferrari, etc.)
 
 #### Allocation Features
+- **Default Allocation for New Users**: Automatically set to 60% Equity, 40% Bonds on account creation
 - **Target Setting**: Define desired allocation percentages (must sum to 100%)
 - **Formula-Based Allocation**: Auto-calculate Equity/Bonds based on age and risk-free rate
   - Formula: `125 - age - (riskFreeRate × 5) = % Equity`
@@ -116,8 +117,11 @@ Portfolio allocation tracking with two-level hierarchy:
 - **Batch Management**: Edit or delete all recurring entries together
 - **Use Case**: Perfect for mortgages, car loans, subscriptions
 
-#### Expense Charts (`/dashboard/expense-charts`)
-**4 interactive visualizations for spending analysis:**
+#### Expense Charts
+**Two pages for different time periods:**
+
+**Cashflow Current Year** (`/dashboard/expense-charts`)
+- **4 interactive visualizations for current year analysis:**
 1. **Expenses by Category** (Pie Chart)
    - Visual breakdown of spending across categories
    - Percentage labels for categories >5%
@@ -129,9 +133,16 @@ Portfolio allocation tracking with two-level hierarchy:
    - Fixed vs Variable vs Debt breakdown
    - Identify spending patterns
 4. **Monthly Trend** (Bar Chart)
-   - 12-month historical view
+   - 12-month view of current year
    - Income, Expenses, and Net Balance bars
    - Identify seasonal patterns and trends
+
+**Cashflow Totale** (`/dashboard/expense-charts-total`)
+- **Same 4 charts but with all-time data:**
+- Includes all expenses from all years
+- Useful for long-term trend analysis
+- Compare spending patterns across multiple years
+- Monthly Trend shows complete history (not just current year)
 
 #### Category Management (`/dashboard/settings`)
 - **Settings Integration**: Manage categories in Settings page
@@ -162,6 +173,7 @@ Summary metrics displayed prominently:
 - **Liquid Net Worth**: Excluding illiquid assets (real estate, private equity)
 - **Asset Count**: Total number of holdings
 - **Month-over-Month Change**: Growth/decline from previous month with percentage
+- **Year-to-Date Change**: Annual performance from first snapshot of current year with percentage
 - **Income This Month**: Total income with MoM delta
 - **Expenses This Month**: Total expenses with MoM delta
 
@@ -198,7 +210,14 @@ Summary metrics displayed prominently:
    - Overlay visualization
    - Monitor portfolio liquidity ratio
 
-4. **Current vs Target Allocation** (Progress Bars)
+4. **YoY Historical Variation** (Bar Chart)
+   - Year-over-year comparison for each year with data
+   - Shows variation from first to last snapshot of each year
+   - Toggle € / % view
+   - Green bars for positive years, red for negative
+   - Identifies best/worst performing years
+
+5. **Current vs Target Allocation** (Progress Bars)
    - Visual comparison per asset class
    - Overlay display (target background, current foreground)
    - Instant identification of rebalancing needs
@@ -449,11 +468,13 @@ app/
 │   ├── allocation/
 │   │   └── page.tsx            # Current vs target comparison ✅
 │   ├── history/
-│   │   └── page.tsx            # Historical charts (4 types) ✅
+│   │   └── page.tsx            # Historical charts (5 types) ✅
 │   ├── expenses/
 │   │   └── page.tsx            # Expense tracking table ✅
 │   ├── expense-charts/
-│   │   └── page.tsx            # Expense visualizations (4 charts) ✅
+│   │   └── page.tsx            # Cashflow current year (4 charts) ✅
+│   ├── expense-charts-total/
+│   │   └── page.tsx            # Cashflow all time (4 charts) ✅
 │   ├── settings/
 │   │   └── page.tsx            # Allocation + expense categories ✅
 │   └── fire/page.tsx           # FIRE tracker (future)
@@ -471,13 +492,13 @@ app/
 ```
 Layout ✅
 ├── Header (user menu, logo)
-├── Sidebar (navigation with 7 pages)
+├── Sidebar (navigation with 8 pages)
 └── Main Content
     ├── Dashboard ✅
-    │   ├── SummaryCard (x6: portfolio + expenses)
+    │   ├── SummaryCard (x7: portfolio, variations, expenses)
     │   ├── AssetClassPie
     │   ├── AssetDistributionPie
-    │   └── ExpenseStatsCards
+    │   └── LiquidityPie
     ├── Assets Page ✅
     │   ├── AssetTable
     │   ├── UpdatePricesButton
@@ -490,6 +511,7 @@ Layout ✅
     │   ├── NetWorthChart (line)
     │   ├── AssetClassEvolutionChart (stacked area)
     │   ├── LiquidityChart (area)
+    │   ├── YoYVariationChart (bar)
     │   ├── AllocationProgressBars
     │   └── SnapshotsTable + CSV export
     ├── Expenses Page ✅
@@ -561,6 +583,7 @@ Layout ✅
 - `getSnapshotsInRange(userId, start, end)`: Date range query
 - `getLatestSnapshot(userId)`: Most recent snapshot
 - `calculateMonthlyChange(current, previous)`: MoM change calculation
+- `calculateYearlyChange(current, snapshots)`: YTD change from first snapshot of current year
 
 #### `expenseService.ts` ✅
 - `getAllExpenses(userId)`: Fetch all expenses sorted by date
@@ -593,6 +616,8 @@ Layout ✅
 - `prepareAssetDistributionData(assets)`: Format for asset pie (top 10 + others)
 - `prepareAssetClassDistributionData(assets)`: Aggregate by class
 - `prepareNetWorthHistoryData(snapshots)`: Format historical line charts
+- `prepareAssetClassHistoryData(snapshots)`: Format asset class evolution over time
+- `prepareYoYVariationData(snapshots)`: Calculate year-over-year variations for bar chart
 - `formatCurrency(value)`: Italian currency formatting (€1.234,56)
 - `formatPercentage(value, decimals)`: Italian percentage (12,34%)
 - `formatNumber(value, decimals)`: Italian number formatting
@@ -611,6 +636,7 @@ Layout ✅
    - Total net worth: €251,953
    - Liquid net worth: €193,207 (excluding €58,746 real estate)
    - Month-over-month change: +€3,240 (+1.3%)
+   - Year-to-date change: +€12,450 (+5.2%)
    - Income this month: €3,500 (+5% from last month)
    - Expenses this month: €2,100 (-3% from last month)
 4. User clicks **"Allocation"** to check rebalancing needs:
@@ -1068,6 +1094,13 @@ Client Component → fetch('/api/prices/quote') → Server Route → Yahoo Finan
 
 ---
 
-**Version**: 2.0.0 (Portfolio + Expense Tracking Complete)
-**Last Updated**: December 2024
+**Version**: 2.1.0 (Enhanced Analytics & YoY Tracking)
+**Last Updated**: January 2025
 **Status**: ✅ Phases 1-3 Complete - Production Ready
+
+**Recent Updates**:
+- Default asset allocation (60/40) for new users
+- Year-to-Date variation tracking in Dashboard
+- Historical YoY bar chart in History page
+- Separate Cashflow pages (current year vs all-time)
+- Improved asset display formatting (e.g., "Real Estate")
