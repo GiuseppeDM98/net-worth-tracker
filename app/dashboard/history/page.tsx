@@ -636,7 +636,7 @@ export default function HistoryPage() {
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Asset Distribution Pie Chart */}
-        <Card>
+        <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle>Distribuzione Asset Corrente</CardTitle>
           </CardHeader>

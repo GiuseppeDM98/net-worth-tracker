@@ -385,7 +385,7 @@ export default function ExpenseChartsPage() {
       <div className="grid gap-6 md:grid-cols-2">
         {/* Expenses by Category */}
         {expensesByCategoryData.length > 0 && (
-          <Card>
+          <Card className="md:col-span-2">
             <CardHeader>
               <CardTitle>Spese per Categoria</CardTitle>
             </CardHeader>
@@ -438,7 +438,7 @@ export default function ExpenseChartsPage() {
 
         {/* Income by Category */}
         {incomeByCategoryData.length > 0 && (
-          <Card>
+          <Card className="md:col-span-2">
             <CardHeader>
               <CardTitle>Entrate per Categoria</CardTitle>
             </CardHeader>
@@ -491,7 +491,7 @@ export default function ExpenseChartsPage() {
 
         {/* Expenses by Type */}
         {expensesByTypeData.length > 0 && (
-          <Card>
+          <Card className="md:col-span-2">
             <CardHeader>
               <CardTitle>Spese per Tipo</CardTitle>
             </CardHeader>
