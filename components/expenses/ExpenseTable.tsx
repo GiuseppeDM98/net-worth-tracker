@@ -13,7 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Edit, Trash2, TrendingUp, TrendingDown, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Edit, Trash2, TrendingUp, TrendingDown, Calendar, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
@@ -165,6 +165,7 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
               <TableHead>Sotto-categoria</TableHead>
               <TableHead className="text-right w-[120px]">Importo</TableHead>
               <TableHead className="max-w-[200px]">Note</TableHead>
+              <TableHead className="w-[50px] text-center">Link</TableHead>
               <TableHead className="w-[100px] text-right">Azioni</TableHead>
             </TableRow>
           </TableHeader>
@@ -212,6 +213,19 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
               </TableCell>
               <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
                 {expense.notes || '-'}
+              </TableCell>
+              <TableCell className="text-center">
+                {expense.link && (
+                  <a
+                    href={expense.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center text-blue-600 hover:text-blue-800"
+                    title="Apri link"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                )}
               </TableCell>
               <TableCell>
                 <div className="flex items-center justify-end gap-1">

@@ -46,6 +46,7 @@ const expenseSchema = z.object({
   currency: z.string().min(1, 'Valuta è obbligatoria'),
   date: z.date(),
   notes: z.string().optional(),
+  link: z.string().url('Inserisci un URL valido').optional().or(z.literal('')),
   isRecurring: z.boolean().optional(),
   recurringDay: z.number().min(1).max(31).optional(),
   recurringMonths: z.number().min(1).max(120).optional(),
@@ -139,6 +140,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
         currency: expense.currency,
         date: expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate(),
         notes: expense.notes || '',
+        link: expense.link || '',
         isRecurring: expense.isRecurring || false,
         recurringDay: expense.recurringDay,
         recurringMonths: 1,
@@ -152,6 +154,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
         currency: 'EUR',
         date: new Date(),
         notes: '',
+        link: '',
         isRecurring: false,
         recurringDay: new Date().getDate(),
         recurringMonths: 12,
@@ -250,6 +253,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
         currency: data.currency,
         date: data.date,
         notes: data.notes,
+        link: data.link,
         isRecurring: data.type === 'debt' ? data.isRecurring : false,
         recurringDay: data.isRecurring ? data.recurringDay : undefined,
         recurringMonths: data.isRecurring ? data.recurringMonths : undefined,
@@ -529,6 +533,24 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
               placeholder="es. Spesa supermercato Conad"
               className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             />
+          </div>
+
+          {/* Link */}
+          <div className="space-y-2">
+            <Label htmlFor="link">Link (opzionale)</Label>
+            <Input
+              id="link"
+              type="url"
+              {...register('link')}
+              placeholder="es. https://www.amazon.it/ordini/..."
+              className={errors.link ? 'border-red-500' : ''}
+            />
+            {errors.link && (
+              <p className="text-sm text-red-500">{errors.link.message}</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Aggiungi un link per tenere traccia di ordini, ricevute, ecc.
+            </p>
           </div>
 
           {/* Ricorrenza (solo per debiti) */}
