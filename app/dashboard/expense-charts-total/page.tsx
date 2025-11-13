@@ -396,7 +396,7 @@ export default function ExpenseChartsTotalPage() {
     return (
       <div className="p-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold mb-4">Grafici Spese Totale</h1>
+          <h1 className="text-3xl font-bold mb-4">Cashflow Totale</h1>
           <div className="rounded-md border border-dashed p-8">
             <p className="text-muted-foreground">
               Nessun dato disponibile per i grafici
@@ -414,7 +414,7 @@ export default function ExpenseChartsTotalPage() {
     <div className="p-8 space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold">Grafici Spese Totale</h1>
+        <h1 className="text-3xl font-bold">Cashflow Totale</h1>
         <p className="text-muted-foreground mt-1">
           Visualizza l'andamento delle tue finanze nel tempo
         </p>
