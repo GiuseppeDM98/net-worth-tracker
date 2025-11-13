@@ -18,15 +18,15 @@ export function PieChart({ data }: PieChartProps) {
   }
 
   return (
-    <ResponsiveContainer width="100%" height={350}>
+    <ResponsiveContainer width="100%" height={500}>
       <RechartsPC>
         <Pie
           data={data as any}
-          cx="40%"
+          cx="50%"
           cy="50%"
           labelLine={false}
           label={(entry: any) => entry.percentage >= 5 ? `${entry.name}: ${(entry.percentage as number).toFixed(1)}%` : ''}
-          outerRadius={80}
+          outerRadius={140}
           fill="#8884d8"
           dataKey="value"
         >

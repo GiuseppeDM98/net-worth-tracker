@@ -653,7 +653,7 @@ export default function HistoryPage() {
         </Card>
 
         {/* Current vs Target Comparison */}
-        <Card>
+        <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle>Asset Class: Corrente vs Desiderata</CardTitle>
           </CardHeader>
