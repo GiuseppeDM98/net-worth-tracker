@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { deleteExpense, deleteRecurringExpenses } from '@/lib/services/expenseService';
 import { Timestamp } from 'firebase/firestore';
@@ -13,10 +13,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Edit, Trash2, TrendingUp, TrendingDown, Calendar } from 'lucide-react';
+import { Edit, Trash2, TrendingUp, TrendingDown, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
+
+const ITEMS_PER_PAGE = 10;
 
 interface ExpenseTableProps {
   expenses: Expense[];
@@ -26,6 +28,7 @@ interface ExpenseTableProps {
 
 export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('it-IT', {
@@ -117,6 +120,28 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
     }
   };
 
+  // Calculate pagination
+  const totalPages = Math.ceil(expenses.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+
+  const paginatedExpenses = useMemo(() => {
+    return expenses.slice(startIndex, endIndex);
+  }, [expenses, startIndex, endIndex]);
+
+  // Reset to page 1 when expenses array length changes (add/delete)
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [expenses.length]);
+
+  const handlePreviousPage = () => {
+    setCurrentPage((prev: number) => Math.max(1, prev - 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage((prev: number) => Math.min(totalPages, prev + 1));
+  };
+
   if (expenses.length === 0) {
     return (
       <div className="rounded-md border border-dashed p-8 text-center">
@@ -129,21 +154,22 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
   }
 
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[100px]">Data</TableHead>
-            <TableHead className="w-[120px]">Tipo</TableHead>
-            <TableHead>Categoria</TableHead>
-            <TableHead>Sotto-categoria</TableHead>
-            <TableHead className="text-right w-[120px]">Importo</TableHead>
-            <TableHead className="max-w-[200px]">Note</TableHead>
-            <TableHead className="w-[100px] text-right">Azioni</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {expenses.map((expense) => (
+    <div className="space-y-4">
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[100px]">Data</TableHead>
+              <TableHead className="w-[120px]">Tipo</TableHead>
+              <TableHead>Categoria</TableHead>
+              <TableHead>Sotto-categoria</TableHead>
+              <TableHead className="text-right w-[120px]">Importo</TableHead>
+              <TableHead className="max-w-[200px]">Note</TableHead>
+              <TableHead className="w-[100px] text-right">Azioni</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {paginatedExpenses.map((expense: Expense) => (
             <TableRow key={expense.id}>
               <TableCell className="font-medium text-sm">
                 <div className="flex items-center gap-1">
@@ -212,5 +238,38 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
         </TableBody>
       </Table>
     </div>
+
+    {/* Pagination Controls */}
+    {totalPages > 1 && (
+      <div className="flex items-center justify-between px-2">
+        <div className="text-sm text-muted-foreground">
+          Visualizzate {startIndex + 1}-{Math.min(endIndex, expenses.length)} di {expenses.length} voci
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePreviousPage}
+            disabled={currentPage === 1}
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Precedente
+          </Button>
+          <div className="text-sm font-medium">
+            Pagina {currentPage} di {totalPages}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleNextPage}
+            disabled={currentPage === totalPages}
+          >
+            Successiva
+            <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
+      </div>
+    )}
+  </div>
   );
 }
