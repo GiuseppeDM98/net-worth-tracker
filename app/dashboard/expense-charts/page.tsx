@@ -225,7 +225,7 @@ export default function ExpenseChartsPage() {
 
         const current = monthlyMap.get(monthKey)!;
         const typeName = EXPENSE_TYPE_LABELS[expense.type];
-        current[typeName] = (current[typeName] || 0) + Math.abs(expense.amount);
+        current[typeName] = ((current[typeName] as number) || 0) + Math.abs(expense.amount);
       });
 
     const data = Array.from(monthlyMap.entries())
@@ -272,7 +272,7 @@ export default function ExpenseChartsPage() {
         const categoryName = top5Categories.includes(expense.categoryName)
           ? expense.categoryName
           : 'Altro';
-        current[categoryName] = (current[categoryName] || 0) + Math.abs(expense.amount);
+        current[categoryName] = ((current[categoryName] as number) || 0) + Math.abs(expense.amount);
       });
 
     const data = Array.from(monthlyMap.entries())
@@ -319,7 +319,7 @@ export default function ExpenseChartsPage() {
         const categoryName = top5Categories.includes(expense.categoryName)
           ? expense.categoryName
           : 'Altro';
-        current[categoryName] = (current[categoryName] || 0) + expense.amount;
+        current[categoryName] = ((current[categoryName] as number) || 0) + expense.amount;
       });
 
     const data = Array.from(monthlyMap.entries())
