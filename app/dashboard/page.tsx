@@ -15,6 +15,8 @@ import {
   prepareAssetDistributionData,
 } from '@/lib/services/chartService';
 import { getUserSnapshots, calculateMonthlyChange } from '@/lib/services/snapshotService';
+import { getExpenseStats } from '@/lib/services/expenseService';
+import { ExpenseStats } from '@/types/expenses';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PieChart as PieChartComponent } from '@/components/ui/pie-chart';
 import { Button } from '@/components/ui/button';
@@ -26,7 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Wallet, TrendingUp, PieChart, DollarSign, Camera } from 'lucide-react';
+import { Wallet, TrendingUp, PieChart, DollarSign, Camera, TrendingDown, Receipt } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function DashboardPage() {
@@ -40,10 +42,13 @@ export default function DashboardPage() {
     value: number;
     percentage: number;
   } | null>(null);
+  const [expenseStats, setExpenseStats] = useState<ExpenseStats | null>(null);
+  const [loadingExpenses, setLoadingExpenses] = useState(false);
 
   useEffect(() => {
     if (user) {
       loadAssets();
+      loadExpenseStats();
     }
   }, [user]);
 
@@ -97,6 +102,22 @@ export default function DashboardPage() {
       console.error('Error loading assets:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadExpenseStats = async () => {
+    if (!user) return;
+
+    try {
+      setLoadingExpenses(true);
+      const stats = await getExpenseStats(user.uid);
+      setExpenseStats(stats);
+    } catch (error) {
+      console.error('Error loading expense stats:', error);
+      // Non mostriamo toast error per non disturbare l'utente
+      setExpenseStats(null);
+    } finally {
+      setLoadingExpenses(false);
     }
   };
 
@@ -282,6 +303,65 @@ export default function DashboardPage() {
                 <p className="text-xs text-muted-foreground">
                   Dati non disponibili
                 </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Expense Stats Cards */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Entrate Questo Mese</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            {loadingExpenses ? (
+              <div className="text-sm text-muted-foreground">Caricamento...</div>
+            ) : expenseStats ? (
+              <>
+                <div className="text-2xl font-bold text-green-600">
+                  {formatCurrency(expenseStats.currentMonth.income)}
+                </div>
+                <p className={`text-xs ${
+                  expenseStats.delta.income >= 0 ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {expenseStats.delta.income >= 0 ? '+' : ''}{expenseStats.delta.income.toFixed(1)}% dal mese scorso
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">€0,00</div>
+                <p className="text-xs text-muted-foreground">Nessun dato</p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Spese Questo Mese</CardTitle>
+            <TrendingDown className="h-4 w-4 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            {loadingExpenses ? (
+              <div className="text-sm text-muted-foreground">Caricamento...</div>
+            ) : expenseStats ? (
+              <>
+                <div className="text-2xl font-bold text-red-600">
+                  {formatCurrency(expenseStats.currentMonth.expenses)}
+                </div>
+                <p className={`text-xs ${
+                  expenseStats.delta.expenses >= 0 ? 'text-red-600' : 'text-green-600'
+                }`}>
+                  {expenseStats.delta.expenses >= 0 ? '+' : ''}{expenseStats.delta.expenses.toFixed(1)}% dal mese scorso
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">€0,00</div>
+                <p className="text-xs text-muted-foreground">Nessun dato</p>
               </>
             )}
           </CardContent>

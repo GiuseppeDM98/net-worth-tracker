@@ -1,22 +1,25 @@
 # Portfolio Tracker
 
-A comprehensive web application for tracking and managing investment portfolios across multiple asset classes. Built to replace a 5+ year old Google Sheets workflow with a modern, automated solution.
+A comprehensive web application for tracking and managing investment portfolios across multiple asset classes, with integrated expense tracking and budgeting. Built to replace a 5+ year old Google Sheets workflow with a modern, automated solution.
 
 ## Project Vision
 
-This application serves as a complete financial portfolio management system designed for serious investors who want to:
+This application serves as a complete financial management system designed for serious investors who want to:
 - Track multi-asset class portfolios (stocks, ETFs, bonds, crypto, real estate, commodities, cash)
 - Monitor asset allocation against target percentages
 - Maintain historical records of portfolio value over time
 - Make data-driven rebalancing decisions
+- **Track income and expenses with custom categories**
+- **Analyze spending patterns with visual charts**
 - Track progress toward Financial Independence / Retire Early (FIRE) goals
 
 The app prioritizes:
 - **Accuracy**: Automated price updates from reliable sources
-- **Clarity**: Visual representations of portfolio composition and allocation
+- **Clarity**: Visual representations of portfolio composition and financial data
 - **Control**: Manual oversight of automated processes
 - **Persistence**: Long-term historical tracking (months/years)
 - **Privacy**: Self-hosted data in Firebase (no third-party portfolio services)
+- **Completeness**: All-in-one solution for investments and personal finance
 
 ## Core Features
 
@@ -39,15 +42,18 @@ The app prioritizes:
   - Current market price (automatically fetched from Yahoo Finance)
   - Last price update timestamp
   - Currency (default EUR, multi-currency support)
+- **Composite Assets**: Support for mixed-allocation assets (e.g., pension funds with equity + bonds)
+- **Liquidity Tracking**: Flag assets as liquid or illiquid for separate net worth calculations
 - **Automatic Price Fetching**: Prices are automatically retrieved from Yahoo Finance when adding new assets (no manual entry required)
 
 ### 2. Automated Price Updates
 - **Yahoo Finance Integration**: Real-time price fetching for publicly traded securities
 - **Manual Update Trigger**: On-demand button to update all prices instantly
-- **End-of-Month Updates**: Scheduled automatic updates at month-end (not month-start)
+- **End-of-Month Updates**: Scheduled automatic updates at month-end (28-31st, 8 PM UTC)
 - **Price History**: Historical price data stored for trend analysis
 - **Error Handling**: Graceful handling of tickers not found or API failures
 - **Multi-Market Support**: European (XETRA, LSE, Euronext), US (NYSE, NASDAQ), and other exchanges
+- **Smart Update Logic**: Automatically skips assets that don't need price updates (real estate, cash, private equity)
 
 ### 3. Asset Allocation Management
 Portfolio allocation tracking with two-level hierarchy:
@@ -62,7 +68,7 @@ Portfolio allocation tracking with two-level hierarchy:
 
 #### Sub-Categories (Example: Equity)
 - **All-World Equity**: Broad market ETFs (VWCE, SWDA)
-- **Factor ETFs**: 
+- **Factor ETFs**:
   - Momentum (IWMO)
   - Quality (IWQU)
   - Value (IWVL)
@@ -73,65 +79,171 @@ Portfolio allocation tracking with two-level hierarchy:
 
 #### Allocation Features
 - **Target Setting**: Define desired allocation percentages (must sum to 100%)
+- **Formula-Based Allocation**: Auto-calculate Equity/Bonds based on age and risk-free rate
+  - Formula: `125 - age - (riskFreeRate × 5) = % Equity`
+- **Fixed Amount Cash**: Set cash as fixed € amount (not percentage)
 - **Current vs Target**: Real-time comparison showing deviations
 - **Rebalancing Actions**: Automated suggestions (COMPRA/VENDI/OK)
 - **Visual Indicators**: Color-coded differences (red = rebalance needed, green = on target)
 - **Euro Amounts**: Show both percentages and absolute euro values for clarity
+- **Sub-Category Targets**: Set precise allocations within each asset class
 
-### 4. Portfolio Visualization
+### 4. 💰 Expense Tracking System
+**Complete personal finance management integrated with portfolio tracking.**
+
+#### Expense Management (`/dashboard/expenses`)
+- **4 Types of Entries**:
+  - **Income** (Entrate): Salary, bonuses, dividends, etc.
+  - **Fixed Expenses** (Spese Fisse): Rent, insurance, subscriptions
+  - **Variable Expenses** (Variabili): Groceries, dining, shopping
+  - **Debts** (Debiti): Mortgage, loans, installments
+- **Custom Categories**: Create unlimited categories for each expense type
+- **Sub-Categories**: Hierarchical organization (e.g., Food → Groceries, Restaurants)
+- **Category Colors**: Visual coding with customizable colors
+- **Notes Field**: Detailed descriptions (e.g., "Spesa supermercato Conad")
+- **Date Tracking**: Record exact date of each transaction
+- **Amount Management**: Automatic positive/negative handling (income +, expenses -)
+- **Dashboard Statistics**:
+  - Total Income this month
+  - Total Expenses this month
+  - Net Balance (income - expenses)
+  - Transaction count by type
+
+#### Recurring Expenses (Debts)
+- **Automatic Creation**: Generate N months of recurring expenses in one action
+- **Day-of-Month**: Specify recurring day (1-31)
+- **Smart Date Handling**: Auto-adjust for months with fewer days (e.g., Feb 30 → Feb 28/29)
+- **Batch Management**: Edit or delete all recurring entries together
+- **Use Case**: Perfect for mortgages, car loans, subscriptions
+
+#### Expense Charts (`/dashboard/expense-charts`)
+**4 interactive visualizations for spending analysis:**
+1. **Expenses by Category** (Pie Chart)
+   - Visual breakdown of spending across categories
+   - Percentage labels for categories >5%
+   - Color-coded by category
+2. **Income by Category** (Pie Chart)
+   - Income sources distribution
+   - Track multiple income streams
+3. **Expenses by Type** (Pie Chart)
+   - Fixed vs Variable vs Debt breakdown
+   - Identify spending patterns
+4. **Monthly Trend** (Bar Chart)
+   - 12-month historical view
+   - Income, Expenses, and Net Balance bars
+   - Identify seasonal patterns and trends
+
+#### Category Management (`/dashboard/settings`)
+- **Settings Integration**: Manage categories in Settings page
+- **Type-Based Organization**: Categories grouped by expense type
+- **Visual Management**: See all categories with colors and sub-categories
+- **Bulk Operations**: Easy edit/delete with confirmation
+- **Empty State**: Start from scratch - no default categories
+- **Validation**: Prevent duplicate category names
+
+#### Expense Statistics in Dashboard
+- **Income This Month**: With % change from previous month
+- **Expenses This Month**: With % change from previous month
+- **Trend Indicators**: Green/red arrows for increase/decrease
+- **At-a-Glance**: Quick financial health check on main dashboard
+
+### 5. Portfolio Visualization
 - **Asset Class Pie Chart**: High-level distribution across major categories
 - **Individual Asset Pie Chart**: Detailed breakdown by specific holdings (top 10 + "Others")
+- **Liquidity Distribution**: Liquid vs Illiquid net worth visualization
 - **Percentage Labels**: Clear labeling on chart slices (shown if >5%)
 - **Interactive Tooltips**: Hover details showing name, value, percentage
 - **Consistent Color Coding**: Asset classes always use same colors across all views
+- **Toggle View**: Switch between € amounts and percentages
 
-### 5. Dashboard Overview
+### 6. Dashboard Overview
 Summary metrics displayed prominently:
 - **Total Net Worth**: Complete portfolio value
 - **Liquid Net Worth**: Excluding illiquid assets (real estate, private equity)
 - **Asset Count**: Total number of holdings
-- **Month-over-Month Change**: Growth/decline from previous month (when available)
+- **Month-over-Month Change**: Growth/decline from previous month with percentage
+- **Income This Month**: Total income with MoM delta
+- **Expenses This Month**: Total expenses with MoM delta
 
-### 6. Historical Tracking
-Monthly snapshot system for long-term analysis:
-- **Monthly Snapshots**: Automatic capture of portfolio state at month-end
-- **Net Worth Timeline**: Line chart showing total value over time (Total & Liquid)
-- **Asset Distribution**: Pie chart showing current portfolio composition
-- **Current vs Target Visualization**: Visual comparison of asset class allocation against targets
-- **Recent Snapshots Grid**: Display of last 6 monthly snapshots
-- **Export Capability**: Download historical data as CSV
+### 7. Historical Tracking
+**Comprehensive time-series analysis of portfolio performance:**
 
-**Note**: Currently implemented with basic historical tracking. Additional features (stacked area charts, year-over-year growth) can be added as needed.
+#### Monthly Snapshots
+- **Automated Creation**: Cron job creates snapshots at month-end (28-31st, 8 PM UTC)
+- **Manual Creation**: Button to create snapshot anytime with duplicate protection
+- **Price Update Integration**: Automatically updates prices before snapshot
+- **Data Captured**:
+  - Total net worth
+  - Liquid net worth
+  - Illiquid net worth
+  - Asset class breakdown (€ and %)
+  - Individual asset details
 
-### 7. FIRE Progress Tracker (Future Enhancement)
-Financial Independence planning tools:
-- **FIRE Target**: Set desired portfolio value for retirement
-- **Years to FIRE**: Calculate based on current savings rate and growth assumptions
-- **Progress Bar**: Visual indicator of completion percentage
-- **Projection Calculator**: Model future scenarios with different savings rates
-- **Withdrawal Rate**: 4% rule calculator for sustainable retirement spending
+#### Historical Charts (`/dashboard/history`)
+1. **Net Worth Timeline** (Line Chart)
+   - Total net worth evolution
+   - Liquid net worth overlay
+   - Illiquid net worth overlay
+   - Toggle € / % view
+   - Last 6+ months visible
+
+2. **Asset Class Evolution** (Stacked Area Chart)
+   - Visual evolution of all asset classes over time
+   - Color-coded by asset class
+   - Toggle € / % view
+   - Identify allocation drift
+
+3. **Liquidity Evolution** (Area Chart)
+   - Separate tracking of liquid vs illiquid assets
+   - Overlay visualization
+   - Monitor portfolio liquidity ratio
+
+4. **Current vs Target Allocation** (Progress Bars)
+   - Visual comparison per asset class
+   - Overlay display (target background, current foreground)
+   - Instant identification of rebalancing needs
+
+#### Export & Analysis
+- **CSV Export**: Download complete snapshot history
+- **Date Range**: Display last 6+ snapshots
+- **Statistics Table**: Detailed breakdown by snapshot
+
+### 8. Settings & Configuration
+- **Allocation Targets**: Configure target % for each asset class
+- **Sub-Category Targets**: Set precise sub-allocations (must sum to 100%)
+- **Auto-Calculate Mode**: Enable age-based Equity/Bonds formula
+- **User Age**: Input for formula-based allocation
+- **Risk-Free Rate**: BTP 10-year rate input for calculations
+- **Fixed Cash Amount**: Set cash as € amount (not %)
+- **Validation**: Real-time validation of percentage totals
+- **Reset to Defaults**: Restore default allocation template
+- **Expense Categories**: Full CRUD for income/expense categories
+- **Category Organization**: Grouped by expense type with visual indicators
 
 ## Technical Architecture
 
 ### Technology Stack
-- **Frontend**: Next.js 14+ (App Router), React 18, TypeScript
-- **Styling**: Tailwind CSS, shadcn/ui component library
+- **Frontend**: Next.js 16.0.1 (App Router), React 19.2.0, TypeScript 5
+- **Styling**: Tailwind CSS 4, shadcn/ui component library, lucide-react icons
 - **Backend**: Next.js API Routes (serverless functions)
 - **Database**: Firebase Firestore (NoSQL document database)
 - **Authentication**: Firebase Authentication (email/password + OAuth)
-- **Price Data**: yahoo-finance2 v3+ (npm package with YahooFinance instance API)
-- **Charts**: Recharts (React charting library)
+- **Price Data**: yahoo-finance2 v3.10.1 (npm package with YahooFinance instance API)
+- **Charts**: Recharts 3.3.0 (React charting library)
 - **Deployment**: Vercel (automatic deployments from Git)
-- **Form Management**: react-hook-form + zod (validation)
-- **Date Utilities**: date-fns
+- **Form Management**: react-hook-form 7.66.0 + zod 4.1.12 (validation)
+- **Date Utilities**: date-fns 4.1.0 (with Italian locale)
+- **Notifications**: sonner 2.0.7 (toast notifications)
+- **Themes**: next-themes 0.4.6 (dark mode support)
 
 ### Why These Choices?
 - **Next.js**: Best-in-class React framework with excellent DX and performance
 - **Firebase**: Generous free tier, real-time updates, easy authentication, no server management
 - **Yahoo Finance**: Free, reliable, extensive ticker coverage (unlike most APIs)
-- **Vercel**: Seamless Next.js integration, generous free tier, edge functions
+- **Vercel**: Seamless Next.js integration, generous free tier, cron jobs, edge functions
 - **TypeScript**: Type safety prevents bugs, improves code maintainability
 - **shadcn/ui**: High-quality, customizable components, no runtime JS overhead
+- **Recharts**: Powerful, flexible charting with great TypeScript support
 
 ### Database Schema
 
@@ -150,25 +262,63 @@ assets/
       - name: string
       - type: "stock" | "etf" | "bond" | "crypto" | "commodity" | "cash" | "realestate"
       - assetClass: "equity" | "bonds" | "crypto" | "realestate" | "cash" | "commodity"
-      - subCategory: string (optional)
-      - exchange: string (optional)
+      - subCategory?: string
+      - exchange?: string
       - currency: string
       - quantity: number
       - currentPrice: number
+      - isLiquid?: boolean
+      - autoUpdatePrice?: boolean
+      - composition?: Array<{assetClass, percentage, subCategory?}>
       - lastPriceUpdate: timestamp
       - createdAt: timestamp
       - updatedAt: timestamp
 
 assetAllocationTargets/
   └─ {userId}/
+      - userId: string
+      - userAge?: number
+      - riskFreeRate?: number
       - targets: {
           equity: {
             targetPercentage: number
-            subTargets: { allWorld: number, momentum: number, ... }
+            useFixedAmount?: boolean
+            fixedAmount?: number
+            subCategoryConfig?: { enabled: boolean, categories: string[] }
+            subTargets?: { allWorld: number, momentum: number, ... }
           }
           bonds: { targetPercentage: number }
           ...
         }
+      - updatedAt: timestamp
+
+expenses/
+  └─ {expenseId}/
+      - userId: string (indexed)
+      - type: "income" | "fixed" | "variable" | "debt"
+      - categoryId: string
+      - categoryName: string (denormalized)
+      - subCategoryId?: string
+      - subCategoryName?: string (denormalized)
+      - amount: number (positive for income, negative for expenses)
+      - currency: string
+      - date: timestamp
+      - notes?: string
+      - isRecurring?: boolean
+      - recurringDay?: number (1-31)
+      - recurringParentId?: string (links recurring expenses)
+      - createdAt: timestamp
+      - updatedAt: timestamp
+
+expenseCategories/
+  └─ {categoryId}/
+      - userId: string (indexed)
+      - name: string
+      - type: "income" | "fixed" | "variable" | "debt"
+      - color?: string (#hex)
+      - icon?: string
+      - subCategories: Array<{id: string, name: string}>
+      - createdAt: timestamp
       - updatedAt: timestamp
 
 priceHistory/
@@ -185,6 +335,7 @@ monthlySnapshots/
       - month: number
       - totalNetWorth: number
       - liquidNetWorth: number
+      - illiquidNetWorth: number
       - byAssetClass: { equity: number, bonds: number, ... }
       - byAsset: Array<{ assetId, ticker, name, quantity, price, totalValue }>
       - assetAllocation: { equity: %, bonds: %, ... }
@@ -193,13 +344,13 @@ monthlySnapshots/
 
 ### Key Design Decisions
 
-#### 1. End-of-Month Price Updates
+#### 1. End-of-Month Price Updates & Snapshots
 **Rationale**: User's workflow involves monthly portfolio reviews at month-end. This timing:
 - Aligns with salary deposits and investment purchases
 - Provides clean monthly boundaries for historical snapshots
 - Matches typical financial reporting periods
 
-**Implementation**: Vercel Cron job scheduled for last day of each month (e.g., 31st, 30th, 28/29th)
+**Implementation**: Vercel Cron job scheduled for last 3 days of each month (28-31st) at 8 PM UTC
 
 #### 2. Manual Price Update Override
 **Rationale**: While automated updates are convenient, users need control to:
@@ -231,43 +382,56 @@ monthlySnapshots/
 - Fast loading of historical charts (no recalculation needed)
 - Audit trail of portfolio state
 
-**Implementation**: Automated job creates snapshot from current asset state + prices
+**Implementation**: Automated cron job creates snapshot from current asset state + prices
+
+#### 6. Denormalized Expense Data
+**Rationale**: Storing categoryName alongside categoryId:
+- Faster queries (no joins needed)
+- Historical accuracy (if category renamed, old expenses keep original name)
+- Simplified reporting
+
+**Trade-off**: Slightly more storage, but Firestore pricing is generous
 
 ### API Routes
 
-#### `/api/prices/update`
+#### `/api/prices/update` ✅
 - **Method**: POST
 - **Auth**: Required (userId in request body)
-- **Body**: `{ userId: string, assetIds?: string[] }` (assetIds optional, defaults to all user assets)
+- **Body**: `{ userId: string, assetIds?: string[] }`
 - **Response**: `{ updated: number, failed: string[], message: string }`
-- **Implementation**: Uses Firebase Admin SDK for server-side operations
+- **Implementation**: Uses Firebase Admin SDK + Yahoo Finance v3+ instance
 - **Logic**:
   1. Verify userId provided
   2. Fetch assets from Firestore using Admin SDK
-  3. Filter assets that need price updates (excludes cash, real estate, private equity)
+  3. Filter assets that need price updates
   4. Extract unique tickers
-  5. Call `yahooFinanceService.getMultipleQuotes(tickers)` (uses YahooFinance v3+ instance)
-  6. Update each asset's `currentPrice` and `lastPriceUpdate` using Admin SDK
+  5. Call `yahooFinanceService.getMultipleQuotes(tickers)`
+  6. Update each asset's `currentPrice` and `lastPriceUpdate`
   7. Return results with count of updated/failed tickers
 
-#### `/api/prices/quote`
+#### `/api/prices/quote` ✅
 - **Method**: GET
 - **Query Params**: `ticker` (required)
 - **Response**: `{ ticker: string, price: number | null, currency: string, error?: string }`
-- **Implementation**: Server-side only (yahoo-finance2 requires Node.js environment)
-- **Logic**: Fetches single quote from Yahoo Finance and returns price data
+- **Implementation**: Server-side only (yahoo-finance2 requires Node.js)
+- **Logic**: Fetches single quote from Yahoo Finance
 
-#### `/api/portfolio/calculate` (Future)
-- **Method**: GET
-- **Auth**: Required
-- **Response**: Current portfolio metrics (net worth, allocation, etc.)
-- **Logic**: Real-time calculation from current asset data
-
-#### `/api/portfolio/snapshot` (Future)
+#### `/api/portfolio/snapshot` ✅
 - **Method**: POST
-- **Auth**: Required or Cron secret
-- **Response**: Snapshot document ID
-- **Logic**: Create monthly snapshot, triggered by Cron job
+- **Auth**: Required (userId) or Cron secret
+- **Body**: `{ userId: string, year?: number, month?: number }`
+- **Response**: `{ success: boolean, snapshotId: string, message: string }`
+- **Logic**:
+  1. Update all asset prices
+  2. Calculate portfolio metrics
+  3. Create monthly snapshot document
+  4. Return snapshot ID
+
+#### `/api/cron/monthly-snapshot` ✅
+- **Method**: GET
+- **Auth**: Vercel Cron secret
+- **Trigger**: Automated (28-31st of month, 8 PM UTC)
+- **Logic**: Creates snapshots for all users
 
 ### Frontend Components Architecture
 
@@ -275,122 +439,237 @@ monthlySnapshots/
 ```
 app/
 ├── (auth)/
-│   ├── login/page.tsx          # Login form
-│   └── register/page.tsx       # Registration form
+│   ├── login/page.tsx          # Login form ✅
+│   └── register/page.tsx       # Registration form ✅
 ├── dashboard/
-│   ├── page.tsx                # Overview (charts, summary)
-│   ├── layout.tsx              # Sidebar navigation
+│   ├── page.tsx                # Overview (charts, summary, expense stats) ✅
+│   ├── layout.tsx              # Sidebar navigation ✅
 │   ├── assets/
 │   │   └── page.tsx            # Asset table, CRUD operations ✅
 │   ├── allocation/
 │   │   └── page.tsx            # Current vs target comparison ✅
-│   ├── history/page.tsx        # Historical charts ✅
-│   ├── settings/page.tsx       # Edit allocation targets ✅
+│   ├── history/
+│   │   └── page.tsx            # Historical charts (4 types) ✅
+│   ├── expenses/
+│   │   └── page.tsx            # Expense tracking table ✅
+│   ├── expense-charts/
+│   │   └── page.tsx            # Expense visualizations (4 charts) ✅
+│   ├── settings/
+│   │   └── page.tsx            # Allocation + expense categories ✅
 │   └── fire/page.tsx           # FIRE tracker (future)
 └── api/
     ├── prices/
     │   ├── update/route.ts     # Batch price update ✅
     │   └── quote/route.ts      # Single quote fetch ✅
-    └── portfolio/
-        ├── calculate/route.ts  # (future)
-        └── snapshot/route.ts   # (future)
+    ├── portfolio/
+    │   └── snapshot/route.ts   # Create snapshot ✅
+    └── cron/
+        └── monthly-snapshot/route.ts  # Automated snapshots ✅
 ```
 
 #### Component Hierarchy
 ```
-Layout
+Layout ✅
 ├── Header (user menu, logo)
-├── Sidebar (navigation)
+├── Sidebar (navigation with 7 pages)
 └── Main Content
-    ├── Dashboard
-    │   ├── SummaryCard (x4)
+    ├── Dashboard ✅
+    │   ├── SummaryCard (x6: portfolio + expenses)
     │   ├── AssetClassPie
-    │   └── AssetDistributionPie
-    ├── Assets Page
+    │   ├── AssetDistributionPie
+    │   └── ExpenseStatsCards
+    ├── Assets Page ✅
     │   ├── AssetTable
     │   ├── UpdatePricesButton
     │   └── AssetDialog (add/edit)
-    └── Allocation Page
-        ├── AllocationTable (current)
-        ├── AllocationTable (target)
-        └── Link to settings
+    ├── Allocation Page ✅
+    │   ├── AllocationTable (current)
+    │   ├── AllocationTable (target)
+    │   └── Link to settings
+    ├── History Page ✅
+    │   ├── NetWorthChart (line)
+    │   ├── AssetClassEvolutionChart (stacked area)
+    │   ├── LiquidityChart (area)
+    │   ├── AllocationProgressBars
+    │   └── SnapshotsTable + CSV export
+    ├── Expenses Page ✅
+    │   ├── ExpenseStatsCards (x3)
+    │   ├── ExpenseTable (sortable, filterable)
+    │   └── ExpenseDialog (add/edit)
+    └── Expense Charts Page ✅
+        ├── ExpensesByCategoryPie
+        ├── IncomeByCategoryPie
+        ├── ExpensesByTypePie
+        └── MonthlyTrendBar
 ```
 
 #### Reusable Components
-- `SummaryCard`: Metric display with optional trend indicator
+**Portfolio Components:**
 - `AssetTable`: Sortable table with actions (edit/delete) ✅
 - `AssetDialog`: Form for adding/editing assets with automatic price fetching ✅
 - `AllocationTable`: Display allocation with differences ✅
-- `AssetClassPie`: Pie chart for asset class distribution (Recharts) ✅
-- `AssetDistributionPie`: Pie chart for individual assets (Recharts) ✅
+- `AssetClassPie`: Pie chart for asset class distribution ✅
+- `AssetDistributionPie`: Pie chart for individual assets ✅
 - `UpdatePricesButton`: Trigger manual price updates ✅
+
+**Expense Components:**
+- `ExpenseTable`: Sortable table with delete/edit, recurring badge ✅
+- `ExpenseDialog`: Form with cascading selects, recurring options ✅
+- `CategoryManagementDialog`: CRUD for categories with sub-categories ✅
+- `ExpenseCharts`: 4 chart types (pie + bar) ✅
+
+**Shared Components:**
+- `SummaryCard`: Metric display with optional trend indicator ✅
 - `LoadingSpinner`: Generic loading indicator
 - `LoadingSkeleton`: Skeleton screens for tables/cards
+- `ProtectedRoute`: Authentication wrapper ✅
 
 ### Service Layer
 
 #### `assetService.ts` ✅
-- `getAllAssets(userId)`: Fetch all user assets (Client SDK)
+- `getAllAssets(userId)`: Fetch all user assets with sorting
 - `getAssetById(assetId)`: Fetch single asset
 - `createAsset(userId, assetData)`: Add new asset with automatic price
 - `updateAsset(assetId, updates)`: Modify existing asset
 - `deleteAsset(assetId)`: Remove asset
 - `updateAssetPrice(assetId, price)`: Update price and timestamp
-- `calculateAssetValue(asset)`: Calculate total value of asset
-- `calculateTotalValue(assets)`: Calculate portfolio total value
-- `calculateLiquidNetWorth(assets)`: Exclude illiquid assets
+- `calculateAssetValue(asset)`: Calculate total value
+- `calculateTotalValue(assets)`: Portfolio total
+- `calculateLiquidNetWorth(assets)`: Exclude illiquid
+- `calculateIlliquidNetWorth(assets)`: Illiquid only
 
 #### `yahooFinanceService.ts` ✅
-- **Implementation**: Uses `YahooFinance` instance (v3+ API)
-- `getQuote(ticker)`: Fetch single ticker price
-- `getMultipleQuotes(tickers)`: Batch fetch (more efficient, parallel execution)
+- `getQuote(ticker)`: Fetch single ticker price (YahooFinance v3+ instance)
+- `getMultipleQuotes(tickers)`: Batch fetch (parallel execution)
 - `validateTicker(ticker)`: Check if ticker exists
 - `searchTicker(query)`: Search for tickers by name/symbol
-- `shouldUpdatePrice(type, subCategory)`: Determine if asset needs price updates
+- `shouldUpdatePrice(type, subCategory)`: Determine if asset needs updates
 
 #### `assetAllocationService.ts` ✅
-- `getTargets(userId)`: Fetch user's allocation targets from Firestore
-- `setTargets(userId, targets)`: Save allocation targets
-- `calculateCurrentAllocation(assets)`: Compute current allocation by asset class and sub-category
-- `compareAllocations(current, targets)`: Generate rebalancing actions (COMPRA/VENDI/OK)
-- `getDefaultTargets()`: Return default allocation template
+- `getSettings(userId)`: Fetch allocation settings
+- `setSettings(userId, settings)`: Save allocation settings
+- `getTargets(userId)`: Get allocation targets
+- `calculateCurrentAllocation(assets)`: Compute by class and sub-category
+- `compareAllocations(current, targets)`: Generate rebalancing actions
+- `getDefaultTargets()`: Default allocation template
+- `addSubCategory(userId, assetClass, name)`: Add sub-category
+- `calculateEquityPercentage(age, riskFreeRate)`: Formula-based calculation
 
 #### `snapshotService.ts` ✅
-- `createSnapshot(userId, assets, year?, month?)`: Create monthly portfolio snapshot
-- `getUserSnapshots(userId)`: Fetch all snapshots for a user
-- `getSnapshotsInRange(userId, startYear, startMonth, endYear, endMonth)`: Fetch snapshots in date range
-- `getLatestSnapshot(userId)`: Get most recent snapshot
-- `calculateMonthlyChange(currentNetWorth, previousSnapshot)`: Calculate month-over-month change
+- `createSnapshot(userId, assets, year?, month?)`: Create portfolio snapshot
+- `getUserSnapshots(userId)`: Fetch all snapshots
+- `getSnapshotsInRange(userId, start, end)`: Date range query
+- `getLatestSnapshot(userId)`: Most recent snapshot
+- `calculateMonthlyChange(current, previous)`: MoM change calculation
+
+#### `expenseService.ts` ✅
+- `getAllExpenses(userId)`: Fetch all expenses sorted by date
+- `getExpensesByMonth(userId, year, month)`: Month filter
+- `getExpensesByDateRange(userId, start, end)`: Range query
+- `getExpenseById(expenseId)`: Single expense
+- `createExpense(userId, data, categoryName, subCategoryName?)`: Create entry
+- `createRecurringExpenses(userId, data, ...)`: Batch create recurring
+- `updateExpense(expenseId, updates, ...)`: Update entry
+- `deleteExpense(expenseId)`: Delete single
+- `deleteRecurringExpenses(parentId)`: Delete all recurring
+- `getMonthlyExpenseSummary(userId, year, month)`: Aggregate by month
+- `getExpenseStats(userId)`: Current vs previous month with delta
+- `calculateTotalIncome(expenses)`: Sum income
+- `calculateTotalExpenses(expenses)`: Sum expenses
+- `calculateNetBalance(expenses)`: Income - expenses
+
+#### `expenseCategoryService.ts` ✅
+- `getAllCategories(userId)`: Fetch all categories
+- `getCategoriesByType(userId, type)`: Filter by expense type
+- `getCategoryById(categoryId)`: Single category
+- `createCategory(userId, data)`: Create new category
+- `updateCategory(categoryId, updates)`: Update category
+- `deleteCategory(categoryId)`: Delete category
+- `addSubCategory(categoryId, name)`: Add sub-category
+- `removeSubCategory(categoryId, subCategoryId)`: Remove sub-category
+- `updateSubCategory(categoryId, subCategoryId, name)`: Rename sub-category
 
 #### `chartService.ts` ✅
-- `prepareAssetDistributionData(assets)`: Format for asset pie chart (top 10 + others)
-- `prepareAssetClassDistributionData(assets)`: Aggregate by class for pie chart
-- `prepareNetWorthHistoryData(snapshots)`: Format historical data for line charts
+- `prepareAssetDistributionData(assets)`: Format for asset pie (top 10 + others)
+- `prepareAssetClassDistributionData(assets)`: Aggregate by class
+- `prepareNetWorthHistoryData(snapshots)`: Format historical line charts
 - `formatCurrency(value)`: Italian currency formatting (€1.234,56)
-- `formatPercentage(value, decimals)`: Italian percentage formatting (12,34%)
+- `formatPercentage(value, decimals)`: Italian percentage (12,34%)
 - `formatNumber(value, decimals)`: Italian number formatting
+
+#### `dummySnapshotGenerator.ts` ✅
+- **Purpose**: Testing utility for generating sample historical data
+- `generateDummySnapshots(userId, months)`: Create N months of fake snapshots
+- Used during development, not in production
 
 ## User Workflow Examples
 
 ### Monthly Portfolio Review (Primary Use Case)
-1. **Day 30-31 of month**: Automated Cron job updates all asset prices from Yahoo Finance
+1. **Day 28-31 of month**: Automated Cron job updates all asset prices and creates snapshot
 2. **Month-end**: User logs in to review portfolio
 3. User views **Dashboard** for high-level overview:
    - Total net worth: €251,953
    - Liquid net worth: €193,207 (excluding €58,746 real estate)
    - Month-over-month change: +€3,240 (+1.3%)
+   - Income this month: €3,500 (+5% from last month)
+   - Expenses this month: €2,100 (-3% from last month)
 4. User clicks **"Allocation"** to check rebalancing needs:
-   - Equity: 84.5% current vs 80.6% target → **VENDI** €9,804 in equity
-   - Bonds: 5.5% current vs 16.9% target → **COMPRA** €28,723 in bonds
-   - Crypto: 2.1% current vs 2.5% target → **COMPRA** €1,008 in crypto
-5. User invests €2,000 monthly savings according to rebalancing actions:
+   - Equity: 84.5% current vs 80.6% target → **VENDI** €9,804
+   - Bonds: 5.5% current vs 16.9% target → **COMPRA** €28,723
+   - Crypto: 2.1% current vs 2.5% target → **COMPRA** €1,008
+5. User invests €2,000 monthly savings according to rebalancing:
    - €1,500 into bond ETF (IMB28)
    - €500 into crypto (WBIT)
 6. User updates holdings in **"Assets"** page:
    - Edit IMB28: increase quantity by 15 shares
    - Edit WBIT: increase quantity by 0.02 BTC
-7. Click **"Update Prices"** to refresh current values
+7. Click **"Aggiorna Prezzi"** to refresh current values
 8. Return to **"Allocation"** to verify closer to targets
+9. Review **"Tracciamento Spese"** to see monthly spending breakdown
+10. Check **"Grafici Spese"** to identify spending trends
+
+### Monthly Expense Review
+1. User logs in at month-end
+2. Dashboard shows:
+   - Income: €3,500 this month (+5% from last month ✅)
+   - Expenses: €2,100 (-3% from last month ✅)
+   - Net balance: +€1,400
+3. Navigate to **"Tracciamento Spese"**
+4. Review all transactions:
+   - Filter by date range
+   - Sort by amount
+   - Check category breakdown
+5. Navigate to **"Grafici Spese"**
+6. Analyze spending patterns:
+   - **Expenses by Category**: Alimentari (€600), Trasporti (€300), Intrattenimento (€200)
+   - **Monthly Trend**: Compare last 12 months, identify anomalies
+   - **Expenses by Type**: Fixed 45%, Variable 40%, Debts 15%
+7. Identify areas to reduce spending
+8. Adjust next month's budget mentally
+
+### Setting Up Recurring Debt (Mortgage)
+1. Navigate to **Settings**
+2. Scroll to **"Impostazioni Tracciamento Spese"**
+3. Click **"Nuova Categoria"**
+4. Create category:
+   - Name: "Mutuo Casa"
+   - Type: Debiti
+   - Color: Orange
+5. Save category
+6. Navigate to **"Tracciamento Spese"**
+7. Click **"Nuova Spesa"**
+8. Fill form:
+   - Type: Debiti
+   - Category: Mutuo Casa
+   - Amount: €800
+   - Date: 2025-01-10 (first payment)
+   - Enable **"Crea voce per ogni mese"**
+   - Recurring Day: 10
+   - Number of Months: 12 (full year)
+9. Click **"Crea Spesa"**
+10. System creates 12 entries automatically (Jan 10 - Dec 10)
+11. Success notification: "12 voci ricorrenti create con successo"
+12. All entries appear in table with 🗓️ recurring badge
 
 ### Adding a New Investment
 1. User purchases new ETF: VWCE (all-world equity)
@@ -402,41 +681,30 @@ Layout
    - Type: ETF
    - Asset Class: Equity
    - Sub-category: All-World
-   - Exchange: XETRA (optional)
    - Currency: EUR
    - Quantity: 15
-5. Click **"Crea"** → System automatically fetches current price from Yahoo Finance
-6. Success notification shows: "Prezzo recuperato: €108.50 EUR"
+5. Click **"Crea"** → System automatically fetches price
+6. Success notification: "Prezzo recuperato: €108.50 EUR"
 7. Asset appears in table with:
    - Quantity: 15
    - Current Price: €108.50
    - Total Value: €1,627.50
-   - Last Update: Current timestamp
 
-### Rebalancing Portfolio
-1. User notices **Allocation** page shows significant deviations
-2. Equity overweighted (+€15,000) → needs to sell
-3. Bonds underweighted (-€28,000) → needs to buy
-4. User decides to rebalance with €10,000:
-   - Sell €10,000 of VWCE (all-world equity)
-   - Buy €10,000 of CSBGE3 (bond ETF)
-5. After transactions settle:
-   - Navigate to **"Assets"**
-   - Edit VWCE: reduce quantity
-   - Edit CSBGE3: increase quantity
-   - Update prices to get latest values
-6. Check **"Allocation"** → deviations reduced
-
-### Tracking FIRE Progress (Future)
-1. User sets FIRE target: €1,000,000
-2. Current net worth: €251,953 (25% complete)
-3. Monthly savings: €2,000
-4. Assumed annual return: 7%
-5. App calculates: **18.3 years to FIRE**
-6. User adjusts scenarios:
-   - Increase savings to €2,500 → 16.1 years
-   - Reduce target to €800,000 → 14.2 years
-7. Dashboard shows progress bar: 25% complete
+### Tracking Composite Asset (Pension Fund)
+1. User has pension fund: 60% equity, 30% bonds, 10% real estate
+2. Navigate to **"Assets"**
+3. Add new asset:
+   - Ticker: FONDOPENS
+   - Name: Fondo Pensione Giuseppe
+   - Type: ETF
+   - Asset Class: Equity (primary)
+   - Enable **"Asset Composto"**
+4. Define composition:
+   - Equity 60% (All-World sub-category)
+   - Bonds 30% (Government sub-category)
+   - Real Estate 10%
+5. Set quantity and price
+6. System calculates allocation across multiple classes automatically
 
 ## Localization & Formatting
 
@@ -445,12 +713,19 @@ Layout
 - **Dates**: DD/MM/YYYY (e.g., 31/12/2024)
 - **Percentages**: 12,34% (comma for decimals)
 - **Number Format**: Use `Intl.NumberFormat('it-IT')`
+- **Date Library**: date-fns with `it` locale
 
 ### UI Language
 - Primary language: Italian for user-facing strings
-- Technical terms: English is acceptable (ETF, FIRE, etc.)
-- Action labels: Italian (COMPRA, VENDI, OK)
-- Navigation: Italian (Dashboard → Panoramica, Assets → Patrimonio)
+- Technical terms: English acceptable (ETF, FIRE, ROI)
+- Action labels: Italian (COMPRA, VENDI, OK, Crea, Modifica, Elimina)
+- Navigation: Italian
+  - Overview → Panoramica
+  - Assets → Patrimonio
+  - Allocation → Allocazione
+  - History → Storico
+  - Expenses → Spese
+  - Settings → Impostazioni
 
 ### Color Coding
 - **Asset Classes**:
@@ -460,60 +735,66 @@ Layout
   - Real Estate: Green (#10B981)
   - Cash: Gray (#6B7280)
   - Commodity: Brown (#92400E)
-- **Allocation Differences**:
-  - Over-allocated (needs selling): Red
-  - Under-allocated (needs buying): Orange
-  - On target: Green
-  - Close to target (±1%): Yellow
+- **Allocation Actions**:
+  - COMPRA (buy): Orange (#F59E0B)
+  - VENDI (sell): Red (#EF4444)
+  - OK (on target): Green (#10B981)
+- **Expense Types**:
+  - Income: Green (#10B981)
+  - Fixed: Blue (#3B82F6)
+  - Variable: Purple (#8B5CF6)
+  - Debt: Orange (#F59E0B)
 
 ## Special Asset Handling
 
 ### Real Estate
-- **Fixed Valuation**: Manually set price (doesn't update from Yahoo Finance)
+- **Fixed Valuation**: Manually set price (no Yahoo Finance updates)
 - **Illiquid Flag**: Excluded from "Liquid Net Worth"
-- **Example**: Casa Rovereto s/s = €58,745.99 (fixed)
-- **Update Process**: User manually updates value when reassessed
+- **Example**: Casa Rovereto = €58,745.99 (fixed)
+- **Update Process**: User manually updates when reassessed
 
 ### Private Equity
-- **Fixed Valuation**: Academia Private Equity = €4,000 (fixed)
-- **No Market Price**: Doesn't trade publicly
-- **Update Process**: User updates when quarterly reports received
+- **Fixed Valuation**: No market price
+- **Illiquid**: Not tradeable
+- **Update Process**: User updates from quarterly reports
 
 ### Pension Funds
-- **Semi-Liquid**: Fondo Pensione Giuseppe
-- **Price Updates**: May require manual updates (check if Yahoo Finance has ticker)
-- **Special Category**: Tracked separately under equity sub-category
+- **Semi-Liquid**: Restricted withdrawal
+- **Composite Asset**: Support for mixed allocations
+- **Price Updates**: May require manual updates
 
 ### Cryptocurrency
-- **High Volatility**: Prices update frequently
+- **High Volatility**: Frequent price updates
 - **Multiple Tickers**: WBIT (Bitcoin), CETH (Ethereum)
-- **Euro Pairs**: Use EUR pairs when available (BTC-EUR vs BTC-USD)
+- **Euro Pairs**: Use EUR pairs when available
 
 ### Bank Accounts (Cash)
 - **Fixed Value**: No price updates needed
 - **Quantity = Balance**: Conto BNL = €14,962.56
-- **Price = 1**: Always €1.00 per "share"
+- **Price = 1**: Always €1.00 per unit
 
 ## Error Handling & Edge Cases
 
 ### Price Update Failures
-- **Ticker Not Found**: Log error, skip asset, continue with others
-- **API Timeout**: Retry once, then mark as failed
+- **Ticker Not Found**: Log error, skip asset, continue
+- **API Timeout**: Retry once, mark as failed
 - **Invalid Response**: Use previous price, log warning
-- **Zero Price**: Reject as invalid, keep previous price
+- **Zero Price**: Reject as invalid, keep previous
 
 ### Data Validation
 - **Quantity**: Must be positive number
-- **Percentage**: Must be 0-100
-- **Ticker**: Must match format (alphanumeric + optional .XX suffix)
-- **Allocation Totals**: Must sum to exactly 100%
+- **Percentage**: Must be 0-100, totals must sum to 100%
+- **Ticker**: Alphanumeric + optional exchange suffix
+- **Amount**: Positive for income, auto-negative for expenses
+- **Recurring Day**: 1-31, auto-adjust for short months
 
 ### User Experience
-- **Loading States**: Show spinners during async operations
-- **Error Toasts**: Clear, actionable error messages
-- **Confirmation Dialogs**: Confirm before deleting assets
+- **Loading States**: Spinners during async operations
+- **Error Toasts**: Clear, actionable error messages (sonner)
+- **Confirmation Dialogs**: Confirm before deleting assets/expenses
 - **Optimistic Updates**: Update UI immediately, rollback on failure
-- **Empty States**: Helpful messages when no data (e.g., "Add your first asset to get started")
+- **Empty States**: Helpful messages when no data
+- **Form Validation**: Real-time validation with zod schemas
 
 ## Security Considerations
 
@@ -529,6 +810,16 @@ match /assets/{assetId} {
   allow read, write: if request.auth.uid == resource.data.userId;
 }
 
+// Expenses belong to users
+match /expenses/{expenseId} {
+  allow read, write: if request.auth.uid == resource.data.userId;
+}
+
+// Expense categories belong to users
+match /expenseCategories/{categoryId} {
+  allow read, write: if request.auth.uid == resource.data.userId;
+}
+
 // Price history readable by all authenticated users
 // Only backend can write (via Admin SDK)
 match /priceHistory/{document} {
@@ -541,51 +832,37 @@ match /priceHistory/{document} {
 - **Authentication**: All API routes verify Firebase Auth token
 - **Authorization**: Users can only access their own data
 - **Rate Limiting**: Prevent abuse of price update endpoint
-- **Input Validation**: Sanitize all user inputs (ticker, quantity, etc.)
-- **SQL Injection**: N/A (Firestore is NoSQL)
+- **Input Validation**: Sanitize all user inputs
 - **XSS Prevention**: React auto-escapes by default
+- **HTTPS**: All requests encrypted in transit
 
 ### Data Privacy
 - **No Third-Party Analytics**: User data stays in Firebase
-- **No External Portfolio Services**: Direct Yahoo Finance integration only
+- **No External Services**: Direct Yahoo Finance integration only
 - **Encrypted Transmission**: HTTPS for all requests
 - **Firebase Security**: Google-managed infrastructure, SOC 2 certified
+- **User Isolation**: Strict Firestore rules prevent data leaks
 
 ## Performance Optimization
 
 ### Frontend
-- **Code Splitting**: Dynamic imports for charts (loaded on-demand)
-- **Memoization**: `React.memo` for expensive chart components
+- **Code Splitting**: Dynamic imports for charts
+- **Memoization**: `React.memo` for expensive components
 - **Lazy Loading**: Images and heavy components load when visible
 - **Bundle Size**: Tree-shaking to remove unused code
+- **Recharts**: Load charts only when page visited
 
 ### Backend
-- **Batch Operations**: Update multiple prices in single Firebase batch write
-- **Caching**: Cache Yahoo Finance responses (5-minute TTL)
-- **Pagination**: Limit asset list to 100 per page (if user has many assets)
+- **Batch Operations**: Update multiple prices in single Firebase batch
+- **Parallel Execution**: Yahoo Finance fetches run concurrently
 - **Indexing**: Firestore composite indexes for complex queries
+- **Caching**: Consider 5-minute TTL for Yahoo Finance responses
 
 ### Database
-- **Denormalization**: Store computed values (totalValue) to avoid recalculation
-- **Snapshot Strategy**: Pre-compute historical data instead of aggregating on-the-fly
+- **Denormalization**: Store computed values to avoid recalculation
+- **Snapshot Strategy**: Pre-compute historical data
 - **Selective Fetching**: Only fetch fields needed for each view
-
-## Testing Strategy
-
-### Manual Testing
-- **Authentication Flow**: Register, login, logout, password reset
-- **Asset CRUD**: Add, edit, delete, list all operations
-- **Price Updates**: Manual trigger, verify prices update correctly
-- **Allocation Calculations**: Verify math is correct
-- **Charts**: Check percentages sum to 100%, colors consistent
-- **Responsive Design**: Test on mobile, tablet, desktop
-- **Error Scenarios**: Test with invalid tickers, network failures
-
-### Automated Testing (Future)
-- **Unit Tests**: Test calculation functions (allocation, percentages)
-- **Integration Tests**: Test API routes with mock Firebase
-- **E2E Tests**: Playwright/Cypress for critical user flows
-- **Visual Regression**: Percy or Chromatic for UI consistency
+- **Query Optimization**: Use Firestore query limits
 
 ## Deployment
 
@@ -599,65 +876,44 @@ match /priceHistory/{document} {
 }
 ```
 
-### Se da visual studio ricevi errore durante npm install, run questo
-```bash
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
+### Environment Variables
+Set in Vercel dashboard or `.env.local`:
+```
+# Firebase Client SDK
+NEXT_PUBLIC_FIREBASE_API_KEY=
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+NEXT_PUBLIC_FIREBASE_APP_ID=
+
+# Firebase Admin SDK (server-side)
+FIREBASE_ADMIN_PROJECT_ID=
+FIREBASE_ADMIN_CLIENT_EMAIL=
+FIREBASE_ADMIN_PRIVATE_KEY=
 ```
 
-### Environment Variables
-Set in Vercel dashboard (Settings → Environment Variables):
-- `NEXT_PUBLIC_FIREBASE_API_KEY`
-- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
-- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
-- `FIREBASE_ADMIN_PRIVATE_KEY` (for server-side)
-
 ### Cron Jobs (Vercel Cron)
-Create `vercel.json`:
+Create `vercel.json` in project root:
 ```json
 {
   "crons": [{
-    "path": "/api/prices/update",
-    "schedule": "0 20 28-31 * *"  // 10 PM on 30th and 31st of every month
+    "path": "/api/cron/monthly-snapshot",
+    "schedule": "0 20 28-31 * *"
   }]
 }
 ```
 
-#### Modifica Schedule Cron Job
+**Schedule Explanation**:
+- `0 20 28-31 * *` = Run at 8 PM UTC on days 28-31 of every month
+- Covers month-end for all months (28th for Feb, 30th for Apr/Jun/Sep/Nov, 31st for others)
+- UTC time: Adjust for local timezone (Italy = UTC+1 winter, UTC+2 summer)
 
-Il cron job degli snapshot mensili è configurabile modificando il file `vercel.json` nella root del progetto.
-
-**Schedule attuale**: Esegue ogni giorno alle 13:00 UTC
-```json
-{
-  "crons": [
-    {
-      "path": "/api/cron/monthly-snapshot",
-      "schedule": "0 13 * * *"
-    }
-  ]
-}
+**Note on Visual Studio npm install error**:
+If you receive execution policy errors, run:
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
 ```
-
-**Come modificare l'orario**:
-
-Il formato del campo `schedule` segue la sintassi cron standard: `minuto ora giorno mese giorno_settimana`
-
-Esempi comuni:
-- **Ogni giorno alle 13:00**: `0 13 * * *`
-- **Fine mese (28-31) alle 20:00**: `0 20 28-31 * *`
-- **Primo del mese alle 00:00**: `0 0 1 * *`
-- **Ultimo del mese alle 23:00**: `0 23 L * *` (Nota: Vercel potrebbe non supportare `L`)
-
-**Nota importante**:
-- Gli orari sono in UTC (UTC+0)
-- Per l'Italia: UTC+1 in inverno, UTC+2 in estate
-- Esempio: per eseguire alle 14:00 ora italiana invernale, usa `0 13 * * *` (13:00 UTC)
-
-**Dopo la modifica**:
-1. Salva il file `vercel.json`
-2. Committa e pusha su Git
-3. Vercel rileggerà automaticamente la configurazione al prossimo deploy
-4. Verifica nella dashboard Vercel → Settings → Cron Jobs che il nuovo schedule sia attivo
 
 ### Custom Domain (Optional)
 - Register domain (e.g., `portfolio.example.com`)
@@ -666,86 +922,105 @@ Esempi comuni:
 
 ## Implementation Status & Roadmap
 
-### Phase 1: Core Features ✅ COMPLETED
+### ✅ Phase 1: Core Portfolio Features (COMPLETED)
 - [x] Asset management (CRUD operations)
 - [x] Automatic price fetching from Yahoo Finance v3+
 - [x] Asset allocation tracking and comparison
+- [x] Formula-based allocation (age + risk-free rate)
+- [x] Fixed amount cash support
+- [x] Composite assets (pension funds)
 - [x] Settings page for allocation targets
-- [x] Basic historical tracking with snapshots
+- [x] Sub-category management
+
+### ✅ Phase 2: Historical Analysis (COMPLETED)
+- [x] Automated monthly snapshot creation (Cron job)
 - [x] Net worth timeline chart
-- [x] Asset distribution visualization
-- [x] Current vs target allocation comparison
+- [x] Asset class evolution chart (stacked area)
+- [x] Liquidity evolution chart
+- [x] Current vs target visualization (progress bars)
 - [x] CSV export functionality
+- [x] Toggle € / % view
 
-### Phase 2: Enhanced Historical Analysis
-- [ ] Automated monthly snapshot creation (Cron job)
-- [ ] Year-over-year growth metrics
-- [ ] Asset class evolution chart (stacked area)
-- [ ] Performance tracking over time
-- [ ] Advanced filtering and date range selection
+### ✅ Phase 3: Expense Tracking (COMPLETED)
+- [x] Expense management (CRUD)
+- [x] 4 expense types (Income, Fixed, Variable, Debt)
+- [x] Custom categories with sub-categories
+- [x] Recurring expenses (automatic creation)
+- [x] Expense charts (4 types)
+- [x] Monthly statistics with MoM delta
+- [x] Category colors and visual coding
+- [x] Integration in main dashboard
+- [x] Settings page for category management
 
-### Phase 3: FIRE Tracking (Future)
+### 🔄 Phase 4: FIRE Tracking (FUTURE)
 - [ ] FIRE target configuration
 - [ ] Years to FIRE calculator
 - [ ] Withdrawal rate calculator (4% rule)
 - [ ] Scenario modeling (different savings rates)
 - [ ] Progress visualization
+- [ ] Retirement spending projections
 
-### Phase 4: Advanced Features (Future)
+### 🔄 Phase 5: Advanced Features (FUTURE)
 - [ ] CSV/Excel import for bulk asset additions
 - [ ] PDF export of portfolio reports
 - [ ] Email notifications (monthly summary)
-- [ ] Multi-currency support (full conversion)
-- [ ] Budget tracking integration
+- [ ] Multi-currency full conversion
 - [ ] Tax reporting (capital gains, dividends)
+- [ ] Dividend tracking
+- [ ] Cost basis tracking (average cost per share)
 
-### Phase 5: Portfolio Analysis (Future)
-- [ ] Performance metrics (ROI, IRR)
-- [ ] Risk metrics (Sharpe ratio, volatility)
-- [ ] Correlation analysis
+### 🔄 Phase 6: Portfolio Analysis (FUTURE)
+- [ ] Performance metrics (ROI, IRR, CAGR)
+- [ ] Risk metrics (Sharpe ratio, volatility, max drawdown)
+- [ ] Correlation analysis between assets
 - [ ] Factor exposure breakdown
 - [ ] Backtesting allocation strategies
+- [ ] Monte Carlo simulations
 
 ## Support & Maintenance
 
 ### Common Issues & Solutions
 
 1. **Ticker not found on Yahoo Finance**
-   - **Solution**: Verify ticker format. US stocks: `AAPL`, EU stocks need exchange suffix: `VWCE.DE` (XETRA), `BMW.DE`, `NESN.SW` (Swiss), etc.
-   - The system will show error message and allow manual price entry later
+   - **Solution**: Verify ticker format. US: `AAPL`, EU needs suffix: `VWCE.DE` (XETRA), `BMW.DE`, `NESN.SW` (Swiss)
+   - System shows error, allows manual price entry
 
 2. **Error: "Module not found: Can't resolve 'child_process'"**
-   - **Cause**: yahoo-finance2 library imported in client component
-   - **Solution**: Already fixed - uses `/api/prices/quote` server route instead
+   - **Cause**: yahoo-finance2 imported in client component
+   - **Solution**: Use `/api/prices/quote` server route instead
 
 3. **Error: "Call const yahooFinance = new YahooFinance() first"**
-   - **Cause**: yahoo-finance2 v3+ requires YahooFinance instance
-   - **Solution**: Already fixed - uses `new YahooFinance()` singleton instance
+   - **Cause**: yahoo-finance2 v3+ requires instance
+   - **Solution**: Already fixed with singleton pattern
 
 4. **500 Error when updating prices**
-   - **Cause**: Missing Firebase Admin SDK credentials or using Client SDK in API routes
-   - **Solution**: Verify `.env.local` has `FIREBASE_ADMIN_*` variables configured correctly
+   - **Cause**: Missing Firebase Admin SDK credentials
+   - **Solution**: Verify `.env.local` has correct `FIREBASE_ADMIN_*` variables
 
 5. **Allocation doesn't sum to 100%**
-   - **Issue**: Rounding errors or incorrect target percentages
-   - **Solution**: Settings page validates totals and shows error if not exactly 100%
+   - **Issue**: Rounding errors or incorrect targets
+   - **Solution**: Settings page validates and shows error
 
 6. **Charts not loading**
-   - **Check**: Recharts is installed (`npm list recharts`)
+   - **Check**: Recharts installed (`npm list recharts`)
    - **Check**: Data format matches expected structure
-   - **Check**: Browser console for specific errors
+   - **Check**: Browser console for errors
+
+7. **SelectItem empty value error**
+   - **Cause**: shadcn/ui Select doesn't support empty string values
+   - **Solution**: Use `undefined` instead of `''` for optional selects
 
 ### Debugging
 - **Firebase Console**: View raw database documents
 - **Vercel Logs**: Check API route execution and errors
-- **Browser DevTools**: Network tab for failed requests
+- **Browser DevTools**: Network tab for failed requests, Console for JS errors
 - **React DevTools**: Component state and props inspection
 
 ### Contact
-For questions or issues related to this project:
-- Check TODO.md for implementation details
+For questions or issues:
 - Review Firebase/Vercel documentation
 - Consult Next.js App Router guides
+- Check shadcn/ui component documentation
 
 ## License
 Private project - All rights reserved
@@ -754,6 +1029,7 @@ Private project - All rights reserved
 - Built to replace 5+ years of Google Sheets tracking
 - Inspired by FIRE community portfolio tracking needs
 - Designed for Italian investors (EUR, XETRA, Borsa Italiana)
+- Expense tracking inspired by YNAB and Mint methodologies
 
 ---
 
@@ -767,18 +1043,31 @@ const yahooFinance = new YahooFinance();
 ```
 
 ### Firebase Architecture
-- **Client SDK** (`firebase/firestore`): Used in React components for real-time data binding
+- **Client SDK** (`firebase/firestore`): Used in React components for real-time data
 - **Admin SDK** (`firebase-admin/firestore`): Used in API routes for server-side operations
-- API routes MUST use Admin SDK to avoid authentication and permission issues
+- API routes MUST use Admin SDK to avoid auth issues
 
 ### API Route Pattern
-All price fetching goes through server-side API routes to avoid importing Node.js modules in client components:
+All price fetching goes through server-side routes:
 ```
 Client Component → fetch('/api/prices/quote') → Server Route → Yahoo Finance API
 ```
 
+### Expense Amount Convention
+- **Income**: Positive values (€3,500)
+- **Expenses**: Negative values (-€2,100)
+- **Form Input**: Always positive, system converts based on type
+- **Net Balance**: Sum of all amounts (€3,500 - €2,100 = €1,400)
+
+### Recurring Expenses Algorithm
+1. User specifies: start date, recurring day, number of months
+2. System generates N expense entries
+3. Each entry gets same `recurringParentId` for batch operations
+4. Date calculation handles short months (Feb 30 → Feb 28/29)
+5. Delete action offers: delete single OR delete all recurring
+
 ---
 
-**Version**: 1.0.0 (MVP - Core Features Complete)
-**Last Updated**: November 2025
-**Status**: ✅ Phase 1 Complete - Ready for Use
+**Version**: 2.0.0 (Portfolio + Expense Tracking Complete)
+**Last Updated**: December 2024
+**Status**: ✅ Phases 1-3 Complete - Production Ready

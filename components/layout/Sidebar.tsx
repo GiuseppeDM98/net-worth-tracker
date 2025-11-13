@@ -9,6 +9,8 @@ import {
   PieChart,
   History,
   Settings,
+  Receipt,
+  BarChart3,
 } from 'lucide-react';
 
 const navigation = [
@@ -16,6 +18,8 @@ const navigation = [
   { name: 'Assets', href: '/dashboard/assets', icon: Wallet },
   { name: 'Allocation', href: '/dashboard/allocation', icon: PieChart },
   { name: 'History', href: '/dashboard/history', icon: History },
+  { name: 'Tracciamento Spese', href: '/dashboard/expenses', icon: Receipt },
+  { name: 'Grafici Spese', href: '/dashboard/expense-charts', icon: BarChart3 },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ];
 
