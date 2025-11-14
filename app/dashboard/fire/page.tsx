@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAllAssets, calculateTotalValue } from '@/lib/services/assetService';
 import { getSettings, setSettings, getDefaultTargets } from '@/lib/services/assetAllocationService';
-import { getFIREData, FIREMetrics, MonthlyFIREData } from '@/lib/services/fireService';
+import { getFIREData, FIREMetrics, MonthlyFIREData, PlannedFIREMetrics, calculatePlannedFIREMetrics } from '@/lib/services/fireService';
 import { formatCurrency, formatPercentage } from '@/lib/services/chartService';
 import { Asset } from '@/types/assets';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,7 +29,10 @@ export default function FIREPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [withdrawalRate, setWithdrawalRate] = useState<number>(4.0);
   const [tempWithdrawalRate, setTempWithdrawalRate] = useState<string>('4.0');
+  const [plannedAnnualExpenses, setPlannedAnnualExpenses] = useState<number | null>(null);
+  const [tempPlannedAnnualExpenses, setTempPlannedAnnualExpenses] = useState<string>('');
   const [fireMetrics, setFireMetrics] = useState<FIREMetrics | null>(null);
+  const [plannedFireMetrics, setPlannedFireMetrics] = useState<PlannedFIREMetrics | null>(null);
   const [chartData, setChartData] = useState<MonthlyFIREData[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -59,6 +62,11 @@ export default function FIREPage() {
       setWithdrawalRate(wr);
       setTempWithdrawalRate(wr.toString());
 
+      // Get planned annual expenses from settings
+      const pae = settingsData?.plannedAnnualExpenses ?? null;
+      setPlannedAnnualExpenses(pae);
+      setTempPlannedAnnualExpenses(pae ? pae.toString() : '');
+
       // Calculate current net worth
       const currentNetWorth = calculateTotalValue(assetsData);
 
@@ -66,6 +74,14 @@ export default function FIREPage() {
       const fireData = await getFIREData(user.uid, currentNetWorth, wr);
       setFireMetrics(fireData.metrics);
       setChartData(fireData.chartData);
+
+      // Calculate planned FIRE metrics if plannedAnnualExpenses is set
+      if (pae && pae > 0) {
+        const plannedMetrics = calculatePlannedFIREMetrics(currentNetWorth, pae, wr);
+        setPlannedFireMetrics(plannedMetrics);
+      } else {
+        setPlannedFireMetrics(null);
+      }
 
     } catch (error) {
       console.error('Error loading FIRE data:', error);
@@ -75,38 +91,46 @@ export default function FIREPage() {
     }
   };
 
-  const handleSaveWithdrawalRate = async () => {
+  const handleSaveSettings = async () => {
     if (!user) return;
 
     try {
       setSaving(true);
       const newWR = parseFloat(tempWithdrawalRate);
+      const newPAE = tempPlannedAnnualExpenses.trim() !== '' ? parseFloat(tempPlannedAnnualExpenses) : null;
 
       if (isNaN(newWR) || newWR <= 0 || newWR > 100) {
-        toast.error('Inserisci un valore valido tra 0 e 100');
+        toast.error('Inserisci un Withdrawal Rate valido tra 0 e 100');
+        return;
+      }
+
+      if (newPAE !== null && (isNaN(newPAE) || newPAE < 0)) {
+        toast.error('Inserisci spese annuali previste valide (numero positivo)');
         return;
       }
 
       // Get current settings
       const currentSettings = await getSettings(user.uid);
 
-      // Update settings with new withdrawal rate
+      // Update settings with new withdrawal rate and planned expenses
       await setSettings(user.uid, {
         userAge: currentSettings?.userAge,
         riskFreeRate: currentSettings?.riskFreeRate,
         withdrawalRate: newWR,
+        plannedAnnualExpenses: newPAE ?? undefined,
         targets: currentSettings?.targets || getDefaultTargets(),
       });
 
       setWithdrawalRate(newWR);
-      toast.success('Withdrawal Rate salvato con successo');
+      setPlannedAnnualExpenses(newPAE);
+      toast.success('Impostazioni FIRE salvate con successo');
 
-      // Reload data with new WR
+      // Reload data with new settings
       await loadData();
 
     } catch (error) {
-      console.error('Error saving withdrawal rate:', error);
-      toast.error('Errore nel salvataggio del Withdrawal Rate');
+      console.error('Error saving FIRE settings:', error);
+      toast.error('Errore nel salvataggio delle impostazioni FIRE');
     } finally {
       setSaving(false);
     }
@@ -135,7 +159,7 @@ export default function FIREPage() {
         </div>
       </div>
 
-      {/* Withdrawal Rate Input */}
+      {/* Settings Input */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -144,8 +168,8 @@ export default function FIREPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-end gap-4">
-            <div className="flex-1">
+          <div className="grid gap-4 md:grid-cols-2 mb-4">
+            <div>
               <Label htmlFor="withdrawalRate">Safe Withdrawal Rate (%)</Label>
               <Input
                 id="withdrawalRate"
@@ -161,20 +185,45 @@ export default function FIREPage() {
                 Tipicamente 4% secondo la regola del 4% (Trinity Study)
               </p>
             </div>
-            <Button
-              onClick={handleSaveWithdrawalRate}
-              disabled={saving}
-            >
-              {saving ? 'Salvataggio...' : 'Salva'}
-            </Button>
+            <div>
+              <Label htmlFor="plannedExpenses">Spese Annuali Previste (€)</Label>
+              <Input
+                id="plannedExpenses"
+                type="number"
+                step="100"
+                min="0"
+                value={tempPlannedAnnualExpenses}
+                onChange={(e) => setTempPlannedAnnualExpenses(e.target.value)}
+                className="mt-1"
+                placeholder="Es. 25000"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Spese annuali che prevedi di avere in FIRE (opzionale)
+              </p>
+            </div>
           </div>
+          <Button
+            onClick={handleSaveSettings}
+            disabled={saving}
+            className="w-full md:w-auto"
+          >
+            {saving ? 'Salvataggio...' : 'Salva Impostazioni'}
+          </Button>
         </CardContent>
       </Card>
 
       {/* FIRE Metrics Cards */}
       {fireMetrics && (
         <>
-          {/* Row 1: FIRE Number and Progress */}
+          {/* Section Title: Current Metrics */}
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">📊 Metriche Attuali</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Basate sulle tue spese reali dell'anno corrente
+            </p>
+          </div>
+
+          {/* Row 1: FIRE Number and Progress (Current) */}
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
               <CardHeader>
@@ -223,6 +272,75 @@ export default function FIREPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Planned Metrics Section (if plannedAnnualExpenses is set) */}
+          {plannedFireMetrics && (
+            <>
+              <div className="mt-8">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">🎯 Metriche Previste</h2>
+                <p className="text-sm text-gray-600 mb-4">
+                  Basate sulle spese annuali previste che hai impostato ({formatCurrency(plannedFireMetrics.plannedAnnualExpenses)})
+                </p>
+              </div>
+
+              <div className="grid gap-6 md:grid-cols-2">
+                <Card className="border-purple-200 bg-purple-50">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <TrendingUp className="h-5 w-5 text-purple-600" />
+                      FIRE Number Previsto
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-purple-700">
+                      {formatCurrency(plannedFireMetrics.plannedFireNumber)}
+                    </div>
+                    <p className="mt-2 text-sm text-purple-900">
+                      Patrimonio target basato sulle spese previste di {formatCurrency(plannedFireMetrics.plannedAnnualExpenses)}
+                    </p>
+                    {fireMetrics.fireNumber !== plannedFireMetrics.plannedFireNumber && (
+                      <p className="mt-2 text-xs text-purple-700 font-semibold">
+                        {plannedFireMetrics.plannedFireNumber < fireMetrics.fireNumber
+                          ? `📉 ${formatCurrency(fireMetrics.fireNumber - plannedFireMetrics.plannedFireNumber)} in meno rispetto all'attuale`
+                          : `📈 ${formatCurrency(plannedFireMetrics.plannedFireNumber - fireMetrics.fireNumber)} in più rispetto all'attuale`
+                        }
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="border-purple-200 bg-purple-50">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Percent className="h-5 w-5 text-purple-600" />
+                      Progresso verso FI Previsto
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-purple-700">
+                      {formatPercentage(plannedFireMetrics.plannedProgressToFI)}
+                    </div>
+                    <div className="mt-3">
+                      <div className="h-4 w-full overflow-hidden rounded-full bg-purple-200">
+                        <div
+                          className="h-full bg-gradient-to-r from-purple-400 to-purple-600 transition-all"
+                          style={{
+                            width: `${Math.min(plannedFireMetrics.plannedProgressToFI, 100)}%`,
+                          }}
+                        />
+                      </div>
+                      <p className="mt-2 text-sm text-purple-900">
+                        {plannedFireMetrics.plannedProgressToFI >= 100
+                          ? '🎉 Hai raggiunto il target previsto!'
+                          : `Ancora ${formatCurrency(plannedFireMetrics.plannedFireNumber - fireMetrics.currentNetWorth)} da accumulare per il target previsto`
+                        }
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          )}
 
           {/* Row 2: Allowances */}
           <div className="grid gap-6 md:grid-cols-3">

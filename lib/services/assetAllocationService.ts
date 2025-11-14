@@ -22,11 +22,12 @@ export async function getSettings(
 
     const data = targetDoc.data();
 
-    // Support both old format (only targets) and new format (with userAge, riskFreeRate, and withdrawalRate)
+    // Support both old format (only targets) and new format (with userAge, riskFreeRate, withdrawalRate, and plannedAnnualExpenses)
     return {
       userAge: data.userAge,
       riskFreeRate: data.riskFreeRate,
       withdrawalRate: data.withdrawalRate,
+      plannedAnnualExpenses: data.plannedAnnualExpenses,
       targets: data.targets as AssetAllocationTarget,
     };
   } catch (error) {
@@ -60,6 +61,7 @@ export async function setSettings(
       userAge: settings.userAge,
       riskFreeRate: settings.riskFreeRate,
       withdrawalRate: settings.withdrawalRate,
+      plannedAnnualExpenses: settings.plannedAnnualExpenses,
       targets: settings.targets,
       updatedAt: Timestamp.now(),
     });
