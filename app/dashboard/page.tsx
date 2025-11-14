@@ -16,6 +16,7 @@ import {
 } from '@/lib/services/chartService';
 import { getUserSnapshots, calculateMonthlyChange, calculateYearlyChange } from '@/lib/services/snapshotService';
 import { getExpenseStats } from '@/lib/services/expenseService';
+import { updateHallOfFame } from '@/lib/services/hallOfFameService';
 import { ExpenseStats } from '@/types/expenses';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PieChart as PieChartComponent } from '@/components/ui/pie-chart';
@@ -185,6 +186,15 @@ export default function DashboardPage() {
 
       if (result.success) {
         toast.success(result.message);
+
+        // Update Hall of Fame after successful snapshot creation
+        try {
+          await updateHallOfFame(user.uid);
+          console.log('Hall of Fame updated successfully');
+        } catch (error) {
+          console.error('Error updating Hall of Fame:', error);
+          // Don't show error to user - Hall of Fame update is non-critical
+        }
       } else {
         toast.error(result.error || 'Errore nella creazione dello snapshot');
       }

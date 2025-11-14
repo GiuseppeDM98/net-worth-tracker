@@ -108,6 +108,20 @@ service cloud.firestore {
       allow delete: if isOwner(resource.data.userId);
     }
 
+    // Collezione hall-of-fame - ranking personali dell'utente
+    match /hall-of-fame/{userId} {
+      // Lettura: solo il proprietario può leggere i propri ranking
+      allow read: if isOwner(userId);
+
+      // Scrittura: solo il proprietario può aggiornare i propri ranking
+      // (il document ID è uguale all'userId)
+      allow create, update: if isOwner(userId) &&
+                               request.resource.data.userId == userId;
+
+      // Cancellazione: solo il proprietario
+      allow delete: if isOwner(userId);
+    }
+
     // Blocca tutto il resto per sicurezza
     match /{document=**} {
       allow read, write: if false;

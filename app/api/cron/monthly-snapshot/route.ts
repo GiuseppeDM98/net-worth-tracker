@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
+import { updateHallOfFame } from '@/lib/services/hallOfFameService';
 
 export async function GET(request: NextRequest) {
   try {
@@ -50,6 +51,15 @@ export async function GET(request: NextRequest) {
         const snapshotResult = await snapshotResponse.json();
 
         if (snapshotResult.success) {
+          // Update Hall of Fame after successful snapshot creation
+          try {
+            await updateHallOfFame(userId);
+            console.log(`Hall of Fame updated for user ${userId}`);
+          } catch (hallOfFameError) {
+            console.error(`Error updating Hall of Fame for user ${userId}:`, hallOfFameError);
+            // Don't fail the snapshot creation if Hall of Fame update fails
+          }
+
           results.push({
             userId,
             snapshotId: snapshotResult.snapshotId,

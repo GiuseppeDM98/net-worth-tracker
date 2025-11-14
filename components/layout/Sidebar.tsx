@@ -12,6 +12,7 @@ import {
   Receipt,
   BarChart3,
   Flame,
+  Trophy,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -28,6 +29,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     { name: 'Assets', href: '/dashboard/assets', icon: Wallet },
     { name: 'Allocation', href: '/dashboard/allocation', icon: PieChart },
     { name: 'History', href: '/dashboard/history', icon: History },
+    { name: 'Hall of Fame', href: '/dashboard/hall-of-fame', icon: Trophy },
     { name: 'FIRE', href: '/dashboard/fire', icon: Flame },
     { name: 'Tracciamento Spese', href: '/dashboard/expenses', icon: Receipt },
     { name: `Cashflow ${currentYear}`, href: '/dashboard/expense-charts', icon: BarChart3 },

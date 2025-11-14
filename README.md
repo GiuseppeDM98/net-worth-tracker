@@ -11,7 +11,8 @@ This application serves as a complete financial management system designed for s
 - Make data-driven rebalancing decisions
 - **Track income and expenses with custom categories**
 - **Analyze spending patterns with visual charts**
-- Track progress toward Financial Independence / Retire Early (FIRE) goals
+- **Calculate and track progress toward Financial Independence / Retire Early (FIRE) goals with Safe Withdrawal Rate analysis**
+- **Compare personal financial records with Hall of Fame rankings**
 
 The app prioritizes:
 - **Accuracy**: Automated price updates from reliable sources
@@ -109,6 +110,13 @@ Portfolio allocation tracking with two-level hierarchy:
   - Total Expenses this month
   - Net Balance (income - expenses)
   - Transaction count by type
+- **Month/Year Filtering**:
+  - Filter expenses by specific year (dropdown with all available years)
+  - Filter by specific month within a year
+  - "All" option to view complete history
+  - Statistics update dynamically based on active filters
+  - Cascading filters (month selector enabled only when year is selected)
+  - Table title changes to reflect current filter (e.g., "Voci di Novembre 2025")
 
 #### Recurring Expenses (Debts)
 - **Automatic Creation**: Generate N months of recurring expenses in one action
@@ -239,6 +247,74 @@ Summary metrics displayed prominently:
 - **Expense Categories**: Full CRUD for income/expense categories
 - **Category Organization**: Grouped by expense type with visual indicators
 
+### 9. 🔥 FIRE Tracker & Calculator
+**Complete Financial Independence tracking and retirement planning.**
+
+#### FIRE Metrics (`/dashboard/fire`)
+- **Safe Withdrawal Rate Configuration**: Set your target withdrawal rate (default 4% based on Trinity Study)
+- **Planned Annual Expenses**: Optional input for future retirement expense planning
+- **Current Metrics** (based on actual year-to-date expenses):
+  - **FIRE Number**: Target net worth needed for financial independence (Annual Expenses ÷ Withdrawal Rate)
+  - **Progress to FI**: Percentage toward financial independence goal
+  - **Annual/Monthly/Daily Allowance**: Sustainable withdrawal amounts based on current net worth
+  - **Current Withdrawal Rate**: Actual expense ratio vs net worth (real spending vs 4% rule)
+  - **Years of Expenses**: Portfolio longevity at current spending level
+- **Planned Metrics** (if planned expenses set):
+  - **Planned FIRE Number**: Target based on projected retirement expenses
+  - **Planned Progress**: Comparison with planned scenario
+  - **Side-by-side comparison** of current vs planned scenarios
+  - **Gap Analysis**: How much less you need if reducing expenses
+- **Historical Evolution Chart**:
+  - Income, Expenses, and Monthly Allowance trends over time
+  - Visual tracking of FIRE progress month-by-month
+  - Identify periods where expenses exceeded allowance
+- **Educational Info Box**: Explains FIRE concepts, Trinity Study, Safe Withdrawal Rate methodology
+- **Database Integration**:
+  - Withdrawal rate stored in `assetAllocationTargets` collection
+  - Planned expenses persisted across sessions
+  - Automatic recalculation when creating new snapshots
+- **Calculations**:
+  - FIRE Number = Annual Expenses ÷ Withdrawal Rate
+  - Progress = Current Net Worth ÷ FIRE Number × 100
+  - Monthly Allowance = Net Worth × (Withdrawal Rate ÷ 12)
+  - Current WR = (Annual Expenses ÷ Net Worth) × 100
+
+### 10. 🏆 Hall of Fame
+**Personal financial rankings showcasing your best and worst months/years.**
+
+#### Monthly Rankings (`/dashboard/hall-of-fame`)
+- **Top 20 Best Months**:
+  - **Highest Net Worth Growth**: Months with largest € increase vs previous month
+  - **Highest Income**: Months with maximum income earned
+- **Top 20 Worst Months**:
+  - **Largest Net Worth Decline**: Months with biggest € decrease (market crashes, major expenses)
+  - **Highest Expenses**: Months with maximum spending
+- **Format**: Ranked tables showing:
+  - Rank (1-20)
+  - Month/Year (MM/YYYY format, e.g., "11/2025")
+  - Value (€ formatted with Italian locale)
+
+#### Yearly Rankings
+- **Top 10 Best Years**:
+  - **Highest Net Worth Growth**: Years with largest annual increase (Dec 31 - Jan 1)
+  - **Highest Income**: Years with maximum total income
+- **Top 10 Worst Years**:
+  - **Largest Net Worth Decline**: Years with biggest annual decrease
+  - **Highest Expenses**: Years with maximum total spending
+- **Automatic Calculation**:
+  - Updated automatically when creating new monthly snapshots
+  - Calculates from all historical snapshots and expenses
+  - Stored in Firestore `hall-of-fame` collection (one document per user)
+- **Visual Indicators**:
+  - Green cards with TrendingUp icons for achievements
+  - Red cards with TrendingDown icons for challenges
+  - Trophy icon in page header
+- **Motivation & Insights**:
+  - Track personal financial records over time
+  - Identify spending/earning patterns
+  - Compare current performance with historical bests
+  - Empty state message if < 2 snapshots available
+
 ## Technical Architecture
 
 ### Technology Stack
@@ -298,6 +374,8 @@ assetAllocationTargets/
       - userId: string
       - userAge?: number
       - riskFreeRate?: number
+      - withdrawalRate?: number (Safe Withdrawal Rate for FIRE, default 4%)
+      - plannedAnnualExpenses?: number (planned retirement expenses in €)
       - targets: {
           equity: {
             targetPercentage: number
@@ -359,6 +437,35 @@ monthlySnapshots/
       - byAsset: Array<{ assetId, ticker, name, quantity, price, totalValue }>
       - assetAllocation: { equity: %, bonds: %, ... }
       - createdAt: timestamp
+
+hall-of-fame/
+  └─ {userId}/
+      - userId: string
+      - bestMonthsByNetWorthGrowth: Array<MonthlyRecord> (top 20)
+      - bestMonthsByIncome: Array<MonthlyRecord> (top 20)
+      - worstMonthsByNetWorthDecline: Array<MonthlyRecord> (top 20)
+      - worstMonthsByExpenses: Array<MonthlyRecord> (top 20)
+      - bestYearsByNetWorthGrowth: Array<YearlyRecord> (top 10)
+      - bestYearsByIncome: Array<YearlyRecord> (top 10)
+      - worstYearsByNetWorthDecline: Array<YearlyRecord> (top 10)
+      - worstYearsByExpenses: Array<YearlyRecord> (top 10)
+      - updatedAt: timestamp
+
+      MonthlyRecord: {
+        year: number,
+        month: number (1-12),
+        monthYear: string (MM/YYYY format),
+        netWorthDiff: number (€ change vs previous month),
+        totalIncome: number (€ income for month),
+        totalExpenses: number (€ expenses for month)
+      }
+
+      YearlyRecord: {
+        year: number,
+        netWorthDiff: number (€ change from Jan 1 to Dec 31),
+        totalIncome: number (€ total income for year),
+        totalExpenses: number (€ total expenses for year)
+      }
 ```
 
 ### Key Design Decisions
@@ -475,9 +582,12 @@ app/
 │   │   └── page.tsx            # Cashflow current year (4 charts) ✅
 │   ├── expense-charts-total/
 │   │   └── page.tsx            # Cashflow all time (4 charts) ✅
-│   ├── settings/
-│   │   └── page.tsx            # Allocation + expense categories ✅
-│   └── fire/page.tsx           # FIRE tracker (future)
+│   ├── fire/
+│   │   └── page.tsx            # FIRE calculator & progress tracker ✅
+│   ├── hall-of-fame/
+│   │   └── page.tsx            # Personal financial rankings ✅
+│   └── settings/
+│       └── page.tsx            # Allocation + expense categories ✅
 └── api/
     ├── prices/
     │   ├── update/route.ts     # Batch price update ✅
@@ -492,7 +602,7 @@ app/
 ```
 Layout ✅
 ├── Header (user menu, logo)
-├── Sidebar (navigation with 8 pages)
+├── Sidebar (navigation with 10 pages)
 └── Main Content
     ├── Dashboard ✅
     │   ├── SummaryCard (x7: portfolio, variations, expenses)
@@ -611,6 +721,20 @@ Layout ✅
 - `addSubCategory(categoryId, name)`: Add sub-category
 - `removeSubCategory(categoryId, subCategoryId)`: Remove sub-category
 - `updateSubCategory(categoryId, subCategoryId, name)`: Rename sub-category
+
+#### `fireService.ts` ✅
+- `getAnnualExpenses(userId)`: Calculate current year expenses (Jan 1 - Dec 31)
+- `getAnnualIncome(userId)`: Calculate current year income (Jan 1 - today)
+- `calculateFIREMetrics(netWorth, annualExpenses, withdrawalRate)`: Compute FIRE Number, Progress, Allowances, Years of Expenses
+- `calculatePlannedFIREMetrics(netWorth, plannedExpenses, withdrawalRate)`: Planned scenario metrics
+- `prepareFIREChartData(userId, snapshots, withdrawalRate)`: Format historical FIRE evolution data for charts
+- `getFIREData(userId, netWorth, withdrawalRate)`: Complete FIRE data package with current and planned metrics
+
+#### `hallOfFameService.ts` ✅
+- `getHallOfFameData(userId)`: Fetch user's Hall of Fame rankings from Firestore
+- `updateHallOfFame(userId)`: Recalculate and update all rankings (called after snapshot creation)
+- `calculateMonthlyRecords(snapshots, expenses)`: Generate monthly rankings from historical data
+- `calculateYearlyRecords(snapshots, expenses)`: Generate yearly rankings, aggregate full-year data
 
 #### `chartService.ts` ✅
 - `prepareAssetDistributionData(assets)`: Format for asset pie (top 10 + others)
@@ -732,6 +856,35 @@ Layout ✅
 5. Set quantity and price
 6. System calculates allocation across multiple classes automatically
 
+### Tracking FIRE Progress
+1. User logs in and navigates to **"FIRE"** page
+2. First-time setup:
+   - Set **Safe Withdrawal Rate**: 4.0% (Trinity Study recommendation)
+   - Optionally set **Planned Annual Expenses**: €25,000 (retirement budget estimate)
+   - Click **"Salva Impostazioni"**
+3. Review **Current Metrics** (based on actual year-to-date expenses):
+   - Current Net Worth: €193,207
+   - Annual Expenses (current year): €28,800
+   - **FIRE Number**: €720,000 (€28,800 ÷ 0.04)
+   - **Progress to FI**: 26.8%
+   - **Monthly Allowance**: €643.36 (what you could sustainably withdraw each month)
+   - **Current Withdrawal Rate**: 14.9% (currently living above 4% rule)
+   - **Years of Expenses**: 6.7 years of runway
+4. Review **Planned Metrics** (if planned expenses set):
+   - **Planned FIRE Number**: €625,000 (€25,000 ÷ 0.04)
+   - **Planned Progress**: 30.9% (closer to goal with reduced expenses!)
+   - **Difference**: €95,000 less capital needed if reducing expenses to €25k/year
+5. Analyze **Historical Evolution Chart**:
+   - See how monthly allowance has grown over time
+   - Compare income vs expenses trends month-by-month
+   - Identify months where expenses exceeded sustainable allowance
+6. **Action Plan**: Need to accumulate €526,793 more (or reduce expenses to €25k/year target)
+7. Navigate to **"Hall of Fame"** to:
+   - Review best months by income for motivation
+   - Identify worst months by expenses to spot problem areas
+   - Track personal financial records over time
+8. Return monthly to track progress as net worth grows
+
 ## Localization & Formatting
 
 ### Italian Standards
@@ -846,6 +999,14 @@ match /expenseCategories/{categoryId} {
   allow read, write: if request.auth.uid == resource.data.userId;
 }
 
+// Hall of Fame - personal rankings belong to users
+match /hall-of-fame/{userId} {
+  allow read: if request.auth.uid == userId;
+  allow create, update: if request.auth.uid == userId &&
+                           request.resource.data.userId == userId;
+  allow delete: if request.auth.uid == userId;
+}
+
 // Price history readable by all authenticated users
 // Only backend can write (via Admin SDK)
 match /priceHistory/{document} {
@@ -917,6 +1078,10 @@ NEXT_PUBLIC_FIREBASE_APP_ID=
 FIREBASE_ADMIN_PROJECT_ID=
 FIREBASE_ADMIN_CLIENT_EMAIL=
 FIREBASE_ADMIN_PRIVATE_KEY=
+
+# Cron Job Configuration
+CRON_SECRET=your_secure_random_string_here
+NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
 ```
 
 ### Cron Jobs (Vercel Cron)
@@ -978,15 +1143,39 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
 - [x] Integration in main dashboard
 - [x] Settings page for category management
 
-### 🔄 Phase 4: FIRE Tracking (FUTURE)
-- [ ] FIRE target configuration
-- [ ] Years to FIRE calculator
-- [ ] Withdrawal rate calculator (4% rule)
-- [ ] Scenario modeling (different savings rates)
-- [ ] Progress visualization
-- [ ] Retirement spending projections
+### ✅ Phase 4: FIRE Tracking (COMPLETED)
+- [x] FIRE target configuration (Safe Withdrawal Rate)
+- [x] Planned annual expenses input (optional planning)
+- [x] FIRE Number calculator (25x annual expenses formula)
+- [x] Progress to FI percentage tracker
+- [x] Withdrawal rate calculator (4% rule implementation)
+- [x] Annual/Monthly/Daily allowance calculations
+- [x] Current Withdrawal Rate vs target comparison
+- [x] Years of expenses coverage calculator
+- [x] Planned vs Actual FIRE scenario comparison
+- [x] Historical evolution chart (Income, Expenses, Allowance)
+- [x] Integration with Settings page
+- [x] Educational info about FIRE methodology (Trinity Study)
 
-### 🔄 Phase 5: Advanced Features (FUTURE)
+### ✅ Phase 5: Hall of Fame (COMPLETED)
+- [x] Monthly rankings system (Top 20)
+  - [x] Best months by Net Worth growth
+  - [x] Best months by Income
+  - [x] Worst months by Net Worth decline
+  - [x] Worst months by Expenses
+- [x] Yearly rankings system (Top 10)
+  - [x] Best years by Net Worth growth
+  - [x] Best years by Income
+  - [x] Worst years by Net Worth decline
+  - [x] Worst years by Expenses
+- [x] Automatic calculation from snapshots and expenses
+- [x] Persistent storage in Firestore (`hall-of-fame` collection)
+- [x] Visual ranking tables with color-coded cards
+- [x] Trophy icon UI elements
+- [x] Empty state handling (< 2 snapshots)
+- [x] Firestore security rules for hall-of-fame collection
+
+### 🔄 Phase 6: Advanced Features (FUTURE)
 - [ ] CSV/Excel import for bulk asset additions
 - [ ] PDF export of portfolio reports
 - [ ] Email notifications (monthly summary)
@@ -995,7 +1184,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
 - [ ] Dividend tracking
 - [ ] Cost basis tracking (average cost per share)
 
-### 🔄 Phase 6: Portfolio Analysis (FUTURE)
+### 🔄 Phase 7: Portfolio Analysis (FUTURE)
 - [ ] Performance metrics (ROI, IRR, CAGR)
 - [ ] Risk metrics (Sharpe ratio, volatility, max drawdown)
 - [ ] Correlation analysis between assets
@@ -1094,11 +1283,17 @@ Client Component → fetch('/api/prices/quote') → Server Route → Yahoo Finan
 
 ---
 
-**Version**: 2.1.0 (Enhanced Analytics & YoY Tracking)
-**Last Updated**: January 2025
-**Status**: ✅ Phases 1-3 Complete - Production Ready
+**Version**: 2.2.0 (FIRE Calculator & Hall of Fame)
+**Last Updated**: November 2025
+**Status**: ✅ Phases 1-5 Complete - Production Ready
 
 **Recent Updates**:
+- ✅ **FIRE Calculator** with Safe Withdrawal Rate configuration
+- ✅ **Planned vs Actual FIRE scenarios** comparison
+- ✅ **Hall of Fame** personal rankings (monthly & yearly)
+- ✅ **Month/Year expense filtering** with cascading dropdowns
+- ✅ **Withdrawal rate storage** in user settings
+- ✅ **Historical FIRE evolution chart**
 - Default asset allocation (60/40) for new users
 - Year-to-Date variation tracking in Dashboard
 - Historical YoY bar chart in History page

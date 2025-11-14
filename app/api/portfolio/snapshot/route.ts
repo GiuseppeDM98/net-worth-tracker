@@ -117,6 +117,9 @@ export async function POST(request: NextRequest) {
     // Save snapshot
     await existingSnapshotRef.set(snapshotData);
 
+    // Note: Hall of Fame update is triggered from the client after successful snapshot creation
+    // See: app/dashboard/page.tsx createSnapshot function
+
     return NextResponse.json({
       success: true,
       message: existingSnapshot.exists
