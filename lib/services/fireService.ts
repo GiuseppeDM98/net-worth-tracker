@@ -30,14 +30,14 @@ export interface MonthlyFIREData {
 }
 
 /**
- * Calculate annual expenses for current year (January 1st to today)
+ * Calculate annual expenses for current year (January 1st to December 31st)
  */
 export async function getAnnualExpenses(userId: string): Promise<number> {
   try {
     const now = new Date();
     const currentYear = now.getFullYear();
     const startDate = new Date(currentYear, 0, 1); // January 1st
-    const endDate = now;
+    const endDate = new Date(currentYear, 11, 31, 23, 59, 59, 999); // December 31st
 
     const expenses = await getExpensesByDateRange(userId, startDate, endDate);
     return calculateTotalExpenses(expenses);
