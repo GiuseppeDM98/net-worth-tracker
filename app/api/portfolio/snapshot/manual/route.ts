@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { Timestamp } from 'firebase-admin/firestore';
+import { updateHallOfFame } from '@/lib/services/hallOfFameService.server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -98,6 +99,15 @@ export async function POST(request: NextRequest) {
 
     // Save to Firestore
     await adminDb.collection('monthly-snapshots').doc(snapshotId).set(snapshot);
+
+    // Update Hall of Fame rankings
+    try {
+      await updateHallOfFame(userId);
+      console.log('Hall of Fame updated successfully after manual snapshot');
+    } catch (error) {
+      console.error('Error updating Hall of Fame:', error);
+      // Don't fail the request if Hall of Fame update fails
+    }
 
     return NextResponse.json({
       success: true,

@@ -39,6 +39,14 @@ import {
 } from 'recharts';
 import { getAssetClassColor } from '@/lib/constants/colors';
 
+const getMonthName = (month: number): string => {
+  const months = [
+    'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+    'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
+  ];
+  return months[month - 1];
+};
+
 export default function HistoryPage() {
   const { user } = useAuth();
   const [snapshots, setSnapshots] = useState<MonthlySnapshot[]>([]);
@@ -776,16 +784,18 @@ export default function HistoryPage() {
                   key={`${snapshot.year}-${snapshot.month}`}
                   className="rounded-lg border p-4"
                 >
-                  <div className="text-sm font-medium text-gray-500">
-                    {snapshot.createdAt.toLocaleString('it-IT', {
+                  <div className="text-lg font-semibold">
+                    {getMonthName(snapshot.month)} {snapshot.year}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Creato il: {snapshot.createdAt.toLocaleString('it-IT', {
                       day: '2-digit',
                       month: '2-digit',
-                      year: 'numeric',
                       hour: '2-digit',
                       minute: '2-digit'
                     })}
                   </div>
-                  <div className="mt-2">
+                  <div className="mt-3">
                     <div className="text-lg font-bold">
                       {formatCurrency(snapshot.totalNetWorth)}
                     </div>
