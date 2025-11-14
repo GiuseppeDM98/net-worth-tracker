@@ -19,6 +19,16 @@ export interface FIREMetrics {
   yearsOfExpenses: number; // Anni di spesa
 }
 
+export interface PlannedFIREMetrics {
+  // Input values
+  plannedAnnualExpenses: number;
+  withdrawalRate: number;
+
+  // Calculated values
+  plannedFireNumber: number;
+  plannedProgressToFI: number; // Percentage
+}
+
 export interface MonthlyFIREData {
   year: number;
   month: number;
@@ -107,6 +117,29 @@ export function calculateFIREMetrics(
     dailyAllowance,
     currentWR,
     yearsOfExpenses,
+  };
+}
+
+/**
+ * Calculate planned FIRE metrics based on user-provided planned annual expenses
+ */
+export function calculatePlannedFIREMetrics(
+  currentNetWorth: number,
+  plannedAnnualExpenses: number,
+  withdrawalRate: number
+): PlannedFIREMetrics {
+  // Planned FIRE Number = Planned Annual Expenses / Withdrawal Rate (as decimal)
+  const wrDecimal = withdrawalRate / 100;
+  const plannedFireNumber = wrDecimal > 0 ? plannedAnnualExpenses / wrDecimal : 0;
+
+  // Planned Progress to FI = (Current Net Worth / Planned FIRE Number) * 100
+  const plannedProgressToFI = plannedFireNumber > 0 ? (currentNetWorth / plannedFireNumber) * 100 : 0;
+
+  return {
+    plannedAnnualExpenses,
+    withdrawalRate,
+    plannedFireNumber,
+    plannedProgressToFI,
   };
 }
 
