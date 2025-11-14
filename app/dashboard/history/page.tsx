@@ -19,8 +19,9 @@ import {
 import { Asset, MonthlySnapshot, AssetAllocationTarget } from '@/types/assets';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download } from 'lucide-react';
+import { Download, Plus } from 'lucide-react';
 import { toast } from 'sonner';
+import { CreateManualSnapshotModal } from '@/components/CreateManualSnapshotModal';
 import {
   LineChart,
   Line,
@@ -38,6 +39,14 @@ import {
 } from 'recharts';
 import { getAssetClassColor } from '@/lib/constants/colors';
 
+const getMonthName = (month: number): string => {
+  const months = [
+    'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+    'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
+  ];
+  return months[month - 1];
+};
+
 export default function HistoryPage() {
   const { user } = useAuth();
   const [snapshots, setSnapshots] = useState<MonthlySnapshot[]>([]);
@@ -47,6 +56,7 @@ export default function HistoryPage() {
   const [showAssetClassPercentage, setShowAssetClassPercentage] = useState(false);
   const [showLiquidityPercentage, setShowLiquidityPercentage] = useState(false);
   const [showYoYPercentage, setShowYoYPercentage] = useState(false);
+  const [showManualSnapshotModal, setShowManualSnapshotModal] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -306,14 +316,23 @@ export default function HistoryPage() {
             Analizza l'evoluzione del tuo patrimonio nel tempo
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={handleExportCSV}
-          disabled={snapshots.length === 0}
-        >
-          <Download className="mr-2 h-4 w-4" />
-          Esporta CSV
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setShowManualSnapshotModal(true)}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Inserisci Snapshot Passato
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleExportCSV}
+            disabled={snapshots.length === 0}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Esporta CSV
+          </Button>
+        </div>
       </div>
 
       {/* Net Worth History Chart */}
@@ -765,16 +784,18 @@ export default function HistoryPage() {
                   key={`${snapshot.year}-${snapshot.month}`}
                   className="rounded-lg border p-4"
                 >
-                  <div className="text-sm font-medium text-gray-500">
-                    {snapshot.createdAt.toLocaleString('it-IT', {
+                  <div className="text-lg font-semibold">
+                    {getMonthName(snapshot.month)} {snapshot.year}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Creato il: {snapshot.createdAt.toLocaleString('it-IT', {
                       day: '2-digit',
                       month: '2-digit',
-                      year: 'numeric',
                       hour: '2-digit',
                       minute: '2-digit'
                     })}
                   </div>
-                  <div className="mt-2">
+                  <div className="mt-3">
                     <div className="text-lg font-bold">
                       {formatCurrency(snapshot.totalNetWorth)}
                     </div>
@@ -788,6 +809,13 @@ export default function HistoryPage() {
           </CardContent>
         </Card>
       )}
+
+      <CreateManualSnapshotModal
+        open={showManualSnapshotModal}
+        onOpenChange={setShowManualSnapshotModal}
+        userId={user?.uid || ''}
+        onSuccess={loadData}
+      />
     </div>
   );
 }

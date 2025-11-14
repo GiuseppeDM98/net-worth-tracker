@@ -6,12 +6,15 @@ import { HallOfFameData, MonthlyRecord, YearlyRecord } from '@/types/hall-of-fam
 import { getHallOfFameData } from '@/lib/services/hallOfFameService';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Trophy, TrendingUp, TrendingDown, DollarSign, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Trophy, TrendingUp, TrendingDown, DollarSign, Loader2, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function HallOfFamePage() {
   const { user } = useAuth();
   const [data, setData] = useState<HallOfFameData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [recalculating, setRecalculating] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -30,6 +33,35 @@ export default function HallOfFamePage() {
       console.error('Error loading Hall of Fame data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRecalculate = async () => {
+    if (!user) return;
+
+    try {
+      setRecalculating(true);
+      const response = await fetch('/api/hall-of-fame/recalculate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: user.uid }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to recalculate Hall of Fame');
+      }
+
+      toast.success('Rankings aggiornati con successo!');
+
+      // Ricarica i dati
+      await loadData();
+    } catch (error) {
+      console.error('Error recalculating Hall of Fame:', error);
+      toast.error('Errore durante il ricalcolo dei rankings');
+    } finally {
+      setRecalculating(false);
     }
   };
 
@@ -68,6 +100,24 @@ export default function HallOfFamePage() {
               I tuoi migliori e peggiori record finanziari
             </p>
           </div>
+          <Button
+            onClick={handleRecalculate}
+            disabled={recalculating}
+            variant="outline"
+            className="gap-2"
+          >
+            {recalculating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Ricalcolo in corso...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4" />
+                Ricalcola Rankings
+              </>
+            )}
+          </Button>
         </div>
         <Card>
           <CardContent className="pt-6">
@@ -93,6 +143,24 @@ export default function HallOfFamePage() {
             I tuoi migliori e peggiori record finanziari
           </p>
         </div>
+        <Button
+          onClick={handleRecalculate}
+          disabled={recalculating}
+          variant="outline"
+          className="gap-2"
+        >
+          {recalculating ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Ricalcolo in corso...
+            </>
+          ) : (
+            <>
+              <RefreshCw className="h-4 w-4" />
+              Ricalcola Rankings
+            </>
+          )}
+        </Button>
       </div>
 
       {/* Ranking Mensili */}
