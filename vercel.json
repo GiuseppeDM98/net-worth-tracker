@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/monthly-snapshot",
-      "schedule": "0 20 28-31 * *"
+      "schedule": "0 22 * * *"
     }
   ]
 }
