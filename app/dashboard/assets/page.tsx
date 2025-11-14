@@ -21,7 +21,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, RefreshCw, Pencil, Trash2 } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Plus, RefreshCw, Pencil, Trash2, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { AssetDialog } from '@/components/assets/AssetDialog';
 import { format } from 'date-fns';
@@ -248,7 +254,27 @@ export default function AssetsPage() {
                           {formatCurrency(asset.currentPrice)}
                         </TableCell>
                         <TableCell className="text-right font-semibold">
-                          {formatCurrency(value)}
+                          {asset.assetClass === 'realestate' && asset.outstandingDebt && asset.outstandingDebt > 0 ? (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex items-center justify-end gap-1 cursor-help">
+                                    {formatCurrency(value)}
+                                    <Info className="h-3 w-3 text-gray-400" />
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <div className="text-xs space-y-1">
+                                    <p><strong>Valore lordo:</strong> {formatCurrency(asset.quantity * asset.currentPrice)}</p>
+                                    <p><strong>Debito residuo:</strong> {formatCurrency(asset.outstandingDebt)}</p>
+                                    <p><strong>Valore netto:</strong> {formatCurrency(value)}</p>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          ) : (
+                            formatCurrency(value)
+                          )}
                         </TableCell>
                         <TableCell>
                           {format(lastUpdate, 'dd/MM/yyyy HH:mm', {

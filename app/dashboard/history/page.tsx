@@ -11,7 +11,6 @@ import {
 } from '@/lib/services/assetAllocationService';
 import {
   prepareNetWorthHistoryData,
-  prepareAssetDistributionData,
   prepareAssetClassHistoryData,
   prepareYoYVariationData,
   formatCurrency,
@@ -22,7 +21,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import { toast } from 'sonner';
-import { PieChart as PieChartComponent } from '@/components/ui/pie-chart';
 import {
   LineChart,
   Line,
@@ -113,7 +111,6 @@ export default function HistoryPage() {
   };
 
   const netWorthHistory = prepareNetWorthHistoryData(snapshots);
-  const assetDistribution = prepareAssetDistributionData(assets);
   const assetClassHistory = prepareAssetClassHistoryData(snapshots);
   const yoyVariationData = prepareYoYVariationData(snapshots);
 
@@ -702,26 +699,8 @@ export default function HistoryPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Asset Distribution Pie Chart */}
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle>Distribuzione Asset Corrente</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {assetDistribution.length === 0 ? (
-              <div className="flex h-64 items-center justify-center text-gray-500">
-                Nessun asset presente. Aggiungi degli asset per vedere la
-                distribuzione.
-              </div>
-            ) : (
-              <PieChartComponent data={assetDistribution} />
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Current vs Target Comparison */}
-        <Card className="md:col-span-2">
+      {/* Current vs Target Comparison */}
+      <Card>
           <CardHeader>
             <CardTitle>Asset Class: Corrente vs Desiderata</CardTitle>
           </CardHeader>
@@ -773,7 +752,6 @@ export default function HistoryPage() {
             )}
           </CardContent>
         </Card>
-      </div>
 
       {snapshots.length > 0 && (
         <Card>
@@ -788,7 +766,13 @@ export default function HistoryPage() {
                   className="rounded-lg border p-4"
                 >
                   <div className="text-sm font-medium text-gray-500">
-                    {String(snapshot.month).padStart(2, '0')}/{snapshot.year}
+                    {snapshot.createdAt.toLocaleString('it-IT', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
                   </div>
                   <div className="mt-2">
                     <div className="text-lg font-bold">

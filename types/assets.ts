@@ -25,6 +25,7 @@ export interface Asset {
   isLiquid?: boolean; // Default: true - indica se l'asset è liquido o illiquido
   autoUpdatePrice?: boolean; // Default: true - indica se il prezzo deve essere aggiornato automaticamente via Yahoo Finance
   composition?: AssetComposition[]; // Per asset composti (es. fondi pensione)
+  outstandingDebt?: number; // Debito residuo per immobili (es. mutuo). Il valore netto = valore - debito residuo
   lastPriceUpdate: Date | Timestamp;
   createdAt: Date | Timestamp;
   updatedAt: Date | Timestamp;
@@ -44,6 +45,7 @@ export interface AssetFormData {
   isLiquid?: boolean;
   autoUpdatePrice?: boolean;
   composition?: AssetComposition[];
+  outstandingDebt?: number;
 }
 
 export interface SubCategoryConfig {

@@ -217,11 +217,11 @@ export function compareAllocations(
     const difference = currentPercentage - targetPercentage;
     const differenceValue = currentValue - targetValue;
 
-    // Determine action (threshold: ±1%)
+    // Determine action (threshold: ±100€)
     let action: 'COMPRA' | 'VENDI' | 'OK';
-    if (difference > 1) {
+    if (differenceValue > 100) {
       action = 'VENDI';
-    } else if (difference < -1) {
+    } else if (differenceValue < -100) {
       action = 'COMPRA';
     } else {
       action = 'OK';
@@ -258,9 +258,9 @@ export function compareAllocations(
         const subDifferenceValue = subCurrentValue - subTargetValue;
 
         let subAction: 'COMPRA' | 'VENDI' | 'OK';
-        if (subDifference > 1) {
+        if (subDifferenceValue > 100) {
           subAction = 'VENDI';
-        } else if (subDifference < -1) {
+        } else if (subDifferenceValue < -100) {
           subAction = 'COMPRA';
         } else {
           subAction = 'OK';

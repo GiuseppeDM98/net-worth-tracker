@@ -58,6 +58,7 @@ const assetSchema = z.object({
   isLiquid: z.boolean().optional(),
   autoUpdatePrice: z.boolean().optional(),
   isComposite: z.boolean().optional(),
+  outstandingDebt: z.number().nonnegative('Il debito non può essere negativo').optional().or(z.nan()),
 });
 
 type AssetFormValues = z.infer<typeof assetSchema>;
@@ -97,6 +98,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
   const [isAddingSubCategory, setIsAddingSubCategory] = useState(false);
   const [composition, setComposition] = useState<AssetComposition[]>([]);
   const [isComposite, setIsComposite] = useState(false);
+  const [hasOutstandingDebt, setHasOutstandingDebt] = useState(false);
   const {
     register,
     handleSubmit,
@@ -112,6 +114,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
       isLiquid: true,
       autoUpdatePrice: true,
       isComposite: false,
+      outstandingDebt: undefined,
     },
   });
 
@@ -192,6 +195,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         isLiquid: defaultIsLiquid,
         autoUpdatePrice: asset.autoUpdatePrice !== undefined ? asset.autoUpdatePrice : shouldUpdatePrice(asset.type, asset.subCategory),
         isComposite: !!(asset.composition && asset.composition.length > 0),
+        outstandingDebt: asset.outstandingDebt || undefined,
       });
 
       if (asset.composition && asset.composition.length > 0) {
@@ -201,6 +205,9 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         setComposition([]);
         setIsComposite(false);
       }
+
+      // Set hasOutstandingDebt state based on asset data
+      setHasOutstandingDebt(!!(asset.outstandingDebt && asset.outstandingDebt > 0));
     } else {
       reset({
         ticker: '',
@@ -215,9 +222,11 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         isLiquid: true,
         autoUpdatePrice: true,
         isComposite: false,
+        outstandingDebt: undefined,
       });
       setComposition([]);
       setIsComposite(false);
+      setHasOutstandingDebt(false);
     }
   }, [asset, reset]);
 
@@ -370,6 +379,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         isLiquid: data.isLiquid,
         autoUpdatePrice: data.autoUpdatePrice,
         composition: isComposite && composition.length > 0 ? composition : undefined,
+        outstandingDebt: data.outstandingDebt && !isNaN(data.outstandingDebt) && data.outstandingDebt > 0 ? data.outstandingDebt : undefined,
       };
 
       if (asset) {
@@ -738,6 +748,50 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
               </div>
             )}
           </div>
+
+          {/* Debito Residuo - solo per immobili */}
+          {selectedType === 'realestate' && selectedAssetClass === 'realestate' && (
+            <div className="space-y-2 rounded-lg border p-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="hasOutstandingDebt">Debito Residuo</Label>
+                  <p className="text-xs text-gray-500">
+                    Es. mutuo residuo sull&apos;immobile. Il valore netto sarà: valore - debito
+                  </p>
+                </div>
+                <Switch
+                  id="hasOutstandingDebt"
+                  checked={hasOutstandingDebt}
+                  onCheckedChange={(checked) => {
+                    setHasOutstandingDebt(checked);
+                    if (!checked) {
+                      setValue('outstandingDebt', undefined);
+                    }
+                  }}
+                />
+              </div>
+
+              {hasOutstandingDebt && (
+                <div className="mt-4 space-y-2">
+                  <Label htmlFor="outstandingDebt">Importo Debito Residuo ({watch('currency')})</Label>
+                  <Input
+                    id="outstandingDebt"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    {...register('outstandingDebt', { valueAsNumber: true })}
+                    placeholder="es. 150000"
+                  />
+                  {errors.outstandingDebt && (
+                    <p className="text-sm text-red-500">{errors.outstandingDebt.message}</p>
+                  )}
+                  <p className="text-xs text-gray-500">
+                    Il valore netto dell&apos;immobile sarà calcolato come: valore lordo - debito residuo
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {shouldUpdatePrice(selectedType, selectedSubCategory) && (
             <div className="space-y-2">

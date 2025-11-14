@@ -197,9 +197,17 @@ export async function deleteAsset(assetId: string): Promise<void> {
 
 /**
  * Calculate total value of an asset
+ * Per immobili con debito residuo: valore netto = valore lordo - debito
  */
 export function calculateAssetValue(asset: Asset): number {
-  return asset.quantity * asset.currentPrice;
+  const baseValue = asset.quantity * asset.currentPrice;
+
+  // Se è un immobile con debito residuo, sottrai il debito
+  if (asset.assetClass === 'realestate' && asset.outstandingDebt) {
+    return Math.max(0, baseValue - asset.outstandingDebt);
+  }
+
+  return baseValue;
 }
 
 /**
