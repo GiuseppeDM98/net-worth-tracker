@@ -22,10 +22,11 @@ export async function getSettings(
 
     const data = targetDoc.data();
 
-    // Support both old format (only targets) and new format (with userAge and riskFreeRate)
+    // Support both old format (only targets) and new format (with userAge, riskFreeRate, and withdrawalRate)
     return {
       userAge: data.userAge,
       riskFreeRate: data.riskFreeRate,
+      withdrawalRate: data.withdrawalRate,
       targets: data.targets as AssetAllocationTarget,
     };
   } catch (error) {
@@ -58,6 +59,7 @@ export async function setSettings(
       userId,
       userAge: settings.userAge,
       riskFreeRate: settings.riskFreeRate,
+      withdrawalRate: settings.withdrawalRate,
       targets: settings.targets,
       updatedAt: Timestamp.now(),
     });
