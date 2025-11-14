@@ -68,6 +68,7 @@ export interface AssetAllocationTarget {
 export interface AssetAllocationSettings {
   userAge?: number;
   riskFreeRate?: number;
+  withdrawalRate?: number; // Safe withdrawal rate for FIRE calculations (e.g., 4.0 for 4%)
   targets: AssetAllocationTarget;
 }
 
