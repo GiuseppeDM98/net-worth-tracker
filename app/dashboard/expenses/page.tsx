@@ -29,12 +29,13 @@ const MONTHS = [
 
 export default function ExpensesPage() {
   const { user } = useAuth();
+  const currentYear = new Date().getFullYear();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [allExpenses, setAllExpenses] = useState<Expense[]>([]); // Keep all expenses for year calculation
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const [selectedYear, setSelectedYear] = useState<string>('all');
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
 
   // Generate available years from ALL expenses (not filtered)
@@ -50,19 +51,36 @@ export default function ExpensesPage() {
     return uniqueYears;
   }, [allExpenses]);
 
-  const handleYearChange = (value: string) => {
-    setSelectedYear(value);
-    // Reset month when "all" is selected for year
-    if (value === 'all') {
-      setSelectedMonth('all');
-    }
+  const handleYearChange = (year: number) => {
+    setSelectedYear(year);
+    // Reset month when changing year
+    setSelectedMonth('all');
   };
 
+  // Load all expenses in background to get available years
+  useEffect(() => {
+    if (user) {
+      loadAllExpensesForYears();
+    }
+  }, [user]);
+
+  // Load filtered expenses based on selected year and month
   useEffect(() => {
     if (user) {
       loadExpenses();
     }
   }, [user, selectedYear, selectedMonth]);
+
+  const loadAllExpensesForYears = async () => {
+    if (!user) return;
+
+    try {
+      const data = await getAllExpenses(user.uid);
+      setAllExpenses(data);
+    } catch (error) {
+      console.error('Error loading all expenses for years:', error);
+    }
+  };
 
   const loadExpenses = async () => {
     if (!user) return;
@@ -71,19 +89,14 @@ export default function ExpensesPage() {
       setLoading(true);
       let data: Expense[];
 
-      if (selectedYear !== 'all' && selectedMonth !== 'all') {
+      if (selectedMonth !== 'all') {
         // Filter by specific month and year
-        data = await getExpensesByMonth(user.uid, parseInt(selectedYear), parseInt(selectedMonth));
-      } else if (selectedYear !== 'all') {
-        // Filter by year only
-        const startDate = new Date(parseInt(selectedYear), 0, 1);
-        const endDate = new Date(parseInt(selectedYear), 11, 31, 23, 59, 59);
-        data = await getExpensesByDateRange(user.uid, startDate, endDate);
+        data = await getExpensesByMonth(user.uid, selectedYear, parseInt(selectedMonth));
       } else {
-        // No filter, get all expenses
-        data = await getAllExpenses(user.uid);
-        // Update allExpenses only when loading everything
-        setAllExpenses(data);
+        // Filter by year only
+        const startDate = new Date(selectedYear, 0, 1);
+        const endDate = new Date(selectedYear, 11, 31, 23, 59, 59);
+        data = await getExpensesByDateRange(user.uid, startDate, endDate);
       }
 
       setExpenses(data);
@@ -114,14 +127,7 @@ export default function ExpensesPage() {
     // Reload filtered expenses
     await loadExpenses();
     // Also reload all expenses to update available years
-    if (user && (selectedYear !== 'all' || selectedMonth !== 'all')) {
-      try {
-        const allData = await getAllExpenses(user.uid);
-        setAllExpenses(allData);
-      } catch (error) {
-        console.error('Error reloading all expenses:', error);
-      }
-    }
+    await loadAllExpensesForYears();
   };
 
   const formatCurrency = (amount: number): string => {
@@ -154,7 +160,7 @@ export default function ExpensesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Tracciamento Spese</h1>
+          <h1 className="text-3xl font-bold">Tracciamento Spese {selectedYear}</h1>
           <p className="text-muted-foreground mt-1">
             Gestisci le tue entrate e uscite
           </p>
@@ -217,6 +223,29 @@ export default function ExpensesPage() {
         </Card>
       </div>
 
+      {/* Year Selection */}
+      {availableYears.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Seleziona Anno</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {availableYears.map(year => (
+                <Button
+                  key={year}
+                  variant={selectedYear === year ? "default" : "outline"}
+                  onClick={() => handleYearChange(year)}
+                  className="min-w-[100px]"
+                >
+                  {year}
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Filters */}
       <Card>
         <CardHeader>
@@ -228,28 +257,10 @@ export default function ExpensesPage() {
         <CardContent>
           <div className="flex flex-wrap gap-4">
             <div className="flex flex-col gap-2 min-w-[150px]">
-              <label className="text-sm font-medium">Anno</label>
-              <Select value={selectedYear} onValueChange={handleYearChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleziona anno" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tutti</SelectItem>
-                  {availableYears.map(year => (
-                    <SelectItem key={year} value={year.toString()}>
-                      {year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex flex-col gap-2 min-w-[150px]">
               <label className="text-sm font-medium">Mese</label>
               <Select
                 value={selectedMonth}
                 onValueChange={setSelectedMonth}
-                disabled={selectedYear === 'all'}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleziona mese" />
@@ -265,12 +276,11 @@ export default function ExpensesPage() {
               </Select>
             </div>
 
-            {(selectedYear !== 'all' || selectedMonth !== 'all') && (
+            {selectedMonth !== 'all' && (
               <div className="flex items-end">
                 <Button
                   variant="outline"
                   onClick={() => {
-                    setSelectedYear('all');
                     setSelectedMonth('all');
                   }}
                 >
@@ -286,13 +296,9 @@ export default function ExpensesPage() {
       <Card>
         <CardHeader>
           <CardTitle>
-            {selectedYear === 'all' && selectedMonth === 'all'
-              ? 'Tutte le Voci'
-              : selectedYear !== 'all' && selectedMonth !== 'all'
+            {selectedMonth !== 'all'
               ? `Voci di ${MONTHS.find(m => m.value === selectedMonth)?.label} ${selectedYear}`
-              : selectedYear !== 'all'
-              ? `Voci del ${selectedYear}`
-              : 'Tutte le Voci'}
+              : `Voci del ${selectedYear}`}
           </CardTitle>
         </CardHeader>
         <CardContent>
