@@ -111,12 +111,15 @@ Portfolio allocation tracking with two-level hierarchy:
   - Net Balance (income - expenses)
   - Transaction count by type
 - **Month/Year Filtering**:
-  - Filter expenses by specific year (dropdown with all available years)
-  - Filter by specific month within a year
-  - "All" option to view complete history
-  - Statistics update dynamically based on active filters
-  - Cascading filters (month selector enabled only when year is selected)
-  - Table title changes to reflect current filter (e.g., "Voci di Novembre 2025")
+  - **Default view**: Shows current year expenses automatically on page load
+  - **Year selection**: Interactive buttons for each available year (sorted descending)
+  - Filter by specific month within selected year (dropdown with Italian month names)
+  - "Tutti" option to view all expenses for the entire year
+  - Statistics cards update dynamically based on active filters (year + month)
+  - **Automatic month reset**: Changing year automatically resets month filter to "Tutti"
+  - **Dynamic page title**: Shows selected year in header (e.g., "Tracciamento Spese 2025")
+  - **Dynamic table title**: Changes to reflect active filters (e.g., "Voci di Novembre 2025" or "Voci del 2025")
+  - **Performance optimization**: Loads all expenses in background for year calculation, displays only filtered data
 
 #### Recurring Expenses (Debts)
 - **Automatic Creation**: Generate N months of recurring expenses in one action
@@ -785,17 +788,22 @@ Layout ✅
    - Expenses: €2,100 (-3% from last month ✅)
    - Net balance: +€1,400
 3. Navigate to **"Tracciamento Spese"**
-4. Review all transactions:
-   - Filter by date range
-   - Sort by amount
-   - Check category breakdown
-5. Navigate to **"Grafici Spese"**
-6. Analyze spending patterns:
+4. Page automatically displays current year (2025) expenses
+5. Review transactions with filtering:
+   - Use year buttons to switch between years (if available)
+   - Select specific month from dropdown (Gennaio, Febbraio, etc.)
+   - View "Tutti" to see all months for selected year
+   - Statistics cards update automatically based on filters
+6. Sort and analyze:
+   - Sort by amount, category, or date
+   - Check category breakdown in table
+7. Navigate to **"Grafici Spese"**
+8. Analyze spending patterns:
    - **Expenses by Category**: Alimentari (€600), Trasporti (€300), Intrattenimento (€200)
    - **Monthly Trend**: Compare last 12 months, identify anomalies
    - **Expenses by Type**: Fixed 45%, Variable 40%, Debts 15%
-7. Identify areas to reduce spending
-8. Adjust next month's budget mentally
+9. Identify areas to reduce spending
+10. Adjust next month's budget mentally
 
 ### Setting Up Recurring Debt (Mortgage)
 1. Navigate to **Settings**
