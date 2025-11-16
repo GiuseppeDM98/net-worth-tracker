@@ -1,78 +1,78 @@
-# Configurazione Firebase su Vercel
+# Firebase Configuration on Vercel
 
-Questa guida spiega come configurare correttamente le credenziali Firebase Admin SDK su Vercel per risolvere l'errore "DECODER routines::unsupported".
+This guide explains how to properly configure Firebase Admin SDK credentials on Vercel to resolve the "DECODER routines::unsupported" error.
 
-## Problema
+## Problem
 
-Quando si usa Firebase Admin SDK su Vercel con variabili d'ambiente separate (`FIREBASE_ADMIN_PROJECT_ID`, `FIREBASE_ADMIN_CLIENT_EMAIL`, `FIREBASE_ADMIN_PRIVATE_KEY`), potresti incontrare errori di decodifica delle credenziali come:
+When using Firebase Admin SDK on Vercel with separate environment variables (`FIREBASE_ADMIN_PROJECT_ID`, `FIREBASE_ADMIN_CLIENT_EMAIL`, `FIREBASE_ADMIN_PRIVATE_KEY`), you may encounter credential decoding errors like:
 
 ```
 Error: 2 UNKNOWN: Getting metadata from plugin failed with error: error:1E08010C:DECODER routines::unsupported
 ```
 
-Questo accade perché i caratteri speciali nella chiave privata (in particolare i newline `\n`) possono essere gestiti in modo diverso su Vercel rispetto all'ambiente locale.
+This happens because special characters in the private key (especially newlines `\n`) can be handled differently on Vercel compared to the local environment.
 
-## Soluzione Raccomandata: Usa Service Account JSON Completo
+## Recommended Solution: Use Complete Service Account JSON
 
-### Passo 1: Ottieni il Service Account JSON da Firebase
+### Step 1: Get the Service Account JSON from Firebase
 
-1. Vai alla [Firebase Console](https://console.firebase.google.com/)
-2. Seleziona il tuo progetto
-3. Vai su **Impostazioni progetto** (icona ingranaggio) → **Account di servizio**
-4. Clicca su **Genera nuova chiave privata**
-5. Scarica il file JSON (es: `your-project-firebase-adminsdk.json`)
+1. Go to the [Firebase Console](https://console.firebase.google.com/)
+2. Select your project
+3. Go to **Project Settings** (gear icon) → **Service Accounts**
+4. Click **Generate New Private Key**
+5. Download the JSON file (e.g., `your-project-firebase-adminsdk.json`)
 
-### Passo 2: Configura la Variabile d'Ambiente su Vercel
+### Step 2: Configure the Environment Variable on Vercel
 
-1. Vai al tuo progetto su [Vercel Dashboard](https://vercel.com/dashboard)
-2. Vai su **Settings** → **Environment Variables**
-3. Aggiungi una nuova variabile:
-   - **Nome**: `FIREBASE_SERVICE_ACCOUNT_KEY`
-   - **Valore**: Copia e incolla **l'intero contenuto** del file JSON scaricato
-   - Il valore dovrebbe assomigliare a questo:
+1. Go to your project on [Vercel Dashboard](https://vercel.com/dashboard)
+2. Go to **Settings** → **Environment Variables**
+3. Add a new variable:
+   - **Name**: `FIREBASE_SERVICE_ACCOUNT_KEY`
+   - **Value**: Copy and paste the **entire contents** of the downloaded JSON file
+   - The value should look like this:
      ```json
      {"type":"service_account","project_id":"your-project-id","private_key_id":"...","private_key":"-----BEGIN PRIVATE KEY-----\n...","client_email":"...","client_id":"...","auth_uri":"...","token_uri":"...","auth_provider_x509_cert_url":"...","client_x509_cert_url":"..."}
      ```
-   - **Environment**: Seleziona Production, Preview, e Development
-4. Clicca su **Save**
+   - **Environment**: Select Production, Preview, and Development
+4. Click **Save**
 
-### Passo 3: Redeploy
+### Step 3: Redeploy
 
-1. Vai alla tab **Deployments**
-2. Clicca sui tre puntini del deployment più recente
-3. Seleziona **Redeploy**
-4. Conferma il redeploy
+1. Go to the **Deployments** tab
+2. Click the three dots on the most recent deployment
+3. Select **Redeploy**
+4. Confirm the redeploy
 
-## Soluzione Alternativa: Usa Variabili Separate (Solo per Local Development)
+## Alternative Solution: Use Separate Variables (Local Development Only)
 
-Se preferisci usare variabili d'ambiente separate per lo sviluppo locale, assicurati di:
+If you prefer to use separate environment variables for local development, make sure to:
 
-1. Aggiungere le seguenti variabili nel tuo `.env.local`:
+1. Add the following variables to your `.env.local`:
    ```env
    FIREBASE_ADMIN_PROJECT_ID=your_project_id
    FIREBASE_ADMIN_CLIENT_EMAIL=your_service_account_email@your-project.iam.gserviceaccount.com
    FIREBASE_ADMIN_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYour private key here\n-----END PRIVATE KEY-----\n"
    ```
 
-2. **IMPORTANTE**: La `FIREBASE_ADMIN_PRIVATE_KEY` deve includere:
-   - Le virgolette doppie all'inizio e alla fine
-   - I caratteri `\n` letterali (non newline veri)
-   - L'intera chiave privata tra `-----BEGIN PRIVATE KEY-----` e `-----END PRIVATE KEY-----`
+2. **IMPORTANT**: The `FIREBASE_ADMIN_PRIVATE_KEY` must include:
+   - Double quotes at the beginning and end
+   - Literal `\n` characters (not actual newlines)
+   - The entire private key between `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----`
 
-## Verifica della Configurazione
+## Configuration Verification
 
-Dopo aver configurato le variabili d'ambiente e fatto il redeploy:
+After configuring environment variables and redeploying:
 
-1. Prova la funzionalità "Aggiorna Prezzi" dalla tua app deployata
-2. Prova la funzionalità "Crea Snapshot"
-3. Controlla i log su Vercel (Deployments → Seleziona il deployment → Functions) per eventuali errori
+1. Test the "Update Prices" functionality from your deployed app
+2. Test the "Create Snapshot" functionality
+3. Check Vercel logs (Deployments → Select deployment → Functions) for any errors
 
-## Altre Variabili d'Ambiente Necessarie
+## Other Required Environment Variables
 
-Non dimenticare di configurare anche:
+Don't forget to also configure:
 
 ```env
-# Firebase Client (pubbliche, possono essere visibili)
+# Firebase Client (public, can be visible)
 NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
@@ -80,7 +80,7 @@ NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
 NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
 
-# Cron Job Secret (per proteggere gli endpoint scheduled)
+# Cron Job Secret (to protect scheduled endpoints)
 CRON_SECRET=your_secure_random_string
 
 # App URL
@@ -89,25 +89,25 @@ NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
 
 ## Troubleshooting
 
-### L'errore persiste dopo il redeploy
+### Error persists after redeploy
 
-1. Verifica che la variabile `FIREBASE_SERVICE_ACCOUNT_KEY` contenga un JSON valido
-2. Assicurati che il JSON non abbia spazi o newline aggiuntivi
-3. Verifica che tutte le environment variables siano configurate per Production
-4. Prova a rimuovere le vecchie variabili `FIREBASE_ADMIN_*` per evitare conflitti
+1. Verify that the `FIREBASE_SERVICE_ACCOUNT_KEY` variable contains valid JSON
+2. Ensure the JSON has no extra spaces or newlines
+3. Verify that all environment variables are configured for Production
+4. Try removing old `FIREBASE_ADMIN_*` variables to avoid conflicts
 
-### Come verificare che il JSON sia valido
+### How to verify the JSON is valid
 
-Puoi usare [jsonlint.com](https://jsonlint.com/) per verificare che il JSON sia formattato correttamente.
+You can use [jsonlint.com](https://jsonlint.com/) to verify the JSON is formatted correctly.
 
-### Errore "Firebase Admin credentials not found"
+### Error "Firebase Admin credentials not found"
 
-Questo significa che né `FIREBASE_SERVICE_ACCOUNT_KEY` né le variabili individuali sono configurate. Segui i passi sopra per configurare almeno una delle due opzioni.
+This means neither `FIREBASE_SERVICE_ACCOUNT_KEY` nor individual variables are configured. Follow the steps above to configure at least one of the two options.
 
-## Sicurezza
+## Security
 
-⚠️ **IMPORTANTE**:
-- Non committare mai il file JSON del service account nel repository
-- Non condividere mai le credenziali Firebase pubblicamente
-- Usa sempre variabili d'ambiente per le credenziali sensibili
-- Il file `firebase-adminsdk-*.json` dovrebbe essere aggiunto al `.gitignore`
+⚠️ **IMPORTANT**:
+- Never commit the service account JSON file to the repository
+- Never share Firebase credentials publicly
+- Always use environment variables for sensitive credentials
+- The `firebase-adminsdk-*.json` file should be added to `.gitignore`
