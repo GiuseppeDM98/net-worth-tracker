@@ -412,8 +412,8 @@ See the [LICENSE](./LICENSE) file for the full license text.
 ## 📞 Support
 
 - **Documentation**: See [SETUP.md](./SETUP.md) for detailed guides
-- **Issues**: Report bugs or request features via [GitHub Issues](https://github.com/your-username/portfolio-tracker/issues)
-- **Discussions**: Ask questions in [GitHub Discussions](https://github.com/your-username/portfolio-tracker/discussions)
+- **Issues**: Report bugs or request features via [GitHub Issues]([https://github.com/your-username/portfolio-tracker/issues](https://github.com/GiuseppeDM98/net-worth-tracker/issues))
+- **Discussions**: Ask questions in [GitHub Discussions]([https://github.com/your-username/portfolio-tracker/discussions](https://github.com/GiuseppeDM98/net-worth-tracker/discussions))
 
 ---
 
