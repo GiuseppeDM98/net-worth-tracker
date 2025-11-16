@@ -36,7 +36,7 @@ The app prioritizes:
   - Cash (bank accounts, money market funds)
   - Private Equity (unlisted investments with manual valuations)
 - **Detailed Asset Information**:
-  - Ticker symbol (with exchange suffix for European securities)
+  - Ticker symbol (with exchange suffix for European securities, e.g., `VWCE.DE`)
   - Asset name
   - Asset type and class categorization
   - Quantity held
@@ -361,7 +361,6 @@ assets/
       - type: "stock" | "etf" | "bond" | "crypto" | "commodity" | "cash" | "realestate"
       - assetClass: "equity" | "bonds" | "crypto" | "realestate" | "cash" | "commodity"
       - subCategory?: string
-      - exchange?: string
       - currency: string
       - quantity: number
       - currentPrice: number
@@ -1030,6 +1029,7 @@ match /priceHistory/{document} {
 - **Input Validation**: Sanitize all user inputs
 - **XSS Prevention**: React auto-escapes by default
 - **HTTPS**: All requests encrypted in transit
+- **Registration Control**: Server-side validation for user registration with whitelist support
 
 ### Data Privacy
 - **No Third-Party Analytics**: User data stays in Firebase
@@ -1090,6 +1090,11 @@ FIREBASE_ADMIN_PRIVATE_KEY=
 # Cron Job Configuration
 CRON_SECRET=your_secure_random_string_here
 NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
+
+# Registration Control (for open source deployments)
+NEXT_PUBLIC_REGISTRATIONS_ENABLED=true
+NEXT_PUBLIC_REGISTRATION_WHITELIST_ENABLED=false
+NEXT_PUBLIC_REGISTRATION_WHITELIST=
 ```
 
 ### Cron Jobs (Vercel Cron)
@@ -1245,6 +1250,58 @@ For questions or issues:
 - Consult Next.js App Router guides
 - Check shadcn/ui component documentation
 
+## Registration Control System
+
+The application includes a flexible registration control system designed for open source deployments where you may want to limit who can create accounts.
+
+### Features
+- **Complete Registration Blocking**: Disable all new registrations while allowing existing users to log in
+- **Email Whitelist**: Allow only specific email addresses to register
+- **Server-Side Validation**: Impossible to bypass via client-side manipulation
+- **Multi-Layer Security**: Client-side UX feedback + server-side validation
+- **Orphan Document Prevention**: Automatic cleanup of Firestore documents if registration is blocked
+
+### Configuration
+
+Set these environment variables in Vercel or `.env.local`:
+
+**Scenario 1: Open Registrations (Default)**
+```bash
+NEXT_PUBLIC_REGISTRATIONS_ENABLED=true
+NEXT_PUBLIC_REGISTRATION_WHITELIST_ENABLED=false
+```
+→ Anyone can register
+
+**Scenario 2: Completely Blocked**
+```bash
+NEXT_PUBLIC_REGISTRATIONS_ENABLED=false
+NEXT_PUBLIC_REGISTRATION_WHITELIST_ENABLED=false
+```
+→ No new registrations allowed, shows "Registration Disabled" page
+
+**Scenario 3: Whitelist Only**
+```bash
+NEXT_PUBLIC_REGISTRATIONS_ENABLED=false
+NEXT_PUBLIC_REGISTRATION_WHITELIST_ENABLED=true
+NEXT_PUBLIC_REGISTRATION_WHITELIST=your-email@gmail.com,admin@example.com
+```
+→ Only whitelisted emails can register
+
+### Implementation Details
+
+- **Client-Side Check** (`app/register/page.tsx`): Provides immediate user feedback
+- **Server-Side API** (`app/api/auth/check-registration/route.ts`): Validates registration permissions
+- **AuthContext Integration** (`contexts/AuthContext.tsx`): Validates both email/password and Google sign-in registrations
+- **Race Condition Fix**: Prevents orphan Firestore documents when Google registration is blocked
+
+### Security Layers
+
+1. **UI Layer**: Shows appropriate message when registrations are disabled
+2. **API Layer**: Server validates registration before allowing Firebase user creation
+3. **Cleanup Layer**: Automatically removes orphan documents if race condition occurs
+
+This system is ideal for personal deployments where you want to use the app yourself without allowing public registrations.
+
 ## License
 Private project - All rights reserved
 
@@ -1291,11 +1348,18 @@ Client Component → fetch('/api/prices/quote') → Server Route → Yahoo Finan
 
 ---
 
-**Version**: 2.2.0 (FIRE Calculator & Hall of Fame)
-**Last Updated**: November 2025
+**Version**: 2.3.0 (Registration Control & Code Cleanup)
+**Last Updated**: January 2025
 **Status**: ✅ Phases 1-5 Complete - Production Ready
 
-**Recent Updates**:
+**Recent Updates** (January 2025):
+- ✅ **Registration Control System** with email whitelist support for open source deployments
+- ✅ **Removed unused Exchange field** from asset management (not needed for Yahoo Finance)
+- ✅ **Fixed race condition** preventing orphan Firestore documents during blocked Google registrations
+- ✅ **Server-side validation** for user registration to prevent client-side bypass
+- ✅ **Multi-layer security** with client UX feedback + API validation + cleanup logic
+
+**Previous Updates** (November 2025):
 - ✅ **FIRE Calculator** with Safe Withdrawal Rate configuration
 - ✅ **Planned vs Actual FIRE scenarios** comparison
 - ✅ **Hall of Fame** personal rankings (monthly & yearly)

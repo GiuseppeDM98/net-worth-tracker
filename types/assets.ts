@@ -17,7 +17,6 @@ export interface Asset {
   type: AssetType;
   assetClass: AssetClass;
   subCategory?: string;
-  exchange?: string;
   currency: string;
   quantity: number;
   averageCost?: number;
@@ -37,7 +36,6 @@ export interface AssetFormData {
   type: AssetType;
   assetClass: AssetClass;
   subCategory?: string;
-  exchange?: string;
   currency: string;
   quantity: number;
   averageCost?: number;
