@@ -446,6 +446,7 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - 🚀 AI-powered rebalancing suggestions
 - 🚀 Dividend tracking
 - 🚀 Tax reporting (capital gains, dividends)
+- 🚀 Automatic price tracking for individual bonds
 
 ---
 
