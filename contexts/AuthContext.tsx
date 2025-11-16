@@ -9,6 +9,7 @@ import {
   signOut as firebaseSignOut,
   signInWithPopup,
   GoogleAuthProvider,
+  updateProfile,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase/config';
@@ -48,11 +49,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
+        // Try to get displayName from Firebase Auth first
+        let displayName = firebaseUser.displayName;
+
+        // If displayName is not in Firebase Auth, try to get it from Firestore
+        if (!displayName) {
+          try {
+            const userRef = doc(db, 'users', firebaseUser.uid);
+            const userSnap = await getDoc(userRef);
+            if (userSnap.exists()) {
+              const userData = userSnap.data();
+              displayName = userData.displayName || null;
+            }
+          } catch (error) {
+            console.error('Error fetching user displayName from Firestore:', error);
+          }
+        }
+
         // Convert Firebase user to our User type
         const userData: User = {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
+          displayName: displayName,
         };
         setUser(userData);
       } else {
@@ -87,6 +105,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const { user: firebaseUser } = await createUserWithEmailAndPassword(auth, email, password);
+
+    // Update Firebase Auth profile with displayName if provided
+    if (displayName) {
+      await updateProfile(firebaseUser, {
+        displayName: displayName,
+      });
+    }
 
     // Create user document in Firestore
     await setDoc(doc(db, 'users', firebaseUser.uid), {
