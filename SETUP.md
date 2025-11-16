@@ -267,7 +267,11 @@ git push -u origin main
 
 ### Step 5: Configure Cron Jobs
 
-Vercel Cron Jobs are configured in `vercel.json`:
+Vercel Cron Jobs are configured in `vercel.json` file in the project root.
+
+#### Understanding the Cron Configuration
+
+The `vercel.json` file contains:
 
 ```json
 {
@@ -280,29 +284,115 @@ Vercel Cron Jobs are configured in `vercel.json`:
 }
 ```
 
-**Schedule format**: `minute hour day month dayOfWeek` (cron syntax)
+**What this does**:
+- `path`: The API endpoint to call (creates monthly portfolio snapshots)
+- `schedule`: When to run (cron syntax format)
 
-**Current schedule**: `0 19 * * *`
-- Runs daily at 19:00 UTC (20:00 CET in winter, 21:00 CEST in summer)
+#### Cron Schedule Format
 
-**To run only at month-end**:
-```json
-"schedule": "0 19 28-31 * *"
+The schedule uses standard cron syntax: `minute hour day month dayOfWeek`
+
+| Field | Values | Example |
+|-------|--------|---------|
+| minute | 0-59 | `0` = at the start of the hour |
+| hour | 0-23 (UTC) | `19` = 19:00 UTC (20:00 CET, 21:00 CEST) |
+| day | 1-31 | `28-31` = days 28 through 31 |
+| month | 1-12 or * | `*` = every month |
+| dayOfWeek | 0-6 or * | `*` = every day of week |
+
+#### Common Schedule Examples
+
+**Current default** (`0 19 * * *`):
+- Runs **every day** at 19:00 UTC
+- Good for testing, but creates daily snapshots
+
+**Recommended for production** (`0 19 28-31 * *`):
+- Runs only on days **28-31** of each month at 19:00 UTC
+- Covers all month lengths (Feb=28/29, Apr/Jun/Sep/Nov=30, others=31)
+- Creates true monthly snapshots at month-end
+
+**Custom time examples**:
+- `0 22 28-31 * *` - 22:00 UTC (23:00 CET, 00:00 CEST)
+- `0 20 1 * *` - 1st day of each month at 20:00 UTC
+- `0 18 15 * *` - 15th day of each month at 18:00 UTC
+
+**Timezone note**:
+- All times are in **UTC**
+- Italy is UTC+1 (winter) or UTC+2 (summer)
+- 19:00 UTC = 20:00 CET (winter) or 21:00 CEST (summer)
+
+#### How to Modify the Cron Schedule
+
+1. **Edit `vercel.json`** in your project root:
+   ```json
+   {
+     "crons": [
+       {
+         "path": "/api/cron/monthly-snapshot",
+         "schedule": "0 19 28-31 * *"
+       }
+     ]
+   }
+   ```
+
+2. **Commit and push** to GitHub:
+   ```bash
+   git add vercel.json
+   git commit -m "Update cron schedule to run at month-end only"
+   git push
+   ```
+
+3. **Vercel auto-redeploys** with the new configuration (usually takes 1-2 minutes)
+
+4. **Verify** in Vercel Dashboard → Your Project → Settings → Cron Jobs
+
+#### Authentication & Security
+
+**Important**: The cron endpoint is protected by the `CRON_SECRET` environment variable.
+
+- Without the correct secret, the endpoint returns 401 Unauthorized
+- Set `CRON_SECRET` in Vercel environment variables (see Step 3)
+- The secret is automatically passed by Vercel's cron system
+
+#### Testing Your Cron Job
+
+**Manual test** (useful after configuration changes):
+
+```bash
+curl "https://your-app.vercel.app/api/cron/monthly-snapshot?secret=YOUR_CRON_SECRET"
 ```
-- Runs at 19:00 UTC on days 28-31 of every month
-- Covers all month lengths (28 for February, 30 for Apr/Jun/Sep/Nov, 31 for others)
 
-**To change the time**:
-- Adjust the hour to your preferred time in UTC
-- Example: `0 22 28-31 * *` runs at 22:00 UTC (23:00/00:00 in Italy)
+Replace:
+- `your-app.vercel.app` with your actual Vercel URL
+- `YOUR_CRON_SECRET` with the value from your environment variables
 
-**Cron job authentication**:
-- The cron endpoint is protected by `CRON_SECRET` environment variable
-- Only requests with the correct secret can trigger the snapshot creation
+**Expected response**:
+```json
+{
+  "message": "Snapshots created successfully",
+  "results": [...]
+}
+```
 
-**After modifying `vercel.json`:**
-1. Commit and push changes to GitHub
-2. Vercel will automatically redeploy with new cron configuration
+#### Monitoring Cron Execution
+
+1. Go to **Vercel Dashboard** → Your Project → **Deployments**
+2. Click on the latest deployment
+3. Go to **Functions** tab
+4. Find `/api/cron/monthly-snapshot` in the list
+5. Click to view execution logs and any errors
+
+#### What the Cron Job Does
+
+When triggered, the endpoint (`/app/api/cron/monthly-snapshot/route.ts`):
+
+1. Updates all asset prices from Yahoo Finance
+2. Calculates current portfolio metrics
+3. Creates a snapshot document in Firestore
+4. Updates Hall of Fame rankings
+5. Returns success/failure status
+
+**Note**: The implementation is in `/app/api/cron/monthly-snapshot/route.ts` if you need to customize the logic.
 
 ---
 
