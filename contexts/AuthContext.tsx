@@ -86,6 +86,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, displayName?: string) => {
+    // Server-side validation: check if registration is allowed
+    try {
+      const response = await fetch('/api/auth/check-registration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Le registrazioni sono attualmente chiuse.');
+      }
+    } catch (error: any) {
+      // Re-throw the error to be caught by the component
+      throw new Error(error.message || 'Impossibile verificare i permessi di registrazione.');
+    }
+
     const { user: firebaseUser } = await createUserWithEmailAndPassword(auth, email, password);
 
     // Create user document in Firestore
@@ -103,7 +120,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+    const result = await signInWithPopup(auth, provider);
+
+    // Check if this is a new user (first time signing in with Google)
+    const userRef = doc(db, 'users', result.user.uid);
+    const userSnap = await getDoc(userRef);
+
+    // If user doesn't exist, this is a registration, so check permissions
+    if (!userSnap.exists() && result.user.email) {
+      try {
+        const response = await fetch('/api/auth/check-registration', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: result.user.email }),
+        });
+
+        if (!response.ok) {
+          // Delete the Firebase user since registration is not allowed
+          await result.user.delete();
+          const error = await response.json();
+          throw new Error(error.message || 'Le registrazioni sono attualmente chiuse.');
+        }
+      } catch (error: any) {
+        // If we couldn't delete the user, sign them out
+        await firebaseSignOut(auth);
+        throw new Error(error.message || 'Impossibile verificare i permessi di registrazione.');
+      }
+    }
   };
 
   const signOut = async () => {

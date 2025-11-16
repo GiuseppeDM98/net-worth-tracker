@@ -51,7 +51,6 @@ const assetSchema = z.object({
   type: z.enum(['stock', 'etf', 'bond', 'crypto', 'commodity', 'cash', 'realestate']),
   assetClass: z.enum(['equity', 'bonds', 'crypto', 'realestate', 'cash', 'commodity']),
   subCategory: z.string().optional(),
-  exchange: z.string().optional(),
   currency: z.string().min(1, 'Valuta è obbligatoria'),
   quantity: z.number().positive('Quantità deve essere positiva'),
   manualPrice: z.number().positive('Il prezzo deve essere positivo').optional().or(z.nan()),
@@ -188,7 +187,6 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         type: asset.type,
         assetClass: asset.assetClass,
         subCategory: asset.subCategory || '',
-        exchange: asset.exchange || '',
         currency: asset.currency,
         quantity: asset.quantity,
         manualPrice: asset.currentPrice > 0 ? asset.currentPrice : undefined,
@@ -215,7 +213,6 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         type: 'etf',
         assetClass: 'equity',
         subCategory: '',
-        exchange: '',
         currency: 'EUR',
         quantity: 0,
         manualPrice: undefined,
@@ -372,7 +369,6 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         type: data.type,
         assetClass: data.assetClass,
         subCategory: data.subCategory || undefined,
-        exchange: data.exchange || undefined,
         currency: data.currency,
         quantity: data.quantity,
         currentPrice,
@@ -489,87 +485,76 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            {isSubCategoryEnabled() && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="subCategory">
-                    Sotto-categoria
-                    {isSubCategoryEnabled() && availableSubCategories().length > 0 && ' *'}
-                  </Label>
+          {isSubCategoryEnabled() && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="subCategory">
+                  Sotto-categoria
+                  {isSubCategoryEnabled() && availableSubCategories().length > 0 && ' *'}
+                </Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowNewSubCategory(!showNewSubCategory)}
+                  className="h-7 px-2"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {showNewSubCategory ? (
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Nuova sottocategoria"
+                    value={newSubCategoryName}
+                    onChange={(e) => setNewSubCategoryName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddSubCategory();
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleAddSubCategory}
+                    disabled={isAddingSubCategory || !newSubCategoryName.trim()}
+                  >
+                    {isAddingSubCategory ? 'Creazione...' : 'Crea'}
+                  </Button>
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={() => setShowNewSubCategory(!showNewSubCategory)}
-                    className="h-7 px-2"
+                    onClick={() => {
+                      setShowNewSubCategory(false);
+                      setNewSubCategoryName('');
+                    }}
                   >
-                    <Plus className="h-4 w-4" />
+                    <X className="h-4 w-4" />
                   </Button>
                 </div>
-
-                {showNewSubCategory ? (
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Nuova sottocategoria"
-                      value={newSubCategoryName}
-                      onChange={(e) => setNewSubCategoryName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleAddSubCategory();
-                        }
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={handleAddSubCategory}
-                      disabled={isAddingSubCategory || !newSubCategoryName.trim()}
-                    >
-                      {isAddingSubCategory ? 'Creazione...' : 'Crea'}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setShowNewSubCategory(false);
-                        setNewSubCategoryName('');
-                      }}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <Select
-                    value={watch('subCategory')}
-                    onValueChange={(value) => setValue('subCategory', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleziona sotto-categoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableSubCategories().map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="exchange">Exchange</Label>
-              <Input
-                id="exchange"
-                {...register('exchange')}
-                placeholder="es. XETRA, NYSE"
-              />
+              ) : (
+                <Select
+                  value={watch('subCategory')}
+                  onValueChange={(value) => setValue('subCategory', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleziona sotto-categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableSubCategories().map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
-          </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">

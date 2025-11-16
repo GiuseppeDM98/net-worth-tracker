@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { APP_CONFIG } from '@/lib/constants/appConfig';
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
@@ -18,6 +19,9 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const { signUp, signInWithGoogle } = useAuth();
   const router = useRouter();
+
+  // Check if registrations are completely disabled
+  const areRegistrationsDisabled = !APP_CONFIG.REGISTRATIONS_ENABLED && !APP_CONFIG.REGISTRATION_WHITELIST_ENABLED;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,6 +64,32 @@ export default function RegisterPage() {
     }
   };
 
+  // If registrations are completely disabled, show a different UI
+  if (areRegistrationsDisabled) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-2xl font-bold">Registrazione Disabilitata</CardTitle>
+            <CardDescription>
+              Le registrazioni sono attualmente chiuse.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-600 mb-4">
+              Se hai già un account, puoi accedere usando le tue credenziali.
+            </p>
+            <Link href="/login">
+              <Button className="w-full">
+                Vai alla pagina di accesso
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <Card className="w-full max-w-md">
@@ -70,6 +100,14 @@ export default function RegisterPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {APP_CONFIG.REGISTRATION_WHITELIST_ENABLED && (
+            <div className="mb-4 rounded-lg bg-blue-50 p-3 border border-blue-200">
+              <p className="text-sm text-blue-800">
+                <strong>Nota:</strong> Le registrazioni sono limitate a email autorizzate.
+              </p>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="displayName">Nome</Label>
