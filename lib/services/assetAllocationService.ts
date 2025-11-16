@@ -56,15 +56,28 @@ export async function setSettings(
   try {
     const targetRef = doc(db, ALLOCATION_TARGETS_COLLECTION, userId);
 
-    await setDoc(targetRef, {
+    // Build the document object, only including defined fields
+    const docData: any = {
       userId,
-      userAge: settings.userAge,
-      riskFreeRate: settings.riskFreeRate,
-      withdrawalRate: settings.withdrawalRate,
-      plannedAnnualExpenses: settings.plannedAnnualExpenses,
       targets: settings.targets,
       updatedAt: Timestamp.now(),
-    });
+    };
+
+    // Only add optional fields if they are defined
+    if (settings.userAge !== undefined) {
+      docData.userAge = settings.userAge;
+    }
+    if (settings.riskFreeRate !== undefined) {
+      docData.riskFreeRate = settings.riskFreeRate;
+    }
+    if (settings.withdrawalRate !== undefined) {
+      docData.withdrawalRate = settings.withdrawalRate;
+    }
+    if (settings.plannedAnnualExpenses !== undefined) {
+      docData.plannedAnnualExpenses = settings.plannedAnnualExpenses;
+    }
+
+    await setDoc(targetRef, docData);
   } catch (error) {
     console.error('Error setting allocation settings:', error);
     throw new Error('Failed to save allocation settings');
