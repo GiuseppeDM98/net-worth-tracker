@@ -83,7 +83,13 @@ export async function setTargets(
 
 /**
  * Calculate current allocation from assets
- * Gestisce anche asset con composizione (es. fondi pensione misti)
+ *
+ * Handles both simple assets and composite assets (e.g., mixed pension funds).
+ * For composite assets, distributes value across multiple asset classes based
+ * on the composition percentages.
+ *
+ * @param assets - All user assets
+ * @returns Allocation breakdown by asset class, sub-category, and total value
  */
 export function calculateCurrentAllocation(assets: Asset[]): {
   byAssetClass: { [assetClass: string]: number };
@@ -106,7 +112,7 @@ export function calculateCurrentAllocation(assets: Asset[]): {
   assets.forEach((asset) => {
     const value = calculateAssetValue(asset);
 
-    // Se l'asset ha una composizione, distribuisci il valore tra le asset class
+    // For composite assets, distribute value across multiple asset classes
     if (asset.composition && asset.composition.length > 0) {
       asset.composition.forEach((comp) => {
         const compValue = (value * comp.percentage) / 100;
@@ -118,8 +124,8 @@ export function calculateCurrentAllocation(assets: Asset[]): {
         byAssetClass[comp.assetClass] += compValue;
 
         // Aggregate by sub-category if present in composition
-        // Ogni componente può avere la sua sottocategoria specifica
-        // Usa chiave composta "assetClass:subCategory" per evitare collisioni
+        // Each component can have its own specific sub-category
+        // Use composite key "assetClass:subCategory" to avoid collisions
         if (comp.subCategory) {
           const subCategoryKey = `${comp.assetClass}:${comp.subCategory}`;
           if (!bySubCategory[subCategoryKey]) {
@@ -129,7 +135,7 @@ export function calculateCurrentAllocation(assets: Asset[]): {
         }
       });
     } else {
-      // Asset semplice (senza composizione) - comportamento normale
+      // Simple asset (no composition) - standard aggregation
 
       // Aggregate by asset class
       if (!byAssetClass[asset.assetClass]) {
@@ -138,7 +144,7 @@ export function calculateCurrentAllocation(assets: Asset[]): {
       byAssetClass[asset.assetClass] += value;
 
       // Aggregate by sub-category if present
-      // Usa chiave composta "assetClass:subCategory" per evitare collisioni
+      // Use composite key "assetClass:subCategory" to avoid collisions
       if (asset.subCategory) {
         const subCategoryKey = `${asset.assetClass}:${asset.subCategory}`;
         if (!bySubCategory[subCategoryKey]) {
@@ -248,7 +254,7 @@ export function compareAllocations(
 
       Object.keys(targetData.subTargets).forEach((subCategory) => {
         const subTargetPercentage = targetData.subTargets![subCategory];
-        // Usa chiave composta "assetClass:subCategory"
+        // Use composite key "assetClass:subCategory" to avoid collisions
         const subCategoryKey = `${assetClass}:${subCategory}`;
         const subCurrentValue = current.bySubCategory[subCategoryKey] || 0;
 
@@ -305,7 +311,13 @@ export function calculateEquityPercentage(
 
 /**
  * Add a new subcategory to an asset class
- * La sottocategoria viene inizializzata con 0% target
+ *
+ * The subcategory is initialized with 0% target allocation.
+ * This allows users to create custom sub-categories beyond the defaults.
+ *
+ * @param userId - The user ID
+ * @param assetClass - The asset class to add the subcategory to
+ * @param subCategoryName - Name of the new subcategory
  */
 export async function addSubCategory(
   userId: string,
@@ -313,19 +325,19 @@ export async function addSubCategory(
   subCategoryName: string
 ): Promise<void> {
   try {
-    // Carica le settings attuali
+    // Load current settings
     const settings = await getSettings(userId);
 
     if (!settings) {
       throw new Error('Settings not found. Please configure allocation targets first.');
     }
 
-    // Verifica che l'asset class esista
+    // Verify that the asset class exists
     if (!settings.targets[assetClass]) {
       throw new Error(`Asset class ${assetClass} not found in targets`);
     }
 
-    // Inizializza subCategoryConfig se non esiste
+    // Initialize subCategoryConfig if it doesn't exist
     if (!settings.targets[assetClass].subCategoryConfig) {
       settings.targets[assetClass].subCategoryConfig = {
         enabled: true,
@@ -333,25 +345,25 @@ export async function addSubCategory(
       };
     }
 
-    // Inizializza subTargets se non esiste
+    // Initialize subTargets if it doesn't exist
     if (!settings.targets[assetClass].subTargets) {
       settings.targets[assetClass].subTargets = {};
     }
 
-    // Verifica che la sottocategoria non esista già
+    // Verify that the subcategory doesn't already exist
     const existingCategories = settings.targets[assetClass].subCategoryConfig!.categories;
     if (existingCategories.includes(subCategoryName)) {
       throw new Error(`Subcategory ${subCategoryName} already exists in ${assetClass}`);
     }
 
-    // Aggiungi la nuova sottocategoria
+    // Add the new subcategory
     settings.targets[assetClass].subCategoryConfig!.categories.push(subCategoryName);
     settings.targets[assetClass].subCategoryConfig!.enabled = true;
 
-    // Inizializza il target a 0%
+    // Initialize target to 0%
     settings.targets[assetClass].subTargets![subCategoryName] = 0;
 
-    // Salva le settings aggiornate
+    // Save updated settings
     await setSettings(userId, settings);
   } catch (error) {
     console.error('Error adding subcategory:', error);

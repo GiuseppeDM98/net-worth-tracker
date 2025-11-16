@@ -12,11 +12,11 @@ export interface FIREMetrics {
   // Calculated values
   fireNumber: number;
   progressToFI: number; // Percentage
-  annualAllowance: number; // Indennità annuale
-  monthlyAllowance: number; // Indennità mensile
-  dailyAllowance: number; // Indennità giornaliera
+  annualAllowance: number; // Annual withdrawal allowance based on safe withdrawal rate
+  monthlyAllowance: number; // Monthly withdrawal allowance (annualAllowance / 12)
+  dailyAllowance: number; // Daily withdrawal allowance (annualAllowance / 365)
   currentWR: number; // Current withdrawal rate
-  yearsOfExpenses: number; // Anni di spesa
+  yearsOfExpenses: number; // Years of expenses covered by current net worth
 }
 
 export interface PlannedFIREMetrics {

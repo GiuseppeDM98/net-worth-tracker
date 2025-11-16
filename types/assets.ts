@@ -6,7 +6,7 @@ export type AssetClass = 'equity' | 'bonds' | 'crypto' | 'realestate' | 'cash' |
 export interface AssetComposition {
   assetClass: AssetClass;
   percentage: number;
-  subCategory?: string; // Sottocategoria specifica per questa componente dell'asset composto
+  subCategory?: string; // Specific sub-category for this component of the composite asset
 }
 
 export interface Asset {
@@ -21,10 +21,10 @@ export interface Asset {
   quantity: number;
   averageCost?: number;
   currentPrice: number;
-  isLiquid?: boolean; // Default: true - indica se l'asset è liquido o illiquido
-  autoUpdatePrice?: boolean; // Default: true - indica se il prezzo deve essere aggiornato automaticamente via Yahoo Finance
-  composition?: AssetComposition[]; // Per asset composti (es. fondi pensione)
-  outstandingDebt?: number; // Debito residuo per immobili (es. mutuo). Il valore netto = valore - debito residuo
+  isLiquid?: boolean; // Default: true - indicates whether the asset is liquid or illiquid
+  autoUpdatePrice?: boolean; // Default: true - indicates whether price should be automatically updated via Yahoo Finance
+  composition?: AssetComposition[]; // For composite assets (e.g., pension funds)
+  outstandingDebt?: number; // Outstanding debt for real estate (e.g., mortgage). Net value = value - outstanding debt
   lastPriceUpdate: Date | Timestamp;
   createdAt: Date | Timestamp;
   updatedAt: Date | Timestamp;
@@ -117,7 +117,7 @@ export interface MonthlySnapshot {
   month: number;
   totalNetWorth: number;
   liquidNetWorth: number;
-  illiquidNetWorth: number; // Nuovo campo per tracciare separatamente gli illiquidi
+  illiquidNetWorth: number; // New field to track illiquid assets separately
   byAssetClass: {
     [assetClass: string]: number;
   };

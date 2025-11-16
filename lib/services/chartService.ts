@@ -5,7 +5,12 @@ import { getAssetClassColor, getChartColor } from '@/lib/constants/colors';
 
 /**
  * Prepare data for asset class distribution pie chart
- * Usa calculateCurrentAllocation per gestire correttamente gli asset composti
+ *
+ * Uses calculateCurrentAllocation to properly handle composite assets
+ * (e.g., pension funds distributed across multiple asset classes).
+ *
+ * @param assets - All user assets
+ * @returns Array of pie chart data points with percentages and colors
  */
 export function prepareAssetClassDistributionData(
   assets: Asset[]
@@ -94,7 +99,7 @@ export function prepareNetWorthHistoryData(snapshots: MonthlySnapshot[]): {
     date: `${String(snapshot.month).padStart(2, '0')}/${String(snapshot.year).slice(-2)}`,
     totalNetWorth: snapshot.totalNetWorth,
     liquidNetWorth: snapshot.liquidNetWorth,
-    illiquidNetWorth: snapshot.illiquidNetWorth || 0, // default 0 per retrocompatibilità
+    illiquidNetWorth: snapshot.illiquidNetWorth || 0, // Default to 0 for backward compatibility with older snapshots
     month: snapshot.month,
     year: snapshot.year,
   }));

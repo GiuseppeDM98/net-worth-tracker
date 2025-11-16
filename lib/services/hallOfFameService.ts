@@ -11,7 +11,13 @@ const MAX_MONTHLY_RECORDS = 20;
 const MAX_YEARLY_RECORDS = 10;
 
 /**
- * Recupera i dati Hall of Fame per un utente
+ * Fetch Hall of Fame data for a user
+ *
+ * Returns pre-calculated rankings of best/worst months and years
+ * based on net worth growth, income, and expenses.
+ *
+ * @param userId - The user ID to fetch data for
+ * @returns Hall of Fame data or null if not found
  */
 export async function getHallOfFameData(userId: string): Promise<HallOfFameData | null> {
   try {
@@ -34,20 +40,31 @@ export async function getHallOfFameData(userId: string): Promise<HallOfFameData 
 }
 
 /**
- * Formatta mese e anno in formato MM/YYYY
+ * Format month and year as MM/YYYY string
+ *
+ * @param month - Month number (1-12)
+ * @param year - Year number
+ * @returns Formatted string in MM/YYYY format
  */
 function formatMonthYear(month: number, year: number): string {
   return `${month.toString().padStart(2, '0')}/${year}`;
 }
 
 /**
- * Calcola i record mensili da tutti gli snapshot
+ * Calculate monthly records from all snapshots
+ *
+ * Computes month-over-month net worth changes and aggregates
+ * income/expenses for each month to identify best/worst periods.
+ *
+ * @param snapshots - All monthly snapshots for the user
+ * @param expenses - All expenses for the user
+ * @returns Array of monthly records with net worth diff and expense totals
  */
 function calculateMonthlyRecords(
   snapshots: MonthlySnapshot[],
   expenses: Expense[]
 ): MonthlyRecord[] {
-  // Ordina snapshot per data (più vecchio prima)
+  // Sort snapshots chronologically (oldest first) to calculate month-over-month changes
   const sortedSnapshots = [...snapshots].sort((a, b) => {
     if (a.year !== b.year) return a.year - b.year;
     return a.month - b.month;
@@ -59,10 +76,10 @@ function calculateMonthlyRecords(
     const current = sortedSnapshots[i];
     const previous = sortedSnapshots[i - 1];
 
-    // Calcola differenza NW
+    // Calculate net worth difference between consecutive months
     const netWorthDiff = current.totalNetWorth - previous.totalNetWorth;
 
-    // Filtra spese del mese corrente
+    // Filter expenses for the current month to aggregate income/expense totals
     const monthExpenses = expenses.filter(expense => {
       const expenseDate = expense.date instanceof Date
         ? expense.date
@@ -88,13 +105,20 @@ function calculateMonthlyRecords(
 }
 
 /**
- * Calcola i record annuali da tutti gli snapshot
+ * Calculate yearly records from all snapshots
+ *
+ * Aggregates snapshots by year to compute year-over-year net worth
+ * changes and total income/expenses for ranking best/worst years.
+ *
+ * @param snapshots - All monthly snapshots for the user
+ * @param expenses - All expenses for the user
+ * @returns Array of yearly records with annual net worth diff and totals
  */
 function calculateYearlyRecords(
   snapshots: MonthlySnapshot[],
   expenses: Expense[]
 ): YearlyRecord[] {
-  // Raggruppa snapshot per anno
+  // Group snapshots by year to aggregate annual data
   const snapshotsByYear = snapshots.reduce((acc, snapshot) => {
     if (!acc[snapshot.year]) {
       acc[snapshot.year] = [];
@@ -108,19 +132,19 @@ function calculateYearlyRecords(
   for (const [yearStr, yearSnapshots] of Object.entries(snapshotsByYear)) {
     const year = parseInt(yearStr);
 
-    // Ordina per mese
+    // Sort snapshots within the year by month
     const sorted = yearSnapshots.sort((a, b) => a.month - b.month);
 
-    // Controlla se abbiamo almeno gennaio e un altro mese per calcolare la differenza
+    // Skip years with less than 2 months of data (can't calculate year-over-year change)
     if (sorted.length < 2) continue;
 
     const firstSnapshot = sorted[0];
     const lastSnapshot = sorted[sorted.length - 1];
 
-    // Calcola differenza NW annuale
+    // Calculate annual net worth change (last month - first month of the year)
     const netWorthDiff = lastSnapshot.totalNetWorth - firstSnapshot.totalNetWorth;
 
-    // Filtra spese dell'anno
+    // Filter all expenses for this year to calculate annual income/expense totals
     const yearExpenses = expenses.filter(expense => {
       const expenseDate = expense.date instanceof Date
         ? expense.date
@@ -143,64 +167,74 @@ function calculateYearlyRecords(
 }
 
 /**
- * Aggiorna la Hall of Fame per un utente
+ * Update Hall of Fame rankings for a user
+ *
+ * Recalculates all monthly and yearly records from snapshots and expenses,
+ * then generates Top 20 monthly and Top 10 yearly rankings across categories:
+ * - Best/worst months and years by net worth growth/decline
+ * - Best months and years by income
+ * - Worst months and years by expenses
+ *
+ * This should be called after each new monthly snapshot is created.
+ *
+ * @param userId - The user ID to update Hall of Fame for
  */
 export async function updateHallOfFame(userId: string): Promise<void> {
   try {
-    // Recupera tutti gli snapshot e le spese dell'utente
+    // Fetch all snapshots and expenses to calculate comprehensive rankings
     const [snapshots, expenses] = await Promise.all([
       getUserSnapshots(userId),
       getAllExpenses(userId),
     ]);
 
-    // Calcola record mensili e annuali
+    // Calculate monthly and yearly records from raw data
     const monthlyRecords = calculateMonthlyRecords(snapshots, expenses);
     const yearlyRecords = calculateYearlyRecords(snapshots, expenses);
 
-    // Crea i ranking
+    // Create rankings by sorting records across different dimensions
     const hallOfFameData: HallOfFameData = {
       userId,
 
-      // Migliori mesi per crescita NW (ordinati per netWorthDiff decrescente)
+      // Best months by net worth growth (sorted descending by netWorthDiff)
       bestMonthsByNetWorthGrowth: [...monthlyRecords]
         .filter(r => r.netWorthDiff > 0)
         .sort((a, b) => b.netWorthDiff - a.netWorthDiff)
         .slice(0, MAX_MONTHLY_RECORDS),
 
-      // Migliori mesi per entrate
+      // Best months by income
       bestMonthsByIncome: [...monthlyRecords]
         .sort((a, b) => b.totalIncome - a.totalIncome)
         .slice(0, MAX_MONTHLY_RECORDS),
 
-      // Peggiori mesi per decremento NW (ordinati per netWorthDiff crescente, cioè valori più negativi)
+      // Worst months by net worth decline (sorted ascending, i.e., most negative values first)
       worstMonthsByNetWorthDecline: [...monthlyRecords]
         .filter(r => r.netWorthDiff < 0)
         .sort((a, b) => a.netWorthDiff - b.netWorthDiff)
         .slice(0, MAX_MONTHLY_RECORDS),
 
-      // Peggiori mesi per spese
+      // Worst months by expenses
       worstMonthsByExpenses: [...monthlyRecords]
         .sort((a, b) => b.totalExpenses - a.totalExpenses)
         .slice(0, MAX_MONTHLY_RECORDS),
 
-      // Migliori anni per crescita NW
+      // Best years by net worth growth
       bestYearsByNetWorthGrowth: [...yearlyRecords]
         .filter(r => r.netWorthDiff > 0)
         .sort((a, b) => b.netWorthDiff - a.netWorthDiff)
         .slice(0, MAX_YEARLY_RECORDS),
 
-      // Migliori anni per entrate
+      // Best years by income
       bestYearsByIncome: [...yearlyRecords]
         .sort((a, b) => b.totalIncome - a.totalIncome)
         .slice(0, MAX_YEARLY_RECORDS),
 
-      // Peggiori anni per decremento NW
+      // Worst years by net worth decline
       worstYearsByNetWorthDecline: [...yearlyRecords]
         .filter(r => r.netWorthDiff < 0)
         .sort((a, b) => a.netWorthDiff - b.netWorthDiff)
         .slice(0, MAX_YEARLY_RECORDS),
 
-      // Peggiori anni per spese
+      // Worst years by expenses
       worstYearsByExpenses: [...yearlyRecords]
         .sort((a, b) => b.totalExpenses - a.totalExpenses)
         .slice(0, MAX_YEARLY_RECORDS),
