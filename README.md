@@ -440,22 +440,21 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - ✅ Registration control system
 
 ### Future Enhancements (Planned 🔜)
-- 🔜 CSV/Excel import for bulk asset additions
 - 🔜 PDF export of portfolio reports
 - 🔜 Email notifications (monthly summary)
 - 🔜 Multi-currency full conversion support
-- 🔜 Tax reporting (capital gains, dividends)
-- 🔜 Dividend tracking and forecasting
 - 🔜 Cost basis tracking (average cost per share)
 - 🔜 Performance metrics (ROI, IRR, CAGR, Sharpe ratio)
-- 🔜 Mobile app (React Native or PWA)
 
 ### Long-term Vision (Future 🚀)
+- 🚀 CSV/Excel import for bulk asset additions
 - 🚀 Risk analysis (volatility, max drawdown, correlation)
 - 🚀 Backtesting allocation strategies
 - 🚀 Monte Carlo retirement simulations
 - 🚀 Social features (anonymous portfolio comparison)
 - 🚀 AI-powered rebalancing suggestions
+- 🚀 Dividend tracking
+- 🚀 Tax reporting (capital gains, dividends)
 
 ---
 
