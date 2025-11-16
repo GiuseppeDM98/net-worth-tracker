@@ -79,11 +79,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Le registrazioni sono attualmente chiuse.');
+        throw new Error(error.message || 'Registrations are currently closed.');
       }
     } catch (error: any) {
       // Re-throw the error to be caught by the component
-      throw new Error(error.message || 'Impossibile verificare i permessi di registrazione.');
+      throw new Error(error.message || 'Unable to verify registration permissions.');
     }
 
     const { user: firebaseUser } = await createUserWithEmailAndPassword(auth, email, password);
@@ -137,7 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
 
           const error = await response.json();
-          throw new Error(error.message || 'Le registrazioni sono attualmente chiuse.');
+          throw new Error(error.message || 'Registrations are currently closed.');
         }
 
         // Registration is allowed - create Firestore document
