@@ -13,47 +13,37 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
 
 ## 📸 Screenshots
 
-> **Note**: Add screenshots of the following pages/features:
-
 ### Dashboard Overview
-> Screenshot showing the main dashboard with summary cards (Total Net Worth, Liquid Net Worth, MoM/YoY changes, Income/Expense stats) and three pie charts (Asset Class Distribution, Individual Assets, Liquidity Breakdown)
+<img width="2284" height="1271" alt="image" src="https://github.com/user-attachments/assets/8b11c9a4-3907-4801-8b6d-7cbac8f0882b" />
 
-*[Screenshot placeholder: Dashboard with charts and summary metrics]*
 
 ### Asset Management
-> Screenshot of the "Patrimonio" (Assets) page displaying the asset table with columns for Ticker, Name, Type, Quantity, Price, Total Value, and action buttons (Edit/Delete). Include the "Add Asset" and "Update Prices" buttons.
+<img width="2299" height="600" alt="image" src="https://github.com/user-attachments/assets/aa8373f5-883e-438f-af6d-b511009edf9e" />
 
-*[Screenshot placeholder: Asset management table with CRUD operations]*
 
 ### Asset Allocation Comparison
-> Screenshot of the "Allocazione" (Allocation) page showing side-by-side comparison of current vs target allocation with color-coded rebalancing actions (COMPRA/VENDI/OK) and difference indicators
+<img width="2293" height="1070" alt="image" src="https://github.com/user-attachments/assets/2b9b2450-9d64-4127-813d-c7b77fb84b02" />
 
-*[Screenshot placeholder: Current vs Target allocation comparison]*
 
 ### Historical Performance Charts
-> Screenshot of the "Storico" (History) page featuring the Net Worth Evolution line chart, Asset Class Evolution stacked area chart, and Year-over-Year variation bar chart
+<img width="2289" height="1234" alt="image" src="https://github.com/user-attachments/assets/fee5a375-39d4-4030-901f-a6fb2d3ba99b" />
 
-*[Screenshot placeholder: Historical charts showing portfolio evolution over time]*
 
 ### Expense Tracking
-> Screenshot of the "Tracciamento Spese" (Expense Tracking) page with year/month filters, statistics cards (Total Income, Total Expenses, Net Balance), and the expense table with categories and notes
+<img width="2281" height="1262" alt="image" src="https://github.com/user-attachments/assets/fde827b9-60a0-4b63-857f-51f56813141d" />
 
-*[Screenshot placeholder: Expense tracking page with filters and statistics]*
 
 ### Expense Analytics
-> Screenshot of "Grafici Spese" (Expense Charts) page showing the four visualizations: Expenses by Category pie chart, Income by Category pie chart, Expenses by Type pie chart, and Monthly Trend bar chart
+<img width="2251" height="1273" alt="image" src="https://github.com/user-attachments/assets/b4d7fa8f-49a1-46fd-af4a-9065a90c9d36" />
 
-*[Screenshot placeholder: Expense analytics with pie and bar charts]*
 
 ### FIRE Tracker
-> Screenshot of the "FIRE" page displaying FIRE Number, Progress to FI percentage, Safe Withdrawal Rate configuration, Monthly Allowance, Current vs Planned scenarios comparison, and historical evolution chart
+<img width="2283" height="1258" alt="image" src="https://github.com/user-attachments/assets/580da85f-8557-4e2f-b973-92159b69be18" />
 
-*[Screenshot placeholder: FIRE calculator and progress tracker]*
 
 ### Hall of Fame Rankings
-> Screenshot of the "Hall of Fame" page showing the four ranking categories: Best Months by Net Worth Growth, Best Months by Income, Worst Months by Net Worth Decline, and Highest Expenses months
+<img width="2286" height="1261" alt="image" src="https://github.com/user-attachments/assets/7fe5b615-2905-4da3-9ec3-54bdaee184c9" />
 
-*[Screenshot placeholder: Personal financial rankings and achievements]*
 
 ---
 
