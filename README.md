@@ -445,6 +445,7 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - 🔜 Multi-currency full conversion support
 - 🔜 Cost basis tracking (average cost per share)
 - 🔜 Performance metrics (ROI, IRR, CAGR, Sharpe ratio)
+- 🔜 Internationalization (i18n) for multi-language support
 
 ### Long-term Vision (Future 🚀)
 - 🚀 CSV/Excel import for bulk asset additions
