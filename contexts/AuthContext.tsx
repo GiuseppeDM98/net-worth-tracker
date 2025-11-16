@@ -10,7 +10,7 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase/config';
 import { User } from '@/types/assets';
 import { getDefaultTargets, setSettings } from '@/lib/services/assetAllocationService';
@@ -55,23 +55,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           displayName: firebaseUser.displayName,
         };
         setUser(userData);
-
-        // Ensure user document exists in Firestore
-        const userRef = doc(db, 'users', firebaseUser.uid);
-        const userSnap = await getDoc(userRef);
-
-        if (!userSnap.exists()) {
-          await setDoc(userRef, {
-            email: firebaseUser.email,
-            displayName: firebaseUser.displayName || '',
-            createdAt: new Date(),
-          });
-
-          // Set default asset allocation (60% equity, 40% bonds)
-          await setSettings(firebaseUser.uid, {
-            targets: getDefaultTargets(),
-          });
-        }
       } else {
         setUser(null);
       }
@@ -136,14 +119,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
 
         if (!response.ok) {
-          // Delete the Firebase user since registration is not allowed
-          await result.user.delete();
+          // Registration is not allowed - cleanup everything
+          try {
+            // First, check if a Firestore document was created (race condition)
+            const orphanDocSnap = await getDoc(userRef);
+            if (orphanDocSnap.exists()) {
+              await deleteDoc(userRef);
+              console.log(`[CLEANUP] Deleted orphan Firestore document for user: ${result.user.uid}`);
+            }
+
+            // Delete the Firebase Auth user
+            await result.user.delete();
+          } catch (deleteError) {
+            console.error('[CLEANUP_ERROR]', deleteError);
+            // If we couldn't delete the user, sign them out
+            await firebaseSignOut(auth);
+          }
+
           const error = await response.json();
           throw new Error(error.message || 'Le registrazioni sono attualmente chiuse.');
         }
+
+        // Registration is allowed - create Firestore document
+        await setDoc(userRef, {
+          email: result.user.email,
+          displayName: result.user.displayName || '',
+          createdAt: new Date(),
+        });
+
+        // Set default asset allocation (60% equity, 40% bonds)
+        await setSettings(result.user.uid, {
+          targets: getDefaultTargets(),
+        });
       } catch (error: any) {
-        // If we couldn't delete the user, sign them out
-        await firebaseSignOut(auth);
+        // Re-throw the error to be caught by the component
         throw new Error(error.message || 'Impossibile verificare i permessi di registrazione.');
       }
     }
