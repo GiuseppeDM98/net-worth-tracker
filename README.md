@@ -1345,29 +1345,3 @@ Client Component → fetch('/api/prices/quote') → Server Route → Yahoo Finan
 3. Each entry gets same `recurringParentId` for batch operations
 4. Date calculation handles short months (Feb 30 → Feb 28/29)
 5. Delete action offers: delete single OR delete all recurring
-
----
-
-**Version**: 2.3.0 (Registration Control & Code Cleanup)
-**Last Updated**: January 2025
-**Status**: ✅ Phases 1-5 Complete - Production Ready
-
-**Recent Updates** (January 2025):
-- ✅ **Registration Control System** with email whitelist support for open source deployments
-- ✅ **Removed unused Exchange field** from asset management (not needed for Yahoo Finance)
-- ✅ **Fixed race condition** preventing orphan Firestore documents during blocked Google registrations
-- ✅ **Server-side validation** for user registration to prevent client-side bypass
-- ✅ **Multi-layer security** with client UX feedback + API validation + cleanup logic
-
-**Previous Updates** (November 2025):
-- ✅ **FIRE Calculator** with Safe Withdrawal Rate configuration
-- ✅ **Planned vs Actual FIRE scenarios** comparison
-- ✅ **Hall of Fame** personal rankings (monthly & yearly)
-- ✅ **Month/Year expense filtering** with cascading dropdowns
-- ✅ **Withdrawal rate storage** in user settings
-- ✅ **Historical FIRE evolution chart**
-- Default asset allocation (60/40) for new users
-- Year-to-Date variation tracking in Dashboard
-- Historical YoY bar chart in History page
-- Separate Cashflow pages (current year vs all-time)
-- Improved asset display formatting (e.g., "Real Estate")
