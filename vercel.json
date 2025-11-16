@@ -1,4 +1,6 @@
 {
+  "_comment_cron_schedule": "Cron schedule format: 'minute hour day month dayOfWeek'. Current: '0 19 * * *' runs at 19:00 UTC (20:00 CET, 21:00 CEST) every day. To run only at month-end, use '0 19 28-31 * *' to run on days 28-31. Adjust hour for your timezone (UTC+1 winter, UTC+2 summer in Italy).",
+  "_comment_cron_path": "This endpoint creates monthly portfolio snapshots. See /app/api/cron/monthly-snapshot/route.ts for implementation. Requires CRON_SECRET environment variable for authentication.",
   "crons": [
     {
       "path": "/api/cron/monthly-snapshot",
