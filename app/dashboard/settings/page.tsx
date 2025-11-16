@@ -613,7 +613,16 @@ export default function SettingsPage() {
                 disabled={userAge === undefined || riskFreeRate === undefined}
               />
               <Label htmlFor="autoCalculate" className="text-sm">
-                Calcola automaticamente % Azioni e Obbligazioni
+                Calcola automaticamente % Azioni e Obbligazioni (Formula di{' '}
+                <a
+                  href="https://www.youtube.com/channel/UCNp1e5n6rlnfm5aWbHe3cJw"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  The Bull
+                </a>
+                )
               </Label>
             </div>
 
