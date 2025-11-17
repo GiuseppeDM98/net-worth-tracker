@@ -313,7 +313,7 @@ export default function HistoryPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Storico</h1>
           <p className="mt-2 text-gray-600">
-            Analizza l'evoluzione del tuo patrimonio nel tempo
+            Analizza l'evoluzione del tuo patrimonio (lordo) nel tempo
           </p>
         </div>
         <div className="flex gap-2">

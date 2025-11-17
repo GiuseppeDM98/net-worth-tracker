@@ -55,6 +55,11 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
 - **Asset allocation tracking** with target vs current comparison and rebalancing recommendations
 - **Composite assets** for pension funds and mixed-allocation investments
 - **Liquidity tracking** to separate liquid and illiquid net worth
+- **Cost basis tracking** with unrealized gains and tax estimation
+  - Track average cost per share/unit for each asset
+  - Automatic calculation of unrealized gains (current value - cost basis)
+  - Estimated tax calculation based on configurable tax rates
+  - Gross and net net worth visualization (before/after taxes)
 
 ### 📈 **Historical Analysis**
 - **Automated monthly snapshots** via scheduled cron jobs
@@ -336,6 +341,21 @@ See [Infrastructure Alternatives](./SETUP.md#infrastructure-alternatives) for mi
 5. Compare current vs planned scenarios
 6. Track progress month-over-month with historical chart
 
+### Tracking Cost Basis and Taxes
+
+1. Navigate to **"Patrimonio"** (Assets)
+2. Click on an existing asset or create a new one
+3. Enable **"Tracciamento Cost Basis"** toggle
+4. Enter:
+   - **Costo Medio per Azione**: €85.50 (your average purchase price)
+   - **Aliquota Fiscale**: 26 (tax rate percentage)
+5. Save the asset
+6. View on Dashboard:
+   - **Patrimonio Totale Lordo/Netto**: Gross and net total worth
+   - **Patrimonio Liquido Lordo/Netto**: Gross and net liquid worth
+   - **Plusvalenze Non Realizzate**: Unrealized gains (green) or losses (red)
+   - **Tasse Stimate**: Estimated taxes on gains
+
 ---
 
 ## 🤝 Contributing
@@ -428,12 +448,12 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - ✅ FIRE calculator and progress tracker
 - ✅ Hall of Fame personal financial rankings
 - ✅ Registration control system
+- ✅ Cost basis tracking with unrealized gains and tax estimation
 
 ### Future Enhancements (Planned 🔜)
 - 🔜 PDF export of portfolio reports
 - 🔜 Email notifications (monthly summary)
 - 🔜 Multi-currency full conversion support
-- 🔜 Cost basis tracking (average cost per share)
 - 🔜 Performance metrics (ROI, IRR, CAGR, Sharpe ratio)
 - 🔜 Internationalization (i18n) for multi-language support
 

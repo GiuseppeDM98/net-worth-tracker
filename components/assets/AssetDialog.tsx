@@ -54,6 +54,8 @@ const assetSchema = z.object({
   currency: z.string().min(1, 'Valuta è obbligatoria'),
   quantity: z.number().positive('Quantità deve essere positiva'),
   manualPrice: z.number().positive('Il prezzo deve essere positivo').optional().or(z.nan()),
+  averageCost: z.number().positive('Il costo medio deve essere positivo').optional().or(z.nan()),
+  taxRate: z.number().min(0, 'L\'aliquota fiscale deve essere almeno 0').max(100, 'L\'aliquota fiscale deve essere massimo 100').optional().or(z.nan()),
   isLiquid: z.boolean().optional(),
   autoUpdatePrice: z.boolean().optional(),
   isComposite: z.boolean().optional(),
@@ -98,6 +100,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
   const [composition, setComposition] = useState<AssetComposition[]>([]);
   const [isComposite, setIsComposite] = useState(false);
   const [hasOutstandingDebt, setHasOutstandingDebt] = useState(false);
+  const [showCostBasis, setShowCostBasis] = useState(false);
   const {
     register,
     handleSubmit,
@@ -190,6 +193,8 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         currency: asset.currency,
         quantity: asset.quantity,
         manualPrice: asset.currentPrice > 0 ? asset.currentPrice : undefined,
+        averageCost: asset.averageCost || undefined,
+        taxRate: asset.taxRate || undefined,
         isLiquid: defaultIsLiquid,
         autoUpdatePrice: asset.autoUpdatePrice !== undefined ? asset.autoUpdatePrice : shouldUpdatePrice(asset.type, asset.subCategory),
         isComposite: !!(asset.composition && asset.composition.length > 0),
@@ -206,6 +211,9 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
 
       // Set hasOutstandingDebt state based on asset data
       setHasOutstandingDebt(!!(asset.outstandingDebt && asset.outstandingDebt > 0));
+
+      // Set showCostBasis state based on asset data
+      setShowCostBasis(!!((asset.averageCost && asset.averageCost > 0) || (asset.taxRate && asset.taxRate > 0)));
     } else {
       reset({
         ticker: '',
@@ -216,6 +224,8 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         currency: 'EUR',
         quantity: 0,
         manualPrice: undefined,
+        averageCost: undefined,
+        taxRate: undefined,
         isLiquid: true,
         autoUpdatePrice: true,
         isComposite: false,
@@ -224,6 +234,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
       setComposition([]);
       setIsComposite(false);
       setHasOutstandingDebt(false);
+      setShowCostBasis(false);
     }
   }, [asset, reset]);
 
@@ -371,6 +382,8 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         subCategory: data.subCategory || undefined,
         currency: data.currency,
         quantity: data.quantity,
+        averageCost: data.averageCost && !isNaN(data.averageCost) && data.averageCost > 0 ? data.averageCost : undefined,
+        taxRate: data.taxRate && !isNaN(data.taxRate) && data.taxRate >= 0 ? data.taxRate : undefined,
         currentPrice,
         isLiquid: data.isLiquid,
         autoUpdatePrice: data.autoUpdatePrice,
@@ -777,6 +790,71 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
               )}
             </div>
           )}
+
+          {/* Cost Basis Tracking */}
+          <div className="space-y-2 rounded-lg border p-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="showCostBasis">Tracciamento Cost Basis</Label>
+                <p className="text-xs text-gray-500">
+                  Abilita il calcolo di plusvalenze non realizzate e tasse stimate
+                </p>
+              </div>
+              <Switch
+                id="showCostBasis"
+                checked={showCostBasis}
+                onCheckedChange={(checked) => {
+                  setShowCostBasis(checked);
+                  if (!checked) {
+                    setValue('averageCost', undefined);
+                    setValue('taxRate', undefined);
+                  }
+                }}
+              />
+            </div>
+
+            {showCostBasis && (
+              <div className="mt-4 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="averageCost">Costo Medio per Azione ({watch('currency')})</Label>
+                    <Input
+                      id="averageCost"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      {...register('averageCost', { valueAsNumber: true })}
+                      placeholder="es. 85.50"
+                    />
+                    {errors.averageCost && (
+                      <p className="text-sm text-red-500">{errors.averageCost.message}</p>
+                    )}
+                    <p className="text-xs text-gray-500">
+                      Il costo medio di acquisto per singola azione/unità
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="taxRate">Aliquota Fiscale (%)</Label>
+                    <Input
+                      id="taxRate"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      {...register('taxRate', { valueAsNumber: true })}
+                      placeholder="es. 26"
+                    />
+                    {errors.taxRate && (
+                      <p className="text-sm text-red-500">{errors.taxRate.message}</p>
+                    )}
+                    <p className="text-xs text-gray-500">
+                      Percentuale di tassazione sulle plusvalenze (es. 26 per 26%)
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
           {shouldUpdatePrice(selectedType, selectedSubCategory) && (
             <div className="space-y-2">

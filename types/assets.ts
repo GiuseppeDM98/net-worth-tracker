@@ -20,6 +20,7 @@ export interface Asset {
   currency: string;
   quantity: number;
   averageCost?: number;
+  taxRate?: number; // Tax rate percentage for unrealized gains (e.g., 26 for 26%)
   currentPrice: number;
   isLiquid?: boolean; // Default: true - indicates whether the asset is liquid or illiquid
   autoUpdatePrice?: boolean; // Default: true - indicates whether price should be automatically updated via Yahoo Finance
@@ -39,6 +40,7 @@ export interface AssetFormData {
   currency: string;
   quantity: number;
   averageCost?: number;
+  taxRate?: number; // Tax rate percentage for unrealized gains (e.g., 26 for 26%)
   currentPrice: number;
   isLiquid?: boolean;
   autoUpdatePrice?: boolean;
