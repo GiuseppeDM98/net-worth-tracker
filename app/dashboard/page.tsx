@@ -8,6 +8,11 @@ import {
   calculateTotalValue,
   calculateLiquidNetWorth,
   calculateIlliquidNetWorth,
+  calculateTotalUnrealizedGains,
+  calculateTotalEstimatedTaxes,
+  calculateLiquidEstimatedTaxes,
+  calculateGrossTotal,
+  calculateNetTotal,
 } from '@/lib/services/assetService';
 import {
   formatCurrency,
@@ -213,6 +218,17 @@ export default function DashboardPage() {
   const illiquidNetWorth = calculateIlliquidNetWorth(assets);
   const assetCount = assets.length;
 
+  // Cost basis tracking calculations
+  const unrealizedGains = calculateTotalUnrealizedGains(assets);
+  const estimatedTaxes = calculateTotalEstimatedTaxes(assets);
+  const liquidEstimatedTaxes = calculateLiquidEstimatedTaxes(assets);
+  const grossTotal = calculateGrossTotal(assets);
+  const netTotal = calculateNetTotal(assets);
+  const liquidNetTotal = liquidNetWorth - liquidEstimatedTaxes;
+
+  // Check if any asset has cost basis tracking enabled
+  const hasCostBasisTracking = assets.some(a => (a.averageCost && a.averageCost > 0) || (a.taxRate && a.taxRate > 0));
+
   // Prepare chart data
   const assetClassData = prepareAssetClassDistributionData(assets);
   const assetData = prepareAssetDistributionData(assets);
@@ -263,7 +279,7 @@ export default function DashboardPage() {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Patrimonio Totale</CardTitle>
+            <CardTitle className="text-sm font-medium">Patrimonio Totale Lordo</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -276,7 +292,7 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Patrimonio Liquido</CardTitle>
+            <CardTitle className="text-sm font-medium">Patrimonio Liquido Lordo</CardTitle>
             <Wallet className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -297,6 +313,79 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Cost Basis Cards - only show if any asset has cost basis tracking */}
+      {hasCostBasisTracking && (
+        <>
+          {/* Net Worth Cards */}
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Patrimonio Totale Netto</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-600">
+                  {formatCurrency(netTotal)}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Dopo tasse stimate
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Patrimonio Liquido Netto</CardTitle>
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-600">
+                  {formatCurrency(liquidNetTotal)}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Liquidità dopo tasse stimate
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Gains and Taxes Cards */}
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Plusvalenze Non Realizzate</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${
+                  unrealizedGains >= 0 ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {unrealizedGains >= 0 ? '+' : ''}{formatCurrency(unrealizedGains)}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Guadagno/perdita rispetto al costo medio
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Tasse Stimate</CardTitle>
+                <Receipt className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-orange-600">
+                  {formatCurrency(estimatedTaxes)}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Imposte su plusvalenze non realizzate
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      )}
 
       {/* Variazioni Cards */}
       <div className="grid gap-6 md:grid-cols-2">

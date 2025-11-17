@@ -256,3 +256,82 @@ export function calculateIlliquidNetWorth(assets: Asset[]): number {
     })
     .reduce((total, asset) => total + calculateAssetValue(asset), 0);
 }
+
+/**
+ * Calculate unrealized gains for a single asset
+ * Returns 0 if averageCost is not set
+ */
+export function calculateUnrealizedGains(asset: Asset): number {
+  if (!asset.averageCost || asset.averageCost <= 0) {
+    return 0;
+  }
+
+  const currentValue = asset.quantity * asset.currentPrice;
+  const costBasis = asset.quantity * asset.averageCost;
+  return currentValue - costBasis;
+}
+
+/**
+ * Calculate estimated taxes on unrealized gains for a single asset
+ * Returns 0 if taxRate is not set or gains are negative/zero
+ */
+export function calculateEstimatedTaxes(asset: Asset): number {
+  const gains = calculateUnrealizedGains(asset);
+
+  if (gains <= 0 || !asset.taxRate || asset.taxRate <= 0) {
+    return 0;
+  }
+
+  return gains * (asset.taxRate / 100);
+}
+
+/**
+ * Calculate total unrealized gains for portfolio
+ */
+export function calculateTotalUnrealizedGains(assets: Asset[]): number {
+  return assets.reduce((total, asset) => total + calculateUnrealizedGains(asset), 0);
+}
+
+/**
+ * Calculate total estimated taxes for portfolio
+ */
+export function calculateTotalEstimatedTaxes(assets: Asset[]): number {
+  return assets.reduce((total, asset) => total + calculateEstimatedTaxes(asset), 0);
+}
+
+/**
+ * Calculate estimated taxes only for liquid assets
+ * Used to calculate net liquid net worth
+ */
+export function calculateLiquidEstimatedTaxes(assets: Asset[]): number {
+  return assets
+    .filter(asset => {
+      // Use same logic as calculateLiquidNetWorth
+      if (asset.isLiquid !== undefined) {
+        return asset.isLiquid === true;
+      }
+      // Legacy logic for backwards compatibility
+      return (
+        asset.assetClass !== 'realestate' &&
+        asset.subCategory !== 'Private Equity'
+      );
+    })
+    .reduce((total, asset) => total + calculateEstimatedTaxes(asset), 0);
+}
+
+/**
+ * Calculate gross total (current portfolio value)
+ * Alias for calculateTotalValue for clarity in cost basis context
+ */
+export function calculateGrossTotal(assets: Asset[]): number {
+  return calculateTotalValue(assets);
+}
+
+/**
+ * Calculate net total (portfolio value after estimated taxes on unrealized gains)
+ */
+export function calculateNetTotal(assets: Asset[]): number {
+  const grossTotal = calculateTotalValue(assets);
+  const estimatedTaxes = calculateTotalEstimatedTaxes(assets);
+  return grossTotal - estimatedTaxes;
+}
