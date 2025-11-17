@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getAllAssets } from '@/lib/services/assetService';
+import { getAllAssets, ASSET_CLASS_ORDER } from '@/lib/services/assetService';
 import { getUserSnapshots } from '@/lib/services/snapshotService';
 import {
   getTargets,
@@ -140,14 +140,27 @@ export default function HistoryPage() {
     targets || getDefaultTargets()
   );
 
-  const currentVsTargetData = Object.entries(allocation.byAssetClass).map(
-    ([assetClass, data]) => ({
-      name: assetClass,
+  const assetClassLabels: Record<string, string> = {
+    equity: 'Azioni (Equity)',
+    bonds: 'Obbligazioni (Bonds)',
+    crypto: 'Criptovalute (Crypto)',
+    realestate: 'Immobili (Real Estate)',
+    cash: 'Liquidità (Cash)',
+    commodity: 'Materie Prime (Commodity)',
+  };
+
+  const currentVsTargetData = Object.entries(allocation.byAssetClass)
+    .sort(([a], [b]) => {
+      const orderA = ASSET_CLASS_ORDER[a] || 999;
+      const orderB = ASSET_CLASS_ORDER[b] || 999;
+      return orderA - orderB;
+    })
+    .map(([assetClass, data]) => ({
+      name: assetClassLabels[assetClass] || assetClass,
       corrente: data.currentPercentage,
       target: data.targetPercentage,
       color: getAssetClassColor(assetClass),
-    })
-  );
+    }));
 
   // Custom label render functions for charts
   const renderNetWorthLabelTotal = (props: any) => {
@@ -733,7 +746,7 @@ export default function HistoryPage() {
                 {currentVsTargetData.map((item) => (
                   <div key={item.name} className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium capitalize">{item.name}</span>
+                      <span className="font-medium">{item.name}</span>
                       <span className="text-gray-600">
                         {formatPercentage(item.corrente)} /{' '}
                         {formatPercentage(item.target)}
