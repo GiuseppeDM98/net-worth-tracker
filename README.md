@@ -450,12 +450,17 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - ✅ Registration control system
 - ✅ Cost basis tracking with unrealized gains and tax estimation
 
+### Fixes & Improvements (🔧)
+- 🔧 Fix for manual date entry when adding expenses
+
 ### Future Enhancements (Planned 🔜)
 - 🔜 PDF export of portfolio reports
 - 🔜 Email notifications (monthly summary)
 - 🔜 Multi-currency full conversion support
 - 🔜 Performance metrics (ROI, IRR, CAGR, Sharpe ratio)
 - 🔜 Internationalization (i18n) for multi-language support
+- 🔜 Ability to search for a category or subcategory when adding an expense
+- 🔜 Display selected month in expense tracking page (when filtering by month, make it clear to users that income, expense, and balance boxes refer to the filtered month)
 
 ### Long-term Vision (Future 🚀)
 - 🚀 CSV/Excel import for bulk asset additions
