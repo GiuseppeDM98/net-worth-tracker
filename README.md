@@ -452,6 +452,7 @@ See the [LICENSE](./LICENSE) file for the full license text.
 
 ### Fixes & Improvements (🔧)
 - 🔧 Fix for manual date entry when adding expenses
+- 🔧 Fix for pie chart legends in History and Overview pages to be sorted from top to bottom by largest to smallest value
 
 ### Future Enhancements (Planned 🔜)
 - 🔜 PDF export of portfolio reports
@@ -467,11 +468,11 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - 🚀 Risk analysis (volatility, max drawdown, correlation)
 - 🚀 Backtesting allocation strategies
 - 🚀 Monte Carlo retirement simulations
-- 🚀 Social features (anonymous portfolio comparison)
 - 🚀 AI-powered rebalancing suggestions
 - 🚀 Dividend tracking
 - 🚀 Tax reporting (capital gains, dividends)
 - 🚀 Automatic price tracking for individual bonds
+- 🚀 Find a way to dockerize the application for easy self-hosting by anyone, explore database structure modifications (SQLite or other options?) to give users broad choice based on an .env.local variable, so the software will know whether to use Firebase or a local database - Idea to explore
 
 ---
 
