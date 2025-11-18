@@ -476,9 +476,17 @@ See the [LICENSE](./LICENSE) file for the full license text.
 
 ---
 
-## ⭐ Star History
 
+## ⭐ Star History
 If you find this project useful, please consider giving it a star on GitHub!
+
+<a href="https://www.star-history.com/#GiuseppeDM98/net-worth-tracker&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=GiuseppeDM98/net-worth-tracker&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=GiuseppeDM98/net-worth-tracker&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=GiuseppeDM98/net-worth-tracker&type=date&legend=top-left" />
+ </picture>
+</a>
 
 ---
 
