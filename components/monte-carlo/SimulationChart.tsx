@@ -12,7 +12,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
-import { formatCurrency } from '@/lib/services/chartService';
+import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
 
 interface SimulationChartProps {
   data: PercentilesData[];
@@ -67,7 +67,7 @@ export function SimulationChart({ data, retirementYears }: SimulationChartProps)
               stroke="#9CA3AF"
             />
             <YAxis
-              tickFormatter={(value) => `€${(value / 1000).toFixed(0)}k`}
+              tickFormatter={(value) => formatCurrencyCompact(value)}
               label={{ value: 'Patrimonio', angle: -90, position: 'insideLeft' }}
               stroke="#9CA3AF"
             />

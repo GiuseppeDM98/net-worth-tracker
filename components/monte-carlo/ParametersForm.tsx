@@ -54,6 +54,7 @@ export function ParametersForm({
     setCustomPortfolio(value);
     const numValue = parseFloat(value);
     if (!isNaN(numValue) && numValue > 0) {
+      updateParam('portfolioSource', 'custom'); // FIX: Imposta source a custom
       updateParam('initialPortfolio', numValue);
     }
   };
@@ -155,7 +156,7 @@ export function ParametersForm({
                 value={customPortfolio}
                 onChange={(e) => handleCustomPortfolioChange(e.target.value)}
                 className="ml-6"
-                step="1000"
+                step="1"
                 min="0"
               />
             )}

@@ -10,6 +10,7 @@ import {
   calculateHistoricalReturns,
   getDefaultMarketParameters,
 } from '@/lib/services/monteCarloService';
+import { formatCurrencyCompact } from '@/lib/services/chartService';
 import { Asset, MonteCarloParams, MonteCarloResults, HistoricalReturnsData } from '@/types/assets';
 import { toast } from 'sonner';
 import { Dices } from 'lucide-react';
@@ -305,11 +306,11 @@ export default function MonteCarloPage() {
                       .map((p) => (
                         <tr key={p.year} className="border-b">
                           <td className="p-2">{p.year}</td>
-                          <td className="text-right p-2">€{(p.p10 / 1000).toFixed(0)}k</td>
-                          <td className="text-right p-2">€{(p.p25 / 1000).toFixed(0)}k</td>
-                          <td className="text-right p-2 font-bold">€{(p.p50 / 1000).toFixed(0)}k</td>
-                          <td className="text-right p-2">€{(p.p75 / 1000).toFixed(0)}k</td>
-                          <td className="text-right p-2">€{(p.p90 / 1000).toFixed(0)}k</td>
+                          <td className="text-right p-2">{formatCurrencyCompact(p.p10)}</td>
+                          <td className="text-right p-2">{formatCurrencyCompact(p.p25)}</td>
+                          <td className="text-right p-2 font-bold">{formatCurrencyCompact(p.p50)}</td>
+                          <td className="text-right p-2">{formatCurrencyCompact(p.p75)}</td>
+                          <td className="text-right p-2">{formatCurrencyCompact(p.p90)}</td>
                         </tr>
                       ))}
                   </tbody>
