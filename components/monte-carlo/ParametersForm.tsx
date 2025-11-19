@@ -3,8 +3,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { AlertCircle, Settings, Info } from 'lucide-react';
-import { MonteCarloParams, PortfolioSource, HistoricalReturnsData } from '@/types/assets';
+import { AlertCircle, Settings, Info, ChevronDown, ChevronUp } from 'lucide-react';
+import { MonteCarloParams, HistoricalReturnsData } from '@/types/assets';
 import { formatCurrency } from '@/lib/services/chartService';
 import { useState } from 'react';
 
@@ -27,7 +27,18 @@ export function ParametersForm({
   historicalReturns,
   isRunning,
 }: ParametersFormProps) {
-  const [customPortfolio, setCustomPortfolio] = useState<string>('');
+  const [equityInput, setEquityInput] = useState<string>(params.equityPercentage.toString());
+  const [bondsInput, setBondsInput] = useState<string>(params.bondsPercentage.toString());
+
+  // Market parameters local state
+  const [equityReturnInput, setEquityReturnInput] = useState<string>(params.equityReturn.toFixed(1));
+  const [equityVolatilityInput, setEquityVolatilityInput] = useState<string>(params.equityVolatility.toFixed(1));
+  const [bondsReturnInput, setBondsReturnInput] = useState<string>(params.bondsReturn.toFixed(1));
+  const [bondsVolatilityInput, setBondsVolatilityInput] = useState<string>(params.bondsVolatility.toFixed(1));
+  const [inflationRateInput, setInflationRateInput] = useState<string>(params.inflationRate.toFixed(1));
+
+  // Collapsible state for technical details
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState<boolean>(false);
 
   const isHistoricalAvailable = historicalReturns !== null;
   const availableMonths = historicalReturns?.availableMonths ?? 0;
@@ -39,23 +50,57 @@ export function ParametersForm({
     onParamsChange({ ...params, [key]: value });
   };
 
-  const handlePortfolioSourceChange = (source: PortfolioSource) => {
-    updateParam('portfolioSource', source);
-    if (source === 'total') {
-      updateParam('initialPortfolio', totalNetWorth);
-      setCustomPortfolio('');
-    } else if (source === 'liquid') {
-      updateParam('initialPortfolio', liquidNetWorth);
-      setCustomPortfolio('');
+  const handleUseTotalPortfolio = () => {
+    updateParam('initialPortfolio', Math.round(totalNetWorth));
+  };
+
+  const handleUseLiquidPortfolio = () => {
+    updateParam('initialPortfolio', Math.round(liquidNetWorth));
+  };
+
+  const handleEquityChange = (value: string) => {
+    setEquityInput(value);
+  };
+
+  const handleBondsChange = (value: string) => {
+    setBondsInput(value);
+  };
+
+  const handleEquityBlur = () => {
+    const value = parseFloat(equityInput);
+    if (!isNaN(value) && value >= 0 && value <= 100) {
+      updateParam('equityPercentage', value);
+      updateParam('bondsPercentage', 100 - value);
+      setBondsInput((100 - value).toString());
+    } else {
+      setEquityInput(params.equityPercentage.toString());
     }
   };
 
-  const handleCustomPortfolioChange = (value: string) => {
-    setCustomPortfolio(value);
-    const numValue = parseFloat(value);
-    if (!isNaN(numValue) && numValue > 0) {
-      updateParam('portfolioSource', 'custom'); // FIX: Imposta source a custom
-      updateParam('initialPortfolio', numValue);
+  const handleBondsBlur = () => {
+    const value = parseFloat(bondsInput);
+    if (!isNaN(value) && value >= 0 && value <= 100) {
+      updateParam('bondsPercentage', value);
+      updateParam('equityPercentage', 100 - value);
+      setEquityInput((100 - value).toString());
+    } else {
+      setBondsInput(params.bondsPercentage.toString());
+    }
+  };
+
+  // Market parameter handlers
+  const handleMarketParamBlur = (
+    paramKey: 'equityReturn' | 'equityVolatility' | 'bondsReturn' | 'bondsVolatility' | 'inflationRate',
+    inputValue: string,
+    setInputState: (value: string) => void,
+    fallbackValue: number
+  ) => {
+    const value = parseFloat(inputValue);
+    if (!isNaN(value) && value >= -100 && value <= 100) {
+      updateParam(paramKey, value);
+      setInputState(value.toFixed(1));
+    } else {
+      setInputState(fallbackValue.toFixed(1));
     }
   };
 
@@ -66,6 +111,11 @@ export function ParametersForm({
       updateParam('equityVolatility', historicalReturns.equity.volatility);
       updateParam('bondsReturn', historicalReturns.bonds.mean);
       updateParam('bondsVolatility', historicalReturns.bonds.volatility);
+      // Update local state
+      setEquityReturnInput(historicalReturns.equity.mean.toFixed(1));
+      setEquityVolatilityInput(historicalReturns.equity.volatility.toFixed(1));
+      setBondsReturnInput(historicalReturns.bonds.mean.toFixed(1));
+      setBondsVolatilityInput(historicalReturns.bonds.volatility.toFixed(1));
     } else {
       updateParam('parameterSource', 'market');
       // Reset to market defaults
@@ -73,6 +123,11 @@ export function ParametersForm({
       updateParam('equityVolatility', 18.0);
       updateParam('bondsReturn', 3.0);
       updateParam('bondsVolatility', 6.0);
+      // Update local state
+      setEquityReturnInput('7.0');
+      setEquityVolatilityInput('18.0');
+      setBondsReturnInput('3.0');
+      setBondsVolatilityInput('6.0');
     }
   };
 
@@ -108,59 +163,39 @@ export function ParametersForm({
 
         {/* Portfolio Source */}
         <div className="space-y-3">
-          <Label className="text-base font-semibold">Patrimonio Iniziale</Label>
-          <div className="grid gap-3">
-            <div className="flex items-center space-x-2">
-              <input
-                type="radio"
-                id="total"
-                name="portfolioSource"
-                checked={params.portfolioSource === 'total'}
-                onChange={() => handlePortfolioSourceChange('total')}
-                className="h-4 w-4"
-              />
-              <Label htmlFor="total" className="cursor-pointer font-normal">
-                Patrimonio Totale ({formatCurrency(totalNetWorth)})
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <input
-                type="radio"
-                id="liquid"
-                name="portfolioSource"
-                checked={params.portfolioSource === 'liquid'}
-                onChange={() => handlePortfolioSourceChange('liquid')}
-                className="h-4 w-4"
-              />
-              <Label htmlFor="liquid" className="cursor-pointer font-normal">
-                Patrimonio Liquido ({formatCurrency(liquidNetWorth)})
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <input
-                type="radio"
-                id="custom"
-                name="portfolioSource"
-                checked={params.portfolioSource === 'custom'}
-                onChange={() => handlePortfolioSourceChange('custom')}
-                className="h-4 w-4"
-              />
-              <Label htmlFor="custom" className="cursor-pointer font-normal">
-                Valore Personalizzato
-              </Label>
-            </div>
-            {params.portfolioSource === 'custom' && (
-              <Input
-                type="number"
-                placeholder="Inserisci importo (€)"
-                value={customPortfolio}
-                onChange={(e) => handleCustomPortfolioChange(e.target.value)}
-                className="ml-6"
-                step="1"
-                min="0"
-              />
-            )}
+          <Label htmlFor="initialPortfolio" className="text-base font-semibold">
+            Patrimonio Iniziale
+          </Label>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleUseTotalPortfolio}
+              className="flex-1"
+            >
+              Usa Patrimonio Totale ({formatCurrency(totalNetWorth)})
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleUseLiquidPortfolio}
+              className="flex-1"
+            >
+              Usa Patrimonio Liquido ({formatCurrency(liquidNetWorth)})
+            </Button>
           </div>
+          <Input
+            id="initialPortfolio"
+            type="number"
+            placeholder="Inserisci importo (€)"
+            value={params.initialPortfolio}
+            onChange={(e) => updateParam('initialPortfolio', parseInt(e.target.value, 10) || 0)}
+            onWheel={(e) => e.currentTarget.blur()}
+            step="1000"
+            min="0"
+          />
         </div>
 
         {/* Retirement Years & Annual Withdrawal */}
@@ -172,6 +207,7 @@ export function ParametersForm({
               type="number"
               value={params.retirementYears}
               onChange={(e) => updateParam('retirementYears', parseInt(e.target.value) || 30)}
+              onWheel={(e) => e.currentTarget.blur()}
               min="1"
               max="60"
               className="mt-1"
@@ -184,7 +220,8 @@ export function ParametersForm({
               id="annualWithdrawal"
               type="number"
               value={params.annualWithdrawal}
-              onChange={(e) => updateParam('annualWithdrawal', parseFloat(e.target.value) || 0)}
+              onChange={(e) => updateParam('annualWithdrawal', parseInt(e.target.value, 10) || 0)}
+              onWheel={(e) => e.currentTarget.blur()}
               step="1000"
               min="0"
               className="mt-1"
@@ -204,12 +241,10 @@ export function ParametersForm({
               <Input
                 id="equityPercentage"
                 type="number"
-                value={params.equityPercentage}
-                onChange={(e) => {
-                  const value = parseFloat(e.target.value) || 0;
-                  updateParam('equityPercentage', value);
-                  updateParam('bondsPercentage', 100 - value);
-                }}
+                value={equityInput}
+                onChange={(e) => handleEquityChange(e.target.value)}
+                onBlur={handleEquityBlur}
+                onWheel={(e) => e.currentTarget.blur()}
                 min="0"
                 max="100"
                 step="5"
@@ -221,12 +256,10 @@ export function ParametersForm({
               <Input
                 id="bondsPercentage"
                 type="number"
-                value={params.bondsPercentage}
-                onChange={(e) => {
-                  const value = parseFloat(e.target.value) || 0;
-                  updateParam('bondsPercentage', value);
-                  updateParam('equityPercentage', 100 - value);
-                }}
+                value={bondsInput}
+                onChange={(e) => handleBondsChange(e.target.value)}
+                onBlur={handleBondsBlur}
+                onWheel={(e) => e.currentTarget.blur()}
                 min="0"
                 max="100"
                 step="5"
@@ -240,6 +273,89 @@ export function ParametersForm({
               La somma deve essere 100%
             </p>
           )}
+        </div>
+
+        {/* Market vs Historical Parameters Explanation */}
+        <div className="space-y-2">
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex gap-2">
+              <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-blue-900">
+                <p className="font-semibold mb-2">Parametri di Mercato vs Storici</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>
+                    <strong>Parametri di Mercato</strong>: Valori medi storici generali
+                    (Equity: 7% rendimento / 18% volatilità, Bonds: 3% / 6%)
+                  </li>
+                  <li>
+                    <strong>Parametri Storici</strong>: Calcolati dai tuoi snapshot mensili reali
+                    analizzando i rendimenti passati dei tuoi investimenti in equity e bonds
+                  </li>
+                  <li>
+                    I parametri storici riflettono il <strong>tuo comportamento</strong> di investimento
+                    reale e le tue allocazioni specifiche
+                  </li>
+                  <li>
+                    Requisito minimo: <strong>24 snapshot mensili</strong> per avere dati statisticamente significativi
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Technical Details Collapsible */}
+          <div className="border border-blue-200 rounded-lg overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
+              className="w-full p-3 bg-blue-100 hover:bg-blue-150 transition-colors flex items-center justify-between text-left"
+            >
+              <span className="text-sm font-semibold text-blue-900">Dettagli Tecnici del Calcolo</span>
+              {showTechnicalDetails ? (
+                <ChevronUp className="h-4 w-4 text-blue-600" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-blue-600" />
+              )}
+            </button>
+
+            {showTechnicalDetails && (
+              <div className="p-4 bg-blue-50 text-sm text-blue-900 space-y-3">
+                <div>
+                  <p className="font-semibold mb-1">Come vengono calcolati i parametri storici:</p>
+                  <ol className="list-decimal list-inside space-y-2 ml-2">
+                    <li>
+                      <strong>Calcolo dei rendimenti mensili</strong>: Per ogni mese viene calcolato
+                      il rendimento percentuale degli asset equity e bonds separatamente
+                    </li>
+                    <li>
+                      <strong>Filtraggio degli outlier</strong>: I rendimenti mensili superiori a +50%
+                      o inferiori a -50% vengono scartati, in quanto probabilmente dovuti a depositi
+                      o prelievi piuttosto che a performance di mercato
+                    </li>
+                    <li>
+                      <strong>Annualizzazione dei rendimenti</strong>: La media dei rendimenti mensili
+                      viene annualizzata usando la formula composta: ((1 + rendimento_mensile)<sup>12</sup> - 1) × 100
+                    </li>
+                    <li>
+                      <strong>Calcolo della volatilità</strong>: La deviazione standard dei rendimenti
+                      mensili viene calcolata e poi annualizzata moltiplicandola per √12
+                    </li>
+                    <li>
+                      <strong>Requisiti minimi</strong>: Servono almeno 24 snapshot mensili e 12 rendimenti
+                      mensili validi (dopo il filtraggio) per ogni asset class
+                    </li>
+                  </ol>
+                </div>
+                <div className="pt-2 border-t border-blue-200">
+                  <p className="text-xs italic">
+                    Questo approccio statistico garantisce che i parametri riflettano accuratamente
+                    la tua esperienza di investimento personale, escludendo anomalie dovute a movimenti
+                    di capitale.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Historical vs Market Parameters Toggle */}
@@ -291,8 +407,10 @@ export function ParametersForm({
               <Input
                 id="equityReturn"
                 type="number"
-                value={params.equityReturn.toFixed(1)}
-                onChange={(e) => updateParam('equityReturn', parseFloat(e.target.value) || 0)}
+                value={equityReturnInput}
+                onChange={(e) => setEquityReturnInput(e.target.value)}
+                onBlur={() => handleMarketParamBlur('equityReturn', equityReturnInput, setEquityReturnInput, params.equityReturn)}
+                onWheel={(e) => e.currentTarget.blur()}
                 step="0.1"
                 disabled={params.parameterSource === 'historical'}
                 className="mt-1"
@@ -303,10 +421,10 @@ export function ParametersForm({
               <Input
                 id="equityVolatility"
                 type="number"
-                value={params.equityVolatility.toFixed(1)}
-                onChange={(e) =>
-                  updateParam('equityVolatility', parseFloat(e.target.value) || 0)
-                }
+                value={equityVolatilityInput}
+                onChange={(e) => setEquityVolatilityInput(e.target.value)}
+                onBlur={() => handleMarketParamBlur('equityVolatility', equityVolatilityInput, setEquityVolatilityInput, params.equityVolatility)}
+                onWheel={(e) => e.currentTarget.blur()}
                 step="0.1"
                 disabled={params.parameterSource === 'historical'}
                 className="mt-1"
@@ -319,8 +437,10 @@ export function ParametersForm({
               <Input
                 id="bondsReturn"
                 type="number"
-                value={params.bondsReturn.toFixed(1)}
-                onChange={(e) => updateParam('bondsReturn', parseFloat(e.target.value) || 0)}
+                value={bondsReturnInput}
+                onChange={(e) => setBondsReturnInput(e.target.value)}
+                onBlur={() => handleMarketParamBlur('bondsReturn', bondsReturnInput, setBondsReturnInput, params.bondsReturn)}
+                onWheel={(e) => e.currentTarget.blur()}
                 step="0.1"
                 disabled={params.parameterSource === 'historical'}
                 className="mt-1"
@@ -331,10 +451,10 @@ export function ParametersForm({
               <Input
                 id="bondsVolatility"
                 type="number"
-                value={params.bondsVolatility.toFixed(1)}
-                onChange={(e) =>
-                  updateParam('bondsVolatility', parseFloat(e.target.value) || 0)
-                }
+                value={bondsVolatilityInput}
+                onChange={(e) => setBondsVolatilityInput(e.target.value)}
+                onBlur={() => handleMarketParamBlur('bondsVolatility', bondsVolatilityInput, setBondsVolatilityInput, params.bondsVolatility)}
+                onWheel={(e) => e.currentTarget.blur()}
                 step="0.1"
                 disabled={params.parameterSource === 'historical'}
                 className="mt-1"
@@ -346,8 +466,10 @@ export function ParametersForm({
             <Input
               id="inflationRate"
               type="number"
-              value={params.inflationRate.toFixed(1)}
-              onChange={(e) => updateParam('inflationRate', parseFloat(e.target.value) || 0)}
+              value={inflationRateInput}
+              onChange={(e) => setInflationRateInput(e.target.value)}
+              onBlur={() => handleMarketParamBlur('inflationRate', inflationRateInput, setInflationRateInput, params.inflationRate)}
+              onWheel={(e) => e.currentTarget.blur()}
               step="0.1"
               className="mt-1"
             />
@@ -364,6 +486,7 @@ export function ParametersForm({
             onChange={(e) =>
               updateParam('numberOfSimulations', parseInt(e.target.value) || 10000)
             }
+            onWheel={(e) => e.currentTarget.blur()}
             step="1000"
             min="1000"
             max="50000"
