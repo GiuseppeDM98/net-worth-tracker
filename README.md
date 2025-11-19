@@ -85,6 +85,18 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
 - **Years of expenses** coverage tracker
 - **Historical evolution** charts of income, expenses, and sustainable withdrawal
 
+### 🎲 **Monte Carlo Retirement Simulations**
+- **Probabilistic retirement planning** with thousands of simulations
+- **Success rate calculation** to assess plan sustainability
+- **Market vs Historical parameters**: Use standard market assumptions or your own historical returns
+- **Flexible portfolio selection**: Total net worth, liquid assets only, or custom amount
+- **Interactive visualizations**:
+  - Fan chart showing percentile distributions (10th, 25th, 50th, 75th, 90th)
+  - Distribution histogram of final portfolio values
+  - Failure analysis with median and average depletion years
+- **Configurable parameters**: Retirement duration, asset allocation, withdrawal rates, inflation
+- **Automatic data integration**: Pre-populates with your current portfolio and expense data
+
 ### 🏆 **Hall of Fame Rankings**
 - **Personal financial records** across all time
 - **Best/Worst months** by net worth growth, income, and expenses (Top 20)
@@ -449,6 +461,7 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - ✅ Hall of Fame personal financial rankings
 - ✅ Registration control system
 - ✅ Cost basis tracking with unrealized gains and tax estimation
+- ✅ Monte Carlo retirement simulations
 
 ### Future Enhancements (Planned 🔜)
 - 🔜 PDF export of portfolio reports
@@ -463,7 +476,6 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - 🚀 CSV/Excel import for bulk asset additions
 - 🚀 Risk analysis (volatility, max drawdown, correlation)
 - 🚀 Backtesting allocation strategies
-- 🚀 Monte Carlo retirement simulations
 - 🚀 AI-powered rebalancing suggestions
 - 🚀 Dividend tracking
 - 🚀 Tax reporting (capital gains, dividends)

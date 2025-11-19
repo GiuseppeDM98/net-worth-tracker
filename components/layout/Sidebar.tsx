@@ -13,6 +13,7 @@ import {
   BarChart3,
   Flame,
   Trophy,
+  Dices,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -31,6 +32,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     { name: 'History', href: '/dashboard/history', icon: History },
     { name: 'Hall of Fame', href: '/dashboard/hall-of-fame', icon: Trophy },
     { name: 'FIRE', href: '/dashboard/fire', icon: Flame },
+    { name: 'Monte Carlo', href: '/dashboard/monte-carlo', icon: Dices },
     { name: 'Tracciamento Spese', href: '/dashboard/expenses', icon: Receipt },
     { name: `Cashflow ${currentYear}`, href: '/dashboard/expense-charts', icon: BarChart3 },
     { name: 'Cashflow Totale', href: '/dashboard/expense-charts-total', icon: BarChart3 },
