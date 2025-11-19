@@ -422,12 +422,38 @@ export default function ExpenseChartsPage() {
                     layout="vertical"
                     align="right"
                     verticalAlign="middle"
-                    formatter={(value, entry: any) => {
-                      const item = expensesByCategoryData.find(d => d.name === value);
-                      if (item) {
-                        return `${value} (${item.percentage.toFixed(1)}%)`;
-                      }
-                      return value;
+                    content={() => {
+                      const filteredData = expensesByCategoryData
+                        .filter(d => d.percentage >= 5)
+                        .sort((a, b) => b.value - a.value);
+                      return (
+                        <div style={{ paddingLeft: '20px' }}>
+                          {filteredData.map((entry, index) => (
+                            <div
+                              key={`legend-item-${index}`}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                marginBottom: '8px',
+                                fontSize: '14px',
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: '14px',
+                                  height: '14px',
+                                  backgroundColor: entry.color,
+                                  marginRight: '8px',
+                                  flexShrink: 0,
+                                }}
+                              />
+                              <span style={{ color: '#374151' }}>
+                                {entry.name} ({entry.percentage.toFixed(1)}%)
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      );
                     }}
                   />
                 </RechartsPC>
@@ -475,12 +501,38 @@ export default function ExpenseChartsPage() {
                     layout="vertical"
                     align="right"
                     verticalAlign="middle"
-                    formatter={(value, entry: any) => {
-                      const item = incomeByCategoryData.find(d => d.name === value);
-                      if (item) {
-                        return `${value} (${item.percentage.toFixed(1)}%)`;
-                      }
-                      return value;
+                    content={() => {
+                      const filteredData = incomeByCategoryData
+                        .filter(d => d.percentage >= 5)
+                        .sort((a, b) => b.value - a.value);
+                      return (
+                        <div style={{ paddingLeft: '20px' }}>
+                          {filteredData.map((entry, index) => (
+                            <div
+                              key={`legend-item-${index}`}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                marginBottom: '8px',
+                                fontSize: '14px',
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: '14px',
+                                  height: '14px',
+                                  backgroundColor: entry.color,
+                                  marginRight: '8px',
+                                  flexShrink: 0,
+                                }}
+                              />
+                              <span style={{ color: '#374151' }}>
+                                {entry.name} ({entry.percentage.toFixed(1)}%)
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      );
                     }}
                   />
                 </RechartsPC>
@@ -528,12 +580,38 @@ export default function ExpenseChartsPage() {
                     layout="vertical"
                     align="right"
                     verticalAlign="middle"
-                    formatter={(value, entry: any) => {
-                      const item = expensesByTypeData.find(d => d.name === value);
-                      if (item) {
-                        return `${value} (${item.percentage.toFixed(1)}%)`;
-                      }
-                      return value;
+                    content={() => {
+                      const filteredData = expensesByTypeData
+                        .filter(d => d.percentage >= 5)
+                        .sort((a, b) => b.value - a.value);
+                      return (
+                        <div style={{ paddingLeft: '20px' }}>
+                          {filteredData.map((entry, index) => (
+                            <div
+                              key={`legend-item-${index}`}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                marginBottom: '8px',
+                                fontSize: '14px',
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: '14px',
+                                  height: '14px',
+                                  backgroundColor: entry.color,
+                                  marginRight: '8px',
+                                  flexShrink: 0,
+                                }}
+                              />
+                              <span style={{ color: '#374151' }}>
+                                {entry.name} ({entry.percentage.toFixed(1)}%)
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      );
                     }}
                   />
                 </RechartsPC>
@@ -550,7 +628,7 @@ export default function ExpenseChartsPage() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={350}>
-                <BarChart data={monthlyTrendData}>
+                <LineChart data={monthlyTrendData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis tickFormatter={(value) => `€${value.toLocaleString('it-IT')}`} />
@@ -563,10 +641,10 @@ export default function ExpenseChartsPage() {
                     }}
                   />
                   <Legend />
-                  <Bar dataKey="Entrate" fill="#10b981" />
-                  <Bar dataKey="Spese" fill="#ef4444" />
-                  <Bar dataKey="Netto" fill="#3b82f6" />
-                </BarChart>
+                  <Line type="monotone" dataKey="Entrate" stroke="#10b981" strokeWidth={2} />
+                  <Line type="monotone" dataKey="Spese" stroke="#ef4444" strokeWidth={2} />
+                  <Line type="monotone" dataKey="Netto" stroke="#3b82f6" strokeWidth={2} />
+                </LineChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
@@ -623,7 +701,7 @@ export default function ExpenseChartsPage() {
                     }}
                   />
                   <Legend />
-                  {monthlyExpensesByCategory.categories.map((category, index) => (
+                  {monthlyExpensesByCategory.categories.filter(cat => cat !== 'Altro').map((category, index) => (
                     <Line
                       key={category}
                       type="monotone"
@@ -659,7 +737,7 @@ export default function ExpenseChartsPage() {
                     }}
                   />
                   <Legend />
-                  {monthlyIncomeByCategory.categories.map((category, index) => (
+                  {monthlyIncomeByCategory.categories.filter(cat => cat !== 'Altro').map((category, index) => (
                     <Line
                       key={category}
                       type="monotone"

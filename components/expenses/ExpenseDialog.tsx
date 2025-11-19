@@ -170,7 +170,9 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
   }, [selectedDate, selectedIsRecurring, expense, setValue]);
 
   const getAvailableCategories = (): ExpenseCategory[] => {
-    return categories.filter(cat => cat.type === selectedType);
+    return categories
+      .filter(cat => cat.type === selectedType)
+      .sort((a, b) => a.name.localeCompare(b.name, 'it'));
   };
 
   const getSelectedCategory = (): ExpenseCategory | undefined => {
@@ -179,7 +181,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
 
   const getAvailableSubCategories = () => {
     const category = getSelectedCategory();
-    return category?.subCategories || [];
+    return (category?.subCategories || []).sort((a, b) => a.name.localeCompare(b.name, 'it'));
   };
 
   const handleCategoryCreated = async () => {
@@ -512,8 +514,14 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
                   type="date"
                   value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
                   onChange={(e) => {
-                    const date = e.target.value ? new Date(e.target.value) : new Date();
-                    field.onChange(date);
+                    const dateString = e.target.value;
+                    // Browser garantisce formato yyyy-MM-dd quando onChange viene chiamato
+                    if (dateString) {
+                      const date = new Date(dateString + 'T00:00:00');
+                      if (!isNaN(date.getTime())) {
+                        field.onChange(date);
+                      }
+                    }
                   }}
                   className={errors.date ? 'border-red-500' : ''}
                 />

@@ -430,7 +430,7 @@ export default function ExpenseChartsTotalPage() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={350}>
-                <BarChart data={monthlyTrendData}>
+                <LineChart data={monthlyTrendData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis tickFormatter={(value) => `€${value.toLocaleString('it-IT')}`} />
@@ -443,10 +443,10 @@ export default function ExpenseChartsTotalPage() {
                     }}
                   />
                   <Legend />
-                  <Bar dataKey="Entrate" fill="#10b981" />
-                  <Bar dataKey="Spese" fill="#ef4444" />
-                  <Bar dataKey="Netto" fill="#3b82f6" />
-                </BarChart>
+                  <Line type="monotone" dataKey="Entrate" stroke="#10b981" strokeWidth={2} />
+                  <Line type="monotone" dataKey="Spese" stroke="#ef4444" strokeWidth={2} />
+                  <Line type="monotone" dataKey="Netto" stroke="#3b82f6" strokeWidth={2} />
+                </LineChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
@@ -460,7 +460,7 @@ export default function ExpenseChartsTotalPage() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={350}>
-                <BarChart data={yearlyTrendData}>
+                <LineChart data={yearlyTrendData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="year" />
                   <YAxis tickFormatter={(value) => `€${value.toLocaleString('it-IT')}`} />
@@ -473,10 +473,10 @@ export default function ExpenseChartsTotalPage() {
                     }}
                   />
                   <Legend />
-                  <Bar dataKey="Entrate" fill="#10b981" />
-                  <Bar dataKey="Spese" fill="#ef4444" />
-                  <Bar dataKey="Netto" fill="#3b82f6" />
-                </BarChart>
+                  <Line type="monotone" dataKey="Entrate" stroke="#10b981" strokeWidth={2} />
+                  <Line type="monotone" dataKey="Spese" stroke="#ef4444" strokeWidth={2} />
+                  <Line type="monotone" dataKey="Netto" stroke="#3b82f6" strokeWidth={2} />
+                </LineChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
@@ -563,7 +563,7 @@ export default function ExpenseChartsTotalPage() {
                     }}
                   />
                   <Legend />
-                  {monthlyExpensesByCategory.categories.map((category, index) => (
+                  {monthlyExpensesByCategory.categories.filter(cat => cat !== 'Altro').map((category, index) => (
                     <Line
                       key={category}
                       type="monotone"
@@ -599,7 +599,7 @@ export default function ExpenseChartsTotalPage() {
                     }}
                   />
                   <Legend />
-                  {yearlyExpensesByCategory.categories.map((category, index) => (
+                  {yearlyExpensesByCategory.categories.filter(cat => cat !== 'Altro').map((category, index) => (
                     <Line
                       key={category}
                       type="monotone"
@@ -635,7 +635,7 @@ export default function ExpenseChartsTotalPage() {
                     }}
                   />
                   <Legend />
-                  {monthlyIncomeByCategory.categories.map((category, index) => (
+                  {monthlyIncomeByCategory.categories.filter(cat => cat !== 'Altro').map((category, index) => (
                     <Line
                       key={category}
                       type="monotone"
@@ -671,7 +671,7 @@ export default function ExpenseChartsTotalPage() {
                     }}
                   />
                   <Legend />
-                  {yearlyIncomeByCategory.categories.map((category, index) => (
+                  {yearlyIncomeByCategory.categories.filter(cat => cat !== 'Altro').map((category, index) => (
                     <Line
                       key={category}
                       type="monotone"

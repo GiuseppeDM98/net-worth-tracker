@@ -450,10 +450,6 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - ✅ Registration control system
 - ✅ Cost basis tracking with unrealized gains and tax estimation
 
-### Fixes & Improvements (🔧)
-- 🔧 Fix for manual date entry when adding expenses
-- 🔧 Fix for pie chart legends in History and Overview pages to be sorted from top to bottom by largest to smallest value
-
 ### Future Enhancements (Planned 🔜)
 - 🔜 PDF export of portfolio reports
 - 🔜 Email notifications (monthly summary)

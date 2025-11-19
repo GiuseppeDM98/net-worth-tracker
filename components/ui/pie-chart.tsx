@@ -17,11 +17,14 @@ export function PieChart({ data }: PieChartProps) {
     );
   }
 
+  // Ensure data is sorted by value descending for legend order
+  const sortedData = [...data].sort((a, b) => b.value - a.value);
+
   return (
     <ResponsiveContainer width="100%" height={500}>
       <RechartsPC>
         <Pie
-          data={data as any}
+          data={sortedData as any}
           cx="50%"
           cy="50%"
           labelLine={false}
@@ -30,7 +33,7 @@ export function PieChart({ data }: PieChartProps) {
           fill="#8884d8"
           dataKey="value"
         >
-          {data.map((entry, index) => (
+          {sortedData.map((entry, index) => (
             <Cell key={`cell-${index}`} fill={entry.color} />
           ))}
         </Pie>
@@ -46,13 +49,34 @@ export function PieChart({ data }: PieChartProps) {
           layout="vertical"
           align="right"
           verticalAlign="middle"
-          formatter={(value, entry: any) => {
-            const item = data.find((d) => d.name === value);
-            if (item) {
-              return `${value} (${item.percentage.toFixed(1)}%)`;
-            }
-            return value;
-          }}
+          content={() => (
+            <div style={{ paddingLeft: '20px' }}>
+              {sortedData.map((entry, index) => (
+                <div
+                  key={`legend-item-${index}`}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    marginBottom: '8px',
+                    fontSize: '14px',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '14px',
+                      height: '14px',
+                      backgroundColor: entry.color,
+                      marginRight: '8px',
+                      flexShrink: 0,
+                    }}
+                  />
+                  <span style={{ color: '#374151' }}>
+                    {entry.name} ({entry.percentage.toFixed(1)}%)
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         />
       </RechartsPC>
     </ResponsiveContainer>
