@@ -6,6 +6,7 @@ import {
   HistoricalReturnsData,
   MonthlySnapshot,
 } from '@/types/assets';
+import { formatCurrencyCompact } from './chartService';
 
 /**
  * Generate a random number from a normal distribution using Box-Muller transform
@@ -257,7 +258,7 @@ function createDistribution(
     const rangeLabel =
       rangeStart === 0 && rangeEnd === 0
         ? '€0'
-        : `€${Math.round(rangeStart / 1000)}k-${Math.round(rangeEnd / 1000)}k`;
+        : `${formatCurrencyCompact(rangeStart)}-${formatCurrencyCompact(rangeEnd)}`;
 
     distribution.push({
       range: rangeLabel,

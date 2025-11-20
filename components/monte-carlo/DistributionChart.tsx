@@ -43,8 +43,8 @@ export function DistributionChart({ data, retirementYears }: DistributionChartPr
         </p>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={data}>
+        <ResponsiveContainer width="100%" height={400}>
+          <BarChart data={data} margin={{ left: 50 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
             <XAxis
               dataKey="range"
@@ -55,6 +55,7 @@ export function DistributionChart({ data, retirementYears }: DistributionChartPr
               tick={{ fontSize: 11 }}
             />
             <YAxis
+              width={100}
               label={{
                 value: 'Numero di Simulazioni',
                 angle: -90,

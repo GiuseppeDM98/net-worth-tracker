@@ -32,6 +32,11 @@ export function ParametersForm({
   const [equityInput, setEquityInput] = useState<string>(params.equityPercentage.toString());
   const [bondsInput, setBondsInput] = useState<string>(params.bondsPercentage.toString());
 
+  // Initial portfolio local state for formatted display
+  const [initialPortfolioInput, setInitialPortfolioInput] = useState<string>(
+    params.initialPortfolio.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  );
+
   // Market parameters local state
   const [equityReturnInput, setEquityReturnInput] = useState<string>(params.equityReturn.toFixed(1));
   const [equityVolatilityInput, setEquityVolatilityInput] = useState<string>(params.equityVolatility.toFixed(1));
@@ -51,6 +56,13 @@ export function ParametersForm({
   useEffect(() => {
     setIsHistoricalMode(params.parameterSource === 'historical');
   }, [params.parameterSource]);
+
+  // Sync initialPortfolio input when params change (e.g., from buttons)
+  useEffect(() => {
+    setInitialPortfolioInput(
+      params.initialPortfolio.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    );
+  }, [params.initialPortfolio]);
 
   const updateParam = <K extends keyof MonteCarloParams>(
     key: K,
@@ -94,6 +106,32 @@ export function ParametersForm({
       setEquityInput((100 - value).toString());
     } else {
       setBondsInput(params.bondsPercentage.toString());
+    }
+  };
+
+  const handleInitialPortfolioChange = (value: string) => {
+    // Allow user to type freely (including partial numbers)
+    setInitialPortfolioInput(value);
+  };
+
+  const handleInitialPortfolioBlur = () => {
+    // Remove all non-numeric characters except comma and dot
+    const cleanValue = initialPortfolioInput.replace(/[^\d,.-]/g, '');
+    // Replace Italian comma with dot for parsing
+    const normalizedValue = cleanValue.replace(',', '.');
+    const value = parseFloat(normalizedValue);
+
+    if (!isNaN(value) && value >= 0) {
+      updateParam('initialPortfolio', Math.round(value));
+      // Format the display value
+      setInitialPortfolioInput(
+        Math.round(value).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      );
+    } else {
+      // Reset to current param value if invalid
+      setInitialPortfolioInput(
+        params.initialPortfolio.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      );
     }
   };
 
@@ -200,13 +238,11 @@ export function ParametersForm({
           </div>
           <Input
             id="initialPortfolio"
-            type="number"
+            type="text"
             placeholder="Inserisci importo (€)"
-            value={params.initialPortfolio}
-            onChange={(e) => updateParam('initialPortfolio', parseInt(e.target.value, 10) || 0)}
-            onWheel={(e) => e.currentTarget.blur()}
-            step="1000"
-            min="0"
+            value={initialPortfolioInput}
+            onChange={(e) => handleInitialPortfolioChange(e.target.value)}
+            onBlur={handleInitialPortfolioBlur}
           />
         </div>
 
