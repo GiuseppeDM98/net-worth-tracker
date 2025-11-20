@@ -22,24 +22,31 @@ interface SimulationChartProps {
 export function SimulationChart({ data, retirementYears }: SimulationChartProps) {
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
+      // Find values by dataKey instead of using hardcoded indices
+      const p90 = payload.find((p: any) => p.dataKey === 'p90')?.value || 0;
+      const p75 = payload.find((p: any) => p.dataKey === 'p75')?.value || 0;
+      const p50 = payload.find((p: any) => p.dataKey === 'p50')?.value || 0;
+      const p25 = payload.find((p: any) => p.dataKey === 'p25')?.value || 0;
+      const p10 = payload.find((p: any) => p.dataKey === 'p10')?.value || 0;
+
       return (
         <div className="bg-background border border-border p-4 rounded-lg shadow-lg">
           <p className="font-semibold mb-2">Anno {label}</p>
           <div className="space-y-1 text-sm">
             <p className="text-green-600">
-              90° percentile: {formatCurrency(payload[4]?.value || 0)}
+              90° percentile: {formatCurrency(p90)}
             </p>
             <p className="text-green-500">
-              75° percentile: {formatCurrency(payload[3]?.value || 0)}
+              75° percentile: {formatCurrency(p75)}
             </p>
             <p className="text-blue-600 font-semibold">
-              Mediana (50°): {formatCurrency(payload[2]?.value || 0)}
+              Mediana (50°): {formatCurrency(p50)}
             </p>
             <p className="text-orange-500">
-              25° percentile: {formatCurrency(payload[1]?.value || 0)}
+              25° percentile: {formatCurrency(p25)}
             </p>
             <p className="text-red-600">
-              10° percentile: {formatCurrency(payload[0]?.value || 0)}
+              10° percentile: {formatCurrency(p10)}
             </p>
           </div>
         </div>
@@ -59,7 +66,7 @@ export function SimulationChart({ data, retirementYears }: SimulationChartProps)
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={400}>
-          <LineChart data={data}>
+          <LineChart data={data} margin={{ left: 50 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
             <XAxis
               dataKey="year"
@@ -67,6 +74,7 @@ export function SimulationChart({ data, retirementYears }: SimulationChartProps)
               stroke="#9CA3AF"
             />
             <YAxis
+              width={100}
               tickFormatter={(value) => formatCurrencyCompact(value)}
               label={{ value: 'Patrimonio', angle: -90, position: 'insideLeft' }}
               stroke="#9CA3AF"
@@ -79,7 +87,13 @@ export function SimulationChart({ data, retirementYears }: SimulationChartProps)
               y={0}
               stroke="#ef4444"
               strokeDasharray="3 3"
-              label={{ value: 'Fallimento', fill: '#ef4444', fontSize: 12 }}
+              label={{
+                value: 'Fallimento',
+                fill: '#ef4444',
+                fontSize: 14,
+                fontWeight: 'bold',
+                position: 'right'
+              }}
             />
 
             {/* Area charts for percentile ranges */}

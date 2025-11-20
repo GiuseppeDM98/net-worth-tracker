@@ -71,14 +71,14 @@ export function SuccessRateCard({
             <div className="border-t pt-4">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">
-                  Valore Mediano Finale:
+                  Valore Mediano (solo simulazioni riuscite):
                 </span>
                 <span className="text-lg font-semibold">
                   {formatCurrency(medianFinalValue)}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Valore del patrimonio al 50° percentile dopo {retirementYears} anni
+                Valore mediano del patrimonio nelle simulazioni che durano almeno {retirementYears} anni
               </p>
             </div>
           )}

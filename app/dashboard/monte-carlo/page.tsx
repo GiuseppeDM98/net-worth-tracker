@@ -26,6 +26,7 @@ export default function MonteCarloPage() {
   const [totalNetWorth, setTotalNetWorth] = useState(0);
   const [liquidNetWorth, setLiquidNetWorth] = useState(0);
   const [historicalReturns, setHistoricalReturns] = useState<HistoricalReturnsData | null>(null);
+  const [availableSnapshotCount, setAvailableSnapshotCount] = useState(0);
   const [results, setResults] = useState<MonteCarloResults | null>(null);
   const [loading, setLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
@@ -75,6 +76,10 @@ export default function MonteCarloPage() {
       const liquid = calculateLiquidNetWorth(assetsData);
       setTotalNetWorth(total);
       setLiquidNetWorth(liquid);
+
+      // Count real (non-dummy) snapshots
+      const realSnapshotsCount = snapshots.filter((s) => !s.isDummy).length;
+      setAvailableSnapshotCount(realSnapshotsCount);
 
       // Calculate historical returns if enough snapshots
       const historicalData = calculateHistoricalReturns(snapshots);
@@ -229,6 +234,7 @@ export default function MonteCarloPage() {
         totalNetWorth={totalNetWorth}
         liquidNetWorth={liquidNetWorth}
         historicalReturns={historicalReturns}
+        availableSnapshotCount={availableSnapshotCount}
         isRunning={isRunning}
       />
 

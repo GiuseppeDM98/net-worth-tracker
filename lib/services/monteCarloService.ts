@@ -93,12 +93,15 @@ function annualizeVolatility(monthlyReturns: number[]): number {
 export function calculateHistoricalReturns(
   snapshots: MonthlySnapshot[]
 ): HistoricalReturnsData | null {
-  if (snapshots.length < 24) {
+  // Filter out dummy/test snapshots
+  const realSnapshots = snapshots.filter((s) => !s.isDummy);
+
+  if (realSnapshots.length < 24) {
     return null;
   }
 
   // Sort snapshots by date (oldest first)
-  const sortedSnapshots = [...snapshots].sort((a, b) => {
+  const sortedSnapshots = [...realSnapshots].sort((a, b) => {
     if (a.year !== b.year) return a.year - b.year;
     return a.month - b.month;
   });

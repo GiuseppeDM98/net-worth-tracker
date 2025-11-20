@@ -15,6 +15,7 @@ interface ParametersFormProps {
   totalNetWorth: number;
   liquidNetWorth: number;
   historicalReturns: HistoricalReturnsData | null;
+  availableSnapshotCount: number;
   isRunning: boolean;
 }
 
@@ -25,6 +26,7 @@ export function ParametersForm({
   totalNetWorth,
   liquidNetWorth,
   historicalReturns,
+  availableSnapshotCount,
   isRunning,
 }: ParametersFormProps) {
   const [equityInput, setEquityInput] = useState<string>(params.equityPercentage.toString());
@@ -44,7 +46,6 @@ export function ParametersForm({
   const [isHistoricalMode, setIsHistoricalMode] = useState<boolean>(params.parameterSource === 'historical');
 
   const isHistoricalAvailable = historicalReturns !== null;
-  const availableMonths = historicalReturns?.availableMonths ?? 0;
 
   // Sync local toggle state with parent params
   useEffect(() => {
@@ -376,7 +377,7 @@ export function ParametersForm({
               <Label className="text-base font-semibold">Parametri di Mercato</Label>
               <p className="text-xs text-muted-foreground">
                 {isHistoricalAvailable
-                  ? `Usa dati storici personali (${historicalReturns.availableMonths} mesi disponibili)`
+                  ? `Usa dati storici personali (${availableSnapshotCount} mesi disponibili)`
                   : 'Servono almeno 24 snapshot mensili per parametri storici'}
               </p>
             </div>
@@ -393,7 +394,7 @@ export function ParametersForm({
                 <AlertCircle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-yellow-900">
                   Per utilizzare parametri storici personali servono almeno 24 snapshot
-                  mensili. Attualmente ne hai {availableMonths}.
+                  mensili. Attualmente ne hai {availableSnapshotCount}.
                   Continua a tracciare il tuo patrimonio!
                 </p>
               </div>
