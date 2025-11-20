@@ -8,6 +8,7 @@ import {
   deleteAsset,
   calculateAssetValue,
   calculateTotalValue,
+  calculateUnrealizedGains,
 } from '@/lib/services/assetService';
 import { formatCurrency, formatNumber } from '@/lib/services/chartService';
 import { getAssetClassColor } from '@/lib/constants/colors';
@@ -17,6 +18,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -211,6 +213,7 @@ export default function AssetsPage() {
                     <TableHead className="text-right">Quantità</TableHead>
                     <TableHead className="text-right">Prezzo</TableHead>
                     <TableHead className="text-right">Valore Totale</TableHead>
+                    <TableHead className="text-right">G/P</TableHead>
                     <TableHead>Ultimo Aggiornamento</TableHead>
                     <TableHead className="text-right">Azioni</TableHead>
                   </TableRow>
@@ -276,6 +279,27 @@ export default function AssetsPage() {
                             formatCurrency(value)
                           )}
                         </TableCell>
+                        <TableCell className="text-right">
+                          {asset.averageCost ? (
+                            (() => {
+                              const gainLoss = calculateUnrealizedGains(asset);
+                              const costBasis = asset.quantity * asset.averageCost;
+                              const percentage = costBasis > 0 ? (gainLoss / costBasis) * 100 : 0;
+                              const isPositive = gainLoss > 0;
+                              const isNegative = gainLoss < 0;
+                              const textColor = isPositive ? 'text-green-600' : isNegative ? 'text-red-600' : 'text-gray-600';
+
+                              return (
+                                <div className={`${textColor} font-medium`}>
+                                  <div>{isPositive ? '+' : ''}{formatCurrency(gainLoss)}</div>
+                                  <div className="text-xs">{isPositive ? '+' : ''}{formatNumber(percentage, 2)}%</div>
+                                </div>
+                              );
+                            })()
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           {format(lastUpdate, 'dd/MM/yyyy HH:mm', {
                             locale: it,
@@ -303,6 +327,47 @@ export default function AssetsPage() {
                     );
                   })}
                 </TableBody>
+                <TableFooter>
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-right font-semibold">
+                      Totale:
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {formatCurrency(totalValue)}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {(() => {
+                        // Calculate total gain/loss
+                        const assetsWithCostBasis = assets.filter(a => a.averageCost);
+                        const totalGainLoss = assetsWithCostBasis.reduce(
+                          (sum, asset) => sum + calculateUnrealizedGains(asset),
+                          0
+                        );
+                        const totalCostBasis = assetsWithCostBasis.reduce(
+                          (sum, asset) => sum + (asset.quantity * asset.averageCost!),
+                          0
+                        );
+                        const totalPercentage = totalCostBasis > 0
+                          ? (totalGainLoss / totalCostBasis) * 100
+                          : 0;
+
+                        const isPositive = totalGainLoss > 0;
+                        const isNegative = totalGainLoss < 0;
+                        const textColor = isPositive ? 'text-green-600' : isNegative ? 'text-red-600' : 'text-gray-600';
+
+                        return assetsWithCostBasis.length > 0 ? (
+                          <div className={`${textColor}`}>
+                            <div>{isPositive ? '+' : ''}{formatCurrency(totalGainLoss)}</div>
+                            <div className="text-xs">{isPositive ? '+' : ''}{formatNumber(totalPercentage, 2)}%</div>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        );
+                      })()}
+                    </TableCell>
+                    <TableCell colSpan={2}></TableCell>
+                  </TableRow>
+                </TableFooter>
               </Table>
             </div>
           )}

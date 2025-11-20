@@ -58,6 +58,9 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
 - **Cost basis tracking** with unrealized gains and tax estimation
   - Track average cost per share/unit for each asset
   - Automatic calculation of unrealized gains (current value - cost basis)
+  - **G/P (Gain/Loss) column** in Assets table showing absolute value and percentage for each asset
+  - **Total portfolio G/P** displayed in table footer with aggregate performance
+  - Special calculation for real estate: G/P based on gross property value vs purchase cost (independent of outstanding debt)
   - Estimated tax calculation based on configurable tax rates
   - Gross and net net worth visualization (before/after taxes)
 
@@ -494,6 +497,50 @@ See [Infrastructure Alternatives](./SETUP.md#infrastructure-alternatives) for mi
    - **Plusvalenze Non Realizzate**: Unrealized gains (green) or losses (red)
    - **Tasse Stimate**: Estimated taxes on gains
 
+### Viewing Gain/Loss in Assets Table
+
+Once you've set up cost basis tracking for your assets, the **G/P (Gain/Loss) column** provides immediate visibility into each investment's performance.
+
+#### Understanding the G/P Column
+
+1. Navigate to **"Patrimonio"** (Assets) page
+2. The G/P column appears after **"Valore Totale"** (Total Value)
+3. For each asset with cost basis set:
+   - **First line**: Absolute gain/loss (e.g., +€1,250.00 or -€340.00)
+   - **Second line**: Percentage gain/loss (e.g., +12.5% or -4.2%)
+   - **Green text**: Positive returns
+   - **Red text**: Losses
+4. Assets without cost basis show **"-"** in gray
+
+#### Table Footer Totals
+
+At the bottom of the assets table:
+- **Total portfolio value**: Sum of all asset values
+- **Total G/P**: Aggregate gain/loss across all assets with cost basis
+  - Calculated as: Sum of all individual gains/losses
+  - Percentage: (Total G/P / Total Cost Basis) × 100
+
+#### Special Case: Real Estate with Debt
+
+For real estate properties with outstanding mortgages, the G/P calculation follows this logic:
+
+**Example:**
+- House purchased at: €200,000 (cost basis)
+- Current market value: €250,000
+- Outstanding mortgage: €150,000
+
+**What you see in the table:**
+- **Valore Totale (Total Value)**: €100,000 (net value: €250k - €150k debt)
+- **G/P**: +€50,000 (+25%)
+
+**Why this calculation?**
+The G/P reflects the **property's appreciation**, not your equity gain. The calculation is:
+- Gain/Loss = Current Gross Value - Purchase Cost
+- Gain/Loss = €250,000 - €200,000 = +€50,000
+- Percentage = €50,000 / €200,000 = +25%
+
+This approach accurately represents the investment performance of the property itself, independent of how it was financed. Your net worth correctly shows €100,000 (after debt), while the G/P shows the true appreciation of the asset (+€50,000).
+
 ---
 
 ## 🤝 Contributing
@@ -587,6 +634,7 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - ✅ Hall of Fame personal financial rankings
 - ✅ Registration control system
 - ✅ Cost basis tracking with unrealized gains and tax estimation
+- ✅ Gain/Loss (G/P) column in Assets table with total portfolio performance
 - ✅ Monte Carlo retirement simulations
 
 ### Future Enhancements (Planned 🔜)
