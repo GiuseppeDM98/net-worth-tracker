@@ -21,6 +21,7 @@ import { ExpenseCategory, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expen
 import { getAllCategories, deleteCategory } from '@/lib/services/expenseCategoryService';
 import { CategoryManagementDialog } from '@/components/expenses/CategoryManagementDialog';
 import { CreateDummySnapshotModal } from '@/components/CreateDummySnapshotModal';
+import { DeleteDummyDataDialog } from '@/components/DeleteDummyDataDialog';
 
 interface SubTarget {
   name: string;
@@ -80,6 +81,7 @@ export default function SettingsPage() {
 
   // Test snapshot modal state
   const [dummySnapshotModalOpen, setDummySnapshotModalOpen] = useState(false);
+  const [deleteDummyDataDialogOpen, setDeleteDummyDataDialogOpen] = useState(false);
   const enableTestSnapshots = process.env.NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS === 'true';
 
   useEffect(() => {
@@ -1009,8 +1011,7 @@ export default function SettingsPage() {
               </h3>
               <p className="text-sm text-gray-700">
                 Genera snapshot mensili fittizi per testare grafici e statistiche.
-                Gli snapshot verranno salvati nella stessa collection Firebase degli snapshot reali
-                e dovranno essere eliminati manualmente.
+                Gli snapshot verranno salvati nella stessa collection Firebase degli snapshot reali.
               </p>
               <Button
                 variant="outline"
@@ -1019,6 +1020,24 @@ export default function SettingsPage() {
               >
                 <FlaskConical className="mr-2 h-4 w-4" />
                 Genera Snapshot di Test
+              </Button>
+            </div>
+
+            <div className="space-y-3 border-t border-orange-200 pt-4">
+              <h3 className="font-semibold text-sm text-gray-900">
+                Eliminazione Dati di Test
+              </h3>
+              <p className="text-sm text-gray-700">
+                Elimina tutti i dati dummy (snapshot, spese e categorie) in un&apos;unica operazione.
+                Questa azione è irreversibile.
+              </p>
+              <Button
+                variant="destructive"
+                onClick={() => setDeleteDummyDataDialogOpen(true)}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Elimina Tutti i Dati Dummy
               </Button>
             </div>
           </CardContent>
@@ -1039,6 +1058,19 @@ export default function SettingsPage() {
           open={dummySnapshotModalOpen}
           onOpenChange={setDummySnapshotModalOpen}
           userId={user?.uid || ''}
+        />
+      )}
+
+      {/* Delete Dummy Data Dialog */}
+      {enableTestSnapshots && (
+        <DeleteDummyDataDialog
+          open={deleteDummyDataDialogOpen}
+          onOpenChange={setDeleteDummyDataDialogOpen}
+          userId={user?.uid || ''}
+          onDeleted={() => {
+            // Refresh page or data after deletion
+            window.location.reload();
+          }}
         />
       )}
     </div>

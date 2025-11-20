@@ -117,6 +117,7 @@ export interface MonthlySnapshot {
   userId: string;
   year: number;
   month: number;
+  isDummy?: boolean; // Indicates if this is a test/dummy snapshot
   totalNetWorth: number;
   liquidNetWorth: number;
   illiquidNetWorth: number; // New field to track illiquid assets separately

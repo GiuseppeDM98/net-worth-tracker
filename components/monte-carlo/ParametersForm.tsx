@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { AlertCircle, Settings, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { MonteCarloParams, HistoricalReturnsData } from '@/types/assets';
 import { formatCurrency } from '@/lib/services/chartService';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface ParametersFormProps {
   params: MonteCarloParams;
@@ -40,8 +40,16 @@ export function ParametersForm({
   // Collapsible state for technical details
   const [showTechnicalDetails, setShowTechnicalDetails] = useState<boolean>(false);
 
+  // Local state for toggle to provide instant visual feedback
+  const [isHistoricalMode, setIsHistoricalMode] = useState<boolean>(params.parameterSource === 'historical');
+
   const isHistoricalAvailable = historicalReturns !== null;
   const availableMonths = historicalReturns?.availableMonths ?? 0;
+
+  // Sync local toggle state with parent params
+  useEffect(() => {
+    setIsHistoricalMode(params.parameterSource === 'historical');
+  }, [params.parameterSource]);
 
   const updateParam = <K extends keyof MonteCarloParams>(
     key: K,
@@ -105,6 +113,9 @@ export function ParametersForm({
   };
 
   const handleParameterSourceToggle = (useHistorical: boolean) => {
+    // Update local state immediately for instant visual feedback
+    setIsHistoricalMode(useHistorical);
+
     if (useHistorical && historicalReturns) {
       updateParam('parameterSource', 'historical');
       updateParam('equityReturn', historicalReturns.equity.mean);
@@ -370,7 +381,7 @@ export function ParametersForm({
               </p>
             </div>
             <Switch
-              checked={params.parameterSource === 'historical'}
+              checked={isHistoricalMode}
               onCheckedChange={handleParameterSourceToggle}
               disabled={!isHistoricalAvailable}
             />

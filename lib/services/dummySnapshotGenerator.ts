@@ -33,6 +33,20 @@ const DUMMY_ASSETS: DummyAsset[] = [
 ];
 
 /**
+ * Generates a random variation around the target growth rate to simulate market volatility
+ * Uses Box-Muller transform to approximate normal distribution
+ */
+function getRandomGrowthRate(targetRate: number, volatility: number): number {
+  // Box-Muller transform for normal distribution
+  const u1 = Math.random();
+  const u2 = Math.random();
+  const z0 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+
+  // Add random variation with specified volatility
+  return targetRate + (z0 * volatility);
+}
+
+/**
  * Generates dummy monthly snapshots for testing purposes
  */
 export async function generateDummySnapshots(params: DummySnapshotParams): Promise<void> {
@@ -54,6 +68,63 @@ export async function generateDummySnapshots(params: DummySnapshotParams): Promi
     categoriesByType = await createDummyCategories(userId);
   }
 
+  // Asset allocation percentages (constant throughout simulation)
+  const EQUITY_ALLOCATION = 0.60;   // 60%
+  const BONDS_ALLOCATION = 0.25;    // 25%
+  const CRYPTO_ALLOCATION = 0.08;   // 8%
+  const REALESTATE_ALLOCATION = 0.05; // 5%
+  const CASH_ALLOCATION = 0.02;     // 2%
+
+  // Calculate initial values for each asset class
+  let equityValue = initialNetWorth * EQUITY_ALLOCATION;
+  let bondsValue = initialNetWorth * BONDS_ALLOCATION;
+  let cryptoValue = initialNetWorth * CRYPTO_ALLOCATION;
+  let realEstateValue = initialNetWorth * REALESTATE_ALLOCATION;
+  let cashValue = initialNetWorth * CASH_ALLOCATION;
+
+  // Track asset class values separately for realistic behavior
+  const equityHistory: number[] = [equityValue];
+  const bondsHistory: number[] = [bondsValue];
+  const cryptoHistory: number[] = [cryptoValue];
+  const realEstateHistory: number[] = [realEstateValue];
+  const cashHistory: number[] = [cashValue];
+  const netWorthHistory: number[] = [initialNetWorth];
+
+  // Pre-calculate each asset class growth with different rates and volatility
+  // Target rates are derived from user's input to maintain portfolio average
+  // Equity: higher return, higher volatility
+  // Bonds: lower return, lower volatility
+  for (let i = 1; i < numberOfMonths; i++) {
+    // Equity: ~1.25x user's target rate, volatility ~1.4% monthly (~5% annual)
+    const equityRate = getRandomGrowthRate(monthlyGrowthRate * 1.25, 1.4);
+    equityValue = equityValue * (1 + equityRate / 100);
+    equityHistory.push(equityValue);
+
+    // Bonds: ~0.5x user's target rate, volatility ~0.4% monthly (~1.4% annual)
+    const bondsRate = getRandomGrowthRate(monthlyGrowthRate * 0.5, 0.4);
+    bondsValue = bondsValue * (1 + bondsRate / 100);
+    bondsHistory.push(bondsValue);
+
+    // Crypto: ~1.5x user's target rate, high volatility ~3% monthly (~10% annual)
+    const cryptoRate = getRandomGrowthRate(monthlyGrowthRate * 1.5, 3.0);
+    cryptoValue = cryptoValue * (1 + cryptoRate / 100);
+    cryptoHistory.push(cryptoValue);
+
+    // Real Estate: ~0.7x user's target rate, low volatility ~0.3% monthly
+    const realEstateRate = getRandomGrowthRate(monthlyGrowthRate * 0.7, 0.3);
+    realEstateValue = realEstateValue * (1 + realEstateRate / 100);
+    realEstateHistory.push(realEstateValue);
+
+    // Cash: minimal growth (inflation only), very low volatility
+    const cashRate = getRandomGrowthRate(0.2, 0.05); // ~2.4% annual
+    cashValue = cashValue * (1 + cashRate / 100);
+    cashHistory.push(cashValue);
+
+    // Total net worth is sum of all asset classes
+    const totalNetWorth = equityValue + bondsValue + cryptoValue + realEstateValue + cashValue;
+    netWorthHistory.push(totalNetWorth);
+  }
+
   // Generate snapshots for the last N months
   for (let i = numberOfMonths - 1; i >= 0; i--) {
     const snapshotDate = new Date(currentDate);
@@ -62,31 +133,37 @@ export async function generateDummySnapshots(params: DummySnapshotParams): Promi
     const year = snapshotDate.getFullYear();
     const month = snapshotDate.getMonth() + 1; // 1-12
 
-    // Calculate net worth with growth
+    // Get values for this month from pre-calculated histories
     const monthsFromStart = numberOfMonths - i - 1;
-    const totalNetWorth = initialNetWorth * Math.pow(1 + monthlyGrowthRate / 100, monthsFromStart);
+    const totalNetWorth = netWorthHistory[monthsFromStart];
+    const equity = equityHistory[monthsFromStart];
+    const bonds = bondsHistory[monthsFromStart];
+    const crypto = cryptoHistory[monthsFromStart];
+    const realestate = realEstateHistory[monthsFromStart];
+    const cash = cashHistory[monthsFromStart];
 
-    // Calculate liquid/illiquid split (85% liquid, 15% illiquid)
-    const liquidNetWorth = totalNetWorth * 0.85;
-    const illiquidNetWorth = totalNetWorth * 0.15;
+    // Calculate liquid/illiquid split
+    // Real estate is illiquid, others are liquid
+    const liquidNetWorth = equity + bonds + crypto + cash;
+    const illiquidNetWorth = realestate;
 
-    // Distribute net worth by asset class
+    // Use pre-calculated values for each asset class
     const byAssetClass = {
-      equity: totalNetWorth * 0.60,      // 60%
-      bonds: totalNetWorth * 0.25,       // 25%
-      crypto: totalNetWorth * 0.08,      // 8%
-      realestate: totalNetWorth * 0.05,  // 5% (illiquid)
-      cash: totalNetWorth * 0.02,        // 2%
-      commodity: 0,                       // 0%
+      equity,
+      bonds,
+      crypto,
+      realestate,
+      cash,
+      commodity: 0, // No commodity allocation in dummy data
     };
 
-    // Calculate allocation percentages
+    // Calculate allocation percentages based on actual values (will vary over time)
     const assetAllocation = {
-      equity: 60,
-      bonds: 25,
-      crypto: 8,
-      realestate: 5,
-      cash: 2,
+      equity: totalNetWorth > 0 ? (equity / totalNetWorth) * 100 : 0,
+      bonds: totalNetWorth > 0 ? (bonds / totalNetWorth) * 100 : 0,
+      crypto: totalNetWorth > 0 ? (crypto / totalNetWorth) * 100 : 0,
+      realestate: totalNetWorth > 0 ? (realestate / totalNetWorth) * 100 : 0,
+      cash: totalNetWorth > 0 ? (cash / totalNetWorth) * 100 : 0,
       commodity: 0,
     };
 
@@ -127,6 +204,7 @@ export async function generateDummySnapshots(params: DummySnapshotParams): Promi
       userId,
       year,
       month,
+      isDummy: true, // Mark as dummy/test data
       totalNetWorth: Math.round(totalNetWorth * 100) / 100,
       liquidNetWorth: Math.round(liquidNetWorth * 100) / 100,
       illiquidNetWorth: Math.round(illiquidNetWorth * 100) / 100,

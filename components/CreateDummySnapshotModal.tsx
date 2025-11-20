@@ -28,7 +28,7 @@ export function CreateDummySnapshotModal({
   userId,
 }: CreateDummySnapshotModalProps) {
   const [initialNetWorth, setInitialNetWorth] = useState<string>('50000');
-  const [monthlyGrowthRate, setMonthlyGrowthRate] = useState<string>('3');
+  const [monthlyGrowthRate, setMonthlyGrowthRate] = useState<string>('0.8');
   const [numberOfMonths, setNumberOfMonths] = useState<string>('24');
   const [averageMonthlyIncome, setAverageMonthlyIncome] = useState<string>('3000');
   const [averageMonthlyExpenses, setAverageMonthlyExpenses] = useState<string>('2500');
@@ -95,7 +95,7 @@ export function CreateDummySnapshotModal({
 
       // Reset form
       setInitialNetWorth('50000');
-      setMonthlyGrowthRate('3');
+      setMonthlyGrowthRate('0.8');
       setNumberOfMonths('24');
       setAverageMonthlyIncome('3000');
       setAverageMonthlyExpenses('2500');
@@ -150,11 +150,11 @@ export function CreateDummySnapshotModal({
                 type="number"
                 value={monthlyGrowthRate}
                 onChange={(e) => setMonthlyGrowthRate(e.target.value)}
-                placeholder="3"
+                placeholder="0.8"
                 step="0.1"
               />
               <p className="text-xs text-muted-foreground">
-                Percentuale di crescita mese su mese
+                Percentuale di crescita mensile media del portfolio (0.5-1.0% realistico → 6-12% annuo)
               </p>
             </div>
 
@@ -237,7 +237,8 @@ export function CreateDummySnapshotModal({
           <div className="rounded-lg bg-amber-50 dark:bg-amber-950 p-3 border border-amber-200 dark:border-amber-800">
             <p className="text-xs text-amber-800 dark:text-amber-200">
               <strong>Attenzione:</strong> I dati verranno salvati nelle stesse collection
-              dei dati reali. Dovrai eliminarli manualmente da Firebase Console.
+              dei dati reali. Puoi eliminarli usando il pulsante &quot;Elimina Tutti i Dati Dummy&quot;
+              in questa pagina o manualmente da Firebase Console.
             </p>
           </div>
         </div>
