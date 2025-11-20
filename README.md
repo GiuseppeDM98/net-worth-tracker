@@ -643,8 +643,6 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - 🔜 Multi-currency full conversion support
 - 🔜 Performance metrics (ROI, IRR, CAGR, Sharpe ratio)
 - 🔜 Internationalization (i18n) for multi-language support
-- 🔜 Ability to search for a category or subcategory when adding an expense
-- 🔜 Display selected month in expense tracking page (when filtering by month, make it clear to users that income, expense, and balance boxes refer to the filtered month)
 - 🔜 Monte Carlo: Expand asset allocation to include all asset classes (Equity, Bonds, Commodities, Cryptocurrencies, Real Estate, Cash) with configurable percentages
 - 🔜 Monte Carlo: Calculate historical returns and volatility from user snapshots when sufficient data is available (minimum 24 monthly data points per asset class). Display warning message when data is insufficient for specific asset classes (e.g., "⚠️ Asset X: Limited historical data. Using market averages")
 - 🔜 Dummy snapshot generator: Add Commodity asset class generation (currently set to 0%) to match all available asset classes
