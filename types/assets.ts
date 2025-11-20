@@ -117,6 +117,7 @@ export interface MonthlySnapshot {
   userId: string;
   year: number;
   month: number;
+  isDummy?: boolean; // Indicates if this is a test/dummy snapshot
   totalNetWorth: number;
   liquidNetWorth: number;
   illiquidNetWorth: number; // New field to track illiquid assets separately
@@ -142,4 +143,93 @@ export interface PriceHistory {
   price: number;
   date: Date | Timestamp;
   currency: string;
+}
+
+// Monte Carlo Simulation Types
+export type PortfolioSource = 'total' | 'liquid' | 'custom';
+export type WithdrawalAdjustment = 'inflation' | 'fixed' | 'percentage';
+export type ParameterSource = 'market' | 'historical';
+
+export interface MonteCarloParams {
+  // Portfolio settings
+  portfolioSource: PortfolioSource;
+  initialPortfolio: number;
+
+  // Retirement duration
+  retirementYears: number;
+
+  // Asset allocation
+  equityPercentage: number;
+  bondsPercentage: number;
+
+  // Withdrawal settings
+  annualWithdrawal: number;
+  withdrawalAdjustment: WithdrawalAdjustment;
+
+  // Market parameters
+  parameterSource: ParameterSource;
+  equityReturn: number;
+  equityVolatility: number;
+  bondsReturn: number;
+  bondsVolatility: number;
+  inflationRate: number;
+
+  // Simulation settings
+  numberOfSimulations: number;
+}
+
+export interface SimulationPath {
+  year: number;
+  value: number;
+}
+
+export interface SingleSimulationResult {
+  simulationId: number;
+  success: boolean;
+  failureYear?: number;
+  finalValue: number;
+  path: SimulationPath[];
+}
+
+export interface PercentilesData {
+  year: number;
+  p10: number;
+  p25: number;
+  p50: number;
+  p75: number;
+  p90: number;
+}
+
+export interface MonteCarloResults {
+  successRate: number;
+  successCount: number;
+  failureCount: number;
+  medianFinalValue: number;
+  percentiles: PercentilesData[];
+  failureAnalysis: {
+    averageFailureYear: number;
+    medianFailureYear: number;
+  } | null;
+  distribution: {
+    range: string;
+    count: number;
+    percentage: number;
+  }[];
+  simulations: SingleSimulationResult[];
+}
+
+export interface HistoricalReturnsData {
+  equity: {
+    mean: number;
+    volatility: number;
+    monthlyReturns: number[];
+  };
+  bonds: {
+    mean: number;
+    volatility: number;
+    monthlyReturns: number[];
+  };
+  availableMonths: number;
+  startDate: string;
+  endDate: string;
 }

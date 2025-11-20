@@ -85,6 +85,18 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
 - **Years of expenses** coverage tracker
 - **Historical evolution** charts of income, expenses, and sustainable withdrawal
 
+### 🎲 **Monte Carlo Retirement Simulations**
+- **Probabilistic retirement planning** with thousands of simulations
+- **Success rate calculation** to assess plan sustainability
+- **Market vs Historical parameters**: Use standard market assumptions or your own historical returns
+- **Flexible portfolio selection**: Total net worth, liquid assets only, or custom amount
+- **Interactive visualizations**:
+  - Fan chart showing percentile distributions (10th, 25th, 50th, 75th, 90th)
+  - Distribution histogram of final portfolio values
+  - Failure analysis with median and average depletion years
+- **Configurable parameters**: Retirement duration, asset allocation, withdrawal rates, inflation
+- **Automatic data integration**: Pre-populates with your current portfolio and expense data
+
 ### 🏆 **Hall of Fame Rankings**
 - **Personal financial records** across all time
 - **Best/Worst months** by net worth growth, income, and expenses (Top 20)
@@ -253,6 +265,132 @@ NEXT_PUBLIC_REGISTRATION_WHITELIST=your-email@gmail.com,admin@example.com
 ```
 
 See [SETUP.md](./SETUP.md#registration-control) for details.
+
+---
+
+## 🧪 Development Features
+
+### Test Snapshot Generator
+
+For development and testing purposes, the application includes a **bulk test snapshot generator** that creates realistic historical data to test charts, statistics, and UI components.
+
+#### How to Enable
+
+1. **Set environment variable** in your `.env.local`:
+   ```bash
+   NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS=true
+   ```
+
+2. **Navigate to Settings page** in the application
+
+3. **Scroll to "Funzionalità di Sviluppo"** section (only visible when enabled)
+
+4. **Click "Genera Snapshot di Test"** button
+
+#### What It Does
+
+The test data generator creates:
+
+**1. Historical Monthly Snapshots** (going back N months, configurable up to 120)
+- Initial net worth: Configurable (default: €50,000)
+- Monthly growth rate: Configurable average portfolio growth (default: 0.8% → ~10% annual)
+- Asset allocation: 85% liquid / 15% illiquid
+- Asset class distribution: 60% equity, 25% bonds, 8% crypto, 5% real estate, 2% cash
+- **Realistic asset class returns** with different volatilities:
+  - **Equity** (60%): ~1.0% monthly (~12% annual), volatility ~5% annual
+  - **Bonds** (25%): ~0.4% monthly (~5% annual), volatility ~1.5% annual
+  - **Crypto** (8%): ~1.2% monthly (~15% annual), volatility ~10% annual (high risk)
+  - **Real Estate** (5%): ~0.6% monthly (~7% annual), volatility ~1% annual
+  - **Cash** (2%): ~0.2% monthly (~2.4% annual, inflation), minimal volatility
+- 10 dummy assets: AAPL, GOOGL, MSFT, TSLA, BTC, ETH, US Treasury, Corporate Bonds, Real Estate Fund, Cash EUR
+- Random but realistic price variations using normal distribution (Box-Muller transform)
+
+**Technical Implementation:**
+- Each asset class grows **independently** with its own return rate and volatility
+- Equity, bonds, crypto, real estate, and cash are tracked separately month-by-month
+- Portfolio value is recalculated as sum of all asset classes each month
+- This creates realistic correlation and diversification effects
+- Asset allocation percentages vary over time based on performance (e.g., if equity outperforms, its percentage increases)
+- **Perfect for testing Monte Carlo simulations** with historical data that has proper equity/bonds differentiation
+
+**2. Expenses & Income Data** (optional, enabled by default)
+- **Income entries**: 1-2 per month with ±8% variation
+  - Categories: Stipendio, Freelance, Investimenti, Altro
+- **Fixed expenses**: Constant with ±3% variation (35% of total expenses)
+  - Categories: Affitto, Utenze, Abbonamenti
+- **Variable expenses**: 8-15 entries per month with ±40% variation (50% of total expenses)
+  - Categories: Spesa, Trasporti, Svago, Shopping
+- **Debts**: Nearly constant with ±1% variation (15% of total expenses)
+  - Categories: Mutuo, Prestito Auto
+- Realistic date distribution throughout each month
+
+#### Parameters
+
+When you click the button, a modal allows you to configure:
+
+**Patrimonio (Net Worth):**
+- **Patrimonio Iniziale** (Initial Net Worth): Starting amount in EUR (default: €50,000)
+- **Tasso di Crescita Mensile** (Monthly Growth Rate): Average monthly portfolio growth percentage (default: 0.8% → ~10% annual). Realistic range: 0.5-1.0% for typical portfolios
+- **Numero di Mesi** (Number of Months): How many months to generate (1-120, default: 24)
+
+**Spese ed Entrate (optional toggle):**
+- **Entrate Mensili Medie** (Average Monthly Income): Mean monthly income in EUR (default: €3,000)
+- **Spese Mensili Medie** (Average Monthly Expenses): Mean monthly expenses in EUR (default: €2,500)
+
+#### 🏷️ Dummy Data Identification
+
+All test data generated by this feature is marked with special identifiers for easy management:
+
+- **Snapshots**: Have `isDummy: true` field in the database
+- **Expenses**: Have IDs starting with `dummy-` (e.g., `dummy-income-...`, `dummy-fixed-...`)
+- **Categories**: Have IDs starting with `dummy-category-` (e.g., `dummy-category-income-stipendio`)
+
+This naming convention allows you to identify and remove all test data at once.
+
+#### ⚠️ Important Warning
+
+**Test data is saved to the same Firebase collections as real data:**
+- Snapshots → `monthly-snapshots` collection (with `isDummy: true`)
+- Expenses → `expenses` collection (with IDs starting with `dummy-`)
+- Categories → `expenseCategories` collection (with IDs starting with `dummy-category-`)
+
+All test data will appear in your charts, statistics, and Hall of Fame alongside real data.
+
+#### 🗑️ Removing Test Data
+
+You have two options to remove test data:
+
+**Option 1: Use the Built-in Delete Button (Recommended)**
+1. Navigate to **Settings** page in the application
+2. Scroll to **"Funzionalità di Sviluppo"** section
+3. Click **"Elimina Tutti i Dati Dummy"** button
+4. Review the count of items to be deleted
+5. Confirm deletion
+
+This will remove all dummy snapshots, expenses, and categories in one operation.
+
+**Option 2: Manual Firebase Console Deletion**
+1. Open [Firebase Console](https://console.firebase.google.com/)
+2. Navigate to Firestore Database
+3. Select your project
+4. Delete test documents from these collections:
+   - `monthly-snapshots`: Documents with `isDummy: true` field
+   - `expenses`: Documents with IDs starting with `dummy-`
+   - `expenseCategories`: Documents with IDs starting with `dummy-category-`
+
+**Recommendation**: Only use this feature in a development/test environment or in a separate Firebase project to avoid mixing test data with real financial data.
+
+#### Use Cases
+
+- **Testing charts** with historical data without waiting months for real snapshots
+- **Hall of Fame testing** with realistic income/expense variations to see best/worst months and years
+- **FIRE calculator testing** with actual expense data to validate sustainable withdrawal calculations
+- **Monte Carlo simulation testing** with realistic equity/bonds returns and volatilities that differ appropriately (equity higher return/volatility, bonds lower)
+- **Expense analytics testing** to verify category breakdowns, trends, and monthly comparisons
+- **UI development** to see how components handle different data scales and edge cases
+- **Performance testing** with large datasets (up to 120 months of data)
+- **Demo purposes** to showcase the application's full capabilities
+- **Development** of new features requiring historical portfolio and expense data
 
 ---
 
@@ -449,6 +587,7 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - ✅ Hall of Fame personal financial rankings
 - ✅ Registration control system
 - ✅ Cost basis tracking with unrealized gains and tax estimation
+- ✅ Monte Carlo retirement simulations
 
 ### Future Enhancements (Planned 🔜)
 - 🔜 PDF export of portfolio reports
@@ -463,7 +602,6 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - 🚀 CSV/Excel import for bulk asset additions
 - 🚀 Risk analysis (volatility, max drawdown, correlation)
 - 🚀 Backtesting allocation strategies
-- 🚀 Monte Carlo retirement simulations
 - 🚀 AI-powered rebalancing suggestions
 - 🚀 Dividend tracking
 - 🚀 Tax reporting (capital gains, dividends)

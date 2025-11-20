@@ -200,12 +200,16 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 NEXT_PUBLIC_REGISTRATIONS_ENABLED=true
 NEXT_PUBLIC_REGISTRATION_WHITELIST_ENABLED=false
 NEXT_PUBLIC_REGISTRATION_WHITELIST=
+
+# Development Features (optional - for testing/demo)
+NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS=false
 ```
 
 **How to get the values:**
 - Firebase Client SDK values: From Firebase Console → Project Settings → Your apps
 - `FIREBASE_SERVICE_ACCOUNT_KEY`: Paste the entire content of the downloaded JSON file
 - `CRON_SECRET`: Generate a random string (e.g., use `openssl rand -hex 32`)
+- `NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS`: Set to `true` to enable dummy data generation in Settings page (for development, testing, or demo purposes). **Warning**: Test data is saved to the same Firebase collections as real data. You can delete all dummy data using the "Elimina Tutti i Dati Dummy" button in Settings. See [README.md](./README.md) for full feature documentation. **Recommended**: Keep `false` in production environments.
 
 **For detailed Firebase Admin SDK configuration on Vercel, see [VERCEL_SETUP.md](./VERCEL_SETUP.md)**
 

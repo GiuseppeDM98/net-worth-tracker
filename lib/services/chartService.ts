@@ -204,6 +204,30 @@ export function formatNumber(value: number, decimals: number = 2): string {
 }
 
 /**
+ * Format currency value in compact format for chart axes
+ * Examples: €1,5 Mln, €850k, €250
+ */
+export function formatCurrencyCompact(value: number): string {
+  const absValue = Math.abs(value);
+
+  if (absValue >= 1_000_000) {
+    // Millions: €1,5 Mln
+    const millions = value / 1_000_000;
+    return `€${millions.toLocaleString('it-IT', {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1
+    })} Mln`;
+  } else if (absValue >= 1_000) {
+    // Thousands: €850k
+    const thousands = value / 1_000;
+    return `€${Math.round(thousands)}k`;
+  } else {
+    // Below 1000: €250
+    return `€${Math.round(value)}`;
+  }
+}
+
+/**
  * Prepare data for YoY (Year over Year) variation chart
  * Compares first snapshot of each year with last snapshot of the same year
  */
