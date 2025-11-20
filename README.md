@@ -268,6 +268,94 @@ See [SETUP.md](./SETUP.md#registration-control) for details.
 
 ---
 
+## 🧪 Development Features
+
+### Test Snapshot Generator
+
+For development and testing purposes, the application includes a **bulk test snapshot generator** that creates realistic historical data to test charts, statistics, and UI components.
+
+#### How to Enable
+
+1. **Set environment variable** in your `.env.local`:
+   ```bash
+   NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS=true
+   ```
+
+2. **Navigate to Settings page** in the application
+
+3. **Scroll to "Funzionalità di Sviluppo"** section (only visible when enabled)
+
+4. **Click "Genera Snapshot di Test"** button
+
+#### What It Does
+
+The test data generator creates:
+
+**1. Historical Monthly Snapshots** (going back N months, configurable up to 120)
+- Initial net worth: Configurable (default: €50,000)
+- Monthly growth rate: Configurable percentage (default: 3%)
+- Asset allocation: 85% liquid / 15% illiquid
+- Asset class distribution: 60% equity, 25% bonds, 8% crypto, 5% real estate, 2% cash
+- 10 dummy assets: AAPL, GOOGL, MSFT, TSLA, NVDA, BTC, ETH, Real Estate, Gold, Cash
+- Random but realistic price variations for each asset
+
+**2. Expenses & Income Data** (optional, enabled by default)
+- **Income entries**: 1-2 per month with ±8% variation
+  - Categories: Stipendio, Freelance, Investimenti, Altro
+- **Fixed expenses**: Constant with ±3% variation (35% of total expenses)
+  - Categories: Affitto, Utenze, Abbonamenti
+- **Variable expenses**: 8-15 entries per month with ±40% variation (50% of total expenses)
+  - Categories: Spesa, Trasporti, Svago, Shopping
+- **Debts**: Nearly constant with ±1% variation (15% of total expenses)
+  - Categories: Mutuo, Prestito Auto
+- Realistic date distribution throughout each month
+
+#### Parameters
+
+When you click the button, a modal allows you to configure:
+
+**Patrimonio (Net Worth):**
+- **Patrimonio Iniziale** (Initial Net Worth): Starting amount in EUR (default: €50,000)
+- **Tasso di Crescita Mensile** (Monthly Growth Rate): Percentage growth per month (default: 3%)
+- **Numero di Mesi** (Number of Months): How many months to generate (1-120, default: 24)
+
+**Spese ed Entrate (optional toggle):**
+- **Entrate Mensili Medie** (Average Monthly Income): Mean monthly income in EUR (default: €3,000)
+- **Spese Mensili Medie** (Average Monthly Expenses): Mean monthly expenses in EUR (default: €2,500)
+
+#### ⚠️ Important Warning
+
+**Test data is saved to the same Firebase collections as real data:**
+- Snapshots → `monthly-snapshots` collection
+- Expenses → `expenses` collection
+- Categories → `expenseCategories` collection
+
+All test data will appear in your charts, statistics, and Hall of Fame alongside real data.
+
+**To remove test data:**
+1. Open [Firebase Console](https://console.firebase.google.com/)
+2. Navigate to Firestore Database
+3. Select your project
+4. Delete test documents from these collections:
+   - `monthly-snapshots`: Look for documents with IDs like `{userId}-{year}-{month}`
+   - `expenses`: Look for documents with IDs starting with `dummy-`
+   - `expenseCategories`: Look for documents with IDs starting with `dummy-category-`
+
+**Recommendation**: Only use this feature in a development/test environment or in a separate Firebase project to avoid mixing test data with real financial data.
+
+#### Use Cases
+
+- **Testing charts** with historical data without waiting months for real snapshots
+- **Hall of Fame testing** with realistic income/expense variations to see best/worst months and years
+- **FIRE calculator testing** with actual expense data to validate sustainable withdrawal calculations
+- **Expense analytics testing** to verify category breakdowns, trends, and monthly comparisons
+- **UI development** to see how components handle different data scales and edge cases
+- **Performance testing** with large datasets (up to 120 months of data)
+- **Demo purposes** to showcase the application's full capabilities
+- **Development** of new features requiring historical portfolio and expense data
+
+---
+
 ## 🔄 Price Data Providers
 
 This project uses **Yahoo Finance** by default (free, no API key required).

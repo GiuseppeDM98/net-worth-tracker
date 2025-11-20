@@ -14,12 +14,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Save, RotateCcw, Plus, Trash2, ChevronDown, ChevronUp, Edit, Receipt } from 'lucide-react';
+import { Save, RotateCcw, Plus, Trash2, ChevronDown, ChevronUp, Edit, Receipt, FlaskConical } from 'lucide-react';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { ExpenseCategory, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { getAllCategories, deleteCategory } from '@/lib/services/expenseCategoryService';
 import { CategoryManagementDialog } from '@/components/expenses/CategoryManagementDialog';
+import { CreateDummySnapshotModal } from '@/components/CreateDummySnapshotModal';
 
 interface SubTarget {
   name: string;
@@ -76,6 +77,10 @@ export default function SettingsPage() {
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ExpenseCategory | null>(null);
+
+  // Test snapshot modal state
+  const [dummySnapshotModalOpen, setDummySnapshotModalOpen] = useState(false);
+  const enableTestSnapshots = process.env.NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS === 'true';
 
   useEffect(() => {
     if (user) {
@@ -979,6 +984,47 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Development Features Section */}
+      {enableTestSnapshots && (
+        <Card className="mt-8 border-orange-200 bg-orange-50">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <FlaskConical className="h-5 w-5 text-orange-600" />
+              <CardTitle className="text-orange-900">Funzionalità di Sviluppo</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-lg bg-orange-100 border border-orange-300 p-4">
+              <p className="text-sm text-orange-900 font-semibold">⚠️ Attenzione</p>
+              <p className="text-sm text-orange-800 mt-1">
+                Questa sezione è visibile solo quando la variabile d&apos;ambiente{' '}
+                <code className="bg-orange-200 px-1 rounded">NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS</code>{' '}
+                è impostata su <code className="bg-orange-200 px-1 rounded">true</code>.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="font-semibold text-sm text-gray-900">
+                Generazione Snapshot di Test
+              </h3>
+              <p className="text-sm text-gray-700">
+                Genera snapshot mensili fittizi per testare grafici e statistiche.
+                Gli snapshot verranno salvati nella stessa collection Firebase degli snapshot reali
+                e dovranno essere eliminati manualmente.
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => setDummySnapshotModalOpen(true)}
+                className="border-orange-300 hover:bg-orange-100"
+              >
+                <FlaskConical className="mr-2 h-4 w-4" />
+                Genera Snapshot di Test
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Category Management Dialog */}
       <CategoryManagementDialog
         open={categoryDialogOpen}
@@ -986,6 +1032,15 @@ export default function SettingsPage() {
         category={editingCategory}
         onSuccess={handleExpenseCategorySuccess}
       />
+
+      {/* Dummy Snapshot Modal */}
+      {enableTestSnapshots && (
+        <CreateDummySnapshotModal
+          open={dummySnapshotModalOpen}
+          onOpenChange={setDummySnapshotModalOpen}
+          userId={user?.uid || ''}
+        />
+      )}
     </div>
   );
 }
