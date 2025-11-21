@@ -335,3 +335,64 @@ export function calculateNetTotal(assets: Asset[]): number {
   const estimatedTaxes = calculateTotalEstimatedTaxes(assets);
   return grossTotal - estimatedTaxes;
 }
+
+/**
+ * Calculate portfolio weighted average TER (Total Expense Ratio)
+ * Formula: TER_portfolio = (TER_asset1 × Value_asset1 + TER_asset2 × Value_asset2 + ...) / Total_portfolio_value
+ * Only includes assets that have a TER value
+ * Returns 0 if no assets have TER
+ */
+export function calculatePortfolioWeightedTER(assets: Asset[]): number {
+  // Filter assets that have TER defined
+  const assetsWithTER = assets.filter(
+    asset => asset.totalExpenseRatio !== undefined && asset.totalExpenseRatio > 0
+  );
+
+  if (assetsWithTER.length === 0) {
+    return 0;
+  }
+
+  // Calculate weighted sum of TER
+  const weightedTERSum = assetsWithTER.reduce((sum, asset) => {
+    const assetValue = calculateAssetValue(asset);
+    const ter = asset.totalExpenseRatio || 0;
+    return sum + (ter * assetValue);
+  }, 0);
+
+  // Calculate total value of assets with TER
+  const totalValueWithTER = assetsWithTER.reduce(
+    (sum, asset) => sum + calculateAssetValue(asset),
+    0
+  );
+
+  if (totalValueWithTER === 0) {
+    return 0;
+  }
+
+  return weightedTERSum / totalValueWithTER;
+}
+
+/**
+ * Calculate annual portfolio cost based on TER
+ * Formula: Annual_cost = Total_portfolio_value × (TER_portfolio / 100)
+ * Returns 0 if no assets have TER
+ */
+export function calculateAnnualPortfolioCost(assets: Asset[]): number {
+  const portfolioTER = calculatePortfolioWeightedTER(assets);
+
+  if (portfolioTER === 0) {
+    return 0;
+  }
+
+  // Calculate total value of assets with TER
+  const assetsWithTER = assets.filter(
+    asset => asset.totalExpenseRatio !== undefined && asset.totalExpenseRatio > 0
+  );
+
+  const totalValueWithTER = assetsWithTER.reduce(
+    (sum, asset) => sum + calculateAssetValue(asset),
+    0
+  );
+
+  return totalValueWithTER * (portfolioTER / 100);
+}

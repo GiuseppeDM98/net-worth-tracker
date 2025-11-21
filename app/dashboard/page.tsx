@@ -13,6 +13,8 @@ import {
   calculateLiquidEstimatedTaxes,
   calculateGrossTotal,
   calculateNetTotal,
+  calculatePortfolioWeightedTER,
+  calculateAnnualPortfolioCost,
 } from '@/lib/services/assetService';
 import {
   formatCurrency,
@@ -228,6 +230,11 @@ export default function DashboardPage() {
 
   // Check if any asset has cost basis tracking enabled
   const hasCostBasisTracking = assets.some(a => (a.averageCost && a.averageCost > 0) || (a.taxRate && a.taxRate > 0));
+
+  // TER calculations
+  const portfolioTER = calculatePortfolioWeightedTER(assets);
+  const annualPortfolioCost = calculateAnnualPortfolioCost(assets);
+  const hasTERTracking = assets.some(a => a.totalExpenseRatio && a.totalExpenseRatio > 0);
 
   // Prepare chart data
   const assetClassData = prepareAssetClassDistributionData(assets);
@@ -508,6 +515,41 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* TER Cards - only show if any asset has TER tracking */}
+      {hasTERTracking && (
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">TER Portfolio</CardTitle>
+              <Receipt className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-purple-600">
+                {portfolioTER.toFixed(2)}%
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Total Expense Ratio medio ponderato
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Costo Annuale Portfolio</CardTitle>
+              <TrendingDown className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600">
+                {formatCurrency(annualPortfolioCost)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Costi di gestione annuali stimati
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="md:col-span-2">
