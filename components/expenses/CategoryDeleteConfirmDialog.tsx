@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   ExpenseCategory,
@@ -24,9 +24,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { AlertTriangle, Plus, Search } from 'lucide-react';
+import { AlertTriangle, Plus, Search, Check, ChevronsUpDown } from 'lucide-react';
 import { CategoryManagementDialog } from './CategoryManagementDialog';
 import { getAllCategories } from '@/lib/services/expenseCategoryService';
+import { cn } from '@/lib/utils';
 
 interface CategoryDeleteConfirmDialogProps {
   open: boolean;
@@ -52,10 +53,14 @@ export function CategoryDeleteConfirmDialog({
   const [selectedSubCategoryId, setSelectedSubCategoryId] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   // New category creation dialog state
   const [createCategoryDialogOpen, setCreateCategoryDialogOpen] = useState(false);
   const [localCategories, setLocalCategories] = useState<ExpenseCategory[]>(allCategories);
+
+  // Ref for click outside detection
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Filter out the category being deleted
   const availableCategories = localCategories.filter(
@@ -98,11 +103,34 @@ export function CategoryDeleteConfirmDialog({
       }
       setSelectedSubCategoryId('');
       setSearchQuery('');
+      setIsDropdownOpen(false);
     }
   }, [open, availableCategories]);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isDropdownOpen]);
+
   const handleCreateCategory = () => {
     setCreateCategoryDialogOpen(true);
+    setIsDropdownOpen(false);
+  };
+
+  const handleSelectCategory = (categoryId: string) => {
+    setSelectedCategoryId(categoryId);
+    setSelectedSubCategoryId(''); // Reset subcategory when category changes
+    setIsDropdownOpen(false);
+    setSearchQuery(''); // Clear search after selection
   };
 
   const handleCategoryCreated = async () => {
@@ -176,54 +204,83 @@ export function CategoryDeleteConfirmDialog({
           {/* Category Selection - Only show if multiple categories available */}
           {availableCategories.length > 1 && (
             <div className="space-y-2">
-              <Label htmlFor="new-category">
+              <Label htmlFor="category-combobox">
                 Nuova Categoria *
               </Label>
 
-              {/* Search input */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Cerca categoria..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
+              {/* Category Combobox */}
+              <div ref={dropdownRef} className="relative">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <Input
+                    id="category-combobox"
+                    placeholder="Cerca o seleziona categoria..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setIsDropdownOpen(true);
+                    }}
+                    onFocus={() => setIsDropdownOpen(true)}
+                    className="pl-9 pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  >
+                    <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </div>
 
-              {/* Category dropdown */}
-              <Select
-                value={selectedCategoryId}
-                onValueChange={(value) => {
-                  setSelectedCategoryId(value);
-                  setSelectedSubCategoryId(''); // Reset subcategory when category changes
-                }}
-              >
-                <SelectTrigger id="new-category">
-                  <SelectValue placeholder="Seleziona una categoria..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredCategories.length === 0 ? (
-                    <div className="p-2 text-sm text-muted-foreground text-center">
-                      Nessuna categoria trovata
-                    </div>
-                  ) : (
-                    filteredCategories.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        <div className="flex items-center gap-2">
+                {/* Dropdown list */}
+                {isDropdownOpen && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                    {filteredCategories.length === 0 ? (
+                      <div className="p-3 text-sm text-muted-foreground text-center">
+                        Nessuna categoria trovata
+                      </div>
+                    ) : (
+                      filteredCategories.map((category) => (
+                        <button
+                          key={category.id}
+                          type="button"
+                          className={cn(
+                            "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer text-left",
+                            selectedCategoryId === category.id && "bg-gray-100"
+                          )}
+                          onClick={() => handleSelectCategory(category.id)}
+                        >
                           {category.color && (
                             <div
-                              className="w-3 h-3 rounded-full"
+                              className="w-3 h-3 rounded-full flex-shrink-0"
                               style={{ backgroundColor: category.color }}
                             />
                           )}
-                          {category.name}
-                        </div>
-                      </SelectItem>
-                    ))
+                          <span className="flex-1">{category.name}</span>
+                          {selectedCategoryId === category.id && (
+                            <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                          )}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Selected category display */}
+              {selectedCategoryId && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                  {selectedCategory?.color && (
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: selectedCategory.color }}
+                    />
                   )}
-                </SelectContent>
-              </Select>
+                  <span className="text-sm font-medium">{selectedCategory?.name}</span>
+                </div>
+              )}
 
               {/* Create new category button */}
               <Button
