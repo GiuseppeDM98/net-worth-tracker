@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   ExpenseCategory,
   ExpenseSubCategory,
+  ExpenseType,
 } from '@/types/expenses';
 import {
   Dialog,
@@ -14,6 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -21,7 +24,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Plus, Search } from 'lucide-react';
+import { CategoryManagementDialog } from './CategoryManagementDialog';
+import { getAllCategories } from '@/lib/services/expenseCategoryService';
 
 interface CategoryDeleteConfirmDialogProps {
   open: boolean;
@@ -42,23 +47,45 @@ export function CategoryDeleteConfirmDialog({
   allCategories,
   subCategoryToDelete,
 }: CategoryDeleteConfirmDialogProps) {
+  const { user } = useAuth();
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [selectedSubCategoryId, setSelectedSubCategoryId] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // New category creation dialog state
+  const [createCategoryDialogOpen, setCreateCategoryDialogOpen] = useState(false);
+  const [localCategories, setLocalCategories] = useState<ExpenseCategory[]>(allCategories);
 
   // Filter out the category being deleted
-  const availableCategories = allCategories.filter(
+  const availableCategories = localCategories.filter(
     cat => cat.id !== categoryToDelete.id
   );
 
+  // Filter categories based on search query
+  const filteredCategories = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return availableCategories;
+    }
+    const query = searchQuery.toLowerCase();
+    return availableCategories.filter(cat =>
+      cat.name.toLowerCase().includes(query)
+    );
+  }, [availableCategories, searchQuery]);
+
   // Get subcategories of selected category
-  const selectedCategory = allCategories.find(cat => cat.id === selectedCategoryId);
+  const selectedCategory = localCategories.find(cat => cat.id === selectedCategoryId);
   const availableSubCategories = selectedCategory?.subCategories || [];
 
   // If deleting a subcategory, filter it out from available subcategories
   const filteredSubCategories = subCategoryToDelete
     ? availableSubCategories.filter(sub => sub.id !== subCategoryToDelete.id)
     : availableSubCategories;
+
+  // Update local categories when allCategories prop changes
+  useEffect(() => {
+    setLocalCategories(allCategories);
+  }, [allCategories]);
 
   useEffect(() => {
     // Reset selections when dialog opens/closes
@@ -70,8 +97,34 @@ export function CategoryDeleteConfirmDialog({
         setSelectedCategoryId('');
       }
       setSelectedSubCategoryId('');
+      setSearchQuery('');
     }
   }, [open, availableCategories]);
+
+  const handleCreateCategory = () => {
+    setCreateCategoryDialogOpen(true);
+  };
+
+  const handleCategoryCreated = async () => {
+    // Reload categories from database
+    if (user) {
+      const updatedCategories = await getAllCategories(user.uid);
+      setLocalCategories(updatedCategories);
+
+      // Auto-select the newly created category (last one in the list)
+      const newestCategory = updatedCategories
+        .filter(cat => cat.id !== categoryToDelete.id)
+        .sort((a, b) => {
+          const timeA = a.createdAt instanceof Date ? a.createdAt.getTime() : a.createdAt.toMillis();
+          const timeB = b.createdAt instanceof Date ? b.createdAt.getTime() : b.createdAt.toMillis();
+          return timeB - timeA;
+        })[0];
+
+      if (newestCategory) {
+        setSelectedCategoryId(newestCategory.id);
+      }
+    }
+  };
 
   const handleConfirm = async () => {
     if (!selectedCategoryId) {
@@ -126,6 +179,19 @@ export function CategoryDeleteConfirmDialog({
               <Label htmlFor="new-category">
                 Nuova Categoria *
               </Label>
+
+              {/* Search input */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Cerca categoria..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+
+              {/* Category dropdown */}
               <Select
                 value={selectedCategoryId}
                 onValueChange={(value) => {
@@ -137,21 +203,39 @@ export function CategoryDeleteConfirmDialog({
                   <SelectValue placeholder="Seleziona una categoria..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableCategories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      <div className="flex items-center gap-2">
-                        {category.color && (
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: category.color }}
-                          />
-                        )}
-                        {category.name}
-                      </div>
-                    </SelectItem>
-                  ))}
+                  {filteredCategories.length === 0 ? (
+                    <div className="p-2 text-sm text-muted-foreground text-center">
+                      Nessuna categoria trovata
+                    </div>
+                  ) : (
+                    filteredCategories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        <div className="flex items-center gap-2">
+                          {category.color && (
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: category.color }}
+                            />
+                          )}
+                          {category.name}
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
+
+              {/* Create new category button */}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCreateCategory}
+                className="w-full"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Crea nuova categoria
+              </Button>
             </div>
           )}
 
@@ -180,11 +264,43 @@ export function CategoryDeleteConfirmDialog({
             </div>
           )}
 
+          {/* Single category case - show button to create */}
+          {availableCategories.length === 1 && (
+            <div className="space-y-3">
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800">
+                La categoria selezionata è l&apos;unica disponibile.
+                {' '}Le spese verranno automaticamente riassegnate a questa categoria.
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCreateCategory}
+                className="w-full"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Oppure crea una nuova categoria
+              </Button>
+            </div>
+          )}
+
           {/* Warning if no categories available */}
           {availableCategories.length === 0 && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800">
-              Non puoi eliminare l&apos;unica categoria con spese associate.
-              Crea prima una nuova categoria.
+            <div className="space-y-3">
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800">
+                Non puoi eliminare l&apos;unica categoria con spese associate.
+                Crea prima una nuova categoria.
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCreateCategory}
+                className="w-full"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Crea nuova categoria
+              </Button>
             </div>
           )}
         </div>
@@ -211,6 +327,14 @@ export function CategoryDeleteConfirmDialog({
           </Button>
         </div>
       </DialogContent>
+
+      {/* Category Creation Dialog */}
+      <CategoryManagementDialog
+        open={createCategoryDialogOpen}
+        onClose={() => setCreateCategoryDialogOpen(false)}
+        onSuccess={handleCategoryCreated}
+        initialType={categoryToDelete.type}
+      />
     </Dialog>
   );
 }
