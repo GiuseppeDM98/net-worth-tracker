@@ -54,6 +54,7 @@ interface CategoryManagementDialogProps {
   category?: ExpenseCategory | null;
   onSuccess?: () => void;
   initialType?: ExpenseType;
+  initialName?: string;
 }
 
 const expenseTypes: { value: ExpenseType; label: string }[] = [
@@ -82,6 +83,7 @@ export function CategoryManagementDialog({
   category,
   onSuccess,
   initialType,
+  initialName,
 }: CategoryManagementDialogProps) {
   const { user } = useAuth();
   const [subCategories, setSubCategories] = useState<ExpenseSubCategory[]>([]);
@@ -119,14 +121,14 @@ export function CategoryManagementDialog({
       setSubCategories(category.subCategories || []);
     } else {
       reset({
-        name: '',
+        name: initialName || '',
         type: initialType || 'variable',
         color: '#3b82f6',
       });
       setSubCategories([]);
     }
     setNewSubCategoryName('');
-  }, [category, reset, open, initialType]);
+  }, [category, reset, open, initialType, initialName]);
 
   const handleAddSubCategory = () => {
     if (!newSubCategoryName.trim()) {

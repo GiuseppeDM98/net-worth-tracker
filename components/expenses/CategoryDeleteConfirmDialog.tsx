@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { AlertTriangle, Plus, Search, Check, ChevronsUpDown } from 'lucide-react';
+import { AlertTriangle, Plus, Search, Check } from 'lucide-react';
 import { CategoryManagementDialog } from './CategoryManagementDialog';
 import { getAllCategories } from '@/lib/services/expenseCategoryService';
 import { cn } from '@/lib/utils';
@@ -221,22 +221,25 @@ export function CategoryDeleteConfirmDialog({
                       setIsDropdownOpen(true);
                     }}
                     onFocus={() => setIsDropdownOpen(true)}
-                    className="pl-9 pr-10"
+                    className="pl-9"
                   />
-                  <div
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 cursor-pointer"
-                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  >
-                    <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
-                  </div>
                 </div>
 
                 {/* Dropdown list */}
                 {isDropdownOpen && (
                   <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                    {filteredCategories.length === 0 ? (
+                    {filteredCategories.length === 0 && searchQuery.trim() ? (
+                      <button
+                        type="button"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer text-left"
+                        onClick={handleCreateCategory}
+                      >
+                        <Plus className="h-4 w-4 text-primary flex-shrink-0" />
+                        <span className="flex-1">Crea categoria &quot;{searchQuery.trim()}&quot;</span>
+                      </button>
+                    ) : filteredCategories.length === 0 ? (
                       <div className="p-3 text-sm text-muted-foreground text-center">
-                        Nessuna categoria trovata
+                        Inizia a digitare per cercare o creare una categoria
                       </div>
                     ) : (
                       filteredCategories.map((category) => (
@@ -278,18 +281,6 @@ export function CategoryDeleteConfirmDialog({
                   <span className="text-sm font-medium">{selectedCategory?.name}</span>
                 </div>
               )}
-
-              {/* Create new category button */}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleCreateCategory}
-                className="w-full"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Crea nuova categoria
-              </Button>
             </div>
           )}
 
@@ -318,43 +309,19 @@ export function CategoryDeleteConfirmDialog({
             </div>
           )}
 
-          {/* Single category case - show button to create */}
+          {/* Single category case */}
           {availableCategories.length === 1 && (
-            <div className="space-y-3">
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800">
-                La categoria selezionata è l&apos;unica disponibile.
-                {' '}Le spese verranno automaticamente riassegnate a questa categoria.
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleCreateCategory}
-                className="w-full"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Oppure crea una nuova categoria
-              </Button>
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800">
+              La categoria selezionata è l&apos;unica disponibile.
+              {' '}Le spese verranno automaticamente riassegnate a questa categoria.
             </div>
           )}
 
           {/* Warning if no categories available */}
           {availableCategories.length === 0 && (
-            <div className="space-y-3">
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800">
-                Non puoi eliminare l&apos;unica categoria con spese associate.
-                Crea prima una nuova categoria.
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleCreateCategory}
-                className="w-full"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Crea nuova categoria
-              </Button>
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800">
+              Non puoi eliminare l&apos;unica categoria con spese associate.
+              {' '}Crea prima una nuova categoria digitando il nome nel campo sopra.
             </div>
           )}
         </div>
@@ -388,6 +355,7 @@ export function CategoryDeleteConfirmDialog({
         onClose={() => setCreateCategoryDialogOpen(false)}
         onSuccess={handleCategoryCreated}
         initialType={categoryToDelete.type}
+        initialName={searchQuery.trim()}
       />
     </Dialog>
   );
