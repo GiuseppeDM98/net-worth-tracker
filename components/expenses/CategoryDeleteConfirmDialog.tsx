@@ -223,15 +223,12 @@ export function CategoryDeleteConfirmDialog({
                     onFocus={() => setIsDropdownOpen(true)}
                     className="pl-9 pr-10"
                   />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                  <div
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 cursor-pointer"
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                   >
                     <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
-                  </Button>
+                  </div>
                 </div>
 
                 {/* Dropdown list */}
