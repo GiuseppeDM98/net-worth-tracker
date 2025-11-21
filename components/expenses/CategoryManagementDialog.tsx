@@ -181,12 +181,35 @@ export function CategoryManagementDialog({
   };
 
   const handleConfirmSubCategoryDelete = async (
-    newCategoryId: string,
+    newCategoryId?: string,
     newSubCategoryId?: string
   ) => {
     if (!category || !subCategoryToDelete || !user) return;
 
     try {
+      // If no category ID provided, delete without reassignment
+      // (for subcategories, this means keeping the category but removing subcategory)
+      if (!newCategoryId) {
+        await reassignExpensesSubCategory(
+          category.id,
+          subCategoryToDelete.id,
+          user.uid,
+          undefined,
+          undefined
+        );
+
+        // Remove the subcategory from the local state
+        setSubCategories(subCategories.filter(sub => sub.id !== subCategoryToDelete.id));
+
+        toast.success(`Sotto-categoria "${subCategoryToDelete.name}" eliminata. Le spese rimarranno nella categoria senza sotto-categoria.`);
+
+        // Close the dialog
+        setDeleteSubCategoryDialogOpen(false);
+        setSubCategoryToDelete(null);
+        setSubCategoryExpenseCount(0);
+        return;
+      }
+
       // Reassign expenses to new category/subcategory
       await reassignExpensesSubCategory(
         category.id,

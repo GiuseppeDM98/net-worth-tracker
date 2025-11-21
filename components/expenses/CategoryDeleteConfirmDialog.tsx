@@ -32,7 +32,7 @@ import { cn } from '@/lib/utils';
 interface CategoryDeleteConfirmDialogProps {
   open: boolean;
   onClose: () => void;
-  onConfirm: (newCategoryId: string, newSubCategoryId?: string) => Promise<void>;
+  onConfirm: (newCategoryId?: string, newSubCategoryId?: string) => Promise<void>;
   categoryToDelete: ExpenseCategory;
   expenseCount: number;
   allCategories: ExpenseCategory[];
@@ -171,6 +171,18 @@ export function CategoryDeleteConfirmDialog({
     }
   };
 
+  const handleDeleteWithoutReassign = async () => {
+    setIsSubmitting(true);
+    try {
+      await onConfirm(undefined, undefined);
+      onClose();
+    } catch (error) {
+      console.error('Error during deletion:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const isDeleting = subCategoryToDelete ? 'sotto-categoria' : 'categoria';
   const nameToDelete = subCategoryToDelete
     ? subCategoryToDelete.name
@@ -219,7 +231,6 @@ export function CategoryDeleteConfirmDialog({
                     setSearchQuery(e.target.value);
                     setIsDropdownOpen(true);
                   }}
-                  onFocus={() => setIsDropdownOpen(true)}
                 />
 
                 {/* Dropdown list */}
@@ -327,7 +338,7 @@ export function CategoryDeleteConfirmDialog({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex justify-end gap-2 pt-4 border-t">
+        <div className="flex flex-wrap justify-end gap-2 pt-4 border-t">
           <Button
             type="button"
             variant="outline"
@@ -335,6 +346,15 @@ export function CategoryDeleteConfirmDialog({
             disabled={isSubmitting}
           >
             Annulla
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleDeleteWithoutReassign}
+            disabled={isSubmitting}
+            className="text-amber-600 hover:text-amber-700 border-amber-300 hover:bg-amber-50"
+          >
+            Elimina senza riassegnare
           </Button>
           <Button
             type="button"

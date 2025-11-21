@@ -305,12 +305,28 @@ export default function SettingsPage() {
   };
 
   const handleConfirmDeleteWithReassignment = async (
-    newCategoryId: string,
+    newCategoryId?: string,
     newSubCategoryId?: string
   ) => {
     if (!categoryToDelete || !user) return;
 
     try {
+      // If no new category ID provided, delete without reassignment
+      if (!newCategoryId) {
+        await deleteCategory(categoryToDelete.id);
+
+        toast.success(
+          `Categoria "${categoryToDelete.name}" eliminata con successo. Le spese associate rimarranno senza categoria.`
+        );
+
+        // Reset state and reload categories
+        setDeleteConfirmDialogOpen(false);
+        setCategoryToDelete(null);
+        setExpenseCountToReassign(0);
+        await loadExpenseCategories();
+        return;
+      }
+
       // Get the new category details
       const newCategory = await getCategoryById(newCategoryId);
       if (!newCategory) {
