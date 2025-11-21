@@ -507,12 +507,14 @@ export function calculateNetBalance(expenses: Expense[]): number {
  * Count expenses associated with a category
  */
 export async function getExpenseCountByCategoryId(
-  categoryId: string
+  categoryId: string,
+  userId: string
 ): Promise<number> {
   try {
     const expensesRef = collection(db, EXPENSES_COLLECTION);
     const q = query(
       expensesRef,
+      where('userId', '==', userId),
       where('categoryId', '==', categoryId)
     );
 
@@ -529,12 +531,14 @@ export async function getExpenseCountByCategoryId(
  */
 export async function getExpenseCountBySubCategoryId(
   categoryId: string,
-  subCategoryId: string
+  subCategoryId: string,
+  userId: string
 ): Promise<number> {
   try {
     const expensesRef = collection(db, EXPENSES_COLLECTION);
     const q = query(
       expensesRef,
+      where('userId', '==', userId),
       where('categoryId', '==', categoryId),
       where('subCategoryId', '==', subCategoryId)
     );
@@ -552,12 +556,14 @@ export async function getExpenseCountBySubCategoryId(
  */
 export async function updateExpensesCategoryName(
   categoryId: string,
-  newCategoryName: string
+  newCategoryName: string,
+  userId: string
 ): Promise<void> {
   try {
     const expensesRef = collection(db, EXPENSES_COLLECTION);
     const q = query(
       expensesRef,
+      where('userId', '==', userId),
       where('categoryId', '==', categoryId)
     );
 
@@ -589,12 +595,14 @@ export async function updateExpensesCategoryName(
 export async function updateExpensesSubCategoryName(
   categoryId: string,
   subCategoryId: string,
-  newSubCategoryName: string
+  newSubCategoryName: string,
+  userId: string
 ): Promise<void> {
   try {
     const expensesRef = collection(db, EXPENSES_COLLECTION);
     const q = query(
       expensesRef,
+      where('userId', '==', userId),
       where('categoryId', '==', categoryId),
       where('subCategoryId', '==', subCategoryId)
     );
@@ -628,6 +636,7 @@ export async function reassignExpensesCategory(
   oldCategoryId: string,
   newCategoryId: string,
   newCategoryName: string,
+  userId: string,
   newSubCategoryId?: string,
   newSubCategoryName?: string
 ): Promise<number> {
@@ -635,6 +644,7 @@ export async function reassignExpensesCategory(
     const expensesRef = collection(db, EXPENSES_COLLECTION);
     const q = query(
       expensesRef,
+      where('userId', '==', userId),
       where('categoryId', '==', oldCategoryId)
     );
 
@@ -681,6 +691,7 @@ export async function reassignExpensesCategory(
 export async function reassignExpensesSubCategory(
   categoryId: string,
   oldSubCategoryId: string,
+  userId: string,
   newSubCategoryId?: string,
   newSubCategoryName?: string
 ): Promise<number> {
@@ -688,6 +699,7 @@ export async function reassignExpensesSubCategory(
     const expensesRef = collection(db, EXPENSES_COLLECTION);
     const q = query(
       expensesRef,
+      where('userId', '==', userId),
       where('categoryId', '==', categoryId),
       where('subCategoryId', '==', oldSubCategoryId)
     );

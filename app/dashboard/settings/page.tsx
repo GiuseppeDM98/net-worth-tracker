@@ -276,9 +276,11 @@ export default function SettingsPage() {
   };
 
   const handleDeleteExpenseCategory = async (categoryId: string, categoryName: string) => {
+    if (!user) return;
+
     try {
       // Check if there are expenses associated with this category
-      const expenseCount = await getExpenseCountByCategoryId(categoryId);
+      const expenseCount = await getExpenseCountByCategoryId(categoryId, user.uid);
 
       if (expenseCount > 0) {
         // Show reassignment dialog
@@ -306,7 +308,7 @@ export default function SettingsPage() {
     newCategoryId: string,
     newSubCategoryId?: string
   ) => {
-    if (!categoryToDelete) return;
+    if (!categoryToDelete || !user) return;
 
     try {
       // Get the new category details
@@ -330,6 +332,7 @@ export default function SettingsPage() {
         categoryToDelete.id,
         newCategoryId,
         newCategory.name,
+        user.uid,
         newSubCategoryId,
         newSubCategoryName
       );

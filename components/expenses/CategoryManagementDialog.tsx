@@ -152,9 +152,9 @@ export function CategoryManagementDialog({
 
   const handleRemoveSubCategory = async (subCategoryId: string) => {
     // If editing an existing category, check for associated expenses
-    if (category) {
+    if (category && user) {
       try {
-        const expenseCount = await getExpenseCountBySubCategoryId(category.id, subCategoryId);
+        const expenseCount = await getExpenseCountBySubCategoryId(category.id, subCategoryId, user.uid);
 
         if (expenseCount > 0) {
           // Show reassignment dialog
@@ -182,13 +182,14 @@ export function CategoryManagementDialog({
     newCategoryId: string,
     newSubCategoryId?: string
   ) => {
-    if (!category || !subCategoryToDelete) return;
+    if (!category || !subCategoryToDelete || !user) return;
 
     try {
       // Reassign expenses to new category/subcategory
       await reassignExpensesSubCategory(
         category.id,
         subCategoryToDelete.id,
+        user.uid,
         newSubCategoryId,
         newSubCategoryId ? subCategories.find(sub => sub.id === newSubCategoryId)?.name : undefined
       );
@@ -224,7 +225,7 @@ export function CategoryManagementDialog({
 
       if (category) {
         // Update existing category
-        await updateCategory(category.id, categoryData);
+        await updateCategory(category.id, categoryData, user.uid);
         toast.success('Categoria aggiornata con successo');
       } else {
         // Create new category

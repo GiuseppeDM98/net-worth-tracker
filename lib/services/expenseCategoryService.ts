@@ -160,15 +160,16 @@ export async function createCategory(
  */
 export async function updateCategory(
   categoryId: string,
-  updates: Partial<ExpenseCategoryFormData>
+  updates: Partial<ExpenseCategoryFormData>,
+  userId?: string
 ): Promise<void> {
   try {
     // If the name is being updated, also update all associated expenses
-    if (updates.name) {
+    if (updates.name && userId) {
       const oldCategory = await getCategoryById(categoryId);
       if (oldCategory && oldCategory.name !== updates.name) {
         // Update all expenses with this category
-        await updateExpensesCategoryName(categoryId, updates.name);
+        await updateExpensesCategoryName(categoryId, updates.name, userId);
       }
     }
 
@@ -267,7 +268,8 @@ export async function removeSubCategory(
 export async function updateSubCategory(
   categoryId: string,
   subCategoryId: string,
-  newName: string
+  newName: string,
+  userId?: string
 ): Promise<void> {
   try {
     const category = await getCategoryById(categoryId);
@@ -278,9 +280,9 @@ export async function updateSubCategory(
     // Find the old subcategory to check if name is different
     const oldSubCategory = category.subCategories.find(sub => sub.id === subCategoryId);
 
-    if (oldSubCategory && oldSubCategory.name !== newName) {
+    if (oldSubCategory && oldSubCategory.name !== newName && userId) {
       // Update all expenses with this subcategory
-      await updateExpensesSubCategoryName(categoryId, subCategoryId, newName);
+      await updateExpensesSubCategoryName(categoryId, subCategoryId, newName, userId);
     }
 
     const updatedSubCategories = category.subCategories.map(sub =>
