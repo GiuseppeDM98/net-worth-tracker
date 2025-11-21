@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { AlertTriangle, Plus, Search, Check } from 'lucide-react';
+import { AlertTriangle, Plus, Check } from 'lucide-react';
 import { CategoryManagementDialog } from './CategoryManagementDialog';
 import { getAllCategories } from '@/lib/services/expenseCategoryService';
 import { cn } from '@/lib/utils';
@@ -209,25 +209,24 @@ export function CategoryDeleteConfirmDialog({
               </Label>
 
               {/* Category Combobox */}
-              <div ref={dropdownRef} className="relative">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                  <Input
-                    id="category-combobox"
-                    placeholder="Cerca o seleziona categoria..."
-                    value={searchQuery}
-                    onChange={(e) => {
-                      setSearchQuery(e.target.value);
-                      setIsDropdownOpen(true);
-                    }}
-                    onFocus={() => setIsDropdownOpen(true)}
-                    className="pl-9"
-                  />
-                </div>
+              <div className="relative">
+                <Input
+                  id="category-combobox"
+                  placeholder="Cerca o seleziona categoria..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setIsDropdownOpen(true);
+                  }}
+                  onFocus={() => setIsDropdownOpen(true)}
+                />
 
                 {/* Dropdown list */}
                 {isDropdownOpen && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                  <div
+                    ref={dropdownRef}
+                    className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto"
+                  >
                     {filteredCategories.length === 0 && searchQuery.trim() ? (
                       <button
                         type="button"
