@@ -62,9 +62,10 @@ export function CategoryDeleteConfirmDialog({
   // Ref for click outside detection
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Filter out the category being deleted
-  const availableCategories = localCategories.filter(
-    cat => cat.id !== categoryToDelete.id
+  // Filter out the category being deleted (memoized to prevent useEffect triggers)
+  const availableCategories = useMemo(
+    () => localCategories.filter(cat => cat.id !== categoryToDelete.id),
+    [localCategories, categoryToDelete.id]
   );
 
   // Filter categories based on search query
