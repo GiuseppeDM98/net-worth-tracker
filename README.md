@@ -63,6 +63,12 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
   - Special calculation for real estate: G/P based on gross property value vs purchase cost (independent of outstanding debt)
   - Estimated tax calculation based on configurable tax rates
   - Gross and net net worth visualization (before/after taxes)
+- **TER (Total Expense Ratio) tracking** for cost-conscious investing
+  - Optional TER field for ETFs, mutual funds, and other managed investments
+  - Weighted average portfolio TER calculation
+  - **Annual portfolio cost** displayed in absolute terms (EUR)
+  - Dashboard cards showing Portfolio TER percentage and yearly management costs
+  - **PMC (Average Cost) and TER columns** in Assets table for quick reference
 
 ### 📈 **Historical Analysis**
 - **Automated monthly snapshots** via scheduled cron jobs
@@ -541,6 +547,59 @@ The G/P reflects the **property's appreciation**, not your equity gain. The calc
 
 This approach accurately represents the investment performance of the property itself, independent of how it was financed. Your net worth correctly shows €100,000 (after debt), while the G/P shows the true appreciation of the asset (+€50,000).
 
+### Tracking TER and Portfolio Costs
+
+The **TER (Total Expense Ratio)** feature helps you monitor and optimize the management costs of your portfolio, particularly important for ETFs and mutual funds.
+
+#### Setting Up TER for Assets
+
+1. Navigate to **"Patrimonio"** (Assets) page
+2. Click on an existing asset or create a new one
+3. Enable **"TER (Total Expense Ratio)"** toggle
+4. Enter the TER percentage (e.g., 0.20 for 0.20%)
+   - Find TER in the fund's factsheet or prospectus
+   - Common examples: Vanguard FTSE All-World ~0.22%, iShares Core S&P 500 ~0.07%
+5. Save the asset
+
+#### Understanding Portfolio TER Metrics
+
+Once you've added TER data for your assets, two new cards appear in the **Dashboard Overview**:
+
+**Portfolio TER Card (Purple)**
+- Shows the weighted average TER across all your investments
+- Formula: `(TER₁ × Value₁ + TER₂ × Value₂ + ...) / Total Portfolio Value`
+- Only includes assets with TER defined (stocks without TER are excluded)
+- Example: If you have €50k in an ETF with 0.20% TER and €30k in another with 0.50% TER, your Portfolio TER = 0.31%
+
+**Annual Portfolio Cost Card (Orange)**
+- Displays the real cost in euros you'll pay annually
+- Formula: `Portfolio Value × (Portfolio TER / 100)`
+- Example: €80k portfolio with 0.31% TER = €248/year in management fees
+
+#### Viewing TER in Assets Table
+
+The **Assets table** includes dedicated columns for cost analysis:
+- **PMC (Prezzo Medio di Carico)**: Your average purchase cost per unit
+- **TER**: The expense ratio for each asset (displayed in purple)
+- Assets without TER show "-" in gray
+
+#### Use Cases
+
+**Compare Investment Options**
+- ETF A: €50k, TER 0.20% → €100/year
+- ETF B: €50k, TER 0.75% → €375/year
+- **Savings by choosing A: €275/year**
+
+**Optimize Existing Portfolio**
+- Identify high-cost funds dragging down returns
+- Calculate the impact of switching to lower-cost alternatives
+- Track how costs evolve as your portfolio grows
+
+**Real Numbers Matter**
+- A 0.50% difference might sound small
+- On a €100k portfolio: **€500/year difference**
+- Over 30 years at 7% growth: **€47,000+ in lost returns**
+
 ---
 
 ## 🤝 Contributing
@@ -636,6 +695,7 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - ✅ Cost basis tracking with unrealized gains and tax estimation
 - ✅ Gain/Loss (G/P) column in Assets table with total portfolio performance
 - ✅ Monte Carlo retirement simulations
+- ✅ TER (Total Expense Ratio) tracking with portfolio cost analysis
 
 ### Future Enhancements (Planned 🔜)
 - 🔜 PDF export of portfolio reports
