@@ -18,8 +18,10 @@ import { Save, RotateCcw, Plus, Trash2, ChevronDown, ChevronUp, Edit, Receipt, F
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { ExpenseCategory, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
-import { getAllCategories, deleteCategory } from '@/lib/services/expenseCategoryService';
+import { getAllCategories, deleteCategory, getCategoryById } from '@/lib/services/expenseCategoryService';
+import { getExpenseCountByCategoryId, reassignExpensesCategory } from '@/lib/services/expenseService';
 import { CategoryManagementDialog } from '@/components/expenses/CategoryManagementDialog';
+import { CategoryDeleteConfirmDialog } from '@/components/expenses/CategoryDeleteConfirmDialog';
 import { CreateDummySnapshotModal } from '@/components/CreateDummySnapshotModal';
 import { DeleteDummyDataDialog } from '@/components/DeleteDummyDataDialog';
 
@@ -78,6 +80,11 @@ export default function SettingsPage() {
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ExpenseCategory | null>(null);
+
+  // Delete confirmation dialog state
+  const [deleteConfirmDialogOpen, setDeleteConfirmDialogOpen] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<ExpenseCategory | null>(null);
+  const [expenseCountToReassign, setExpenseCountToReassign] = useState(0);
 
   // Test snapshot modal state
   const [dummySnapshotModalOpen, setDummySnapshotModalOpen] = useState(false);
@@ -269,17 +276,79 @@ export default function SettingsPage() {
   };
 
   const handleDeleteExpenseCategory = async (categoryId: string, categoryName: string) => {
-    if (!window.confirm(`Sei sicuro di voler eliminare la categoria "${categoryName}"?`)) {
-      return;
-    }
-
     try {
-      await deleteCategory(categoryId);
-      toast.success('Categoria eliminata con successo');
-      await loadExpenseCategories();
+      // Check if there are expenses associated with this category
+      const expenseCount = await getExpenseCountByCategoryId(categoryId);
+
+      if (expenseCount > 0) {
+        // Show reassignment dialog
+        const category = await getCategoryById(categoryId);
+        if (category) {
+          setCategoryToDelete(category);
+          setExpenseCountToReassign(expenseCount);
+          setDeleteConfirmDialogOpen(true);
+        }
+      } else {
+        // No expenses, proceed with direct deletion after confirmation
+        if (window.confirm(`Sei sicuro di voler eliminare la categoria "${categoryName}"?`)) {
+          await deleteCategory(categoryId);
+          toast.success('Categoria eliminata con successo');
+          await loadExpenseCategories();
+        }
+      }
     } catch (error) {
       console.error('Error deleting category:', error);
       toast.error('Errore nell\'eliminazione della categoria');
+    }
+  };
+
+  const handleConfirmDeleteWithReassignment = async (
+    newCategoryId: string,
+    newSubCategoryId?: string
+  ) => {
+    if (!categoryToDelete) return;
+
+    try {
+      // Get the new category details
+      const newCategory = await getCategoryById(newCategoryId);
+      if (!newCategory) {
+        toast.error('Categoria di destinazione non trovata');
+        return;
+      }
+
+      // Get subcategory name if provided
+      let newSubCategoryName: string | undefined;
+      if (newSubCategoryId) {
+        const newSubCategory = newCategory.subCategories.find(
+          sub => sub.id === newSubCategoryId
+        );
+        newSubCategoryName = newSubCategory?.name;
+      }
+
+      // Reassign expenses
+      const reassignedCount = await reassignExpensesCategory(
+        categoryToDelete.id,
+        newCategoryId,
+        newCategory.name,
+        newSubCategoryId,
+        newSubCategoryName
+      );
+
+      // Delete the old category
+      await deleteCategory(categoryToDelete.id);
+
+      toast.success(
+        `${reassignedCount} ${reassignedCount === 1 ? 'spesa riassegnata' : 'spese riassegnate'} a "${newCategory.name}" e categoria eliminata con successo`
+      );
+
+      // Reset state and reload categories
+      setDeleteConfirmDialogOpen(false);
+      setCategoryToDelete(null);
+      setExpenseCountToReassign(0);
+      await loadExpenseCategories();
+    } catch (error) {
+      console.error('Error during reassignment and deletion:', error);
+      toast.error('Errore durante la riassegnazione delle spese');
     }
   };
 
@@ -1051,6 +1120,22 @@ export default function SettingsPage() {
         category={editingCategory}
         onSuccess={handleExpenseCategorySuccess}
       />
+
+      {/* Category Delete Confirmation Dialog */}
+      {categoryToDelete && (
+        <CategoryDeleteConfirmDialog
+          open={deleteConfirmDialogOpen}
+          onClose={() => {
+            setDeleteConfirmDialogOpen(false);
+            setCategoryToDelete(null);
+            setExpenseCountToReassign(0);
+          }}
+          onConfirm={handleConfirmDeleteWithReassignment}
+          categoryToDelete={categoryToDelete}
+          expenseCount={expenseCountToReassign}
+          allCategories={expenseCategories}
+        />
+      )}
 
       {/* Dummy Snapshot Modal */}
       {enableTestSnapshots && (

@@ -18,6 +18,10 @@ import {
   ExpenseType,
   ExpenseSubCategory
 } from '@/types/expenses';
+import {
+  updateExpensesCategoryName,
+  updateExpensesSubCategoryName,
+} from './expenseService';
 
 const CATEGORIES_COLLECTION = 'expenseCategories';
 
@@ -152,12 +156,22 @@ export async function createCategory(
 
 /**
  * Update an existing expense category
+ * Automatically updates all associated expenses if the category name changes
  */
 export async function updateCategory(
   categoryId: string,
   updates: Partial<ExpenseCategoryFormData>
 ): Promise<void> {
   try {
+    // If the name is being updated, also update all associated expenses
+    if (updates.name) {
+      const oldCategory = await getCategoryById(categoryId);
+      if (oldCategory && oldCategory.name !== updates.name) {
+        // Update all expenses with this category
+        await updateExpensesCategoryName(categoryId, updates.name);
+      }
+    }
+
     const categoryRef = doc(db, CATEGORIES_COLLECTION, categoryId);
 
     const cleanedUpdates = removeUndefinedFields({
@@ -248,6 +262,7 @@ export async function removeSubCategory(
 
 /**
  * Update a subcategory name
+ * Automatically updates all associated expenses with the new subcategory name
  */
 export async function updateSubCategory(
   categoryId: string,
@@ -260,13 +275,25 @@ export async function updateSubCategory(
       throw new Error('Category not found');
     }
 
+    // Find the old subcategory to check if name is different
+    const oldSubCategory = category.subCategories.find(sub => sub.id === subCategoryId);
+
+    if (oldSubCategory && oldSubCategory.name !== newName) {
+      // Update all expenses with this subcategory
+      await updateExpensesSubCategoryName(categoryId, subCategoryId, newName);
+    }
+
     const updatedSubCategories = category.subCategories.map(sub =>
       sub.id === subCategoryId ? { ...sub, name: newName } : sub
     );
 
-    await updateCategory(categoryId, {
+    // Use direct Firestore update to avoid infinite recursion
+    const categoryRef = doc(db, CATEGORIES_COLLECTION, categoryId);
+    const cleanedUpdates = removeUndefinedFields({
       subCategories: updatedSubCategories,
+      updatedAt: Timestamp.now(),
     });
+    await updateDoc(categoryRef, cleanedUpdates);
   } catch (error) {
     console.error('Error updating subcategory:', error);
     throw new Error('Failed to update subcategory');

@@ -17,6 +17,11 @@ import {
   updateCategory,
 } from '@/lib/services/expenseCategoryService';
 import {
+  getExpenseCountBySubCategoryId,
+  reassignExpensesSubCategory,
+} from '@/lib/services/expenseService';
+import { CategoryDeleteConfirmDialog } from './CategoryDeleteConfirmDialog';
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -82,6 +87,11 @@ export function CategoryManagementDialog({
   const [subCategories, setSubCategories] = useState<ExpenseSubCategory[]>([]);
   const [newSubCategoryName, setNewSubCategoryName] = useState('');
 
+  // Subcategory deletion confirmation state
+  const [deleteSubCategoryDialogOpen, setDeleteSubCategoryDialogOpen] = useState(false);
+  const [subCategoryToDelete, setSubCategoryToDelete] = useState<ExpenseSubCategory | null>(null);
+  const [subCategoryExpenseCount, setSubCategoryExpenseCount] = useState(0);
+
   const {
     register,
     handleSubmit,
@@ -140,9 +150,62 @@ export function CategoryManagementDialog({
     toast.success('Sotto-categoria aggiunta');
   };
 
-  const handleRemoveSubCategory = (subCategoryId: string) => {
+  const handleRemoveSubCategory = async (subCategoryId: string) => {
+    // If editing an existing category, check for associated expenses
+    if (category) {
+      try {
+        const expenseCount = await getExpenseCountBySubCategoryId(category.id, subCategoryId);
+
+        if (expenseCount > 0) {
+          // Show reassignment dialog
+          const subCat = subCategories.find(sub => sub.id === subCategoryId);
+          if (subCat) {
+            setSubCategoryToDelete(subCat);
+            setSubCategoryExpenseCount(expenseCount);
+            setDeleteSubCategoryDialogOpen(true);
+          }
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking subcategory expenses:', error);
+        toast.error('Errore nel controllo delle spese associate');
+        return;
+      }
+    }
+
+    // No expenses or new category, proceed with removal
     setSubCategories(subCategories.filter(sub => sub.id !== subCategoryId));
     toast.success('Sotto-categoria rimossa');
+  };
+
+  const handleConfirmSubCategoryDelete = async (
+    newCategoryId: string,
+    newSubCategoryId?: string
+  ) => {
+    if (!category || !subCategoryToDelete) return;
+
+    try {
+      // Reassign expenses to new category/subcategory
+      await reassignExpensesSubCategory(
+        category.id,
+        subCategoryToDelete.id,
+        newSubCategoryId,
+        newSubCategoryId ? subCategories.find(sub => sub.id === newSubCategoryId)?.name : undefined
+      );
+
+      // Remove the subcategory from the local state
+      setSubCategories(subCategories.filter(sub => sub.id !== subCategoryToDelete.id));
+
+      toast.success('Spese riassegnate e sotto-categoria rimossa con successo');
+
+      // Close the dialog
+      setDeleteSubCategoryDialogOpen(false);
+      setSubCategoryToDelete(null);
+      setSubCategoryExpenseCount(0);
+    } catch (error) {
+      console.error('Error reassigning subcategory expenses:', error);
+      toast.error('Errore nella riassegnazione delle spese');
+    }
   };
 
   const onSubmit = async (data: CategoryFormValues) => {
@@ -338,6 +401,23 @@ export function CategoryManagementDialog({
           </div>
         </form>
       </DialogContent>
+
+      {/* Subcategory Delete Confirmation Dialog */}
+      {category && subCategoryToDelete && (
+        <CategoryDeleteConfirmDialog
+          open={deleteSubCategoryDialogOpen}
+          onClose={() => {
+            setDeleteSubCategoryDialogOpen(false);
+            setSubCategoryToDelete(null);
+            setSubCategoryExpenseCount(0);
+          }}
+          onConfirm={handleConfirmSubCategoryDelete}
+          categoryToDelete={category}
+          expenseCount={subCategoryExpenseCount}
+          allCategories={[category]} // Only allow reassignment within same category for subcategories
+          subCategoryToDelete={subCategoryToDelete}
+        />
+      )}
     </Dialog>
   );
 }
