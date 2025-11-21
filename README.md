@@ -88,6 +88,16 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
   - Blue highlight when filtering by specific month
   - Prevents confusion between filtered and unfiltered views
 - **Current year view** by default with automatic filters
+- **Smart category management** with expense protection
+  - **Automatic expense reassignment** when deleting categories with associated expenses
+  - **Interactive reassignment dialog** with searchable category dropdown
+  - **Inline category creation** during deletion workflow (no need to leave the dialog)
+  - **Flexible deletion options**:
+    - Reassign expenses to another category before deletion
+    - Delete without reassignment (expenses marked as "Senza categoria")
+  - **Auto-update expense records** when category names are modified
+  - **Subcategory protection** with same reassignment workflow
+  - **Prevents orphaned data** and maintains data integrity across all expense records
 
 ### 🔥 **FIRE Calculator & Tracker**
 - **Safe Withdrawal Rate** configuration (4% rule based on Trinity Study)
@@ -479,6 +489,46 @@ See [Infrastructure Alternatives](./SETUP.md#infrastructure-alternatives) for mi
    - Months: 12
 5. System creates 12 monthly entries automatically
 
+### Managing Categories with Associated Expenses
+
+When you need to delete or reorganize expense categories that have expenses associated with them:
+
+**Scenario: Merging two similar categories**
+1. Go to **Settings** → **Categorie Spese**
+2. Try to delete "Groceries" category (which has 45 expenses)
+3. System shows **reassignment dialog** with expense count
+4. Use the **search box** to find "Food & Dining" category
+5. Select "Food & Dining" from the dropdown
+6. Click **"Conferma ed Elimina"**
+7. System automatically:
+   - Reassigns all 45 expenses to "Food & Dining"
+   - Updates expense records with new category name
+   - Deletes the old "Groceries" category
+   - Shows success message with reassignment count
+
+**Scenario: Creating a new category during deletion**
+1. Try to delete category with expenses
+2. In the search box, type "Entertainment"
+3. No results found → System shows **"Crea categoria 'Entertainment'"**
+4. Click to create → Category dialog opens with name pre-filled
+5. Set color and type, save
+6. New category auto-selected in reassignment dialog
+7. Confirm deletion to complete reassignment
+
+**Scenario: Deleting without reassignment**
+1. Try to delete category "Miscellaneous" (20 expenses)
+2. Click **"Elimina senza riassegnare"** (amber button)
+3. System:
+   - Marks all 20 expenses as "Senza categoria" (Uncategorized)
+   - Deletes the category
+   - Expenses remain in database for historical tracking
+   - Shows message: "20 spese contrassegnate come 'Senza categoria'"
+
+**Renaming categories**
+- Edit category name in Settings
+- System automatically updates all associated expense records
+- No manual reassignment needed
+
 ### Tracking FIRE Progress
 
 1. Navigate to **"FIRE"** page
@@ -694,6 +744,7 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - ✅ Historical snapshots and performance charts
 - ✅ Expense and income tracking
 - ✅ Period indicator for expense tracking (visual display of selected month/year)
+- ✅ Smart category management with automatic expense reassignment
 - ✅ FIRE calculator and progress tracker
 - ✅ Hall of Fame personal financial rankings
 - ✅ Registration control system
