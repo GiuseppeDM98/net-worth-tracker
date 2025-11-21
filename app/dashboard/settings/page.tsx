@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { ExpenseCategory, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { getAllCategories, deleteCategory, getCategoryById } from '@/lib/services/expenseCategoryService';
-import { getExpenseCountByCategoryId, reassignExpensesCategory } from '@/lib/services/expenseService';
+import { getExpenseCountByCategoryId, reassignExpensesCategory, clearExpensesCategoryAssignment } from '@/lib/services/expenseService';
 import { CategoryManagementDialog } from '@/components/expenses/CategoryManagementDialog';
 import { CategoryDeleteConfirmDialog } from '@/components/expenses/CategoryDeleteConfirmDialog';
 import { CreateDummySnapshotModal } from '@/components/CreateDummySnapshotModal';
@@ -313,10 +313,17 @@ export default function SettingsPage() {
     try {
       // If no new category ID provided, delete without reassignment
       if (!newCategoryId) {
+        // Clear category assignment from expenses (set to "Senza categoria")
+        const clearedCount = await clearExpensesCategoryAssignment(
+          categoryToDelete.id,
+          user.uid
+        );
+
+        // Delete the category
         await deleteCategory(categoryToDelete.id);
 
         toast.success(
-          `Categoria "${categoryToDelete.name}" eliminata con successo. Le spese associate rimarranno senza categoria.`
+          `Categoria "${categoryToDelete.name}" eliminata con successo. ${clearedCount} ${clearedCount === 1 ? 'spesa contrassegnata' : 'spese contrassegnate'} come "Senza categoria".`
         );
 
         // Reset state and reload categories
