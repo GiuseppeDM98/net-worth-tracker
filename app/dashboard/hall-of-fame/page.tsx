@@ -175,7 +175,7 @@ export default function HallOfFamePage() {
                 Miglior Mese: Differenza NW
               </CardTitle>
               <CardDescription>
-                Mesi con il maggior incremento di Net Worth
+                Mesi con il maggior incremento di Net Worth rispetto al mese precedente
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -207,7 +207,7 @@ export default function HallOfFamePage() {
                 Peggior Mese: Differenza NW
               </CardTitle>
               <CardDescription>
-                Mesi con il maggior decremento di Net Worth
+                Mesi con il maggior decremento di Net Worth rispetto al mese precedente
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -245,7 +245,7 @@ export default function HallOfFamePage() {
                 Miglior Anno: Differenza NW
               </CardTitle>
               <CardDescription>
-                Anni con il maggior incremento di Net Worth
+                Anni con il maggior incremento di Net Worth rispetto all'anno precedente
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -277,7 +277,7 @@ export default function HallOfFamePage() {
                 Peggior Anno: Differenza NW
               </CardTitle>
               <CardDescription>
-                Anni con il maggior decremento di Net Worth
+                Anni con il maggior decremento di Net Worth rispetto all'anno precedente
               </CardDescription>
             </CardHeader>
             <CardContent>
