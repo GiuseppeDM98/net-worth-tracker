@@ -7,7 +7,8 @@ import { getAllExpenses, getExpensesByMonth, getExpensesByDateRange, calculateTo
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, TrendingUp, TrendingDown, Wallet, RefreshCw, Filter } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Plus, TrendingUp, TrendingDown, Wallet, RefreshCw, Filter, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import { ExpenseDialog } from '@/components/expenses/ExpenseDialog';
 import { ExpenseTable } from '@/components/expenses/ExpenseTable';
@@ -170,6 +171,29 @@ export default function ExpensesPage() {
           Nuova Spesa
         </Button>
       </div>
+
+      {/* Period Indicator */}
+      <Card className={selectedMonth !== 'all' ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/20' : ''}>
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-3">
+            <Calendar className={`h-5 w-5 ${selectedMonth !== 'all' ? 'text-blue-600' : 'text-muted-foreground'}`} />
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-medium text-muted-foreground">
+                Riepilogo per:
+              </span>
+              {selectedMonth !== 'all' ? (
+                <Badge variant="default" className="text-base py-1 px-3 bg-blue-600 hover:bg-blue-700">
+                  {MONTHS.find(m => m.value === selectedMonth)?.label} {selectedYear}
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-base py-1 px-3">
+                  Anno {selectedYear}
+                </Badge>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Statistics Cards */}
       <div className="grid gap-4 md:grid-cols-3">
