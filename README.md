@@ -83,6 +83,10 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
 - **Recurring expenses** with automatic monthly generation
 - **Visual analytics**: Spending breakdown by category, type, and monthly trends
 - **Year/month filtering** with dynamic statistics
+- **Period indicator**: Clear visual display showing which month/year the summary boxes represent
+  - Prominent badge above income/expense/balance cards
+  - Blue highlight when filtering by specific month
+  - Prevents confusion between filtered and unfiltered views
 - **Current year view** by default with automatic filters
 
 ### 🔥 **FIRE Calculator & Tracker**
@@ -689,6 +693,7 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - ✅ Asset allocation tracking and rebalancing
 - ✅ Historical snapshots and performance charts
 - ✅ Expense and income tracking
+- ✅ Period indicator for expense tracking (visual display of selected month/year)
 - ✅ FIRE calculator and progress tracker
 - ✅ Hall of Fame personal financial rankings
 - ✅ Registration control system
