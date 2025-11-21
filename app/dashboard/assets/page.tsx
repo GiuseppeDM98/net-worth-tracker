@@ -212,6 +212,8 @@ export default function AssetsPage() {
                     <TableHead>Classe</TableHead>
                     <TableHead className="text-right">Quantità</TableHead>
                     <TableHead className="text-right">Prezzo</TableHead>
+                    <TableHead className="text-right">PMC</TableHead>
+                    <TableHead className="text-right">TER</TableHead>
                     <TableHead className="text-right">Valore Totale</TableHead>
                     <TableHead className="text-right">G/P</TableHead>
                     <TableHead>Ultimo Aggiornamento</TableHead>
@@ -255,6 +257,22 @@ export default function AssetsPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           {formatCurrency(asset.currentPrice)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {asset.averageCost ? (
+                            formatCurrency(asset.averageCost)
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {asset.totalExpenseRatio ? (
+                            <span className="text-purple-600">
+                              {asset.totalExpenseRatio.toFixed(2)}%
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right font-semibold">
                           {asset.assetClass === 'realestate' && asset.outstandingDebt && asset.outstandingDebt > 0 ? (
@@ -329,7 +347,7 @@ export default function AssetsPage() {
                 </TableBody>
                 <TableFooter>
                   <TableRow>
-                    <TableCell colSpan={6} className="text-right font-semibold">
+                    <TableCell colSpan={8} className="text-right font-semibold">
                       Totale:
                     </TableCell>
                     <TableCell className="text-right font-semibold">
