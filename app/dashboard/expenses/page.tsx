@@ -7,8 +7,8 @@ import { getAllExpenses, getExpensesByMonth, getExpensesByDateRange, calculateTo
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Plus, TrendingUp, TrendingDown, Wallet, RefreshCw, Filter, Calendar } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Plus, TrendingUp, TrendingDown, Wallet, RefreshCw, Filter, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { ExpenseDialog } from '@/components/expenses/ExpenseDialog';
 import { ExpenseTable } from '@/components/expenses/ExpenseTable';
@@ -38,6 +38,7 @@ export default function ExpensesPage() {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const [filtersOpen, setFiltersOpen] = useState<boolean>(true);
 
   // Generate available years from ALL expenses (not filtered)
   const availableYears = useMemo(() => {
@@ -161,7 +162,9 @@ export default function ExpensesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Tracciamento Spese {selectedYear}</h1>
+          <h1 className="text-3xl font-bold">
+            Tracciamento Spese {selectedMonth !== 'all' ? `${MONTHS.find(m => m.value === selectedMonth)?.label} ` : ''}{selectedYear}
+          </h1>
           <p className="text-muted-foreground mt-1">
             Gestisci le tue entrate e uscite
           </p>
@@ -171,29 +174,6 @@ export default function ExpensesPage() {
           Nuova Spesa
         </Button>
       </div>
-
-      {/* Period Indicator */}
-      <Card className={selectedMonth !== 'all' ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/20' : ''}>
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-3">
-            <Calendar className={`h-5 w-5 ${selectedMonth !== 'all' ? 'text-blue-600' : 'text-muted-foreground'}`} />
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-medium text-muted-foreground">
-                Riepilogo per:
-              </span>
-              {selectedMonth !== 'all' ? (
-                <Badge variant="default" className="text-base py-1 px-3 bg-blue-600 hover:bg-blue-700">
-                  {MONTHS.find(m => m.value === selectedMonth)?.label} {selectedYear}
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="text-base py-1 px-3">
-                  Anno {selectedYear}
-                </Badge>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Statistics Cards */}
       <div className="grid gap-4 md:grid-cols-3">
@@ -271,50 +251,59 @@ export default function ExpensesPage() {
       )}
 
       {/* Filters */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Filter className="h-5 w-5 text-muted-foreground" />
-            <CardTitle>Filtri</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-4">
-            <div className="flex flex-col gap-2 min-w-[150px]">
-              <label className="text-sm font-medium">Mese</label>
-              <Select
-                value={selectedMonth}
-                onValueChange={setSelectedMonth}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleziona mese" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tutti</SelectItem>
-                  {MONTHS.map(month => (
-                    <SelectItem key={month.value} value={month.value}>
-                      {month.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {selectedMonth !== 'all' && (
-              <div className="flex items-end">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedMonth('all');
-                  }}
-                >
-                  Ripristina Filtri
-                </Button>
+      <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
+        <Card>
+          <CardHeader>
+            <CollapsibleTrigger asChild>
+              <div className="flex items-center justify-between cursor-pointer w-full">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-5 w-5 text-muted-foreground" />
+                  <CardTitle>Filtri</CardTitle>
+                </div>
+                <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
               </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            </CollapsibleTrigger>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent>
+              <div className="flex flex-wrap gap-4">
+                <div className="flex flex-col gap-2 min-w-[150px]">
+                  <label className="text-sm font-medium">Mese</label>
+                  <Select
+                    value={selectedMonth}
+                    onValueChange={setSelectedMonth}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleziona mese" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tutti</SelectItem>
+                      {MONTHS.map(month => (
+                        <SelectItem key={month.value} value={month.value}>
+                          {month.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {selectedMonth !== 'all' && (
+                  <div className="flex items-end">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedMonth('all');
+                      }}
+                    >
+                      Ripristina Filtri
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       {/* Expenses Table */}
       <Card>

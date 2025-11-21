@@ -83,10 +83,15 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
 - **Recurring expenses** with automatic monthly generation
 - **Visual analytics**: Spending breakdown by category, type, and monthly trends
 - **Year/month filtering** with dynamic statistics
-- **Period indicator**: Clear visual display showing which month/year the summary boxes represent
-  - Prominent badge above income/expense/balance cards
-  - Blue highlight when filtering by specific month
+- **Dynamic page title**: Automatically displays the filtered month/year in the page title
+  - Shows "Tracciamento Spese Gennaio 2025" when filtering by month
+  - Shows "Tracciamento Spese 2025" when viewing entire year
+  - Clean, space-efficient design without redundant indicators
   - Prevents confusion between filtered and unfiltered views
+- **Collapsible filters section** with toggle to show/hide filter controls
+  - Saves screen space when filters are not actively being changed
+  - Chevron icon indicates expand/collapse state
+  - Defaults to expanded for easy access
 - **Current year view** by default with automatic filters
 - **Smart category management** with expense protection
   - **Automatic expense reassignment** when deleting categories with associated expenses
