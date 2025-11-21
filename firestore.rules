@@ -32,9 +32,10 @@ service cloud.firestore {
       // Creazione: solo se autenticato e il userId corrisponde
       allow create: if isAuthenticated() && hasValidUserId();
 
-      // Aggiornamento: solo se è il proprietario e non cambia il userId
+      // Aggiornamento: solo se è il proprietario e non cambia il userId (se presente)
       allow update: if isOwner(resource.data.userId) &&
-                       request.resource.data.userId == resource.data.userId;
+                       (!('userId' in request.resource.data) ||
+                        request.resource.data.userId == resource.data.userId);
 
       // Cancellazione: solo se è il proprietario
       allow delete: if isOwner(resource.data.userId);
@@ -45,7 +46,8 @@ service cloud.firestore {
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow create: if isAuthenticated() && hasValidUserId();
       allow update: if isOwner(resource.data.userId) &&
-                       request.resource.data.userId == resource.data.userId;
+                       (!('userId' in request.resource.data) ||
+                        request.resource.data.userId == resource.data.userId);
       allow delete: if isOwner(resource.data.userId);
     }
 
@@ -63,7 +65,8 @@ service cloud.firestore {
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow create: if isAuthenticated() && hasValidUserId();
       allow update: if isOwner(resource.data.userId) &&
-                       request.resource.data.userId == resource.data.userId;
+                       (!('userId' in request.resource.data) ||
+                        request.resource.data.userId == resource.data.userId);
       allow delete: if isOwner(resource.data.userId);
     }
 
@@ -72,7 +75,8 @@ service cloud.firestore {
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow create: if isAuthenticated() && hasValidUserId();
       allow update: if isOwner(resource.data.userId) &&
-                       request.resource.data.userId == resource.data.userId;
+                       (!('userId' in request.resource.data) ||
+                        request.resource.data.userId == resource.data.userId);
       allow delete: if isOwner(resource.data.userId);
     }
 
@@ -84,9 +88,11 @@ service cloud.firestore {
       // Creazione: solo se autenticato e il userId corrisponde
       allow create: if isAuthenticated() && hasValidUserId();
 
-      // Aggiornamento: solo se è il proprietario e non cambia il userId
+      // Aggiornamento: solo se è il proprietario e non cambia il userId (se presente)
+      // Permette update parziali che non includono userId
       allow update: if isOwner(resource.data.userId) &&
-                       request.resource.data.userId == resource.data.userId;
+                       (!('userId' in request.resource.data) ||
+                        request.resource.data.userId == resource.data.userId);
 
       // Cancellazione: solo se è il proprietario
       allow delete: if isOwner(resource.data.userId);
@@ -100,9 +106,10 @@ service cloud.firestore {
       // Creazione: solo se autenticato e il userId corrisponde
       allow create: if isAuthenticated() && hasValidUserId();
 
-      // Aggiornamento: solo se è il proprietario e non cambia il userId
+      // Aggiornamento: solo se è il proprietario e non cambia il userId (se presente)
       allow update: if isOwner(resource.data.userId) &&
-                       request.resource.data.userId == resource.data.userId;
+                       (!('userId' in request.resource.data) ||
+                        request.resource.data.userId == resource.data.userId);
 
       // Cancellazione: solo se è il proprietario
       allow delete: if isOwner(resource.data.userId);

@@ -502,3 +502,284 @@ export function calculateTotalExpenses(expenses: Expense[]): number {
 export function calculateNetBalance(expenses: Expense[]): number {
   return calculateTotalIncome(expenses) - calculateTotalExpenses(expenses);
 }
+
+/**
+ * Count expenses associated with a category
+ */
+export async function getExpenseCountByCategoryId(
+  categoryId: string,
+  userId: string
+): Promise<number> {
+  try {
+    const expensesRef = collection(db, EXPENSES_COLLECTION);
+    const q = query(
+      expensesRef,
+      where('userId', '==', userId),
+      where('categoryId', '==', categoryId)
+    );
+
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.size;
+  } catch (error) {
+    console.error('Error counting expenses by category:', error);
+    throw new Error('Failed to count expenses by category');
+  }
+}
+
+/**
+ * Count expenses associated with a subcategory
+ */
+export async function getExpenseCountBySubCategoryId(
+  categoryId: string,
+  subCategoryId: string,
+  userId: string
+): Promise<number> {
+  try {
+    const expensesRef = collection(db, EXPENSES_COLLECTION);
+    const q = query(
+      expensesRef,
+      where('userId', '==', userId),
+      where('categoryId', '==', categoryId),
+      where('subCategoryId', '==', subCategoryId)
+    );
+
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.size;
+  } catch (error) {
+    console.error('Error counting expenses by subcategory:', error);
+    throw new Error('Failed to count expenses by subcategory');
+  }
+}
+
+/**
+ * Update all expenses when a category name changes
+ */
+export async function updateExpensesCategoryName(
+  categoryId: string,
+  newCategoryName: string,
+  userId: string
+): Promise<void> {
+  try {
+    const expensesRef = collection(db, EXPENSES_COLLECTION);
+    const q = query(
+      expensesRef,
+      where('userId', '==', userId),
+      where('categoryId', '==', categoryId)
+    );
+
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+      return; // No expenses to update
+    }
+
+    const batch = writeBatch(db);
+
+    querySnapshot.docs.forEach(docSnapshot => {
+      batch.update(docSnapshot.ref, {
+        categoryName: newCategoryName,
+        updatedAt: Timestamp.now(),
+      });
+    });
+
+    await batch.commit();
+  } catch (error) {
+    console.error('Error updating expenses category name:', error);
+    throw new Error('Failed to update expenses category name');
+  }
+}
+
+/**
+ * Update all expenses when a subcategory name changes
+ */
+export async function updateExpensesSubCategoryName(
+  categoryId: string,
+  subCategoryId: string,
+  newSubCategoryName: string,
+  userId: string
+): Promise<void> {
+  try {
+    const expensesRef = collection(db, EXPENSES_COLLECTION);
+    const q = query(
+      expensesRef,
+      where('userId', '==', userId),
+      where('categoryId', '==', categoryId),
+      where('subCategoryId', '==', subCategoryId)
+    );
+
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+      return; // No expenses to update
+    }
+
+    const batch = writeBatch(db);
+
+    querySnapshot.docs.forEach(docSnapshot => {
+      batch.update(docSnapshot.ref, {
+        subCategoryName: newSubCategoryName,
+        updatedAt: Timestamp.now(),
+      });
+    });
+
+    await batch.commit();
+  } catch (error) {
+    console.error('Error updating expenses subcategory name:', error);
+    throw new Error('Failed to update expenses subcategory name');
+  }
+}
+
+/**
+ * Reassign all expenses from one category to another
+ */
+export async function reassignExpensesCategory(
+  oldCategoryId: string,
+  newCategoryId: string,
+  newCategoryName: string,
+  userId: string,
+  newSubCategoryId?: string,
+  newSubCategoryName?: string
+): Promise<number> {
+  try {
+    const expensesRef = collection(db, EXPENSES_COLLECTION);
+    const q = query(
+      expensesRef,
+      where('userId', '==', userId),
+      where('categoryId', '==', oldCategoryId)
+    );
+
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+      return 0; // No expenses to reassign
+    }
+
+    const batch = writeBatch(db);
+    let count = 0;
+
+    querySnapshot.docs.forEach(docSnapshot => {
+      const updates: any = {
+        categoryId: newCategoryId,
+        categoryName: newCategoryName,
+        updatedAt: Timestamp.now(),
+      };
+
+      // If new subcategory is provided, update it; otherwise clear it
+      if (newSubCategoryId && newSubCategoryName) {
+        updates.subCategoryId = newSubCategoryId;
+        updates.subCategoryName = newSubCategoryName;
+      } else {
+        updates.subCategoryId = null;
+        updates.subCategoryName = null;
+      }
+
+      batch.update(docSnapshot.ref, removeUndefinedFields(updates));
+      count++;
+    });
+
+    await batch.commit();
+    return count;
+  } catch (error) {
+    console.error('Error reassigning expenses category:', error);
+    throw new Error('Failed to reassign expenses category');
+  }
+}
+
+/**
+ * Clear category assignment from expenses when category is deleted without reassignment
+ */
+export async function clearExpensesCategoryAssignment(
+  categoryId: string,
+  userId: string
+): Promise<number> {
+  try {
+    const expensesRef = collection(db, EXPENSES_COLLECTION);
+    const q = query(
+      expensesRef,
+      where('userId', '==', userId),
+      where('categoryId', '==', categoryId)
+    );
+
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+      return 0; // No expenses to update
+    }
+
+    const batch = writeBatch(db);
+    let count = 0;
+
+    querySnapshot.docs.forEach(docSnapshot => {
+      const updates: any = {
+        categoryId: 'uncategorized',
+        categoryName: 'Senza categoria',
+        subCategoryId: null,
+        subCategoryName: null,
+        updatedAt: Timestamp.now(),
+      };
+
+      batch.update(docSnapshot.ref, removeUndefinedFields(updates));
+      count++;
+    });
+
+    await batch.commit();
+    return count;
+  } catch (error) {
+    console.error('Error clearing expenses category assignment:', error);
+    throw new Error('Failed to clear expenses category assignment');
+  }
+}
+
+/**
+ * Reassign all expenses from one subcategory to another (or to no subcategory)
+ */
+export async function reassignExpensesSubCategory(
+  categoryId: string,
+  oldSubCategoryId: string,
+  userId: string,
+  newSubCategoryId?: string,
+  newSubCategoryName?: string
+): Promise<number> {
+  try {
+    const expensesRef = collection(db, EXPENSES_COLLECTION);
+    const q = query(
+      expensesRef,
+      where('userId', '==', userId),
+      where('categoryId', '==', categoryId),
+      where('subCategoryId', '==', oldSubCategoryId)
+    );
+
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+      return 0; // No expenses to reassign
+    }
+
+    const batch = writeBatch(db);
+    let count = 0;
+
+    querySnapshot.docs.forEach(docSnapshot => {
+      const updates: any = {
+        updatedAt: Timestamp.now(),
+      };
+
+      // If new subcategory is provided, update it; otherwise clear it
+      if (newSubCategoryId && newSubCategoryName) {
+        updates.subCategoryId = newSubCategoryId;
+        updates.subCategoryName = newSubCategoryName;
+      } else {
+        updates.subCategoryId = null;
+        updates.subCategoryName = null;
+      }
+
+      batch.update(docSnapshot.ref, removeUndefinedFields(updates));
+      count++;
+    });
+
+    await batch.commit();
+    return count;
+  } catch (error) {
+    console.error('Error reassigning expenses subcategory:', error);
+    throw new Error('Failed to reassign expenses subcategory');
+  }
+}
