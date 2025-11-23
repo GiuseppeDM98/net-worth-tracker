@@ -82,6 +82,15 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
 - **Custom categories** with sub-categories and color coding
 - **Recurring expenses** with automatic monthly generation
 - **Visual analytics**: Spending breakdown by category, type, and monthly trends
+- **Interactive drill-down pie charts** for hierarchical data exploration
+  - **Three-level navigation**: Categories → Subcategories → Individual transactions
+  - **Click-to-explore**: Click any pie chart slice to drill down into detailed breakdowns
+  - **Color inheritance**: Subcategories use derived color variations from parent category
+  - **"Altro" slice**: Automatically groups expenses without assigned subcategories
+  - **Back navigation**: Breadcrumb-style titles and back button for easy navigation
+  - **Transaction details**: View date, amount, notes, and links for individual expenses/income
+  - Available for both "Spese per Categoria" and "Entrate per Categoria" charts
+  - Year filter context maintained across all drill-down levels
 - **Year/month filtering** with dynamic statistics
 - **Income-to-expense ratio metric** for financial health monitoring
   - Real-time calculation of income/expense ratio
@@ -540,6 +549,51 @@ When you need to delete or reorganize expense categories that have expenses asso
 - System automatically updates all associated expense records
 - No manual reassignment needed
 
+### Exploring Expenses with Interactive Drill-Down Charts
+
+The **Interactive Drill-Down** feature on the Expense Charts page allows you to explore your spending from high-level categories down to individual transactions with just a few clicks.
+
+**How to use the drill-down:**
+
+1. Navigate to **Dashboard** → **Expense Charts** (Cashflow)
+2. View the **"Spese per Categoria"** or **"Entrate per Categoria"** pie chart
+3. **Level 1 - Categories**: See your top-level spending/income categories
+   - Example: Google (€5,000), Shopping (€3,000), Food (€2,500)
+4. **Click on any pie slice** or legend item to drill down
+5. **Level 2 - Subcategories**: View breakdown within that category
+   - Example: Clicking "Google" shows:
+     - Google Workspace (€2,000)
+     - Google Cloud (€1,500)
+     - Google Ads (€1,000)
+     - Altro (€500) - expenses without subcategory
+6. **Click on any subcategory slice** to see individual transactions
+7. **Level 3 - Transaction List**: Detailed table showing:
+   - Date of each expense/income
+   - Amount (color-coded: red for expenses, green for income)
+   - Notes/descriptions
+   - External links (if available)
+8. **Navigate back**: Use the "← Indietro" button to return to previous levels
+
+**Visual cues:**
+- **Cursor changes to pointer** on clickable slices
+- **Title updates** to show your current location (e.g., "Spese - Google - Workspace")
+- **Colors**: Subcategories use lighter/darker variations of the parent category color
+- **"Altro" slice**: Automatically created for transactions without subcategories
+
+**Example workflow:**
+- "Where did my Google expenses come from this year?"
+  - Click Google category → See Workspace dominates
+  - Click Workspace → Review 12 monthly subscription charges
+- "What made up my 'Shopping' category?"
+  - Click Shopping → See Amazon vs IKEA vs Other retailers
+  - Click Amazon → View individual orders with links
+
+**Benefits:**
+- Quickly identify spending patterns without filters
+- Drill down to specific transactions in 2 clicks
+- Understand subcategory distribution within categories
+- Access transaction details (notes, links) directly from charts
+
 ### Understanding Income-to-Expense Ratio
 
 The **Income-to-Expense Ratio** metric provides instant insight into your financial health by comparing total income against total expenses for the selected period.
@@ -813,6 +867,7 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - ✅ Period indicator for expense tracking (visual display of selected month/year)
 - ✅ Smart category management with automatic expense reassignment
 - ✅ Income-to-expense ratio metric with color-coded financial health indicators
+- ✅ Interactive drill-down pie charts for category expense/income exploration
 - ✅ FIRE calculator and progress tracker
 - ✅ Hall of Fame personal financial rankings
 - ✅ Registration control system
