@@ -504,6 +504,22 @@ export function calculateNetBalance(expenses: Expense[]): number {
 }
 
 /**
+ * Calculate income to expense ratio
+ * Returns the ratio of total income to total expenses
+ * Returns null if total expenses is 0 (to avoid division by zero)
+ */
+export function calculateIncomeExpenseRatio(expenses: Expense[]): number | null {
+  const totalIncome = calculateTotalIncome(expenses);
+  const totalExpenses = calculateTotalExpenses(expenses);
+
+  if (totalExpenses === 0) {
+    return null;
+  }
+
+  return totalIncome / totalExpenses;
+}
+
+/**
  * Count expenses associated with a category
  */
 export async function getExpenseCountByCategoryId(
