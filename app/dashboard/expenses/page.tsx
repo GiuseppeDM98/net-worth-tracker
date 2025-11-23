@@ -3,12 +3,12 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Expense } from '@/types/expenses';
-import { getAllExpenses, getExpensesByMonth, getExpensesByDateRange, calculateTotalIncome, calculateTotalExpenses, calculateNetBalance } from '@/lib/services/expenseService';
+import { getAllExpenses, getExpensesByMonth, getExpensesByDateRange, calculateTotalIncome, calculateTotalExpenses, calculateNetBalance, calculateIncomeExpenseRatio } from '@/lib/services/expenseService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Plus, TrendingUp, TrendingDown, Wallet, RefreshCw, Filter, ChevronDown } from 'lucide-react';
+import { Plus, TrendingUp, TrendingDown, Wallet, RefreshCw, Filter, ChevronDown, Scale } from 'lucide-react';
 import { toast } from 'sonner';
 import { ExpenseDialog } from '@/components/expenses/ExpenseDialog';
 import { ExpenseTable } from '@/components/expenses/ExpenseTable';
@@ -143,6 +143,20 @@ export default function ExpensesPage() {
   const totalIncome = calculateTotalIncome(expenses);
   const totalExpenses = calculateTotalExpenses(expenses);
   const netBalance = calculateNetBalance(expenses);
+  const incomeExpenseRatio = calculateIncomeExpenseRatio(expenses);
+
+  // Determine ratio color based on thresholds
+  const getRatioColor = (ratio: number | null): string => {
+    if (ratio === null) return 'text-muted-foreground';
+    if (ratio >= 1.2) return 'text-green-600';
+    if (ratio >= 0.8) return 'text-yellow-600';
+    return 'text-red-600';
+  };
+
+  const formatRatio = (ratio: number | null): string => {
+    if (ratio === null) return 'N/A';
+    return ratio.toFixed(2);
+  };
 
   if (loading) {
     return (
@@ -176,7 +190,7 @@ export default function ExpensesPage() {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Entrate Totali</CardTitle>
@@ -222,6 +236,24 @@ export default function ExpensesPage() {
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Totale: {expenses.length} voci
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Rapporto Entrate/Spese</CardTitle>
+            <Scale className="h-4 w-4 text-purple-600" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${getRatioColor(incomeExpenseRatio)}`}>
+              {formatRatio(incomeExpenseRatio)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {incomeExpenseRatio !== null && incomeExpenseRatio >= 1.2 && 'Salute finanziaria ottima'}
+              {incomeExpenseRatio !== null && incomeExpenseRatio >= 0.8 && incomeExpenseRatio < 1.2 && 'In equilibrio'}
+              {incomeExpenseRatio !== null && incomeExpenseRatio < 0.8 && 'Attenzione alle spese'}
+              {incomeExpenseRatio === null && 'Nessuna spesa registrata'}
             </p>
           </CardContent>
         </Card>
