@@ -83,6 +83,12 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
 - **Recurring expenses** with automatic monthly generation
 - **Visual analytics**: Spending breakdown by category, type, and monthly trends
 - **Year/month filtering** with dynamic statistics
+- **Income-to-expense ratio metric** for financial health monitoring
+  - Real-time calculation of income/expense ratio
+  - Color-coded indicators: Green (≥1.2 optimal), Yellow (0.8-1.2 balanced), Red (<0.8 warning)
+  - Descriptive status messages for quick financial health assessment
+  - Year-filtered metric that updates dynamically with selected period
+  - Handles edge cases (displays "N/A" when no expenses recorded)
 - **Dynamic page title**: Automatically displays the filtered month/year in the page title
   - Shows "Tracciamento Spese Gennaio 2025" when filtering by month
   - Shows "Tracciamento Spese 2025" when viewing entire year
@@ -534,6 +540,62 @@ When you need to delete or reorganize expense categories that have expenses asso
 - System automatically updates all associated expense records
 - No manual reassignment needed
 
+### Understanding Income-to-Expense Ratio
+
+The **Income-to-Expense Ratio** metric provides instant insight into your financial health by comparing total income against total expenses for the selected period.
+
+**Interpreting the ratio:**
+
+1. Navigate to **"Tracciamento Spese"** (Expense Tracking)
+2. Select a year (e.g., 2025)
+3. View the **"Rapporto Entrate/Spese"** card (fourth metric)
+
+**What the colors mean:**
+
+🟢 **Green (≥1.2)** - "Salute finanziaria ottima"
+- Example: Ratio 1.49 (Income: €53,051, Expenses: €35,581)
+- You're earning significantly more than you spend
+- Strong savings potential and financial cushion
+- Ideal for building wealth and reaching FIRE goals
+
+🟡 **Yellow (0.8-1.2)** - "In equilibrio"
+- Example: Ratio 1.05 (Income: €3,150, Expenses: €3,000)
+- Income slightly exceeds expenses
+- Balanced budget with modest savings
+- Consider optimizing expenses or increasing income
+
+🔴 **Red (<0.8)** - "Attenzione alle spese"
+- Example: Ratio 0.65 (Income: €2,600, Expenses: €4,000)
+- Spending more than you earn
+- Unsustainable long-term without drawing from savings
+- Review budget and identify areas to reduce expenses
+
+⚪ **Gray (N/A)** - "Nessuna spesa registrata"
+- No expense data available for the selected period
+- Start tracking expenses to see your ratio
+
+**Year-over-year comparison:**
+- Change year filter to compare financial health across different periods
+- Track improvement over time as you optimize spending
+- Set personal goals (e.g., maintain ratio ≥1.3 for aggressive savings)
+
+**Example scenarios:**
+
+*Aggressive saver for FIRE:*
+- Income: €4,000/month
+- Expenses: €2,200/month
+- Ratio: 1.82 (green) → Saving ~45% of income
+
+*Living paycheck to paycheck:*
+- Income: €2,800/month
+- Expenses: €2,750/month
+- Ratio: 1.02 (yellow) → Saving only 2%, vulnerable to emergencies
+
+*Overspending situation:*
+- Income: €3,500/month
+- Expenses: €4,200/month
+- Ratio: 0.83 (yellow, close to red) → Burning savings, needs budget review
+
 ### Tracking FIRE Progress
 
 1. Navigate to **"FIRE"** page
@@ -750,6 +812,7 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - ✅ Expense and income tracking
 - ✅ Period indicator for expense tracking (visual display of selected month/year)
 - ✅ Smart category management with automatic expense reassignment
+- ✅ Income-to-expense ratio metric with color-coded financial health indicators
 - ✅ FIRE calculator and progress tracker
 - ✅ Hall of Fame personal financial rankings
 - ✅ Registration control system
