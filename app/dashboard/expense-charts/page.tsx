@@ -6,8 +6,11 @@ import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { getAllExpenses, calculateTotalIncome, calculateTotalExpenses } from '@/lib/services/expenseService';
 import { Timestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, ChevronLeft, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { format } from 'date-fns';
+import { it } from 'date-fns/locale';
 import {
   PieChart as RechartsPC,
   Pie,
@@ -45,10 +48,30 @@ const COLORS = [
   '#14b8a6', // teal
 ];
 
+type DrillDownLevel = 'category' | 'subcategory' | 'expenseList';
+type ChartType = 'expenses' | 'income';
+
+interface DrillDownState {
+  level: DrillDownLevel;
+  chartType: ChartType | null;
+  selectedCategory: string | null;
+  selectedCategoryColor: string | null;
+  selectedSubCategory: string | null;
+}
+
 export default function ExpenseChartsPage() {
   const { user } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Drill-down state
+  const [drillDown, setDrillDown] = useState<DrillDownState>({
+    level: 'category',
+    chartType: null,
+    selectedCategory: null,
+    selectedCategoryColor: null,
+    selectedSubCategory: null,
+  });
 
   // Get current year
   const currentYear = new Date().getFullYear();
@@ -332,6 +355,125 @@ export default function ExpenseChartsPage() {
     return { data, categories: [...top5Categories, 'Altro'] };
   };
 
+  // Helper function to derive subcategory colors from parent category color
+  const deriveSubcategoryColors = (baseColor: string, count: number): string[] => {
+    // Parse hex color to RGB
+    const hex = baseColor.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+
+    const colors: string[] = [];
+    for (let i = 0; i < count; i++) {
+      // Create variations by adjusting brightness
+      const factor = 1 - (i * 0.15); // Gradually darken
+      const newR = Math.round(Math.max(0, Math.min(255, r * factor)));
+      const newG = Math.round(Math.max(0, Math.min(255, g * factor)));
+      const newB = Math.round(Math.max(0, Math.min(255, b * factor)));
+      colors.push(`#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`);
+    }
+    return colors;
+  };
+
+  // Get subcategories data for a selected category
+  const getSubcategoriesData = (categoryName: string, chartType: ChartType): ChartData[] => {
+    const filteredExpenses = currentYearExpenses.filter(e =>
+      e.categoryName === categoryName &&
+      (chartType === 'income' ? e.type === 'income' : e.type !== 'income')
+    );
+
+    const total = filteredExpenses.reduce((sum, e) => sum + Math.abs(e.amount), 0);
+    if (total === 0) return [];
+
+    const subcategoryMap = new Map<string, number>();
+
+    filteredExpenses.forEach(expense => {
+      const subCatName = expense.subCategoryName || 'Altro';
+      const current = subcategoryMap.get(subCatName) || 0;
+      subcategoryMap.set(subCatName, current + Math.abs(expense.amount));
+    });
+
+    const baseColor = drillDown.selectedCategoryColor || COLORS[0];
+    const subcatCount = subcategoryMap.size;
+    const colors = deriveSubcategoryColors(baseColor, subcatCount);
+
+    const data: ChartData[] = [];
+    let colorIndex = 0;
+    subcategoryMap.forEach((value, name) => {
+      data.push({
+        name,
+        value,
+        percentage: (value / total) * 100,
+        color: colors[colorIndex % colors.length],
+      });
+      colorIndex++;
+    });
+
+    return data.sort((a, b) => b.value - a.value);
+  };
+
+  // Get expenses for a specific category and subcategory
+  const getFilteredExpenses = (): Expense[] => {
+    if (!drillDown.selectedCategory) return [];
+
+    return currentYearExpenses.filter(expense => {
+      const matchesCategory = expense.categoryName === drillDown.selectedCategory;
+      const matchesType = drillDown.chartType === 'income'
+        ? expense.type === 'income'
+        : expense.type !== 'income';
+
+      if (!matchesCategory || !matchesType) return false;
+
+      if (drillDown.selectedSubCategory) {
+        if (drillDown.selectedSubCategory === 'Altro') {
+          return !expense.subCategoryName;
+        }
+        return expense.subCategoryName === drillDown.selectedSubCategory;
+      }
+
+      return true;
+    });
+  };
+
+  // Handle category slice click
+  const handleCategoryClick = (data: ChartData, chartType: ChartType) => {
+    setDrillDown({
+      level: 'subcategory',
+      chartType,
+      selectedCategory: data.name,
+      selectedCategoryColor: data.color,
+      selectedSubCategory: null,
+    });
+  };
+
+  // Handle subcategory slice click
+  const handleSubcategoryClick = (data: ChartData) => {
+    setDrillDown(prev => ({
+      ...prev,
+      level: 'expenseList',
+      selectedSubCategory: data.name,
+    }));
+  };
+
+  // Handle back navigation
+  const handleBack = () => {
+    if (drillDown.level === 'expenseList') {
+      setDrillDown(prev => ({
+        ...prev,
+        level: 'subcategory',
+        selectedSubCategory: null,
+      }));
+    } else if (drillDown.level === 'subcategory') {
+      setDrillDown({
+        level: 'category',
+        chartType: null,
+        selectedCategory: null,
+        selectedCategoryColor: null,
+        selectedSubCategory: null,
+      });
+    }
+  };
+
   const expensesByCategoryData = getExpensesByCategory();
   const incomeByCategoryData = getIncomeByCategory();
   const expensesByTypeData = getExpensesByType();
@@ -339,6 +481,15 @@ export default function ExpenseChartsPage() {
   const monthlyExpensesByType = getMonthlyExpensesByType();
   const monthlyExpensesByCategory = getMonthlyExpensesByCategory();
   const monthlyIncomeByCategory = getMonthlyIncomeByCategory();
+
+  // Get current drill-down data
+  const currentSubcategoriesData = drillDown.level === 'subcategory' && drillDown.selectedCategory && drillDown.chartType
+    ? getSubcategoriesData(drillDown.selectedCategory, drillDown.chartType)
+    : [];
+
+  const currentFilteredExpenses = drillDown.level === 'expenseList'
+    ? getFilteredExpenses()
+    : [];
 
   if (loading) {
     return (
@@ -377,166 +528,512 @@ export default function ExpenseChartsPage() {
       <div>
         <h1 className="text-3xl font-bold">Cashflow {currentYear}</h1>
         <p className="text-muted-foreground mt-1">
-          Visualizza l'andamento delle tue finanze
+          Visualizza l&apos;andamento delle tue finanze
         </p>
       </div>
 
       {/* Charts Grid */}
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Expenses by Category */}
-        {expensesByCategoryData.length > 0 && (
+        {/* Expenses by Category - Interactive Drill-Down */}
+        {(expensesByCategoryData.length > 0 || (drillDown.chartType === 'expenses' && drillDown.level !== 'category')) && (
           <Card className="md:col-span-2">
             <CardHeader>
-              <CardTitle>Spese per Categoria</CardTitle>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {drillDown.chartType === 'expenses' && drillDown.level !== 'category' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleBack}
+                      className="gap-1"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      Indietro
+                    </Button>
+                  )}
+                  <CardTitle>
+                    {drillDown.chartType === 'expenses' && drillDown.level === 'subcategory'
+                      ? `Spese - ${drillDown.selectedCategory}`
+                      : drillDown.chartType === 'expenses' && drillDown.level === 'expenseList'
+                      ? `Spese - ${drillDown.selectedCategory} - ${drillDown.selectedSubCategory}`
+                      : 'Spese per Categoria'}
+                  </CardTitle>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={500}>
-                <RechartsPC>
-                  <Pie
-                    data={expensesByCategoryData as any}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={(entry: any) =>
-                      entry.percentage >= 5
-                        ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
-                        : ''
-                    }
-                    outerRadius={140}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {expensesByCategoryData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
-                    contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px',
-                    }}
-                  />
-                  <Legend
-                    layout="vertical"
-                    align="right"
-                    verticalAlign="middle"
-                    content={() => {
-                      const filteredData = expensesByCategoryData
-                        .filter(d => d.percentage >= 5)
-                        .sort((a, b) => b.value - a.value);
-                      return (
-                        <div style={{ paddingLeft: '20px' }}>
-                          {filteredData.map((entry, index) => (
-                            <div
-                              key={`legend-item-${index}`}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                marginBottom: '8px',
-                                fontSize: '14px',
-                              }}
-                            >
+              {/* Level 1: Category Pie Chart */}
+              {drillDown.level === 'category' && expensesByCategoryData.length > 0 && (
+                <ResponsiveContainer width="100%" height={500}>
+                  <RechartsPC>
+                    <Pie
+                      data={expensesByCategoryData as any}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={(entry: any) =>
+                        entry.percentage >= 5
+                          ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
+                          : ''
+                      }
+                      outerRadius={140}
+                      fill="#8884d8"
+                      dataKey="value"
+                      onClick={(data: any) => handleCategoryClick(data, 'expenses')}
+                      cursor="pointer"
+                    >
+                      {expensesByCategoryData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={entry.color}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value: number) => formatCurrency(value)}
+                      contentStyle={{
+                        backgroundColor: 'white',
+                        border: '1px solid #ccc',
+                        borderRadius: '4px',
+                      }}
+                    />
+                    <Legend
+                      layout="vertical"
+                      align="right"
+                      verticalAlign="middle"
+                      content={() => {
+                        const filteredData = expensesByCategoryData
+                          .filter(d => d.percentage >= 5)
+                          .sort((a, b) => b.value - a.value);
+                        return (
+                          <div style={{ paddingLeft: '20px' }}>
+                            {filteredData.map((entry, index) => (
                               <div
+                                key={`legend-item-${index}`}
                                 style={{
-                                  width: '14px',
-                                  height: '14px',
-                                  backgroundColor: entry.color,
-                                  marginRight: '8px',
-                                  flexShrink: 0,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  marginBottom: '8px',
+                                  fontSize: '14px',
+                                  cursor: 'pointer',
                                 }}
-                              />
-                              <span style={{ color: '#374151' }}>
-                                {entry.name} ({entry.percentage.toFixed(1)}%)
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    }}
-                  />
-                </RechartsPC>
-              </ResponsiveContainer>
+                                onClick={() => handleCategoryClick(entry, 'expenses')}
+                              >
+                                <div
+                                  style={{
+                                    width: '14px',
+                                    height: '14px',
+                                    backgroundColor: entry.color,
+                                    marginRight: '8px',
+                                    flexShrink: 0,
+                                  }}
+                                />
+                                <span style={{ color: '#374151' }}>
+                                  {entry.name} ({entry.percentage.toFixed(1)}%)
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      }}
+                    />
+                  </RechartsPC>
+                </ResponsiveContainer>
+              )}
+
+              {/* Level 2: Subcategory Pie Chart */}
+              {drillDown.level === 'subcategory' && drillDown.chartType === 'expenses' && currentSubcategoriesData.length > 0 && (
+                <ResponsiveContainer width="100%" height={500}>
+                  <RechartsPC>
+                    <Pie
+                      data={currentSubcategoriesData as any}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={(entry: any) =>
+                        entry.percentage >= 5
+                          ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
+                          : ''
+                      }
+                      outerRadius={140}
+                      fill="#8884d8"
+                      dataKey="value"
+                      onClick={(data: any) => handleSubcategoryClick(data)}
+                      cursor="pointer"
+                    >
+                      {currentSubcategoriesData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={entry.color}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value: number) => formatCurrency(value)}
+                      contentStyle={{
+                        backgroundColor: 'white',
+                        border: '1px solid #ccc',
+                        borderRadius: '4px',
+                      }}
+                    />
+                    <Legend
+                      layout="vertical"
+                      align="right"
+                      verticalAlign="middle"
+                      content={() => {
+                        const filteredData = currentSubcategoriesData
+                          .filter(d => d.percentage >= 5)
+                          .sort((a, b) => b.value - a.value);
+                        return (
+                          <div style={{ paddingLeft: '20px' }}>
+                            {filteredData.map((entry, index) => (
+                              <div
+                                key={`legend-item-${index}`}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  marginBottom: '8px',
+                                  fontSize: '14px',
+                                  cursor: 'pointer',
+                                }}
+                                onClick={() => handleSubcategoryClick(entry)}
+                              >
+                                <div
+                                  style={{
+                                    width: '14px',
+                                    height: '14px',
+                                    backgroundColor: entry.color,
+                                    marginRight: '8px',
+                                    flexShrink: 0,
+                                  }}
+                                />
+                                <span style={{ color: '#374151' }}>
+                                  {entry.name} ({entry.percentage.toFixed(1)}%)
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      }}
+                    />
+                  </RechartsPC>
+                </ResponsiveContainer>
+              )}
+
+              {/* Level 3: Expense List */}
+              {drillDown.level === 'expenseList' && drillDown.chartType === 'expenses' && currentFilteredExpenses.length > 0 && (
+                <div className="space-y-4">
+                  <div className="rounded-md border">
+                    <div className="max-h-[500px] overflow-y-auto">
+                      <table className="w-full">
+                        <thead className="sticky top-0 bg-muted/50 border-b">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-sm font-medium">Data</th>
+                            <th className="px-4 py-3 text-right text-sm font-medium">Importo</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium">Note</th>
+                            <th className="px-4 py-3 text-center text-sm font-medium">Link</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {currentFilteredExpenses.map((expense) => {
+                            const date = expense.date instanceof Date
+                              ? expense.date
+                              : (expense.date as Timestamp).toDate();
+                            return (
+                              <tr key={expense.id} className="border-b hover:bg-muted/30">
+                                <td className="px-4 py-3 text-sm">
+                                  {format(date, 'dd/MM/yyyy', { locale: it })}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-right font-medium text-red-600">
+                                  {formatCurrency(expense.amount)}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-muted-foreground">
+                                  {expense.notes || '-'}
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  {expense.link && (
+                                    <a
+                                      href={expense.link}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex text-blue-600 hover:text-blue-800"
+                                    >
+                                      <ExternalLink className="h-4 w-4" />
+                                    </a>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Totale: {currentFilteredExpenses.length} {currentFilteredExpenses.length === 1 ? 'voce' : 'voci'}
+                  </div>
+                </div>
+              )}
+
+              {drillDown.level === 'expenseList' && drillDown.chartType === 'expenses' && currentFilteredExpenses.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  Nessuna spesa trovata
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
 
-        {/* Income by Category */}
-        {incomeByCategoryData.length > 0 && (
+        {/* Income by Category - Interactive Drill-Down */}
+        {(incomeByCategoryData.length > 0 || (drillDown.chartType === 'income' && drillDown.level !== 'category')) && (
           <Card className="md:col-span-2">
             <CardHeader>
-              <CardTitle>Entrate per Categoria</CardTitle>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {drillDown.chartType === 'income' && drillDown.level !== 'category' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleBack}
+                      className="gap-1"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      Indietro
+                    </Button>
+                  )}
+                  <CardTitle>
+                    {drillDown.chartType === 'income' && drillDown.level === 'subcategory'
+                      ? `Entrate - ${drillDown.selectedCategory}`
+                      : drillDown.chartType === 'income' && drillDown.level === 'expenseList'
+                      ? `Entrate - ${drillDown.selectedCategory} - ${drillDown.selectedSubCategory}`
+                      : 'Entrate per Categoria'}
+                  </CardTitle>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={500}>
-                <RechartsPC>
-                  <Pie
-                    data={incomeByCategoryData as any}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={(entry: any) =>
-                      entry.percentage >= 5
-                        ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
-                        : ''
-                    }
-                    outerRadius={140}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {incomeByCategoryData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
-                    contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px',
-                    }}
-                  />
-                  <Legend
-                    layout="vertical"
-                    align="right"
-                    verticalAlign="middle"
-                    content={() => {
-                      const filteredData = incomeByCategoryData
-                        .filter(d => d.percentage >= 5)
-                        .sort((a, b) => b.value - a.value);
-                      return (
-                        <div style={{ paddingLeft: '20px' }}>
-                          {filteredData.map((entry, index) => (
-                            <div
-                              key={`legend-item-${index}`}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                marginBottom: '8px',
-                                fontSize: '14px',
-                              }}
-                            >
+              {/* Level 1: Category Pie Chart */}
+              {drillDown.level === 'category' && incomeByCategoryData.length > 0 && (
+                <ResponsiveContainer width="100%" height={500}>
+                  <RechartsPC>
+                    <Pie
+                      data={incomeByCategoryData as any}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={(entry: any) =>
+                        entry.percentage >= 5
+                          ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
+                          : ''
+                      }
+                      outerRadius={140}
+                      fill="#8884d8"
+                      dataKey="value"
+                      onClick={(data: any) => handleCategoryClick(data, 'income')}
+                      cursor="pointer"
+                    >
+                      {incomeByCategoryData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={entry.color}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value: number) => formatCurrency(value)}
+                      contentStyle={{
+                        backgroundColor: 'white',
+                        border: '1px solid #ccc',
+                        borderRadius: '4px',
+                      }}
+                    />
+                    <Legend
+                      layout="vertical"
+                      align="right"
+                      verticalAlign="middle"
+                      content={() => {
+                        const filteredData = incomeByCategoryData
+                          .filter(d => d.percentage >= 5)
+                          .sort((a, b) => b.value - a.value);
+                        return (
+                          <div style={{ paddingLeft: '20px' }}>
+                            {filteredData.map((entry, index) => (
                               <div
+                                key={`legend-item-${index}`}
                                 style={{
-                                  width: '14px',
-                                  height: '14px',
-                                  backgroundColor: entry.color,
-                                  marginRight: '8px',
-                                  flexShrink: 0,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  marginBottom: '8px',
+                                  fontSize: '14px',
+                                  cursor: 'pointer',
                                 }}
-                              />
-                              <span style={{ color: '#374151' }}>
-                                {entry.name} ({entry.percentage.toFixed(1)}%)
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    }}
-                  />
-                </RechartsPC>
-              </ResponsiveContainer>
+                                onClick={() => handleCategoryClick(entry, 'income')}
+                              >
+                                <div
+                                  style={{
+                                    width: '14px',
+                                    height: '14px',
+                                    backgroundColor: entry.color,
+                                    marginRight: '8px',
+                                    flexShrink: 0,
+                                  }}
+                                />
+                                <span style={{ color: '#374151' }}>
+                                  {entry.name} ({entry.percentage.toFixed(1)}%)
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      }}
+                    />
+                  </RechartsPC>
+                </ResponsiveContainer>
+              )}
+
+              {/* Level 2: Subcategory Pie Chart */}
+              {drillDown.level === 'subcategory' && drillDown.chartType === 'income' && currentSubcategoriesData.length > 0 && (
+                <ResponsiveContainer width="100%" height={500}>
+                  <RechartsPC>
+                    <Pie
+                      data={currentSubcategoriesData as any}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={(entry: any) =>
+                        entry.percentage >= 5
+                          ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
+                          : ''
+                      }
+                      outerRadius={140}
+                      fill="#8884d8"
+                      dataKey="value"
+                      onClick={(data: any) => handleSubcategoryClick(data)}
+                      cursor="pointer"
+                    >
+                      {currentSubcategoriesData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={entry.color}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value: number) => formatCurrency(value)}
+                      contentStyle={{
+                        backgroundColor: 'white',
+                        border: '1px solid #ccc',
+                        borderRadius: '4px',
+                      }}
+                    />
+                    <Legend
+                      layout="vertical"
+                      align="right"
+                      verticalAlign="middle"
+                      content={() => {
+                        const filteredData = currentSubcategoriesData
+                          .filter(d => d.percentage >= 5)
+                          .sort((a, b) => b.value - a.value);
+                        return (
+                          <div style={{ paddingLeft: '20px' }}>
+                            {filteredData.map((entry, index) => (
+                              <div
+                                key={`legend-item-${index}`}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  marginBottom: '8px',
+                                  fontSize: '14px',
+                                  cursor: 'pointer',
+                                }}
+                                onClick={() => handleSubcategoryClick(entry)}
+                              >
+                                <div
+                                  style={{
+                                    width: '14px',
+                                    height: '14px',
+                                    backgroundColor: entry.color,
+                                    marginRight: '8px',
+                                    flexShrink: 0,
+                                  }}
+                                />
+                                <span style={{ color: '#374151' }}>
+                                  {entry.name} ({entry.percentage.toFixed(1)}%)
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      }}
+                    />
+                  </RechartsPC>
+                </ResponsiveContainer>
+              )}
+
+              {/* Level 3: Expense List */}
+              {drillDown.level === 'expenseList' && drillDown.chartType === 'income' && currentFilteredExpenses.length > 0 && (
+                <div className="space-y-4">
+                  <div className="rounded-md border">
+                    <div className="max-h-[500px] overflow-y-auto">
+                      <table className="w-full">
+                        <thead className="sticky top-0 bg-muted/50 border-b">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-sm font-medium">Data</th>
+                            <th className="px-4 py-3 text-right text-sm font-medium">Importo</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium">Note</th>
+                            <th className="px-4 py-3 text-center text-sm font-medium">Link</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {currentFilteredExpenses.map((expense) => {
+                            const date = expense.date instanceof Date
+                              ? expense.date
+                              : (expense.date as Timestamp).toDate();
+                            return (
+                              <tr key={expense.id} className="border-b hover:bg-muted/30">
+                                <td className="px-4 py-3 text-sm">
+                                  {format(date, 'dd/MM/yyyy', { locale: it })}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-right font-medium text-green-600">
+                                  {formatCurrency(expense.amount)}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-muted-foreground">
+                                  {expense.notes || '-'}
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  {expense.link && (
+                                    <a
+                                      href={expense.link}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex text-blue-600 hover:text-blue-800"
+                                    >
+                                      <ExternalLink className="h-4 w-4" />
+                                    </a>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Totale: {currentFilteredExpenses.length} {currentFilteredExpenses.length === 1 ? 'voce' : 'voci'}
+                  </div>
+                </div>
+              )}
+
+              {drillDown.level === 'expenseList' && drillDown.chartType === 'income' && currentFilteredExpenses.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  Nessuna entrata trovata
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
