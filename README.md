@@ -156,6 +156,18 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
 - **Automatic ranking updates** with each new snapshot
 - **Motivation tracking** to compare current performance with historical bests
 
+### 🎨 **Streamlined Navigation & UI**
+- **Simplified sidebar** from 11 to 8 navigation items for cleaner UX
+- **Grouped related pages** with tab-based navigation:
+  - **FIRE e Simulazioni**: Combines FIRE Calculator and Monte Carlo simulations in one place
+  - **Cashflow**: Unified section with 3 tabs:
+    - **Tracciamento**: Full expense/income tracking with filters
+    - **Anno Corrente**: Current year analytics with drill-down charts
+    - **Storico Totale**: All-time cashflow trends and visualizations
+- **Contextual navigation**: Switch between related views without leaving the page
+- **Backward compatible**: Original URLs still work for existing bookmarks and links
+- **Reduced cognitive load**: Logical grouping makes features easier to discover
+
 ### ⚙️ **Smart Automation**
 - **Formula-based allocation**: Auto-calculate equity/bonds % based on age and risk-free rate
 - **End-of-month automation**: Prices update and snapshots create automatically
@@ -948,6 +960,7 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - ✅ Monte Carlo retirement simulations
 - ✅ TER (Total Expense Ratio) tracking with portfolio cost analysis
 - ✅ Specific asset allocation tracking within subcategories with drill-down functionality
+- ✅ UI/UX rationalization with streamlined navigation and grouped pages (sidebar reduced from 11 to 8 items)
 
 ### Future Enhancements (Planned 🔜)
 - 🔜 PDF export of portfolio reports
