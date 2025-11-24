@@ -701,19 +701,20 @@ Set specific assets within "Single Stock":
 3. Look for subcategories with the **ℹ️ info icon**
 4. **Click on the row** to drill down
 5. View the detailed breakdown:
-   - **Asset Name**: Specific ticker or asset name
+   - **Asset Name**: Specific ticker or asset name (e.g., "AAPL", "Enel")
    - **Target %**: Target percentage (relative to subcategory)
    - **Target €**: Target value in euros
-   - **Current %/€**: Always 0 (these are theoretical targets)
-   - **Difference**: Shows how much to buy to reach target
-   - **Action**: COMPRA (since current is always 0)
+   - **Current %/€**: Automatically calculated by matching real portfolio assets
+   - **Difference**: Shows how much to buy or sell to reach target
+   - **Action**: COMPRA, VENDI, or OK (threshold: ±100€)
 6. Use the **← back button** to return to the main view
 
 **Important notes:**
-- Specific assets are **theoretical targets only** - they are NOT linked to your actual portfolio assets
-- Current values are always 0 because they represent allocation goals, not actual holdings
-- The feature is designed to help you plan and track target allocation percentages
-- Use the "Action" column to see buy recommendations to reach your targets
+- Specific assets are **automatically linked** to your real portfolio assets based on ticker/name matching
+- The system performs case-insensitive partial matching on both ticker and asset name
+- Current values are calculated by summing all matching assets in your portfolio
+- Example: A specific asset "Enel" will automatically match any portfolio asset with "enel" in its ticker or name
+- Use the "Action" column to see buy/sell recommendations to reach your targets
 
 **Benefits:**
 - More granular portfolio rebalancing guidance

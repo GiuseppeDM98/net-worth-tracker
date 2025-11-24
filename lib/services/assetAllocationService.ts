@@ -176,6 +176,41 @@ export function calculateCurrentAllocation(assets: Asset[]): {
 }
 
 /**
+ * Find assets that match a specific asset name/ticker
+ *
+ * Matching is case-insensitive and checks both ticker and name fields.
+ * Only returns assets that match the specified asset class and subcategory.
+ *
+ * @param assets - Array of all portfolio assets
+ * @param specificAssetName - Name or ticker to search for (e.g., "Enel", "AAPL")
+ * @param assetClass - Asset class to filter by
+ * @param subCategory - Subcategory to filter by
+ * @returns Array of matching assets
+ */
+function findMatchingAssets(
+  assets: Asset[],
+  specificAssetName: string,
+  assetClass: string,
+  subCategory: string
+): Asset[] {
+  const searchTerm = specificAssetName.trim().toLowerCase();
+
+  return assets.filter(asset => {
+    // Must match asset class
+    if (asset.assetClass !== assetClass) return false;
+
+    // Must match subcategory
+    if (asset.subCategory !== subCategory) return false;
+
+    // Match on ticker or name (case-insensitive, partial match)
+    const tickerMatch = asset.ticker.toLowerCase().includes(searchTerm);
+    const nameMatch = asset.name.toLowerCase().includes(searchTerm);
+
+    return tickerMatch || nameMatch;
+  });
+}
+
+/**
  * Compare current allocation against targets and generate rebalancing actions
  */
 export function compareAllocations(
@@ -313,9 +348,24 @@ export function compareAllocations(
             // Use composite key "assetClass:subCategory:assetName"
             const specificAssetKey = `${assetClass}:${subCategory}:${specificAsset.name}`;
 
-            // Specific assets are theoretical targets, so current value is always 0
-            const specificCurrentValue = 0;
-            const specificCurrentPercentage = 0;
+            // Find matching assets in the portfolio
+            const matchingAssets = findMatchingAssets(
+              assets,
+              specificAsset.name,
+              assetClass,
+              subCategory
+            );
+
+            // Calculate current value by summing matching assets
+            const specificCurrentValue = matchingAssets.reduce(
+              (sum, asset) => sum + calculateAssetValue(asset),
+              0
+            );
+
+            // Calculate percentage relative to subcategory current value
+            const specificCurrentPercentage = subCurrentValue > 0
+              ? (specificCurrentValue / subCurrentValue) * 100
+              : 0;
 
             // Target value is percentage of the subcategory target value
             const specificTargetValue = (subTargetValue * specificAsset.targetPercentage) / 100;
@@ -326,8 +376,15 @@ export function compareAllocations(
             const specificDifference = specificCurrentPercentage - specificTargetPercentage;
             const specificDifferenceValue = specificCurrentValue - specificTargetValue;
 
-            // Since current is always 0, action is always COMPRA (unless target is 0)
-            const specificAction: 'COMPRA' | 'VENDI' | 'OK' = specificTargetValue > 0 ? 'COMPRA' : 'OK';
+            // Determine action based on difference (threshold: ±100€)
+            let specificAction: 'COMPRA' | 'VENDI' | 'OK';
+            if (specificDifferenceValue > 100) {
+              specificAction = 'VENDI';
+            } else if (specificDifferenceValue < -100) {
+              specificAction = 'COMPRA';
+            } else {
+              specificAction = 'OK';
+            }
 
             bySpecificAsset[specificAssetKey] = {
               currentPercentage: specificCurrentPercentage,
