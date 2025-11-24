@@ -7,8 +7,9 @@ import {
   setSettings,
   getDefaultTargets,
   calculateEquityPercentage,
+  validateSpecificAssets,
 } from '@/lib/services/assetAllocationService';
-import { AssetAllocationTarget, AssetClass } from '@/types/assets';
+import { AssetAllocationTarget, AssetClass, SubCategoryTarget as SubCategoryTargetType } from '@/types/assets';
 import { formatPercentage } from '@/lib/services/chartService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +29,14 @@ import { DeleteDummyDataDialog } from '@/components/DeleteDummyDataDialog';
 interface SubTarget {
   name: string;
   percentage: number;
+  specificAssetsEnabled?: boolean;
+  specificAssets?: SpecificAsset[];
+  expanded?: boolean; // For UI state (expand/collapse specific assets)
+}
+
+interface SpecificAsset {
+  name: string;
+  targetPercentage: number;
 }
 
 interface AssetClassState {
@@ -232,10 +241,23 @@ export default function SettingsPage() {
           subCategoryEnabled: subCategoryConfig?.enabled || false,
           categories: subCategoryConfig?.categories || [],
           subTargets: subTargets
-            ? Object.entries(subTargets).map(([name, percentage]) => ({
-                name,
-                percentage,
-              }))
+            ? Object.entries(subTargets).map(([name, value]) => {
+                // Support both old format (number) and new format (SubCategoryTarget)
+                if (typeof value === 'number') {
+                  return {
+                    name,
+                    percentage: value,
+                  };
+                } else {
+                  return {
+                    name,
+                    percentage: value.targetPercentage,
+                    specificAssetsEnabled: value.specificAssetsEnabled || false,
+                    specificAssets: value.specificAssets || [],
+                    expanded: false,
+                  };
+                }
+              })
             : [],
           expanded: assetClass === 'equity', // Solo equity espanso di default
         };
@@ -458,6 +480,25 @@ export default function SettingsPage() {
           );
           return;
         }
+
+        // Validate specific assets for each subcategory
+        for (const subTarget of state.subTargets) {
+          if (subTarget.specificAssetsEnabled && subTarget.specificAssets) {
+            const validationError = validateSpecificAssets(
+              subTarget.specificAssets.map(sa => ({
+                name: sa.name,
+                targetPercentage: sa.targetPercentage,
+              }))
+            );
+
+            if (validationError) {
+              toast.error(
+                `Sotto-categoria "${subTarget.name}" in ${assetClassLabels[assetClass]}: ${validationError}`
+              );
+              return;
+            }
+          }
+        }
       }
     }
 
@@ -486,10 +527,23 @@ export default function SettingsPage() {
         if (state.subCategoryEnabled && state.subTargets.length > 0) {
           targets[assetClass].subTargets = state.subTargets.reduce(
             (acc, target) => {
-              acc[target.name] = target.percentage;
+              if (target.specificAssetsEnabled && target.specificAssets && target.specificAssets.length > 0) {
+                // New format: SubCategoryTarget with specific assets
+                acc[target.name] = {
+                  targetPercentage: target.percentage,
+                  specificAssetsEnabled: true,
+                  specificAssets: target.specificAssets.map(sa => ({
+                    name: sa.name,
+                    targetPercentage: sa.targetPercentage,
+                  })),
+                };
+              } else {
+                // Old format: just percentage (or SubCategoryTarget without specific assets)
+                acc[target.name] = target.percentage;
+              }
               return acc;
             },
-            {} as { [key: string]: number }
+            {} as { [key: string]: number | SubCategoryTargetType }
           );
         }
       });
@@ -525,10 +579,23 @@ export default function SettingsPage() {
         subCategoryEnabled: subCategoryConfig?.enabled || false,
         categories: subCategoryConfig?.categories || [],
         subTargets: subTargets
-          ? Object.entries(subTargets).map(([name, percentage]) => ({
-              name,
-              percentage,
-            }))
+          ? Object.entries(subTargets).map(([name, value]) => {
+              // Support both old format (number) and new format (SubCategoryTarget)
+              if (typeof value === 'number') {
+                return {
+                  name,
+                  percentage: value,
+                };
+              } else {
+                return {
+                  name,
+                  percentage: value.targetPercentage,
+                  specificAssetsEnabled: value.specificAssetsEnabled || false,
+                  specificAssets: value.specificAssets || [],
+                  expanded: false,
+                };
+              }
+            })
           : [],
         expanded: assetClass === 'equity',
       };
@@ -630,6 +697,86 @@ export default function SettingsPage() {
       categories: newCategories,
       subTargets: newSubTargets,
     });
+  };
+
+  // Specific Assets Management Functions
+  const toggleSubCategoryExpanded = (assetClass: AssetClass, subIndex: number) => {
+    const state = assetClassStates[assetClass];
+    const newSubTargets = [...state.subTargets];
+    newSubTargets[subIndex].expanded = !newSubTargets[subIndex].expanded;
+    updateAssetClassState(assetClass, { subTargets: newSubTargets });
+  };
+
+  const handleToggleSpecificAssets = (
+    assetClass: AssetClass,
+    subIndex: number,
+    enabled: boolean
+  ) => {
+    const state = assetClassStates[assetClass];
+    const newSubTargets = [...state.subTargets];
+    newSubTargets[subIndex].specificAssetsEnabled = enabled;
+
+    if (enabled && (!newSubTargets[subIndex].specificAssets || newSubTargets[subIndex].specificAssets!.length === 0)) {
+      // Initialize with empty array when enabling for the first time
+      newSubTargets[subIndex].specificAssets = [];
+    }
+
+    updateAssetClassState(assetClass, { subTargets: newSubTargets });
+  };
+
+  const handleAddSpecificAsset = (assetClass: AssetClass, subIndex: number) => {
+    const state = assetClassStates[assetClass];
+    const newSubTargets = [...state.subTargets];
+    const specificAssets = newSubTargets[subIndex].specificAssets || [];
+    specificAssets.push({ name: '', targetPercentage: 0 });
+    newSubTargets[subIndex].specificAssets = specificAssets;
+    updateAssetClassState(assetClass, { subTargets: newSubTargets });
+  };
+
+  const handleRemoveSpecificAsset = (
+    assetClass: AssetClass,
+    subIndex: number,
+    specificIndex: number
+  ) => {
+    const state = assetClassStates[assetClass];
+    const newSubTargets = [...state.subTargets];
+    const specificAssets = newSubTargets[subIndex].specificAssets || [];
+    newSubTargets[subIndex].specificAssets = specificAssets.filter(
+      (_, i) => i !== specificIndex
+    );
+    updateAssetClassState(assetClass, { subTargets: newSubTargets });
+  };
+
+  const handleSpecificAssetChange = (
+    assetClass: AssetClass,
+    subIndex: number,
+    specificIndex: number,
+    field: 'name' | 'targetPercentage',
+    value: string | number
+  ) => {
+    const state = assetClassStates[assetClass];
+    const newSubTargets = [...state.subTargets];
+    const specificAssets = [...(newSubTargets[subIndex].specificAssets || [])];
+
+    if (field === 'name') {
+      specificAssets[specificIndex].name = value as string;
+    } else {
+      specificAssets[specificIndex].targetPercentage = value as number;
+    }
+
+    newSubTargets[subIndex].specificAssets = specificAssets;
+    updateAssetClassState(assetClass, { subTargets: newSubTargets });
+  };
+
+  const calculateSpecificAssetTotal = (assetClass: AssetClass, subIndex: number) => {
+    const state = assetClassStates[assetClass];
+    const subTarget = state?.subTargets[subIndex];
+    if (!subTarget?.specificAssets) return 0;
+
+    return subTarget.specificAssets.reduce(
+      (sum, asset) => sum + asset.targetPercentage,
+      0
+    );
   };
 
   if (loading) {
@@ -897,56 +1044,179 @@ export default function SettingsPage() {
                     {state.subTargets
                       .map((target, originalIndex) => ({ target, originalIndex }))
                       .sort((a, b) => a.target.name.localeCompare(b.target.name))
-                      .map(({ target, originalIndex }) => (
-                        <div key={originalIndex} className="flex items-center gap-3">
-                        <div className="flex-1">
-                          <Input
-                            placeholder="Nome sotto-categoria"
-                            value={target.name}
-                            onChange={(e) =>
-                              handleSubTargetChange(
-                                assetClass,
-                                originalIndex,
-                                'name',
-                                e.target.value
-                              )
-                            }
-                            list={`${assetClass}-categories`}
-                          />
-                          <datalist id={`${assetClass}-categories`}>
-                            {state.categories.map((cat) => (
-                              <option key={cat} value={cat} />
-                            ))}
-                          </datalist>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            max="100"
-                            className="w-24"
-                            value={target.percentage}
-                            onChange={(e) =>
-                              handleSubTargetChange(
-                                assetClass,
-                                originalIndex,
-                                'percentage',
-                                roundToTwoDecimals(parseFloat(e.target.value) || 0)
-                              )
-                            }
-                          />
-                          <span className="text-sm text-gray-600">%</span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveSubTarget(assetClass, originalIndex)}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </div>
-                    ))}
+                      .map(({ target, originalIndex }) => {
+                        const specificAssetTotal = calculateSpecificAssetTotal(assetClass, originalIndex);
+                        const isValidSpecificTotal = Math.abs(specificAssetTotal - 100) < 0.01;
+
+                        return (
+                          <div key={originalIndex} className="space-y-3 border rounded-lg p-3 bg-gray-50">
+                            {/* Main subcategory row */}
+                            <div className="flex items-center gap-3">
+                              <div className="flex-1">
+                                <Input
+                                  placeholder="Nome sotto-categoria"
+                                  value={target.name}
+                                  onChange={(e) =>
+                                    handleSubTargetChange(
+                                      assetClass,
+                                      originalIndex,
+                                      'name',
+                                      e.target.value
+                                    )
+                                  }
+                                  list={`${assetClass}-categories`}
+                                />
+                                <datalist id={`${assetClass}-categories`}>
+                                  {state.categories.map((cat) => (
+                                    <option key={cat} value={cat} />
+                                  ))}
+                                </datalist>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  max="100"
+                                  className="w-24"
+                                  value={target.percentage}
+                                  onChange={(e) =>
+                                    handleSubTargetChange(
+                                      assetClass,
+                                      originalIndex,
+                                      'percentage',
+                                      roundToTwoDecimals(parseFloat(e.target.value) || 0)
+                                    )
+                                  }
+                                />
+                                <span className="text-sm text-gray-600">%</span>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveSubTarget(assetClass, originalIndex)}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
+                            </div>
+
+                            {/* Specific Assets Section */}
+                            {target.name && (
+                              <div className="ml-6 space-y-3 border-l-2 border-blue-200 pl-4">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <Switch
+                                      id={`specific-${assetClass}-${originalIndex}`}
+                                      checked={target.specificAssetsEnabled || false}
+                                      onCheckedChange={(checked) =>
+                                        handleToggleSpecificAssets(assetClass, originalIndex, checked)
+                                      }
+                                    />
+                                    <Label
+                                      htmlFor={`specific-${assetClass}-${originalIndex}`}
+                                      className="text-sm cursor-pointer"
+                                    >
+                                      Abilita tracciamento asset specifici
+                                    </Label>
+                                  </div>
+                                  {target.specificAssetsEnabled && (
+                                    <div
+                                      className={`text-xs font-semibold ${
+                                        isValidSpecificTotal ? 'text-green-600' : 'text-red-600'
+                                      }`}
+                                    >
+                                      Totale: {formatPercentage(specificAssetTotal)}
+                                      {!isValidSpecificTotal && ' (deve essere 100%)'}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {target.specificAssetsEnabled && (
+                                  <div className="space-y-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="w-full justify-start text-xs"
+                                      onClick={() => toggleSubCategoryExpanded(assetClass, originalIndex)}
+                                    >
+                                      {target.expanded ? (
+                                        <ChevronUp className="mr-2 h-3 w-3" />
+                                      ) : (
+                                        <ChevronDown className="mr-2 h-3 w-3" />
+                                      )}
+                                      {target.expanded ? 'Nascondi' : 'Mostra'} specific assets
+                                      {target.specificAssets && target.specificAssets.length > 0 && (
+                                        <span className="ml-2 text-gray-500">
+                                          ({target.specificAssets.length})
+                                        </span>
+                                      )}
+                                    </Button>
+
+                                    {target.expanded && (
+                                      <div className="space-y-2 ml-4">
+                                        {target.specificAssets && target.specificAssets.map((specificAsset, specificIndex) => (
+                                          <div key={specificIndex} className="flex items-center gap-2">
+                                            <Input
+                                              placeholder="Ticker/Nome (es. AAPL)"
+                                              value={specificAsset.name}
+                                              onChange={(e) =>
+                                                handleSpecificAssetChange(
+                                                  assetClass,
+                                                  originalIndex,
+                                                  specificIndex,
+                                                  'name',
+                                                  e.target.value
+                                                )
+                                              }
+                                              className="flex-1 text-sm"
+                                            />
+                                            <Input
+                                              type="number"
+                                              step="0.01"
+                                              min="0"
+                                              max="100"
+                                              className="w-20 text-sm"
+                                              value={specificAsset.targetPercentage}
+                                              onChange={(e) =>
+                                                handleSpecificAssetChange(
+                                                  assetClass,
+                                                  originalIndex,
+                                                  specificIndex,
+                                                  'targetPercentage',
+                                                  roundToTwoDecimals(parseFloat(e.target.value) || 0)
+                                                )
+                                              }
+                                            />
+                                            <span className="text-xs text-gray-600">%</span>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() =>
+                                                handleRemoveSpecificAsset(assetClass, originalIndex, specificIndex)
+                                              }
+                                            >
+                                              <Trash2 className="h-3 w-3 text-red-500" />
+                                            </Button>
+                                          </div>
+                                        ))}
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="w-full text-xs"
+                                          onClick={() => handleAddSpecificAsset(assetClass, originalIndex)}
+                                        >
+                                          <Plus className="mr-2 h-3 w-3" />
+                                          Aggiungi Specific Asset
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                   </div>
 
                   <Button

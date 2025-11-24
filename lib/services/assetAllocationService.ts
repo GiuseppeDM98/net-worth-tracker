@@ -1,6 +1,6 @@
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
-import { Asset, AssetAllocationTarget, AssetAllocationSettings, AllocationResult } from '@/types/assets';
+import { Asset, AssetAllocationTarget, AssetAllocationSettings, AllocationResult, SubCategoryTarget, SpecificAssetAllocation, AllocationData } from '@/types/assets';
 import { calculateAssetValue, calculateTotalValue } from './assetService';
 import { DEFAULT_SUB_CATEGORIES, DEFAULT_EQUITY_SUB_TARGETS } from '@/lib/constants/defaultSubCategories';
 
@@ -188,6 +188,7 @@ export function compareAllocations(
     return {
       byAssetClass: {},
       bySubCategory: {},
+      bySpecificAsset: {},
       totalValue: current.totalValue,
     };
   }
@@ -205,6 +206,7 @@ export function compareAllocations(
 
   const byAssetClass: AllocationResult['byAssetClass'] = {};
   const bySubCategory: AllocationResult['bySubCategory'] = {};
+  const bySpecificAsset: AllocationResult['bySpecificAsset'] = {};
 
   // Compare asset classes
   Object.keys(targets).forEach((assetClass) => {
@@ -266,7 +268,13 @@ export function compareAllocations(
       const assetClassTargetTotal = targetValue;
 
       Object.keys(targetData.subTargets).forEach((subCategory) => {
-        const subTargetPercentage = targetData.subTargets![subCategory];
+        const subTargetData = targetData.subTargets![subCategory];
+
+        // Support both old format (number) and new format (SubCategoryTarget)
+        const subTargetPercentage = typeof subTargetData === 'number'
+          ? subTargetData
+          : subTargetData.targetPercentage;
+
         // Use composite key "assetClass:subCategory" to avoid collisions
         const subCategoryKey = `${assetClass}:${subCategory}`;
         const subCurrentValue = current.bySubCategory[subCategoryKey] || 0;
@@ -298,6 +306,40 @@ export function compareAllocations(
           differenceValue: subDifferenceValue,
           action: subAction,
         };
+
+        // Compare specific assets if enabled
+        if (typeof subTargetData === 'object' && subTargetData.specificAssetsEnabled && subTargetData.specificAssets) {
+          subTargetData.specificAssets.forEach((specificAsset) => {
+            // Use composite key "assetClass:subCategory:assetName"
+            const specificAssetKey = `${assetClass}:${subCategory}:${specificAsset.name}`;
+
+            // Specific assets are theoretical targets, so current value is always 0
+            const specificCurrentValue = 0;
+            const specificCurrentPercentage = 0;
+
+            // Target value is percentage of the subcategory target value
+            const specificTargetValue = (subTargetValue * specificAsset.targetPercentage) / 100;
+
+            // Target percentage is relative to the subcategory
+            const specificTargetPercentage = specificAsset.targetPercentage;
+
+            const specificDifference = specificCurrentPercentage - specificTargetPercentage;
+            const specificDifferenceValue = specificCurrentValue - specificTargetValue;
+
+            // Since current is always 0, action is always COMPRA (unless target is 0)
+            const specificAction: 'COMPRA' | 'VENDI' | 'OK' = specificTargetValue > 0 ? 'COMPRA' : 'OK';
+
+            bySpecificAsset[specificAssetKey] = {
+              currentPercentage: specificCurrentPercentage,
+              currentValue: specificCurrentValue,
+              targetPercentage: specificTargetPercentage,
+              targetValue: specificTargetValue,
+              difference: specificDifference,
+              differenceValue: specificDifferenceValue,
+              action: specificAction,
+            };
+          });
+        }
       });
     }
   });
@@ -305,6 +347,7 @@ export function compareAllocations(
   return {
     byAssetClass,
     bySubCategory,
+    bySpecificAsset,
     totalValue: current.totalValue,
   };
 }
@@ -320,6 +363,45 @@ export function calculateEquityPercentage(
   const percentage = 125 - userAge - (riskFreeRate * 5);
   // Ensure percentage is between 0 and 100
   return Math.max(0, Math.min(100, percentage));
+}
+
+/**
+ * Validate specific assets allocation
+ * Returns error message if validation fails, null if valid
+ */
+export function validateSpecificAssets(
+  specificAssets: SpecificAssetAllocation[]
+): string | null {
+  if (!specificAssets || specificAssets.length === 0) {
+    return 'At least one specific asset is required';
+  }
+
+  // Check for empty names
+  for (const asset of specificAssets) {
+    if (!asset.name || asset.name.trim() === '') {
+      return 'All specific assets must have a name';
+    }
+    if (asset.targetPercentage < 0 || asset.targetPercentage > 100) {
+      return 'Specific asset percentages must be between 0 and 100';
+    }
+  }
+
+  // Check for duplicate names
+  const names = specificAssets.map(a => a.name.trim().toLowerCase());
+  const uniqueNames = new Set(names);
+  if (names.length !== uniqueNames.size) {
+    return 'Duplicate specific asset names are not allowed';
+  }
+
+  // Check if sum equals 100%
+  const sum = specificAssets.reduce((acc, asset) => acc + asset.targetPercentage, 0);
+  const tolerance = 0.01; // Allow 0.01% tolerance for floating point arithmetic
+
+  if (Math.abs(sum - 100) > tolerance) {
+    return `Specific asset percentages must sum to exactly 100% (current: ${sum.toFixed(2)}%)`;
+  }
+
+  return null; // Valid
 }
 
 /**

@@ -91,6 +91,15 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
   - **Transaction details**: View date, amount, notes, and links for individual expenses/income
   - Available for both "Spese per Categoria" and "Entrate per Categoria" charts
   - Year filter context maintained across all drill-down levels
+- **Specific asset allocation tracking** (#57) for granular portfolio target management
+  - **Three-level allocation hierarchy**: Asset Class → Subcategory → Specific Assets
+  - Define target percentages for individual tickers within subcategories
+  - Interactive drill-down with info icon (ℹ️) and breadcrumb navigation
+  - Per-subcategory toggle with collapsible UI for space efficiency
+  - Real-time validation: specific asset percentages must sum to 100%
+  - Theoretical targets with automatic buy/sell recommendations
+  - Backward compatible with existing allocation data
+  - Example: Track "AAPL 25%, MSFT 25%, GOOGL 25%, AMZN 25%" within "Single Stock" subcategory
 - **Year/month filtering** with dynamic statistics
 - **Income-to-expense ratio metric** for financial health monitoring
   - Real-time calculation of income/expense ratio
@@ -650,6 +659,68 @@ The **Income-to-Expense Ratio** metric provides instant insight into your financ
 - Expenses: €4,200/month
 - Ratio: 0.83 (yellow, close to red) → Burning savings, needs budget review
 
+### Managing Specific Asset Allocation Targets
+
+The **Specific Asset Allocation Tracking** feature allows you to define granular target allocations for individual stocks, ETFs, or other assets within your subcategories.
+
+**When to use this:**
+- You want precise control over which tickers to hold within a subcategory
+- Track allocation to specific stocks like "AAPL, MSFT, GOOGL, AMZN" within your "Single Stock" allocation
+- Monitor target percentages for individual ETFs in your "All-World" or "Momentum" strategies
+
+**How to set up specific asset tracking:**
+
+1. Navigate to **Settings** → **Sotto-Categorie** section
+2. Find the subcategory you want to track (e.g., "Single Stock" under Equity)
+3. Enable the **"Abilita tracciamento asset specifici"** toggle
+4. Click **"Mostra specific assets"** to expand the configuration
+5. Click **"+ Aggiungi Specific Asset"**
+6. Enter:
+   - **Ticker/Nome**: AAPL (or asset name)
+   - **Target %**: 25 (percentage relative to the subcategory)
+7. Add more specific assets until the total equals 100%
+8. The system validates that percentages sum to exactly 100%
+9. Click **"Salva Impostazioni"**
+
+**Example configuration:**
+
+If your allocation is:
+- **Equity**: 60% of total portfolio (€60,000)
+- **Single Stock**: 6% of Equity (€3,600)
+
+Set specific assets within "Single Stock":
+- AAPL: 25% → Target: €900 (1.5% of total Equity)
+- MSFT: 25% → Target: €900 (1.5% of total Equity)
+- GOOGL: 25% → Target: €900 (1.5% of total Equity)
+- AMZN: 25% → Target: €900 (1.5% of total Equity)
+
+**Viewing specific asset allocation in Allocation page:**
+
+1. Navigate to **Allocazione Asset** page
+2. Scroll to the subcategory section (e.g., "Sotto-Categoria Azioni")
+3. Look for subcategories with the **ℹ️ info icon**
+4. **Click on the row** to drill down
+5. View the detailed breakdown:
+   - **Asset Name**: Specific ticker or asset name
+   - **Target %**: Target percentage (relative to subcategory)
+   - **Target €**: Target value in euros
+   - **Current %/€**: Always 0 (these are theoretical targets)
+   - **Difference**: Shows how much to buy to reach target
+   - **Action**: COMPRA (since current is always 0)
+6. Use the **← back button** to return to the main view
+
+**Important notes:**
+- Specific assets are **theoretical targets only** - they are NOT linked to your actual portfolio assets
+- Current values are always 0 because they represent allocation goals, not actual holdings
+- The feature is designed to help you plan and track target allocation percentages
+- Use the "Action" column to see buy recommendations to reach your targets
+
+**Benefits:**
+- More granular portfolio rebalancing guidance
+- Better visibility into desired individual asset allocation
+- Flexibility to enable tracking only for subcategories where you need detail
+- Maintains consistency with existing allocation tracking UX
+
 ### Tracking FIRE Progress
 
 1. Navigate to **"FIRE"** page
@@ -875,6 +946,7 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - ✅ Gain/Loss (G/P) column in Assets table with total portfolio performance
 - ✅ Monte Carlo retirement simulations
 - ✅ TER (Total Expense Ratio) tracking with portfolio cost analysis
+- ✅ Specific asset allocation tracking within subcategories with drill-down functionality
 
 ### Future Enhancements (Planned 🔜)
 - 🔜 PDF export of portfolio reports

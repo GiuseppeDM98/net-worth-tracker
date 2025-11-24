@@ -55,6 +55,17 @@ export interface SubCategoryConfig {
   categories: string[];
 }
 
+export interface SpecificAssetAllocation {
+  name: string; // Ticker or asset name (e.g., "AAPL", "MSFT")
+  targetPercentage: number; // Percentage relative to the subcategory
+}
+
+export interface SubCategoryTarget {
+  targetPercentage: number;
+  specificAssetsEnabled?: boolean;
+  specificAssets?: SpecificAssetAllocation[];
+}
+
 export interface AssetAllocationTarget {
   [assetClass: string]: {
     targetPercentage: number;
@@ -62,7 +73,7 @@ export interface AssetAllocationTarget {
     fixedAmount?: number;
     subCategoryConfig?: SubCategoryConfig;
     subTargets?: {
-      [subCategory: string]: number;
+      [subCategory: string]: number | SubCategoryTarget; // Support both old (number) and new (SubCategoryTarget) format
     };
   };
 }
@@ -75,28 +86,25 @@ export interface AssetAllocationSettings {
   targets: AssetAllocationTarget;
 }
 
+export interface AllocationData {
+  currentPercentage: number;
+  currentValue: number;
+  targetPercentage: number;
+  targetValue: number;
+  difference: number;
+  differenceValue: number;
+  action: 'COMPRA' | 'VENDI' | 'OK';
+}
+
 export interface AllocationResult {
   byAssetClass: {
-    [assetClass: string]: {
-      currentPercentage: number;
-      currentValue: number;
-      targetPercentage: number;
-      targetValue: number;
-      difference: number;
-      differenceValue: number;
-      action: 'COMPRA' | 'VENDI' | 'OK';
-    };
+    [assetClass: string]: AllocationData;
   };
   bySubCategory: {
-    [subCategory: string]: {
-      currentPercentage: number;
-      currentValue: number;
-      targetPercentage: number;
-      targetValue: number;
-      difference: number;
-      differenceValue: number;
-      action: 'COMPRA' | 'VENDI' | 'OK';
-    };
+    [subCategory: string]: AllocationData; // Key format: "assetClass:subCategory"
+  };
+  bySpecificAsset: {
+    [specificAsset: string]: AllocationData; // Key format: "assetClass:subCategory:assetName"
   };
   totalValue: number;
 }
