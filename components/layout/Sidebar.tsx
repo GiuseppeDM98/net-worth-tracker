@@ -31,11 +31,8 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     { name: 'Allocation', href: '/dashboard/allocation', icon: PieChart },
     { name: 'History', href: '/dashboard/history', icon: History },
     { name: 'Hall of Fame', href: '/dashboard/hall-of-fame', icon: Trophy },
-    { name: 'FIRE', href: '/dashboard/fire', icon: Flame },
-    { name: 'Monte Carlo', href: '/dashboard/monte-carlo', icon: Dices },
-    { name: 'Tracciamento Spese', href: '/dashboard/expenses', icon: Receipt },
-    { name: `Cashflow ${currentYear}`, href: '/dashboard/expense-charts', icon: BarChart3 },
-    { name: 'Cashflow Totale', href: '/dashboard/expense-charts-total', icon: BarChart3 },
+    { name: 'FIRE e Simulazioni', href: '/dashboard/fire-simulations', icon: Flame },
+    { name: 'Cashflow', href: '/dashboard/cashflow', icon: Receipt },
     { name: 'Settings', href: '/dashboard/settings', icon: Settings },
   ];
 
