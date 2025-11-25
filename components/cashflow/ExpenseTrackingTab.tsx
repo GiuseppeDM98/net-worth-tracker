@@ -276,43 +276,27 @@ export function ExpenseTrackingTab() {
 
   // Filter options for Subcategory based on selected category
   const subCategoryOptions = useMemo(() => {
+    // Only show subcategories if a specific category is selected
     if (selectedCategoryId === 'all') {
-      // Show all subcategories from all categories
-      const allSubCategories = categories.flatMap(cat =>
-        cat.subCategories.map(sub => ({
-          ...sub,
-          categoryName: cat.name,
-          categoryId: cat.id,
-        }))
-      );
-
-      if (!searchQuerySubCategory.trim()) {
-        return allSubCategories;
-      }
-
-      const query = searchQuerySubCategory.toLowerCase();
-      return allSubCategories.filter(sub =>
-        sub.name.toLowerCase().includes(query) ||
-        sub.categoryName.toLowerCase().includes(query)
-      );
-    } else {
-      // Show subcategories only from selected category
-      const selectedCategory = categories.find(cat => cat.id === selectedCategoryId);
-      if (!selectedCategory) return [];
-
-      let filtered = selectedCategory.subCategories.map(sub => ({
-        ...sub,
-        categoryName: selectedCategory.name,
-        categoryId: selectedCategory.id,
-      }));
-
-      if (searchQuerySubCategory.trim()) {
-        const query = searchQuerySubCategory.toLowerCase();
-        filtered = filtered.filter(sub => sub.name.toLowerCase().includes(query));
-      }
-
-      return filtered;
+      return [];
     }
+
+    // Show subcategories only from selected category
+    const selectedCategory = categories.find(cat => cat.id === selectedCategoryId);
+    if (!selectedCategory) return [];
+
+    let filtered = selectedCategory.subCategories.map(sub => ({
+      ...sub,
+      categoryName: selectedCategory.name,
+      categoryId: selectedCategory.id,
+    }));
+
+    if (searchQuerySubCategory.trim()) {
+      const query = searchQuerySubCategory.toLowerCase();
+      filtered = filtered.filter(sub => sub.name.toLowerCase().includes(query));
+    }
+
+    return filtered;
   }, [categories, selectedCategoryId, searchQuerySubCategory]);
 
   // Apply cumulative filtering (AND logic)
@@ -329,14 +313,9 @@ export function ExpenseTrackingTab() {
       filtered = filtered.filter(expense => expense.categoryId === selectedCategoryId);
     }
 
-    // Filter by subcategory
-    if (selectedSubCategoryId !== 'all') {
-      if (selectedSubCategoryId === 'none') {
-        // Show expenses without subcategory
-        filtered = filtered.filter(expense => !expense.subCategoryId);
-      } else {
-        filtered = filtered.filter(expense => expense.subCategoryId === selectedSubCategoryId);
-      }
+    // Filter by subcategory (only if a category is selected)
+    if (selectedCategoryId !== 'all' && selectedSubCategoryId !== 'all') {
+      filtered = filtered.filter(expense => expense.subCategoryId === selectedSubCategoryId);
     }
 
     return filtered;
@@ -659,16 +638,16 @@ export function ExpenseTrackingTab() {
                   <div className="relative">
                     <Input
                       id="subcategory-combobox"
-                      placeholder="Cerca sotto-categoria..."
+                      placeholder={selectedCategoryId === 'all' ? 'Seleziona prima una categoria' : 'Cerca sotto-categoria...'}
                       value={searchQuerySubCategory}
                       onChange={(e) => {
                         setSearchQuerySubCategory(e.target.value);
                         setIsSubCategoryDropdownOpen(true);
                       }}
                       onFocus={() => setIsSubCategoryDropdownOpen(true)}
-                      disabled={subCategoryOptions.length === 0}
+                      disabled={selectedCategoryId === 'all' || subCategoryOptions.length === 0}
                     />
-                    {isSubCategoryDropdownOpen && subCategoryOptions.length > 0 && (
+                    {isSubCategoryDropdownOpen && selectedCategoryId !== 'all' && subCategoryOptions.length > 0 && (
                       <div
                         ref={subCategoryDropdownRef}
                         className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto"
@@ -687,20 +666,6 @@ export function ExpenseTrackingTab() {
                             <Check className="h-4 w-4 text-primary flex-shrink-0" />
                           )}
                         </button>
-                        {/* Option for "Nessuna sotto-categoria" */}
-                        <button
-                          type="button"
-                          className={cn(
-                            "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer text-left",
-                            selectedSubCategoryId === 'none' && "bg-gray-100"
-                          )}
-                          onClick={() => handleSelectSubCategory('none')}
-                        >
-                          <span className="flex-1 italic text-muted-foreground">Nessuna sotto-categoria</span>
-                          {selectedSubCategoryId === 'none' && (
-                            <Check className="h-4 w-4 text-primary flex-shrink-0" />
-                          )}
-                        </button>
                         {subCategoryOptions.map((subCategory) => (
                           <button
                             key={subCategory.id}
@@ -712,11 +677,6 @@ export function ExpenseTrackingTab() {
                             onClick={() => handleSelectSubCategory(subCategory.id)}
                           >
                             <span className="flex-1">{subCategory.name}</span>
-                            {selectedCategoryId === 'all' && (
-                              <span className="text-xs text-muted-foreground">
-                                ({subCategory.categoryName})
-                              </span>
-                            )}
                             {selectedSubCategoryId === subCategory.id && (
                               <Check className="h-4 w-4 text-primary flex-shrink-0" />
                             )}
@@ -725,17 +685,10 @@ export function ExpenseTrackingTab() {
                       </div>
                     )}
                   </div>
-                  {selectedSubCategoryId !== 'all' && selectedSubCategoryId !== 'none' && (
+                  {selectedSubCategoryId !== 'all' && (
                     <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
                       <span className="text-sm font-medium">
                         {subCategoryOptions.find(s => s.id === selectedSubCategoryId)?.name}
-                      </span>
-                    </div>
-                  )}
-                  {selectedSubCategoryId === 'none' && (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
-                      <span className="text-sm font-medium italic text-muted-foreground">
-                        Nessuna sotto-categoria
                       </span>
                     </div>
                   )}
