@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
-import { getAllExpenses } from '@/lib/services/expenseService';
+import { getAllExpenses, calculateIncomeExpenseRatio } from '@/lib/services/expenseService';
 import { Timestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RefreshCw } from 'lucide-react';
@@ -19,6 +19,8 @@ import {
   CartesianGrid,
   LineChart,
   Line,
+  ReferenceArea,
+  ReferenceLine,
 } from 'recharts';
 import { formatCurrency } from '@/lib/services/chartService';
 
@@ -370,6 +372,37 @@ export default function ExpenseChartsTotalPage() {
     return { data, categories: [...top5Categories, 'Altro'] };
   };
 
+  // Prepare yearly income/expense ratio data
+  const getYearlyIncomeExpenseRatio = () => {
+    const yearlyMap = new Map<number, Expense[]>();
+
+    // Group expenses by year
+    expenses.forEach((expense: Expense) => {
+      const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
+      const year = date.getFullYear();
+
+      if (!yearlyMap.has(year)) {
+        yearlyMap.set(year, []);
+      }
+
+      yearlyMap.get(year)!.push(expense);
+    });
+
+    // Calculate ratio for each year
+    const data = Array.from(yearlyMap.entries())
+      .map(([year, yearExpenses]) => {
+        const ratio = calculateIncomeExpenseRatio(yearExpenses);
+        return {
+          year: year.toString(),
+          ratio: ratio,
+        };
+      })
+      .filter((item) => item.ratio !== null) // Filter out years with no expenses
+      .sort((a, b) => parseInt(a.year) - parseInt(b.year));
+
+    return data;
+  };
+
   const monthlyTrendData = getMonthlyTrend();
   const yearlyTrendData = getYearlyTrend();
   const monthlyExpensesByType = getMonthlyExpensesByType();
@@ -378,6 +411,7 @@ export default function ExpenseChartsTotalPage() {
   const yearlyExpensesByCategory = getYearlyExpensesByCategory();
   const monthlyIncomeByCategory = getMonthlyIncomeByCategory();
   const yearlyIncomeByCategory = getYearlyIncomeByCategory();
+  const yearlyIncomeExpenseRatioData = getYearlyIncomeExpenseRatio();
 
   if (loading) {
     return (
@@ -478,6 +512,69 @@ export default function ExpenseChartsTotalPage() {
                   <Line type="monotone" dataKey="Netto" stroke="#3b82f6" strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Yearly Income/Expense Ratio */}
+        {yearlyIncomeExpenseRatioData.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Rapporto Entrate/Spese Annuale</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={350}>
+                <LineChart data={yearlyIncomeExpenseRatioData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="year" />
+                  <YAxis
+                    tickFormatter={(value) => value.toFixed(2)}
+                    domain={[0, 'auto']}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => value.toFixed(2)}
+                    contentStyle={{
+                      backgroundColor: 'white',
+                      border: '1px solid #ccc',
+                      borderRadius: '4px',
+                    }}
+                  />
+                  <Legend />
+                  {/* Colored zones */}
+                  <ReferenceArea y1={1.2} y2={5} fill="#10b981" fillOpacity={0.1} />
+                  <ReferenceArea y1={0.8} y2={1.2} fill="#eab308" fillOpacity={0.1} />
+                  <ReferenceArea y1={0} y2={0.8} fill="#ef4444" fillOpacity={0.1} />
+                  {/* Break-even line at 1.0 */}
+                  <ReferenceLine
+                    y={1.0}
+                    stroke="#666"
+                    strokeDasharray="5 5"
+                    label={{ value: 'Break-even (1.0)', position: 'right', fill: '#666', fontSize: 12 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="ratio"
+                    stroke="#8b5cf6"
+                    strokeWidth={3}
+                    name="Rapporto"
+                    dot={{ r: 5 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+              <div className="mt-4 text-sm text-muted-foreground">
+                <p className="mb-1">
+                  <span className="inline-block w-3 h-3 bg-green-600 opacity-30 mr-2"></span>
+                  ≥ 1.2: Salute finanziaria ottima
+                </p>
+                <p className="mb-1">
+                  <span className="inline-block w-3 h-3 bg-yellow-600 opacity-30 mr-2"></span>
+                  0.8 - 1.2: In equilibrio
+                </p>
+                <p>
+                  <span className="inline-block w-3 h-3 bg-red-600 opacity-30 mr-2"></span>
+                  &lt; 0.8: Attenzione alle spese
+                </p>
+              </div>
             </CardContent>
           </Card>
         )}
