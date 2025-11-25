@@ -258,12 +258,12 @@ export function ExpenseTrackingTab() {
 
   // Filter options for Category based on selected type
   const categoryOptions = useMemo(() => {
-    let filtered = categories;
-
-    // Filter by type if selected
-    if (selectedType !== 'all') {
-      filtered = filtered.filter(cat => cat.type === selectedType);
+    // Only show categories if a specific type is selected
+    if (selectedType === 'all') {
+      return [];
     }
+
+    let filtered = categories.filter(cat => cat.type === selectedType);
 
     // Filter by search query
     if (searchQueryCategory.trim()) {
@@ -308,13 +308,13 @@ export function ExpenseTrackingTab() {
       filtered = filtered.filter(expense => expense.type === selectedType);
     }
 
-    // Filter by category
-    if (selectedCategoryId !== 'all') {
+    // Filter by category (only if a type is selected)
+    if (selectedType !== 'all' && selectedCategoryId !== 'all') {
       filtered = filtered.filter(expense => expense.categoryId === selectedCategoryId);
     }
 
-    // Filter by subcategory (only if a category is selected)
-    if (selectedCategoryId !== 'all' && selectedSubCategoryId !== 'all') {
+    // Filter by subcategory (only if a type and category are selected)
+    if (selectedType !== 'all' && selectedCategoryId !== 'all' && selectedSubCategoryId !== 'all') {
       filtered = filtered.filter(expense => expense.subCategoryId === selectedSubCategoryId);
     }
 
@@ -559,15 +559,16 @@ export function ExpenseTrackingTab() {
                   <div className="relative">
                     <Input
                       id="category-combobox"
-                      placeholder="Cerca categoria..."
+                      placeholder={selectedType === 'all' ? 'Seleziona prima un tipo' : 'Cerca categoria...'}
                       value={searchQueryCategory}
                       onChange={(e) => {
                         setSearchQueryCategory(e.target.value);
                         setIsCategoryDropdownOpen(true);
                       }}
                       onFocus={() => setIsCategoryDropdownOpen(true)}
+                      disabled={selectedType === 'all' || categoryOptions.length === 0}
                     />
-                    {isCategoryDropdownOpen && (
+                    {isCategoryDropdownOpen && selectedType !== 'all' && categoryOptions.length > 0 && (
                       <div
                         ref={categoryDropdownRef}
                         className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto"
@@ -586,34 +587,28 @@ export function ExpenseTrackingTab() {
                             <Check className="h-4 w-4 text-primary flex-shrink-0" />
                           )}
                         </button>
-                        {categoryOptions.length === 0 ? (
-                          <div className="p-3 text-sm text-muted-foreground text-center">
-                            Nessuna categoria trovata
-                          </div>
-                        ) : (
-                          categoryOptions.map((category) => (
-                            <button
-                              key={category.id}
-                              type="button"
-                              className={cn(
-                                "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer text-left",
-                                selectedCategoryId === category.id && "bg-gray-100"
-                              )}
-                              onClick={() => handleSelectCategory(category.id)}
-                            >
-                              {category.color && (
-                                <div
-                                  className="w-3 h-3 rounded-full flex-shrink-0"
-                                  style={{ backgroundColor: category.color }}
-                                />
-                              )}
-                              <span className="flex-1">{category.name}</span>
-                              {selectedCategoryId === category.id && (
-                                <Check className="h-4 w-4 text-primary flex-shrink-0" />
-                              )}
-                            </button>
-                          ))
-                        )}
+                        {categoryOptions.map((category) => (
+                          <button
+                            key={category.id}
+                            type="button"
+                            className={cn(
+                              "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer text-left",
+                              selectedCategoryId === category.id && "bg-gray-100"
+                            )}
+                            onClick={() => handleSelectCategory(category.id)}
+                          >
+                            {category.color && (
+                              <div
+                                className="w-3 h-3 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: category.color }}
+                              />
+                            )}
+                            <span className="flex-1">{category.name}</span>
+                            {selectedCategoryId === category.id && (
+                              <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                            )}
+                          </button>
+                        ))}
                       </div>
                     )}
                   </div>
