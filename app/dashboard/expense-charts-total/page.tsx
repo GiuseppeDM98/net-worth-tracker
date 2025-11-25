@@ -392,6 +392,7 @@ export default function ExpenseChartsTotalPage() {
     const data = Array.from(yearlyMap.entries())
       .map(([year, yearExpenses]) => {
         const ratio = calculateIncomeExpenseRatio(yearExpenses);
+        console.log(`Year ${year}: ratio = ${ratio}, expenses count = ${yearExpenses.length}`);
         return {
           year: year.toString(),
           ratio: ratio,
@@ -400,6 +401,7 @@ export default function ExpenseChartsTotalPage() {
       .filter((item) => item.ratio !== null) // Filter out years with no expenses
       .sort((a, b) => parseInt(a.year) - parseInt(b.year));
 
+    console.log('Yearly Income/Expense Ratio Data:', data);
     return data;
   };
 
