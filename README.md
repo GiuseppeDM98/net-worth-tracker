@@ -101,6 +101,17 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
   - Backward compatible with existing allocation data
   - Example: Track "AAPL 25%, MSFT 25%, GOOGL 25%, AMZN 25%" within "Single Stock" subcategory
 - **Year/month filtering** with dynamic statistics
+- **Advanced expense filtering system** (#50) for precision expense tracking
+  - **Hierarchical filter progression**: Type → Category → Subcategory with smart field enabling
+  - **Searchable comboboxes**: Real-time search across all filter levels for quick selection
+  - **Progressive filtering logic**: Categories enabled only after type selection, subcategories only after category
+  - **Individual filter removal**: X buttons on each active filter for granular control without full reset
+  - **Smart hierarchical clearing**: Clearing Type resets Category and Subcategory; clearing Category resets only Subcategory
+  - **Real-time statistics**: All dashboard cards update dynamically based on filtered expense data
+  - **Cumulative AND filtering**: Combine multiple filters for precise data exploration
+  - **Visual filter badges**: Active selections displayed with colored badges and clear indicators
+  - Type filter automatically narrows available categories (e.g., only "Spese Fisse" categories when type is "fixed")
+  - Example workflow: Filter "Variabili" → "Animali domestici" → "Cibo" to analyze specific pet food expenses
 - **Income-to-expense ratio metric** for financial health monitoring
   - Real-time calculation of income/expense ratio
   - Color-coded indicators: Green (≥1.2 optimal), Yellow (0.8-1.2 balanced), Red (<0.8 warning)
@@ -961,6 +972,7 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - ✅ TER (Total Expense Ratio) tracking with portfolio cost analysis
 - ✅ Specific asset allocation tracking within subcategories with drill-down functionality
 - ✅ UI/UX rationalization with streamlined navigation and grouped pages (sidebar reduced from 11 to 8 items)
+- ✅ Advanced expense filtering system with hierarchical Type/Category/Subcategory filters and searchable comboboxes
 
 ### Future Enhancements (Planned 🔜)
 - 🔜 PDF export of portfolio reports
