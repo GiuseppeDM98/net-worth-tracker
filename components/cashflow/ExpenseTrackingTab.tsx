@@ -1,17 +1,21 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Expense } from '@/types/expenses';
+import { Expense, ExpenseCategory, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { getAllExpenses, getExpensesByMonth, getExpensesByDateRange, calculateTotalIncome, calculateTotalExpenses, calculateNetBalance, calculateIncomeExpenseRatio } from '@/lib/services/expenseService';
+import { getAllCategories } from '@/lib/services/expenseCategoryService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Plus, TrendingUp, TrendingDown, Wallet, RefreshCw, Filter, ChevronDown, Scale } from 'lucide-react';
+import { Plus, TrendingUp, TrendingDown, Wallet, RefreshCw, Filter, ChevronDown, Scale, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { ExpenseDialog } from '@/components/expenses/ExpenseDialog';
 import { ExpenseTable } from '@/components/expenses/ExpenseTable';
+import { cn } from '@/lib/utils';
 
 const MONTHS = [
   { value: '1', label: 'Gennaio' },
@@ -40,6 +44,27 @@ export function ExpenseTrackingTab() {
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [filtersOpen, setFiltersOpen] = useState<boolean>(true);
 
+  // New filter states
+  const [selectedType, setSelectedType] = useState<string>('all');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
+  const [selectedSubCategoryId, setSelectedSubCategoryId] = useState<string>('all');
+  const [categories, setCategories] = useState<ExpenseCategory[]>([]);
+
+  // Search states for comboboxes
+  const [searchQueryType, setSearchQueryType] = useState<string>('');
+  const [searchQueryCategory, setSearchQueryCategory] = useState<string>('');
+  const [searchQuerySubCategory, setSearchQuerySubCategory] = useState<string>('');
+
+  // Dropdown open states
+  const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+  const [isSubCategoryDropdownOpen, setIsSubCategoryDropdownOpen] = useState(false);
+
+  // Refs for click outside detection
+  const typeDropdownRef = useRef<HTMLDivElement>(null);
+  const categoryDropdownRef = useRef<HTMLDivElement>(null);
+  const subCategoryDropdownRef = useRef<HTMLDivElement>(null);
+
   // Generate available years from ALL expenses (not filtered)
   const availableYears = useMemo(() => {
     if (allExpenses.length === 0) return [];
@@ -59,6 +84,50 @@ export function ExpenseTrackingTab() {
     setSelectedMonth('all');
   };
 
+  // Handler functions for filter selections
+  const handleSelectType = (type: string) => {
+    setSelectedType(type);
+    setIsTypeDropdownOpen(false);
+    setSearchQueryType('');
+    // Reset category and subcategory when type changes
+    setSelectedCategoryId('all');
+    setSelectedSubCategoryId('all');
+  };
+
+  const handleSelectCategory = (categoryId: string) => {
+    setSelectedCategoryId(categoryId);
+    setIsCategoryDropdownOpen(false);
+    setSearchQueryCategory('');
+    // Reset subcategory when category changes
+    setSelectedSubCategoryId('all');
+  };
+
+  const handleSelectSubCategory = (subCategoryId: string) => {
+    setSelectedSubCategoryId(subCategoryId);
+    setIsSubCategoryDropdownOpen(false);
+    setSearchQuerySubCategory('');
+  };
+
+  const handleResetFilters = () => {
+    setSelectedMonth('all');
+    setSelectedType('all');
+    setSelectedCategoryId('all');
+    setSelectedSubCategoryId('all');
+    setSearchQueryType('');
+    setSearchQueryCategory('');
+    setSearchQuerySubCategory('');
+  };
+
+  // Check if any filter is active
+  const hasActiveFilters = selectedMonth !== 'all' || selectedType !== 'all' || selectedCategoryId !== 'all' || selectedSubCategoryId !== 'all';
+
+  // Load categories
+  useEffect(() => {
+    if (user) {
+      loadCategories();
+    }
+  }, [user]);
+
   // Load all expenses in background to get available years
   useEffect(() => {
     if (user) {
@@ -72,6 +141,36 @@ export function ExpenseTrackingTab() {
       loadExpenses();
     }
   }, [user, selectedYear, selectedMonth]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (typeDropdownRef.current && !typeDropdownRef.current.contains(event.target as Node)) {
+        setIsTypeDropdownOpen(false);
+      }
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target as Node)) {
+        setIsCategoryDropdownOpen(false);
+      }
+      if (subCategoryDropdownRef.current && !subCategoryDropdownRef.current.contains(event.target as Node)) {
+        setIsSubCategoryDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const loadCategories = async () => {
+    if (!user) return;
+
+    try {
+      const data = await getAllCategories(user.uid);
+      setCategories(data);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+      toast.error('Errore nel caricamento delle categorie');
+    }
+  };
 
   const loadAllExpensesForYears = async () => {
     if (!user) return;
@@ -139,11 +238,115 @@ export function ExpenseTrackingTab() {
     }).format(amount);
   };
 
-  // Calculate totals
-  const totalIncome = calculateTotalIncome(expenses);
-  const totalExpenses = calculateTotalExpenses(expenses);
-  const netBalance = calculateNetBalance(expenses);
-  const incomeExpenseRatio = calculateIncomeExpenseRatio(expenses);
+  // Filter options for Type
+  const typeOptions = useMemo(() => {
+    const types = [
+      { value: 'all', label: 'Tutte' },
+      { value: 'income', label: EXPENSE_TYPE_LABELS.income },
+      { value: 'fixed', label: EXPENSE_TYPE_LABELS.fixed },
+      { value: 'variable', label: EXPENSE_TYPE_LABELS.variable },
+      { value: 'debt', label: EXPENSE_TYPE_LABELS.debt },
+    ];
+
+    if (!searchQueryType.trim()) {
+      return types;
+    }
+
+    const query = searchQueryType.toLowerCase();
+    return types.filter(type => type.label.toLowerCase().includes(query));
+  }, [searchQueryType]);
+
+  // Filter options for Category based on selected type
+  const categoryOptions = useMemo(() => {
+    let filtered = categories;
+
+    // Filter by type if selected
+    if (selectedType !== 'all') {
+      filtered = filtered.filter(cat => cat.type === selectedType);
+    }
+
+    // Filter by search query
+    if (searchQueryCategory.trim()) {
+      const query = searchQueryCategory.toLowerCase();
+      filtered = filtered.filter(cat => cat.name.toLowerCase().includes(query));
+    }
+
+    return filtered;
+  }, [categories, selectedType, searchQueryCategory]);
+
+  // Filter options for Subcategory based on selected category
+  const subCategoryOptions = useMemo(() => {
+    if (selectedCategoryId === 'all') {
+      // Show all subcategories from all categories
+      const allSubCategories = categories.flatMap(cat =>
+        cat.subCategories.map(sub => ({
+          ...sub,
+          categoryName: cat.name,
+          categoryId: cat.id,
+        }))
+      );
+
+      if (!searchQuerySubCategory.trim()) {
+        return allSubCategories;
+      }
+
+      const query = searchQuerySubCategory.toLowerCase();
+      return allSubCategories.filter(sub =>
+        sub.name.toLowerCase().includes(query) ||
+        sub.categoryName.toLowerCase().includes(query)
+      );
+    } else {
+      // Show subcategories only from selected category
+      const selectedCategory = categories.find(cat => cat.id === selectedCategoryId);
+      if (!selectedCategory) return [];
+
+      let filtered = selectedCategory.subCategories.map(sub => ({
+        ...sub,
+        categoryName: selectedCategory.name,
+        categoryId: selectedCategory.id,
+      }));
+
+      if (searchQuerySubCategory.trim()) {
+        const query = searchQuerySubCategory.toLowerCase();
+        filtered = filtered.filter(sub => sub.name.toLowerCase().includes(query));
+      }
+
+      return filtered;
+    }
+  }, [categories, selectedCategoryId, searchQuerySubCategory]);
+
+  // Apply cumulative filtering (AND logic)
+  const filteredExpenses = useMemo(() => {
+    let filtered = [...expenses];
+
+    // Filter by type
+    if (selectedType !== 'all') {
+      filtered = filtered.filter(expense => expense.type === selectedType);
+    }
+
+    // Filter by category
+    if (selectedCategoryId !== 'all') {
+      filtered = filtered.filter(expense => expense.categoryId === selectedCategoryId);
+    }
+
+    // Filter by subcategory
+    if (selectedSubCategoryId !== 'all') {
+      if (selectedSubCategoryId === 'none') {
+        // Show expenses without subcategory
+        filtered = filtered.filter(expense => !expense.subCategoryId);
+      } else {
+        filtered = filtered.filter(expense => expense.subCategoryId === selectedSubCategoryId);
+      }
+    }
+
+    return filtered;
+  }, [expenses, selectedType, selectedCategoryId, selectedSubCategoryId]);
+
+  // Calculate totals from filtered expenses
+  const totalIncome = calculateTotalIncome(filteredExpenses);
+  const totalExpenses = calculateTotalExpenses(filteredExpenses);
+  const netBalance = calculateNetBalance(filteredExpenses);
+  const incomeExpenseRatio = calculateIncomeExpenseRatio(filteredExpenses);
 
   // Determine ratio color based on thresholds
   const getRatioColor = (ratio: number | null): string => {
@@ -199,7 +402,7 @@ export function ExpenseTrackingTab() {
               {formatCurrency(totalIncome)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {expenses.filter(e => e.type === 'income').length} voci
+              {filteredExpenses.filter(e => e.type === 'income').length} voci
             </p>
           </CardContent>
         </Card>
@@ -214,7 +417,7 @@ export function ExpenseTrackingTab() {
               {formatCurrency(totalExpenses)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {expenses.filter(e => e.type !== 'income').length} voci
+              {filteredExpenses.filter(e => e.type !== 'income').length} voci
             </p>
           </CardContent>
         </Card>
@@ -233,7 +436,7 @@ export function ExpenseTrackingTab() {
               {formatCurrency(netBalance)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Totale: {expenses.length} voci
+              Totale: {filteredExpenses.length} voci
             </p>
           </CardContent>
         </Card>
@@ -297,6 +500,7 @@ export function ExpenseTrackingTab() {
           <CollapsibleContent>
             <CardContent>
               <div className="flex flex-wrap gap-4">
+                {/* Month Filter */}
                 <div className="flex flex-col gap-2 min-w-[150px]">
                   <label className="text-sm font-medium">Mese</label>
                   <Select
@@ -317,13 +521,232 @@ export function ExpenseTrackingTab() {
                   </Select>
                 </div>
 
-                {selectedMonth !== 'all' && (
+                {/* Type Filter with Search */}
+                <div className="flex flex-col gap-2 min-w-[150px]">
+                  <Label htmlFor="type-combobox">Tipo</Label>
+                  <div className="relative">
+                    <Input
+                      id="type-combobox"
+                      placeholder="Cerca tipo..."
+                      value={searchQueryType}
+                      onChange={(e) => {
+                        setSearchQueryType(e.target.value);
+                        setIsTypeDropdownOpen(true);
+                      }}
+                      onFocus={() => setIsTypeDropdownOpen(true)}
+                    />
+                    {isTypeDropdownOpen && (
+                      <div
+                        ref={typeDropdownRef}
+                        className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto"
+                      >
+                        {typeOptions.length === 0 ? (
+                          <div className="p-3 text-sm text-muted-foreground text-center">
+                            Nessun tipo trovato
+                          </div>
+                        ) : (
+                          typeOptions.map((type) => (
+                            <button
+                              key={type.value}
+                              type="button"
+                              className={cn(
+                                "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer text-left",
+                                selectedType === type.value && "bg-gray-100"
+                              )}
+                              onClick={() => handleSelectType(type.value)}
+                            >
+                              <span className="flex-1">{type.label}</span>
+                              {selectedType === type.value && (
+                                <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                              )}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {selectedType !== 'all' && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                      <span className="text-sm font-medium">
+                        {typeOptions.find(t => t.value === selectedType)?.label}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Category Filter with Search */}
+                <div className="flex flex-col gap-2 min-w-[150px]">
+                  <Label htmlFor="category-combobox">Categoria</Label>
+                  <div className="relative">
+                    <Input
+                      id="category-combobox"
+                      placeholder="Cerca categoria..."
+                      value={searchQueryCategory}
+                      onChange={(e) => {
+                        setSearchQueryCategory(e.target.value);
+                        setIsCategoryDropdownOpen(true);
+                      }}
+                      onFocus={() => setIsCategoryDropdownOpen(true)}
+                    />
+                    {isCategoryDropdownOpen && (
+                      <div
+                        ref={categoryDropdownRef}
+                        className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto"
+                      >
+                        {/* Always show "Tutte" option */}
+                        <button
+                          type="button"
+                          className={cn(
+                            "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer text-left",
+                            selectedCategoryId === 'all' && "bg-gray-100"
+                          )}
+                          onClick={() => handleSelectCategory('all')}
+                        >
+                          <span className="flex-1">Tutte</span>
+                          {selectedCategoryId === 'all' && (
+                            <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                          )}
+                        </button>
+                        {categoryOptions.length === 0 ? (
+                          <div className="p-3 text-sm text-muted-foreground text-center">
+                            Nessuna categoria trovata
+                          </div>
+                        ) : (
+                          categoryOptions.map((category) => (
+                            <button
+                              key={category.id}
+                              type="button"
+                              className={cn(
+                                "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer text-left",
+                                selectedCategoryId === category.id && "bg-gray-100"
+                              )}
+                              onClick={() => handleSelectCategory(category.id)}
+                            >
+                              {category.color && (
+                                <div
+                                  className="w-3 h-3 rounded-full flex-shrink-0"
+                                  style={{ backgroundColor: category.color }}
+                                />
+                              )}
+                              <span className="flex-1">{category.name}</span>
+                              {selectedCategoryId === category.id && (
+                                <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                              )}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {selectedCategoryId !== 'all' && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                      {categories.find(c => c.id === selectedCategoryId)?.color && (
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: categories.find(c => c.id === selectedCategoryId)?.color }}
+                        />
+                      )}
+                      <span className="text-sm font-medium">
+                        {categories.find(c => c.id === selectedCategoryId)?.name}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Subcategory Filter with Search */}
+                <div className="flex flex-col gap-2 min-w-[150px]">
+                  <Label htmlFor="subcategory-combobox">Sotto-categoria</Label>
+                  <div className="relative">
+                    <Input
+                      id="subcategory-combobox"
+                      placeholder="Cerca sotto-categoria..."
+                      value={searchQuerySubCategory}
+                      onChange={(e) => {
+                        setSearchQuerySubCategory(e.target.value);
+                        setIsSubCategoryDropdownOpen(true);
+                      }}
+                      onFocus={() => setIsSubCategoryDropdownOpen(true)}
+                      disabled={subCategoryOptions.length === 0}
+                    />
+                    {isSubCategoryDropdownOpen && subCategoryOptions.length > 0 && (
+                      <div
+                        ref={subCategoryDropdownRef}
+                        className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto"
+                      >
+                        {/* Always show "Tutte" option */}
+                        <button
+                          type="button"
+                          className={cn(
+                            "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer text-left",
+                            selectedSubCategoryId === 'all' && "bg-gray-100"
+                          )}
+                          onClick={() => handleSelectSubCategory('all')}
+                        >
+                          <span className="flex-1">Tutte</span>
+                          {selectedSubCategoryId === 'all' && (
+                            <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                          )}
+                        </button>
+                        {/* Option for "Nessuna sotto-categoria" */}
+                        <button
+                          type="button"
+                          className={cn(
+                            "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer text-left",
+                            selectedSubCategoryId === 'none' && "bg-gray-100"
+                          )}
+                          onClick={() => handleSelectSubCategory('none')}
+                        >
+                          <span className="flex-1 italic text-muted-foreground">Nessuna sotto-categoria</span>
+                          {selectedSubCategoryId === 'none' && (
+                            <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                          )}
+                        </button>
+                        {subCategoryOptions.map((subCategory) => (
+                          <button
+                            key={subCategory.id}
+                            type="button"
+                            className={cn(
+                              "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer text-left",
+                              selectedSubCategoryId === subCategory.id && "bg-gray-100"
+                            )}
+                            onClick={() => handleSelectSubCategory(subCategory.id)}
+                          >
+                            <span className="flex-1">{subCategory.name}</span>
+                            {selectedCategoryId === 'all' && (
+                              <span className="text-xs text-muted-foreground">
+                                ({subCategory.categoryName})
+                              </span>
+                            )}
+                            {selectedSubCategoryId === subCategory.id && (
+                              <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {selectedSubCategoryId !== 'all' && selectedSubCategoryId !== 'none' && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                      <span className="text-sm font-medium">
+                        {subCategoryOptions.find(s => s.id === selectedSubCategoryId)?.name}
+                      </span>
+                    </div>
+                  )}
+                  {selectedSubCategoryId === 'none' && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                      <span className="text-sm font-medium italic text-muted-foreground">
+                        Nessuna sotto-categoria
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Reset Filters Button */}
+                {hasActiveFilters && (
                   <div className="flex items-end">
                     <Button
                       variant="outline"
-                      onClick={() => {
-                        setSelectedMonth('all');
-                      }}
+                      onClick={handleResetFilters}
                     >
                       Ripristina Filtri
                     </Button>
@@ -346,7 +769,7 @@ export function ExpenseTrackingTab() {
         </CardHeader>
         <CardContent>
           <ExpenseTable
-            expenses={expenses}
+            expenses={filteredExpenses}
             onEdit={handleEditExpense}
             onRefresh={loadExpenses}
           />
