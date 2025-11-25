@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Plus, TrendingUp, TrendingDown, Wallet, RefreshCw, Filter, ChevronDown, Scale, Check } from 'lucide-react';
+import { Plus, TrendingUp, TrendingDown, Wallet, RefreshCw, Filter, ChevronDown, Scale, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { ExpenseDialog } from '@/components/expenses/ExpenseDialog';
 import { ExpenseTable } from '@/components/expenses/ExpenseTable';
@@ -115,6 +115,28 @@ export function ExpenseTrackingTab() {
     setSelectedSubCategoryId('all');
     setSearchQueryType('');
     setSearchQueryCategory('');
+    setSearchQuerySubCategory('');
+  };
+
+  // Handler to clear individual filters
+  const handleClearType = () => {
+    setSelectedType('all');
+    setSelectedCategoryId('all');
+    setSelectedSubCategoryId('all');
+    setSearchQueryType('');
+    setSearchQueryCategory('');
+    setSearchQuerySubCategory('');
+  };
+
+  const handleClearCategory = () => {
+    setSelectedCategoryId('all');
+    setSelectedSubCategoryId('all');
+    setSearchQueryCategory('');
+    setSearchQuerySubCategory('');
+  };
+
+  const handleClearSubCategory = () => {
+    setSelectedSubCategoryId('all');
     setSearchQuerySubCategory('');
   };
 
@@ -549,6 +571,14 @@ export function ExpenseTrackingTab() {
                       <span className="text-sm font-medium">
                         {typeOptions.find(t => t.value === selectedType)?.label}
                       </span>
+                      <button
+                        type="button"
+                        onClick={handleClearType}
+                        className="ml-1 hover:bg-gray-200 rounded-full p-0.5 transition-colors"
+                        aria-label="Rimuovi filtro tipo"
+                      >
+                        <X className="h-3 w-3 text-gray-600" />
+                      </button>
                     </div>
                   )}
                 </div>
@@ -623,6 +653,14 @@ export function ExpenseTrackingTab() {
                       <span className="text-sm font-medium">
                         {categories.find(c => c.id === selectedCategoryId)?.name}
                       </span>
+                      <button
+                        type="button"
+                        onClick={handleClearCategory}
+                        className="ml-1 hover:bg-gray-200 rounded-full p-0.5 transition-colors"
+                        aria-label="Rimuovi filtro categoria"
+                      >
+                        <X className="h-3 w-3 text-gray-600" />
+                      </button>
                     </div>
                   )}
                 </div>
@@ -685,6 +723,14 @@ export function ExpenseTrackingTab() {
                       <span className="text-sm font-medium">
                         {subCategoryOptions.find(s => s.id === selectedSubCategoryId)?.name}
                       </span>
+                      <button
+                        type="button"
+                        onClick={handleClearSubCategory}
+                        className="ml-1 hover:bg-gray-200 rounded-full p-0.5 transition-colors"
+                        aria-label="Rimuovi filtro sotto-categoria"
+                      >
+                        <X className="h-3 w-3 text-gray-600" />
+                      </button>
                     </div>
                   )}
                 </div>
