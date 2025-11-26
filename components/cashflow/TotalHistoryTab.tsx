@@ -6,6 +6,7 @@ import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { getAllExpenses, calculateIncomeExpenseRatio } from '@/lib/services/expenseService';
 import { Timestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import {
