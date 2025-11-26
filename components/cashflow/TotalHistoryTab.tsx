@@ -6,6 +6,7 @@ import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { getAllExpenses, calculateIncomeExpenseRatio } from '@/lib/services/expenseService';
 import { Timestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -41,6 +42,10 @@ export function TotalHistoryTab() {
   const { user } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Percentage toggles for trend charts
+  const [showMonthlyTrendPercentage, setShowMonthlyTrendPercentage] = useState(false);
+  const [showYearlyTrendPercentage, setShowYearlyTrendPercentage] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -84,13 +89,23 @@ export function TotalHistoryTab() {
     });
 
     const data = Array.from(monthlyMap.entries())
-      .map(([month, values]) => ({
-        month,
-        Entrate: values.income,
-        Spese: values.expenses,
-        Netto: values.income - values.expenses,
-        sortKey: values.sortKey,
-      }))
+      .map(([month, values]) => {
+        const total = values.income + values.expenses;
+        const incomePercentage = total > 0 ? (values.income / total) * 100 : 0;
+        const expensesPercentage = total > 0 ? (values.expenses / total) * 100 : 0;
+        const savingRate = values.income > 0 ? ((values.income - values.expenses) / values.income) * 100 : 0;
+
+        return {
+          month,
+          Entrate: values.income,
+          Spese: values.expenses,
+          Netto: values.income - values.expenses,
+          'Entrate %': incomePercentage,
+          'Spese %': expensesPercentage,
+          'Saving Rate %': savingRate,
+          sortKey: values.sortKey,
+        };
+      })
       .sort((a, b) => a.sortKey.localeCompare(b.sortKey));
 
     return data;
@@ -116,12 +131,22 @@ export function TotalHistoryTab() {
     });
 
     const data = Array.from(yearlyMap.entries())
-      .map(([year, values]) => ({
-        year: year.toString(),
-        Entrate: values.income,
-        Spese: values.expenses,
-        Netto: values.income - values.expenses,
-      }))
+      .map(([year, values]) => {
+        const total = values.income + values.expenses;
+        const incomePercentage = total > 0 ? (values.income / total) * 100 : 0;
+        const expensesPercentage = total > 0 ? (values.expenses / total) * 100 : 0;
+        const savingRate = values.income > 0 ? ((values.income - values.expenses) / values.income) * 100 : 0;
+
+        return {
+          year: year.toString(),
+          Entrate: values.income,
+          Spese: values.expenses,
+          Netto: values.income - values.expenses,
+          'Entrate %': incomePercentage,
+          'Spese %': expensesPercentage,
+          'Saving Rate %': savingRate,
+        };
+      })
       .sort((a, b) => parseInt(a.year) - parseInt(b.year));
 
     return data;
@@ -460,27 +485,56 @@ export function TotalHistoryTab() {
         {monthlyTrendData.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Trend Mensile</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Trend Mensile</CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowMonthlyTrendPercentage(!showMonthlyTrendPercentage)}
+                >
+                  {showMonthlyTrendPercentage ? '€ Valori Assoluti' : '% Percentuali'}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={350}>
-                <LineChart data={monthlyTrendData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis tickFormatter={(value) => `€${value.toLocaleString('it-IT')}`} />
-                  <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
-                    contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px',
-                    }}
-                  />
-                  <Legend />
-                  <Line type="monotone" dataKey="Entrate" stroke="#10b981" strokeWidth={2} />
-                  <Line type="monotone" dataKey="Spese" stroke="#ef4444" strokeWidth={2} />
-                  <Line type="monotone" dataKey="Netto" stroke="#3b82f6" strokeWidth={2} />
-                </LineChart>
+                {showMonthlyTrendPercentage ? (
+                  <LineChart data={monthlyTrendData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis tickFormatter={(value) => `${value.toFixed(0)}%`} domain={[0, 100]} />
+                    <Tooltip
+                      formatter={(value: number) => `${value.toFixed(2)}%`}
+                      contentStyle={{
+                        backgroundColor: 'white',
+                        border: '1px solid #ccc',
+                        borderRadius: '4px',
+                      }}
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="Entrate %" stroke="#10b981" strokeWidth={2} name="Entrate %" />
+                    <Line type="monotone" dataKey="Spese %" stroke="#ef4444" strokeWidth={2} name="Spese %" />
+                    <Line type="monotone" dataKey="Saving Rate %" stroke="#3b82f6" strokeWidth={2} name="Saving Rate %" />
+                  </LineChart>
+                ) : (
+                  <LineChart data={monthlyTrendData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis tickFormatter={(value) => `€${value.toLocaleString('it-IT')}`} />
+                    <Tooltip
+                      formatter={(value: number) => formatCurrency(value)}
+                      contentStyle={{
+                        backgroundColor: 'white',
+                        border: '1px solid #ccc',
+                        borderRadius: '4px',
+                      }}
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="Entrate" stroke="#10b981" strokeWidth={2} />
+                    <Line type="monotone" dataKey="Spese" stroke="#ef4444" strokeWidth={2} />
+                    <Line type="monotone" dataKey="Netto" stroke="#3b82f6" strokeWidth={2} />
+                  </LineChart>
+                )}
               </ResponsiveContainer>
             </CardContent>
           </Card>
@@ -490,27 +544,56 @@ export function TotalHistoryTab() {
         {yearlyTrendData.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Trend Annuale</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Trend Annuale</CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowYearlyTrendPercentage(!showYearlyTrendPercentage)}
+                >
+                  {showYearlyTrendPercentage ? '€ Valori Assoluti' : '% Percentuali'}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={350}>
-                <LineChart data={yearlyTrendData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="year" />
-                  <YAxis tickFormatter={(value) => `€${value.toLocaleString('it-IT')}`} />
-                  <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
-                    contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px',
-                    }}
-                  />
-                  <Legend />
-                  <Line type="monotone" dataKey="Entrate" stroke="#10b981" strokeWidth={2} />
-                  <Line type="monotone" dataKey="Spese" stroke="#ef4444" strokeWidth={2} />
-                  <Line type="monotone" dataKey="Netto" stroke="#3b82f6" strokeWidth={2} />
-                </LineChart>
+                {showYearlyTrendPercentage ? (
+                  <LineChart data={yearlyTrendData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="year" />
+                    <YAxis tickFormatter={(value) => `${value.toFixed(0)}%`} domain={[0, 100]} />
+                    <Tooltip
+                      formatter={(value: number) => `${value.toFixed(2)}%`}
+                      contentStyle={{
+                        backgroundColor: 'white',
+                        border: '1px solid #ccc',
+                        borderRadius: '4px',
+                      }}
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="Entrate %" stroke="#10b981" strokeWidth={2} name="Entrate %" />
+                    <Line type="monotone" dataKey="Spese %" stroke="#ef4444" strokeWidth={2} name="Spese %" />
+                    <Line type="monotone" dataKey="Saving Rate %" stroke="#3b82f6" strokeWidth={2} name="Saving Rate %" />
+                  </LineChart>
+                ) : (
+                  <LineChart data={yearlyTrendData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="year" />
+                    <YAxis tickFormatter={(value) => `€${value.toLocaleString('it-IT')}`} />
+                    <Tooltip
+                      formatter={(value: number) => formatCurrency(value)}
+                      contentStyle={{
+                        backgroundColor: 'white',
+                        border: '1px solid #ccc',
+                        borderRadius: '4px',
+                      }}
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="Entrate" stroke="#10b981" strokeWidth={2} />
+                    <Line type="monotone" dataKey="Spese" stroke="#ef4444" strokeWidth={2} />
+                    <Line type="monotone" dataKey="Netto" stroke="#3b82f6" strokeWidth={2} />
+                  </LineChart>
+                )}
               </ResponsiveContainer>
             </CardContent>
           </Card>
