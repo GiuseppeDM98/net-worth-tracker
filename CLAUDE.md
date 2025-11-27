@@ -211,25 +211,520 @@ net-worth-tracker/
 - AuthContext for global authentication state
 - Pattern: Context + Provider + custom hook
 
-### Architectural Patterns
+---
 
-**Separation of Concerns:**
-- UI Components in `components/`
-- Business logic in `lib/services/`
-- Type definitions in `types/`
-- API routes in `app/api/`
+## Architecture & Design Patterns
 
-**Data Flow:**
-1. UI Components call services
-2. Services interact with Firebase/external APIs
-3. Services return typed data
-4. Components render data
+### Core Architectural Patterns
 
-**Authentication Flow:**
-1. Firebase Auth via AuthContext
-2. Protected routes verify auth in layout
-3. Firestore Rules authorize server-side operations
-4. API routes validate CRON_SECRET for automation
+The application follows a **layered architecture** with clear separation of concerns between presentation, business logic, and data access layers.
+
+#### 1. Context + Provider Pattern (Global State Management)
+
+**Location:** `contexts/AuthContext.tsx`
+
+The application uses React Context API for global authentication state management:
+
+```typescript
+// Context definition with typed interface
+const AuthContext = createContext<AuthContextType>({...});
+
+// Custom hook for consuming context
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
+
+// Provider component wrapping the app
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Firebase Auth state listener
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      // Transform Firebase user to app User type
+      // Fetch additional user data from Firestore if needed
+    });
+    return () => unsubscribe();
+  }, []);
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+```
+
+**Key Features:**
+- Single source of truth for authentication state
+- Automatic Firebase Auth state synchronization
+- Type-safe access via custom hook
+- Error handling for context misuse
+
+**Usage in components:**
+```typescript
+const { user, loading, signIn, signOut } = useAuth();
+```
+
+#### 2. Protected Routes Pattern (Auth Guards)
+
+**Location:** `components/ProtectedRoute.tsx`, `app/dashboard/layout.tsx`
+
+Protected routes are implemented using a wrapper component that checks authentication state:
+
+```typescript
+export function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login');
+    }
+  }, [user, loading, router]);
+
+  if (loading) return <LoadingSpinner />;
+  if (!user) return null;
+
+  return <>{children}</>;
+}
+```
+
+Dashboard routes are automatically protected:
+```typescript
+// app/dashboard/layout.tsx
+export default function DashboardLayout({ children }) {
+  return (
+    <ProtectedRoute>
+      <Sidebar />
+      <Header />
+      {children}
+    </ProtectedRoute>
+  );
+}
+```
+
+#### 3. Service Layer Pattern (Business Logic Abstraction)
+
+**Location:** `lib/services/*.ts`
+
+Business logic is encapsulated in service modules, keeping components clean and testable:
+
+```typescript
+// lib/services/assetService.ts
+export async function getAllAssets(userId: string): Promise<Asset[]> {
+  const assetsRef = collection(db, 'assets');
+  const q = query(assetsRef, where('userId', '==', userId));
+  const querySnapshot = await getDocs(q);
+
+  const assets = querySnapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data(),
+    // Transform Firestore Timestamps to Dates
+    lastPriceUpdate: doc.data().lastPriceUpdate?.toDate() || new Date(),
+  })) as Asset[];
+
+  // Sort by asset class, then by name
+  return assets.sort((a, b) => {
+    const orderA = ASSET_CLASS_ORDER[a.assetClass] || 999;
+    const orderB = ASSET_CLASS_ORDER[b.assetClass] || 999;
+    if (orderA !== orderB) return orderA - orderB;
+    return a.name.localeCompare(b.name);
+  });
+}
+```
+
+**Service responsibilities:**
+- Data fetching and transformation
+- Business logic implementation
+- Error handling and validation
+- Firestore query construction
+
+#### 4. Dual Firebase SDK Pattern (Client/Server Separation)
+
+**Location:** `lib/firebase/config.ts` (client), `lib/firebase/admin.ts` (server)
+
+The application uses two separate Firebase SDK configurations:
+
+**Client-side SDK** (`lib/firebase/config.ts`):
+```typescript
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+```
+- Used in React components and client-side services
+- Authenticated with Firebase Auth (user-scoped)
+- Subject to Firestore Security Rules
+
+**Server-side Admin SDK** (`lib/firebase/admin.ts`):
+```typescript
+const adminApp = initializeApp({
+  credential: cert(serviceAccount),
+});
+export const adminAuth = getAuth(adminApp);
+export const adminDb = getFirestore(adminApp);
+```
+- Used exclusively in API routes and server-side code
+- Authenticated with service account credentials
+- Bypasses Firestore Security Rules (requires manual authorization)
+
+#### 5. Serverless API Routes Pattern
+
+**Location:** `app/api/**/*.ts`
+
+Next.js API routes provide a serverless backend for operations requiring server-side execution:
+
+```typescript
+// app/api/auth/check-registration/route.ts
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { email } = body;
+
+    // Server-side validation that cannot be bypassed
+    const allowed = isRegistrationAllowed(email);
+
+    if (!allowed) {
+      return NextResponse.json(
+        { allowed: false, message: 'Registration closed' },
+        { status: 403 }
+      );
+    }
+
+    return NextResponse.json({ allowed: true });
+  } catch (error) {
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  }
+}
+```
+
+**API Route types:**
+- **Authentication endpoints** (`/api/auth/*`): Registration validation, user management
+- **Cron job endpoints** (`/api/cron/*`): Scheduled tasks (monthly snapshots)
+- **Price data endpoints** (`/api/prices/*`): Yahoo Finance API integration
+- **Portfolio operations** (`/api/portfolio/*`): Server-side portfolio calculations
+
+#### 6. Environment-based Configuration Pattern
+
+**Location:** `lib/constants/appConfig.ts`
+
+Feature flags and configuration are managed via environment variables:
+
+```typescript
+export const APP_CONFIG = {
+  REGISTRATIONS_ENABLED: process.env.NEXT_PUBLIC_REGISTRATIONS_ENABLED !== 'false',
+  REGISTRATION_WHITELIST_ENABLED: process.env.NEXT_PUBLIC_REGISTRATION_WHITELIST_ENABLED === 'true',
+  REGISTRATION_WHITELIST: (process.env.NEXT_PUBLIC_REGISTRATION_WHITELIST || '')
+    .split(',')
+    .map(email => email.trim())
+    .filter(email => email.length > 0),
+};
+
+export function isRegistrationAllowed(email: string): boolean {
+  if (!APP_CONFIG.REGISTRATIONS_ENABLED) {
+    if (APP_CONFIG.REGISTRATION_WHITELIST_ENABLED) {
+      return APP_CONFIG.REGISTRATION_WHITELIST.includes(email.toLowerCase());
+    }
+    return false;
+  }
+  return true;
+}
+```
+
+**Benefits:**
+- Runtime configuration without code changes
+- Environment-specific behavior (dev/staging/prod)
+- Feature flag toggles for gradual rollouts
+
+#### 7. Repository Pattern (Data Access Abstraction)
+
+Services act as repositories, abstracting Firestore operations:
+
+```typescript
+// Create
+export async function createAsset(userId: string, data: AssetFormData): Promise<Asset> {
+  const assetRef = await addDoc(collection(db, 'assets'), {
+    ...data,
+    userId,
+    createdAt: Timestamp.now(),
+  });
+  return getAssetById(assetRef.id);
+}
+
+// Read
+export async function getAssetById(assetId: string): Promise<Asset | null> {
+  const assetDoc = await getDoc(doc(db, 'assets', assetId));
+  return assetDoc.exists() ? { id: assetDoc.id, ...assetDoc.data() } : null;
+}
+
+// Update
+export async function updateAsset(assetId: string, data: Partial<AssetFormData>): Promise<void> {
+  await updateDoc(doc(db, 'assets', assetId), {
+    ...data,
+    updatedAt: Timestamp.now(),
+  });
+}
+
+// Delete
+export async function deleteAsset(assetId: string): Promise<void> {
+  await deleteDoc(doc(db, 'assets', assetId));
+}
+```
+
+### Key Architectural Files
+
+| File | Purpose | Pattern |
+|------|---------|---------|
+| `contexts/AuthContext.tsx` | Global authentication state | Context + Provider + Custom Hook |
+| `components/ProtectedRoute.tsx` | Route protection guard | Higher-Order Component |
+| `lib/firebase/config.ts` | Client-side Firebase SDK | Singleton Configuration |
+| `lib/firebase/admin.ts` | Server-side Firebase SDK | Singleton Configuration |
+| `app/layout.tsx` | Root layout with providers | Provider Composition |
+| `app/dashboard/layout.tsx` | Protected dashboard layout | Layout Nesting + Auth Guard |
+| `lib/services/assetService.ts` | Asset business logic | Service Layer + Repository |
+| `app/api/cron/monthly-snapshot/route.ts` | Automated snapshots | Cron Job + Serverless Function |
+| `lib/constants/appConfig.ts` | Feature flags | Configuration Management |
+
+---
+
+## Data Flow
+
+### Client-Side Data Flow (User Interactions)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    USER INTERACTION                         │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│            React Component (UI Layer)                       │
+│  • Dashboard pages (app/dashboard/*)                        │
+│  • Reusable components (components/*)                       │
+│  • Uses hooks: useAuth(), useState(), useEffect()           │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│         Service Layer (lib/services/*)                      │
+│  • assetService.ts - Asset CRUD operations                  │
+│  • expenseService.ts - Expense/income management            │
+│  • snapshotService.ts - Historical snapshots                │
+│  • Business logic and data transformation                   │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│      Firebase Client SDK (lib/firebase/config.ts)           │
+│  • getFirestore() - Firestore database                      │
+│  • getAuth() - Authentication                               │
+│  • User-scoped authentication context                       │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   FIRESTORE DATABASE                        │
+│  • Collections: assets, expenses, monthly-snapshots         │
+│  • Security Rules enforce user isolation                    │
+│  • Real-time updates via listeners                          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Example: Adding a New Asset**
+1. User fills form in `app/dashboard/assets/page.tsx`
+2. Component calls `createAsset(userId, formData)` from `assetService.ts`
+3. Service validates data and calls `addDoc(collection(db, 'assets'), {...})`
+4. Firebase Client SDK sends request to Firestore
+5. Firestore Security Rules verify `userId` matches authenticated user
+6. Document created, service returns new `Asset` object
+7. Component updates UI with new asset
+
+### Server-Side Data Flow (API Routes & Cron Jobs)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│         EXTERNAL TRIGGER                                    │
+│  • Vercel Cron Job (scheduled)                              │
+│  • Client API call (fetch('/api/...'))                      │
+│  • Webhook (external service)                               │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│          Next.js API Route (app/api/**/*.ts)                │
+│  • Route handlers: GET, POST, PUT, DELETE                   │
+│  • Request validation (body, headers, auth)                 │
+│  • Error handling and response formatting                   │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│    Service/Helper Layer (lib/services/* or lib/helpers/*)   │
+│  • yahooFinanceService.ts - Price data from Yahoo Finance   │
+│  • priceUpdater.ts - Bulk price updates                     │
+│  • hallOfFameService.ts - Ranking calculations              │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│     Firebase Admin SDK (lib/firebase/admin.ts)              │
+│  • getFirestore() - Firestore with admin privileges         │
+│  • getAuth() - User management                              │
+│  • Bypasses security rules (requires manual auth checks)    │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   FIRESTORE DATABASE                        │
+│  • Full read/write access (server-side)                     │
+│  • Batch operations for efficiency                          │
+│  • No security rule enforcement                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Example: Monthly Snapshot Cron Job**
+1. Vercel Cron triggers `GET /api/cron/monthly-snapshot` at end of month
+2. API route validates `Authorization: Bearer {CRON_SECRET}` header
+3. Route queries all users via Firebase Admin SDK
+4. For each user, calls `POST /api/portfolio/snapshot` with user ID
+5. Snapshot API fetches user assets, calculates totals, creates snapshot document
+6. Calls `updateHallOfFame(userId)` to recalculate rankings
+7. Returns success/error response with snapshot IDs
+
+### Authentication Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              USER LOGIN/REGISTRATION                        │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│        AuthContext (contexts/AuthContext.tsx)               │
+│  • signIn(email, password)                                  │
+│  • signUp(email, password, displayName)                     │
+│  • signInWithGoogle()                                       │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│      Server-Side Validation (API Route)                     │
+│  POST /api/auth/check-registration                          │
+│  • Validates email against whitelist                        │
+│  • Checks if registrations are enabled                      │
+│  • Returns 200 (allowed) or 403 (blocked)                   │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│         Firebase Authentication                             │
+│  • createUserWithEmailAndPassword()                         │
+│  • signInWithEmailAndPassword()                             │
+│  • signInWithPopup(GoogleAuthProvider)                      │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│      User Document Creation (Firestore)                     │
+│  • Create /users/{uid} document                             │
+│  • Set default asset allocation (60/40 equity/bonds)        │
+│  • Store displayName, email, createdAt                      │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│       onAuthStateChanged Listener                           │
+│  • Updates AuthContext user state                           │
+│  • Fetches additional user data from Firestore              │
+│  • Triggers re-render of protected routes                   │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│           ProtectedRoute Guard                              │
+│  • Checks if user is authenticated                          │
+│  • Redirects to /login if not authenticated                 │
+│  • Shows loading spinner during auth check                  │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│              DASHBOARD ACCESS GRANTED                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Price Update Flow (Yahoo Finance Integration)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│    USER CLICKS "Update Prices" or Cron Job Triggers        │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│         POST /api/prices/update                             │
+│  • Receives userId from request body                        │
+│  • Validates user authentication                            │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│     updateUserAssetPrices(userId)                           │
+│  (lib/helpers/priceUpdater.ts)                              │
+│  • Fetch all user assets from Firestore                     │
+│  • Filter assets that need price updates                    │
+│    (skip cash, real estate, manual-only assets)             │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│     Yahoo Finance Service (yahooFinanceService.ts)          │
+│  • Batch fetch prices for multiple tickers                  │
+│  • Handle ticker symbol formatting (.DE, .MI, .L)           │
+│  • Parse response and extract current price                 │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│              YAHOO FINANCE API                              │
+│  • External HTTP request to finance.yahoo.com               │
+│  • Returns JSON with price, market cap, etc.                │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│       Update Firestore Asset Documents                      │
+│  • Batch update: set currentPrice, lastPriceUpdate          │
+│  • Calculate new totalValue (quantity × currentPrice)       │
+│  • Update timestamp                                         │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│         Return Success Response to Client                   │
+│  • Updated count, failed tickers, error messages            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Data Flow Characteristics
+
+**Client-Side:**
+- **User-scoped operations**: All queries filtered by `userId`
+- **Real-time updates**: Firestore listeners provide live data sync
+- **Optimistic UI**: Components update immediately, sync asynchronously
+- **Security Rules**: Firestore rules enforce user isolation server-side
+
+**Server-Side:**
+- **Admin privileges**: Bypasses security rules, requires manual authorization
+- **Batch operations**: Process multiple users/assets efficiently
+- **Scheduled automation**: Cron jobs run independent of user sessions
+- **External API integration**: Yahoo Finance, future webhooks
+
+**Security Layers:**
+1. **Client**: Firebase Auth token validation
+2. **Server**: API route authentication (CRON_SECRET for automated jobs)
+3. **Database**: Firestore Security Rules (client) or manual checks (admin)
 
 ---
 
