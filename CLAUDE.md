@@ -2,124 +2,124 @@
 
 ## Project Overview
 
-**Portfolio Tracker** è un'applicazione web completa per il tracciamento e la gestione di portafogli di investimento multi-asset class, con funzionalità integrate di expense tracking, calcolatore FIRE (Financial Independence, Retire Early) e classifiche personali finanziarie.
+**Portfolio Tracker** is a comprehensive web application for tracking and managing investment portfolios across multiple asset classes, with integrated expense tracking, FIRE (Financial Independence, Retire Early) calculator, and personal financial rankings.
 
-### Scopo del Progetto
-Sostituire la gestione dei portafogli basata su fogli di calcolo con una soluzione moderna e automatizzata, progettata specificamente per investitori italiani che utilizzano mercati europei.
+### Project Purpose
+Replace spreadsheet-based portfolio management with a modern, automated solution specifically designed for Italian investors using European exchanges.
 
-### Caratteristiche Principali
+### Key Features
 
-**Gestione Portafoglio:**
-- Supporto multi-asset class: Azioni, ETF, obbligazioni, crypto, immobili, commodities, cash, private equity
-- Aggiornamento automatico dei prezzi da Yahoo Finance (100+ exchange mondiali)
-- Tracking dell'allocazione degli asset con confronto target vs attuale
-- Tracking del cost basis con calcolo delle plusvalenze non realizzate e stima tasse
-- Tracking TER (Total Expense Ratio) per investimenti consapevoli dei costi
-- Asset compositi per fondi pensione e investimenti ad allocazione mista
+**Portfolio Management:**
+- Multi-asset class support: Stocks, ETFs, bonds, crypto, real estate, commodities, cash, private equity
+- Automatic price updates from Yahoo Finance (100+ worldwide exchanges)
+- Asset allocation tracking with target vs actual comparison
+- Cost basis tracking with unrealized gains calculation and tax estimation
+- TER (Total Expense Ratio) tracking for cost-conscious investing
+- Composite assets for pension funds and mixed-allocation investments
 
-**Analisi Storica:**
-- Snapshot mensili automatizzati tramite cron job schedulati
-- Timeline del patrimonio netto con grafici interattivi
-- Visualizzazione dell'evoluzione delle asset class nel tempo
-- Confronto delle performance anno su anno
-- Export CSV per analisi esterne
+**Historical Analysis:**
+- Automated monthly snapshots via scheduled cron jobs
+- Net worth timeline with interactive charts
+- Asset class evolution visualization over time
+- Year-over-year performance comparison
+- CSV export for external analysis
 
-**Tracking Spese e Entrate:**
-- Quattro tipi di voci: Entrate, Spese Fisse, Spese Variabili, Debiti
-- Categorie personalizzate con sottocategorie e codifica colori
-- Spese ricorrenti con generazione automatica mensile
-- Sistema avanzato di filtri gerarchici (Tipo → Categoria → Sottocategoria)
-- Analisi visive: grafici drill-down interattivi a tre livelli
-- Metrica rapporto entrate/spese con indicatori di salute finanziaria
+**Expense & Income Tracking:**
+- Four entry types: Income, Fixed Expenses, Variable Expenses, Debts
+- Custom categories with subcategories and color coding
+- Recurring expenses with automatic monthly generation
+- Advanced hierarchical filtering system (Type → Category → Subcategory)
+- Visual analytics: interactive three-level drill-down charts
+- Income-to-expense ratio metric with financial health indicators
 
-**Calcolatore e Tracker FIRE:**
-- Configurazione Safe Withdrawal Rate (regola del 4% basata sul Trinity Study)
-- Calcolatore FIRE Number (metodologia 25x spese annuali)
-- Tracking dei progressi verso l'indipendenza finanziaria
-- Simulazioni Monte Carlo per pianificazione pensionistica probabilistica
-- Grafici di evoluzione storica di entrate, spese e prelievi sostenibili
+**FIRE Calculator & Tracker:**
+- Safe Withdrawal Rate configuration (4% rule based on Trinity Study)
+- FIRE Number calculator (25x annual expenses methodology)
+- Progress tracking toward financial independence
+- Monte Carlo retirement simulations for probabilistic planning
+- Historical evolution charts of income, expenses, and sustainable withdrawals
 
 **Hall of Fame:**
-- Record finanziari personali di tutti i tempi
-- Migliori/peggiori mesi per crescita patrimonio, entrate e spese (Top 20)
-- Migliori/peggiori anni per performance annuale (Top 10)
-- Aggiornamento automatico delle classifiche con ogni nuovo snapshot
+- Personal financial records of all time
+- Best/worst months by net worth growth, income, and expenses (Top 20)
+- Best/worst years by annual performance (Top 10)
+- Automatic ranking updates with each new snapshot
 
-**Localizzazione:**
-- 🇮🇹 UI completamente in italiano
-- Formato valuta EUR: €1.234,56
-- Formato data italiano: DD/MM/YYYY
-- Supporto per exchange europei (XETRA, Borsa Italiana, Euronext)
+**Localization:**
+- 🇮🇹 Fully Italian UI
+- EUR currency format: €1.234,56
+- Italian date format: DD/MM/YYYY
+- Support for European exchanges (XETRA, Borsa Italiana, Euronext)
 
 ---
 
 ## Tech Stack
 
-### Framework e Linguaggi
-| Categoria | Tecnologia | Versione |
-|-----------|-----------|----------|
+### Frameworks and Languages
+| Category | Technology | Version |
+|----------|-----------|---------|
 | **Frontend Framework** | Next.js (App Router) | 16.0.1 |
 | **Runtime** | React | 19.2.0 |
-| **Linguaggio** | TypeScript | 5.x |
+| **Language** | TypeScript | 5.x |
 | **Styling** | Tailwind CSS | 4.x |
-| **Componenti UI** | shadcn/ui | - |
-| **Componenti Base** | Radix UI | - |
+| **UI Components** | shadcn/ui | - |
+| **Base Components** | Radix UI | - |
 
-### Backend e Database
-| Categoria | Tecnologia | Versione |
-|-----------|-----------|----------|
+### Backend and Database
+| Category | Technology | Version |
+|----------|-----------|---------|
 | **Backend** | Next.js API Routes (serverless) | 16.0.1 |
 | **Database** | Firebase Firestore (NoSQL) | - |
 | **Authentication** | Firebase Authentication | 12.5.0 |
 | **Admin SDK** | Firebase Admin | 13.6.0 |
 
-### Librerie e Utilities
-| Categoria | Tecnologia | Versione | Scopo |
-|-----------|-----------|----------|-------|
-| **Price Data** | yahoo-finance2 | 3.10.1 | API prezzi finanziari da Yahoo Finance |
-| **Charts** | Recharts | 3.3.0 | Grafici interattivi e visualizzazioni |
-| **Form Management** | react-hook-form | 7.66.0 | Gestione form |
+### Libraries and Utilities
+| Category | Technology | Version | Purpose |
+|----------|-----------|---------|---------|
+| **Price Data** | yahoo-finance2 | 3.10.1 | Financial price API from Yahoo Finance |
+| **Charts** | Recharts | 3.3.0 | Interactive charts and visualizations |
+| **Form Management** | react-hook-form | 7.66.0 | Form handling |
 | **Validation** | zod | 4.1.12 | Schema validation |
-| **Date Utilities** | date-fns | 4.1.0 | Manipolazione date (locale italiano) |
+| **Date Utilities** | date-fns | 4.1.0 | Date manipulation (Italian locale) |
 | **Theming** | next-themes | 0.4.6 | Dark/light mode |
 | **Icons** | lucide-react | 0.553.0 | Icon library |
 | **Notifications** | sonner | 2.0.7 | Toast notifications |
 | **Styling Utils** | clsx + tailwind-merge | - | Class name utilities |
 | **CSS Variance** | class-variance-authority | 0.7.1 | Component variants |
 
-### Deployment e Automazione
-| Categoria | Tecnologia | Scopo |
-|-----------|-----------|-------|
-| **Hosting** | Vercel | Deployment automatico, serverless functions |
-| **Cron Jobs** | Vercel Cron | Snapshot mensili automatici, aggiornamento prezzi |
+### Deployment and Automation
+| Category | Technology | Purpose |
+|----------|-----------|---------|
+| **Hosting** | Vercel | Automatic deployment, serverless functions |
+| **Cron Jobs** | Vercel Cron | Automatic monthly snapshots, price updates |
 
-### Scelte Architetturali
+### Architectural Choices
 
-**Perché Next.js?**
-- Framework React best-in-class con eccellente developer experience
-- App Router per routing moderno e server components
-- API Routes per backend serverless senza infrastruttura separata
+**Why Next.js?**
+- Best-in-class React framework with excellent developer experience
+- App Router for modern routing and server components
+- API Routes for serverless backend without separate infrastructure
 
-**Perché Firebase?**
-- Tier gratuito generoso
-- Aggiornamenti real-time
-- Autenticazione facile senza gestione server
-- Firestore Security Rules per autorizzazione lato server
+**Why Firebase?**
+- Generous free tier
+- Real-time updates
+- Easy authentication without server management
+- Firestore Security Rules for server-side authorization
 
-**Perché Yahoo Finance?**
-- API gratuita senza chiave richiesta
-- Affidabile con copertura estesa di ticker (a differenza delle API a pagamento)
-- Supporto per 100+ exchange mondiali
+**Why Yahoo Finance?**
+- Free API without required API key
+- Reliable with extensive ticker coverage (unlike paid APIs)
+- Support for 100+ worldwide exchanges
 
-**Perché Vercel?**
-- Integrazione seamless con Next.js
-- Deploy automatici da Git
-- Cron jobs integrati per automazione
+**Why Vercel?**
+- Seamless Next.js integration
+- Automatic deployments from Git
+- Built-in cron jobs for automation
 
-**Perché TypeScript?**
-- Type safety previene bug
-- Migliora maintainability e developer experience
-- Autocomplete e refactoring sicuri
+**Why TypeScript?**
+- Type safety prevents bugs
+- Improves maintainability and developer experience
+- Safe autocomplete and refactoring
 
 ---
 
@@ -129,108 +129,108 @@ Sostituire la gestione dei portafogli basata su fogli di calcolo con una soluzio
 net-worth-tracker/
 ├── app/                      # Next.js App Router
 │   ├── api/                  # API Routes (serverless functions)
-│   │   ├── cron/             # Cron job endpoints (snapshot mensili)
-│   │   ├── prices/           # Endpoint aggiornamento prezzi asset
-│   │   ├── auth/             # Endpoint autenticazione
-│   │   └── ...               # Altri endpoint API
-│   ├── dashboard/            # Pagine dashboard (protected routes)
-│   │   ├── patrimonio/       # Gestione asset e portafoglio
-│   │   ├── cashflow/         # Tracking spese e entrate
-│   │   ├── fire/             # Calcolatore FIRE e simulazioni
-│   │   ├── allocazione/      # Asset allocation e rebalancing
-│   │   ├── storico/          # Analisi storica e performance
-│   │   ├── hall-of-fame/     # Classifiche record personali
-│   │   └── settings/         # Impostazioni e configurazione
-│   ├── login/                # Pagina login
-│   ├── register/             # Pagina registrazione
+│   │   ├── cron/             # Cron job endpoints (monthly snapshots)
+│   │   ├── prices/           # Asset price update endpoints
+│   │   ├── auth/             # Authentication endpoints
+│   │   └── ...               # Other API endpoints
+│   ├── dashboard/            # Dashboard pages (protected routes)
+│   │   ├── patrimonio/       # Asset and portfolio management
+│   │   ├── cashflow/         # Expense and income tracking
+│   │   ├── fire/             # FIRE calculator and simulations
+│   │   ├── allocazione/      # Asset allocation and rebalancing
+│   │   ├── storico/          # Historical analysis and performance
+│   │   ├── hall-of-fame/     # Personal record rankings
+│   │   └── settings/         # Settings and configuration
+│   ├── login/                # Login page
+│   ├── register/             # Registration page
 │   ├── layout.tsx            # Root layout (auth provider, themes)
 │   ├── page.tsx              # Homepage/landing
 │   └── globals.css           # Global styles (Tailwind)
 │
-├── components/               # React components riutilizzabili
+├── components/               # Reusable React components
 │   ├── ui/                   # shadcn/ui components (Button, Dialog, etc.)
-│   ├── auth/                 # Componenti autenticazione
-│   ├── dashboard/            # Componenti specifici dashboard
+│   ├── auth/                 # Authentication components
+│   ├── dashboard/            # Dashboard-specific components
 │   ├── charts/               # Chart components (Recharts wrappers)
-│   └── ...                   # Altri componenti shared
+│   └── ...                   # Other shared components
 │
 ├── contexts/                 # React Contexts
-│   └── AuthContext.tsx       # Context autenticazione Firebase
+│   └── AuthContext.tsx       # Firebase authentication context
 │
-├── lib/                      # Librerie e utilities
-│   ├── firebase/             # Configurazione Firebase (client + admin)
+├── lib/                      # Libraries and utilities
+│   ├── firebase/             # Firebase configuration (client + admin)
 │   ├── services/             # Business logic services
-│   │   ├── yahooFinanceService.ts  # API Yahoo Finance
-│   │   ├── assetService.ts         # CRUD asset
-│   │   └── ...                     # Altri services
+│   │   ├── yahooFinanceService.ts  # Yahoo Finance API
+│   │   ├── assetService.ts         # Asset CRUD operations
+│   │   └── ...                     # Other services
 │   └── utils/                # Utility functions
 │
 ├── types/                    # TypeScript type definitions
-│   ├── asset.ts              # Tipi asset e portafoglio
-│   ├── expense.ts            # Tipi spese e entrate
-│   └── ...                   # Altri types
+│   ├── asset.ts              # Asset and portfolio types
+│   ├── expense.ts            # Expense and income types
+│   └── ...                   # Other types
 │
-├── public/                   # Static assets (immagini, favicon)
+├── public/                   # Static assets (images, favicon)
 │
 ├── firestore.rules           # Firestore Security Rules
 ├── firestore.indexes.json    # Firestore database indexes
-├── vercel.json               # Configurazione Vercel (cron jobs)
-├── next.config.ts            # Configurazione Next.js
-├── tsconfig.json             # Configurazione TypeScript
-├── package.json              # Dependencies e scripts
-├── .env.local.example        # Template variabili ambiente
-├── README.md                 # Documentazione progetto
-├── SETUP.md                  # Guida setup e deployment
-└── VERCEL_SETUP.md           # Troubleshooting Vercel + Firebase
+├── vercel.json               # Vercel configuration (cron jobs)
+├── next.config.ts            # Next.js configuration
+├── tsconfig.json             # TypeScript configuration
+├── package.json              # Dependencies and scripts
+├── .env.local.example        # Environment variables template
+├── README.md                 # Project documentation
+├── SETUP.md                  # Setup and deployment guide
+└── VERCEL_SETUP.md           # Vercel + Firebase troubleshooting
 ```
 
-### Directory Principali
+### Main Directories
 
 **app/** - Next.js App Router
-- Routing basato su filesystem
-- Server Components di default
+- Filesystem-based routing
+- Server Components by default
 - API Routes in `app/api/`
-- Layout annidati per struttura UI condivisa
+- Nested layouts for shared UI structure
 
-**components/** - Componenti React riutilizzabili
-- `ui/` contiene componenti shadcn/ui (design system)
-- Componenti organizzati per feature/dominio
-- Componenti presentazionali separati da business logic
+**components/** - Reusable React components
+- `ui/` contains shadcn/ui components (design system)
+- Components organized by feature/domain
+- Presentational components separated from business logic
 
-**lib/** - Business logic e utilities
-- `firebase/` gestisce connessioni client e admin SDK
-- `services/` contiene tutta la business logic (CRUD, API esterne)
-- `utils/` per helper functions generiche
+**lib/** - Business logic and utilities
+- `firebase/` manages client and admin SDK connections
+- `services/` contains all business logic (CRUD, external APIs)
+- `utils/` for generic helper functions
 
 **types/** - TypeScript definitions
-- Types condivisi per entità del dominio
-- Interfacce per API responses
-- Type guards e utility types
+- Shared types for domain entities
+- Interfaces for API responses
+- Type guards and utility types
 
 **contexts/** - React Context providers
-- AuthContext per stato autenticazione globale
+- AuthContext for global authentication state
 - Pattern: Context + Provider + custom hook
 
-### Pattern Architetturali
+### Architectural Patterns
 
 **Separation of Concerns:**
-- Componenti UI in `components/`
+- UI Components in `components/`
 - Business logic in `lib/services/`
 - Type definitions in `types/`
 - API routes in `app/api/`
 
 **Data Flow:**
-1. UI Components chiamano services
-2. Services interagiscono con Firebase/API esterne
-3. Services ritornano typed data
-4. Components renderizzano dati
+1. UI Components call services
+2. Services interact with Firebase/external APIs
+3. Services return typed data
+4. Components render data
 
 **Authentication Flow:**
-1. Firebase Auth tramite AuthContext
-2. Protected routes verificano auth in layout
-3. Firestore Rules autorizzano operazioni lato server
-4. API routes validano CRON_SECRET per automazione
+1. Firebase Auth via AuthContext
+2. Protected routes verify auth in layout
+3. Firestore Rules authorize server-side operations
+4. API routes validate CRON_SECRET for automation
 
 ---
 
-*Documento generato automaticamente - Versione 1.0*
+*Auto-generated document - Version 1.0*
