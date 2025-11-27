@@ -728,4 +728,333 @@ export async function deleteAsset(assetId: string): Promise<void> {
 
 ---
 
+## Key Features & Components
+
+This section documents the 5 core features of the application, their key components, services, and implementation details.
+
+### 1. Portfolio Management (Assets)
+
+**Purpose:** Manage multi-asset class portfolio with automatic price updates and comprehensive tracking.
+
+**Key Components:**
+- **AssetDialog.tsx** (`components/assets/AssetDialog.tsx`):
+  - Complex form dialog for creating/editing assets
+  - Supports 8 asset types: Stocks, ETFs, bonds, crypto, real estate, commodities, cash, private equity
+  - Conditional fields based on asset type and class
+  - Cost basis tracking toggle (average cost per unit, tax rate)
+  - TER (Total Expense Ratio) tracking
+  - Composite asset allocation (mixed pension funds)
+  - Auto/manual price update toggle
+  - Form validation with react-hook-form + zod
+
+**Key Services:**
+- **assetService.ts** (`lib/services/assetService.ts`):
+  - CRUD operations: `getAllAssets()`, `createAsset()`, `updateAsset()`, `deleteAsset()`
+  - Value calculations: `calculateAssetValue()`, `calculateTotalValue()`
+  - Unrealized gains: `calculateUnrealizedGains()`, `calculateEstimatedTaxes()`
+  - Sorting by asset class priority (Equity → Bonds → Commodities → Real Estate → Cash → Crypto)
+
+- **yahooFinanceService.ts** (`lib/services/yahooFinanceService.ts`):
+  - Fetch real-time prices from Yahoo Finance API
+  - Support for 100+ global exchanges
+  - Ticker symbol formatting (.DE, .MI, .L suffixes)
+  - Batch price fetching for efficiency
+
+**Page:** `app/dashboard/assets/page.tsx`
+
+**Data Flow:**
+```
+User → AssetDialog → assetService.createAsset() → Firestore /assets
+User clicks "Update Prices" → /api/prices/update → yahooFinanceService → Update Firestore
+Firestore listeners → Auto-refresh asset list
+```
+
+**Key Features:**
+- Real-time portfolio valuation
+- Automatic price updates (skip cash, real estate, manual-only assets)
+- Liquid vs illiquid classification
+- G/P (Gain/Loss) column with absolute and percentage values
+- TER tracking with weighted portfolio average
+- Manual price override for non-tradeable assets
+
+---
+
+### 2. Expense & Income Tracking (Cashflow)
+
+**Purpose:** Track income, expenses, and debts with advanced filtering, categorization, and analytics.
+
+**Key Components:**
+- **ExpenseDialog.tsx** (`components/expenses/ExpenseDialog.tsx`):
+  - Unified form for all 4 expense types: Income, Fixed Expenses, Variable Expenses, Debts
+  - Category and subcategory selection (hierarchical)
+  - Recurring expense generator (create N monthly entries)
+  - External link field (for receipts, invoices)
+  - Date picker with Italian locale
+  - Type-specific validation
+
+- **ExpenseTable.tsx** (`components/expenses/ExpenseTable.tsx`):
+  - Sortable table with Tanstack Table
+  - Inline edit/delete actions
+  - Color-coded by type (green for income, red for expenses)
+  - Pagination and filtering
+  - Responsive design
+
+- **CategoryManagementDialog.tsx** (`components/expenses/CategoryManagementDialog.tsx`):
+  - Create/edit/delete expense categories
+  - Subcategory management
+  - Color picker for visual identification
+  - Smart category deletion with expense reassignment workflow
+
+**Key Services:**
+- **expenseService.ts** (`lib/services/expenseService.ts`):
+  - CRUD operations: `getAllExpenses()`, `createExpense()`, `updateExpense()`, `deleteExpense()`
+  - Filtering: `getExpensesByMonth()`, `getExpensesByDateRange()`, `getExpensesByType()`
+  - Statistics: `calculateTotalIncome()`, `calculateTotalExpenses()`, `getExpenseStats()`
+  - Recurring expense generation: `createRecurringExpenses()`
+  - Category reassignment: `reassignExpensesCategory()`
+
+- **expenseCategoryService.ts** (`lib/services/expenseCategoryService.ts`):
+  - Category CRUD with validation
+  - Automatic expense updates on category rename
+  - Protected deletion (require reassignment if expenses exist)
+
+**Page:** `app/dashboard/cashflow/page.tsx`
+
+**Data Flow:**
+```
+User → ExpenseDialog → expenseService.createExpense() → Firestore /expenses
+User → CategoryManagementDialog → expenseCategoryService → Firestore /expenseCategories
+Filter change → Re-query with WHERE clauses → Update stats and charts
+```
+
+**Key Features:**
+- **Advanced hierarchical filtering**: Type → Category → Subcategory with progressive enabling
+- **Interactive drill-down pie charts**: 3-level navigation (Categories → Subcategories → Transactions)
+- **Income-to-expense ratio metric**: Color-coded financial health indicator (Green ≥1.2, Yellow 0.8-1.2, Red <0.8)
+- **Smart category management**: Automatic expense reassignment, inline category creation during deletion
+- **Recurring expenses**: Generate 12 monthly entries in one operation
+- **Year/month filtering**: Dynamic statistics update based on selected period
+
+---
+
+### 3. Asset Allocation & Rebalancing
+
+**Purpose:** Define target allocation, track current vs target, and get rebalancing recommendations.
+
+**Key Components:**
+- **Allocation page** (`app/dashboard/allocation/page.tsx`):
+  - Three-tier allocation hierarchy: Asset Class → Subcategory → Specific Assets
+  - Target percentage input for each level
+  - Current allocation calculated from real portfolio
+  - Difference calculation (target - current)
+  - Buy/Sell recommendations (threshold: ±€100)
+  - Interactive drill-down with breadcrumb navigation
+  - Formula-based allocation calculator (age-based equity/bonds split)
+
+**Key Services:**
+- **assetAllocationService.ts** (`lib/services/assetAllocationService.ts`):
+  - Settings management: `getSettings()`, `setSettings()`
+  - Allocation calculation: `calculateAllocation()` (handles composite assets)
+  - Rebalancing: `calculateRebalancing()` (buy/sell amounts)
+  - Default targets: `getDefaultTargets()` (60/40 equity/bonds)
+  - Specific asset tracking: Match portfolio assets to target tickers
+  - Subcategory-level granularity with percentage validation
+
+**Data Model:**
+```typescript
+AssetAllocationTarget {
+  equity: { percentage: number, subCategories: SubCategoryTarget[] }
+  bonds: { percentage: number, subCategories: SubCategoryTarget[] }
+  crypto: { percentage: number }
+  realestate: { percentage: number }
+  commodity: { percentage: number }
+  cash: { percentage: number }
+}
+
+SubCategoryTarget {
+  name: string
+  percentage: number  // Relative to asset class
+  specificAssets?: SpecificAssetAllocation[]
+}
+
+SpecificAssetAllocation {
+  ticker: string
+  percentage: number  // Relative to subcategory, must sum to 100%
+}
+```
+
+**Page:** `app/dashboard/allocation/page.tsx`
+
+**Data Flow:**
+```
+User → Settings page → assetAllocationService.setSettings() → Firestore /assetAllocationTargets
+Allocation page load → getSettings() + getAllAssets() → calculateAllocation() → Display
+User drills down → Filter to subcategory → Calculate specific asset targets
+```
+
+**Key Features:**
+- **Multi-level allocation tracking**: Asset class → Subcategory → Individual tickers
+- **Composite asset support**: Pension funds with mixed allocations (e.g., 60% equity, 40% bonds)
+- **Formula-based targets**: Auto-calculate equity/bonds based on age and risk-free rate
+- **Specific asset drill-down**: Define target % for individual stocks within subcategories
+- **Real-time validation**: Specific asset percentages must sum to 100%
+- **Automatic portfolio matching**: Link specific assets to real holdings by ticker/name
+
+---
+
+### 4. FIRE Calculator & Monte Carlo Simulations
+
+**Purpose:** Calculate Financial Independence goals and simulate retirement scenarios probabilistically.
+
+**Key Components:**
+- **FireCalculatorTab.tsx** (`components/fire-simulations/FireCalculatorTab.tsx`):
+  - Safe Withdrawal Rate (SWR) configuration (default: 4%)
+  - Current scenario metrics (based on actual net worth and expenses)
+  - Planned scenario metrics (user-defined annual expenses)
+  - Progress bar to FI
+  - Monthly/daily allowance calculations
+  - Years of expenses coverage
+  - Historical FIRE evolution chart (income, expenses, sustainable withdrawal over time)
+
+- **MonteCarloTab.tsx** (`components/fire-simulations/MonteCarloTab.tsx`):
+  - Simulation parameter inputs (retirement years, inflation, allocation, returns)
+  - Portfolio amount selector (total, liquid only, custom)
+  - Market vs Historical returns toggle
+  - Run simulation button (1,000-10,000 iterations)
+  - Results display: success rate, median/average outcomes
+  - Fan chart (10th, 25th, 50th, 75th, 90th percentiles over time)
+  - Distribution histogram (final portfolio values)
+  - Failure analysis (depletion years)
+
+**Key Services:**
+- **fireService.ts** (`lib/services/fireService.ts`):
+  - Annual calculations: `getAnnualExpenses()`, `getAnnualIncome()`
+  - FIRE metrics: `calculateFIREMetrics()` (FIRE number, progress %, allowances)
+  - Planned metrics: `calculatePlannedFIREMetrics()`
+  - Historical data: `getMonthlyFIREData()` (12-month rolling window)
+  - Trinity Study methodology: 25x rule (FIRE Number = Annual Expenses × 25)
+
+- **monteCarloService.ts** (`lib/services/monteCarloService.ts`):
+  - Simulation engine: `runMonteCarloSimulation()` (N iterations)
+  - Random number generation: `randomNormal()` (Box-Muller transform)
+  - Historical returns calculation: `calculateHistoricalReturns()` (from snapshots)
+  - Statistical analysis: `calculatePercentiles()`, `calculateSuccessRate()`
+  - Asset class-specific returns and volatilities
+  - Inflation adjustment for withdrawal amounts
+
+**Pages:**
+- `app/dashboard/fire/page.tsx` (FIRE Calculator)
+- `app/dashboard/monte-carlo/page.tsx` (Monte Carlo Simulations)
+
+**Data Flow:**
+```
+FIRE Calculator:
+User → fireService.getAnnualExpenses() + getAnnualIncome() → Display metrics
+Settings change → calculateFIREMetrics() → Update progress and allowances
+
+Monte Carlo:
+User clicks "Run Simulation" → monteCarloService.runMonteCarloSimulation()
+  ↓ (for each iteration)
+  - Generate random returns (normal distribution)
+  - Simulate portfolio growth/depletion over N years
+  - Track outcomes
+  ↓
+Calculate percentiles and success rate → Display charts
+```
+
+**Key Features:**
+- **FIRE Number calculation**: 25x annual expenses (4% SWR from Trinity Study)
+- **Dual scenarios**: Current (actual expenses) vs Planned (target expenses)
+- **Monte Carlo simulations**: 1,000+ iterations with probabilistic outcomes
+- **Historical returns integration**: Use actual portfolio returns if ≥24 months of data
+- **Success rate analysis**: % of simulations where portfolio lasts N years
+- **Fan chart visualization**: 5 percentile bands showing range of outcomes
+- **Failure analysis**: Median/average depletion year when portfolio fails
+- **Configurable parameters**: Asset allocation, expected returns, volatility, inflation
+
+---
+
+### 5. Historical Analysis & Snapshots
+
+**Purpose:** Track net worth evolution over time with automated monthly snapshots.
+
+**Key Components:**
+- **CreateManualSnapshotModal.tsx** (`components/CreateManualSnapshotModal.tsx`):
+  - Manual snapshot creation for specific date
+  - Fetches current portfolio state
+  - Calculates totals by asset class and liquidity
+  - Preview before saving
+  - Duplicate prevention
+
+- **History page** (`app/dashboard/history/page.tsx`):
+  - Net worth timeline chart (Recharts area chart)
+  - Asset class breakdown over time (stacked area chart)
+  - Year-over-year comparison table
+  - Monthly growth rate calculations
+  - CSV export functionality
+  - Filter by date range
+
+**Key Services:**
+- **snapshotService.ts** (`lib/services/snapshotService.ts`):
+  - Snapshot creation: `createSnapshot()` (captures portfolio state)
+  - Retrieval: `getUserSnapshots()`, `getSnapshotsByDateRange()`
+  - Duplicate check: `snapshotExistsForMonth()`
+  - Calculations: `calculateTotalsByAssetClass()`, `calculateLiquidVsIlliquid()`
+  - CSV export: `exportSnapshotsToCSV()`
+
+**Data Model:**
+```typescript
+MonthlySnapshot {
+  userId: string
+  date: Date
+  totalNetWorth: number
+  liquidNetWorth: number
+  illiquidNetWorth: number
+  byAssetClass: {
+    equity: number
+    bonds: number
+    crypto: number
+    realestate: number
+    commodity: number
+    cash: number
+  }
+  assets: SnapshotAsset[]  // Full asset details
+  isDummy?: boolean  // Test data flag
+  createdAt: Date
+}
+```
+
+**Pages:** `app/dashboard/history/page.tsx`
+
+**Data Flow:**
+```
+Automated (Cron):
+Vercel Cron (monthly) → /api/cron/monthly-snapshot → snapshotService.createSnapshot()
+  ↓
+  For each user:
+  - Fetch all assets
+  - Calculate totals by asset class
+  - Check for duplicates
+  - Save to Firestore /monthly-snapshots
+  - Update Hall of Fame rankings
+
+Manual:
+User → CreateManualSnapshotModal → /api/portfolio/snapshot → snapshotService.createSnapshot()
+
+Historical Analysis:
+Page load → getUserSnapshots() → Sort by date → Render charts
+Export button → exportSnapshotsToCSV() → Download file
+```
+
+**Key Features:**
+- **Automated monthly snapshots**: Cron job captures portfolio state on last day of month
+- **Asset class evolution**: Visualize how allocation changes over time
+- **Growth tracking**: Month-over-month and year-over-year performance
+- **Duplicate prevention**: Only one snapshot per user per month
+- **CSV export**: Download historical data for external analysis (Excel, Google Sheets)
+- **Test data support**: Dummy snapshot generator for development/demo (up to 120 months)
+- **Composite asset handling**: Correctly split mixed-allocation assets (e.g., 60/40 pension funds)
+
+---
+
 *Auto-generated document - Version 1.0*
