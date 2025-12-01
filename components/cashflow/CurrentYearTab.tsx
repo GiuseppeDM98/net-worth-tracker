@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { getAllExpenses, calculateTotalIncome, calculateTotalExpenses } from '@/lib/services/expenseService';
@@ -80,6 +80,10 @@ export function CurrentYearTab() {
   // Info alert dismissal state
   const [showDrillDownInfo, setShowDrillDownInfo] = useState(true);
 
+  // Refs for auto-scroll on drill-down
+  const expensesChartRef = useRef<HTMLDivElement>(null);
+  const incomeChartRef = useRef<HTMLDivElement>(null);
+
   // Get current year
   const currentYear = new Date().getFullYear();
 
@@ -96,6 +100,19 @@ export function CurrentYearTab() {
       loadExpenses();
     }
   }, [user]);
+
+  // Auto-scroll to the appropriate chart when drill-down changes
+  useEffect(() => {
+    if (drillDown.level !== 'category' && drillDown.chartType) {
+      const targetRef = drillDown.chartType === 'expenses' ? expensesChartRef : incomeChartRef;
+      if (targetRef.current) {
+        // Small delay to allow DOM to update
+        setTimeout(() => {
+          targetRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+      }
+    }
+  }, [drillDown.level, drillDown.chartType]);
 
   const loadExpenses = async () => {
     if (!user) return;
@@ -588,7 +605,7 @@ export function CurrentYearTab() {
       <div className="grid gap-6 md:grid-cols-2">
         {/* Expenses by Category - Interactive Drill-Down */}
         {(expensesByCategoryData.length > 0 || (drillDown.chartType === 'expenses' && drillDown.level !== 'category')) && (
-          <Card className="md:col-span-2">
+          <Card ref={expensesChartRef} className="md:col-span-2">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -840,7 +857,7 @@ export function CurrentYearTab() {
 
         {/* Income by Category - Interactive Drill-Down */}
         {(incomeByCategoryData.length > 0 || (drillDown.chartType === 'income' && drillDown.level !== 'category')) && (
-          <Card className="md:col-span-2">
+          <Card ref={incomeChartRef} className="md:col-span-2">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
