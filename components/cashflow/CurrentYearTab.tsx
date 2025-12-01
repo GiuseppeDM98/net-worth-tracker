@@ -6,9 +6,10 @@ import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { getAllExpenses, calculateTotalIncome, calculateTotalExpenses } from '@/lib/services/expenseService';
 import { Timestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { RefreshCw, ChevronLeft, ExternalLink } from 'lucide-react';
+import { RefreshCw, ChevronLeft, ExternalLink, Info, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import {
@@ -76,8 +77,19 @@ export function CurrentYearTab() {
   // Percentage toggle for monthly trend
   const [showMonthlyTrendPercentage, setShowMonthlyTrendPercentage] = useState(false);
 
+  // Info alert dismissal state
+  const [showDrillDownInfo, setShowDrillDownInfo] = useState(true);
+
   // Get current year
   const currentYear = new Date().getFullYear();
+
+  // Load alert dismissal state from localStorage
+  useEffect(() => {
+    const dismissed = localStorage.getItem('drillDownInfoDismissed');
+    if (dismissed === 'true') {
+      setShowDrillDownInfo(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -487,6 +499,12 @@ export function CurrentYearTab() {
     }
   };
 
+  // Handle dismissal of drill-down info alert
+  const handleDismissInfo = () => {
+    setShowDrillDownInfo(false);
+    localStorage.setItem('drillDownInfoDismissed', 'true');
+  };
+
   const expensesByCategoryData = getExpensesByCategory();
   const incomeByCategoryData = getIncomeByCategory();
   const expensesByTypeData = getExpensesByType();
@@ -544,6 +562,27 @@ export function CurrentYearTab() {
           Visualizza l&apos;andamento delle tue finanze per l&apos;anno corrente
         </p>
       </div>
+
+      {/* Info Alert for Drill-Down Functionality */}
+      {showDrillDownInfo && drillDown.level === 'category' && (expensesByCategoryData.length > 0 || incomeByCategoryData.length > 0) && (
+        <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800">
+          <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <AlertDescription className="flex items-start justify-between gap-4">
+            <span className="text-blue-900 dark:text-blue-100">
+              💡 <strong>Suggerimento:</strong> Clicca sulle fette dei grafici &quot;Spese per Categoria&quot; e &quot;Entrate per Categoria&quot; per visualizzare i dettagli delle sottocategorie.
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDismissInfo}
+              className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800 hover:bg-blue-100 dark:text-blue-400 dark:hover:text-blue-200 dark:hover:bg-blue-900"
+              aria-label="Chiudi suggerimento"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Charts Grid */}
       <div className="grid gap-6 md:grid-cols-2">
