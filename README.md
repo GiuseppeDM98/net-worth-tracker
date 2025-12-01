@@ -147,6 +147,15 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
   - **Auto-update expense records** when category names are modified
   - **Subcategory protection** with same reassignment workflow
   - **Prevents orphaned data** and maintains data integrity across all expense records
+- **Searchable category and subcategory dropdowns** (#43) for faster expense entry
+  - **Real-time search** with partial match support (case-insensitive)
+  - **Reusable SearchableCombobox** component with consistent UX
+  - **Keyboard navigation** and click-outside detection for seamless interaction
+  - **Color-coded category indicators** displayed in search results
+  - **Significantly improved UX** especially for users with many categories
+  - No more scrolling through long dropdown lists - just start typing
+  - Example: Type "food" to instantly find "Food & Dining", "Fast Food", "Pet Food"
+  - Maintains all existing functionality: inline creation, validation, color display
 
 ### 🔥 **FIRE Calculator & Tracker**
 - **Safe Withdrawal Rate** configuration (4% rule based on Trinity Study)

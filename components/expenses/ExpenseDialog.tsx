@@ -32,6 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SearchableCombobox, ComboboxOption } from '@/components/ui/searchable-combobox';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { format } from 'date-fns';
@@ -348,37 +349,26 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
             ) : (
               <>
                 <div className="flex items-center gap-2">
-                  <Select
-                    value={watch('categoryId')}
-                    onValueChange={(value) => {
-                      setValue('categoryId', value);
-                      setValue('subCategoryId', '');
-                      setShowSubCategoryInput(false);
-                    }}
-                  >
-                    <SelectTrigger id="categoryId" className="flex-1">
-                      <SelectValue placeholder="Seleziona categoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableCategories.length === 0 ? (
-                        <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                          Nessuna categoria disponibile
-                        </div>
-                      ) : (
-                        availableCategories.map((category) => (
-                          <SelectItem key={category.id} value={category.id}>
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="w-3 h-3 rounded-full border border-gray-300"
-                                style={{ backgroundColor: category.color || '#3b82f6' }}
-                              />
-                              <span>{category.name}</span>
-                            </div>
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex-1">
+                    <SearchableCombobox
+                      id="categoryId"
+                      options={availableCategories.map((cat) => ({
+                        value: cat.id,
+                        label: cat.name,
+                        color: cat.color || '#3b82f6',
+                      }))}
+                      value={watch('categoryId') || ''}
+                      onValueChange={(value) => {
+                        setValue('categoryId', value);
+                        setValue('subCategoryId', '');
+                        setShowSubCategoryInput(false);
+                      }}
+                      placeholder="Seleziona categoria"
+                      searchPlaceholder="Cerca categoria..."
+                      emptyMessage="Nessuna categoria disponibile"
+                      showBadge={false}
+                    />
+                  </div>
                   <Button
                     type="button"
                     variant="outline"
@@ -402,21 +392,21 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
               <Label htmlFor="subCategoryId">Sotto-categoria (opzionale)</Label>
               {availableSubCategories.length > 0 && (
                 <div className="flex items-center gap-2">
-                  <Select
-                    value={watch('subCategoryId') || undefined}
-                    onValueChange={(value) => setValue('subCategoryId', value || undefined)}
-                  >
-                    <SelectTrigger id="subCategoryId" className="flex-1">
-                      <SelectValue placeholder="Seleziona sotto-categoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableSubCategories.map((subCategory) => (
-                        <SelectItem key={subCategory.id} value={subCategory.id}>
-                          {subCategory.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex-1">
+                    <SearchableCombobox
+                      id="subCategoryId"
+                      options={availableSubCategories.map((sub) => ({
+                        value: sub.id,
+                        label: sub.name,
+                      }))}
+                      value={watch('subCategoryId') || ''}
+                      onValueChange={(value) => setValue('subCategoryId', value || undefined)}
+                      placeholder="Seleziona sotto-categoria"
+                      searchPlaceholder="Cerca sotto-categoria..."
+                      emptyMessage="Nessuna sotto-categoria disponibile"
+                      showBadge={false}
+                    />
+                  </div>
                   <Button
                     type="button"
                     variant="outline"
