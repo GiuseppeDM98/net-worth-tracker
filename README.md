@@ -98,6 +98,8 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
   - **"Altro" slice**: Automatically groups expenses without assigned subcategories
   - **Back navigation**: Breadcrumb-style titles and back button for easy navigation
   - **Transaction details**: View date, amount, notes, and links for individual expenses/income
+  - **Informative alert**: Dismissible tip explaining drill-down functionality (persisted via localStorage)
+  - **Auto-scroll on drill-down**: Automatically scrolls to keep the active chart in view when navigating
   - Available for both "Spese per Categoria" and "Entrate per Categoria" charts
   - Year filter context maintained across all drill-down levels
 - **Specific asset allocation tracking** (#57) for granular portfolio target management
