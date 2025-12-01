@@ -63,6 +63,15 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
   - Special calculation for real estate: G/P based on gross property value vs purchase cost (independent of outstanding debt)
   - Estimated tax calculation based on configurable tax rates
   - Gross and net net worth visualization (before/after taxes)
+- **Capital Gains Tax Calculator** for simulating asset sales
+  - Interactive modal accessible from Assets page (calculator icon)
+  - Two input modes: sell by quantity or by target sale value
+  - Real-time calculations showing sale value, gains/losses, taxes, and net proceeds
+  - Visual indicators: green for gains, red for losses
+  - Edge case handling (prevents selling more than owned)
+  - Read-only simulator with no database changes
+  - Helpful contextual messages (e.g., "to get €10k net, you need to sell €11.2k gross")
+  - Only visible for assets with cost basis tracking enabled
 - **TER (Total Expense Ratio) tracking** for cost-conscious investing
   - Optional TER field for ETFs, mutual funds, and other managed investments
   - Weighted average portfolio TER calculation
@@ -773,6 +782,68 @@ Set specific assets within "Single Stock":
    - **Plusvalenze Non Realizzate**: Unrealized gains (green) or losses (red)
    - **Tasse Stimate**: Estimated taxes on gains
 
+### Simulating Asset Sales with Tax Calculator
+
+Before selling an asset, you can simulate the tax impact to understand your net proceeds.
+
+**Prerequisites:**
+- Asset must have **cost basis tracking enabled** (average cost and tax rate configured)
+
+**How to use:**
+
+1. Navigate to **"Patrimonio"** (Assets) page
+2. Find the asset you want to simulate selling
+3. Click the **blue calculator icon** (🧮) in the Actions column
+4. The Tax Calculator modal opens with asset details
+
+**Selling by Quantity:**
+1. Select **"Per Quantità"** mode (default)
+2. Enter how many shares/units to sell (e.g., 10)
+3. View instant calculations:
+   - Total sale value (gross)
+   - Capital gain or loss (+€200 or -€150)
+   - Taxes owed (€52 on gains, €0 on losses)
+   - Net proceeds after taxes
+
+**Selling by Target Value:**
+1. Select **"Per Valore Target"** mode
+2. Enter desired gross sale amount (e.g., €10,000)
+3. System calculates:
+   - Required quantity to sell (e.g., 0.1923 BTC)
+   - Resulting gains/losses
+   - Taxes to pay
+   - **Net proceeds** (what you'll actually receive)
+4. Use the helpful message to understand: "To get €10k net, you need to sell €11.2k gross"
+
+**Example Scenarios:**
+
+*Profitable ETF sale:*
+- Asset: VWCE.DE ETF
+- Current price: €105.50, Average cost: €85.50
+- Selling: 10 shares
+- Result: +€200 gain (+23.4%), €52 taxes (26%), €1,003 net proceeds
+
+*Cryptocurrency with target proceeds:*
+- Asset: BTC
+- Current: €52,000, Cost: €30,000
+- Target: Need €10,000 cash
+- Calculator shows: Must sell 0.1923 BTC (€10,000 gross), pays €1,100 taxes, nets €8,900
+- **Insight**: You actually need to sell €11,235 worth to get €10k after taxes
+
+*Loss scenario (tax loss harvesting):*
+- Asset: TSLA stock
+- Current: €180, Cost: €220
+- Selling: 20 shares
+- Result: -€800 loss (-18.2%), €0 taxes, €3,600 net proceeds
+- **Note**: The modal explains that losses can offset future gains
+
+**Benefits:**
+- Make informed selling decisions before execution
+- Understand true after-tax proceeds
+- Plan for tax-efficient rebalancing
+- Avoid surprises at tax time
+- Calculate optimal sale amounts to reach net cash goals
+
 ### Viewing Gain/Loss in Assets Table
 
 Once you've set up cost basis tracking for your assets, the **G/P (Gain/Loss) column** provides immediate visibility into each investment's performance.
@@ -973,6 +1044,7 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - ✅ Specific asset allocation tracking within subcategories with drill-down functionality
 - ✅ UI/UX rationalization with streamlined navigation and grouped pages (sidebar reduced from 11 to 8 items)
 - ✅ Advanced expense filtering system with hierarchical Type/Category/Subcategory filters and searchable comboboxes
+- ✅ Capital Gains Tax Calculator for simulating asset sales with dual input modes and real-time tax impact calculation
 
 ### Future Enhancements (Planned 🔜)
 - 🔜 PDF export of portfolio reports
