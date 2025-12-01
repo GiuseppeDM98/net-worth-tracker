@@ -29,9 +29,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Plus, RefreshCw, Pencil, Trash2, Info } from 'lucide-react';
+import { Plus, RefreshCw, Pencil, Trash2, Info, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 import { AssetDialog } from '@/components/assets/AssetDialog';
+import { TaxCalculatorModal } from '@/components/assets/TaxCalculatorModal';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 
@@ -56,6 +57,8 @@ export default function AssetsPage() {
   const [updating, setUpdating] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
+  const [taxCalculatorOpen, setTaxCalculatorOpen] = useState(false);
+  const [calculatingAsset, setCalculatingAsset] = useState<Asset | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -135,6 +138,21 @@ export default function AssetsPage() {
     setDialogOpen(false);
     setEditingAsset(null);
     loadAssets();
+  };
+
+  const handleCalculateTaxes = (asset: Asset) => {
+    setCalculatingAsset(asset);
+    setTaxCalculatorOpen(true);
+  };
+
+  const handleTaxCalculatorClose = () => {
+    setTaxCalculatorOpen(false);
+    setCalculatingAsset(null);
+  };
+
+  // Check if an asset has cost basis tracking enabled
+  const hasCostBasisTracking = (asset: Asset) => {
+    return !!(asset.averageCost && asset.averageCost > 0 && asset.taxRate && asset.taxRate >= 0);
   };
 
   const totalValue = calculateTotalValue(assets);
@@ -325,6 +343,16 @@ export default function AssetsPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
+                            {hasCostBasisTracking(asset) && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleCalculateTaxes(asset)}
+                                title="Calcola Plusvalenze"
+                              >
+                                <Calculator className="h-4 w-4 text-blue-600" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="sm"
@@ -397,6 +425,14 @@ export default function AssetsPage() {
         onClose={handleDialogClose}
         asset={editingAsset}
       />
+
+      {calculatingAsset && (
+        <TaxCalculatorModal
+          open={taxCalculatorOpen}
+          onClose={handleTaxCalculatorClose}
+          asset={calculatingAsset}
+        />
+      )}
     </div>
   );
 }
