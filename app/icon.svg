@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <style>
+    /* Light mode (default) */
+    .pot { fill: #6B7280; }
+    .soil { fill: #4B5563; }
+    .stem { fill: #3B82F6; }
+    .leaf { fill: #10B981; }
+    .coin { fill: #F59E0B; }
+    .coin-text { fill: #FFF; }
+
+    /* Dark mode adjustments */
+    @media (prefers-color-scheme: dark) {
+      .pot { fill: #9CA3AF; }
+      .soil { fill: #6B7280; }
+      .stem { fill: #60A5FA; }
+      .leaf { fill: #34D399; }
+      .coin { fill: #FBBF24; }
+      .coin-text { fill: #1F2937; }
+    }
+  </style>
+
+  <!-- Money Tree Icon -->
+
+  <!-- Pot/Vase -->
+  <path class="pot" d="M 180 380 L 160 480 L 352 480 L 332 380 Z"/>
+
+  <!-- Soil line -->
+  <ellipse class="soil" cx="256" cy="380" rx="76" ry="12"/>
+
+  <!-- Stem/Trunk -->
+  <rect class="stem" x="240" y="200" width="32" height="180" rx="16"/>
+
+  <!-- Leaves - 5 circular leaves -->
+
+  <!-- Left bottom leaf -->
+  <ellipse class="leaf" cx="200" cy="320" rx="40" ry="32" transform="rotate(-25 200 320)"/>
+
+  <!-- Right bottom leaf -->
+  <ellipse class="leaf" cx="312" cy="320" rx="40" ry="32" transform="rotate(25 312 320)"/>
+
+  <!-- Left middle leaf -->
+  <ellipse class="leaf" cx="180" cy="260" rx="44" ry="36" transform="rotate(-30 180 260)"/>
+
+  <!-- Right middle leaf -->
+  <ellipse class="leaf" cx="332" cy="260" rx="44" ry="36" transform="rotate(30 332 260)"/>
+
+  <!-- Top center leaf (largest) -->
+  <ellipse class="leaf" cx="256" cy="180" rx="50" ry="42"/>
+
+  <!-- Euro coin accent -->
+  <circle class="coin" cx="256" cy="180" r="18" opacity="0.9"/>
+  <text class="coin-text" x="256" y="192" font-family="Arial, sans-serif" font-size="24" font-weight="bold" text-anchor="middle">€</text>
+</svg>
