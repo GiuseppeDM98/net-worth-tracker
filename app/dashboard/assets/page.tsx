@@ -32,6 +32,7 @@ import {
 import { Plus, RefreshCw, Pencil, Trash2, Info, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 import { AssetDialog } from '@/components/assets/AssetDialog';
+import { AssetCard } from '@/components/assets/AssetCard';
 import { TaxCalculatorModal } from '@/components/assets/TaxCalculatorModal';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
@@ -192,18 +193,22 @@ export default function AssetsPage() {
             Gestisci i tuoi asset di investimento
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <Button
             variant="outline"
             onClick={handleUpdatePrices}
             disabled={updating || assets.length === 0}
+            className="w-full sm:w-auto"
           >
             <RefreshCw
               className={`mr-2 h-4 w-4 ${updating ? 'animate-spin' : ''}`}
             />
             Aggiorna Prezzi
           </Button>
-          <Button onClick={() => setDialogOpen(true)}>
+          <Button
+            onClick={() => setDialogOpen(true)}
+            className="w-full sm:w-auto"
+          >
             <Plus className="mr-2 h-4 w-4" />
             Aggiungi Asset
           </Button>
@@ -220,7 +225,80 @@ export default function AssetsPage() {
               Nessun asset presente. Clicca su "Aggiungi Asset" per iniziare.
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+              {/* Mobile Card Layout */}
+              <div className="md:hidden space-y-4">
+                {assets.map((asset) => (
+                  <AssetCard
+                    key={asset.id}
+                    asset={asset}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    onCalculateTaxes={
+                      hasCostBasisTracking(asset)
+                        ? handleCalculateTaxes
+                        : undefined
+                    }
+                    isManualPrice={requiresManualPricing(asset)}
+                  />
+                ))}
+
+                {/* Mobile Total Summary Card */}
+                <Card className="border-2 border-primary">
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-sm text-gray-500">Totale Patrimonio</p>
+                        <p className="text-2xl font-bold text-gray-900">
+                          {formatCurrency(totalValue)}
+                        </p>
+                      </div>
+                      {(() => {
+                        const assetsWithCostBasis = assets.filter((a) => a.averageCost);
+                        if (assetsWithCostBasis.length === 0) return null;
+
+                        const totalGainLoss = assetsWithCostBasis.reduce(
+                          (sum, asset) => sum + calculateUnrealizedGains(asset),
+                          0
+                        );
+                        const totalCostBasis = assetsWithCostBasis.reduce(
+                          (sum, asset) => sum + asset.quantity * asset.averageCost!,
+                          0
+                        );
+                        const totalPercentage =
+                          totalCostBasis > 0 ? (totalGainLoss / totalCostBasis) * 100 : 0;
+
+                        const isPositive = totalGainLoss > 0;
+                        const isNegative = totalGainLoss < 0;
+                        const textColor = isPositive
+                          ? 'text-green-600'
+                          : isNegative
+                          ? 'text-red-600'
+                          : 'text-gray-600';
+
+                        return (
+                          <div className="text-right">
+                            <p className="text-sm text-gray-500">G/P Totale</p>
+                            <div className={`font-semibold ${textColor}`}>
+                              <div className="text-lg">
+                                {isPositive ? '+' : ''}
+                                {formatCurrency(totalGainLoss)}
+                              </div>
+                              <div className="text-xs">
+                                {isPositive ? '+' : ''}
+                                {formatNumber(totalPercentage, 2)}%
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Desktop Table Layout */}
+              <div className="hidden md:block overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -415,7 +493,8 @@ export default function AssetsPage() {
                   </TableRow>
                 </TableFooter>
               </Table>
-            </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

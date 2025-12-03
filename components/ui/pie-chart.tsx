@@ -3,6 +3,7 @@
 import { PieChart as RechartsPC, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { PieChartData } from '@/types/assets';
 import { formatCurrency } from '@/lib/services/chartService';
+import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 
 interface PieChartProps {
   data: PieChartData[];
@@ -20,16 +21,29 @@ export function PieChart({ data }: PieChartProps) {
   // Ensure data is sorted by value descending for legend order
   const sortedData = [...data].sort((a, b) => b.value - a.value);
 
+  // Detect mobile screen for responsive sizing
+  const isMobile = useMediaQuery('(max-width: 768px)');
+
+  // Responsive configuration
+  const chartConfig = {
+    height: isMobile ? 350 : 500,
+    outerRadius: isMobile ? 90 : 140,
+    labelThreshold: isMobile ? 10 : 5,
+    legendLayout: isMobile ? 'horizontal' : 'vertical',
+    legendAlign: isMobile ? 'center' : 'right',
+    legendVerticalAlign: isMobile ? 'bottom' : 'middle',
+  };
+
   return (
-    <ResponsiveContainer width="100%" height={500}>
+    <ResponsiveContainer width="100%" height={chartConfig.height}>
       <RechartsPC>
         <Pie
           data={sortedData as any}
           cx="50%"
-          cy="50%"
+          cy={isMobile ? "45%" : "50%"}
           labelLine={false}
-          label={(entry: any) => entry.percentage >= 5 ? `${entry.name}: ${(entry.percentage as number).toFixed(1)}%` : ''}
-          outerRadius={140}
+          label={false}
+          outerRadius={chartConfig.outerRadius}
           fill="#8884d8"
           dataKey="value"
         >
@@ -46,20 +60,25 @@ export function PieChart({ data }: PieChartProps) {
           }}
         />
         <Legend
-          layout="vertical"
-          align="right"
-          verticalAlign="middle"
-          content={() => (
-            <div style={{ paddingLeft: '20px' }}>
-              {sortedData.map((entry, index) => (
+          layout={chartConfig.legendLayout as any}
+          align={chartConfig.legendAlign as any}
+          verticalAlign={chartConfig.legendVerticalAlign as any}
+          content={() => {
+            // On mobile, filter legend to show only items >= 7%
+            const legendData = isMobile
+              ? sortedData.filter(entry => entry.percentage >= 7)
+              : sortedData;
+
+            return (
+              <div
+                className={isMobile ? "flex flex-wrap justify-center gap-3 px-4" : ""}
+                style={isMobile ? { paddingTop: '20px' } : { paddingLeft: '20px' }}
+              >
+                {legendData.map((entry, index) => (
                 <div
                   key={`legend-item-${index}`}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    marginBottom: '8px',
-                    fontSize: '14px',
-                  }}
+                  className={isMobile ? "flex items-center" : "flex items-center mb-2"}
+                  style={{ fontSize: '14px' }}
                 >
                   <div
                     style={{
@@ -76,7 +95,8 @@ export function PieChart({ data }: PieChartProps) {
                 </div>
               ))}
             </div>
-          )}
+            );
+          }}
         />
       </RechartsPC>
     </ResponsiveContainer>
