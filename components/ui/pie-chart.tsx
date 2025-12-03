@@ -42,7 +42,7 @@ export function PieChart({ data }: PieChartProps) {
           cx="50%"
           cy={isMobile ? "45%" : "50%"}
           labelLine={false}
-          label={false}
+          label={isMobile ? false : (entry: any) => entry.percentage >= chartConfig.labelThreshold ? `${entry.name}: ${(entry.percentage as number).toFixed(1)}%` : ''}
           outerRadius={chartConfig.outerRadius}
           fill="#8884d8"
           dataKey="value"
