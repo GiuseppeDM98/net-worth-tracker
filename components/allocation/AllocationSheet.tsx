@@ -3,7 +3,7 @@
 import { ReactNode } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, X as XIcon } from 'lucide-react';
 
 interface AllocationSheetProps {
   open: boolean;
@@ -27,7 +27,7 @@ export function AllocationSheet({
       <SheetContent
         side="bottom"
         className="h-[85vh] overflow-y-auto"
-        showCloseButton={true}
+        showCloseButton={false}
       >
         <SheetHeader className="sticky top-0 bg-white dark:bg-gray-950 z-10 pb-4 border-b">
           <div className="flex items-center gap-3">
@@ -58,6 +58,20 @@ export function AllocationSheet({
                 {title}
               </SheetTitle>
             </div>
+
+            {/* Close button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenChange(false);
+              }}
+              className="shrink-0 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
+              aria-label="Chiudi"
+            >
+              <XIcon className="h-5 w-5 text-gray-700 dark:text-gray-300" />
+            </Button>
           </div>
         </SheetHeader>
 
