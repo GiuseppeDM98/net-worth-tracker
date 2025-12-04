@@ -23,11 +23,21 @@ import {
 } from '@/components/ui/table';
 import { Settings, TrendingUp, TrendingDown, Minus, Info, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
+import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
+import { AllocationCard } from '@/components/allocation/AllocationCard';
+import { AllocationSheet } from '@/components/allocation/AllocationSheet';
 
 type DrillDownLevel = 'assetClass' | 'subCategory' | 'specificAsset';
 
 interface DrillDownState {
   level: DrillDownLevel;
+  assetClass: string | null;
+  subCategory: string | null;
+}
+
+interface SheetNavigation {
+  isOpen: boolean;
+  level: 'subCategory' | 'specificAsset' | null;
   assetClass: string | null;
   subCategory: string | null;
 }
@@ -38,11 +48,24 @@ export default function AllocationPage() {
   const [targets, setTargets] = useState<AssetAllocationTarget | null>(null);
   const [allocation, setAllocation] = useState<AllocationResult | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Desktop drill-down state (for specific assets page)
   const [drillDown, setDrillDown] = useState<DrillDownState>({
     level: 'assetClass',
     assetClass: null,
     subCategory: null,
   });
+
+  // Mobile sheet navigation state
+  const [sheetNav, setSheetNav] = useState<SheetNavigation>({
+    isOpen: false,
+    level: null,
+    assetClass: null,
+    subCategory: null,
+  });
+
+  // Responsive detection
+  const isMobile = useMediaQuery('(max-width: 767px)');
 
   useEffect(() => {
     if (user) {
@@ -114,7 +137,6 @@ export default function AllocationPage() {
   };
 
   // Group sub-categories by asset class
-  // Le chiavi in bySubCategory sono nel formato "assetClass:subCategory"
   const getSubCategoriesByAssetClass = () => {
     if (!targets || !allocation) return {};
 
@@ -123,19 +145,15 @@ export default function AllocationPage() {
       Record<string, AllocationResult['bySubCategory'][string]>
     > = {};
 
-    // Iterate through all subcategory entries
     Object.entries(allocation.bySubCategory).forEach(([key, data]) => {
-      // Parse the composite key "assetClass:subCategory"
       const parts = key.split(':');
       if (parts.length === 2) {
         const [assetClass, subCategory] = parts;
 
-        // Initialize asset class group if needed
         if (!grouped[assetClass]) {
           grouped[assetClass] = {};
         }
 
-        // Add subcategory to its asset class group
         grouped[assetClass][subCategory] = data;
       }
     });
@@ -149,9 +167,7 @@ export default function AllocationPage() {
 
     const result: Record<string, typeof allocation.bySpecificAsset[string]> = {};
 
-    // Filter specific assets that match the asset class and subcategory
     Object.entries(allocation.bySpecificAsset).forEach(([key, data]) => {
-      // Key format: "assetClass:subCategory:assetName"
       const parts = key.split(':');
       if (parts.length === 3) {
         const [ac, sc, assetName] = parts;
@@ -177,7 +193,48 @@ export default function AllocationPage() {
     return subTargetData.specificAssetsEnabled || false;
   };
 
-  // Navigate to specific asset drill-down
+  // Check if asset class has subcategories
+  const hasSubCategories = (assetClass: string): boolean => {
+    const subs = getSubCategoriesByAssetClass()[assetClass];
+    return subs && Object.keys(subs).length > 0;
+  };
+
+  // ========== MOBILE NAVIGATION HANDLERS ==========
+
+  const openSubCategories = (assetClass: string) => {
+    setSheetNav({
+      isOpen: true,
+      level: 'subCategory',
+      assetClass,
+      subCategory: null,
+    });
+  };
+
+  const openSpecificAssets = (assetClass: string, subCategory: string) => {
+    setSheetNav({
+      isOpen: true,
+      level: 'specificAsset',
+      assetClass,
+      subCategory,
+    });
+  };
+
+  const handleBack = () => {
+    if (sheetNav.level === 'specificAsset') {
+      // Go back to subcategories
+      setSheetNav({ ...sheetNav, level: 'subCategory', subCategory: null });
+    } else {
+      // Close sheet
+      setSheetNav({ isOpen: false, level: null, assetClass: null, subCategory: null });
+    }
+  };
+
+  const handleSheetClose = () => {
+    setSheetNav({ isOpen: false, level: null, assetClass: null, subCategory: null });
+  };
+
+  // ========== DESKTOP NAVIGATION HANDLERS ==========
+
   const handleDrillDownToSpecificAssets = (assetClass: string, subCategory: string) => {
     setDrillDown({
       level: 'specificAsset',
@@ -186,7 +243,6 @@ export default function AllocationPage() {
     });
   };
 
-  // Navigate back to subcategories
   const handleBackToSubCategories = () => {
     setDrillDown({
       level: 'assetClass',
@@ -194,6 +250,110 @@ export default function AllocationPage() {
       subCategory: null,
     });
   };
+
+  // ========== MOBILE RENDERING FUNCTIONS ==========
+
+  const renderAssetClassCards = () => (
+    <div className="space-y-4">
+      {Object.entries(allocation!.byAssetClass)
+        .sort(([a], [b]) => {
+          const orderA = ASSET_CLASS_ORDER[a] || 999;
+          const orderB = ASSET_CLASS_ORDER[b] || 999;
+          return orderA - orderB;
+        })
+        .map(([assetClass, data]) => {
+          const hasSubCats = hasSubCategories(assetClass);
+
+          return (
+            <AllocationCard
+              key={assetClass}
+              name={assetClassLabels[assetClass]}
+              data={data}
+              level="assetClass"
+              hasChildren={hasSubCats}
+              onDrillDown={hasSubCats ? () => openSubCategories(assetClass) : undefined}
+            />
+          );
+        })}
+    </div>
+  );
+
+  const renderSubCategoryCards = () => {
+    if (!sheetNav.assetClass) return null;
+
+    const subCategories = getSubCategoriesByAssetClass()[sheetNav.assetClass];
+    if (!subCategories) return null;
+
+    return (
+      <div className="space-y-4">
+        {Object.entries(subCategories)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([subCategory, data]) => {
+            const hasSpecificAssets = hasSpecificAssetTracking(sheetNav.assetClass!, subCategory);
+
+            return (
+              <AllocationCard
+                key={subCategory}
+                name={subCategory}
+                data={data}
+                level="subCategory"
+                hasChildren={hasSpecificAssets}
+                onDrillDown={
+                  hasSpecificAssets
+                    ? () => openSpecificAssets(sheetNav.assetClass!, subCategory)
+                    : undefined
+                }
+              />
+            );
+          })}
+      </div>
+    );
+  };
+
+  const renderSpecificAssetCards = () => {
+    if (!sheetNav.assetClass || !sheetNav.subCategory) return null;
+
+    const specificAssets = getSpecificAssetsForSubCategory(
+      sheetNav.assetClass,
+      sheetNav.subCategory
+    );
+
+    if (Object.keys(specificAssets).length === 0) {
+      return (
+        <div className="flex h-32 items-center justify-center text-gray-500 text-sm">
+          Nessun specific asset configurato per questa sotto-categoria.
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        {Object.entries(specificAssets)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([assetName, data]) => (
+            <AllocationCard
+              key={assetName}
+              name={assetName}
+              data={data}
+              level="specificAsset"
+              hasChildren={false}
+            />
+          ))}
+      </div>
+    );
+  };
+
+  const renderSheetContent = () => {
+    if (sheetNav.level === 'subCategory') {
+      return renderSubCategoryCards();
+    }
+    if (sheetNav.level === 'specificAsset') {
+      return renderSpecificAssetCards();
+    }
+    return null;
+  };
+
+  // ========== LOADING & EMPTY STATES ==========
 
   if (loading) {
     return (
@@ -211,8 +371,9 @@ export default function AllocationPage() {
     );
   }
 
-  // Render drill-down view for specific assets
-  if (drillDown.level === 'specificAsset' && drillDown.assetClass && drillDown.subCategory) {
+  // ========== DESKTOP: DRILL-DOWN VIEW FOR SPECIFIC ASSETS ==========
+
+  if (drillDown.level === 'specificAsset' && drillDown.assetClass && drillDown.subCategory && !isMobile) {
     const specificAssets = getSpecificAssetsForSubCategory(drillDown.assetClass, drillDown.subCategory);
 
     return (
@@ -345,9 +506,11 @@ export default function AllocationPage() {
     );
   }
 
-  // Normal view (asset classes and subcategories)
+  // ========== MAIN VIEW (MOBILE + DESKTOP) ==========
+
   return (
     <div className="space-y-6">
+      {/* Header (shared for both mobile and desktop) */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
@@ -365,215 +528,253 @@ export default function AllocationPage() {
         </Link>
       </div>
 
-      {/* Asset Class Allocation */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Allocazione per Classe di Asset</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {Object.keys(allocation.byAssetClass).length === 0 ? (
-            <div className="flex h-32 items-center justify-center text-gray-500">
-              Nessun asset presente. Aggiungi degli asset per vedere
-              l'allocazione.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Classe Asset</TableHead>
-                    <TableHead className="text-right">Corrente %</TableHead>
-                    <TableHead className="text-right">Corrente €</TableHead>
-                    <TableHead className="text-right">Target %</TableHead>
-                    <TableHead className="text-right">Target €</TableHead>
-                    <TableHead className="text-right">Differenza %</TableHead>
-                    <TableHead className="text-right">Differenza €</TableHead>
-                    <TableHead className="text-center">Azione</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {Object.entries(allocation.byAssetClass)
-                    .sort(([a], [b]) => {
-                      const orderA = ASSET_CLASS_ORDER[a] || 999;
-                      const orderB = ASSET_CLASS_ORDER[b] || 999;
-                      return orderA - orderB;
-                    })
-                    .map(([assetClass, data]) => (
-                      <TableRow key={assetClass}>
-                        <TableCell className="font-medium">
-                          {assetClassLabels[assetClass] || assetClass}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatPercentage(data.currentPercentage)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(data.currentValue)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatPercentage(data.targetPercentage)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(data.targetValue)}
-                        </TableCell>
-                        <TableCell
-                          className={`text-right font-semibold ${getDifferenceColor(
-                            data.difference
-                          )}`}
-                        >
-                          {data.difference > 0 ? '+' : ''}
-                          {formatPercentage(data.difference)}
-                        </TableCell>
-                        <TableCell
-                          className={`text-right font-semibold ${getDifferenceColor(
-                            data.difference
-                          )}`}
-                        >
-                          {data.differenceValue > 0 ? '+' : ''}
-                          {formatCurrency(data.differenceValue)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center justify-center">
-                            <span
-                              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${getActionColor(
-                                data.action
-                              )}`}
-                            >
-                              {getActionIcon(data.action)}
-                              {data.action}
-                            </span>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Sub-Category Allocation - One card per asset class */}
-      {Object.entries(getSubCategoriesByAssetClass())
-        .sort(([a], [b]) => {
-          const orderA = ASSET_CLASS_ORDER[a] || 999;
-          const orderB = ASSET_CLASS_ORDER[b] || 999;
-          return orderA - orderB;
-        })
-        .map(([assetClass, subCategories]) => (
-          <Card key={`sub-${assetClass}`}>
-            <CardHeader>
-              <CardTitle>
-                Allocazione Sotto-Categoria {assetClassLabels[assetClass]}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Sotto-Categoria</TableHead>
-                      <TableHead className="text-right">Corrente %</TableHead>
-                      <TableHead className="text-right">Corrente €</TableHead>
-                      <TableHead className="text-right">Target %</TableHead>
-                      <TableHead className="text-right">Target €</TableHead>
-                      <TableHead className="text-right">Differenza %</TableHead>
-                      <TableHead className="text-right">Differenza €</TableHead>
-                      <TableHead className="text-center">Azione</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {Object.entries(subCategories)
-                      .sort(([a], [b]) => a.localeCompare(b))
-                      .map(([subCategory, data]) => {
-                        const hasSpecificAssets = hasSpecificAssetTracking(assetClass, subCategory);
-
-                        return (
-                          <TableRow
-                            key={subCategory}
-                            className={hasSpecificAssets ? 'cursor-pointer hover:bg-gray-50' : ''}
-                            onClick={() => {
-                              if (hasSpecificAssets) {
-                                handleDrillDownToSpecificAssets(assetClass, subCategory);
-                              }
-                            }}
-                          >
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                {subCategory}
-                                {hasSpecificAssets && (
-                                  <Info className="h-4 w-4 text-blue-500" />
-                                )}
-                              </div>
-                            </TableCell>
-                          <TableCell className="text-right">
-                            {formatPercentage(data.currentPercentage)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {formatCurrency(data.currentValue)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {formatPercentage(data.targetPercentage)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {formatCurrency(data.targetValue)}
-                          </TableCell>
-                          <TableCell
-                            className={`text-right font-semibold ${getDifferenceColor(
-                              data.difference
-                            )}`}
-                          >
-                            {data.difference > 0 ? '+' : ''}
-                            {formatPercentage(data.difference)}
-                          </TableCell>
-                          <TableCell
-                            className={`text-right font-semibold ${getDifferenceColor(
-                              data.difference
-                            )}`}
-                          >
-                            {data.differenceValue > 0 ? '+' : ''}
-                            {formatCurrency(data.differenceValue)}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center justify-center">
-                              <span
-                                className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${getActionColor(
-                                  data.action
-                                )}`}
-                              >
-                                {getActionIcon(data.action)}
-                                {data.action}
-                              </span>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                        );
-                      })}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        )
-      )}
-
+      {/* Legend (shared for both mobile and desktop) */}
       <div className="rounded-lg bg-blue-50 p-4">
         <h3 className="font-semibold text-blue-900">Legenda</h3>
         <ul className="mt-2 space-y-1 text-sm text-blue-800">
-          <li>
-            <strong>COMPRA:</strong> La percentuale corrente è inferiore al
-            target (sotto-allocato)
-          </li>
-          <li>
-            <strong>VENDI:</strong> La percentuale corrente è superiore al target
-            (sovra-allocato)
-          </li>
-          <li>
-            <strong>OK:</strong> La percentuale corrente è vicina al target
-            (±1%)
-          </li>
+          <li><strong>COMPRA:</strong> Sotto-allocato (compra di più)</li>
+          <li><strong>VENDI:</strong> Sovra-allocato (riduci posizione)</li>
+          <li><strong>OK:</strong> Allocazione ottimale (±1% o ±€100)</li>
         </ul>
       </div>
+
+      {/* ========== MOBILE VIEW ========== */}
+      {isMobile && (
+        <>
+          {/* Asset Class Cards */}
+          {Object.keys(allocation.byAssetClass).length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center text-gray-500">
+                Nessun asset presente. Aggiungi degli asset per vedere l'allocazione.
+              </CardContent>
+            </Card>
+          ) : (
+            renderAssetClassCards()
+          )}
+
+          {/* Bottom Sheet for drill-down */}
+          <AllocationSheet
+            open={sheetNav.isOpen}
+            onOpenChange={(open) => {
+              if (!open) {
+                handleSheetClose();
+              }
+            }}
+            title={
+              sheetNav.level === 'specificAsset'
+                ? 'Specific Assets'
+                : 'Sotto-Categoria'
+            }
+            breadcrumb={
+              sheetNav.assetClass
+                ? `${assetClassLabels[sheetNav.assetClass]}${
+                    sheetNav.subCategory ? ` → ${sheetNav.subCategory}` : ''
+                  }`
+                : undefined
+            }
+            onBack={sheetNav.level === 'specificAsset' ? handleBack : undefined}
+          >
+            {renderSheetContent()}
+          </AllocationSheet>
+        </>
+      )}
+
+      {/* ========== DESKTOP VIEW (unchanged tables) ========== */}
+      {!isMobile && (
+        <>
+          {/* Asset Class Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Allocazione per Classe di Asset</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {Object.keys(allocation.byAssetClass).length === 0 ? (
+                <div className="flex h-32 items-center justify-center text-gray-500">
+                  Nessun asset presente. Aggiungi degli asset per vedere
+                  l'allocazione.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Classe Asset</TableHead>
+                        <TableHead className="text-right">Corrente %</TableHead>
+                        <TableHead className="text-right">Corrente €</TableHead>
+                        <TableHead className="text-right">Target %</TableHead>
+                        <TableHead className="text-right">Target €</TableHead>
+                        <TableHead className="text-right">Differenza %</TableHead>
+                        <TableHead className="text-right">Differenza €</TableHead>
+                        <TableHead className="text-center">Azione</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {Object.entries(allocation.byAssetClass)
+                        .sort(([a], [b]) => {
+                          const orderA = ASSET_CLASS_ORDER[a] || 999;
+                          const orderB = ASSET_CLASS_ORDER[b] || 999;
+                          return orderA - orderB;
+                        })
+                        .map(([assetClass, data]) => (
+                          <TableRow key={assetClass}>
+                            <TableCell className="font-medium">
+                              {assetClassLabels[assetClass] || assetClass}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatPercentage(data.currentPercentage)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatCurrency(data.currentValue)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatPercentage(data.targetPercentage)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatCurrency(data.targetValue)}
+                            </TableCell>
+                            <TableCell
+                              className={`text-right font-semibold ${getDifferenceColor(
+                                data.difference
+                              )}`}
+                            >
+                              {data.difference > 0 ? '+' : ''}
+                              {formatPercentage(data.difference)}
+                            </TableCell>
+                            <TableCell
+                              className={`text-right font-semibold ${getDifferenceColor(
+                                data.difference
+                              )}`}
+                            >
+                              {data.differenceValue > 0 ? '+' : ''}
+                              {formatCurrency(data.differenceValue)}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center justify-center">
+                                <span
+                                  className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${getActionColor(
+                                    data.action
+                                  )}`}
+                                >
+                                  {getActionIcon(data.action)}
+                                  {data.action}
+                                </span>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Sub-Category Tables - One card per asset class */}
+          {Object.entries(getSubCategoriesByAssetClass())
+            .sort(([a], [b]) => {
+              const orderA = ASSET_CLASS_ORDER[a] || 999;
+              const orderB = ASSET_CLASS_ORDER[b] || 999;
+              return orderA - orderB;
+            })
+            .map(([assetClass, subCategories]) => (
+              <Card key={`sub-${assetClass}`}>
+                <CardHeader>
+                  <CardTitle>
+                    Allocazione Sotto-Categoria {assetClassLabels[assetClass]}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Sotto-Categoria</TableHead>
+                          <TableHead className="text-right">Corrente %</TableHead>
+                          <TableHead className="text-right">Corrente €</TableHead>
+                          <TableHead className="text-right">Target %</TableHead>
+                          <TableHead className="text-right">Target €</TableHead>
+                          <TableHead className="text-right">Differenza %</TableHead>
+                          <TableHead className="text-right">Differenza €</TableHead>
+                          <TableHead className="text-center">Azione</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {Object.entries(subCategories)
+                          .sort(([a], [b]) => a.localeCompare(b))
+                          .map(([subCategory, data]) => {
+                            const hasSpecificAssets = hasSpecificAssetTracking(assetClass, subCategory);
+
+                            return (
+                              <TableRow
+                                key={subCategory}
+                                className={hasSpecificAssets ? 'cursor-pointer hover:bg-gray-50' : ''}
+                                onClick={() => {
+                                  if (hasSpecificAssets) {
+                                    handleDrillDownToSpecificAssets(assetClass, subCategory);
+                                  }
+                                }}
+                              >
+                                <TableCell className="font-medium">
+                                  <div className="flex items-center gap-2">
+                                    {subCategory}
+                                    {hasSpecificAssets && (
+                                      <Info className="h-4 w-4 text-blue-500" />
+                                    )}
+                                  </div>
+                                </TableCell>
+                              <TableCell className="text-right">
+                                {formatPercentage(data.currentPercentage)}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {formatCurrency(data.currentValue)}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {formatPercentage(data.targetPercentage)}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {formatCurrency(data.targetValue)}
+                              </TableCell>
+                              <TableCell
+                                className={`text-right font-semibold ${getDifferenceColor(
+                                  data.difference
+                                )}`}
+                              >
+                                {data.difference > 0 ? '+' : ''}
+                                {formatPercentage(data.difference)}
+                              </TableCell>
+                              <TableCell
+                                className={`text-right font-semibold ${getDifferenceColor(
+                                  data.difference
+                                )}`}
+                              >
+                                {data.differenceValue > 0 ? '+' : ''}
+                                {formatCurrency(data.differenceValue)}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center justify-center">
+                                  <span
+                                    className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${getActionColor(
+                                      data.action
+                                    )}`}
+                                  >
+                                    {getActionIcon(data.action)}
+                                    {data.action}
+                                  </span>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                            );
+                          })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          )}
+        </>
+      )}
     </div>
   );
 }

@@ -215,10 +215,60 @@ export default function AssetsPage() {
         </div>
       </div>
 
+      {/* Total Summary Card - Shown at top for both mobile and desktop */}
+      <Card className="border-2 border-primary">
+        <CardContent className="p-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-sm text-gray-500">Totale Patrimonio</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {formatCurrency(totalValue)}
+              </p>
+            </div>
+            {(() => {
+              const assetsWithCostBasis = assets.filter((a) => a.averageCost);
+              if (assetsWithCostBasis.length === 0) return null;
+
+              const totalGainLoss = assetsWithCostBasis.reduce(
+                (sum, asset) => sum + calculateUnrealizedGains(asset),
+                0
+              );
+              const totalCostBasis = assetsWithCostBasis.reduce(
+                (sum, asset) => sum + asset.quantity * asset.averageCost!,
+                0
+              );
+              const totalPercentage =
+                totalCostBasis > 0 ? (totalGainLoss / totalCostBasis) * 100 : 0;
+
+              const isPositive = totalGainLoss > 0;
+              const isNegative = totalGainLoss < 0;
+              const textColor = isPositive
+                ? 'text-green-600'
+                : isNegative
+                ? 'text-red-600'
+                : 'text-gray-600';
+
+              return (
+                <div className="text-right">
+                  <p className="text-sm text-gray-500">G/P Totale</p>
+                  <div className={`font-semibold ${textColor}`}>
+                    <div className="text-lg">
+                      {isPositive ? '+' : ''}
+                      {formatCurrency(totalGainLoss)}
+                    </div>
+                    <div className="text-xs">
+                      {isPositive ? '+' : ''}
+                      {formatNumber(totalPercentage, 2)}%
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
-        <CardHeader>
-          <CardTitle>Totale Patrimonio: {formatCurrency(totalValue)}</CardTitle>
-        </CardHeader>
         <CardContent>
           {assets.length === 0 ? (
             <div className="flex h-64 items-center justify-center text-gray-500">
@@ -227,7 +277,7 @@ export default function AssetsPage() {
           ) : (
             <>
               {/* Mobile Card Layout */}
-              <div className="md:hidden space-y-4">
+              <div className="md:hidden space-y-4 pt-4">
                 {assets.map((asset) => (
                   <AssetCard
                     key={asset.id}
@@ -242,59 +292,6 @@ export default function AssetsPage() {
                     isManualPrice={requiresManualPricing(asset)}
                   />
                 ))}
-
-                {/* Mobile Total Summary Card */}
-                <Card className="border-2 border-primary">
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="text-sm text-gray-500">Totale Patrimonio</p>
-                        <p className="text-2xl font-bold text-gray-900">
-                          {formatCurrency(totalValue)}
-                        </p>
-                      </div>
-                      {(() => {
-                        const assetsWithCostBasis = assets.filter((a) => a.averageCost);
-                        if (assetsWithCostBasis.length === 0) return null;
-
-                        const totalGainLoss = assetsWithCostBasis.reduce(
-                          (sum, asset) => sum + calculateUnrealizedGains(asset),
-                          0
-                        );
-                        const totalCostBasis = assetsWithCostBasis.reduce(
-                          (sum, asset) => sum + asset.quantity * asset.averageCost!,
-                          0
-                        );
-                        const totalPercentage =
-                          totalCostBasis > 0 ? (totalGainLoss / totalCostBasis) * 100 : 0;
-
-                        const isPositive = totalGainLoss > 0;
-                        const isNegative = totalGainLoss < 0;
-                        const textColor = isPositive
-                          ? 'text-green-600'
-                          : isNegative
-                          ? 'text-red-600'
-                          : 'text-gray-600';
-
-                        return (
-                          <div className="text-right">
-                            <p className="text-sm text-gray-500">G/P Totale</p>
-                            <div className={`font-semibold ${textColor}`}>
-                              <div className="text-lg">
-                                {isPositive ? '+' : ''}
-                                {formatCurrency(totalGainLoss)}
-                              </div>
-                              <div className="text-xs">
-                                {isPositive ? '+' : ''}
-                                {formatNumber(totalPercentage, 2)}%
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </CardContent>
-                </Card>
               </div>
 
               {/* Desktop Table Layout */}

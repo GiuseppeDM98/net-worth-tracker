@@ -202,6 +202,9 @@ export default function DashboardPage() {
           console.error('Error updating Hall of Fame:', error);
           // Don't show error to user - Hall of Fame update is non-critical
         }
+
+        // Refresh assets to update monthly/yearly variation cards
+        await loadAssets();
       } else {
         toast.error(result.error || 'Errore nella creazione dello snapshot');
       }
