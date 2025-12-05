@@ -38,6 +38,7 @@ export function SearchableCombobox({
 }: SearchableComboboxProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Filter options based on search query
@@ -47,6 +48,9 @@ export function SearchableCombobox({
 
   // Get selected option
   const selectedOption = options.find((opt) => opt.value === value);
+
+  // Calculate display value: show selected label when not focused, search query when focused
+  const displayValue = isFocused ? searchQuery : (selectedOption?.label || '');
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -64,6 +68,28 @@ export function SearchableCombobox({
     onValueChange(optionValue);
     setIsDropdownOpen(false);
     setSearchQuery('');
+    setIsFocused(false);
+  };
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    setIsDropdownOpen(true);
+  };
+
+  const handleBlur = () => {
+    // Delay to allow option click to register
+    setTimeout(() => {
+      setIsFocused(false);
+      setSearchQuery('');
+      setIsDropdownOpen(false);
+    }, 200);
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+    if (!isDropdownOpen) {
+      setIsDropdownOpen(true);
+    }
   };
 
   const handleClear = () => {
@@ -78,16 +104,14 @@ export function SearchableCombobox({
       <div className="relative" ref={dropdownRef}>
         <Input
           id={id}
-          placeholder={disabled ? placeholder : searchPlaceholder}
-          value={searchQuery}
-          onChange={(e) => {
-            setSearchQuery(e.target.value);
-            setIsDropdownOpen(true);
-          }}
-          onFocus={() => setIsDropdownOpen(true)}
+          placeholder={isFocused ? searchPlaceholder : placeholder}
+          value={displayValue}
+          onChange={handleSearchChange}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
           disabled={disabled}
         />
-        {isDropdownOpen && !disabled && (
+        {isFocused && isDropdownOpen && !disabled && (
           <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg max-h-60 overflow-auto">
             {filteredOptions.length === 0 ? (
               <div className="p-3 text-sm text-muted-foreground text-center">
