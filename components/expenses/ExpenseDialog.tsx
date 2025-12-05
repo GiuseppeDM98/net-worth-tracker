@@ -723,7 +723,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
                     </div>
 
                     {/* Preview auto-calcolo */}
-                    {watch('installmentTotalAmount') && watch('installmentCount') && watch('installmentCount') > 1 && (
+                    {watch('installmentTotalAmount') && (watch('installmentCount') ?? 0) > 1 && (
                       <div className="p-3 bg-primary/5 rounded-md">
                         <p className="text-sm font-medium mb-2">✓ Divisione intelligente:</p>
                         <InstallmentPreview
@@ -773,7 +773,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
                       </div>
                     </div>
 
-                    {watch('installmentCount') && watch('installmentCount') > 1 && (
+                    {(watch('installmentCount') ?? 0) > 1 && (
                       <>
                         <Button
                           type="button"
