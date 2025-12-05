@@ -50,6 +50,11 @@ export interface Expense {
   isRecurring?: boolean; // For debts with monthly recurrence
   recurringDay?: number; // Day of month for recurring expenses (1-31)
   recurringParentId?: string; // Reference to parent recurring expense
+  isInstallment?: boolean; // For installment payments (BNPL)
+  installmentParentId?: string; // Reference to parent installment series
+  installmentNumber?: number; // Current installment number (1, 2, 3...)
+  installmentTotal?: number; // Total number of installments in series
+  installmentTotalAmount?: number; // Total amount of the purchase (for analytics)
   createdAt: Date | Timestamp;
   updatedAt: Date | Timestamp;
 }
@@ -66,6 +71,12 @@ export interface ExpenseFormData {
   isRecurring?: boolean;
   recurringDay?: number;
   recurringMonths?: number; // Number of months to create recurring expenses
+  isInstallment?: boolean; // Enable installment payments
+  installmentMode?: 'auto' | 'manual'; // Auto-calculate or manual amounts
+  installmentCount?: number; // Number of installments (2-60)
+  installmentTotalAmount?: number; // Total amount to divide (auto mode only)
+  installmentAmounts?: number[]; // Individual amounts for each installment (manual mode)
+  installmentStartDate?: Date; // Date of first installment
 }
 
 export interface MonthlyExpenseSummary {

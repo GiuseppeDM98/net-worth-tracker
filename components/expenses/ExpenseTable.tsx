@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
-import { deleteExpense, deleteRecurringExpenses } from '@/lib/services/expenseService';
+import { deleteExpense, deleteRecurringExpenses, deleteInstallmentExpenses } from '@/lib/services/expenseService';
 import { Timestamp } from 'firebase/firestore';
 import {
   Table,
@@ -13,6 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Edit, Trash2, TrendingUp, TrendingDown, Calendar, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -43,8 +44,28 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
   };
 
   const handleDelete = async (expense: Expense) => {
+    // Check if this is an installment expense
+    if (expense.isInstallment && expense.installmentParentId) {
+      const confirmMessage = `Questa è la rata ${expense.installmentNumber}/${expense.installmentTotal}. Vuoi eliminare:\n\n` +
+        `[SOLO QUESTA RATA] - Solo questa rata singola\n` +
+        `[TUTTE LE RATE] - Tutte le ${expense.installmentTotal} rate\n\n` +
+        `Clicca OK per eliminare solo questa rata, Annulla per tornare indietro.`;
+
+      const deleteSingle = window.confirm(confirmMessage);
+
+      if (deleteSingle) {
+        await deleteSingleExpense(expense.id, expense.notes || 'questa voce');
+      } else {
+        const deleteAll = window.confirm(
+          `Vuoi eliminare TUTTE le ${expense.installmentTotal} rate?`
+        );
+        if (deleteAll) {
+          await deleteAllInstallmentExpenses(expense.installmentParentId);
+        }
+      }
+    }
     // Check if this is a recurring expense
-    if (expense.isRecurring && expense.recurringParentId) {
+    else if (expense.isRecurring && expense.recurringParentId) {
       const confirmMessage = `Questa è una voce ricorrente. Vuoi eliminare:\n\n` +
         `[SOLO QUESTA] - Solo questa voce singola\n` +
         `[TUTTE] - Tutte le voci ricorrenti correlate\n\n` +
@@ -96,6 +117,20 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
     } catch (error) {
       console.error('Error deleting recurring expenses:', error);
       toast.error('Errore nell\'eliminazione delle voci ricorrenti');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const deleteAllInstallmentExpenses = async (installmentParentId: string) => {
+    try {
+      setDeletingId(installmentParentId);
+      await deleteInstallmentExpenses(installmentParentId);
+      toast.success('Tutte le rate sono state eliminate');
+      onRefresh();
+    } catch (error) {
+      console.error('Error deleting installment expenses:', error);
+      toast.error('Errore nell\'eliminazione delle rate');
     } finally {
       setDeletingId(null);
     }
@@ -211,8 +246,15 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
                   <span>{formatCurrency(expense.amount)}</span>
                 </div>
               </TableCell>
-              <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
-                {expense.notes || '-'}
+              <TableCell className="text-sm text-muted-foreground max-w-[200px]">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="truncate">{expense.notes || '-'}</span>
+                  {expense.isInstallment && (
+                    <Badge variant="outline" className="flex-shrink-0 text-xs">
+                      Rata {expense.installmentNumber}/{expense.installmentTotal}
+                    </Badge>
+                  )}
+                </div>
               </TableCell>
               <TableCell className="text-center">
                 {expense.link && (
@@ -233,7 +275,7 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
                     variant="ghost"
                     size="sm"
                     onClick={() => onEdit(expense)}
-                    disabled={deletingId === expense.id || deletingId === expense.recurringParentId}
+                    disabled={deletingId === expense.id || deletingId === expense.recurringParentId || deletingId === expense.installmentParentId}
                   >
                     <Edit className="h-4 w-4" />
                   </Button>
@@ -241,7 +283,7 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
                     variant="ghost"
                     size="sm"
                     onClick={() => handleDelete(expense)}
-                    disabled={deletingId === expense.id || deletingId === expense.recurringParentId}
+                    disabled={deletingId === expense.id || deletingId === expense.recurringParentId || deletingId === expense.installmentParentId}
                   >
                     <Trash2 className="h-4 w-4 text-red-500" />
                   </Button>

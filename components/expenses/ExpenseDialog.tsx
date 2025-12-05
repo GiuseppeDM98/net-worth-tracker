@@ -33,11 +33,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { SearchableCombobox, ComboboxOption } from '@/components/ui/searchable-combobox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { Plus } from 'lucide-react';
+import { formatCurrency } from '@/lib/utils/formatters';
 
 const expenseSchema = z.object({
   type: z.enum(['fixed', 'variable', 'debt', 'income']),
@@ -51,6 +53,29 @@ const expenseSchema = z.object({
   isRecurring: z.boolean().optional(),
   recurringDay: z.number().min(1).max(31).optional(),
   recurringMonths: z.number().min(1).max(120).optional(),
+  isInstallment: z.boolean().optional(),
+  installmentMode: z.enum(['auto', 'manual']).optional(),
+  installmentCount: z.number().min(2).max(60).optional(),
+  installmentTotalAmount: z.number().positive().optional(),
+  installmentAmounts: z.array(z.number()).optional(),
+  installmentStartDate: z.date().optional(),
+}).refine((data) => {
+  // Validazione custom: se isInstallment=true, campi richiesti
+  if (data.isInstallment) {
+    if (!data.installmentCount || data.installmentCount < 2) {
+      return false;
+    }
+    if (data.installmentMode === 'auto' && !data.installmentTotalAmount) {
+      return false;
+    }
+    if (data.installmentMode === 'manual' &&
+        (!data.installmentAmounts || data.installmentAmounts.length !== data.installmentCount)) {
+      return false;
+    }
+  }
+  return true;
+}, {
+  message: "Campi installment incompleti o non validi"
 });
 
 type ExpenseFormValues = z.infer<typeof expenseSchema>;
@@ -94,6 +119,10 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
       date: new Date(),
       isRecurring: false,
       recurringMonths: 12,
+      isInstallment: false,
+      installmentMode: 'auto',
+      installmentCount: 2,
+      installmentAmounts: [],
     },
   });
 
@@ -260,6 +289,18 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
         isRecurring: data.type === 'debt' ? data.isRecurring : false,
         recurringDay: data.isRecurring ? data.recurringDay : undefined,
         recurringMonths: data.isRecurring ? data.recurringMonths : undefined,
+
+        // Campi installment
+        isInstallment: data.isInstallment,
+        installmentMode: data.isInstallment ? data.installmentMode : undefined,
+        installmentCount: data.isInstallment ? data.installmentCount : undefined,
+        installmentTotalAmount: data.isInstallment && data.installmentMode === 'auto'
+          ? data.installmentTotalAmount
+          : undefined,
+        installmentAmounts: data.isInstallment && data.installmentMode === 'manual'
+          ? data.installmentAmounts
+          : undefined,
+        installmentStartDate: data.isInstallment ? data.installmentStartDate : undefined,
       };
 
       if (expense) {
@@ -281,7 +322,14 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
         );
 
         if (Array.isArray(result)) {
-          toast.success(`${result.length} voci ricorrenti create con successo`);
+          if (expenseData.isInstallment) {
+            const total = expenseData.installmentMode === 'auto'
+              ? expenseData.installmentTotalAmount
+              : expenseData.installmentAmounts?.reduce((sum, amt) => sum + amt, 0);
+            toast.success(`${result.length} rate create con successo (Totale: ${formatCurrency(total || 0)})`);
+          } else {
+            toast.success(`${result.length} voci ricorrenti create con successo`);
+          }
         } else {
           toast.success('Spesa creata con successo');
         }
@@ -297,6 +345,38 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
 
   const availableCategories = getAvailableCategories();
   const availableSubCategories = getAvailableSubCategories();
+
+  // Helper: Calcola data N-esima rata (mensile)
+  const calculateInstallmentDate = (startDate: Date, monthOffset: number): Date => {
+    const date = new Date(startDate);
+    date.setMonth(date.getMonth() + monthOffset);
+    return date;
+  };
+
+  // Helper Component: Preview divisione automatica rate
+  const InstallmentPreview = ({ total, count }: { total: number; count: number }) => {
+    const perInstallment = total / count;
+    const baseAmount = Math.floor(perInstallment * 100) / 100; // Arrotonda per difetto
+    const remainder = total - (baseAmount * count);
+    const lastAmount = baseAmount + remainder;
+
+    // Se tutte le rate sono uguali (remainder trascurabile)
+    if (Math.abs(remainder) < 0.01) {
+      return (
+        <p className="text-sm">
+          {count} rate da {formatCurrency(baseAmount)}
+        </p>
+      );
+    }
+
+    // Se c'è una differenza, mostra la divisione
+    const identicalCount = count - 1;
+    return (
+      <p className="text-sm">
+        {identicalCount} rate da {formatCurrency(baseAmount)} + 1 rata da {formatCurrency(lastAmount)}
+      </p>
+    );
+  };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -551,6 +631,208 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
             </p>
           </div>
 
+          {/* Acquisto Rateale (tutte le categorie) */}
+          {!expense && (
+            <div className="space-y-4 border rounded-md p-4 bg-muted/50">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="isInstallment">Acquisto rateale</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Crea automaticamente rate mensili con importi personalizzati
+                  </p>
+                </div>
+                <Switch
+                  id="isInstallment"
+                  checked={watch('isInstallment') || false}
+                  onCheckedChange={(checked) => {
+                    setValue('isInstallment', checked);
+                    if (checked) {
+                      setValue('isRecurring', false);
+                      setValue('installmentMode', 'auto');
+                      setValue('installmentStartDate', watch('date'));
+
+                      // Pre-compila importo totale con l'importo già inserito
+                      const currentAmount = watch('amount');
+                      if (currentAmount && currentAmount > 0) {
+                        setValue('installmentTotalAmount', currentAmount);
+                      }
+                    }
+                  }}
+                />
+              </div>
+
+              {watch('isInstallment') && (
+                <Tabs
+                  defaultValue="auto"
+                  onValueChange={(mode) => setValue('installmentMode', mode as 'auto' | 'manual')}
+                >
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="auto">Calcolo Automatico</TabsTrigger>
+                    <TabsTrigger value="manual">Importi Personalizzati</TabsTrigger>
+                  </TabsList>
+
+                  {/* TAB 1: Auto-calcolo */}
+                  <TabsContent value="auto" className="space-y-4 mt-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="installmentTotalAmount">Importo Totale *</Label>
+                        <Input
+                          id="installmentTotalAmount"
+                          type="number"
+                          step="0.01"
+                          min="0.01"
+                          placeholder="333.41"
+                          {...register('installmentTotalAmount', { valueAsNumber: true })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="installmentCount">Numero di Rate *</Label>
+                        <Input
+                          id="installmentCount"
+                          type="number"
+                          min="2"
+                          max="60"
+                          placeholder="5"
+                          {...register('installmentCount', { valueAsNumber: true })}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="installmentStartDate">Prima Rata il *</Label>
+                      <Controller
+                        control={control}
+                        name="installmentStartDate"
+                        render={({ field }) => (
+                          <Input
+                            id="installmentStartDate"
+                            type="date"
+                            value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
+                            onChange={(e) => {
+                              const dateString = e.target.value;
+                              if (dateString) {
+                                const date = new Date(dateString + 'T00:00:00');
+                                if (!isNaN(date.getTime())) {
+                                  field.onChange(date);
+                                }
+                              }
+                            }}
+                          />
+                        )}
+                      />
+                    </div>
+
+                    {/* Preview auto-calcolo */}
+                    {watch('installmentTotalAmount') && watch('installmentCount') && watch('installmentCount') > 1 && (
+                      <div className="p-3 bg-primary/5 rounded-md">
+                        <p className="text-sm font-medium mb-2">✓ Divisione intelligente:</p>
+                        <InstallmentPreview
+                          total={watch('installmentTotalAmount') || 0}
+                          count={watch('installmentCount') || 2}
+                        />
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  {/* TAB 2: Importi manuali */}
+                  <TabsContent value="manual" className="space-y-4 mt-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="installmentCountManual">Numero di Rate *</Label>
+                        <Input
+                          id="installmentCountManual"
+                          type="number"
+                          min="2"
+                          max="60"
+                          placeholder="5"
+                          {...register('installmentCount', { valueAsNumber: true })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="installmentStartDateManual">Prima Rata il *</Label>
+                        <Controller
+                          control={control}
+                          name="installmentStartDate"
+                          render={({ field }) => (
+                            <Input
+                              id="installmentStartDateManual"
+                              type="date"
+                              value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
+                              onChange={(e) => {
+                                const dateString = e.target.value;
+                                if (dateString) {
+                                  const date = new Date(dateString + 'T00:00:00');
+                                  if (!isNaN(date.getTime())) {
+                                    field.onChange(date);
+                                  }
+                                }
+                              }}
+                            />
+                          )}
+                        />
+                      </div>
+                    </div>
+
+                    {watch('installmentCount') && watch('installmentCount') > 1 && (
+                      <>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            const count = watch('installmentCount') || 2;
+                            const baseAmount = watch('amount') || 0;
+                            const perInstallment = Number((baseAmount / count).toFixed(2));
+                            const amounts = Array(count).fill(perInstallment);
+                            setValue('installmentAmounts', amounts);
+                          }}
+                        >
+                          Genera Campi Rate
+                        </Button>
+
+                        {/* Lista input rate */}
+                        {watch('installmentAmounts') && watch('installmentAmounts')!.length > 0 && (
+                          <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                            {Array.from({ length: watch('installmentCount') || 0 }).map((_, index) => {
+                              const installmentDate = calculateInstallmentDate(
+                                watch('installmentStartDate') || new Date(),
+                                index
+                              );
+
+                              return (
+                                <div key={index} className="flex items-center gap-2">
+                                  <Label className="w-32 text-sm flex-shrink-0">
+                                    Rata {index + 1} ({format(installmentDate, 'MMM yyyy', { locale: it })}):
+                                  </Label>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="0.00"
+                                    {...register(`installmentAmounts.${index}`, { valueAsNumber: true })}
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Totale */}
+                        {watch('installmentAmounts') && watch('installmentAmounts')!.length > 0 && (
+                          <div className="flex justify-end p-2 bg-muted rounded-md">
+                            <span className="font-medium">
+                              Totale: {formatCurrency(
+                                (watch('installmentAmounts') || []).reduce((sum: number, amt: number) => sum + (amt || 0), 0)
+                              )}
+                            </span>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </TabsContent>
+                </Tabs>
+              )}
+            </div>
+          )}
+
           {/* Ricorrenza (solo per debiti) */}
           {selectedType === 'debt' && !expense && (
             <div className="space-y-4 border rounded-md p-4 bg-muted/50">
@@ -564,7 +846,13 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
                 <Switch
                   id="isRecurring"
                   checked={watch('isRecurring') || false}
-                  onCheckedChange={(checked) => setValue('isRecurring', checked)}
+                  onCheckedChange={(checked) => {
+                    setValue('isRecurring', checked);
+                    if (checked) {
+                      setValue('isInstallment', false);
+                    }
+                  }}
+                  disabled={watch('isInstallment')}
                 />
               </div>
 

@@ -90,6 +90,15 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
 - **Four entry types**: Income, Fixed Expenses, Variable Expenses, Debts
 - **Custom categories** with sub-categories and color coding
 - **Recurring expenses** with automatic monthly generation
+- **Installment payments (BNPL)** for tracking multi-payment purchases
+  - **Dual modes**: Auto-calculate equal installments or enter custom amounts per payment
+  - **Flexible terms**: 2-60 installments with monthly frequency
+  - **Smart preview**: Shows simplified format when payments are equal, detailed breakdown when different
+  - **Batch creation**: Generates all installments in one operation with proper date distribution
+  - **Visual tracking**: "Rata X/Y" badges in expense table for easy identification
+  - **Bulk deletion**: Option to delete entire installment series or individual payments
+  - **Universal support**: Available for all expense/income types, not just debts
+  - **Mutual exclusion**: Prevents conflicts with recurring expense feature
 - **Visual analytics**: Spending breakdown by category, type, and monthly trends
 - **Interactive drill-down pie charts** for hierarchical data exploration
   - **Three-level navigation**: Categories → Subcategories → Individual transactions
@@ -560,6 +569,84 @@ See [Infrastructure Alternatives](./SETUP.md#infrastructure-alternatives) for mi
    - Day: 10
    - Months: 12
 5. System creates 12 monthly entries automatically
+
+### Tracking Installment Payments (Buy Now Pay Later)
+
+The **Installment Payments** feature allows you to track purchases split into multiple monthly payments, common with Buy Now Pay Later (BNPL) services or financing options.
+
+**When to use:**
+- Amazon Pay in Installments (5 monthly payments)
+- Scalapay, Klarna, or other BNPL services
+- Store financing (e.g., 12-month furniture payment plan)
+- Auto loans with fixed monthly payments
+- Any purchase split into multiple scheduled payments
+
+**How to create installment expenses:**
+
+**Option 1: Auto-Calculate Equal Installments**
+1. Navigate to **"Tracciamento Spese"** (Expense Tracking)
+2. Click **"Nuova Spesa"**
+3. Enter the base expense details:
+   - Amount: €500 (this will auto-populate "Importo Totale")
+   - Category: Shopping
+   - Date: 2025-12-05
+4. Enable **"Acquisto rateale"** toggle
+5. The system automatically:
+   - Switches to "Calcolo Automatico" tab
+   - Pre-fills "Importo Totale" with €500
+6. Configure installments:
+   - Numero di Rate: 5
+   - Prima Rata il: 05/12/2025
+7. Review the smart preview:
+   - If equal: "5 rate da 100,00 €"
+   - If different: "4 rate da 66,68 € + 1 rata da 66,69 €"
+8. Click **"Crea Spesa"**
+9. System creates 5 monthly expenses:
+   - Expense 1: €100 on 05/12/2025 (Rata 1/5)
+   - Expense 2: €100 on 05/01/2026 (Rata 2/5)
+   - Expense 3: €100 on 05/02/2026 (Rata 3/5)
+   - Expense 4: €100 on 05/03/2026 (Rata 4/5)
+   - Expense 5: €100 on 05/04/2026 (Rata 5/5)
+
+**Option 2: Custom Amounts per Installment**
+1. Follow steps 1-5 from Option 1
+2. Switch to **"Importi Personalizzati"** tab
+3. Configure:
+   - Numero di Rate: 3
+   - Prima Rata il: 05/12/2025
+4. Click **"Genera Campi Rate"**
+5. Enter custom amounts:
+   - Rata 1 (Dic 2025): €150
+   - Rata 2 (Gen 2026): €200
+   - Rata 3 (Feb 2026): €150
+6. View real-time total: €500
+7. Click **"Crea Spesa"**
+
+**Viewing installments in the table:**
+- Each expense displays a **"Rata X/Y" badge** (e.g., "Rata 1/5")
+- Expenses are grouped by `installmentParentId` in the database
+- Notes automatically include installment information
+
+**Deleting installments:**
+1. Click delete icon on any installment expense
+2. System shows prompt: "Questa è la rata 3/5. Vuoi eliminare solo questa rata o tutte le 5 rate?"
+3. Choose:
+   - **Solo questa rata**: Deletes individual payment
+   - **Tutte le rate**: Bulk deletes entire installment series
+
+**Important notes:**
+- Installment feature is **mutually exclusive** with recurring expenses
+- Available for all expense types (Fixed, Variable, Debt, Income)
+- Maximum 60 installments (5 years)
+- Minimum 2 installments
+- Monthly frequency only (daily/weekly not supported)
+- First installment date must be today or in the future
+
+**Example use cases:**
+- Amazon BNPL: €333.41 purchase → 5 equal installments
+- Furniture financing: €3,000 → 12 monthly payments
+- Jewelry store layaway: Custom amounts per month
+- Auto loan: 60 installments over 5 years
 
 ### Managing Categories with Associated Expenses
 
@@ -1056,6 +1143,7 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - ✅ UI/UX rationalization with streamlined navigation and grouped pages (sidebar reduced from 11 to 8 items)
 - ✅ Advanced expense filtering system with hierarchical Type/Category/Subcategory filters and searchable comboboxes
 - ✅ Capital Gains Tax Calculator for simulating asset sales with dual input modes and real-time tax impact calculation
+- ✅ Installment payments (BNPL) tracking with dual input modes (auto-calculate or custom amounts), visual badges, and bulk operations
 
 ### Future Enhancements (Planned 🔜)
 - 🔜 PDF export of portfolio reports

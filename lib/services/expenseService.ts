@@ -177,6 +177,11 @@ export async function createExpense(
   try {
     const now = Timestamp.now();
 
+    // Check installment first (priority over recurring)
+    if (expenseData.isInstallment && expenseData.installmentCount && expenseData.installmentCount > 1) {
+      return await createInstallmentExpenses(userId, expenseData, categoryName, subCategoryName);
+    }
+
     // If it's a recurring expense, create multiple entries
     if (expenseData.isRecurring && expenseData.recurringMonths && expenseData.recurringMonths > 0) {
       return await createRecurringExpenses(userId, expenseData, categoryName, subCategoryName);
@@ -283,6 +288,128 @@ async function createRecurringExpenses(
   } catch (error) {
     console.error('Error creating recurring expenses:', error);
     throw new Error('Failed to create recurring expenses');
+  }
+}
+
+/**
+ * Create installment expenses (for BNPL payments)
+ * Supports both auto-calculation and manual amounts
+ */
+async function createInstallmentExpenses(
+  userId: string,
+  expenseData: ExpenseFormData,
+  categoryName: string,
+  subCategoryName?: string
+): Promise<string[]> {
+  try {
+    const batch = writeBatch(db);
+    const expensesRef = collection(db, EXPENSES_COLLECTION);
+    const createdIds: string[] = [];
+    const now = Timestamp.now();
+
+    // Generate unique parent ID for linking installments
+    const parentId = `installment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    const installmentCount = expenseData.installmentCount!;
+    const startDate = expenseData.installmentStartDate || expenseData.date;
+
+    // Calculate amounts based on mode
+    let installmentAmounts: number[];
+    let totalAmount: number;
+
+    if (expenseData.installmentMode === 'auto') {
+      // Auto-calculation: divide total amount
+      totalAmount = expenseData.installmentTotalAmount!;
+      const perInstallment = totalAmount / installmentCount;
+      const baseAmount = Math.floor(perInstallment * 100) / 100; // Round down to 2 decimals
+      const remainder = totalAmount - (baseAmount * installmentCount);
+
+      // All installments get base amount except last one (gets base + remainder)
+      installmentAmounts = Array(installmentCount - 1).fill(baseAmount);
+      installmentAmounts.push(baseAmount + remainder);
+    } else {
+      // Manual: use provided amounts
+      installmentAmounts = expenseData.installmentAmounts!;
+      totalAmount = installmentAmounts.reduce((sum, amt) => sum + amt, 0);
+    }
+
+    // Ensure amounts are negative for expenses (positive for income)
+    const isExpense = expenseData.type !== 'income';
+    if (isExpense) {
+      installmentAmounts = installmentAmounts.map(amt => -Math.abs(amt));
+      totalAmount = -Math.abs(totalAmount);
+    }
+
+    // Create one expense document per installment
+    for (let i = 0; i < installmentCount; i++) {
+      const installmentDate = new Date(startDate);
+      installmentDate.setMonth(installmentDate.getMonth() + i);
+
+      const docRef = doc(expensesRef);
+      const cleanedData = removeUndefinedFields({
+        userId,
+        type: expenseData.type,
+        categoryId: expenseData.categoryId,
+        categoryName,
+        subCategoryId: expenseData.subCategoryId,
+        subCategoryName,
+        amount: installmentAmounts[i],
+        currency: expenseData.currency,
+        date: Timestamp.fromDate(installmentDate),
+        notes: expenseData.notes
+          ? `${expenseData.notes} (Rata ${i + 1}/${installmentCount})`
+          : `Rata ${i + 1}/${installmentCount}`,
+        link: expenseData.link,
+
+        // Installment-specific fields
+        isInstallment: true,
+        installmentParentId: parentId,
+        installmentNumber: i + 1,
+        installmentTotal: installmentCount,
+        installmentTotalAmount: totalAmount,
+
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      batch.set(docRef, cleanedData);
+      createdIds.push(docRef.id);
+    }
+
+    await batch.commit();
+
+    console.log(`Created ${installmentCount} installment expenses with parent ID: ${parentId}`);
+    return createdIds;
+  } catch (error) {
+    console.error('Error creating installment expenses:', error);
+    throw new Error('Failed to create installment expenses');
+  }
+}
+
+/**
+ * Delete all expenses in an installment series
+ * @param installmentParentId - The parent ID linking all installments
+ */
+export async function deleteInstallmentExpenses(installmentParentId: string): Promise<void> {
+  try {
+    const expensesRef = collection(db, EXPENSES_COLLECTION);
+    const q = query(
+      expensesRef,
+      where('installmentParentId', '==', installmentParentId)
+    );
+
+    const querySnapshot = await getDocs(q);
+    const batch = writeBatch(db);
+
+    querySnapshot.docs.forEach(docSnapshot => {
+      batch.delete(docSnapshot.ref);
+    });
+
+    await batch.commit();
+    console.log(`Deleted ${querySnapshot.size} installment expenses with parent ID: ${installmentParentId}`);
+  } catch (error) {
+    console.error('Error deleting installment expenses:', error);
+    throw new Error('Failed to delete installment expenses');
   }
 }
 
