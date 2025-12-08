@@ -35,6 +35,7 @@ const MONTHS = [
 export function ExpenseTrackingTab() {
   const { user } = useAuth();
   const currentYear = new Date().getFullYear();
+  const currentMonth = String(new Date().getMonth() + 1); // 1-based month (1-12)
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [allExpenses, setAllExpenses] = useState<Expense[]>([]); // Keep all expenses for year calculation
   const [loading, setLoading] = useState(true);
@@ -82,6 +83,11 @@ export function ExpenseTrackingTab() {
     setSelectedYear(year);
     // Reset month when changing year
     setSelectedMonth('all');
+  };
+
+  const handleCurrentMonth = () => {
+    setSelectedYear(currentYear);
+    setSelectedMonth(currentMonth);
   };
 
   // Handler functions for filter selections
@@ -500,7 +506,7 @@ export function ExpenseTrackingTab() {
           </CardHeader>
           <CollapsibleContent>
             <CardContent>
-              <div className="flex flex-wrap gap-4">
+              <div className="flex flex-wrap items-end gap-4">
                 {/* Month Filter */}
                 <div className="flex flex-col gap-2 min-w-[150px]">
                   <label className="text-sm font-medium">Mese</label>
@@ -520,6 +526,18 @@ export function ExpenseTrackingTab() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                {/* Current Month Quick Filter Button */}
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium">&nbsp;</label>
+                  <Button
+                    onClick={handleCurrentMonth}
+                    variant="secondary"
+                    size="default"
+                  >
+                    Mese corrente
+                  </Button>
                 </div>
 
                 {/* Type Filter with Search */}
