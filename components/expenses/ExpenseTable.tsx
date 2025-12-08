@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Trash2, TrendingUp, TrendingDown, Calendar, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
+import { Edit, Trash2, TrendingUp, TrendingDown, Calendar, ChevronLeft, ChevronRight, ExternalLink, ArrowUp, ArrowDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
@@ -30,6 +30,7 @@ interface ExpenseTableProps {
 export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState<'asc' | 'desc' | null>(null);
 
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('it-IT', {
@@ -160,14 +161,34 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
 
-  const paginatedExpenses = useMemo(() => {
-    return expenses.slice(startIndex, endIndex);
-  }, [expenses, startIndex, endIndex]);
+  // Sort expenses based on sortBy state
+  const sortedExpenses = useMemo(() => {
+    if (sortBy === null) {
+      return expenses; // No sort: keep date order
+    }
 
-  // Reset to page 1 when expenses array length changes (add/delete)
+    const sorted = [...expenses]; // Copy to avoid mutation
+    sorted.sort((a, b) => {
+      return sortBy === 'desc' ? b.amount - a.amount : a.amount - b.amount;
+    });
+
+    return sorted;
+  }, [expenses, sortBy]);
+
+  // Paginate sorted expenses
+  const paginatedExpenses = useMemo(() => {
+    return sortedExpenses.slice(startIndex, endIndex);
+  }, [sortedExpenses, startIndex, endIndex]);
+
+  // Reset to page 1 when expenses array length changes (add/delete) or sort changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [expenses.length]);
+  }, [expenses.length, sortBy]);
+
+  // Reset sort when expenses change (new filters applied)
+  useEffect(() => {
+    setSortBy(null);
+  }, [expenses]);
 
   const handlePreviousPage = () => {
     setCurrentPage((prev: number) => Math.max(1, prev - 1));
@@ -175,6 +196,14 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
 
   const handleNextPage = () => {
     setCurrentPage((prev: number) => Math.min(totalPages, prev + 1));
+  };
+
+  const handleSortByAmount = () => {
+    setSortBy(prevSort => {
+      if (prevSort === null) return 'desc';
+      if (prevSort === 'desc') return 'asc';
+      return null; // Reset to no sort
+    });
   };
 
   if (expenses.length === 0) {
@@ -198,7 +227,17 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
               <TableHead className="w-[120px]">Tipo</TableHead>
               <TableHead>Categoria</TableHead>
               <TableHead>Sotto-categoria</TableHead>
-              <TableHead className="text-right w-[120px]">Importo</TableHead>
+              <TableHead className="text-right w-[120px]">
+                <button
+                  onClick={handleSortByAmount}
+                  className="flex items-center justify-end gap-1 cursor-pointer hover:text-foreground transition-colors w-full"
+                  aria-label="Ordina per importo"
+                >
+                  <span>Importo</span>
+                  {sortBy === 'desc' && <ArrowDown className="h-4 w-4 text-muted-foreground" />}
+                  {sortBy === 'asc' && <ArrowUp className="h-4 w-4 text-muted-foreground" />}
+                </button>
+              </TableHead>
               <TableHead className="max-w-[200px]">Note</TableHead>
               <TableHead className="w-[50px] text-center">Link</TableHead>
               <TableHead className="w-[100px] text-right">Azioni</TableHead>

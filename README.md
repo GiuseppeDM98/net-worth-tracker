@@ -167,6 +167,20 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
   - No more scrolling through long dropdown lists - just start typing
   - Example: Type "food" to instantly find "Food & Dining", "Fast Food", "Pet Food"
   - Maintains all existing functionality: inline creation, validation, color display
+- **Amount column sorting** (#63) in Cashflow tracking table
+  - **Three-state toggle**: Click "Importo" header to cycle between descending → ascending → default date order
+  - **Visual indicators**: Arrow icons (↓/↑) show current sort direction
+  - **Real-value sorting**: Income and expenses grouped naturally (highest income first when descending, largest expenses first when ascending)
+  - **Smart auto-reset**: Sort resets to date order when filters change
+  - **Preserves all functionality**: Works seamlessly with pagination, filtering, and existing table features
+  - Example: Quickly identify highest monthly expense or largest income source with one click
+- **Current Month Quick Filter** (#64) for instant access to current month data
+  - **One-click filtering**: "Mese corrente" button next to month dropdown automatically sets current year and month
+  - **Smart year override**: Updates both year and month filters to ensure consistency
+  - **Perfect alignment**: Filter controls aligned with `items-end` for clean visual appearance
+  - **Mobile-responsive**: Button wraps appropriately on smaller screens
+  - **Always accessible**: Button remains enabled for quick data refresh
+  - Example: Jump to current month's expenses with a single click instead of navigating dropdowns
 
 ### 🔥 **FIRE Calculator & Tracker**
 - **Safe Withdrawal Rate** configuration (4% rule based on Trinity Study)
@@ -1144,6 +1158,8 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - ✅ Advanced expense filtering system with hierarchical Type/Category/Subcategory filters and searchable comboboxes
 - ✅ Capital Gains Tax Calculator for simulating asset sales with dual input modes and real-time tax impact calculation
 - ✅ Installment payments (BNPL) tracking with dual input modes (auto-calculate or custom amounts), visual badges, and bulk operations
+- ✅ Amount column sorting in Cashflow table with three-state toggle (desc/asc/none), visual indicators, and smart auto-reset
+- ✅ Current Month Quick Filter button in Cashflow tracking for instant access to current month data with one-click filtering
 
 ### Future Enhancements (Planned 🔜)
 - 🔜 PDF export of portfolio reports
