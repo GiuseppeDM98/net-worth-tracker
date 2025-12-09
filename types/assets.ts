@@ -146,6 +146,7 @@ export interface MonthlySnapshot {
     [assetClass: string]: number;
   };
   createdAt: Date | Timestamp;
+  note?: string; // Optional note to document significant financial events (max 500 characters)
 }
 
 export interface PriceHistory {

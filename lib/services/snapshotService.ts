@@ -7,6 +7,7 @@ import {
   where,
   orderBy,
   Timestamp,
+  deleteField,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { Asset, MonthlySnapshot } from '@/types/assets';
@@ -57,9 +58,7 @@ export async function createSnapshot(
       totalValue: calculateAssetValue(asset),
     }));
 
-    const snapshotId = `${userId}-${snapshotYear}-${String(
-      snapshotMonth
-    ).padStart(2, '0')}`;
+    const snapshotId = `${userId}-${snapshotYear}-${snapshotMonth}`;
 
     const snapshot: Omit<MonthlySnapshot, 'createdAt'> & {
       createdAt: Timestamp;
@@ -208,4 +207,51 @@ export function calculateYearlyChange(
   const percentage = (value / firstSnapshotOfYear.totalNetWorth) * 100;
 
   return { value, percentage };
+}
+
+/**
+ * Update or delete a note from a monthly snapshot
+ * @param userId - User ID
+ * @param year - Snapshot year
+ * @param month - Snapshot month (1-12)
+ * @param note - Note text (empty string deletes the note)
+ * @throws Error if note exceeds 500 characters or if snapshot doesn't exist
+ */
+export async function updateSnapshotNote(
+  userId: string,
+  year: number,
+  month: number,
+  note: string
+): Promise<void> {
+  const trimmedNote = note.trim();
+
+  if (trimmedNote.length > 500) {
+    throw new Error('La nota non può superare i 500 caratteri');
+  }
+
+  // Firestore document ID format: userId-YYYY-M (without padding for consistency with existing snapshots)
+  const snapshotId = `${userId}-${year}-${month}`;
+  const snapshotRef = doc(db, SNAPSHOTS_COLLECTION, snapshotId);
+
+  // Use setDoc with merge: true to handle both create and update cases
+  // Include userId to satisfy Firestore security rules for document creation
+  if (trimmedNote.length === 0) {
+    await setDoc(
+      snapshotRef,
+      {
+        note: deleteField(),
+        userId: userId,
+      },
+      { merge: true }
+    );
+  } else {
+    await setDoc(
+      snapshotRef,
+      {
+        note: trimmedNote,
+        userId: userId,
+      },
+      { merge: true }
+    );
+  }
 }

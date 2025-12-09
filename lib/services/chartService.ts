@@ -94,6 +94,7 @@ export function prepareNetWorthHistoryData(snapshots: MonthlySnapshot[]): {
   illiquidNetWorth: number;
   month: number;
   year: number;
+  note?: string;
 }[] {
   return snapshots.map((snapshot) => ({
     date: `${String(snapshot.month).padStart(2, '0')}/${String(snapshot.year).slice(-2)}`,
@@ -102,6 +103,7 @@ export function prepareNetWorthHistoryData(snapshots: MonthlySnapshot[]): {
     illiquidNetWorth: snapshot.illiquidNetWorth || 0, // Default to 0 for backward compatibility with older snapshots
     month: snapshot.month,
     year: snapshot.year,
+    note: snapshot.note,
   }));
 }
 

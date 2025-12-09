@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAllAssets, ASSET_CLASS_ORDER } from '@/lib/services/assetService';
-import { getUserSnapshots } from '@/lib/services/snapshotService';
+import { getUserSnapshots, updateSnapshotNote } from '@/lib/services/snapshotService';
 import {
   getTargets,
   compareAllocations,
@@ -19,9 +19,11 @@ import {
 import { Asset, MonthlySnapshot, AssetAllocationTarget } from '@/types/assets';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, Plus } from 'lucide-react';
+import { Download, Plus, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { CreateManualSnapshotModal } from '@/components/CreateManualSnapshotModal';
+import { SnapshotSearchDialog } from '@/components/history/SnapshotSearchDialog';
+import { CustomChartDot } from '@/components/history/CustomChartDot';
 import {
   LineChart,
   Line,
@@ -36,6 +38,7 @@ import {
   Legend,
   ResponsiveContainer,
   Cell,
+  LabelList,
 } from 'recharts';
 import { getAssetClassColor } from '@/lib/constants/colors';
 
@@ -57,6 +60,8 @@ export default function HistoryPage() {
   const [showLiquidityPercentage, setShowLiquidityPercentage] = useState(false);
   const [showYoYPercentage, setShowYoYPercentage] = useState(false);
   const [showManualSnapshotModal, setShowManualSnapshotModal] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
+  const [snapshotSearchDialogOpen, setSnapshotSearchDialogOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -118,6 +123,21 @@ export default function HistoryPage() {
     document.body.removeChild(link);
 
     toast.success('Storico esportato con successo');
+  };
+
+  const handleSaveNote = async (year: number, month: number, note: string) => {
+    if (!user) return;
+
+    await updateSnapshotNote(user.uid, year, month, note);
+
+    // Aggiorna stato locale (optimistic update)
+    setSnapshots((prevSnapshots) =>
+      prevSnapshots.map((s) =>
+        s.year === year && s.month === month
+          ? { ...s, note: note.trim() || undefined }
+          : s
+      )
+    );
   };
 
   const netWorthHistory = prepareNetWorthHistoryData(snapshots);
@@ -351,7 +371,29 @@ export default function HistoryPage() {
       {/* Net Worth History Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>Evoluzione Patrimonio Netto</CardTitle>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <CardTitle>Evoluzione Patrimonio Netto</CardTitle>
+            <div className="flex items-center gap-2">
+              {/* Toggle Visualizza Note */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowNotes(!showNotes)}
+              >
+                {showNotes ? 'Nascondi Note' : 'Visualizza Note'}
+              </Button>
+
+              {/* Bottone Inserisci Nota */}
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setSnapshotSearchDialogOpen(true)}
+              >
+                <MessageSquare className="h-4 w-4 mr-1" />
+                Inserisci una nota
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {netWorthHistory.length === 0 ? (
@@ -382,10 +424,40 @@ export default function HistoryPage() {
                   stroke="#3B82F6"
                   strokeWidth={2}
                   name="Patrimonio Totale"
-                  dot={{ r: 4 }}
+                  dot={(props: any) => <CustomChartDot {...props} />}
+                  activeDot={{ r: 6 }}
                   isAnimationActive={false}
-                  label={false}
-                />
+                >
+                  {showNotes && (
+                    <LabelList
+                      dataKey="note"
+                      position="top"
+                      content={(props: any) => {
+                        // Only render label if note exists
+                        if (!props.value) return null;
+
+                        const note = String(props.value);
+                        const displayText = note.length > 50
+                          ? note.substring(0, 50) + '...'
+                          : note;
+
+                        return (
+                          <text
+                            x={props.x}
+                            y={props.y - 18}
+                            fill="#F59E0B"
+                            fontSize={15}
+                            fontWeight={600}
+                            textAnchor="middle"
+                            style={{ pointerEvents: 'none' }}
+                          >
+                            {displayText}
+                          </text>
+                        );
+                      }}
+                    />
+                  )}
+                </Line>
               </LineChart>
             </ResponsiveContainer>
           )}
@@ -797,16 +869,18 @@ export default function HistoryPage() {
                   key={`${snapshot.year}-${snapshot.month}`}
                   className="rounded-lg border p-4"
                 >
-                  <div className="text-lg font-semibold">
-                    {getMonthName(snapshot.month)} {snapshot.year}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    Creato il: {snapshot.createdAt.toLocaleString('it-IT', {
-                      day: '2-digit',
-                      month: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
+                  <div>
+                    <div className="text-lg font-semibold">
+                      {getMonthName(snapshot.month)} {snapshot.year}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      Creato il: {snapshot.createdAt.toLocaleString('it-IT', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </div>
                   </div>
                   <div className="mt-3">
                     <div className="text-lg font-bold">
@@ -816,6 +890,19 @@ export default function HistoryPage() {
                       Liquido: {formatCurrency(snapshot.liquidNetWorth)}
                     </div>
                   </div>
+                  {snapshot.note && (
+                    <div className="mt-3 pt-3 border-t">
+                      <div className="text-xs text-amber-600 dark:text-amber-400 font-medium mb-1 flex items-center gap-1">
+                        <MessageSquare className="h-3 w-3" />
+                        Nota:
+                      </div>
+                      <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                        {snapshot.note.length > 100
+                          ? snapshot.note.substring(0, 100) + '...'
+                          : snapshot.note}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -828,6 +915,13 @@ export default function HistoryPage() {
         onOpenChange={setShowManualSnapshotModal}
         userId={user?.uid || ''}
         onSuccess={loadData}
+      />
+
+      <SnapshotSearchDialog
+        open={snapshotSearchDialogOpen}
+        onOpenChange={setSnapshotSearchDialogOpen}
+        snapshots={snapshots}
+        onSave={handleSaveNote}
       />
     </div>
   );
