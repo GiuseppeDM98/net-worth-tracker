@@ -38,7 +38,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
   const handleLinkClick = () => {
     // Close sidebar on mobile after navigation
-    if (onClose && window.innerWidth < 768) {
+    if (onClose && window.innerWidth < 1024) {
       onClose();
     }
   };
@@ -48,18 +48,18 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       className={cn(
         'flex h-full w-64 flex-col bg-gray-900 text-white transition-transform duration-300 ease-in-out',
         // Mobile: fixed position, slide in/out
-        'fixed inset-y-0 left-0 z-50 md:relative md:translate-x-0',
+        'fixed inset-y-0 left-0 z-50 lg:relative lg:translate-x-0',
         // Hide by default on mobile, show when open
         isOpen ? 'translate-x-0' : '-translate-x-full'
       )}
     >
       {/* Desktop header (hidden on mobile since we show it in the hamburger menu bar) */}
-      <div className="hidden md:flex h-16 items-center px-6">
+      <div className="hidden lg:flex h-16 items-center px-6">
         <h1 className="text-xl font-bold">Portfolio Tracker</h1>
       </div>
 
       {/* Mobile header */}
-      <div className="flex md:hidden h-16 items-center px-6 border-b border-gray-800">
+      <div className="flex lg:hidden h-16 items-center px-6 border-b border-gray-800">
         <h1 className="text-xl font-bold">Portfolio Tracker</h1>
       </div>
 

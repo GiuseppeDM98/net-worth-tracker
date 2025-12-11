@@ -20,7 +20,7 @@ export default function DashboardLayout({
         {/* Mobile sidebar backdrop */}
         {sidebarOpen && (
           <div
-            className="fixed inset-0 z-40 bg-black/50 md:hidden"
+            className="fixed inset-0 z-40 bg-black/50 lg:hidden"
             onClick={() => setSidebarOpen(false)}
           />
         )}
@@ -31,7 +31,7 @@ export default function DashboardLayout({
         {/* Main content */}
         <div className="flex flex-1 flex-col overflow-hidden">
           {/* Mobile hamburger menu */}
-          <div className="flex items-center gap-4 bg-white px-4 py-3 md:hidden border-b">
+          <div className="flex items-center gap-4 bg-white px-4 py-3 lg:hidden border-b">
             <Button
               variant="ghost"
               size="sm"
