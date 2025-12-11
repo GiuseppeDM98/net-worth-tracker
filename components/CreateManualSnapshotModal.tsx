@@ -246,13 +246,13 @@ export function CreateManualSnapshotModal({
 
         <Tabs defaultValue="general" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="general">Dati Generali</TabsTrigger>
-            <TabsTrigger value="assetclass">Asset Class</TabsTrigger>
-            <TabsTrigger value="assets">Asset (Opzionale)</TabsTrigger>
+            <TabsTrigger value="general" className="text-xs sm:text-sm">Dati Generali</TabsTrigger>
+            <TabsTrigger value="assetclass" className="text-xs sm:text-sm">Asset Class</TabsTrigger>
+            <TabsTrigger value="assets" className="text-xs sm:text-sm">Asset (Opzionale)</TabsTrigger>
           </TabsList>
 
           <TabsContent value="general" className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="year">Anno *</Label>
                 <Input
@@ -296,7 +296,7 @@ export function CreateManualSnapshotModal({
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="liquid-net-worth">Patrimonio Liquido (€) *</Label>
                 <Input
@@ -460,7 +460,7 @@ export function CreateManualSnapshotModal({
                       <Trash2 className="h-4 w-4" />
                     </Button>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="grid gap-2">
                         <Label htmlFor={`ticker-${index}`}>Ticker</Label>
                         <Input
@@ -482,7 +482,7 @@ export function CreateManualSnapshotModal({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div className="grid gap-2">
                         <Label htmlFor={`quantity-${index}`}>Quantità</Label>
                         <Input
@@ -532,15 +532,16 @@ export function CreateManualSnapshotModal({
           </TabsContent>
         </Tabs>
 
-        <DialogFooter>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={isCreating}
+            className="w-full sm:w-auto"
           >
             Annulla
           </Button>
-          <Button onClick={handleCreate} disabled={isCreating}>
+          <Button onClick={handleCreate} disabled={isCreating} className="w-full sm:w-auto">
             {isCreating ? 'Creazione...' : 'Crea Snapshot'}
           </Button>
         </DialogFooter>

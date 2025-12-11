@@ -8,19 +8,29 @@ interface CustomChartDotProps {
     year?: number;
     month?: number;
   };
+  isMobile?: boolean;
 }
 
-export function CustomChartDot({ cx, cy, payload }: CustomChartDotProps) {
+export function CustomChartDot({ cx, cy, payload, isMobile = false }: CustomChartDotProps) {
   if (cx === undefined || cy === undefined || !payload) {
     return null;
   }
 
   const hasNote = !!payload.note;
 
+  // Responsive sizes
+  const baseRadius = isMobile ? 5 : 4;
+  const noteRadius = isMobile ? 8 : 6;
+  const strokeWidth = isMobile ? 2.5 : 2;
+  const iconSize = isMobile ? 10 : 8;
+  const iconOffset = isMobile ? 5 : 4;
+
   return (
     <g>
-      {/* Dot visibile (no click) */}
-      <circle cx={cx} cy={cy} r={1} fill="transparent" />
+      {/* Invisible larger hitbox for touch (mobile only) */}
+      {isMobile && (
+        <circle cx={cx} cy={cy} r={12} fill="transparent" pointerEvents="all" />
+      )}
 
       {hasNote ? (
         // Marker ambra per snapshot con nota
@@ -28,15 +38,15 @@ export function CustomChartDot({ cx, cy, payload }: CustomChartDotProps) {
           <circle
             cx={cx}
             cy={cy}
-            r={6}
+            r={noteRadius}
             fill="#F59E0B"
             stroke="#fff"
-            strokeWidth={2}
+            strokeWidth={strokeWidth}
           />
-          {/* Icona MessageSquare piccola */}
-          <g transform={`translate(${cx - 4}, ${cy - 4})`}>
+          {/* Icona MessageSquare responsive */}
+          <g transform={`translate(${cx - iconOffset}, ${cy - iconOffset})`}>
             <path
-              d="M0 0 h8 v6 l-2 -2 h-6 z"
+              d={isMobile ? "M0 0 h10 v7.5 l-2.5 -2.5 h-7.5 z" : "M0 0 h8 v6 l-2 -2 h-6 z"}
               fill="white"
               stroke="white"
               strokeWidth={0.5}
@@ -48,10 +58,10 @@ export function CustomChartDot({ cx, cy, payload }: CustomChartDotProps) {
         <circle
           cx={cx}
           cy={cy}
-          r={4}
+          r={baseRadius}
           fill="#3B82F6"
           stroke="#fff"
-          strokeWidth={2}
+          strokeWidth={strokeWidth}
         />
       )}
     </g>

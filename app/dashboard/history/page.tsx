@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { getAllAssets, ASSET_CLASS_ORDER } from '@/lib/services/assetService';
 import { getUserSnapshots, updateSnapshotNote } from '@/lib/services/snapshotService';
 import {
@@ -21,6 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Download, Plus, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import { CreateManualSnapshotModal } from '@/components/CreateManualSnapshotModal';
 import { SnapshotSearchDialog } from '@/components/history/SnapshotSearchDialog';
 import { CustomChartDot } from '@/components/history/CustomChartDot';
@@ -62,6 +64,24 @@ export default function HistoryPage() {
   const [showManualSnapshotModal, setShowManualSnapshotModal] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   const [snapshotSearchDialogOpen, setSnapshotSearchDialogOpen] = useState(false);
+
+  // Responsive breakpoints
+  const isMobile = useMediaQuery('(max-width: 767px)');
+  const isLandscape = useMediaQuery('(min-width: 568px) and (max-height: 500px) and (orientation: landscape)');
+
+  // Responsive helper functions
+  const getChartHeight = () => {
+    if (isLandscape) return 300;
+    if (isMobile) return 280;
+    return 400;
+  };
+
+  const getChartMargins = () => {
+    if (isMobile) return { left: 10, right: 10, top: 5, bottom: 5 };
+    return { left: 50 };
+  };
+
+  const getYAxisWidth = () => (isMobile ? 70 : 100);
 
   useEffect(() => {
     if (user) {
@@ -342,25 +362,28 @@ export default function HistoryPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Storico</h1>
-          <p className="mt-2 text-gray-600">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Storico</h1>
+          <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600">
             Analizza l'evoluzione del tuo patrimonio (lordo) nel tempo
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <Button
             variant="outline"
             onClick={() => setShowManualSnapshotModal(true)}
+            className="w-full sm:w-auto"
           >
             <Plus className="mr-2 h-4 w-4" />
-            Inserisci Snapshot Passato
+            <span className="hidden sm:inline">Inserisci Snapshot Passato</span>
+            <span className="sm:hidden">Snapshot Passato</span>
           </Button>
           <Button
             variant="outline"
             onClick={handleExportCSV}
             disabled={snapshots.length === 0}
+            className="w-full sm:w-auto"
           >
             <Download className="mr-2 h-4 w-4" />
             Esporta CSV
@@ -371,14 +394,15 @@ export default function HistoryPage() {
       {/* Net Worth History Chart */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <CardTitle>Evoluzione Patrimonio Netto</CardTitle>
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="text-lg sm:text-xl">Evoluzione Patrimonio Netto</CardTitle>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               {/* Toggle Visualizza Note */}
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setShowNotes(!showNotes)}
+                className="w-full sm:w-auto text-xs sm:text-sm"
               >
                 {showNotes ? 'Nascondi Note' : 'Visualizza Note'}
               </Button>
@@ -388,8 +412,9 @@ export default function HistoryPage() {
                 variant="default"
                 size="sm"
                 onClick={() => setSnapshotSearchDialogOpen(true)}
+                className="w-full sm:w-auto text-xs sm:text-sm"
               >
-                <MessageSquare className="h-4 w-4 mr-1" />
+                <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                 Inserisci una nota
               </Button>
             </div>
@@ -402,12 +427,12 @@ export default function HistoryPage() {
               automaticamente.
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={400}>
-              <LineChart data={netWorthHistory} margin={{ left: 50 }}>
+            <ResponsiveContainer width="100%" height={getChartHeight()}>
+              <LineChart data={netWorthHistory} margin={getChartMargins()}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis
-                  width={100}
+                  width={getYAxisWidth()}
                   tickFormatter={(value) =>
                     formatCurrency(value).replace(/,00$/, '')
                   }
@@ -415,16 +440,40 @@ export default function HistoryPage() {
                 />
                 <Tooltip
                   formatter={(value: number) => formatCurrency(value)}
-                  labelStyle={{ color: '#000' }}
+                  contentStyle={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                    border: '1px solid #ccc',
+                    borderRadius: '8px',
+                    padding: isMobile ? '8px' : '12px',
+                    fontSize: isMobile ? '11px' : '13px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                  }}
+                  labelStyle={{
+                    color: '#000',
+                    fontWeight: 600,
+                    marginBottom: '4px',
+                  }}
+                  itemStyle={{
+                    fontSize: isMobile ? '11px' : '12px',
+                    padding: '2px 0',
+                  }}
+                  cursor={{ stroke: '#3B82F6', strokeWidth: 1, strokeDasharray: '5 5' }}
                 />
-                <Legend />
+                <Legend
+                  wrapperStyle={{
+                    display: isMobile ? 'none' : 'block',
+                    paddingTop: isMobile ? '0' : '20px'
+                  }}
+                  iconSize={isMobile ? 8 : 10}
+                  fontSize={isMobile ? 11 : 12}
+                />
                 <Line
                   type="monotone"
                   dataKey="totalNetWorth"
                   stroke="#3B82F6"
                   strokeWidth={2}
                   name="Patrimonio Totale"
-                  dot={(props: any) => <CustomChartDot {...props} />}
+                  dot={(props: any) => <CustomChartDot {...props} isMobile={isMobile} />}
                   activeDot={{ r: 6 }}
                   isAnimationActive={false}
                 >
@@ -467,12 +516,13 @@ export default function HistoryPage() {
       {/* Asset Class Evolution Chart */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Patrimonio Netto per Asset Class</CardTitle>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="text-lg sm:text-xl">Patrimonio Netto per Asset Class</CardTitle>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setShowAssetClassPercentage(!showAssetClassPercentage)}
+              className="w-full sm:w-auto text-xs sm:text-sm"
             >
               {showAssetClassPercentage ? '€ Valori Assoluti' : '% Percentuali'}
             </Button>
@@ -484,22 +534,45 @@ export default function HistoryPage() {
               Nessuno storico disponibile.
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={400}>
+            <ResponsiveContainer width="100%" height={getChartHeight()}>
               {showAssetClassPercentage ? (
                 // Percentage mode: Use LineChart with separate lines
-                <LineChart data={assetClassHistory} margin={{ left: 50 }}>
+                <LineChart data={assetClassHistory} margin={getChartMargins()}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis
-                    width={100}
+                    width={getYAxisWidth()}
                     tickFormatter={(value) => `${value.toFixed(0)}%`}
                     domain={[0, 100]}
                   />
                   <Tooltip
                     formatter={(value: number) => `${value.toFixed(2)}%`}
-                    labelStyle={{ color: '#000' }}
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                      border: '1px solid #ccc',
+                      borderRadius: '8px',
+                      padding: isMobile ? '8px' : '12px',
+                      fontSize: isMobile ? '11px' : '13px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    }}
+                    labelStyle={{
+                      color: '#000',
+                      fontWeight: 600,
+                      marginBottom: '4px',
+                    }}
+                    itemStyle={{
+                      fontSize: isMobile ? '11px' : '12px',
+                      padding: '2px 0',
+                    }}
                   />
-                  <Legend />
+                  <Legend
+                    wrapperStyle={{
+                      display: isMobile ? 'none' : 'block',
+                      paddingTop: isMobile ? '0' : '20px'
+                    }}
+                    iconSize={isMobile ? 8 : 10}
+                    fontSize={isMobile ? 11 : 12}
+                  />
                   <Line
                     type="monotone"
                     dataKey="equityPercentage"
@@ -563,18 +636,41 @@ export default function HistoryPage() {
                 </LineChart>
               ) : (
                 // Absolute values mode: Use Stacked AreaChart
-                <AreaChart data={assetClassHistory} margin={{ left: 50 }}>
+                <AreaChart data={assetClassHistory} margin={getChartMargins()}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis
-                    width={100}
+                    width={getYAxisWidth()}
                     tickFormatter={(value) => formatCurrency(value).replace(/,00$/, '')}
                   />
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
-                    labelStyle={{ color: '#000' }}
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                      border: '1px solid #ccc',
+                      borderRadius: '8px',
+                      padding: isMobile ? '8px' : '12px',
+                      fontSize: isMobile ? '11px' : '13px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    }}
+                    labelStyle={{
+                      color: '#000',
+                      fontWeight: 600,
+                      marginBottom: '4px',
+                    }}
+                    itemStyle={{
+                      fontSize: isMobile ? '11px' : '12px',
+                      padding: '2px 0',
+                    }}
                   />
-                  <Legend />
+                  <Legend
+                    wrapperStyle={{
+                      display: isMobile ? 'none' : 'block',
+                      paddingTop: isMobile ? '0' : '20px'
+                    }}
+                    iconSize={isMobile ? 8 : 10}
+                    fontSize={isMobile ? 11 : 12}
+                  />
                   <Area
                     type="monotone"
                     dataKey="equity"
@@ -645,12 +741,13 @@ export default function HistoryPage() {
       {/* Liquidity Evolution Chart */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Evoluzione Liquidità vs Illiquidità</CardTitle>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="text-lg sm:text-xl">Evoluzione Liquidità vs Illiquidità</CardTitle>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setShowLiquidityPercentage(!showLiquidityPercentage)}
+              className="w-full sm:w-auto text-xs sm:text-sm"
             >
               {showLiquidityPercentage ? '€ Valori Assoluti' : '% Percentuali'}
             </Button>
@@ -662,22 +759,45 @@ export default function HistoryPage() {
               Nessuno storico disponibile.
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={400}>
+            <ResponsiveContainer width="100%" height={getChartHeight()}>
               {showLiquidityPercentage ? (
                 // Percentage mode: Use LineChart with separate lines
-                <LineChart data={liquidityHistory} margin={{ left: 50 }}>
+                <LineChart data={liquidityHistory} margin={getChartMargins()}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis
-                    width={100}
+                    width={getYAxisWidth()}
                     tickFormatter={(value) => `${value.toFixed(0)}%`}
                     domain={[0, 100]}
                   />
                   <Tooltip
                     formatter={(value: number) => `${value.toFixed(2)}%`}
-                    labelStyle={{ color: '#000' }}
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                      border: '1px solid #ccc',
+                      borderRadius: '8px',
+                      padding: isMobile ? '8px' : '12px',
+                      fontSize: isMobile ? '11px' : '13px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    }}
+                    labelStyle={{
+                      color: '#000',
+                      fontWeight: 600,
+                      marginBottom: '4px',
+                    }}
+                    itemStyle={{
+                      fontSize: isMobile ? '11px' : '12px',
+                      padding: '2px 0',
+                    }}
                   />
-                  <Legend />
+                  <Legend
+                    wrapperStyle={{
+                      display: isMobile ? 'none' : 'block',
+                      paddingTop: isMobile ? '0' : '20px'
+                    }}
+                    iconSize={isMobile ? 8 : 10}
+                    fontSize={isMobile ? 11 : 12}
+                  />
                   <Line
                     type="monotone"
                     dataKey="liquidPercentage"
@@ -701,19 +821,42 @@ export default function HistoryPage() {
                 </LineChart>
               ) : (
                 // Absolute values mode: Use AreaChart with overlapping areas (no stack)
-                <AreaChart data={liquidityHistory} margin={{ left: 50 }}>
+                <AreaChart data={liquidityHistory} margin={getChartMargins()}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis
-                    width={100}
+                    width={getYAxisWidth()}
                     tickFormatter={(value) => formatCurrency(value).replace(/,00$/, '')}
                     domain={[(dataMin: number) => dataMin * 0.95, (dataMax: number) => dataMax * 1.05]}
                   />
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
-                    labelStyle={{ color: '#000' }}
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                      border: '1px solid #ccc',
+                      borderRadius: '8px',
+                      padding: isMobile ? '8px' : '12px',
+                      fontSize: isMobile ? '11px' : '13px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    }}
+                    labelStyle={{
+                      color: '#000',
+                      fontWeight: 600,
+                      marginBottom: '4px',
+                    }}
+                    itemStyle={{
+                      fontSize: isMobile ? '11px' : '12px',
+                      padding: '2px 0',
+                    }}
                   />
-                  <Legend />
+                  <Legend
+                    wrapperStyle={{
+                      display: isMobile ? 'none' : 'block',
+                      paddingTop: isMobile ? '0' : '20px'
+                    }}
+                    iconSize={isMobile ? 8 : 10}
+                    fontSize={isMobile ? 11 : 12}
+                  />
                   <Area
                     type="monotone"
                     dataKey="liquidNetWorth"
@@ -744,12 +887,13 @@ export default function HistoryPage() {
       {/* YoY Variation Chart */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Storico YoY</CardTitle>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="text-lg sm:text-xl">Storico YoY</CardTitle>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setShowYoYPercentage(!showYoYPercentage)}
+              className="w-full sm:w-auto text-xs sm:text-sm"
             >
               {showYoYPercentage ? '€ Valori Assoluti' : '% Percentuali'}
             </Button>
@@ -761,12 +905,12 @@ export default function HistoryPage() {
               Nessuno storico disponibile.
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={400}>
-              <BarChart data={yoyVariationData} margin={{ left: 50 }}>
+            <ResponsiveContainer width="100%" height={getChartHeight()}>
+              <BarChart data={yoyVariationData} margin={getChartMargins()}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="year" />
                 <YAxis
-                  width={100}
+                  width={getYAxisWidth()}
                   tickFormatter={(value) =>
                     showYoYPercentage
                       ? `${value.toFixed(0)}%`
@@ -782,9 +926,32 @@ export default function HistoryPage() {
                     }
                     return formatCurrency(value);
                   }}
-                  labelStyle={{ color: '#000' }}
+                  contentStyle={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                    border: '1px solid #ccc',
+                    borderRadius: '8px',
+                    padding: isMobile ? '8px' : '12px',
+                    fontSize: isMobile ? '11px' : '13px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                  }}
+                  labelStyle={{
+                    color: '#000',
+                    fontWeight: 600,
+                    marginBottom: '4px',
+                  }}
+                  itemStyle={{
+                    fontSize: isMobile ? '11px' : '12px',
+                    padding: '2px 0',
+                  }}
                 />
-                <Legend />
+                <Legend
+                  wrapperStyle={{
+                    display: isMobile ? 'none' : 'block',
+                    paddingTop: isMobile ? '0' : '20px'
+                  }}
+                  iconSize={isMobile ? 8 : 10}
+                  fontSize={isMobile ? 11 : 12}
+                />
                 <Bar
                   dataKey={showYoYPercentage ? 'variationPercentage' : 'variation'}
                   name="Variazione"
@@ -863,7 +1030,11 @@ export default function HistoryPage() {
             <CardTitle>Snapshot Mensili</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className={cn(
+              "grid gap-4",
+              isLandscape ? "grid-cols-2" : "grid-cols-1",
+              "md:grid-cols-2 lg:grid-cols-3"
+            )}>
               {snapshots.slice(-6).reverse().map((snapshot) => (
                 <div
                   key={`${snapshot.year}-${snapshot.month}`}
