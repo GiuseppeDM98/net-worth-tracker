@@ -98,6 +98,7 @@ function calculateMonthlyRecords(
       netWorthDiff,
       totalIncome,
       totalExpenses,
+      note: current.note,
     });
   }
 

@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Trophy, TrendingUp, TrendingDown, DollarSign, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { NoteIconCell } from '@/components/hall-of-fame/NoteIconCell';
 
 export default function HallOfFamePage() {
   const { user } = useAuth();
@@ -332,6 +333,7 @@ function MonthlyTable({
             <TableHead className="w-16">Rank</TableHead>
             <TableHead>Mese</TableHead>
             <TableHead className="text-right">Valore</TableHead>
+            <TableHead className="w-12 text-center">Note</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -341,6 +343,9 @@ function MonthlyTable({
               <TableCell>{record.monthYear}</TableCell>
               <TableCell className="text-right font-mono">
                 {formatCurrency(record[valueKey] as number)}
+              </TableCell>
+              <TableCell className="text-center">
+                <NoteIconCell note={record.note} monthYear={record.monthYear} />
               </TableCell>
             </TableRow>
           ))}

@@ -10,6 +10,7 @@ export interface MonthlyRecord {
   netWorthDiff: number; // Differenza NW rispetto al mese precedente
   totalIncome: number; // Entrate del mese
   totalExpenses: number; // Spese del mese
+  note?: string; // Nota opzionale dallo snapshot (max 500 chars)
 }
 
 /**
