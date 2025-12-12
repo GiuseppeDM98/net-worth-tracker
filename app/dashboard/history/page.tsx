@@ -473,7 +473,7 @@ export default function HistoryPage() {
                   stroke="#3B82F6"
                   strokeWidth={2}
                   name="Patrimonio Totale"
-                  dot={(props: any) => <CustomChartDot {...props} isMobile={isMobile} />}
+                  dot={({ key, ...props }: any) => <CustomChartDot key={key} {...props} isMobile={isMobile} />}
                   activeDot={{ r: 6 }}
                   isAnimationActive={false}
                 >
