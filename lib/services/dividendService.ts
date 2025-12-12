@@ -1,0 +1,443 @@
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  Timestamp,
+  orderBy,
+} from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
+import {
+  Dividend,
+  DividendFormData,
+  DividendStats,
+  DividendsByAsset,
+  DividendType,
+} from '@/types/dividend';
+
+const DIVIDENDS_COLLECTION = 'dividends';
+
+/**
+ * Remove undefined fields from an object to prevent Firebase errors
+ */
+function removeUndefinedFields<T extends Record<string, any>>(obj: T): Partial<T> {
+  const cleaned: Partial<T> = {};
+  Object.keys(obj).forEach((key) => {
+    const value = obj[key];
+    if (value !== undefined) {
+      cleaned[key as keyof T] = value;
+    }
+  });
+  return cleaned;
+}
+
+/**
+ * Get all dividends for a specific user
+ * Sorted by payment date (most recent first)
+ */
+export async function getAllDividends(userId: string): Promise<Dividend[]> {
+  try {
+    const dividendsRef = collection(db, DIVIDENDS_COLLECTION);
+    const q = query(
+      dividendsRef,
+      where('userId', '==', userId),
+      orderBy('paymentDate', 'desc')
+    );
+
+    const querySnapshot = await getDocs(q);
+
+    const dividends = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      exDate: doc.data().exDate?.toDate() || new Date(),
+      paymentDate: doc.data().paymentDate?.toDate() || new Date(),
+      createdAt: doc.data().createdAt?.toDate() || new Date(),
+      updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+    })) as Dividend[];
+
+    return dividends;
+  } catch (error) {
+    console.error('Error getting dividends:', error);
+    throw new Error('Failed to fetch dividends');
+  }
+}
+
+/**
+ * Get dividends for a specific asset
+ * Sorted by payment date (most recent first)
+ */
+export async function getDividendsByAsset(
+  userId: string,
+  assetId: string
+): Promise<Dividend[]> {
+  try {
+    const dividendsRef = collection(db, DIVIDENDS_COLLECTION);
+    const q = query(
+      dividendsRef,
+      where('userId', '==', userId),
+      where('assetId', '==', assetId),
+      orderBy('paymentDate', 'desc')
+    );
+
+    const querySnapshot = await getDocs(q);
+
+    const dividends = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      exDate: doc.data().exDate?.toDate() || new Date(),
+      paymentDate: doc.data().paymentDate?.toDate() || new Date(),
+      createdAt: doc.data().createdAt?.toDate() || new Date(),
+      updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+    })) as Dividend[];
+
+    return dividends;
+  } catch (error) {
+    console.error('Error getting dividends by asset:', error);
+    throw new Error('Failed to fetch dividends by asset');
+  }
+}
+
+/**
+ * Get dividends in a date range
+ * Sorted by payment date (most recent first)
+ */
+export async function getDividendsByDateRange(
+  userId: string,
+  startDate: Date,
+  endDate: Date
+): Promise<Dividend[]> {
+  try {
+    const dividendsRef = collection(db, DIVIDENDS_COLLECTION);
+    const q = query(
+      dividendsRef,
+      where('userId', '==', userId),
+      where('paymentDate', '>=', Timestamp.fromDate(startDate)),
+      where('paymentDate', '<=', Timestamp.fromDate(endDate)),
+      orderBy('paymentDate', 'desc')
+    );
+
+    const querySnapshot = await getDocs(q);
+
+    const dividends = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      exDate: doc.data().exDate?.toDate() || new Date(),
+      paymentDate: doc.data().paymentDate?.toDate() || new Date(),
+      createdAt: doc.data().createdAt?.toDate() || new Date(),
+      updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+    })) as Dividend[];
+
+    return dividends;
+  } catch (error) {
+    console.error('Error getting dividends by date range:', error);
+    throw new Error('Failed to fetch dividends by date range');
+  }
+}
+
+/**
+ * Get a single dividend by ID
+ */
+export async function getDividendById(dividendId: string): Promise<Dividend | null> {
+  try {
+    const dividendRef = doc(db, DIVIDENDS_COLLECTION, dividendId);
+    const dividendDoc = await getDoc(dividendRef);
+
+    if (!dividendDoc.exists()) {
+      return null;
+    }
+
+    return {
+      id: dividendDoc.id,
+      ...dividendDoc.data(),
+      exDate: dividendDoc.data().exDate?.toDate() || new Date(),
+      paymentDate: dividendDoc.data().paymentDate?.toDate() || new Date(),
+      createdAt: dividendDoc.data().createdAt?.toDate() || new Date(),
+      updatedAt: dividendDoc.data().updatedAt?.toDate() || new Date(),
+    } as Dividend;
+  } catch (error) {
+    console.error('Error getting dividend:', error);
+    throw new Error('Failed to fetch dividend');
+  }
+}
+
+/**
+ * Create a new dividend
+ * Automatically calculates netAmount if not provided
+ */
+export async function createDividend(
+  userId: string,
+  dividendData: DividendFormData,
+  assetTicker: string,
+  assetName: string,
+  assetIsin?: string,
+  isAutoGenerated: boolean = false
+): Promise<string> {
+  try {
+    const now = Timestamp.now();
+    const dividendsRef = collection(db, DIVIDENDS_COLLECTION);
+
+    // Auto-calculate netAmount if not already set
+    const netAmount = dividendData.netAmount || (dividendData.grossAmount - dividendData.taxAmount);
+
+    const cleanedData = removeUndefinedFields({
+      userId,
+      assetId: dividendData.assetId,
+      assetTicker,
+      assetName,
+      assetIsin,
+      exDate: Timestamp.fromDate(dividendData.exDate),
+      paymentDate: Timestamp.fromDate(dividendData.paymentDate),
+      dividendPerShare: dividendData.dividendPerShare,
+      quantity: dividendData.quantity,
+      grossAmount: dividendData.grossAmount,
+      taxAmount: dividendData.taxAmount,
+      netAmount,
+      currency: dividendData.currency,
+      dividendType: dividendData.dividendType,
+      notes: dividendData.notes,
+      isAutoGenerated,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const docRef = await addDoc(dividendsRef, cleanedData);
+
+    return docRef.id;
+  } catch (error) {
+    console.error('Error creating dividend:', error);
+    throw new Error('Failed to create dividend');
+  }
+}
+
+/**
+ * Update an existing dividend
+ */
+export async function updateDividend(
+  dividendId: string,
+  updates: Partial<DividendFormData>
+): Promise<void> {
+  try {
+    const dividendRef = doc(db, DIVIDENDS_COLLECTION, dividendId);
+
+    // Convert dates to Timestamps if present
+    const cleanedUpdates = removeUndefinedFields({
+      ...updates,
+      exDate: updates.exDate ? Timestamp.fromDate(updates.exDate) : undefined,
+      paymentDate: updates.paymentDate ? Timestamp.fromDate(updates.paymentDate) : undefined,
+      updatedAt: Timestamp.now(),
+    });
+
+    await updateDoc(dividendRef, cleanedUpdates);
+  } catch (error) {
+    console.error('Error updating dividend:', error);
+    throw new Error('Failed to update dividend');
+  }
+}
+
+/**
+ * Delete a dividend
+ */
+export async function deleteDividend(dividendId: string): Promise<void> {
+  try {
+    const dividendRef = doc(db, DIVIDENDS_COLLECTION, dividendId);
+    await deleteDoc(dividendRef);
+  } catch (error) {
+    console.error('Error deleting dividend:', error);
+    throw new Error('Failed to delete dividend');
+  }
+}
+
+/**
+ * Calculate dividend statistics for a user
+ * Optionally filtered by date range
+ */
+export async function calculateDividendStats(
+  userId: string,
+  startDate?: Date,
+  endDate?: Date
+): Promise<DividendStats> {
+  try {
+    let dividends: Dividend[];
+
+    if (startDate && endDate) {
+      dividends = await getDividendsByDateRange(userId, startDate, endDate);
+    } else {
+      dividends = await getAllDividends(userId);
+    }
+
+    const stats: DividendStats = {
+      totalGross: 0,
+      totalTax: 0,
+      totalNet: 0,
+      count: dividends.length,
+      byAsset: {},
+      byType: {
+        ordinary: { totalGross: 0, totalTax: 0, totalNet: 0, count: 0 },
+        extraordinary: { totalGross: 0, totalTax: 0, totalNet: 0, count: 0 },
+        interim: { totalGross: 0, totalTax: 0, totalNet: 0, count: 0 },
+        final: { totalGross: 0, totalTax: 0, totalNet: 0, count: 0 },
+      },
+    };
+
+    dividends.forEach(dividend => {
+      // Total stats
+      stats.totalGross += dividend.grossAmount;
+      stats.totalTax += dividend.taxAmount;
+      stats.totalNet += dividend.netAmount;
+
+      // By asset stats
+      if (!stats.byAsset[dividend.assetId]) {
+        stats.byAsset[dividend.assetId] = {
+          assetTicker: dividend.assetTicker,
+          assetName: dividend.assetName,
+          totalGross: 0,
+          totalTax: 0,
+          totalNet: 0,
+          count: 0,
+        };
+      }
+      stats.byAsset[dividend.assetId].totalGross += dividend.grossAmount;
+      stats.byAsset[dividend.assetId].totalTax += dividend.taxAmount;
+      stats.byAsset[dividend.assetId].totalNet += dividend.netAmount;
+      stats.byAsset[dividend.assetId].count += 1;
+
+      // By type stats
+      stats.byType[dividend.dividendType].totalGross += dividend.grossAmount;
+      stats.byType[dividend.dividendType].totalTax += dividend.taxAmount;
+      stats.byType[dividend.dividendType].totalNet += dividend.netAmount;
+      stats.byType[dividend.dividendType].count += 1;
+    });
+
+    return stats;
+  } catch (error) {
+    console.error('Error calculating dividend stats:', error);
+    throw new Error('Failed to calculate dividend stats');
+  }
+}
+
+/**
+ * Get dividends grouped by asset
+ * Returns array of assets with their dividends and totals
+ */
+export async function getDividendsByAssetGrouped(
+  userId: string
+): Promise<DividendsByAsset[]> {
+  try {
+    const dividends = await getAllDividends(userId);
+
+    // Group by assetId
+    const groupedMap = new Map<string, DividendsByAsset>();
+
+    dividends.forEach(dividend => {
+      if (!groupedMap.has(dividend.assetId)) {
+        groupedMap.set(dividend.assetId, {
+          assetId: dividend.assetId,
+          assetTicker: dividend.assetTicker,
+          assetName: dividend.assetName,
+          dividends: [],
+          totalGross: 0,
+          totalTax: 0,
+          totalNet: 0,
+        });
+      }
+
+      const group = groupedMap.get(dividend.assetId)!;
+      group.dividends.push(dividend);
+      group.totalGross += dividend.grossAmount;
+      group.totalTax += dividend.taxAmount;
+      group.totalNet += dividend.netAmount;
+    });
+
+    // Convert map to array and sort by total net (highest first)
+    return Array.from(groupedMap.values()).sort(
+      (a, b) => b.totalNet - a.totalNet
+    );
+  } catch (error) {
+    console.error('Error getting dividends grouped by asset:', error);
+    throw new Error('Failed to get dividends grouped by asset');
+  }
+}
+
+/**
+ * Get upcoming dividends (payment date in the future)
+ * Sorted by payment date (nearest first)
+ */
+export async function getUpcomingDividends(userId: string): Promise<Dividend[]> {
+  try {
+    const now = new Date();
+    const dividendsRef = collection(db, DIVIDENDS_COLLECTION);
+    const q = query(
+      dividendsRef,
+      where('userId', '==', userId),
+      where('paymentDate', '>=', Timestamp.fromDate(now)),
+      orderBy('paymentDate', 'asc')
+    );
+
+    const querySnapshot = await getDocs(q);
+
+    const dividends = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      exDate: doc.data().exDate?.toDate() || new Date(),
+      paymentDate: doc.data().paymentDate?.toDate() || new Date(),
+      createdAt: doc.data().createdAt?.toDate() || new Date(),
+      updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+    })) as Dividend[];
+
+    return dividends;
+  } catch (error) {
+    console.error('Error getting upcoming dividends:', error);
+    throw new Error('Failed to fetch upcoming dividends');
+  }
+}
+
+/**
+ * Check if a dividend already exists for an asset on a specific ex-date
+ * Used to prevent duplicate imports from scraping
+ */
+export async function isDuplicateDividend(
+  userId: string,
+  assetId: string,
+  exDate: Date
+): Promise<boolean> {
+  try {
+    const dividendsRef = collection(db, DIVIDENDS_COLLECTION);
+
+    // Create date range for the same day (start of day to end of day)
+    const startOfDay = new Date(exDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(exDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const q = query(
+      dividendsRef,
+      where('userId', '==', userId),
+      where('assetId', '==', assetId),
+      where('exDate', '>=', Timestamp.fromDate(startOfDay)),
+      where('exDate', '<=', Timestamp.fromDate(endOfDay))
+    );
+
+    const querySnapshot = await getDocs(q);
+
+    return !querySnapshot.empty;
+  } catch (error) {
+    console.error('Error checking duplicate dividend:', error);
+    throw new Error('Failed to check duplicate dividend');
+  }
+}
+
+/**
+ * Calculate withholding tax amount
+ * Default Italian withholding tax rate: 26%
+ */
+export function calculateWithholdingTax(
+  grossAmount: number,
+  taxRate: number = 26
+): number {
+  return grossAmount * (taxRate / 100);
+}
