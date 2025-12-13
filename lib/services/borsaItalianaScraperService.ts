@@ -66,6 +66,7 @@ export async function scrapeDividendsByIsin(isin: string): Promise<ScrapedDivide
   try {
     // Construct URL with ISIN parameter
     const url = `${BORSA_ITALIANA_BASE_URL}?isin=${isin}&lang=it`;
+    console.log(`[Scraper] Fetching URL: ${url}`);
 
     // Fetch HTML
     const response = await fetch(url);
@@ -74,19 +75,37 @@ export async function scrapeDividendsByIsin(isin: string): Promise<ScrapedDivide
     }
 
     const html = await response.text();
+    console.log(`[Scraper] Received HTML, length: ${html.length} characters`);
 
     // Parse HTML with jsdom
     const dom = new JSDOM(html);
     const document = dom.window.document;
 
-    // Find the dividends table
-    // The exact selector may need adjustment based on actual HTML structure
-    const tableRows = document.querySelectorAll('table.m-table tbody tr');
+    // Debug: Try multiple selectors to find the table
+    console.log(`[Scraper] Looking for dividend table...`);
+    const tableRows1 = document.querySelectorAll('table.m-table tbody tr');
+    const tableRows2 = document.querySelectorAll('table tbody tr');
+    const allTables = document.querySelectorAll('table');
+
+    console.log(`[Scraper] Found with 'table.m-table tbody tr': ${tableRows1.length} rows`);
+    console.log(`[Scraper] Found with 'table tbody tr': ${tableRows2.length} rows`);
+    console.log(`[Scraper] Total tables in page: ${allTables.length}`);
+
+    // Use the selector that finds rows
+    const tableRows = tableRows1.length > 0 ? tableRows1 : tableRows2;
 
     if (tableRows.length === 0) {
-      console.log(`No dividend data found for ISIN: ${isin}`);
+      console.log(`[Scraper] No dividend data found for ISIN: ${isin}`);
+      console.log(`[Scraper] Page title: ${document.title}`);
+
+      // Log first 1000 chars of body for debugging
+      const bodyText = document.body?.textContent?.substring(0, 1000) || 'No body content';
+      console.log(`[Scraper] Page content preview: ${bodyText}`);
+
       return [];
     }
+
+    console.log(`[Scraper] Processing ${tableRows.length} table rows...`);
 
     const dividends: ScrapedDividend[] = [];
 

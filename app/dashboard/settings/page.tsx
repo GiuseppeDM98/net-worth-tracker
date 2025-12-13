@@ -15,7 +15,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Save, RotateCcw, Plus, Trash2, ChevronDown, ChevronUp, Edit, Receipt, FlaskConical } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Save, RotateCcw, Plus, Trash2, ChevronDown, ChevronUp, Edit, Receipt, FlaskConical, Coins } from 'lucide-react';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { ExpenseCategory, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
@@ -94,6 +101,11 @@ export default function SettingsPage() {
   const [deleteConfirmDialogOpen, setDeleteConfirmDialogOpen] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<ExpenseCategory | null>(null);
   const [expenseCountToReassign, setExpenseCountToReassign] = useState(0);
+
+  // Dividend settings state
+  const [dividendIncomeCategoryId, setDividendIncomeCategoryId] = useState<string>('');
+  const [dividendIncomeSubCategoryId, setDividendIncomeSubCategoryId] = useState<string>('');
+  const [syncingDividends, setSyncingDividends] = useState(false);
 
   // Test snapshot modal state
   const [dummySnapshotModalOpen, setDummySnapshotModalOpen] = useState(false);
@@ -217,6 +229,9 @@ export default function SettingsPage() {
           settingsData.userAge !== undefined &&
           settingsData.riskFreeRate !== undefined
         );
+        // Load dividend settings
+        setDividendIncomeCategoryId(settingsData.dividendIncomeCategoryId || '');
+        setDividendIncomeSubCategoryId(settingsData.dividendIncomeSubCategoryId || '');
       }
 
       // Load cash fixed amount settings if available
@@ -409,6 +424,114 @@ export default function SettingsPage() {
     await loadExpenseCategories();
   };
 
+  // Dividend settings handlers
+  const handleSaveDividendSettings = async () => {
+    if (!user) return;
+
+    try {
+      setSaving(true);
+      const settingsData = await getSettings(user.uid);
+      const targets = settingsData?.targets || getDefaultTargets();
+
+      await setSettings(user.uid, {
+        userAge,
+        riskFreeRate,
+        targets,
+        dividendIncomeCategoryId: dividendIncomeCategoryId || undefined,
+        dividendIncomeSubCategoryId: dividendIncomeSubCategoryId || undefined,
+      });
+
+      toast.success('Impostazioni dividendi salvate con successo');
+    } catch (error) {
+      console.error('Error saving dividend settings:', error);
+      toast.error('Errore nel salvataggio delle impostazioni dividendi');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSyncDividends = async () => {
+    if (!user) return;
+
+    if (!dividendIncomeCategoryId) {
+      toast.error('Seleziona prima una categoria per le entrate da dividendi');
+      return;
+    }
+
+    const confirmSync = window.confirm(
+      'Sincronizzare tutti i dividendi esistenti creando le relative entrate nel tracking cashflow?'
+    );
+
+    if (!confirmSync) return;
+
+    try {
+      setSyncingDividends(true);
+
+      // Get category details
+      const category = await getCategoryById(dividendIncomeCategoryId);
+      if (!category) {
+        toast.error('Categoria non trovata');
+        return;
+      }
+
+      // Get subcategory name if selected
+      let subCategoryName: string | undefined;
+      if (dividendIncomeSubCategoryId) {
+        const subCategory = category.subCategories.find(
+          (sub) => sub.id === dividendIncomeSubCategoryId
+        );
+        subCategoryName = subCategory?.name;
+      }
+
+      // Fetch all dividends for this user
+      const response = await fetch(`/api/dividends?userId=${user.uid}`);
+      if (!response.ok) {
+        throw new Error('Errore nel caricamento dei dividendi');
+      }
+      const data = await response.json();
+      const dividends = data.dividends || [];
+
+      // Sync dividends via API
+      const syncResponse = await fetch('/api/dividends/sync-expenses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.uid,
+          dividends,
+          categoryId: dividendIncomeCategoryId,
+          categoryName: category.name,
+          subCategoryId: dividendIncomeSubCategoryId || undefined,
+          subCategoryName,
+        }),
+      });
+
+      if (!syncResponse.ok) {
+        throw new Error('Errore nella sincronizzazione');
+      }
+
+      const syncData = await syncResponse.json();
+      const result = syncData.result;
+
+      if (result.failed > 0) {
+        toast.warning(
+          `Sincronizzazione completata con ${result.failed} errori. ` +
+          `Create: ${result.created}, Saltate: ${result.skipped}`
+        );
+      } else {
+        toast.success(
+          `Sincronizzazione completata! Create: ${result.created}, Saltate: ${result.skipped}`
+        );
+      }
+    } catch (error) {
+      console.error('Error syncing dividends:', error);
+      toast.error('Errore nella sincronizzazione dei dividendi');
+    } finally {
+      setSyncingDividends(false);
+    }
+  };
+
   const getCategoriesByType = (type: ExpenseType): ExpenseCategory[] => {
     return expenseCategories.filter(cat => cat.type === type);
   };
@@ -552,6 +675,8 @@ export default function SettingsPage() {
         userAge,
         riskFreeRate,
         targets,
+        dividendIncomeCategoryId: dividendIncomeCategoryId || undefined,
+        dividendIncomeSubCategoryId: dividendIncomeSubCategoryId || undefined,
       });
       toast.success('Impostazioni salvate con successo');
     } catch (error) {
@@ -1347,6 +1472,124 @@ export default function SettingsPage() {
                 );
               })}
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Dividend Settings Section */}
+      <Card className="mt-8">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Coins className="h-5 w-5 text-green-600" />
+            <CardTitle>Impostazioni Dividendi</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <p className="text-sm text-muted-foreground">
+            Configura la categoria per le entrate automatiche da dividendi
+          </p>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {/* Dividend Income Category */}
+            <div className="space-y-2">
+              <Label htmlFor="dividendIncomeCategory">Categoria Entrate Dividendi</Label>
+              <div className="flex gap-2">
+                <Select
+                  value={dividendIncomeCategoryId || undefined}
+                  onValueChange={(value) => {
+                    setDividendIncomeCategoryId(value);
+                    setDividendIncomeSubCategoryId(''); // Reset subcategory
+                  }}
+                >
+                  <SelectTrigger id="dividendIncomeCategory">
+                    <SelectValue placeholder="Seleziona categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getCategoriesByType('income').map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {dividendIncomeCategoryId && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setDividendIncomeCategoryId('');
+                      setDividendIncomeSubCategoryId('');
+                    }}
+                  >
+                    Cancella
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Dividend Income Subcategory */}
+            <div className="space-y-2">
+              <Label htmlFor="dividendIncomeSubCategory">Sottocategoria (opzionale)</Label>
+              <div className="flex gap-2">
+                <Select
+                  value={dividendIncomeSubCategoryId || undefined}
+                  onValueChange={setDividendIncomeSubCategoryId}
+                  disabled={!dividendIncomeCategoryId}
+                >
+                  <SelectTrigger id="dividendIncomeSubCategory">
+                    <SelectValue placeholder="Seleziona sottocategoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {dividendIncomeCategoryId &&
+                      expenseCategories
+                        .find((cat) => cat.id === dividendIncomeCategoryId)
+                        ?.subCategories.map((sub) => (
+                          <SelectItem key={sub.id} value={sub.id}>
+                            {sub.name}
+                          </SelectItem>
+                        ))}
+                  </SelectContent>
+                </Select>
+                {dividendIncomeSubCategoryId && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setDividendIncomeSubCategoryId('')}
+                  >
+                    Cancella
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
+            <Button
+              onClick={handleSaveDividendSettings}
+              disabled={saving}
+              className="flex items-center gap-2"
+            >
+              <Save className="h-4 w-4" />
+              {saving ? 'Salvataggio...' : 'Salva Impostazioni'}
+            </Button>
+
+            <Button
+              onClick={handleSyncDividends}
+              disabled={syncingDividends || !dividendIncomeCategoryId}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <Coins className="h-4 w-4" />
+              {syncingDividends ? 'Sincronizzazione...' : 'Sincronizza Dividendi Esistenti'}
+            </Button>
+          </div>
+
+          {!dividendIncomeCategoryId && (
+            <p className="text-sm text-amber-600">
+              ⚠️ Configura una categoria per abilitare la sincronizzazione automatica dei dividendi
+            </p>
           )}
         </CardContent>
       </Card>

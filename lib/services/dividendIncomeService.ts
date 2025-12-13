@@ -1,11 +1,10 @@
-import { Timestamp } from 'firebase/firestore';
+import 'server-only';
+
+import { Timestamp } from 'firebase-admin/firestore';
+import { adminDb } from '@/lib/firebase/admin';
 import { Dividend } from '@/types/dividend';
-import {
-  createExpense,
-  updateExpense,
-  deleteExpense,
-} from '@/lib/services/expenseService';
 import { updateDividend } from '@/lib/services/dividendService';
+import { toDate } from '@/lib/utils/dateHelpers';
 
 /**
  * Create an expense entry from a dividend
@@ -19,32 +18,35 @@ export async function createExpenseFromDividend(
   subCategoryName?: string
 ): Promise<string> {
   try {
-    // Create expense with dividend data
-    const expenseId = await createExpense(
-      dividend.userId,
-      {
-        type: 'income',
-        categoryId,
-        subCategoryId,
-        amount: dividend.netAmount, // Use net amount (after tax)
-        currency: dividend.currency,
-        date: dividend.paymentDate instanceof Date
-          ? dividend.paymentDate
-          : dividend.paymentDate.toDate(),
-        notes: `Dividendo ${dividend.assetTicker} - ${dividend.assetName}${
-          dividend.notes ? ` | ${dividend.notes}` : ''
-        }`,
-      },
+    const now = Timestamp.now();
+    const paymentDate = toDate(dividend.paymentDate);
+
+    // Create expense with dividend data using Admin SDK
+    const expenseData = {
+      userId: dividend.userId,
+      type: 'income',
+      categoryId,
       categoryName,
-      subCategoryName
-    );
+      subCategoryId: subCategoryId || null,
+      subCategoryName: subCategoryName || null,
+      amount: dividend.netAmount, // Use net amount (after tax)
+      currency: dividend.currency,
+      date: Timestamp.fromDate(paymentDate),
+      notes: `Dividendo ${dividend.assetTicker} - ${dividend.assetName}${
+        dividend.notes ? ` | ${dividend.notes}` : ''
+      }`,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const expenseRef = await adminDb.collection('expenses').add(expenseData);
 
     // Update dividend with expense reference
     await updateDividend(dividend.id, {
-      expenseId,
+      expenseId: expenseRef.id,
     } as any);
 
-    return expenseId as string;
+    return expenseRef.id;
   } catch (error) {
     console.error('Error creating expense from dividend:', error);
     throw new Error('Failed to create expense from dividend');
@@ -61,21 +63,20 @@ export async function updateExpenseFromDividend(
   subCategoryName?: string
 ): Promise<void> {
   try {
-    await updateExpense(
-      expenseId,
-      {
-        amount: dividend.netAmount, // Use net amount (after tax)
-        currency: dividend.currency,
-        date: dividend.paymentDate instanceof Date
-          ? dividend.paymentDate
-          : dividend.paymentDate.toDate(),
-        notes: `Dividendo ${dividend.assetTicker} - ${dividend.assetName}${
-          dividend.notes ? ` | ${dividend.notes}` : ''
-        }`,
-      },
+    const paymentDate = toDate(dividend.paymentDate);
+
+    // Update expense using Admin SDK
+    await adminDb.collection('expenses').doc(expenseId).update({
+      amount: dividend.netAmount, // Use net amount (after tax)
+      currency: dividend.currency,
+      date: Timestamp.fromDate(paymentDate),
+      notes: `Dividendo ${dividend.assetTicker} - ${dividend.assetName}${
+        dividend.notes ? ` | ${dividend.notes}` : ''
+      }`,
       categoryName,
-      subCategoryName
-    );
+      subCategoryName: subCategoryName || null,
+      updatedAt: Timestamp.now(),
+    });
   } catch (error) {
     console.error('Error updating expense from dividend:', error);
     throw new Error('Failed to update expense from dividend');
@@ -91,8 +92,8 @@ export async function deleteExpenseForDividend(
   expenseId: string
 ): Promise<void> {
   try {
-    // Delete the expense
-    await deleteExpense(expenseId);
+    // Delete the expense using Admin SDK
+    await adminDb.collection('expenses').doc(expenseId).delete();
 
     // Remove expense reference from dividend
     await updateDividend(dividendId, {
@@ -123,10 +124,21 @@ export async function syncDividendExpenses(
     failed: 0,
   };
 
+  // Only create expenses for dividends already paid
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   for (const dividend of dividends) {
     try {
       // Skip if expense already exists
       if (dividend.expenseId) {
+        results.skipped++;
+        continue;
+      }
+
+      // Skip if payment date is in the future
+      const paymentDate = toDate(dividend.paymentDate);
+      if (paymentDate > today) {
         results.skipped++;
         continue;
       }

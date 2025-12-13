@@ -1,17 +1,7 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  query,
-  where,
-  Timestamp,
-  orderBy,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
+import 'server-only';
+
+import { adminDb } from '@/lib/firebase/admin';
+import { Timestamp } from 'firebase-admin/firestore';
 import {
   Dividend,
   DividendFormData,
@@ -42,14 +32,14 @@ function removeUndefinedFields<T extends Record<string, any>>(obj: T): Partial<T
  */
 export async function getAllDividends(userId: string): Promise<Dividend[]> {
   try {
-    const dividendsRef = collection(db, DIVIDENDS_COLLECTION);
-    const q = query(
-      dividendsRef,
-      where('userId', '==', userId),
-      orderBy('paymentDate', 'desc')
-    );
+    console.log('[dividendService] getAllDividends called for userId:', userId);
+    const querySnapshot = await adminDb
+      .collection(DIVIDENDS_COLLECTION)
+      .where('userId', '==', userId)
+      .orderBy('paymentDate', 'desc')
+      .get();
 
-    const querySnapshot = await getDocs(q);
+    console.log('[dividendService] Query successful, docs count:', querySnapshot.size);
 
     const dividends = querySnapshot.docs.map(doc => ({
       id: doc.id,
@@ -60,10 +50,16 @@ export async function getAllDividends(userId: string): Promise<Dividend[]> {
       updatedAt: doc.data().updatedAt?.toDate() || new Date(),
     })) as Dividend[];
 
+    console.log('[dividendService] Returning', dividends.length, 'dividends');
     return dividends;
   } catch (error) {
-    console.error('Error getting dividends:', error);
-    throw new Error('Failed to fetch dividends');
+    console.error('[dividendService] Error getting dividends:', error);
+    console.error('[dividendService] Error details:', {
+      name: (error as Error).name,
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
+    throw error;
   }
 }
 
@@ -76,15 +72,12 @@ export async function getDividendsByAsset(
   assetId: string
 ): Promise<Dividend[]> {
   try {
-    const dividendsRef = collection(db, DIVIDENDS_COLLECTION);
-    const q = query(
-      dividendsRef,
-      where('userId', '==', userId),
-      where('assetId', '==', assetId),
-      orderBy('paymentDate', 'desc')
-    );
-
-    const querySnapshot = await getDocs(q);
+    const querySnapshot = await adminDb
+      .collection(DIVIDENDS_COLLECTION)
+      .where('userId', '==', userId)
+      .where('assetId', '==', assetId)
+      .orderBy('paymentDate', 'desc')
+      .get();
 
     const dividends = querySnapshot.docs.map(doc => ({
       id: doc.id,
@@ -112,16 +105,13 @@ export async function getDividendsByDateRange(
   endDate: Date
 ): Promise<Dividend[]> {
   try {
-    const dividendsRef = collection(db, DIVIDENDS_COLLECTION);
-    const q = query(
-      dividendsRef,
-      where('userId', '==', userId),
-      where('paymentDate', '>=', Timestamp.fromDate(startDate)),
-      where('paymentDate', '<=', Timestamp.fromDate(endDate)),
-      orderBy('paymentDate', 'desc')
-    );
-
-    const querySnapshot = await getDocs(q);
+    const querySnapshot = await adminDb
+      .collection(DIVIDENDS_COLLECTION)
+      .where('userId', '==', userId)
+      .where('paymentDate', '>=', Timestamp.fromDate(startDate))
+      .where('paymentDate', '<=', Timestamp.fromDate(endDate))
+      .orderBy('paymentDate', 'desc')
+      .get();
 
     const dividends = querySnapshot.docs.map(doc => ({
       id: doc.id,
@@ -144,20 +134,22 @@ export async function getDividendsByDateRange(
  */
 export async function getDividendById(dividendId: string): Promise<Dividend | null> {
   try {
-    const dividendRef = doc(db, DIVIDENDS_COLLECTION, dividendId);
-    const dividendDoc = await getDoc(dividendRef);
+    const dividendDoc = await adminDb
+      .collection(DIVIDENDS_COLLECTION)
+      .doc(dividendId)
+      .get();
 
-    if (!dividendDoc.exists()) {
+    if (!dividendDoc.exists) {
       return null;
     }
 
     return {
       id: dividendDoc.id,
       ...dividendDoc.data(),
-      exDate: dividendDoc.data().exDate?.toDate() || new Date(),
-      paymentDate: dividendDoc.data().paymentDate?.toDate() || new Date(),
-      createdAt: dividendDoc.data().createdAt?.toDate() || new Date(),
-      updatedAt: dividendDoc.data().updatedAt?.toDate() || new Date(),
+      exDate: dividendDoc.data()?.exDate?.toDate() || new Date(),
+      paymentDate: dividendDoc.data()?.paymentDate?.toDate() || new Date(),
+      createdAt: dividendDoc.data()?.createdAt?.toDate() || new Date(),
+      updatedAt: dividendDoc.data()?.updatedAt?.toDate() || new Date(),
     } as Dividend;
   } catch (error) {
     console.error('Error getting dividend:', error);
@@ -179,10 +171,17 @@ export async function createDividend(
 ): Promise<string> {
   try {
     const now = Timestamp.now();
-    const dividendsRef = collection(db, DIVIDENDS_COLLECTION);
 
     // Auto-calculate netAmount if not already set
     const netAmount = dividendData.netAmount || (dividendData.grossAmount - dividendData.taxAmount);
+
+    // Convert dates to Date objects if they're strings
+    const exDate = dividendData.exDate instanceof Date
+      ? dividendData.exDate
+      : new Date(dividendData.exDate);
+    const paymentDate = dividendData.paymentDate instanceof Date
+      ? dividendData.paymentDate
+      : new Date(dividendData.paymentDate);
 
     const cleanedData = removeUndefinedFields({
       userId,
@@ -190,8 +189,8 @@ export async function createDividend(
       assetTicker,
       assetName,
       assetIsin,
-      exDate: Timestamp.fromDate(dividendData.exDate),
-      paymentDate: Timestamp.fromDate(dividendData.paymentDate),
+      exDate: Timestamp.fromDate(exDate),
+      paymentDate: Timestamp.fromDate(paymentDate),
       dividendPerShare: dividendData.dividendPerShare,
       quantity: dividendData.quantity,
       grossAmount: dividendData.grossAmount,
@@ -205,7 +204,7 @@ export async function createDividend(
       updatedAt: now,
     });
 
-    const docRef = await addDoc(dividendsRef, cleanedData);
+    const docRef = await adminDb.collection(DIVIDENDS_COLLECTION).add(cleanedData);
 
     return docRef.id;
   } catch (error) {
@@ -222,17 +221,25 @@ export async function updateDividend(
   updates: Partial<DividendFormData>
 ): Promise<void> {
   try {
-    const dividendRef = doc(db, DIVIDENDS_COLLECTION, dividendId);
+    // Convert dates to Date objects if they're strings, then to Timestamps
+    const exDate = updates.exDate
+      ? (updates.exDate instanceof Date ? updates.exDate : new Date(updates.exDate))
+      : undefined;
+    const paymentDate = updates.paymentDate
+      ? (updates.paymentDate instanceof Date ? updates.paymentDate : new Date(updates.paymentDate))
+      : undefined;
 
-    // Convert dates to Timestamps if present
     const cleanedUpdates = removeUndefinedFields({
       ...updates,
-      exDate: updates.exDate ? Timestamp.fromDate(updates.exDate) : undefined,
-      paymentDate: updates.paymentDate ? Timestamp.fromDate(updates.paymentDate) : undefined,
+      exDate: exDate ? Timestamp.fromDate(exDate) : undefined,
+      paymentDate: paymentDate ? Timestamp.fromDate(paymentDate) : undefined,
       updatedAt: Timestamp.now(),
     });
 
-    await updateDoc(dividendRef, cleanedUpdates);
+    await adminDb
+      .collection(DIVIDENDS_COLLECTION)
+      .doc(dividendId)
+      .update(cleanedUpdates);
   } catch (error) {
     console.error('Error updating dividend:', error);
     throw new Error('Failed to update dividend');
@@ -244,8 +251,10 @@ export async function updateDividend(
  */
 export async function deleteDividend(dividendId: string): Promise<void> {
   try {
-    const dividendRef = doc(db, DIVIDENDS_COLLECTION, dividendId);
-    await deleteDoc(dividendRef);
+    await adminDb
+      .collection(DIVIDENDS_COLLECTION)
+      .doc(dividendId)
+      .delete();
   } catch (error) {
     console.error('Error deleting dividend:', error);
     throw new Error('Failed to delete dividend');
@@ -270,11 +279,19 @@ export async function calculateDividendStats(
       dividends = await getAllDividends(userId);
     }
 
+    // Filter out future dividends (only calculate stats for paid dividends)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const paidDividends = dividends.filter(div => {
+      const paymentDate = div.paymentDate instanceof Date ? div.paymentDate : new Date();
+      return paymentDate <= today;
+    });
+
     const stats: DividendStats = {
       totalGross: 0,
       totalTax: 0,
       totalNet: 0,
-      count: dividends.length,
+      count: paidDividends.length,
       byAsset: {},
       byType: {
         ordinary: { totalGross: 0, totalTax: 0, totalNet: 0, count: 0 },
@@ -284,7 +301,7 @@ export async function calculateDividendStats(
       },
     };
 
-    dividends.forEach(dividend => {
+    paidDividends.forEach(dividend => {
       // Total stats
       stats.totalGross += dividend.grossAmount;
       stats.totalTax += dividend.taxAmount;
@@ -370,15 +387,12 @@ export async function getDividendsByAssetGrouped(
 export async function getUpcomingDividends(userId: string): Promise<Dividend[]> {
   try {
     const now = new Date();
-    const dividendsRef = collection(db, DIVIDENDS_COLLECTION);
-    const q = query(
-      dividendsRef,
-      where('userId', '==', userId),
-      where('paymentDate', '>=', Timestamp.fromDate(now)),
-      orderBy('paymentDate', 'asc')
-    );
-
-    const querySnapshot = await getDocs(q);
+    const querySnapshot = await adminDb
+      .collection(DIVIDENDS_COLLECTION)
+      .where('userId', '==', userId)
+      .where('paymentDate', '>=', Timestamp.fromDate(now))
+      .orderBy('paymentDate', 'asc')
+      .get();
 
     const dividends = querySnapshot.docs.map(doc => ({
       id: doc.id,
@@ -406,23 +420,19 @@ export async function isDuplicateDividend(
   exDate: Date
 ): Promise<boolean> {
   try {
-    const dividendsRef = collection(db, DIVIDENDS_COLLECTION);
-
     // Create date range for the same day (start of day to end of day)
     const startOfDay = new Date(exDate);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(exDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const q = query(
-      dividendsRef,
-      where('userId', '==', userId),
-      where('assetId', '==', assetId),
-      where('exDate', '>=', Timestamp.fromDate(startOfDay)),
-      where('exDate', '<=', Timestamp.fromDate(endOfDay))
-    );
-
-    const querySnapshot = await getDocs(q);
+    const querySnapshot = await adminDb
+      .collection(DIVIDENDS_COLLECTION)
+      .where('userId', '==', userId)
+      .where('assetId', '==', assetId)
+      .where('exDate', '>=', Timestamp.fromDate(startOfDay))
+      .where('exDate', '<=', Timestamp.fromDate(endOfDay))
+      .get();
 
     return !querySnapshot.empty;
   } catch (error) {

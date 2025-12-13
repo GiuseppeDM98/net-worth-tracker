@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { toDate } from '@/lib/utils/dateHelpers';
 
 const ITEMS_PER_PAGE = 50;
 
@@ -48,8 +49,7 @@ export function DividendTable({ dividends, onEdit, onRefresh }: DividendTablePro
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   const formatDate = (date: Date | string | Timestamp): string => {
-    const dateObj = date instanceof Date ? date : (date instanceof Timestamp ? date.toDate() : new Date(date));
-    return format(dateObj, 'dd/MM/yyyy', { locale: it });
+    return format(toDate(date), 'dd/MM/yyyy', { locale: it });
   };
 
   const handleDelete = async (dividend: Dividend) => {
@@ -104,8 +104,8 @@ export function DividendTable({ dividends, onEdit, onRefresh }: DividendTablePro
     if (sortColumn === null) {
       // Default sort: by exDate desc
       return [...dividends].sort((a, b) => {
-        const dateA = a.exDate instanceof Date ? a.exDate : (a.exDate as Timestamp).toDate();
-        const dateB = b.exDate instanceof Date ? b.exDate : (b.exDate as Timestamp).toDate();
+        const dateA = toDate(a.exDate);
+        const dateB = toDate(b.exDate);
         return dateB.getTime() - dateA.getTime();
       });
     }
@@ -115,13 +115,9 @@ export function DividendTable({ dividends, onEdit, onRefresh }: DividendTablePro
       let comparison = 0;
 
       if (sortColumn === 'exDate' || sortColumn === 'paymentDate') {
-        const dateA = a[sortColumn] instanceof Date
-          ? a[sortColumn]
-          : (a[sortColumn] as Timestamp).toDate();
-        const dateB = b[sortColumn] instanceof Date
-          ? b[sortColumn]
-          : (b[sortColumn] as Timestamp).toDate();
-        comparison = (dateA as Date).getTime() - (dateB as Date).getTime();
+        const dateA = toDate(a[sortColumn]);
+        const dateB = toDate(b[sortColumn]);
+        comparison = dateA.getTime() - dateB.getTime();
       } else if (sortColumn === 'totalNet') {
         comparison = a.netAmount - b.netAmount;
       }
@@ -196,6 +192,8 @@ export function DividendTable({ dividends, onEdit, onRefresh }: DividendTablePro
               <TableHead className="text-right w-[90px]">Tax/Azione</TableHead>
               <TableHead className="text-right w-[90px]">Netto/Azione</TableHead>
               <TableHead className="text-right w-[70px]">Azioni</TableHead>
+              <TableHead className="text-right w-[110px]">Totale Lordo</TableHead>
+              <TableHead className="text-right w-[110px]">Tasse</TableHead>
               <TableHead className="text-right w-[110px]">
                 <SortButton column="totalNet" label="Totale Netto" />
               </TableHead>
@@ -238,6 +236,12 @@ export function DividendTable({ dividends, onEdit, onRefresh }: DividendTablePro
                   }).format(dividend.netAmount / dividend.quantity)}
                 </TableCell>
                 <TableCell className="text-right text-sm">{dividend.quantity}</TableCell>
+                <TableCell className="text-right font-medium">
+                  {formatCurrency(dividend.grossAmount)}
+                </TableCell>
+                <TableCell className="text-right font-medium text-red-600">
+                  {formatCurrency(dividend.taxAmount)}
+                </TableCell>
                 <TableCell className="text-right font-medium text-green-600">
                   {formatCurrency(dividend.netAmount)}
                 </TableCell>

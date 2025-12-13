@@ -22,6 +22,7 @@ import { Plus, Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
+import { toDate } from '@/lib/utils/dateHelpers';
 
 const dividendTypeLabels: Record<DividendType, string> = {
   ordinary: 'Ordinario',
@@ -41,8 +42,8 @@ export function DividendTrackingTab() {
   const [selectedDividend, setSelectedDividend] = useState<Dividend | null>(null);
 
   // Filters
-  const [assetFilter, setAssetFilter] = useState<string>('');
-  const [typeFilter, setTypeFilter] = useState<string>('');
+  const [assetFilter, setAssetFilter] = useState<string>('__all__');
+  const [typeFilter, setTypeFilter] = useState<string>('__all__');
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
 
@@ -78,42 +79,39 @@ export function DividendTrackingTab() {
   };
 
   const fetchDividends = async (): Promise<Dividend[]> => {
-    const response = await fetch('/api/dividends');
+    if (!user) throw new Error('User not authenticated');
+
+    const response = await fetch(`/api/dividends?userId=${user.uid}`);
 
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.message || 'Errore nel caricamento dei dividendi');
     }
 
-    return response.json();
+    const data = await response.json();
+    return data.dividends || [];
   };
 
   const applyFilters = () => {
     let filtered = [...dividends];
 
     // Filter by asset
-    if (assetFilter) {
+    if (assetFilter && assetFilter !== '__all__') {
       filtered = filtered.filter((d) => d.assetId === assetFilter);
     }
 
     // Filter by type
-    if (typeFilter) {
+    if (typeFilter && typeFilter !== '__all__') {
       filtered = filtered.filter((d) => d.dividendType === typeFilter);
     }
 
     // Filter by date range
     if (startDate) {
-      filtered = filtered.filter((d) => {
-        const exDate = d.exDate instanceof Date ? d.exDate : d.exDate.toDate();
-        return exDate >= startDate;
-      });
+      filtered = filtered.filter((d) => toDate(d.exDate) >= startDate);
     }
 
     if (endDate) {
-      filtered = filtered.filter((d) => {
-        const exDate = d.exDate instanceof Date ? d.exDate : d.exDate.toDate();
-        return exDate <= endDate;
-      });
+      filtered = filtered.filter((d) => toDate(d.exDate) <= endDate);
     }
 
     setFilteredDividends(filtered);
@@ -168,8 +166,8 @@ export function DividendTrackingTab() {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
+              userId: user.uid,
               assetId: asset.id,
-              isin: asset.isin,
             }),
           });
 
@@ -229,8 +227,8 @@ export function DividendTrackingTab() {
 
     // CSV rows
     const rows = filteredDividends.map((d) => {
-      const exDate = d.exDate instanceof Date ? d.exDate : d.exDate.toDate();
-      const paymentDate = d.paymentDate instanceof Date ? d.paymentDate : d.paymentDate.toDate();
+      const exDate = toDate(d.exDate);
+      const paymentDate = toDate(d.paymentDate);
 
       return [
         d.assetTicker,
@@ -275,8 +273,8 @@ export function DividendTrackingTab() {
   };
 
   const clearFilters = () => {
-    setAssetFilter('');
-    setTypeFilter('');
+    setAssetFilter('__all__');
+    setTypeFilter('__all__');
     setStartDate(undefined);
     setEndDate(undefined);
   };
@@ -292,32 +290,39 @@ export function DividendTrackingTab() {
   return (
     <div className="space-y-6">
       {/* Action Buttons Row */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Button onClick={handleCreate}>
-          <Plus className="h-4 w-4 mr-2" />
-          Aggiungi Dividendo
-        </Button>
-        <Button
-          onClick={handleScrapeAll}
-          variant="outline"
-          disabled={scraping}
-        >
-          {scraping ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Scaricamento...
-            </>
-          ) : (
-            <>
-              <Download className="h-4 w-4 mr-2" />
-              Scarica Tutti (Borsa Italiana)
-            </>
-          )}
-        </Button>
-        <Button onClick={handleExportCSV} variant="outline">
-          <Download className="h-4 w-4 mr-2" />
-          Esporta CSV
-        </Button>
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={handleCreate}>
+            <Plus className="h-4 w-4 mr-2" />
+            Aggiungi Dividendo
+          </Button>
+          <Button
+            onClick={handleScrapeAll}
+            variant="outline"
+            disabled={scraping}
+            title="Scarica manualmente tutti i dividendi storici per i tuoi asset con ISIN"
+          >
+            {scraping ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Scaricamento...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4 mr-2" />
+                Scarica Tutti (Manuale)
+              </>
+            )}
+          </Button>
+          <Button onClick={handleExportCSV} variant="outline">
+            <Download className="h-4 w-4 mr-2" />
+            Esporta CSV
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          💡 I dividendi recenti vengono scaricati automaticamente ogni giorno.
+          Usa "Scarica Tutti" solo per importare dividendi storici o forzare un refresh.
+        </p>
       </div>
 
       {/* Stats Component */}
@@ -335,7 +340,7 @@ export function DividendTrackingTab() {
                 <SelectValue placeholder="Tutti gli asset" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Tutti gli asset</SelectItem>
+                <SelectItem value="__all__">Tutti gli asset</SelectItem>
                 {assets.map((asset) => (
                   <SelectItem key={asset.id} value={asset.id}>
                     {asset.ticker || asset.name}
@@ -353,7 +358,7 @@ export function DividendTrackingTab() {
                 <SelectValue placeholder="Tutti i tipi" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Tutti i tipi</SelectItem>
+                <SelectItem value="__all__">Tutti i tipi</SelectItem>
                 {Object.entries(dividendTypeLabels).map(([value, label]) => (
                   <SelectItem key={value} value={value}>
                     {label}
@@ -407,7 +412,7 @@ export function DividendTrackingTab() {
         </div>
 
         {/* Clear Filters Button */}
-        {(assetFilter || typeFilter || startDate || endDate) && (
+        {(assetFilter !== '__all__' || typeFilter !== '__all__' || startDate || endDate) && (
           <div className="mt-4">
             <Button onClick={clearFilters} variant="ghost" size="sm">
               Cancella Filtri

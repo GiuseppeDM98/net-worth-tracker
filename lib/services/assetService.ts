@@ -85,6 +85,43 @@ export async function getAllAssets(userId: string): Promise<Asset[]> {
 }
 
 /**
+ * Get all equity assets with ISIN for a specific user
+ * Used for automatic dividend scraping
+ * Filters: assetClass === 'equity' AND isin exists AND isin is not empty
+ */
+export async function getAssetsWithIsin(userId: string): Promise<Asset[]> {
+  try {
+    const assetsRef = collection(db, ASSETS_COLLECTION);
+    const q = query(
+      assetsRef,
+      where('userId', '==', userId),
+      where('assetClass', '==', 'equity')
+    );
+
+    const querySnapshot = await getDocs(q);
+
+    const assets = querySnapshot.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        lastPriceUpdate: doc.data().lastPriceUpdate?.toDate() || new Date(),
+        createdAt: doc.data().createdAt?.toDate() || new Date(),
+        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+      }))
+      .filter(asset => {
+        // Filter out assets without ISIN or with empty ISIN
+        const assetData = asset as Asset;
+        return assetData.isin && assetData.isin.trim() !== '';
+      }) as Asset[];
+
+    return assets;
+  } catch (error) {
+    console.error('Error getting assets with ISIN:', error);
+    throw new Error('Failed to fetch assets with ISIN');
+  }
+}
+
+/**
  * Get a single asset by ID
  */
 export async function getAssetById(assetId: string): Promise<Asset | null> {

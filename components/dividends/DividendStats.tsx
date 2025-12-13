@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DollarSign, TrendingUp, TrendingDown, Percent, Calendar } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/formatters';
@@ -62,18 +63,24 @@ interface DividendStatsData {
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF6B9D'];
 
 export function DividendStats({ startDate, endDate }: DividendStatsProps) {
+  const { user } = useAuth();
   const [stats, setStats] = useState<DividendStatsData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadStats();
-  }, [startDate, endDate]);
+    if (user) {
+      loadStats();
+    }
+  }, [user, startDate, endDate]);
 
   const loadStats = async () => {
+    if (!user) return;
+
     try {
       setLoading(true);
 
       const params = new URLSearchParams();
+      params.append('userId', user.uid);
       if (startDate) params.append('startDate', startDate.toISOString());
       if (endDate) params.append('endDate', endDate.toISOString());
 
@@ -85,7 +92,7 @@ export function DividendStats({ startDate, endDate }: DividendStatsProps) {
       }
 
       const data = await response.json();
-      setStats(data);
+      setStats(data.stats);
     } catch (error) {
       console.error('Error loading dividend stats:', error);
       toast.error('Errore nel caricamento delle statistiche');

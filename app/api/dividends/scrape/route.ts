@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAssetById } from '@/lib/services/assetService';
+import { adminDb } from '@/lib/firebase/admin';
+import { Asset } from '@/types/assets';
+import { ExpenseCategory } from '@/types/expenses';
 import {
   createDividend,
   isDuplicateDividend,
   getDividendById,
 } from '@/lib/services/dividendService';
 import { scrapeDividendsByIsin } from '@/lib/services/borsaItalianaScraperService';
-import { getSettings } from '@/lib/services/assetAllocationService';
-import { getCategoryById } from '@/lib/services/expenseCategoryService';
 import { createExpenseFromDividend } from '@/lib/services/dividendIncomeService';
 import { DividendFormData } from '@/types/dividend';
+import { isDateOnOrAfter, toDate } from '@/lib/utils/dateHelpers';
 
 /**
  * POST /api/dividends/scrape
@@ -32,15 +33,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch asset and verify ISIN exists
-    const asset = await getAssetById(assetId);
+    // Fetch asset using admin SDK and verify ISIN exists
+    const assetDoc = await adminDb.collection('assets').doc(assetId).get();
 
-    if (!asset) {
+    if (!assetDoc.exists) {
       return NextResponse.json(
         { error: 'Asset not found' },
         { status: 404 }
       );
     }
+
+    const assetData = assetDoc.data();
+    const asset: Asset = {
+      id: assetDoc.id,
+      ...assetData,
+      lastPriceUpdate: assetData?.lastPriceUpdate?.toDate() || new Date(),
+      createdAt: assetData?.createdAt?.toDate() || new Date(),
+      updatedAt: assetData?.updatedAt?.toDate() || new Date(),
+    } as Asset;
 
     // Verify asset belongs to user
     if (asset.userId !== userId) {
@@ -73,13 +83,31 @@ export async function POST(request: NextRequest) {
 
     console.log(`Found ${scrapedDividends.length} dividends from Borsa Italiana`);
 
-    // Get user settings for expense creation
-    const settings = await getSettings(userId);
+    // Filter dividends: only import if ex-date >= asset.createdAt
+    // This ensures we only track dividends for assets owned before/on the ex-date
+    const relevantDividends = scrapedDividends.filter((div) =>
+      isDateOnOrAfter(div.exDate, asset.createdAt)
+    );
+
+    const filteredOut = scrapedDividends.length - relevantDividends.length;
+    if (filteredOut > 0) {
+      console.log(
+        `Filtered out ${filteredOut} dividends with ex-date before asset creation (${toDate(asset.createdAt).toLocaleDateString('it-IT')})`
+      );
+    }
+
+    console.log(`Processing ${relevantDividends.length} relevant dividends`);
+
+    // Get user settings for expense creation using admin SDK
+    const settingsDoc = await adminDb.collection('assetAllocationTargets').doc(userId).get();
+    const settings = settingsDoc.exists ? settingsDoc.data() : null;
     let categoryInfo: { categoryId: string; categoryName: string; subCategoryId?: string; subCategoryName?: string } | null = null;
 
     if (settings?.dividendIncomeCategoryId) {
-      const category = await getCategoryById(settings.dividendIncomeCategoryId);
-      if (category) {
+      // Get category using admin SDK
+      const categoryDoc = await adminDb.collection('expenseCategories').doc(settings.dividendIncomeCategoryId).get();
+      if (categoryDoc.exists) {
+        const category = categoryDoc.data() as ExpenseCategory;
         categoryInfo = {
           categoryId: settings.dividendIncomeCategoryId,
           categoryName: category.name,
@@ -87,7 +115,7 @@ export async function POST(request: NextRequest) {
         };
 
         if (settings.dividendIncomeSubCategoryId) {
-          const subCategory = category.subCategories.find(
+          const subCategory = category.subCategories?.find(
             (sub) => sub.id === settings.dividendIncomeSubCategoryId
           );
           if (subCategory) {
@@ -105,7 +133,7 @@ export async function POST(request: NextRequest) {
     let skipped = 0;
     const createdIds: string[] = [];
 
-    for (const scrapedDiv of scrapedDividends) {
+    for (const scrapedDiv of relevantDividends) {
       try {
         // Check for duplicates
         const isDuplicate = await isDuplicateDividend(userId, assetId, scrapedDiv.exDate);
@@ -180,6 +208,7 @@ export async function POST(request: NextRequest) {
       success: true,
       message: `Successfully scraped and imported dividends for ${asset.ticker}`,
       scraped: scrapedDividends.length,
+      filtered: filteredOut,
       created,
       skipped,
       createdIds,

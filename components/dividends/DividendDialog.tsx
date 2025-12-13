@@ -219,12 +219,17 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
 
       const method = dividend ? 'PUT' : 'POST';
 
+      // Prepara il body in base al metodo
+      const requestBody = dividend
+        ? { updates: dividendData } // PUT usa "updates"
+        : { userId: user.uid, dividendData }; // POST usa wrapper
+
       const response = await fetch(endpoint, {
         method,
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(dividendData),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {

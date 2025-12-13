@@ -5,11 +5,11 @@ import {
   getDividendsByDateRange,
   createDividend,
 } from '@/lib/services/dividendService';
-import { getAssetById } from '@/lib/services/assetService';
-import { getSettings } from '@/lib/services/assetAllocationService';
-import { getCategoryById } from '@/lib/services/expenseCategoryService';
+import { adminDb } from '@/lib/firebase/admin';
 import { createExpenseFromDividend } from '@/lib/services/dividendIncomeService';
 import { DividendFormData } from '@/types/dividend';
+import { Asset } from '@/types/assets';
+import { ExpenseCategory } from '@/types/expenses';
 
 /**
  * GET /api/dividends
@@ -97,14 +97,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch asset to get ticker, name, and ISIN
-    const asset = await getAssetById(dividendData.assetId);
-    if (!asset) {
+    // Fetch asset to get ticker, name, and ISIN using Admin SDK
+    const assetDoc = await adminDb
+      .collection('assets')
+      .doc(dividendData.assetId)
+      .get();
+
+    if (!assetDoc.exists) {
       return NextResponse.json(
         { error: 'Asset not found' },
         { status: 404 }
       );
     }
+
+    const assetData = assetDoc.data() as Asset;
+    const asset = {
+      ...assetData,
+      id: assetDoc.id,
+    };
 
     // Verify asset belongs to user
     if (asset.userId !== userId) {
@@ -132,20 +142,34 @@ export async function POST(request: NextRequest) {
     let expenseId: string | undefined;
 
     if (paymentDate <= today) {
-      // Get user settings to check if dividend income category is configured
-      const settings = await getSettings(userId);
+      // Get user settings to check if dividend income category is configured using Admin SDK
+      const settingsDoc = await adminDb
+        .collection('assetAllocationTargets')
+        .doc(userId)
+        .get();
+
+      const settings = settingsDoc.exists ? settingsDoc.data() : null;
 
       if (settings?.dividendIncomeCategoryId) {
         try {
-          // Get category details
-          const category = await getCategoryById(settings.dividendIncomeCategoryId);
+          // Get category details using Admin SDK
+          const categoryDoc = await adminDb
+            .collection('expenseCategories')
+            .doc(settings.dividendIncomeCategoryId)
+            .get();
 
-          if (category) {
+          if (categoryDoc.exists) {
+            const categoryData = categoryDoc.data() as ExpenseCategory;
+            const category = {
+              ...categoryData,
+              id: categoryDoc.id,
+            };
+
             // Get subcategory name if configured
             let subCategoryName: string | undefined;
             if (settings.dividendIncomeSubCategoryId) {
-              const subCategory = category.subCategories.find(
-                (sub) => sub.id === settings.dividendIncomeSubCategoryId
+              const subCategory = category.subCategories?.find(
+                (sub: any) => sub.id === settings.dividendIncomeSubCategoryId
               );
               subCategoryName = subCategory?.name;
             }
