@@ -203,6 +203,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         autoUpdatePrice: asset.autoUpdatePrice !== undefined ? asset.autoUpdatePrice : shouldUpdatePrice(asset.type, asset.subCategory),
         isComposite: !!(asset.composition && asset.composition.length > 0),
         outstandingDebt: asset.outstandingDebt || undefined,
+        isin: asset.isin || undefined,
       });
 
       if (asset.composition && asset.composition.length > 0) {

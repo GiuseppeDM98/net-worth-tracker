@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
     const userAssets = assetsSnapshot.docs.map(doc => ({
       id: doc.id,
       quantity: doc.data().quantity || 0,
+      currentPrice: doc.data().currentPrice || 0,
     }));
     const assetsMap = new Map(userAssets.map(a => [a.id, a]));
 
@@ -127,8 +128,32 @@ export async function GET(request: NextRequest) {
       .map(([month, totalNet]) => ({ month, totalNet }))
       .sort((a, b) => a.month.localeCompare(b.month));
 
-    // Calculate average yield (placeholder - would need asset data to calculate properly)
-    const averageYield = 0;
+    // Calculate average yield based on TTM (Trailing Twelve Months) dividends
+    let averageYield = 0;
+
+    // 1. Calculate date 12 months ago
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1);
+
+    // 2. Filter dividends from last 12 months
+    const ttmDividends = allDividends.filter(div => {
+      const exDate = toDate(div.exDate);
+      return exDate >= twelveMonthsAgo;
+    });
+
+    // 3. Calculate total gross dividends TTM
+    const ttmTotalGross = ttmDividends.reduce((sum, div) => sum + div.grossAmount, 0);
+
+    // 4. Calculate value of assets that paid dividends in TTM period
+    const assetIdsWithDividends = new Set(ttmDividends.map(div => div.assetId));
+    const portfolioValueWithDividends = userAssets
+      .filter(asset => assetIdsWithDividends.has(asset.id) && asset.quantity > 0)
+      .reduce((sum, asset) => sum + (asset.currentPrice * asset.quantity), 0);
+
+    // 5. Calculate yield only if portfolio value > 0
+    if (portfolioValueWithDividends > 0 && ttmTotalGross > 0) {
+      averageYield = (ttmTotalGross / portfolioValueWithDividends) * 100;
+    }
 
     const stats = {
       period: {
