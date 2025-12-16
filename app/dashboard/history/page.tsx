@@ -452,9 +452,10 @@ export default function HistoryPage() {
                     color: '#000',
                     fontWeight: 600,
                     marginBottom: '4px',
+                    fontSize: isMobile ? '14px' : '16px',
                   }}
                   itemStyle={{
-                    fontSize: isMobile ? '11px' : '12px',
+                    fontSize: isMobile ? '14px' : '16px',
                     padding: '2px 0',
                   }}
                   cursor={{ stroke: '#3B82F6', strokeWidth: 1, strokeDasharray: '5 5' }}
@@ -552,7 +553,7 @@ export default function HistoryPage() {
                       border: '1px solid #ccc',
                       borderRadius: '8px',
                       padding: isMobile ? '8px' : '12px',
-                      fontSize: isMobile ? '11px' : '13px',
+                      fontSize: isMobile ? '14px' : '16px',
                       boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                     }}
                     labelStyle={{
@@ -561,7 +562,7 @@ export default function HistoryPage() {
                       marginBottom: '4px',
                     }}
                     itemStyle={{
-                      fontSize: isMobile ? '11px' : '12px',
+                      fontSize: isMobile ? '14px' : '16px',
                       padding: '2px 0',
                     }}
                   />
@@ -650,7 +651,7 @@ export default function HistoryPage() {
                       border: '1px solid #ccc',
                       borderRadius: '8px',
                       padding: isMobile ? '8px' : '12px',
-                      fontSize: isMobile ? '11px' : '13px',
+                      fontSize: isMobile ? '14px' : '16px',
                       boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                     }}
                     labelStyle={{
@@ -659,7 +660,7 @@ export default function HistoryPage() {
                       marginBottom: '4px',
                     }}
                     itemStyle={{
-                      fontSize: isMobile ? '11px' : '12px',
+                      fontSize: isMobile ? '14px' : '16px',
                       padding: '2px 0',
                     }}
                   />
@@ -777,7 +778,7 @@ export default function HistoryPage() {
                       border: '1px solid #ccc',
                       borderRadius: '8px',
                       padding: isMobile ? '8px' : '12px',
-                      fontSize: isMobile ? '11px' : '13px',
+                      fontSize: isMobile ? '14px' : '16px',
                       boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                     }}
                     labelStyle={{
@@ -786,7 +787,7 @@ export default function HistoryPage() {
                       marginBottom: '4px',
                     }}
                     itemStyle={{
-                      fontSize: isMobile ? '11px' : '12px',
+                      fontSize: isMobile ? '14px' : '16px',
                       padding: '2px 0',
                     }}
                   />
@@ -836,7 +837,7 @@ export default function HistoryPage() {
                       border: '1px solid #ccc',
                       borderRadius: '8px',
                       padding: isMobile ? '8px' : '12px',
-                      fontSize: isMobile ? '11px' : '13px',
+                      fontSize: isMobile ? '14px' : '16px',
                       boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                     }}
                     labelStyle={{
@@ -845,7 +846,7 @@ export default function HistoryPage() {
                       marginBottom: '4px',
                     }}
                     itemStyle={{
-                      fontSize: isMobile ? '11px' : '12px',
+                      fontSize: isMobile ? '14px' : '16px',
                       padding: '2px 0',
                     }}
                   />
@@ -931,7 +932,7 @@ export default function HistoryPage() {
                     border: '1px solid #ccc',
                     borderRadius: '8px',
                     padding: isMobile ? '8px' : '12px',
-                    fontSize: isMobile ? '11px' : '13px',
+                    fontSize: isMobile ? '14px' : '16px',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                   }}
                   labelStyle={{
@@ -940,7 +941,7 @@ export default function HistoryPage() {
                     marginBottom: '4px',
                   }}
                   itemStyle={{
-                    fontSize: isMobile ? '11px' : '12px',
+                    fontSize: isMobile ? '14px' : '16px',
                     padding: '2px 0',
                   }}
                 />
