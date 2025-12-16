@@ -436,6 +436,9 @@ export default function SettingsPage() {
       await setSettings(user.uid, {
         userAge,
         riskFreeRate,
+        // Preserve FIRE settings
+        withdrawalRate: settingsData?.withdrawalRate,
+        plannedAnnualExpenses: settingsData?.plannedAnnualExpenses,
         targets,
         dividendIncomeCategoryId: dividendIncomeCategoryId || undefined,
         dividendIncomeSubCategoryId: dividendIncomeSubCategoryId || undefined,

@@ -118,6 +118,9 @@ export function FireCalculatorTab() {
         riskFreeRate: currentSettings?.riskFreeRate,
         withdrawalRate: newWR,
         plannedAnnualExpenses: newPAE ?? undefined,
+        // Preserve dividend settings
+        dividendIncomeCategoryId: currentSettings?.dividendIncomeCategoryId,
+        dividendIncomeSubCategoryId: currentSettings?.dividendIncomeSubCategoryId,
         targets: currentSettings?.targets || getDefaultTargets(),
       });
 
