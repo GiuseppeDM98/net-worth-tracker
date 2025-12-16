@@ -45,6 +45,18 @@ Replace spreadsheet-based portfolio management with a modern, automated solution
 - Best/worst years by annual performance (Top 10)
 - Automatic ranking updates with each new snapshot
 
+**Dividend Tracking & Automation:**
+- Automatic dividend import from Borsa Italiana for Italian stocks/ETFs
+- Manual entry with automatic withholding tax calculation (26% Italian, customizable)
+- Expense integration: Auto-create income entries on payment date
+- Web scraping: Bulk import historical dividends via ISIN lookup (cheerio-based)
+- Daily automation: Cron job processes new dividends and creates expenses
+- Four dividend types: Ordinary, Extraordinary, Interim, Final
+- Multi-currency support: EUR, USD, GBP, CHF
+- Analytics: Dividend yield TTM, top contributors, trends, upcoming payments
+- Smart filtering by asset, type, date range
+- CSV export functionality
+
 **Localization:**
 - 🇮🇹 Fully Italian UI
 - EUR currency format: €1.234,56
@@ -78,6 +90,7 @@ Replace spreadsheet-based portfolio management with a modern, automated solution
 |----------|-----------|---------|---------|
 | **Price Data** | yahoo-finance2 | 3.10.1 | Financial price API from Yahoo Finance |
 | **Charts** | Recharts | 3.3.0 | Interactive charts and visualizations |
+| **HTML Parsing** | cheerio | 1.0.0 | Lightweight HTML parsing for Borsa Italiana dividend scraping (serverless-compatible) |
 | **Form Management** | react-hook-form | 7.66.0 | Form handling |
 | **Validation** | zod | 4.1.12 | Schema validation |
 | **Date Utilities** | date-fns | 4.1.0 | Date manipulation (Italian locale) |
@@ -1054,6 +1067,167 @@ Export button → exportSnapshotsToCSV() → Download file
 - **CSV export**: Download historical data for external analysis (Excel, Google Sheets)
 - **Test data support**: Dummy snapshot generator for development/demo (up to 120 months)
 - **Composite asset handling**: Correctly split mixed-allocation assets (e.g., 60/40 pension funds)
+
+---
+
+### 6. Dividend Tracking & Automation
+
+**Purpose:** Track dividend income with automatic scraping from Borsa Italiana and expense synchronization.
+
+**Key Components:**
+- **DividendDialog.tsx** (`components/dividends/DividendDialog.tsx`):
+  - Form for manual dividend entry
+  - Automatic tax calculation (26% Italian withholding, customizable)
+  - Supports 4 dividend types: ordinary, extraordinary, interim, final
+  - Multi-currency support (EUR, USD, GBP, CHF)
+  - Per-share amount with quantity calculation
+  - Gross/net/tax breakdown
+  - Payment date tracking for expense creation
+
+- **DividendTable.tsx** (`components/dividends/DividendTable.tsx`):
+  - Sortable table with per-share amounts, quantity, gross/tax/net
+  - Color-coded by dividend type
+  - Linked expense indicator (icon shows if expense created)
+  - Edit/delete actions
+  - CSV export
+
+- **BorsaItalianaScraperModal.tsx** (`components/dividends/BorsaItalianaScraperModal.tsx`):
+  - Bulk import dividends by ISIN from Borsa Italiana
+  - Manual "Scarica Tutti" button for historical backfill
+  - Progress indicator during scraping
+  - Duplicate detection
+  - Error handling for failed lookups
+
+- **DividendAnalytics.tsx** (`components/dividends/DividendAnalytics.tsx`):
+  - Dividend yield TTM (trailing twelve months)
+  - Top 10 contributors (pie chart + table)
+  - Historical trends (line chart)
+  - Upcoming payments timeline
+  - Filter by asset, type, date range
+
+**Key Services:**
+- **dividendService.ts** (`lib/services/dividendService.ts`):
+  - CRUD operations: `getAllDividends()`, `createDividend()`, `updateDividend()`, `deleteDividend()`
+  - Filtering: `getDividendsByAsset()`, `getDividendsByDateRange()`, `getDividendsByType()`
+  - Statistics: `calculateDividendYieldTTM()`, `getUpcomingPayments()`, `getTopContributors()`
+  - Duplicate check: `isDuplicateDividend(userId, assetId, exDate)`
+  - Expense linking: Track which dividends have created expenses
+
+- **borsaItalianaScraperService.ts** (`lib/services/borsaItalianaScraperService.ts`):
+  - Web scraping from Borsa Italiana using **cheerio** (lightweight, serverless-compatible)
+  - ISIN-based dividend lookup: `scrapeDividendsByIsin(isin: string)`
+  - HTML parsing: Extract ex-date, payment-date, per-share amount, currency, type
+  - Italian date/number parsing: Handles "DD/MM/YY" and "1.234,56" formats
+  - Error handling: Returns empty array on failure (no crash)
+
+- **dividendIncomeService.ts** (`lib/services/dividendIncomeService.ts`):
+  - Create expense entries from dividends: `createExpenseFromDividend()`
+  - Link dividend to expense: Update `dividend.expenseId`
+  - Use configured dividend income category from user settings
+  - Automatic net amount calculation (gross - tax)
+
+**Data Model:**
+```typescript
+Dividend {
+  id: string
+  userId: string
+  assetId: string
+  assetTicker: string
+  assetName: string
+  isin: string
+  exDate: Date                    // Ex-dividend date
+  paymentDate: Date              // Payment date (triggers expense creation)
+  dividendPerShare: number       // Amount per share
+  quantity: number               // Shares held
+  grossAmount: number            // dividendPerShare × quantity
+  taxAmount: number              // Withholding tax (default 26%)
+  netAmount: number              // grossAmount - taxAmount
+  currency: string               // EUR, USD, GBP, CHF
+  dividendType: DividendType     // ordinary | extraordinary | interim | final
+  notes?: string
+  expenseId?: string             // Link to created expense (if paid)
+  isAutoGenerated: boolean       // True if scraped, false if manual
+  createdAt: Date
+  updatedAt: Date
+}
+```
+
+**Pages:**
+- `app/dashboard/dividends/page.tsx` (Dividend tracking page with table + analytics)
+- Integrated in `app/dashboard/cashflow/page.tsx` (income from dividends)
+
+**Data Flow:**
+
+```
+Automatic Scraping (Daily Cron):
+Vercel Cron (00:00 UTC) → /api/cron/daily-dividend-processing
+  ↓ Phase 1: Dividend Discovery
+  For each user:
+  - Get equity assets with ISIN
+  - Call scrapeDividendsByIsin(isin) → cheerio HTML parsing
+  - Filter: exDate >= (today - 60 days) AND exDate >= asset.createdAt
+  - Check isDuplicateDividend()
+  - Create dividend entries (isAutoGenerated: true)
+
+  ↓ Phase 2: Expense Creation
+  For each user:
+  - Get dividends with paymentDate = today AND no expenseId
+  - Create expense entry (type: income, amount: netAmount)
+  - Link dividend.expenseId → expense.id
+
+Manual Backfill:
+User → "Scarica Tutti" button → BorsaItalianaScraperModal
+  ↓
+  scrapeDividendsByIsin(isin) → Returns ALL dividends from Borsa Italiana
+  ↓
+  Filter by asset.createdAt (no 60-day limit)
+  ↓
+  Create dividend entries
+
+Expense Integration:
+Dividend paymentDate = today → Auto-create expense
+  ↓
+  User sees income in Cashflow page
+  ↓
+  Linked via dividend.expenseId (bidirectional reference)
+```
+
+**Key Features:**
+- **Automatic scraping**: Daily cron job with 60-day lookback window
+- **Smart filtering**: Only dividends after asset creation date
+- **Duplicate prevention**: Check by userId + assetId + exDate
+- **Manual backfill**: "Scarica Tutti" button for full historical import
+- **Expense automation**: Auto-create income entries on payment date
+- **Borsa Italiana integration**: Scrape dividend data via ISIN lookup
+- **Tax calculation**: Italian 26% withholding (configurable per dividend)
+- **Multi-currency**: Support EUR, USD, GBP, CHF
+- **Analytics**: Yield TTM, top contributors, trends, upcoming payments
+
+**Scraper Logic (Important):**
+
+The automatic scraper uses a **60-day lookback window** from the cron run date:
+```typescript
+const sixtyDaysAgo = new Date();
+sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+
+const relevantDividends = scrapedDividends.filter((div) => {
+  return div.exDate >= sixtyDaysAgo && isDateOnOrAfter(div.exDate, asset.createdAt);
+});
+```
+
+This means:
+- ✅ Dividends with ex-date in the last 60 days are scraped automatically
+- ✅ Dividends before asset creation are never scraped (user didn't own them)
+- ❌ Historical dividends (>60 days old) are NOT scraped automatically
+- ✅ Use "Scarica Tutti" button for manual backfill of old dividends
+
+**Cron Job:**
+- **Endpoint**: `/api/cron/daily-dividend-processing`
+- **Schedule**: Daily at 00:00 UTC (Vercel Cron)
+- **Configuration**: `vercel.json`
+- **Two phases**:
+  1. Scrape new dividends (60-day window)
+  2. Create expenses for dividends with paymentDate = today
 
 ---
 
