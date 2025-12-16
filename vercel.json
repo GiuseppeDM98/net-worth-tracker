@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/monthly-snapshot",
       "schedule": "0 19 28-31 * *"
+    },
+    {
+      "path": "/api/cron/daily-dividend-processing",
+      "schedule": "0 0 * * *"
     }
   ]
 }

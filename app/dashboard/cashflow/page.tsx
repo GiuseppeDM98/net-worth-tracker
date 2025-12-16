@@ -1,10 +1,11 @@
 'use client';
 
-import { Wallet, Receipt, TrendingUp, BarChart3 } from 'lucide-react';
+import { Wallet, Receipt, TrendingUp, BarChart3, Coins } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ExpenseTrackingTab } from '@/components/cashflow/ExpenseTrackingTab';
 import { CurrentYearTab } from '@/components/cashflow/CurrentYearTab';
 import { TotalHistoryTab } from '@/components/cashflow/TotalHistoryTab';
+import { DividendTrackingTab } from '@/components/dividends/DividendTrackingTab';
 
 export default function CashflowPage() {
   return (
@@ -22,10 +23,14 @@ export default function CashflowPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="tracking" className="w-full">
-        <TabsList className="grid w-full max-w-2xl grid-cols-3">
+        <TabsList className="grid w-full max-w-4xl grid-cols-4">
           <TabsTrigger value="tracking" className="flex items-center gap-2">
             <Receipt className="h-4 w-4" />
             Tracciamento
+          </TabsTrigger>
+          <TabsTrigger value="dividends" className="flex items-center gap-2">
+            <Coins className="h-4 w-4" />
+            Dividendi
           </TabsTrigger>
           <TabsTrigger value="current-year" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
@@ -39,6 +44,10 @@ export default function CashflowPage() {
 
         <TabsContent value="tracking" className="mt-6">
           <ExpenseTrackingTab />
+        </TabsContent>
+
+        <TabsContent value="dividends" className="mt-6">
+          <DividendTrackingTab />
         </TabsContent>
 
         <TabsContent value="current-year" className="mt-6">

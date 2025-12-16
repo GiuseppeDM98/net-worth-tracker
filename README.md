@@ -79,6 +79,28 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
   - Dashboard cards showing Portfolio TER percentage and yearly management costs
   - **PMC (Average Cost) and TER columns** in Assets table for quick reference
 
+### 💰 **Dividend Tracking & Income Automation**
+- **Automatic dividend import** from Borsa Italiana for Italian stocks and ETFs
+- **Manual entry** with automatic withholding tax calculation (26% Italian rate, customizable for foreign dividends)
+- **Expense integration**: Automatically create income entries when dividends are paid
+- **Web scraping**: Bulk import historical dividends using ISIN lookup from Borsa Italiana
+- **Daily automation**: Scheduled cron job processes new dividends and creates corresponding income expenses
+- **Comprehensive analytics**:
+  - Dividend yield (TTM - Trailing Twelve Months)
+  - Top dividend contributors by asset
+  - Historical trends (by year and month)
+  - Upcoming payments tracker for assets still owned
+- **Four dividend types**: Ordinary, Extraordinary, Interim, Final
+- **Multi-currency support**: EUR, USD, GBP, CHF
+- **Interactive visualizations**:
+  - Pie chart: Dividends by asset
+  - Bar chart: Dividends by year (gross, tax, net)
+  - Line chart: Monthly dividend income trends
+  - Top 10 assets table ranked by net dividends
+- **Detailed tracking**: Per-share amounts, quantity held, total gross/net, tax breakdown
+- **Smart filtering**: By asset, dividend type, and date range
+- **CSV export**: Download dividend history for external analysis
+
 ### 📈 **Historical Analysis**
 - **Automated monthly snapshots** via scheduled cron jobs
 - **Net worth timeline** with interactive charts
@@ -1160,6 +1182,7 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - ✅ Installment payments (BNPL) tracking with dual input modes (auto-calculate or custom amounts), visual badges, and bulk operations
 - ✅ Amount column sorting in Cashflow table with three-state toggle (desc/asc/none), visual indicators, and smart auto-reset
 - ✅ Current Month Quick Filter button in Cashflow tracking for instant access to current month data with one-click filtering
+- ✅ Dividend tracking with automatic Borsa Italiana scraping, manual entry, expense synchronization, and comprehensive analytics
 
 ### Future Enhancements (Planned 🔜)
 - 🔜 PDF export of portfolio reports
@@ -1176,7 +1199,6 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - 🚀 Risk analysis (volatility, max drawdown, correlation)
 - 🚀 Backtesting allocation strategies
 - 🚀 AI-powered rebalancing suggestions
-- 🚀 Dividend tracking
 - 🚀 Tax reporting (capital gains, dividends)
 - 🚀 Automatic price tracking for individual bonds
 - 🚀 Find a way to dockerize the application for easy self-hosting by anyone, explore database structure modifications (SQLite or other options?) to give users broad choice based on an .env.local variable, so the software will know whether to use Firebase or a local database - Idea to explore

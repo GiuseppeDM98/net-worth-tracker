@@ -48,6 +48,7 @@ function shouldUpdatePrice(assetType: string, subCategory?: string): boolean {
 const assetSchema = z.object({
   ticker: z.string().min(1, 'Ticker è obbligatorio'),
   name: z.string().min(1, 'Nome è obbligatorio'),
+  isin: z.string().regex(/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/, 'ISIN non valido (formato: IT0003128367)').optional().or(z.literal('')),
   type: z.enum(['stock', 'etf', 'bond', 'crypto', 'commodity', 'cash', 'realestate']),
   assetClass: z.enum(['equity', 'bonds', 'crypto', 'realestate', 'cash', 'commodity']),
   subCategory: z.string().optional(),
@@ -202,6 +203,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         autoUpdatePrice: asset.autoUpdatePrice !== undefined ? asset.autoUpdatePrice : shouldUpdatePrice(asset.type, asset.subCategory),
         isComposite: !!(asset.composition && asset.composition.length > 0),
         outstandingDebt: asset.outstandingDebt || undefined,
+        isin: asset.isin || undefined,
       });
 
       if (asset.composition && asset.composition.length > 0) {
@@ -385,6 +387,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
       const formData: AssetFormData = {
         ticker: data.ticker,
         name: data.name,
+        isin: data.isin && data.isin.trim() !== '' ? data.isin.trim().toUpperCase() : undefined,
         type: data.type,
         assetClass: data.assetClass,
         subCategory: data.subCategory || undefined,
@@ -455,6 +458,23 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                 <p className="text-sm text-red-500">{errors.name.message}</p>
               )}
             </div>
+          </div>
+
+          {/* ISIN Field */}
+          <div className="space-y-2">
+            <Label htmlFor="isin">ISIN (per dividendi automatici)</Label>
+            <Input
+              id="isin"
+              {...register('isin')}
+              placeholder="IT0003128367"
+              disabled={selectedType !== 'stock' || selectedAssetClass !== 'equity'}
+            />
+            {errors.isin && (
+              <p className="text-sm text-red-500">{errors.isin.message}</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Necessario solo per azioni italiane su Borsa Italiana
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

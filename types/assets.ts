@@ -27,6 +27,7 @@ export interface Asset {
   autoUpdatePrice?: boolean; // Default: true - indicates whether price should be automatically updated via Yahoo Finance
   composition?: AssetComposition[]; // For composite assets (e.g., pension funds)
   outstandingDebt?: number; // Outstanding debt for real estate (e.g., mortgage). Net value = value - outstanding debt
+  isin?: string; // ISIN code for dividend scraping (optional)
   lastPriceUpdate: Date | Timestamp;
   createdAt: Date | Timestamp;
   updatedAt: Date | Timestamp;
@@ -48,6 +49,7 @@ export interface AssetFormData {
   autoUpdatePrice?: boolean;
   composition?: AssetComposition[];
   outstandingDebt?: number;
+  isin?: string; // ISIN code for dividend scraping (optional)
 }
 
 export interface SubCategoryConfig {
@@ -83,6 +85,8 @@ export interface AssetAllocationSettings {
   riskFreeRate?: number;
   withdrawalRate?: number; // Safe withdrawal rate for FIRE calculations (e.g., 4.0 for 4%)
   plannedAnnualExpenses?: number; // Planned annual expenses for FIRE projections
+  dividendIncomeCategoryId?: string; // Category ID for automatic dividend income entries
+  dividendIncomeSubCategoryId?: string; // Subcategory ID for automatic dividend income entries
   targets: AssetAllocationTarget;
 }
 

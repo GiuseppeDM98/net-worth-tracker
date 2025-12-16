@@ -28,6 +28,8 @@ export async function getSettings(
       riskFreeRate: data.riskFreeRate,
       withdrawalRate: data.withdrawalRate,
       plannedAnnualExpenses: data.plannedAnnualExpenses,
+      dividendIncomeCategoryId: data.dividendIncomeCategoryId,
+      dividendIncomeSubCategoryId: data.dividendIncomeSubCategoryId,
       targets: data.targets as AssetAllocationTarget,
     };
   } catch (error) {
@@ -75,6 +77,12 @@ export async function setSettings(
     }
     if (settings.plannedAnnualExpenses !== undefined) {
       docData.plannedAnnualExpenses = settings.plannedAnnualExpenses;
+    }
+    if (settings.dividendIncomeCategoryId !== undefined) {
+      docData.dividendIncomeCategoryId = settings.dividendIncomeCategoryId;
+    }
+    if (settings.dividendIncomeSubCategoryId !== undefined) {
+      docData.dividendIncomeSubCategoryId = settings.dividendIncomeSubCategoryId;
     }
 
     await setDoc(targetRef, docData);

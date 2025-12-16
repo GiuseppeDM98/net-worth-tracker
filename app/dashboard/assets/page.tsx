@@ -116,12 +116,14 @@ export default function AssetsPage() {
   };
 
   const handleDelete = async (assetId: string) => {
+    if (!user) return;
+
     if (!confirm('Sei sicuro di voler eliminare questo asset?')) {
       return;
     }
 
     try {
-      await deleteAsset(assetId);
+      await deleteAsset(assetId, user.uid);
       toast.success('Asset eliminato con successo');
       await loadAssets();
     } catch (error) {

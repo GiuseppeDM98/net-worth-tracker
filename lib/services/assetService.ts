@@ -4,10 +4,12 @@ import {
   getDoc,
   getDocs,
   addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   query,
   where,
+  limit,
   Timestamp,
   orderBy
 } from 'firebase/firestore';
@@ -85,6 +87,43 @@ export async function getAllAssets(userId: string): Promise<Asset[]> {
 }
 
 /**
+ * Get all equity assets with ISIN for a specific user
+ * Used for automatic dividend scraping
+ * Filters: assetClass === 'equity' AND isin exists AND isin is not empty
+ */
+export async function getAssetsWithIsin(userId: string): Promise<Asset[]> {
+  try {
+    const assetsRef = collection(db, ASSETS_COLLECTION);
+    const q = query(
+      assetsRef,
+      where('userId', '==', userId),
+      where('assetClass', '==', 'equity')
+    );
+
+    const querySnapshot = await getDocs(q);
+
+    const assets = querySnapshot.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        lastPriceUpdate: doc.data().lastPriceUpdate?.toDate() || new Date(),
+        createdAt: doc.data().createdAt?.toDate() || new Date(),
+        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+      }))
+      .filter(asset => {
+        // Filter out assets without ISIN or with empty ISIN
+        const assetData = asset as Asset;
+        return assetData.isin && assetData.isin.trim() !== '';
+      }) as Asset[];
+
+    return assets;
+  } catch (error) {
+    console.error('Error getting assets with ISIN:', error);
+    throw new Error('Failed to fetch assets with ISIN');
+  }
+}
+
+/**
  * Get a single asset by ID
  */
 export async function getAssetById(assetId: string): Promise<Asset | null> {
@@ -111,6 +150,8 @@ export async function getAssetById(assetId: string): Promise<Asset | null> {
 
 /**
  * Create a new asset
+ * If ISIN exists and we have historical dividends with that ISIN, reuse the existing assetId
+ * to maintain continuity with historical dividend data
  */
 export async function createAsset(
   userId: string,
@@ -119,6 +160,30 @@ export async function createAsset(
   try {
     const now = Timestamp.now();
     const assetsRef = collection(db, ASSETS_COLLECTION);
+
+    // Check if ISIN exists and we have historical dividends with that ISIN
+    let assetId: string | null = null;
+
+    if (assetData.isin && assetData.isin.trim() !== '') {
+      // Query dividends collection to find existing assetId for this ISIN
+      const dividendsRef = collection(db, 'dividends');
+      const dividendsQuery = query(
+        dividendsRef,
+        where('userId', '==', userId),
+        where('assetIsin', '==', assetData.isin.trim()),
+        limit(1)
+      );
+
+      const dividendsSnapshot = await getDocs(dividendsQuery);
+
+      if (!dividendsSnapshot.empty) {
+        // Found existing dividend with this ISIN - reuse its assetId
+        const existingDividend = dividendsSnapshot.docs[0].data();
+        assetId = existingDividend.assetId;
+
+        console.log(`Reusing existing assetId ${assetId} for ISIN ${assetData.isin}`);
+      }
+    }
 
     // Remove undefined fields to prevent Firebase errors
     const cleanedData = removeUndefinedFields({
@@ -129,9 +194,18 @@ export async function createAsset(
       updatedAt: now,
     });
 
-    const docRef = await addDoc(assetsRef, cleanedData);
-
-    return docRef.id;
+    if (assetId) {
+      // Reuse existing ID
+      const assetRef = doc(db, ASSETS_COLLECTION, assetId);
+      await setDoc(assetRef, cleanedData);
+      console.log(`Asset created with existing ID: ${assetId}`);
+      return assetId;
+    } else {
+      // Generate new ID
+      const docRef = await addDoc(assetsRef, cleanedData);
+      console.log(`Asset created with new ID: ${docRef.id}`);
+      return docRef.id;
+    }
   } catch (error) {
     console.error('Error creating asset:', error);
     throw new Error('Failed to create asset');
@@ -183,12 +257,27 @@ export async function updateAssetPrice(
 }
 
 /**
- * Delete an asset
+ * Delete an asset and its future dividends
+ * Only deletes dividends with ex-date > today to preserve historical data
+ * Uses API endpoint to leverage Admin SDK and bypass Firestore Security Rules
  */
-export async function deleteAsset(assetId: string): Promise<void> {
+export async function deleteAsset(assetId: string, userId: string): Promise<void> {
   try {
-    const assetRef = doc(db, ASSETS_COLLECTION, assetId);
-    await deleteDoc(assetRef);
+    const response = await fetch(`/api/assets/${assetId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to delete asset');
+    }
+
+    const result = await response.json();
+    console.log(`Asset ${assetId} deleted with ${result.deletedFutureDividends} future dividends removed`);
   } catch (error) {
     console.error('Error deleting asset:', error);
     throw new Error('Failed to delete asset');
