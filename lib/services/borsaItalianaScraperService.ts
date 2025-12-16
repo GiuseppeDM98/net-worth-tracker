@@ -1,4 +1,4 @@
-import { JSDOM } from 'jsdom';
+import * as cheerio from 'cheerio';
 import { ScrapedDividend, DividendType } from '@/types/dividend';
 
 const BORSA_ITALIANA_BASE_URL = 'https://www.borsaitaliana.it/borsa/quotazioni/azioni/elenco-completo-dividendi.html';
@@ -77,15 +77,14 @@ export async function scrapeDividendsByIsin(isin: string): Promise<ScrapedDivide
     const html = await response.text();
     console.log(`[Scraper] Received HTML, length: ${html.length} characters`);
 
-    // Parse HTML with jsdom
-    const dom = new JSDOM(html);
-    const document = dom.window.document;
+    // Parse HTML with cheerio
+    const $ = cheerio.load(html);
 
     // Debug: Try multiple selectors to find the table
     console.log(`[Scraper] Looking for dividend table...`);
-    const tableRows1 = document.querySelectorAll('table.m-table tbody tr');
-    const tableRows2 = document.querySelectorAll('table tbody tr');
-    const allTables = document.querySelectorAll('table');
+    const tableRows1 = $('table.m-table tbody tr');
+    const tableRows2 = $('table tbody tr');
+    const allTables = $('table');
 
     console.log(`[Scraper] Found with 'table.m-table tbody tr': ${tableRows1.length} rows`);
     console.log(`[Scraper] Found with 'table tbody tr': ${tableRows2.length} rows`);
@@ -96,10 +95,10 @@ export async function scrapeDividendsByIsin(isin: string): Promise<ScrapedDivide
 
     if (tableRows.length === 0) {
       console.log(`[Scraper] No dividend data found for ISIN: ${isin}`);
-      console.log(`[Scraper] Page title: ${document.title}`);
+      console.log(`[Scraper] Page title: ${$('title').text()}`);
 
       // Log first 1000 chars of body for debugging
-      const bodyText = document.body?.textContent?.substring(0, 1000) || 'No body content';
+      const bodyText = $('body').text().substring(0, 1000) || 'No body content';
       console.log(`[Scraper] Page content preview: ${bodyText}`);
 
       return [];
@@ -109,9 +108,9 @@ export async function scrapeDividendsByIsin(isin: string): Promise<ScrapedDivide
 
     const dividends: ScrapedDividend[] = [];
 
-    tableRows.forEach(row => {
+    tableRows.each((i, row) => {
       try {
-        const cells = row.querySelectorAll('td');
+        const cells = $(row).find('td');
 
         if (cells.length < 7) {
           // Skip rows that don't have enough data
@@ -127,11 +126,11 @@ export async function scrapeDividendsByIsin(isin: string): Promise<ScrapedDivide
         // Cell 5: Pagamento (payment date in DD/MM/YY format)
         // Cell 6: Tipo Dividendo (dividend type)
 
-        const dividendPerShareText = cells[2]?.textContent?.trim() || '';
-        const currencyText = cells[3]?.textContent?.trim() || '';
-        const exDateText = cells[4]?.textContent?.trim() || '';
-        const paymentDateText = cells[5]?.textContent?.trim() || '';
-        const typeText = cells[6]?.textContent?.trim() || '';
+        const dividendPerShareText = $(cells[2]).text().trim() || '';
+        const currencyText = $(cells[3]).text().trim() || '';
+        const exDateText = $(cells[4]).text().trim() || '';
+        const paymentDateText = $(cells[5]).text().trim() || '';
+        const typeText = $(cells[6]).text().trim() || '';
 
         // Parse dates (DD/MM/YY format)
         const exDate = parseItalianDate(exDateText);

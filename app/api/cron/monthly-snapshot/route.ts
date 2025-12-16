@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { updateHallOfFame } from '@/lib/services/hallOfFameService';
+import { updateHallOfFame } from '@/lib/services/hallOfFameService.server';
 
 export async function GET(request: NextRequest) {
   try {
