@@ -15,14 +15,11 @@ import { CHART_IDS } from '@/types/pdf';
 function getRequiredChartIds(sections: PDFGenerateOptions['sections']): string[] {
   const ids: string[] = [];
 
-  if (sections.history) {
-    ids.push(
-      CHART_IDS.NET_WORTH_EVOLUTION,
-      CHART_IDS.ASSET_CLASS_EVOLUTION,
-      CHART_IDS.LIQUIDITY,
-      CHART_IDS.YOY_VARIATION
-    );
-  }
+  // History section now uses tables instead of charts
+  // No chart capture needed for history section
+
+  // Add other section chart IDs here if needed in the future
+  // Example: if (sections.portfolio) { ids.push(...) }
 
   return ids;
 }

@@ -4,11 +4,16 @@
 import { Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { PDFText } from '../primitives/PDFText';
 import { PDFTable } from '../primitives/PDFTable';
-import { PDFChart } from '../primitives/PDFChart';
 import type { HistoryData, ChartImage } from '@/types/pdf';
 import { formatCurrency, formatPercentage } from '@/lib/services/chartService';
-import { format } from 'date-fns';
-import { it } from 'date-fns/locale';
+
+// Helper function to format date from 'YYYY-MM' to 'Gen 2024'
+function formatDate(dateStr: string): string {
+  const [year, month] = dateStr.split('-');
+  const monthNames = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu',
+                      'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
+  return `${monthNames[parseInt(month) - 1]} ${year}`;
+}
 
 interface HistorySectionProps {
   data: HistoryData;
@@ -37,7 +42,13 @@ export function HistorySection({ data, chartImages }: HistorySectionProps) {
     );
   }
 
-  const netWorthChart = chartImages.get('chart-net-worth-evolution');
+  // Convert netWorthEvolution data to table rows
+  const netWorthRows = data.netWorthEvolution.map(point => [
+    formatDate(point.date),
+    formatCurrency(point.totalNetWorth),
+    formatCurrency(point.liquidNetWorth),
+    formatCurrency(point.illiquidNetWorth),
+  ]);
 
   return (
     <>
@@ -86,20 +97,15 @@ export function HistorySection({ data, chartImages }: HistorySectionProps) {
             </View>
           )}
 
-          {/* Net worth evolution chart */}
-          {netWorthChart ? (
-            <View style={styles.section}>
-              <PDFText variant="subheading">Evoluzione Patrimonio Netto</PDFText>
-              <PDFChart image={netWorthChart} maxWidth={480} maxHeight={280} />
-            </View>
-          ) : (
-            <View style={styles.section}>
-              <PDFText variant="subheading">Evoluzione Patrimonio Netto</PDFText>
-              <PDFText variant="caption" style={styles.chartPlaceholder}>
-                Grafico non disponibile
-              </PDFText>
-            </View>
-          )}
+          {/* Net worth evolution table */}
+          <View style={styles.section}>
+            <PDFText variant="subheading">Evoluzione Patrimonio Netto</PDFText>
+            <PDFTable
+              headers={['Data', 'Patrimonio Totale', 'Patrimonio Liquido', 'Patrimonio Illiquido']}
+              rows={netWorthRows}
+              columnWidths={['15%', '28%', '28%', '29%']}
+            />
+          </View>
         </View>
 
         <View style={styles.footer}>

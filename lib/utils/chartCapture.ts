@@ -3,126 +3,12 @@
 
 import html2canvas from 'html2canvas';
 import type { ChartImage, ChartCaptureOptions } from '@/types/pdf';
-import { convertOklchToHex, isOklchColor } from './colorConverter';
 
 /**
  * Sleep utility for retry delays
  */
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-/**
- * Backup object for storing original inline styles
- */
-interface StyleBackup {
-  element: HTMLElement;
-  originalStyles: {
-    backgroundColor?: string;
-    color?: string;
-    borderColor?: string;
-    fill?: string;
-    stroke?: string;
-  };
-}
-
-/**
- * CSS color properties to check and override
- */
-const COLOR_PROPERTIES = [
-  'backgroundColor',
-  'color',
-  'borderColor',
-  'fill',
-  'stroke',
-] as const;
-
-/**
- * Recursively override OKLCh colors with hex equivalents for html2canvas
- *
- * Traverses the DOM tree starting from rootElement and finds all elements
- * with computed styles containing OKLCh colors. Converts them to hex format
- * and applies as inline styles. Stores original inline styles for restoration.
- *
- * @param rootElement - Root element to start traversal from (typically chart container)
- * @returns Array of StyleBackup objects for restoration
- */
-function overrideOklchColors(rootElement: HTMLElement): StyleBackup[] {
-  const backups: StyleBackup[] = [];
-
-  try {
-    // Use TreeWalker for efficient DOM traversal
-    const walker = document.createTreeWalker(
-      rootElement,
-      NodeFilter.SHOW_ELEMENT,
-      null
-    );
-
-    let currentNode = walker.currentNode as HTMLElement;
-
-    while (currentNode) {
-      const computedStyle = window.getComputedStyle(currentNode);
-      const backup: StyleBackup = {
-        element: currentNode,
-        originalStyles: {},
-      };
-      let hasChanges = false;
-
-      // Check each color property
-      COLOR_PROPERTIES.forEach((prop) => {
-        const value = computedStyle[prop];
-
-        if (value && isOklchColor(value)) {
-          // Store original inline style (may be empty)
-          backup.originalStyles[prop] = currentNode.style[prop as keyof CSSStyleDeclaration] as string;
-
-          // Convert OKLCh to hex and set as inline style
-          const hexColor = convertOklchToHex(value);
-          (currentNode.style as any)[prop] = hexColor;
-          hasChanges = true;
-        }
-      });
-
-      // Only save backup if we made changes
-      if (hasChanges) {
-        backups.push(backup);
-      }
-
-      currentNode = walker.nextNode() as HTMLElement;
-    }
-
-  } catch (error) {
-    console.error('Error during OKLCh color override:', error);
-    // Return whatever backups we collected so far
-  }
-
-  return backups;
-}
-
-/**
- * Restore original inline styles from backup
- *
- * Iterates through backup array and restores each element's original inline styles.
- * If the original style was empty, removes the inline property entirely.
- *
- * @param backups - Array of StyleBackup objects from overrideOklchColors()
- */
-function restoreOriginalStyles(backups: StyleBackup[]): void {
-  try {
-    backups.forEach(({ element, originalStyles }) => {
-      Object.entries(originalStyles).forEach(([prop, value]) => {
-        if (value === undefined || value === '') {
-          // Original style was empty, remove the inline property
-          element.style.removeProperty(prop);
-        } else {
-          // Restore original inline style
-          (element.style as any)[prop] = value;
-        }
-      });
-    });
-  } catch (error) {
-    console.error('Error restoring original styles:', error);
-  }
 }
 
 /**
@@ -154,14 +40,19 @@ export async function captureChart(
         await sleep(100);
       }
 
-      // Override OKLCh colors with hex equivalents for html2canvas compatibility
-      let styleBackups: StyleBackup[] = [];
+      // 🔧 FIX: Override LAB colors with HEX before capture
+      // Save original colors
+      const originalBgColor = element.style.backgroundColor;
+      const cardParent = element.closest('.bg-card') as HTMLElement | null;
+      const originalCardBg = cardParent?.style.backgroundColor;
+
+      // Force white background in HEX format (overrides LAB computed styles)
+      element.style.backgroundColor = '#ffffff';
+      if (cardParent) {
+        cardParent.style.backgroundColor = '#ffffff';
+      }
 
       try {
-        console.log(`[Chart Capture] Overriding OKLCh colors for ${options.chartId}...`);
-        styleBackups = overrideOklchColors(element);
-        console.log(`[Chart Capture] Overridden ${styleBackups.length} elements with OKLCh colors`);
-
         const canvas = await html2canvas(element, {
           scale: options.scale || 2,
           backgroundColor: '#ffffff',
@@ -180,12 +71,14 @@ export async function captureChart(
           height: canvas.height / actualScale,
         };
 
-        console.log(`[Chart Capture] Chart captured successfully: ${options.chartId} (${chartImage.width}x${chartImage.height})`);
+        console.log(`Chart captured successfully: ${options.chartId} (${chartImage.width}x${chartImage.height})`);
         return chartImage;
       } finally {
-        // Restore original inline styles
-        console.log(`[Chart Capture] Restoring ${styleBackups.length} original styles...`);
-        restoreOriginalStyles(styleBackups);
+        // 🔧 CLEANUP: Restore original colors
+        element.style.backgroundColor = originalBgColor;
+        if (cardParent && originalCardBg !== undefined) {
+          cardParent.style.backgroundColor = originalCardBg;
+        }
       }
 
     } catch (error) {
