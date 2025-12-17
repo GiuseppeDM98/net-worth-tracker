@@ -71,7 +71,7 @@ export function PortfolioSection({ data }: PortfolioSectionProps) {
 
           <View style={styles.content}>
             <PDFTable
-              headers={['Ticker', 'Nome', 'Classe', 'Quantità', 'Prezzo', 'Valore', 'Peso', 'G/P']}
+              headers={['Ticker', 'Nome', 'Classe', 'Q.TA', 'Prezzo', 'Valore', 'Peso', 'G/P']}
               rows={page.map(asset => [
                 asset.ticker,
                 truncate(asset.name, 25),
@@ -134,7 +134,7 @@ export function PortfolioSection({ data }: PortfolioSectionProps) {
             <View style={styles.summaryCard}>
               <Text style={styles.summaryLabel}>Costi Annuali Stimati</Text>
               <Text style={styles.summaryValue}>
-                {formatCurrency((data.totalValue * data.weightedTER) / 100)}
+                {formatCurrency(data.annualCost)}
               </Text>
             </View>
 

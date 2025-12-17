@@ -147,7 +147,7 @@ export function SummarySection({ data }: SummarySectionProps) {
 
         {/* Disclaimer */}
         <View style={styles.disclaimer}>
-          <Text style={styles.disclaimerTitle}>📋 Disclaimer</Text>
+          <Text style={styles.disclaimerTitle}>Disclaimer</Text>
           <Text style={styles.disclaimerText}>
             I dati riflettono lo stato del portfolio alla data di generazione del report.
             Le valutazioni sono basate sui prezzi correnti degli asset e potrebbero variare.

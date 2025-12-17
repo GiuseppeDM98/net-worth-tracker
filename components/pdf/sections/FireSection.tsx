@@ -134,9 +134,9 @@ export function FireSection({ data }: FireSectionProps) {
 
         {/* Info box */}
         <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>💡 Trinity Study & 4% Rule</Text>
+          <Text style={styles.infoTitle}>Trinity Study & 4% Rule</Text>
           <Text style={styles.infoText}>
-            Il FIRE Number è calcolato come 25x le tue spese annuali, basato sulla Trinity Study
+            Il FIRE Number è calcolato come 25x le tue spese annuali, basato sul Trinity Study
             che dimostra una probabilità di successo del 95%+ con un tasso di prelievo del 4%
             su un portafoglio 50/50 azionario/obbligazionario per 30 anni di pensionamento.
           </Text>

@@ -285,11 +285,11 @@ export function compareAllocations(
     const difference = currentPercentage - targetPercentage;
     const differenceValue = currentValue - targetValue;
 
-    // Determine action (threshold: ±100€)
+    // Determine action (threshold: ±2%)
     let action: 'COMPRA' | 'VENDI' | 'OK';
-    if (differenceValue > 100) {
+    if (difference > 2) {
       action = 'VENDI';
-    } else if (differenceValue < -100) {
+    } else if (difference < -2) {
       action = 'COMPRA';
     } else {
       action = 'OK';
@@ -332,9 +332,9 @@ export function compareAllocations(
         const subDifferenceValue = subCurrentValue - subTargetValue;
 
         let subAction: 'COMPRA' | 'VENDI' | 'OK';
-        if (subDifferenceValue > 100) {
+        if (subDifference > 2) {
           subAction = 'VENDI';
-        } else if (subDifferenceValue < -100) {
+        } else if (subDifference < -2) {
           subAction = 'COMPRA';
         } else {
           subAction = 'OK';
@@ -384,11 +384,11 @@ export function compareAllocations(
             const specificDifference = specificCurrentPercentage - specificTargetPercentage;
             const specificDifferenceValue = specificCurrentValue - specificTargetValue;
 
-            // Determine action based on difference (threshold: ±100€)
+            // Determine action based on difference (threshold: ±2%)
             let specificAction: 'COMPRA' | 'VENDI' | 'OK';
-            if (specificDifferenceValue > 100) {
+            if (specificDifference > 2) {
               specificAction = 'VENDI';
-            } else if (specificDifferenceValue < -100) {
+            } else if (specificDifference < -2) {
               specificAction = 'COMPRA';
             } else {
               specificAction = 'OK';

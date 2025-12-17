@@ -87,7 +87,7 @@ export function AllocationSection({ data, chartImage }: AllocationSectionProps) 
           <View style={styles.section}>
             <PDFText variant="subheading">Azioni di Rebalancing Consigliate</PDFText>
             <PDFText variant="caption" style={styles.caption}>
-              (Soglia di intervento: ±€100)
+              (Soglia di intervento: ±2%)
             </PDFText>
 
             <View style={styles.actionsContainer}>

@@ -26,9 +26,9 @@ import {
   calculateLiquidNetWorth,
   calculateIlliquidNetWorth,
   calculatePortfolioWeightedTER,
+  calculateAnnualPortfolioCost,
 } from './assetService';
 import {
-  calculateCurrentAllocation,
   compareAllocations,
 } from './assetAllocationService';
 import { getAllExpenses } from './expenseService';
@@ -114,6 +114,7 @@ export function preparePortfolioData(assets: Asset[]): PortfolioData {
       weightedTER: 0,
       totalUnrealizedGains: 0,
       totalUnrealizedGainsPercent: 0,
+      annualCost: 0,
     };
   }
 
@@ -121,6 +122,7 @@ export function preparePortfolioData(assets: Asset[]): PortfolioData {
   const liquidValue = calculateLiquidNetWorth(assets);
   const illiquidValue = calculateIlliquidNetWorth(assets);
   const weightedTER = calculatePortfolioWeightedTER(assets);
+  const annualCost = calculateAnnualPortfolioCost(assets);
 
   let totalUnrealizedGains = 0;
   const assetRows: AssetRow[] = assets.map(asset => {
@@ -157,18 +159,21 @@ export function preparePortfolioData(assets: Asset[]): PortfolioData {
     weightedTER,
     totalUnrealizedGains,
     totalUnrealizedGainsPercent: totalValue > 0 ? (totalUnrealizedGains / totalValue) * 100 : 0,
+    annualCost,
   };
 }
 
 /**
  * Prepare allocation data comparing current vs target
+ * Uses compareAllocations() to ensure consistency with allocation page
  */
 export function prepareAllocationData(
   assets: Asset[],
   targets: any
 ): AllocationData {
-  const currentAllocation = calculateCurrentAllocation(assets);
-  const totalValue = currentAllocation.totalValue;
+  // Use compareAllocations() which handles all complex logic including fixed cash
+  const comparisonResult = compareAllocations(assets, targets);
+  const totalValue = comparisonResult.totalValue;
 
   if (totalValue === 0) {
     return {
@@ -181,43 +186,41 @@ export function prepareAllocationData(
 
   const hasTargets = targets && Object.keys(targets).length > 0;
 
-  // Build asset class allocation data
+  // Transform compareAllocations output to PDF format
   const assetClassData: AssetClassAllocation[] = [];
   const assetClasses = ['equity', 'bonds', 'crypto', 'realestate', 'commodity', 'cash'];
 
   assetClasses.forEach(assetClass => {
-    const currentValue = currentAllocation.byAssetClass[assetClass] || 0;
-    const currentPercent = totalValue > 0 ? (currentValue / totalValue) * 100 : 0;
-    const targetPercent = hasTargets && targets[assetClass]?.targetPercentage || undefined;
+    const comparisonData = comparisonResult.byAssetClass[assetClass];
+
+    // Skip if not in comparison result (means no current value and no target)
+    if (!comparisonData) return;
 
     const allocationItem: AssetClassAllocation = {
       assetClass,
       displayName: getAssetClassName(assetClass),
-      currentValue,
-      currentPercent,
-      targetPercent,
+      currentValue: comparisonData.currentValue,
+      currentPercent: comparisonData.currentPercentage,
+      targetPercent: comparisonData.targetPercentage,
+      difference: comparisonData.differenceValue,
+      differencePercent: comparisonData.difference,
     };
 
-    if (targetPercent !== undefined) {
-      const targetValue = (totalValue * targetPercent) / 100;
-      allocationItem.difference = currentValue - targetValue;
-      allocationItem.differencePercent = currentPercent - targetPercent;
-    }
-
     // Only include asset classes with non-zero current value or target
-    if (currentValue > 0 || (targetPercent !== undefined && targetPercent > 0)) {
+    if (comparisonData.currentValue > 0 || comparisonData.targetPercentage > 0) {
       assetClassData.push(allocationItem);
     }
   });
 
-  // Calculate rebalancing actions (threshold: €100)
+  // Extract rebalancing actions from compareAllocations (uses threshold logic from service)
   const rebalancingActions: RebalancingAction[] = [];
   assetClassData.forEach(item => {
-    if (item.difference !== undefined && Math.abs(item.difference) > 100) {
+    const comparisonData = comparisonResult.byAssetClass[item.assetClass];
+    if (comparisonData && comparisonData.action !== 'OK') {
       rebalancingActions.push({
         assetClass: item.displayName,
-        action: item.difference > 0 ? 'sell' : 'buy',
-        amount: Math.abs(item.difference),
+        action: comparisonData.action === 'COMPRA' ? 'buy' : 'sell',
+        amount: Math.abs(comparisonData.differenceValue),
       });
     }
   });

@@ -46,6 +46,7 @@ export interface PortfolioData {
   weightedTER: number;
   totalUnrealizedGains: number;
   totalUnrealizedGainsPercent: number;
+  annualCost: number;
 }
 
 export interface AssetRow {

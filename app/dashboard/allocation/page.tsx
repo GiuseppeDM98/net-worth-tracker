@@ -534,7 +534,7 @@ export default function AllocationPage() {
         <ul className="mt-2 space-y-1 text-sm text-blue-800">
           <li><strong>COMPRA:</strong> Sotto-allocato (compra di più)</li>
           <li><strong>VENDI:</strong> Sovra-allocato (riduci posizione)</li>
-          <li><strong>OK:</strong> Allocazione ottimale (±1% o ±€100)</li>
+          <li><strong>OK:</strong> Allocazione ottimale (±2%)</li>
         </ul>
       </div>
 
