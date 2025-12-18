@@ -130,6 +130,8 @@ export interface CashflowData {
   incomeToExpenseRatio: number;
   byCategory: CategoryBreakdown[];
   monthlyTrend: MonthlyTrendPoint[];
+  numberOfMonthsTracked: number;  // Number of unique months with tracked expenses
+  averageMonthlySavings: number;  // netCashflow / numberOfMonthsTracked
 }
 
 export interface CategoryBreakdown {

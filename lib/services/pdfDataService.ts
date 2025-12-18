@@ -30,6 +30,7 @@ import {
 } from './assetService';
 import {
   compareAllocations,
+  getSettings,
 } from './assetAllocationService';
 import { getAllExpenses } from './expenseService';
 import { getAnnualExpenses, getAnnualIncome, calculateFIREMetrics } from './fireService';
@@ -213,12 +214,13 @@ export function prepareAllocationData(
   });
 
   // Extract rebalancing actions from compareAllocations (uses threshold logic from service)
+  // Iterate directly on comparisonResult to ensure all asset classes with action !== 'OK' appear
   const rebalancingActions: RebalancingAction[] = [];
-  assetClassData.forEach(item => {
-    const comparisonData = comparisonResult.byAssetClass[item.assetClass];
+  assetClasses.forEach(assetClass => {
+    const comparisonData = comparisonResult.byAssetClass[assetClass];
     if (comparisonData && comparisonData.action !== 'OK') {
       rebalancingActions.push({
-        assetClass: item.displayName,
+        assetClass: getAssetClassName(assetClass),
         action: comparisonData.action === 'COMPRA' ? 'buy' : 'sell',
         amount: Math.abs(comparisonData.differenceValue),
       });
@@ -341,6 +343,8 @@ export function prepareCashflowData(expenses: any[]): CashflowData {
       incomeToExpenseRatio: 0,
       byCategory: [],
       monthlyTrend: [],
+      numberOfMonthsTracked: 0,
+      averageMonthlySavings: 0,
     };
   }
 
@@ -348,9 +352,15 @@ export function prepareCashflowData(expenses: any[]): CashflowData {
   let totalExpenses = 0;
 
   const categoryMap: Record<string, CategoryBreakdown> = {};
+  const monthsSet = new Set<string>();
 
   expenses.forEach(expense => {
     const amount = Math.abs(expense.amount);
+
+    // Track unique months
+    const date = expense.date instanceof Date ? expense.date : expense.date.toDate();
+    const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
+    monthsSet.add(monthKey);
 
     if (expense.type === 'income') {
       totalIncome += amount;
@@ -385,6 +395,10 @@ export function prepareCashflowData(expenses: any[]): CashflowData {
   const netCashflow = totalIncome - totalExpenses;
   const incomeToExpenseRatio = totalExpenses > 0 ? totalIncome / totalExpenses : 0;
 
+  // Calculate number of months tracked and average monthly savings
+  const numberOfMonthsTracked = monthsSet.size;
+  const averageMonthlySavings = numberOfMonthsTracked > 0 ? netCashflow / numberOfMonthsTracked : 0;
+
   return {
     totalIncome,
     totalExpenses,
@@ -392,6 +406,8 @@ export function prepareCashflowData(expenses: any[]): CashflowData {
     incomeToExpenseRatio,
     byCategory: topCategories,
     monthlyTrend: [],
+    numberOfMonthsTracked,
+    averageMonthlySavings,
   };
 }
 
@@ -406,7 +422,9 @@ export async function prepareFireData(
   const annualExpenses = await getAnnualExpenses(userId);
   const annualIncome = await getAnnualIncome(userId);
 
-  const safeWithdrawalRate = 4.0; // 4% rule
+  // Get user settings for safe withdrawal rate
+  const settings = await getSettings(userId);
+  const safeWithdrawalRate = settings?.withdrawalRate ?? 4.0; // Default 4% if not set
   const fireMetrics = calculateFIREMetrics(currentNetWorth, annualExpenses, safeWithdrawalRate);
 
   return {

@@ -117,7 +117,8 @@ export function CashflowSection({ data }: CashflowSectionProps) {
                 {formatPercentage((data.netCashflow / data.totalIncome) * 100)}
               </Text>
               <Text style={styles.infoSubtext}>
-                Risparmi {formatCurrency(data.netCashflow)} al mese
+                Risparmi {formatCurrency(data.averageMonthlySavings)} al mese
+                {data.numberOfMonthsTracked > 1 && ` (media su ${data.numberOfMonthsTracked} mesi)`}
               </Text>
             </View>
           </View>
