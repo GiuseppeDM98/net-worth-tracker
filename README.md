@@ -108,6 +108,26 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
 - **Year-over-year performance** comparison
 - **CSV export** for external analysis
 
+### 📄 **PDF Export & Reporting**
+- **Comprehensive portfolio reports** with professional PDF generation
+- **Customizable sections**: Choose which data to include (Portfolio, Allocation, History, Cashflow, FIRE, Summary)
+- **Visual data preservation**: Charts captured as high-quality images embedded in PDF
+- **Six exportable sections**:
+  - **Portfolio Assets**: Complete asset listing with values, weights, G/P, TER
+  - **Asset Allocation**: Current vs target comparison with rebalancing recommendations
+  - **Historical Performance**: Net worth evolution and asset class trends over time
+  - **Cashflow Analysis**: Income, expenses, savings rate with top spending categories
+  - **FIRE Calculator**: Progress to Financial Independence with customizable Safe Withdrawal Rate
+  - **Summary Overview**: Key metrics snapshot (net worth, allocation score, FIRE progress)
+- **Dynamic calculations**:
+  - Safe Withdrawal Rate integration (4% default or custom user setting)
+  - FIRE Number multiplier automatically adjusts (25x for 4% SWR, 33.33x for 3%, etc.)
+  - Average monthly savings calculated across all tracked months
+  - Rebalancing actions include all asset classes with ±2% threshold deviation
+- **Professional formatting**: Styled headers, color-coded metrics, branded footer
+- **Export dialog**: Toggle individual sections on/off before generating
+- **One-click download**: Generates and downloads PDF with timestamp in filename
+
 ### 💸 **Expense & Income Tracking**
 - **Four entry types**: Income, Fixed Expenses, Variable Expenses, Debts
 - **Custom categories** with sub-categories and color coding
@@ -1075,6 +1095,80 @@ The **Assets table** includes dedicated columns for cost analysis:
 - On a €100k portfolio: **€500/year difference**
 - Over 30 years at 7% growth: **€47,000+ in lost returns**
 
+### Exporting Portfolio Report to PDF
+
+Generate a comprehensive PDF report of your portfolio for offline review, sharing with advisors, or archiving.
+
+**How to export:**
+
+1. Navigate to any dashboard page
+2. Click the **"Esporta PDF"** button in the top navigation bar
+3. The **PDF Export Dialog** opens with section toggles
+4. **Choose sections to include**:
+   - ✅ Portfolio Assets (asset list with totals)
+   - ✅ Asset Allocation (current vs target with rebalancing actions)
+   - ✅ Historical Performance (net worth evolution charts)
+   - ✅ Cashflow Analysis (income/expenses breakdown)
+   - ✅ FIRE Calculator (Financial Independence progress)
+   - ✅ Summary (key metrics overview)
+5. Click **"Genera PDF"** button
+6. Wait for generation (typically 5-10 seconds)
+7. PDF automatically downloads with filename: `portfolio-report-YYYYMMDD-HHMMSS.pdf`
+
+**What's included in each section:**
+
+**Portfolio Assets:**
+- Complete list of all assets with ticker, name, type, quantity, current price
+- Total value, weight percentage, G/P (Gain/Loss), TER
+- Footer totals: Total portfolio value, Liquid/Illiquid breakdown, Total G/P
+
+**Asset Allocation:**
+- Table: Asset class, current value, current %, target %, difference (€ and %)
+- Rebalancing actions (±2% threshold): Buy/Sell recommendations with amounts
+- Includes all asset classes, even those with 0€ current value but configured target
+
+**Historical Performance:**
+- Net worth evolution table (embedded chart image)
+- Year-over-year comparison if >1 year of data
+- Oldest and latest snapshot values with total growth %
+
+**Cashflow Analysis:**
+- Total Income, Total Expenses, Net Cashflow
+- Income-to-Expense Ratio with health indicator (Green/Yellow/Red)
+- **Savings Rate**: Calculated as (Net Cashflow / Total Income) × 100
+- **Average Monthly Savings**: Net cashflow divided by number of tracked months
+  - Example: "Risparmi 999,87 € al mese (media su 12 mesi)"
+- Top 5 expense categories with amounts and percentages
+
+**FIRE Calculator:**
+- FIRE Number with **dynamic multiplier** based on Safe Withdrawal Rate
+  - If SWR = 4% → "25x spese annuali"
+  - If SWR = 3% → "33.33x spese annuali"
+  - If SWR = 5% → "20x spese annuali"
+- Progress to Financial Independence (%)
+- Annual expenses and income
+- Monthly/Daily allowance (sustainable withdrawal)
+- Safe Withdrawal Rate (retrieved from user settings, defaults to 4%)
+- **Trinity Study explanation** (shown only when SWR = 4%)
+- Years of expenses covered by current net worth
+
+**Summary:**
+- Total and liquid net worth
+- Asset count and top asset class
+- Portfolio weighted TER
+- Unrealized gains
+- Allocation score (0-100)
+- FIRE progress percentage
+- Income-to-expense ratio
+- Report generation timestamp
+
+**Example use cases:**
+- **Tax filing**: Share portfolio snapshot with accountant
+- **Financial advisor meetings**: Present comprehensive portfolio overview
+- **Personal archiving**: Keep yearly records of financial progress
+- **FIRE tracking**: Document journey to Financial Independence
+- **Performance reviews**: Compare year-over-year portfolio evolution
+
 ---
 
 ## 🤝 Contributing
@@ -1183,9 +1277,9 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - ✅ Amount column sorting in Cashflow table with three-state toggle (desc/asc/none), visual indicators, and smart auto-reset
 - ✅ Current Month Quick Filter button in Cashflow tracking for instant access to current month data with one-click filtering
 - ✅ Dividend tracking with automatic Borsa Italiana scraping, manual entry, expense synchronization, and comprehensive analytics
+- ✅ PDF export of comprehensive portfolio reports with customizable sections, dynamic FIRE calculations, and professional formatting
 
 ### Future Enhancements (Planned 🔜)
-- 🔜 PDF export of portfolio reports
 - 🔜 Email notifications (monthly summary)
 - 🔜 Multi-currency full conversion support
 - 🔜 Performance metrics (ROI, IRR, CAGR, Sharpe ratio)
