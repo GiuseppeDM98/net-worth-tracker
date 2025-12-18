@@ -36,6 +36,7 @@ export function PDFDocument({
       <CoverSection
         generatedAt={context.generatedAt}
         userName={context.userName}
+        timeFilter={context.timeFilter}
       />
 
       {/* Portfolio section */}

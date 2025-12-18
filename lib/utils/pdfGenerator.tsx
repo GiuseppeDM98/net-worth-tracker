@@ -38,7 +38,11 @@ function getRequiredChartIds(sections: PDFGenerateOptions['sections']): string[]
  * @throws Error if generation fails
  */
 export async function generatePDF(options: PDFGenerateOptions): Promise<void> {
-  console.log('Starting PDF generation...', options.sections);
+  console.log('Starting PDF generation...', {
+    sections: options.sections,
+    timeFilter: options.timeFilter || 'total',
+    snapshotCount: options.snapshots.length,
+  });
 
   let chartImages: Map<string, any> | null = null;
 
@@ -59,6 +63,7 @@ export async function generatePDF(options: PDFGenerateOptions): Promise<void> {
       snapshots: options.snapshots,
       assets: options.assets,
       allocationTargets: options.allocationTargets,
+      timeFilter: options.timeFilter,
     };
 
     // Step 3: Fetch and prepare section data
@@ -66,7 +71,8 @@ export async function generatePDF(options: PDFGenerateOptions): Promise<void> {
     const data = await fetchPDFData(
       options.userId,
       context,
-      options.sections
+      options.sections,
+      options.timeFilter
     );
 
     console.log('Data fetched successfully');
@@ -149,6 +155,11 @@ export function validatePDFOptions(options: PDFGenerateOptions): boolean {
   if (options.sections.history) {
     if (!Array.isArray(options.snapshots)) {
       throw new Error('Snapshots array is required for history section');
+    }
+
+    // Require minimum 2 snapshots for history section
+    if (options.snapshots.length < 2) {
+      throw new Error('Sono richiesti almeno 2 snapshot per la sezione Storico');
     }
   }
 

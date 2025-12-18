@@ -17,6 +17,7 @@ import type {
   CategoryBreakdown,
   FireData,
   SummaryData,
+  TimeFilter,
 } from '@/types/pdf';
 import type { Asset, MonthlySnapshot } from '@/types/assets';
 import {
@@ -35,6 +36,7 @@ import {
 import { getAllExpenses } from './expenseService';
 import { getAnnualExpenses, getAnnualIncome, calculateFIREMetrics } from './fireService';
 import { formatCurrency, formatPercentage } from './chartService';
+import { filterExpensesByTime } from '@/lib/utils/pdfTimeFilters';
 
 // Cached expenses to avoid duplicate fetching
 let cachedExpenses: any[] | null = null;
@@ -46,7 +48,8 @@ let cachedUserId: string | null = null;
 export async function fetchPDFData(
   userId: string,
   context: PDFDataContext,
-  sections: SectionSelection
+  sections: SectionSelection,
+  timeFilter?: TimeFilter
 ): Promise<PDFSectionData> {
   const data: PDFSectionData = {};
 
@@ -72,7 +75,7 @@ export async function fetchPDFData(
       data.history = prepareHistoryData(context.snapshots);
     }
 
-    // Cashflow: fetch expenses if not cached
+    // Cashflow: fetch expenses if not cached, then filter by timeFilter
     if (sections.cashflow || sections.fire) {
       if (!cachedExpenses) {
         cachedExpenses = await getAllExpenses(userId);
@@ -80,10 +83,14 @@ export async function fetchPDFData(
     }
 
     if (sections.cashflow) {
-      data.cashflow = prepareCashflowData(cachedExpenses!);
+      // Filter expenses for cashflow section based on timeFilter
+      const filteredExpenses = timeFilter
+        ? filterExpensesByTime(cachedExpenses!, timeFilter)
+        : cachedExpenses!;
+      data.cashflow = prepareCashflowData(filteredExpenses);
     }
 
-    // FIRE: uses expenses + calculates metrics
+    // FIRE: uses all expenses (not filtered) - FIRE needs complete annual data
     if (sections.fire) {
       const totalNetWorth = calculateTotalValue(context.assets);
       data.fire = await prepareFireData(userId, cachedExpenses!, totalNetWorth);

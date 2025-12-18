@@ -59,6 +59,14 @@ Replace spreadsheet-based portfolio management with a modern, automated solution
 
 **PDF Export & Comprehensive Reporting:**
 - Professional PDF generation powered by @react-pdf/renderer library
+- **Temporal filtering**: Three export modes (Total, Annual, Monthly) to filter snapshots and expenses by time period
+  - Total Export: Complete historical data across all time
+  - Annual Export (YYYY): Data from January 1st of current year to present
+  - Monthly Export (Month YYYY): Data from current calendar month only
+  - Smart section management: History and FIRE sections automatically disabled for monthly exports
+  - Automatic section reset: All sections re-enabled when switching to Annual/Total modes
+  - Data validation: Prevents PDF generation with insufficient data (e.g., <2 snapshots for History)
+  - Period badge on cover page: Clear indication of report type with specific month/year
 - Customizable section selection via export dialog with toggles for 6 report sections
 - Chart embedding using html2canvas for visual data preservation
 - Six exportable sections:
@@ -82,12 +90,23 @@ Replace spreadsheet-based portfolio management with a modern, automated solution
 **Technical Implementation:**
 - React-PDF Renderer: Version 4.3.1 for declarative PDF generation
 - Data Service: `lib/services/pdfDataService.ts` orchestrates data fetching and preparation
+- Time Filter Utilities: `lib/utils/pdfTimeFilters.ts` handles temporal filtering logic
+  - `filterSnapshotsByTime()`: Filters snapshots by total/yearly/monthly periods
+  - `filterExpensesByTime()`: Filters expenses with Firestore Timestamp handling
+  - `validateTimeFilterData()`: Checks data availability for each time period
+  - `adjustSectionsForTimeFilter()`: Auto-disables incompatible sections (History/FIRE for monthly)
+  - `validatePDFGeneration()`: Ensures minimum data requirements before generation
 - PDF Components: Modular structure in `components/pdf/`
   - `PDFDocument.tsx`: Main wrapper with conditional section rendering
+  - `PDFExportDialog.tsx`: Enhanced with RadioGroup for time filter selection
   - `sections/`: Individual section components (Portfolio, Allocation, History, Cashflow, FIRE, Summary)
+    - `CoverSection.tsx`: Displays period-specific badge (e.g., "REPORT ANNUALE - 2025")
   - `primitives/`: Reusable UI elements (Text, Table, Section, Chart)
 - Chart Integration: `lib/utils/chartCapture.ts` captures Recharts as PNG using html2canvas
 - Type Definitions: Complete interfaces in `types/pdf.ts` for all data structures
+  - `TimeFilter`: Type for 'total' | 'yearly' | 'monthly'
+  - `TimeFilterValidation`: Interface for data availability checks
+  - `PDFDataContext`: Extended with optional `timeFilter` field
 - Service Integrations:
   - `assetService.ts`: Portfolio data and calculations
   - `assetAllocationService.ts`: Target allocation and rebalancing logic

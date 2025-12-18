@@ -3,7 +3,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -13,12 +13,27 @@ import {
 } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Loader2 } from 'lucide-react';
 import { generatePDF, validatePDFOptions } from '@/lib/utils/pdfGenerator';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import type { SectionSelection } from '@/types/pdf';
+import type { SectionSelection, TimeFilter } from '@/types/pdf';
 import type { MonthlySnapshot, Asset, AssetAllocationTarget } from '@/types/assets';
+import {
+  filterSnapshotsByTime,
+  validateTimeFilterData,
+  adjustSectionsForTimeFilter,
+  validatePDFGeneration,
+  getTimeFilterTooltip,
+  getTimeFilterLabel,
+} from '@/lib/utils/pdfTimeFilters';
 
 export interface PDFExportDialogProps {
   open: boolean;
@@ -37,6 +52,8 @@ export function PDFExportDialog({
 }: PDFExportDialogProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('total');
+  const [validation, setValidation] = useState(validateTimeFilterData(snapshots));
   const [sections, setSections] = useState<SectionSelection>({
     portfolio: true,
     allocation: true,
@@ -46,8 +63,36 @@ export function PDFExportDialog({
     summary: true,
   });
 
+  // Recalculate validation when snapshots change
+  useEffect(() => {
+    setValidation(validateTimeFilterData(snapshots));
+  }, [snapshots]);
+
   const toggleSection = (key: keyof SectionSelection) => {
     setSections(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleTimeFilterChange = (newFilter: TimeFilter) => {
+    setTimeFilter(newFilter);
+
+    // If switching to yearly or total, reset all sections to checked
+    if (newFilter === 'yearly' || newFilter === 'total') {
+      setSections({
+        portfolio: true,
+        allocation: true,
+        history: true,
+        cashflow: true,
+        fire: true,
+        summary: true,
+      });
+    }
+
+    // Adjust sections if necessary (disable FIRE and history for monthly)
+    const adjustedSections = adjustSectionsForTimeFilter(newFilter, sections);
+    if (JSON.stringify(adjustedSections) !== JSON.stringify(sections)) {
+      setSections(adjustedSections);
+      toast.info('Alcune sezioni sono state deselezionate per questo periodo');
+    }
   };
 
   const handleExport = async () => {
@@ -59,14 +104,27 @@ export function PDFExportDialog({
     try {
       setLoading(true);
 
+      // Filter snapshots based on timeFilter
+      const filteredSnapshots = filterSnapshotsByTime(snapshots, timeFilter);
+
+      // Validate PDF generation
+      try {
+        validatePDFGeneration(filteredSnapshots, sections, timeFilter);
+      } catch (validationError: any) {
+        toast.error(validationError.message);
+        setLoading(false);
+        return;
+      }
+
       // Validate options
       const options = {
         userId: user.uid,
         userName: user.displayName || 'Utente',
         sections,
-        snapshots,
+        snapshots: filteredSnapshots, // Use filtered snapshots
         assets,
         allocationTargets,
+        timeFilter, // Pass timeFilter to generator
       };
 
       validatePDFOptions(options);
@@ -103,11 +161,82 @@ export function PDFExportDialog({
         <DialogHeader>
           <DialogTitle>Esporta Report PDF</DialogTitle>
           <DialogDescription>
-            Seleziona le sezioni da includere nel report portfolio
+            Seleziona il periodo e le sezioni da includere nel report portfolio
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Time filter radio group */}
+          <div className="space-y-2 pb-4 border-b">
+            <label className="text-sm font-medium">Periodo di Export</label>
+            <TooltipProvider>
+              <RadioGroup
+                value={timeFilter}
+                onValueChange={(value) => handleTimeFilterChange(value as TimeFilter)}
+              >
+                {/* Export Totale */}
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="total" id="filter-total" disabled={loading} />
+                  <label htmlFor="filter-total" className="text-sm cursor-pointer">
+                    {getTimeFilterLabel('total', validation)}
+                  </label>
+                </div>
+
+                {/* Export Annuale */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem
+                        value="yearly"
+                        id="filter-yearly"
+                        disabled={loading || !validation.hasYearlyData}
+                      />
+                      <label
+                        htmlFor="filter-yearly"
+                        className={`text-sm cursor-pointer ${
+                          !validation.hasYearlyData ? 'text-muted-foreground' : ''
+                        }`}
+                      >
+                        {getTimeFilterLabel('yearly', validation)}
+                      </label>
+                    </div>
+                  </TooltipTrigger>
+                  {!validation.hasYearlyData && (
+                    <TooltipContent>
+                      <p>{getTimeFilterTooltip('yearly', validation)}</p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+
+                {/* Export Mensile */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem
+                        value="monthly"
+                        id="filter-monthly"
+                        disabled={loading || !validation.hasMonthlyData}
+                      />
+                      <label
+                        htmlFor="filter-monthly"
+                        className={`text-sm cursor-pointer ${
+                          !validation.hasMonthlyData ? 'text-muted-foreground' : ''
+                        }`}
+                      >
+                        {getTimeFilterLabel('monthly', validation)}
+                      </label>
+                    </div>
+                  </TooltipTrigger>
+                  {!validation.hasMonthlyData && (
+                    <TooltipContent>
+                      <p>{getTimeFilterTooltip('monthly', validation)}</p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </RadioGroup>
+            </TooltipProvider>
+          </div>
+
           {/* Section checkboxes */}
           <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
             {sectionOptions.map(({ key, label, description }) => (
@@ -116,7 +245,7 @@ export function PDFExportDialog({
                   id={key}
                   checked={sections[key]}
                   onCheckedChange={() => toggleSection(key)}
-                  disabled={loading}
+                  disabled={loading || ((key === 'fire' || key === 'history') && timeFilter === 'monthly')}
                   className="mt-1"
                 />
                 <label
@@ -133,13 +262,22 @@ export function PDFExportDialog({
           </div>
 
           {/* Section count */}
-          <div className="flex items-center justify-between pt-4 border-t">
-            <span className="text-sm text-muted-foreground">
-              {selectedCount} {selectedCount === 1 ? 'sezione selezionata' : 'sezioni selezionate'}
-            </span>
+          <div className="space-y-2 pt-4 border-t">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">
+                {selectedCount} {selectedCount === 1 ? 'sezione selezionata' : 'sezioni selezionate'}
+              </span>
+            </div>
+
+            {/* Warning for FIRE and history sections in monthly filter */}
+            {timeFilter === 'monthly' && (
+              <div className="text-xs text-amber-600 dark:text-amber-500">
+                Le sezioni Storico Patrimonio e FIRE non sono disponibili per export mensile
+              </div>
+            )}
 
             {/* Action buttons */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 pt-2">
               <Button
                 variant="outline"
                 onClick={() => onOpenChange(false)}

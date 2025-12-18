@@ -4,28 +4,46 @@
 import { Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
+import type { TimeFilter } from '@/types/pdf';
 
 interface CoverSectionProps {
   generatedAt: Date;
   userName: string;
+  timeFilter?: TimeFilter;
 }
 
-export function CoverSection({ generatedAt, userName }: CoverSectionProps) {
+function getReportTypeLabel(timeFilter?: TimeFilter): string {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.toLocaleString('it-IT', { month: 'long' });
+  const capitalizedMonth = currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1);
+
+  switch (timeFilter) {
+    case 'monthly':
+      return `Report Mensile - ${capitalizedMonth} ${currentYear}`;
+    case 'yearly':
+      return `Report Annuale - ${currentYear}`;
+    case 'total':
+    default:
+      return 'Report Totale';
+  }
+}
+
+export function CoverSection({ generatedAt, userName, timeFilter }: CoverSectionProps) {
   const formattedDate = format(generatedAt, 'dd/MM/yyyy', { locale: it });
 
   return (
     <Page size="A4" style={styles.page}>
       <View style={styles.content}>
-        {/* Logo */}
-        <View style={styles.logoContainer}>
-          <Image
-            src="/favicon.ico"
-            style={styles.logo}
-          />
-        </View>
-
         {/* Title */}
         <Text style={styles.title}>Portfolio Report</Text>
+
+        {/* Report Type Badge */}
+        {timeFilter && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{getReportTypeLabel(timeFilter)}</Text>
+          </View>
+        )}
 
         {/* Subtitle */}
         <Text style={styles.subtitle}>{userName}</Text>
@@ -62,19 +80,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
   },
-  logoContainer: {
-    marginBottom: 30,
-  },
-  logo: {
-    width: 80,
-    height: 80,
-  },
   title: {
     fontSize: 36,
     fontFamily: 'Helvetica-Bold',
     color: '#3B82F6',
     marginBottom: 20,
     textAlign: 'center',
+  },
+  badge: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginBottom: 20,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontFamily: 'Helvetica-Bold',
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   subtitle: {
     fontSize: 20,

@@ -14,6 +14,7 @@ export interface PDFDataContext {
   snapshots: MonthlySnapshot[];
   assets: Asset[];
   allocationTargets: AssetAllocationTarget;
+  timeFilter?: TimeFilter;
 }
 
 export interface SectionSelection {
@@ -23,6 +24,20 @@ export interface SectionSelection {
   cashflow: boolean;
   fire: boolean;
   summary: boolean;
+}
+
+// ============================================
+// Time Filter Types
+// ============================================
+
+export type TimeFilter = 'total' | 'yearly' | 'monthly';
+
+export interface TimeFilterValidation {
+  hasMonthlyData: boolean;     // true if at least 1 snapshot in current month
+  hasYearlyData: boolean;      // true if at least 2 snapshots in current year
+  hasTotalData: boolean;       // true if at least 2 snapshots total
+  currentMonth: number;        // 1-12
+  currentYear: number;         // e.g., 2025
 }
 
 export interface PDFSectionData {
@@ -228,6 +243,7 @@ export interface PDFGenerateOptions {
   snapshots: MonthlySnapshot[];
   assets: Asset[];
   allocationTargets: AssetAllocationTarget;
+  timeFilter?: TimeFilter;     // Optional: default 'total'
 }
 
 export interface PDFGenerationResult {
