@@ -57,6 +57,51 @@ Replace spreadsheet-based portfolio management with a modern, automated solution
 - Smart filtering by asset, type, date range
 - CSV export functionality
 
+**PDF Export & Comprehensive Reporting:**
+- Professional PDF generation powered by @react-pdf/renderer library
+- Customizable section selection via export dialog with toggles for 6 report sections
+- Chart embedding using html2canvas for visual data preservation
+- Six exportable sections:
+  1. Portfolio Assets: Complete asset table with totals, G/P, TER
+  2. Asset Allocation: Current vs target with rebalancing recommendations (±2% threshold)
+  3. Historical Performance: Net worth evolution and YoY comparison
+  4. Cashflow Analysis: Income/Expenses with savings rate and top categories
+  5. FIRE Calculator: Progress to FI with customizable Safe Withdrawal Rate
+  6. Summary: Key metrics snapshot across all sections
+- Dynamic calculations:
+  - Safe Withdrawal Rate integration: Retrieves user setting from `assetAllocationTargets` collection (default 4%)
+  - FIRE Number multiplier: Auto-calculates 100/SWR (e.g., 25x for 4%, 33.33x for 3%)
+  - Average monthly savings: Net cashflow divided by number of unique tracked months
+  - Rebalancing completeness: Iterates directly on `comparisonResult` to include all asset classes with action !== 'OK'
+- Professional styling: Color-coded metrics, branded headers/footers, table formatting
+- Efficient data aggregation: Single service (`pdfDataService.ts`) prepares all section data
+- Chart capture utilities: `chartCapture.ts` with html2canvas integration
+- Type-safe architecture: Comprehensive TypeScript definitions in `types/pdf.ts`
+- Modular component structure: Reusable PDF primitives (Text, Table, Section, Chart)
+
+**Technical Implementation:**
+- React-PDF Renderer: Version 4.3.1 for declarative PDF generation
+- Data Service: `lib/services/pdfDataService.ts` orchestrates data fetching and preparation
+- PDF Components: Modular structure in `components/pdf/`
+  - `PDFDocument.tsx`: Main wrapper with conditional section rendering
+  - `sections/`: Individual section components (Portfolio, Allocation, History, Cashflow, FIRE, Summary)
+  - `primitives/`: Reusable UI elements (Text, Table, Section, Chart)
+- Chart Integration: `lib/utils/chartCapture.ts` captures Recharts as PNG using html2canvas
+- Type Definitions: Complete interfaces in `types/pdf.ts` for all data structures
+- Service Integrations:
+  - `assetService.ts`: Portfolio data and calculations
+  - `assetAllocationService.ts`: Target allocation and rebalancing logic
+  - `fireService.ts`: FIRE metrics with user-configured SWR
+  - `expenseService.ts`: Cashflow data aggregation
+
+**Key Fixes Implemented (#68):**
+- Dynamic FIRE multiplier: Replaces hardcoded "25x" with calculated 100/SWR
+- Trinity Study conditional display: Detailed explanation shown only when SWR = 4%
+- Average monthly savings: Corrected from showing total to actual per-month average
+- Months tracked: Displays "(media su N mesi)" for transparency
+- Rebalancing completeness: Fixed to include asset classes with 0€ current value but positive target
+- Threshold compliance: Confirmed ±2% in percentage points (not €100 absolute value)
+
 **Localization:**
 - 🇮🇹 Fully Italian UI
 - EUR currency format: €1.234,56

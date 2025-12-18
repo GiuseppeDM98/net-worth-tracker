@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils';
 import { CreateManualSnapshotModal } from '@/components/CreateManualSnapshotModal';
 import { SnapshotSearchDialog } from '@/components/history/SnapshotSearchDialog';
 import { CustomChartDot } from '@/components/history/CustomChartDot';
+import { ExportPDFButton } from '@/components/dashboard/ExportPDFButton';
 import {
   LineChart,
   Line,
@@ -388,6 +389,11 @@ export default function HistoryPage() {
             <Download className="mr-2 h-4 w-4" />
             Esporta CSV
           </Button>
+          <ExportPDFButton
+            snapshots={snapshots}
+            assets={assets}
+            allocationTargets={targets || getDefaultTargets()}
+          />
         </div>
       </div>
 
@@ -427,7 +433,7 @@ export default function HistoryPage() {
               automaticamente.
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={getChartHeight()}>
+            <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-net-worth-evolution">
               <LineChart data={netWorthHistory} margin={getChartMargins()}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
@@ -535,7 +541,7 @@ export default function HistoryPage() {
               Nessuno storico disponibile.
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={getChartHeight()}>
+            <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-asset-class-evolution">
               {showAssetClassPercentage ? (
                 // Percentage mode: Use LineChart with separate lines
                 <LineChart data={assetClassHistory} margin={getChartMargins()}>
@@ -760,7 +766,7 @@ export default function HistoryPage() {
               Nessuno storico disponibile.
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={getChartHeight()}>
+            <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-liquidity">
               {showLiquidityPercentage ? (
                 // Percentage mode: Use LineChart with separate lines
                 <LineChart data={liquidityHistory} margin={getChartMargins()}>
@@ -906,7 +912,7 @@ export default function HistoryPage() {
               Nessuno storico disponibile.
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={getChartHeight()}>
+            <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-yoy-variation">
               <BarChart data={yoyVariationData} margin={getChartMargins()}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="year" />
