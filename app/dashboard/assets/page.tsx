@@ -36,6 +36,7 @@ import { AssetCard } from '@/components/assets/AssetCard';
 import { TaxCalculatorModal } from '@/components/assets/TaxCalculatorModal';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
+import { formatPercentage } from '@/lib/utils';
 
 // Helper function to format asset class and type names
 const formatAssetName = (name: string): string => {
@@ -49,10 +50,6 @@ const formatAssetName = (name: string): string => {
   };
 
   return nameMap[name.toLowerCase()] || name.charAt(0).toUpperCase() + name.slice(1);
-};
-
-const formatPercentage = (value: number): string => {
-  return `${value.toFixed(2)}%`;
 };
 
 export default function AssetsPage() {

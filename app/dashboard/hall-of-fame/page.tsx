@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Trophy, TrendingUp, TrendingDown, DollarSign, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { NoteIconCell } from '@/components/hall-of-fame/NoteIconCell';
+import { formatPercentage as formatPercentageUtil } from '@/lib/utils';
 
 export default function HallOfFamePage() {
   const { user } = useAuth();
@@ -76,6 +77,9 @@ export default function HallOfFamePage() {
   };
 
   const formatPercentage = (value: number): string => {
+    if (value === undefined || value === null) {
+      return '-';
+    }
     const sign = value > 0 ? '+' : '';
     return `${sign}${value.toFixed(2)}%`;
   };

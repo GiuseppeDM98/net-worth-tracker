@@ -23,6 +23,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { formatPercentage } from '@/lib/utils';
 
 interface AssetCardProps {
   asset: Asset;
@@ -33,10 +34,6 @@ interface AssetCardProps {
   onCalculateTaxes?: (asset: Asset) => void;
   isManualPrice: boolean;
 }
-
-const formatPercentage = (value: number): string => {
-  return `${value.toFixed(2)}%`;
-};
 
 const formatAssetName = (name: string): string => {
   const nameMap: Record<string, string> = {
