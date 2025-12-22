@@ -23,7 +23,7 @@ import {
   ReferenceArea,
   ReferenceLine,
 } from 'recharts';
-import { formatCurrency } from '@/lib/services/chartService';
+import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
 
 const COLORS = [
   '#3b82f6', // blue
@@ -520,7 +520,7 @@ export function TotalHistoryTab() {
                   <LineChart data={monthlyTrendData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
-                    <YAxis tickFormatter={(value) => `€${value.toLocaleString('it-IT')}`} />
+                    <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                     <Tooltip
                       formatter={(value: number) => formatCurrency(value)}
                       contentStyle={{
@@ -579,7 +579,7 @@ export function TotalHistoryTab() {
                   <LineChart data={yearlyTrendData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="year" />
-                    <YAxis tickFormatter={(value) => `€${value.toLocaleString('it-IT')}`} />
+                    <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                     <Tooltip
                       formatter={(value: number) => formatCurrency(value)}
                       contentStyle={{
@@ -673,7 +673,7 @@ export function TotalHistoryTab() {
                 <LineChart data={monthlyExpensesByType}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
-                  <YAxis tickFormatter={(value) => `€${value.toLocaleString('it-IT')}`} />
+                  <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
                     contentStyle={{
@@ -703,7 +703,7 @@ export function TotalHistoryTab() {
                 <LineChart data={yearlyExpensesByType}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="year" />
-                  <YAxis tickFormatter={(value) => `€${value.toLocaleString('it-IT')}`} />
+                  <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
                     contentStyle={{
@@ -733,7 +733,7 @@ export function TotalHistoryTab() {
                 <LineChart data={monthlyExpensesByCategory.data}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
-                  <YAxis tickFormatter={(value) => `€${value.toLocaleString('it-IT')}`} />
+                  <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
                     contentStyle={{
@@ -769,7 +769,7 @@ export function TotalHistoryTab() {
                 <LineChart data={yearlyExpensesByCategory.data}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="year" />
-                  <YAxis tickFormatter={(value) => `€${value.toLocaleString('it-IT')}`} />
+                  <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
                     contentStyle={{
@@ -805,7 +805,7 @@ export function TotalHistoryTab() {
                 <LineChart data={monthlyIncomeByCategory.data}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
-                  <YAxis tickFormatter={(value) => `€${value.toLocaleString('it-IT')}`} />
+                  <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
                     contentStyle={{
@@ -841,7 +841,7 @@ export function TotalHistoryTab() {
                 <LineChart data={yearlyIncomeByCategory.data}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="year" />
-                  <YAxis tickFormatter={(value) => `€${value.toLocaleString('it-IT')}`} />
+                  <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
                     contentStyle={{

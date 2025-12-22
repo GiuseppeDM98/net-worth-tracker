@@ -121,6 +121,14 @@ Replace spreadsheet-based portfolio management with a modern, automated solution
 - Rebalancing completeness: Fixed to include asset classes with 0€ current value but positive target
 - Threshold compliance: Confirmed ±2% in percentage points (not €100 absolute value)
 
+**Mobile Optimizations:**
+- Compact chart Y-axis formatting (K/M notation) for improved readability on small screens
+- Responsive bottom navigation bar for mobile portrait mode
+- 4 primary navigation icons: Overview, Assets, Cashflow, Menu
+- Secondary menu drawer with 5 additional sections: Allocation, History, Hall of Fame, FIRE, Settings
+- Intelligent responsive behavior across Desktop, Mobile Landscape, and Mobile Portrait
+- Preserved backward compatibility for desktop and landscape modes
+
 **Localization:**
 - 🇮🇹 Fully Italian UI
 - EUR currency format: €1.234,56
@@ -1292,6 +1300,157 @@ This means:
 - **Two phases**:
   1. Scrape new dividends (60-day window)
   2. Create expenses for dividends with paymentDate = today
+
+---
+
+### 7. Mobile Optimizations
+
+**Purpose:** Optimize user experience on mobile devices with compact data formatting and native-app-like navigation.
+
+**Key Components:**
+
+- **BottomNavigation.tsx** (`components/layout/BottomNavigation.tsx`):
+  - Fixed bottom navigation bar visible only on mobile portrait mode
+  - 4 primary navigation icons with active state highlighting
+  - Menu button opens SecondaryMenuDrawer
+  - Native app-like UI with icon + label layout
+  - Color-coded active states (blue for selected, gray for inactive)
+
+- **SecondaryMenuDrawer.tsx** (`components/layout/SecondaryMenuDrawer.tsx`):
+  - Sheet component sliding from bottom (shadcn/ui)
+  - Contains 5 secondary navigation items: Allocation, History, Hall of Fame, FIRE, Settings
+  - Auto-closes after navigation selection
+  - Active route highlighting
+  - Responsive max-height (80vh)
+
+**Key Services:**
+
+- **chartService.ts** (`lib/services/chartService.ts`):
+  - `formatCurrencyCompact(value: number)`: Compact currency formatting
+  - K/M notation for large numbers (€850k, €1,5 Mln)
+  - Optimized for small screen readability
+  - Applied to ~19 YAxis instances across all monetary charts
+
+**Responsive Behavior Matrix:**
+
+| Device Mode | Screen Size | Orientation | Navigation UI |
+|-------------|-------------|-------------|---------------|
+| **Desktop** | ≥1024px | Any | Sidebar lateral (always visible) |
+| **Mobile Landscape** | <1024px | Landscape | Sidebar with hamburger toggle |
+| **Mobile Portrait** | <1024px | Portrait | Bottom navigation + drawer |
+
+**Technical Implementation:**
+
+The implementation uses Tailwind CSS v4 responsive utilities with careful combination of breakpoint and orientation variants:
+
+```typescript
+// CRITICAL: Use max-lg: prefix to limit orientation variants to mobile only
+
+// Bottom Navigation - Mobile Portrait ONLY
+<nav className="lg:hidden max-lg:portrait:flex max-lg:landscape:hidden">
+
+// Sidebar - Desktop always visible, Mobile Portrait hidden, Mobile Landscape toggle
+<div className={cn(
+  'lg:relative lg:translate-x-0',                    // Desktop: always visible
+  'max-lg:landscape:fixed max-lg:landscape:z-50',    // Mobile Landscape: fixed with toggle
+  'max-lg:portrait:hidden',                          // Mobile Portrait: hidden
+  isOpen ? 'translate-x-0' : 'max-lg:landscape:-translate-x-full'
+)}>
+
+// Main content padding - Bottom nav spacing on Mobile Portrait
+<main className="lg:pb-6 max-lg:portrait:pb-20 max-lg:landscape:pb-6">
+```
+
+**Why `max-lg:` prefix is critical:**
+- `landscape:` and `portrait:` apply to ALL screen sizes, including desktop
+- Desktop monitors are typically in landscape orientation
+- Without `max-lg:`, `landscape:fixed` overrides `lg:relative` on desktop
+- `max-lg:portrait:` = "Only on screens <1024px AND portrait"
+- `max-lg:landscape:` = "Only on screens <1024px AND landscape"
+
+**Chart Formatting Examples:**
+
+```typescript
+// BEFORE (unreadable on mobile):
+YAxis tickFormatter={(value) => formatCurrency(value).replace(/,00$/, '')}
+// Output: €1.500.000
+
+// AFTER (compact notation):
+YAxis tickFormatter={(value) => formatCurrencyCompact(value)}
+// Output: €1,5 Mln
+
+// Logic:
+- value >= 1M → €X,X Mln (1 decimal)
+- value >= 1k → €Xk (rounded to nearest thousand)
+- value < 1k → €X (rounded to nearest euro)
+```
+
+**Files Modified:**
+
+| File | Changes |
+|------|---------|
+| [BottomNavigation.tsx](components/layout/BottomNavigation.tsx) | NEW: Bottom nav component |
+| [SecondaryMenuDrawer.tsx](components/layout/SecondaryMenuDrawer.tsx) | NEW: Drawer component |
+| [Sidebar.tsx](components/layout/Sidebar.tsx) | Fixed responsive classes with `max-lg:` |
+| [dashboard/layout.tsx](app/dashboard/layout.tsx) | Integrated bottom nav, fixed responsive classes |
+| [history/page.tsx](app/dashboard/history/page.tsx) | Updated 4 YAxis formatters |
+| [TotalHistoryTab.tsx](components/cashflow/TotalHistoryTab.tsx) | Updated 8 YAxis formatters |
+| [FireCalculatorTab.tsx](components/fire-simulations/FireCalculatorTab.tsx) | Updated 1 YAxis formatter |
+| [DividendStats.tsx](components/dividends/DividendStats.tsx) | Updated 2 YAxis formatters |
+| [CurrentYearTab.tsx](components/cashflow/CurrentYearTab.tsx) | Updated 4 YAxis formatters |
+
+**Key Features:**
+
+- **Chart readability**: 19 charts updated with compact K/M formatting for mobile portrait
+- **Native app feel**: Bottom navigation mimics iOS/Android app behavior
+- **Context preservation**: Primary actions (Overview, Assets, Cashflow) always accessible
+- **Secondary access**: Less frequent actions (Allocation, FIRE, Settings) in drawer
+- **Zero desktop impact**: All changes scoped to mobile screens only
+- **Orientation awareness**: Different UX for portrait vs landscape mobile
+- **State management**: Simple local state (no global context pollution)
+- **Performance**: No additional network requests or data fetching
+
+**Design Decisions:**
+
+1. **Why Bottom Navigation?**
+   - Thumb-friendly on modern large smartphones
+   - Industry standard (iOS, Android Material Design)
+   - Faster navigation than hamburger menu
+   - Always visible (no need to open menu)
+
+2. **Why 4 Primary + Drawer?**
+   - Bottom nav should have 3-5 items max (UX best practice)
+   - Overview, Assets, Cashflow are most frequently used
+   - Menu button provides access to remaining 5 sections
+   - Avoids cluttered bottom bar
+
+3. **Why Sheet from Bottom?**
+   - More ergonomic on portrait phones (easier to reach)
+   - Consistent with mobile OS patterns (iOS action sheets)
+   - Better use of vertical space than sidebar
+   - Quick dismiss by swiping down
+
+4. **Why K/M Notation?**
+   - €1.500.000 takes 10 characters, hard to read at small font
+   - €1,5 Mln takes 7 characters, easier to scan
+   - Reduces horizontal space requirements
+   - Standard in financial apps (Bloomberg, Yahoo Finance)
+
+**Backward Compatibility:**
+
+- ✅ Desktop experience unchanged (sidebar always visible)
+- ✅ Mobile landscape unchanged (hamburger + sidebar toggle)
+- ✅ All existing functionality preserved
+- ✅ No breaking changes to APIs or data structures
+- ✅ Progressive enhancement (older browsers gracefully degrade)
+
+**Future Enhancements:**
+
+- [ ] Swipe gestures for navigation between sections
+- [ ] Pull-to-refresh for price updates
+- [ ] Haptic feedback on iOS devices
+- [ ] PWA (Progressive Web App) manifest for "Add to Home Screen"
+- [ ] Offline mode with service workers
 
 ---
 

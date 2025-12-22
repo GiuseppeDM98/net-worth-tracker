@@ -47,10 +47,14 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     <div
       className={cn(
         'flex h-full w-64 flex-col bg-gray-900 text-white transition-transform duration-300 ease-in-out',
-        // Mobile: fixed position, slide in/out
-        'fixed inset-y-0 left-0 z-50 lg:relative lg:translate-x-0',
-        // Hide by default on mobile, show when open
-        isOpen ? 'translate-x-0' : '-translate-x-full'
+        // Desktop (≥lg): sempre relativo, sempre visibile
+        'lg:relative lg:translate-x-0',
+        // Mobile landscape SOLO (< lg + landscape): fixed, slide in/out
+        'max-lg:landscape:fixed max-lg:landscape:inset-y-0 max-lg:landscape:left-0 max-lg:landscape:z-50',
+        // Mobile portrait SOLO (< lg + portrait): nascosta
+        'max-lg:portrait:hidden',
+        // Show/hide su mobile landscape
+        isOpen ? 'translate-x-0' : 'max-lg:landscape:-translate-x-full'
       )}
     >
       {/* Desktop header (hidden on mobile since we show it in the hamburger menu bar) */}

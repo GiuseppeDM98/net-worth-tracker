@@ -15,6 +15,7 @@ import {
   prepareAssetClassHistoryData,
   prepareYoYVariationData,
   formatCurrency,
+  formatCurrencyCompact,
   formatPercentage,
 } from '@/lib/services/chartService';
 import { Asset, MonthlySnapshot, AssetAllocationTarget } from '@/types/assets';
@@ -439,9 +440,7 @@ export default function HistoryPage() {
                 <XAxis dataKey="date" />
                 <YAxis
                   width={getYAxisWidth()}
-                  tickFormatter={(value) =>
-                    formatCurrency(value).replace(/,00$/, '')
-                  }
+                  tickFormatter={(value) => formatCurrencyCompact(value)}
                   domain={[(dataMin: number) => dataMin * 0.95, (dataMax: number) => dataMax * 1.05]}
                 />
                 <Tooltip
@@ -648,7 +647,7 @@ export default function HistoryPage() {
                   <XAxis dataKey="date" />
                   <YAxis
                     width={getYAxisWidth()}
-                    tickFormatter={(value) => formatCurrency(value).replace(/,00$/, '')}
+                    tickFormatter={(value) => formatCurrencyCompact(value)}
                   />
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
@@ -833,7 +832,7 @@ export default function HistoryPage() {
                   <XAxis dataKey="date" />
                   <YAxis
                     width={getYAxisWidth()}
-                    tickFormatter={(value) => formatCurrency(value).replace(/,00$/, '')}
+                    tickFormatter={(value) => formatCurrencyCompact(value)}
                     domain={[(dataMin: number) => dataMin * 0.95, (dataMax: number) => dataMax * 1.05]}
                   />
                   <Tooltip
@@ -921,7 +920,7 @@ export default function HistoryPage() {
                   tickFormatter={(value) =>
                     showYoYPercentage
                       ? `${value.toFixed(0)}%`
-                      : formatCurrency(value).replace(/,00$/, '')
+                      : formatCurrencyCompact(value)
                   }
                 />
                 <Tooltip

@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DollarSign, TrendingUp, TrendingDown, Percent, Calendar } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { formatCurrencyCompact } from '@/lib/services/chartService';
 import {
   PieChart,
   Pie,
@@ -252,7 +253,7 @@ export function DividendStats({ startDate, endDate }: DividendStatsProps) {
                 <BarChart data={stats.byYear}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="year" />
-                  <YAxis tickFormatter={(value) => formatCurrency(value).replace(/,00$/, '')} />
+                  <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
                     labelStyle={{ color: '#000' }}

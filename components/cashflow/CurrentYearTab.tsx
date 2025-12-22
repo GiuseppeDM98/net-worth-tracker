@@ -27,7 +27,7 @@ import {
   LineChart,
   Line,
 } from 'recharts';
-import { formatCurrency } from '@/lib/services/chartService';
+import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
 
 interface ChartData {
   name: string;
@@ -1225,7 +1225,7 @@ export function CurrentYearTab() {
                   <LineChart data={monthlyTrendData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
-                    <YAxis tickFormatter={(value) => `€${value.toLocaleString('it-IT')}`} />
+                    <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                     <Tooltip
                       formatter={(value: number) => formatCurrency(value)}
                       contentStyle={{

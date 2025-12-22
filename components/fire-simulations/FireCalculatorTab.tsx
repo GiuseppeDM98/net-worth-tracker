@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getAllAssets, calculateTotalValue } from '@/lib/services/assetService';
 import { getSettings, setSettings, getDefaultTargets } from '@/lib/services/assetAllocationService';
 import { getFIREData, FIREMetrics, MonthlyFIREData, PlannedFIREMetrics, calculatePlannedFIREMetrics } from '@/lib/services/fireService';
-import { formatCurrency, formatPercentage } from '@/lib/services/chartService';
+import { formatCurrency, formatCurrencyCompact, formatPercentage } from '@/lib/services/chartService';
 import { Asset } from '@/types/assets';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -447,7 +447,7 @@ export function FireCalculatorTab() {
                 <XAxis dataKey="monthLabel" />
                 <YAxis
                   width={100}
-                  tickFormatter={(value) => formatCurrency(value).replace(/,00$/, '')}
+                  tickFormatter={(value) => formatCurrencyCompact(value)}
                 />
                 <Tooltip
                   formatter={(value: number) => formatCurrency(value)}
