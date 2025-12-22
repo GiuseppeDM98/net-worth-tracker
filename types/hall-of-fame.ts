@@ -8,6 +8,7 @@ export interface MonthlyRecord {
   month: number; // 1-12
   monthYear: string; // formato "MM/YYYY" per display
   netWorthDiff: number; // Differenza NW rispetto al mese precedente
+  previousNetWorth: number; // Valore NW del mese precedente (per calcolo %)
   totalIncome: number; // Entrate del mese
   totalExpenses: number; // Spese del mese
   note?: string; // Nota opzionale dallo snapshot (max 500 chars)
@@ -19,6 +20,7 @@ export interface MonthlyRecord {
 export interface YearlyRecord {
   year: number;
   netWorthDiff: number; // Differenza NW tra inizio e fine anno
+  startOfYearNetWorth: number; // Valore NW a inizio anno (per calcolo %)
   totalIncome: number; // Entrate totali dell'anno
   totalExpenses: number; // Spese totali dell'anno
 }
