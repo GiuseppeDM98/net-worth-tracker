@@ -26,11 +26,17 @@ import {
 
 interface AssetCardProps {
   asset: Asset;
+  totalValue: number;
+  weightPercentage: number;
   onEdit: (asset: Asset) => void;
   onDelete: (assetId: string) => void;
   onCalculateTaxes?: (asset: Asset) => void;
   isManualPrice: boolean;
 }
+
+const formatPercentage = (value: number): string => {
+  return `${value.toFixed(2)}%`;
+};
 
 const formatAssetName = (name: string): string => {
   const nameMap: Record<string, string> = {
@@ -46,6 +52,8 @@ const formatAssetName = (name: string): string => {
 
 export function AssetCard({
   asset,
+  totalValue,
+  weightPercentage,
   onEdit,
   onDelete,
   onCalculateTaxes,
@@ -105,8 +113,13 @@ export function AssetCard({
         {/* Valore Totale e G/P (prominenti) */}
         <div className="mb-3 p-3 bg-gray-50 rounded-lg">
           <div className="flex justify-between items-center">
-            <div>
-              <p className="text-xs text-gray-500">Valore Totale</p>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-gray-500">Valore Totale</p>
+                <Badge variant="secondary" className="text-xs font-normal">
+                  {formatPercentage(weightPercentage)}
+                </Badge>
+              </div>
               <p className="text-lg font-bold text-gray-900">
                 {asset.assetClass === 'realestate' &&
                 asset.outstandingDebt &&

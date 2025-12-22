@@ -51,6 +51,10 @@ const formatAssetName = (name: string): string => {
   return nameMap[name.toLowerCase()] || name.charAt(0).toUpperCase() + name.slice(1);
 };
 
+const formatPercentage = (value: number): string => {
+  return `${value.toFixed(2)}%`;
+};
+
 export default function AssetsPage() {
   const { user } = useAuth();
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -280,20 +284,26 @@ export default function AssetsPage() {
             <>
               {/* Mobile Card Layout */}
               <div className="md:hidden space-y-4 pt-4">
-                {assets.map((asset) => (
-                  <AssetCard
-                    key={asset.id}
-                    asset={asset}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
-                    onCalculateTaxes={
-                      hasCostBasisTracking(asset)
-                        ? handleCalculateTaxes
-                        : undefined
-                    }
-                    isManualPrice={requiresManualPricing(asset)}
-                  />
-                ))}
+                {assets.map((asset) => {
+                  const assetValue = calculateAssetValue(asset);
+                  const weightPercentage = totalValue > 0 ? (assetValue / totalValue) * 100 : 0;
+                  return (
+                    <AssetCard
+                      key={asset.id}
+                      asset={asset}
+                      totalValue={totalValue}
+                      weightPercentage={weightPercentage}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      onCalculateTaxes={
+                        hasCostBasisTracking(asset)
+                          ? handleCalculateTaxes
+                          : undefined
+                      }
+                      isManualPrice={requiresManualPricing(asset)}
+                    />
+                  );
+                })}
               </div>
 
               {/* Desktop Table Layout */}
@@ -310,6 +320,7 @@ export default function AssetsPage() {
                     <TableHead className="text-right">PMC</TableHead>
                     <TableHead className="text-right">TER</TableHead>
                     <TableHead className="text-right">Valore Totale</TableHead>
+                    <TableHead className="text-right">% Peso</TableHead>
                     <TableHead className="text-right">G/P</TableHead>
                     <TableHead>Ultimo Aggiornamento</TableHead>
                     <TableHead className="text-right">Azioni</TableHead>
@@ -318,6 +329,7 @@ export default function AssetsPage() {
                 <TableBody>
                   {assets.map((asset) => {
                     const value = calculateAssetValue(asset);
+                    const weightPercentage = totalValue > 0 ? (value / totalValue) * 100 : 0;
                     const lastUpdate =
                       asset.lastPriceUpdate instanceof Date
                         ? asset.lastPriceUpdate
@@ -392,6 +404,9 @@ export default function AssetsPage() {
                             formatCurrency(value)
                           )}
                         </TableCell>
+                        <TableCell className="text-right font-mono text-sm">
+                          {formatPercentage(weightPercentage)}
+                        </TableCell>
                         <TableCell className="text-right">
                           {asset.averageCost ? (
                             (() => {
@@ -457,6 +472,9 @@ export default function AssetsPage() {
                     </TableCell>
                     <TableCell className="text-right font-semibold">
                       {formatCurrency(totalValue)}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      100.00%
                     </TableCell>
                     <TableCell className="text-right font-semibold">
                       {(() => {

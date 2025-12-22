@@ -78,6 +78,8 @@ function calculateMonthlyRecords(
 
     // Calculate net worth difference between consecutive months
     const netWorthDiff = current.totalNetWorth - previous.totalNetWorth;
+    const netWorthDiffPercentage =
+      previous.totalNetWorth !== 0 ? (netWorthDiff / previous.totalNetWorth) * 100 : 0;
 
     // Filter expenses for the current month to aggregate income/expense totals
     const monthExpenses = expenses.filter(expense => {
@@ -96,6 +98,7 @@ function calculateMonthlyRecords(
       month: current.month,
       monthYear: formatMonthYear(current.month, current.year),
       netWorthDiff,
+      netWorthDiffPercentage,
       totalIncome,
       totalExpenses,
       ...(current.note && { note: current.note }),
@@ -128,22 +131,48 @@ function calculateYearlyRecords(
     return acc;
   }, {} as Record<number, MonthlySnapshot[]>);
 
+  // Find the last snapshot of each year for percentage calculations
+  const lastSnapshotsOfYear: Record<number, MonthlySnapshot> = {};
+  for (const year in snapshotsByYear) {
+    const snapshotsInYear = snapshotsByYear[year].sort((a, b) => b.month - a.month);
+    if (snapshotsInYear.length > 0) {
+      lastSnapshotsOfYear[year] = snapshotsInYear[0];
+    }
+  }
+
   const yearlyRecords: YearlyRecord[] = [];
 
-  for (const [yearStr, yearSnapshots] of Object.entries(snapshotsByYear)) {
-    const year = parseInt(yearStr);
+  const sortedYears = Object.keys(snapshotsByYear)
+    .map(Number)
+    .sort((a, b) => a - b);
 
-    // Sort snapshots within the year by month
-    const sorted = yearSnapshots.sort((a, b) => a.month - b.month);
+  for (const year of sortedYears) {
+    const yearSnapshots = snapshotsByYear[year].sort((a, b) => a.month - b.month);
 
-    // Skip years with less than 2 months of data (can't calculate year-over-year change)
-    if (sorted.length < 2) continue;
+    if (yearSnapshots.length === 0) continue;
 
-    const firstSnapshot = sorted[0];
-    const lastSnapshot = sorted[sorted.length - 1];
+    const firstSnapshotOfYear = yearSnapshots[0];
+    const lastSnapshotOfYear = yearSnapshots[yearSnapshots.length - 1];
 
-    // Calculate annual net worth change (last month - first month of the year)
-    const netWorthDiff = lastSnapshot.totalNetWorth - firstSnapshot.totalNetWorth;
+    const previousYear = year - 1;
+    const lastSnapshotOfPreviousYear = lastSnapshotsOfYear[previousYear];
+
+    let netWorthDiff = 0;
+    let netWorthDiffPercentage = 0;
+
+    // Calculate year-over-year change if previous year's data exists
+    if (lastSnapshotOfPreviousYear) {
+      netWorthDiff = lastSnapshotOfYear.totalNetWorth - lastSnapshotOfPreviousYear.totalNetWorth;
+      if (lastSnapshotOfPreviousYear.totalNetWorth !== 0) {
+        netWorthDiffPercentage = (netWorthDiff / lastSnapshotOfPreviousYear.totalNetWorth) * 100;
+      }
+    } else {
+      // For the first year, calculate change from the beginning to the end of the year
+      netWorthDiff = lastSnapshotOfYear.totalNetWorth - firstSnapshotOfYear.totalNetWorth;
+      if (firstSnapshotOfYear.totalNetWorth !== 0) {
+        netWorthDiffPercentage = (netWorthDiff / firstSnapshotOfYear.totalNetWorth) * 100;
+      }
+    }
 
     // Filter all expenses for this year to calculate annual income/expense totals
     const yearExpenses = expenses.filter(expense => {
@@ -159,6 +188,7 @@ function calculateYearlyRecords(
     yearlyRecords.push({
       year,
       netWorthDiff,
+      netWorthDiffPercentage,
       totalIncome,
       totalExpenses,
     });

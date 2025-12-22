@@ -75,9 +75,14 @@ export default function HallOfFamePage() {
     }).format(amount);
   };
 
+  const formatPercentage = (value: number): string => {
+    const sign = value > 0 ? '+' : '';
+    return `${sign}${value.toFixed(2)}%`;
+  };
+
   if (loading) {
     return (
-      <div className="p-8">
+      <div className="p-4 md:p-8">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
@@ -90,14 +95,14 @@ export default function HallOfFamePage() {
 
   if (!data) {
     return (
-      <div className="p-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Trophy className="h-8 w-8 text-yellow-500" />
+      <div className="p-4 md:p-8">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div className="flex-1">
+            <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
+              <Trophy className="h-7 w-7 md:h-8 md:w-8 text-yellow-500" />
               Hall of Fame
             </h1>
-            <p className="text-muted-foreground mt-1">
+            <p className="text-muted-foreground mt-1 text-sm md:text-base">
               I tuoi migliori e peggiori record finanziari
             </p>
           </div>
@@ -105,7 +110,7 @@ export default function HallOfFamePage() {
             onClick={handleRecalculate}
             disabled={recalculating}
             variant="outline"
-            className="gap-2"
+            className="gap-2 w-full sm:w-auto"
           >
             {recalculating ? (
               <>
@@ -132,15 +137,15 @@ export default function HallOfFamePage() {
   }
 
   return (
-    <div className="p-8 space-y-8">
+    <div className="p-4 md:p-8 space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Trophy className="h-8 w-8 text-yellow-500" />
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex-1">
+          <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
+            <Trophy className="h-7 w-7 md:h-8 md:w-8 text-yellow-500" />
             Hall of Fame
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-muted-foreground mt-1 text-sm md:text-base">
             I tuoi migliori e peggiori record finanziari
           </p>
         </div>
@@ -148,7 +153,7 @@ export default function HallOfFamePage() {
           onClick={handleRecalculate}
           disabled={recalculating}
           variant="outline"
-          className="gap-2"
+          className="gap-2 w-full sm:w-auto"
         >
           {recalculating ? (
             <>
@@ -166,7 +171,7 @@ export default function HallOfFamePage() {
 
       {/* Ranking Mensili */}
       <div>
-        <h2 className="text-2xl font-semibold mb-4">Ranking Mensili (Top 20)</h2>
+        <h2 className="text-xl md:text-2xl font-semibold mb-4">Ranking Mensili (Top 20)</h2>
         <div className="grid gap-6 md:grid-cols-2">
           {/* Miglior Mese: Differenza NW */}
           <Card>
@@ -180,7 +185,12 @@ export default function HallOfFamePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <MonthlyTable records={data.bestMonthsByNetWorthGrowth} valueKey="netWorthDiff" formatCurrency={formatCurrency} />
+              <MonthlyTable
+                records={data.bestMonthsByNetWorthGrowth}
+                valueKey="netWorthDiff"
+                formatCurrency={formatCurrency}
+                formatPercentage={formatPercentage}
+              />
             </CardContent>
           </Card>
 
@@ -196,7 +206,12 @@ export default function HallOfFamePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <MonthlyTable records={data.bestMonthsByIncome} valueKey="totalIncome" formatCurrency={formatCurrency} />
+              <MonthlyTable
+                records={data.bestMonthsByIncome}
+                valueKey="totalIncome"
+                formatCurrency={formatCurrency}
+                formatPercentage={formatPercentage}
+              />
             </CardContent>
           </Card>
 
@@ -212,7 +227,12 @@ export default function HallOfFamePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <MonthlyTable records={data.worstMonthsByNetWorthDecline} valueKey="netWorthDiff" formatCurrency={formatCurrency} />
+              <MonthlyTable
+                records={data.worstMonthsByNetWorthDecline}
+                valueKey="netWorthDiff"
+                formatCurrency={formatCurrency}
+                formatPercentage={formatPercentage}
+              />
             </CardContent>
           </Card>
 
@@ -228,7 +248,12 @@ export default function HallOfFamePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <MonthlyTable records={data.worstMonthsByExpenses} valueKey="totalExpenses" formatCurrency={formatCurrency} />
+              <MonthlyTable
+                records={data.worstMonthsByExpenses}
+                valueKey="totalExpenses"
+                formatCurrency={formatCurrency}
+                formatPercentage={formatPercentage}
+              />
             </CardContent>
           </Card>
         </div>
@@ -236,7 +261,7 @@ export default function HallOfFamePage() {
 
       {/* Ranking Annuali */}
       <div>
-        <h2 className="text-2xl font-semibold mb-4">Ranking Annuali (Top 10)</h2>
+        <h2 className="text-xl md:text-2xl font-semibold mb-4">Ranking Annuali (Top 10)</h2>
         <div className="grid gap-6 md:grid-cols-2">
           {/* Miglior Anno: Differenza NW */}
           <Card>
@@ -250,7 +275,12 @@ export default function HallOfFamePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <YearlyTable records={data.bestYearsByNetWorthGrowth} valueKey="netWorthDiff" formatCurrency={formatCurrency} />
+              <YearlyTable
+                records={data.bestYearsByNetWorthGrowth}
+                valueKey="netWorthDiff"
+                formatCurrency={formatCurrency}
+                formatPercentage={formatPercentage}
+              />
             </CardContent>
           </Card>
 
@@ -266,7 +296,12 @@ export default function HallOfFamePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <YearlyTable records={data.bestYearsByIncome} valueKey="totalIncome" formatCurrency={formatCurrency} />
+              <YearlyTable
+                records={data.bestYearsByIncome}
+                valueKey="totalIncome"
+                formatCurrency={formatCurrency}
+                formatPercentage={formatPercentage}
+              />
             </CardContent>
           </Card>
 
@@ -282,7 +317,12 @@ export default function HallOfFamePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <YearlyTable records={data.worstYearsByNetWorthDecline} valueKey="netWorthDiff" formatCurrency={formatCurrency} />
+              <YearlyTable
+                records={data.worstYearsByNetWorthDecline}
+                valueKey="netWorthDiff"
+                formatCurrency={formatCurrency}
+                formatPercentage={formatPercentage}
+              />
             </CardContent>
           </Card>
 
@@ -298,7 +338,12 @@ export default function HallOfFamePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <YearlyTable records={data.worstYearsByExpenses} valueKey="totalExpenses" formatCurrency={formatCurrency} />
+              <YearlyTable
+                records={data.worstYearsByExpenses}
+                valueKey="totalExpenses"
+                formatCurrency={formatCurrency}
+                formatPercentage={formatPercentage}
+              />
             </CardContent>
           </Card>
         </div>
@@ -312,11 +357,15 @@ function MonthlyTable({
   records,
   valueKey,
   formatCurrency,
+  formatPercentage,
 }: {
   records: MonthlyRecord[];
   valueKey: keyof MonthlyRecord;
   formatCurrency: (amount: number) => string;
+  formatPercentage: (value: number) => string;
 }) {
+  const showPercentage = valueKey === 'netWorthDiff';
+
   if (records.length === 0) {
     return (
       <p className="text-sm text-muted-foreground text-center py-4">
@@ -330,8 +379,11 @@ function MonthlyTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-16">Rank</TableHead>
+            <TableHead className="w-12 md:w-16">Rank</TableHead>
             <TableHead>Mese</TableHead>
+            {showPercentage && (
+              <TableHead className="text-right hidden sm:table-cell">% Diff</TableHead>
+            )}
             <TableHead className="text-right">Valore</TableHead>
             <TableHead className="w-12 text-center">Note</TableHead>
           </TableRow>
@@ -341,6 +393,17 @@ function MonthlyTable({
             <TableRow key={`${record.year}-${record.month}`}>
               <TableCell className="font-medium">{index + 1}</TableCell>
               <TableCell>{record.monthYear}</TableCell>
+              {showPercentage && (
+                <TableCell
+                  className={`text-right font-mono hidden sm:table-cell ${
+                    record.netWorthDiffPercentage > 0
+                      ? 'text-green-600'
+                      : 'text-red-600'
+                  }`}
+                >
+                  {formatPercentage(record.netWorthDiffPercentage)}
+                </TableCell>
+              )}
               <TableCell className="text-right font-mono">
                 {formatCurrency(record[valueKey] as number)}
               </TableCell>
@@ -360,11 +423,15 @@ function YearlyTable({
   records,
   valueKey,
   formatCurrency,
+  formatPercentage,
 }: {
   records: YearlyRecord[];
   valueKey: keyof YearlyRecord;
   formatCurrency: (amount: number) => string;
+  formatPercentage: (value: number) => string;
 }) {
+  const showPercentage = valueKey === 'netWorthDiff';
+
   if (records.length === 0) {
     return (
       <p className="text-sm text-muted-foreground text-center py-4">
@@ -378,8 +445,11 @@ function YearlyTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-16">Rank</TableHead>
+            <TableHead className="w-12 md:w-16">Rank</TableHead>
             <TableHead>Anno</TableHead>
+            {showPercentage && (
+              <TableHead className="text-right hidden sm:table-cell">% Diff</TableHead>
+            )}
             <TableHead className="text-right">Valore</TableHead>
           </TableRow>
         </TableHeader>
@@ -388,6 +458,17 @@ function YearlyTable({
             <TableRow key={record.year}>
               <TableCell className="font-medium">{index + 1}</TableCell>
               <TableCell>{record.year}</TableCell>
+              {showPercentage && (
+                <TableCell
+                  className={`text-right font-mono hidden sm:table-cell ${
+                    record.netWorthDiffPercentage > 0
+                      ? 'text-green-600'
+                      : 'text-red-600'
+                  }`}
+                >
+                  {formatPercentage(record.netWorthDiffPercentage)}
+                </TableCell>
+              )}
               <TableCell className="text-right font-mono">
                 {formatCurrency(record[valueKey] as number)}
               </TableCell>
