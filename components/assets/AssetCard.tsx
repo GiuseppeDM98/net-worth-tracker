@@ -26,6 +26,7 @@ import {
 
 interface AssetCardProps {
   asset: Asset;
+  weightPercentage: number;
   onEdit: (asset: Asset) => void;
   onDelete: (assetId: string) => void;
   onCalculateTaxes?: (asset: Asset) => void;
@@ -46,6 +47,7 @@ const formatAssetName = (name: string): string => {
 
 export function AssetCard({
   asset,
+  weightPercentage,
   onEdit,
   onDelete,
   onCalculateTaxes,
@@ -104,7 +106,7 @@ export function AssetCard({
 
         {/* Valore Totale e G/P (prominenti) */}
         <div className="mb-3 p-3 bg-gray-50 rounded-lg">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-start">
             <div>
               <p className="text-xs text-gray-500">Valore Totale</p>
               <p className="text-lg font-bold text-gray-900">
@@ -159,6 +161,10 @@ export function AssetCard({
                 </div>
               </div>
             )}
+          </div>
+          <div className="mt-2 pt-2 border-t border-gray-200">
+            <p className="text-xs text-gray-500">Peso sul totale</p>
+            <p className="font-semibold">{weightPercentage.toFixed(2)}%</p>
           </div>
         </div>
 

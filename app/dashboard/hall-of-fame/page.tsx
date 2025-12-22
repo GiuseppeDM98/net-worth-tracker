@@ -75,6 +75,14 @@ export default function HallOfFamePage() {
     }).format(amount);
   };
 
+  const formatPercentage = (value: number | undefined): string => {
+    if (value === undefined || value === null) {
+      return '-';
+    }
+    const formatted = value.toFixed(2);
+    return `${value > 0 ? '+' : ''}${formatted}%`;
+  };
+
   if (loading) {
     return (
       <div className="p-8">
@@ -180,7 +188,7 @@ export default function HallOfFamePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <MonthlyTable records={data.bestMonthsByNetWorthGrowth} valueKey="netWorthDiff" formatCurrency={formatCurrency} />
+              <MonthlyRanking records={data.bestMonthsByNetWorthGrowth} valueKey="netWorthDiff" formatCurrency={formatCurrency} formatPercentage={formatPercentage} />
             </CardContent>
           </Card>
 
@@ -196,7 +204,7 @@ export default function HallOfFamePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <MonthlyTable records={data.bestMonthsByIncome} valueKey="totalIncome" formatCurrency={formatCurrency} />
+              <MonthlyRanking records={data.bestMonthsByIncome} valueKey="totalIncome" formatCurrency={formatCurrency} formatPercentage={formatPercentage} />
             </CardContent>
           </Card>
 
@@ -212,7 +220,7 @@ export default function HallOfFamePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <MonthlyTable records={data.worstMonthsByNetWorthDecline} valueKey="netWorthDiff" formatCurrency={formatCurrency} />
+              <MonthlyRanking records={data.worstMonthsByNetWorthDecline} valueKey="netWorthDiff" formatCurrency={formatCurrency} formatPercentage={formatPercentage} />
             </CardContent>
           </Card>
 
@@ -228,7 +236,7 @@ export default function HallOfFamePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <MonthlyTable records={data.worstMonthsByExpenses} valueKey="totalExpenses" formatCurrency={formatCurrency} />
+              <MonthlyRanking records={data.worstMonthsByExpenses} valueKey="totalExpenses" formatCurrency={formatCurrency} formatPercentage={formatPercentage} />
             </CardContent>
           </Card>
         </div>
@@ -250,7 +258,7 @@ export default function HallOfFamePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <YearlyTable records={data.bestYearsByNetWorthGrowth} valueKey="netWorthDiff" formatCurrency={formatCurrency} />
+              <YearlyRanking records={data.bestYearsByNetWorthGrowth} valueKey="netWorthDiff" formatCurrency={formatCurrency} formatPercentage={formatPercentage} />
             </CardContent>
           </Card>
 
@@ -266,7 +274,7 @@ export default function HallOfFamePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <YearlyTable records={data.bestYearsByIncome} valueKey="totalIncome" formatCurrency={formatCurrency} />
+              <YearlyRanking records={data.bestYearsByIncome} valueKey="totalIncome" formatCurrency={formatCurrency} formatPercentage={formatPercentage} />
             </CardContent>
           </Card>
 
@@ -282,7 +290,7 @@ export default function HallOfFamePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <YearlyTable records={data.worstYearsByNetWorthDecline} valueKey="netWorthDiff" formatCurrency={formatCurrency} />
+              <YearlyRanking records={data.worstYearsByNetWorthDecline} valueKey="netWorthDiff" formatCurrency={formatCurrency} formatPercentage={formatPercentage} />
             </CardContent>
           </Card>
 
@@ -298,7 +306,7 @@ export default function HallOfFamePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <YearlyTable records={data.worstYearsByExpenses} valueKey="totalExpenses" formatCurrency={formatCurrency} />
+              <YearlyRanking records={data.worstYearsByExpenses} valueKey="totalExpenses" formatCurrency={formatCurrency} formatPercentage={formatPercentage} />
             </CardContent>
           </Card>
         </div>
@@ -307,63 +315,58 @@ export default function HallOfFamePage() {
   );
 }
 
-// Componente per tabelle mensili
-function MonthlyTable({
-  records,
+// Componente per Card Annuali (Mobile)
+function YearlyCard({
+  record,
+  rank,
   valueKey,
   formatCurrency,
+  formatPercentage,
 }: {
-  records: MonthlyRecord[];
-  valueKey: keyof MonthlyRecord;
+  record: YearlyRecord;
+  rank: number;
+  valueKey: keyof YearlyRecord;
   formatCurrency: (amount: number) => string;
+  formatPercentage: (value: number | undefined) => string;
 }) {
-  if (records.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground text-center py-4">
-        Nessun dato disponibile
-      </p>
-    );
-  }
+  const isNetWorthDiff = valueKey === 'netWorthDiff';
+  const value = record[valueKey] as number;
+  const percentage = record.netWorthPercentageChange;
+  const isPositive = value > 0;
+  const isNegative = value < 0;
+  const valueColor = isPositive ? 'text-green-600' : isNegative ? 'text-red-600' : 'text-gray-900';
 
   return (
-    <div className="max-h-[400px] overflow-y-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-16">Rank</TableHead>
-            <TableHead>Mese</TableHead>
-            <TableHead className="text-right">Valore</TableHead>
-            <TableHead className="w-12 text-center">Note</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {records.map((record, index) => (
-            <TableRow key={`${record.year}-${record.month}`}>
-              <TableCell className="font-medium">{index + 1}</TableCell>
-              <TableCell>{record.monthYear}</TableCell>
-              <TableCell className="text-right font-mono">
-                {formatCurrency(record[valueKey] as number)}
-              </TableCell>
-              <TableCell className="text-center">
-                <NoteIconCell note={record.note} monthYear={record.monthYear} />
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <div className="p-4 border rounded-lg flex items-center justify-between gap-4">
+      <div className="flex items-center gap-4">
+        <span className="text-lg font-bold text-muted-foreground">{rank}</span>
+        <div>
+          <p className="font-semibold">{record.year}</p>
+          <p className={`text-sm font-mono ${valueColor}`}>{formatCurrency(value)}</p>
+        </div>
+      </div>
+      {isNetWorthDiff && (
+        <div className="text-right">
+          <p className={`text-sm font-mono font-semibold ${valueColor}`}>
+            {formatPercentage(percentage)}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
 
-// Componente per tabelle annuali
-function YearlyTable({
+// Componente per Ranking Mensili
+function MonthlyRanking({
   records,
   valueKey,
   formatCurrency,
+  formatPercentage,
 }: {
-  records: YearlyRecord[];
-  valueKey: keyof YearlyRecord;
+  records: MonthlyRecord[];
+  valueKey: keyof MonthlyRecord;
   formatCurrency: (amount: number) => string;
+  formatPercentage: (value: number | undefined) => string;
 }) {
   if (records.length === 0) {
     return (
@@ -374,27 +377,169 @@ function YearlyTable({
   }
 
   return (
-    <div className="max-h-[400px] overflow-y-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-16">Rank</TableHead>
-            <TableHead>Anno</TableHead>
-            <TableHead className="text-right">Valore</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {records.map((record, index) => (
-            <TableRow key={record.year}>
-              <TableCell className="font-medium">{index + 1}</TableCell>
-              <TableCell>{record.year}</TableCell>
-              <TableCell className="text-right font-mono">
-                {formatCurrency(record[valueKey] as number)}
-              </TableCell>
+    <div>
+      {/* Mobile: Card Layout */}
+      <div className="md:hidden space-y-2">
+        {records.map((record, index) => (
+          <MonthlyCard
+            key={`${record.year}-${record.month}`}
+            record={record}
+            rank={index + 1}
+            valueKey={valueKey}
+            formatCurrency={formatCurrency}
+            formatPercentage={formatPercentage}
+          />
+        ))}
+      </div>
+
+      {/* Desktop: Table Layout */}
+      <div className="hidden md:block max-h-[400px] overflow-y-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-16">Rank</TableHead>
+              <TableHead>Mese</TableHead>
+              <TableHead className="text-right">Valore</TableHead>
+              {valueKey === 'netWorthDiff' && <TableHead className="text-right">Variazione %</TableHead>}
+              <TableHead className="w-12 text-center">Note</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {records.map((record, index) => (
+              <TableRow key={`${record.year}-${record.month}`}>
+                <TableCell className="font-medium">{index + 1}</TableCell>
+                <TableCell>{record.monthYear}</TableCell>
+                <TableCell className="text-right font-mono">
+                  {formatCurrency(record[valueKey] as number)}
+                </TableCell>
+                {valueKey === 'netWorthDiff' && (
+                  <TableCell className="text-right font-mono">
+                    {formatPercentage(record.netWorthPercentageChange)}
+                  </TableCell>
+                )}
+                <TableCell className="text-center">
+                  <NoteIconCell note={record.note} monthYear={record.monthYear} />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+// Componente per Card Mensili (Mobile)
+function MonthlyCard({
+  record,
+  rank,
+  valueKey,
+  formatCurrency,
+  formatPercentage,
+}: {
+  record: MonthlyRecord;
+  rank: number;
+  valueKey: keyof MonthlyRecord;
+  formatCurrency: (amount: number) => string;
+  formatPercentage: (value: number | undefined) => string;
+}) {
+  const isNetWorthDiff = valueKey === 'netWorthDiff';
+  const value = record[valueKey] as number;
+  const percentage = record.netWorthPercentageChange;
+  const isPositive = value > 0;
+  const isNegative = value < 0;
+  const valueColor = isPositive ? 'text-green-600' : isNegative ? 'text-red-600' : 'text-gray-900';
+
+  return (
+    <div className="p-4 border rounded-lg flex items-center justify-between gap-4">
+      <div className="flex items-center gap-4">
+        <span className="text-lg font-bold text-muted-foreground">{rank}</span>
+        <div>
+          <p className="font-semibold">{record.monthYear}</p>
+          <p className={`text-sm font-mono ${valueColor}`}>{formatCurrency(value)}</p>
+        </div>
+      </div>
+      <div className="text-right flex flex-col items-end">
+        {isNetWorthDiff && (
+          <p className={`text-sm font-mono font-semibold ${valueColor}`}>
+            {formatPercentage(percentage)}
+          </p>
+        )}
+        {record.note && (
+          <div className="mt-1">
+            <NoteIconCell note={record.note} monthYear={record.monthYear} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Componente per Ranking Annuali
+function YearlyRanking({
+  records,
+  valueKey,
+  formatCurrency,
+  formatPercentage,
+}: {
+  records: YearlyRecord[];
+  valueKey: keyof YearlyRecord;
+  formatCurrency: (amount: number) => string;
+  formatPercentage: (value: number | undefined) => string;
+}) {
+  if (records.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground text-center py-4">
+        Nessun dato disponibile
+      </p>
+    );
+  }
+
+  return (
+    <div>
+      {/* Mobile: Card Layout */}
+      <div className="md:hidden space-y-2">
+        {records.map((record, index) => (
+          <YearlyCard
+            key={record.year}
+            record={record}
+            rank={index + 1}
+            valueKey={valueKey}
+            formatCurrency={formatCurrency}
+            formatPercentage={formatPercentage}
+          />
+        ))}
+      </div>
+
+      {/* Desktop: Table Layout */}
+      <div className="hidden md:block max-h-[400px] overflow-y-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-16">Rank</TableHead>
+              <TableHead>Anno</TableHead>
+              <TableHead className="text-right">Valore</TableHead>
+              {valueKey === 'netWorthDiff' && <TableHead className="text-right">Variazione %</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {records.map((record, index) => (
+              <TableRow key={record.year}>
+                <TableCell className="font-medium">{index + 1}</TableCell>
+                <TableCell>{record.year}</TableCell>
+                <TableCell className="text-right font-mono">
+                  {formatCurrency(record[valueKey] as number)}
+                </TableCell>
+                {valueKey === 'netWorthDiff' && (
+                  <TableCell className="text-right font-mono">
+                    {formatPercentage(record.netWorthPercentageChange)}
+                  </TableCell>
+                )}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
