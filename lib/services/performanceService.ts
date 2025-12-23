@@ -458,7 +458,7 @@ export async function calculateRollingPeriods(
   const allCashFlows = await getCashFlowsForPeriod(userId, overallStartDate, overallEndDate);
 
   const results: RollingPeriodPerformance[] = [];
-  for (let i = 0; i <= sortedSnapshots.length - windowMonths; i++) {
+  for (let i = 0; i <= sortedSnapshots.length - windowMonths - 1; i++) {
     const windowSnapshots = sortedSnapshots.slice(i, i + windowMonths + 1);
     const startDate = new Date(windowSnapshots[0].year, windowSnapshots[0].month - 1);
     const endDate = new Date(windowSnapshots[windowMonths].year, windowSnapshots[windowMonths].month - 1);
