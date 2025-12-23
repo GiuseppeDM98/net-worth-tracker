@@ -359,7 +359,63 @@ export async function getCashFlowsForPeriod(
 }
 
 /**
+ * Build cash flows from a pre-fetched expense array (in-memory filtering)
+ * This eliminates N Firestore queries in rolling period calculations
+ *
+ * @param expenses - Pre-fetched expense array
+ * @param startDate - Start date for filtering
+ * @param endDate - End date for filtering
+ * @returns Array of monthly cash flow data
+ */
+export function getCashFlowsFromExpenses(
+  expenses: Expense[],
+  startDate: Date,
+  endDate: Date
+): CashFlowData[] {
+  // Filter expenses by date range in-memory
+  const filtered = expenses.filter(expense => {
+    const date = expense.date instanceof Date ? expense.date : expense.date.toDate();
+    return date >= startDate && date <= endDate;
+  });
+
+  // Group expenses by month (same logic as getCashFlowsForPeriod)
+  const monthlyMap = new Map<string, { income: number; expenses: number }>();
+
+  filtered.forEach(expense => {
+    const date = expense.date instanceof Date ? expense.date : expense.date.toDate();
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+    if (!monthlyMap.has(key)) {
+      monthlyMap.set(key, { income: 0, expenses: 0 });
+    }
+
+    const entry = monthlyMap.get(key)!;
+    if (expense.type === 'income') {
+      entry.income += expense.amount;
+    } else {
+      entry.expenses += Math.abs(expense.amount);
+    }
+  });
+
+  // Convert to CashFlowData array
+  const cashFlows: CashFlowData[] = [];
+  monthlyMap.forEach((value, key) => {
+    const [year, month] = key.split('-').map(Number);
+    cashFlows.push({
+      date: new Date(year, month - 1, 1),
+      income: value.income,
+      expenses: value.expenses,
+      netCashFlow: value.income - value.expenses,
+    });
+  });
+
+  return cashFlows.sort((a, b) => a.date.getTime() - b.date.getTime());
+}
+
+/**
  * Calculate performance metrics for a specific time period
+ *
+ * @param preFetchedExpenses - Optional pre-fetched expenses array to avoid redundant Firestore queries
  */
 export async function calculatePerformanceForPeriod(
   userId: string,
@@ -367,7 +423,8 @@ export async function calculatePerformanceForPeriod(
   timePeriod: TimePeriod,
   riskFreeRate: number,
   customStartDate?: Date,
-  customEndDate?: Date
+  customEndDate?: Date,
+  preFetchedExpenses?: Expense[]
 ): Promise<PerformanceMetrics> {
   // Get snapshots for period
   const snapshots = getSnapshotsForPeriod(
@@ -417,8 +474,10 @@ export async function calculatePerformanceForPeriod(
   const endDate = new Date(endSnapshot.year, endSnapshot.month - 1, 1);
   const numberOfMonths = calculateMonthsDifference(endDate, startDate);
 
-  // Get cash flows for period
-  const cashFlows = await getCashFlowsForPeriod(userId, startDate, endDate);
+  // Get cash flows for period - use pre-fetched if available, otherwise fetch
+  const cashFlows = preFetchedExpenses
+    ? getCashFlowsFromExpenses(preFetchedExpenses, startDate, endDate)
+    : await getCashFlowsForPeriod(userId, startDate, endDate);
 
   // Calculate net cash flow totals
   let totalContributions = 0;
@@ -498,13 +557,28 @@ export async function getAllPerformanceData(userId: string): Promise<Performance
 
   const riskFreeRate = settings?.riskFreeRate || 2.5; // Default to 2.5%
 
-  // Calculate metrics for each period
+  // OPTIMIZATION: Fetch ALL expenses once for the entire history
+  const sortedSnapshots = snapshots.filter(s => !s.isDummy).sort((a, b) => {
+    if (a.year !== b.year) return a.year - b.year;
+    return a.month - b.month;
+  });
+
+  let allExpenses: Expense[] = [];
+  if (sortedSnapshots.length > 0) {
+    const firstSnapshot = sortedSnapshots[0];
+    const lastSnapshot = sortedSnapshots[sortedSnapshots.length - 1];
+    const overallStartDate = new Date(firstSnapshot.year, firstSnapshot.month - 1, 1);
+    const overallEndDate = new Date(lastSnapshot.year, lastSnapshot.month, 0); // Last day of month
+    allExpenses = await getExpensesByDateRange(userId, overallStartDate, overallEndDate);
+  }
+
+  // Calculate metrics for each period (passing pre-fetched expenses)
   const [ytd, oneYear, threeYear, fiveYear, allTime] = await Promise.all([
-    calculatePerformanceForPeriod(userId, snapshots, 'YTD', riskFreeRate),
-    calculatePerformanceForPeriod(userId, snapshots, '1Y', riskFreeRate),
-    calculatePerformanceForPeriod(userId, snapshots, '3Y', riskFreeRate),
-    calculatePerformanceForPeriod(userId, snapshots, '5Y', riskFreeRate),
-    calculatePerformanceForPeriod(userId, snapshots, 'ALL', riskFreeRate),
+    calculatePerformanceForPeriod(userId, snapshots, 'YTD', riskFreeRate, undefined, undefined, allExpenses),
+    calculatePerformanceForPeriod(userId, snapshots, '1Y', riskFreeRate, undefined, undefined, allExpenses),
+    calculatePerformanceForPeriod(userId, snapshots, '3Y', riskFreeRate, undefined, undefined, allExpenses),
+    calculatePerformanceForPeriod(userId, snapshots, '5Y', riskFreeRate, undefined, undefined, allExpenses),
+    calculatePerformanceForPeriod(userId, snapshots, 'ALL', riskFreeRate, undefined, undefined, allExpenses),
   ]);
 
   // Calculate rolling periods
@@ -545,6 +619,14 @@ async function calculateRollingPeriods(
     return [];
   }
 
+  // OPTIMIZATION: Fetch ALL expenses once for the entire period range
+  const firstSnapshot = sortedSnapshots[0];
+  const lastSnapshot = sortedSnapshots[sortedSnapshots.length - 1];
+  const overallStartDate = new Date(firstSnapshot.year, firstSnapshot.month - 1, 1);
+  const overallEndDate = new Date(lastSnapshot.year, lastSnapshot.month, 0); // Last day of month
+
+  const allExpenses = await getExpensesByDateRange(userId, overallStartDate, overallEndDate);
+
   const rollingPeriods: RollingPeriodPerformance[] = [];
 
   for (let i = windowMonths; i < sortedSnapshots.length; i++) {
@@ -556,7 +638,8 @@ async function calculateRollingPeriods(
 
     // Get snapshots and cash flows for this window
     const windowSnapshots = sortedSnapshots.slice(i - windowMonths, i + 1);
-    const cashFlows = await getCashFlowsForPeriod(userId, periodStartDate, periodEndDate);
+    // OPTIMIZATION: Use in-memory filtering instead of Firestore query
+    const cashFlows = getCashFlowsFromExpenses(allExpenses, periodStartDate, periodEndDate);
 
     // Calculate CAGR
     const netCashFlow = cashFlows.reduce((sum, cf) => sum + cf.netCashFlow, 0);
