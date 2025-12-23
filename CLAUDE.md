@@ -45,7 +45,9 @@ Replace spreadsheet-based portfolio management with a modern, automated solution
 - Best/worst years by annual performance (Top 10)
 - Percentage growth columns for net worth rankings (month-over-month and year-over-year)
 - Automatic ranking updates with each new snapshot
-- Mobile-optimized responsive layout with horizontal scrollable tables
+- Mobile-optimized responsive card layout eliminates horizontal scroll
+- Card-based mobile UI (<768px) with vertical stacking and large text
+- Desktop table layout preserved (≥768px) for detailed data view
 
 **Dividend Tracking & Automation:**
 - Automatic dividend import from Borsa Italiana for Italian stocks/ETFs
@@ -130,6 +132,7 @@ Replace spreadsheet-based portfolio management with a modern, automated solution
 - Secondary menu drawer with 5 additional sections: Allocation, History, Hall of Fame, FIRE, Settings
 - Intelligent responsive behavior across Desktop, Mobile Landscape, and Mobile Portrait
 - Preserved backward compatibility for desktop and landscape modes
+- **Hall of Fame mobile UI**: Card layout replaces tables on mobile portrait (<768px) with MonthlyRecordCard and YearlyRecordCard components for zero horizontal scroll
 
 **Localization:**
 - 🇮🇹 Fully Italian UI

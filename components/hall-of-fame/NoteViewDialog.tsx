@@ -1,6 +1,6 @@
 'use client';
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 
 interface NoteViewDialogProps {
@@ -16,6 +16,9 @@ export function NoteViewDialog({ open, onOpenChange, monthYear, note }: NoteView
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Nota - {monthYear}</DialogTitle>
+          <DialogDescription>
+            Visualizza la nota completa per questo periodo
+          </DialogDescription>
         </DialogHeader>
 
         <div className="py-4">
