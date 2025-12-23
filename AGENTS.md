@@ -164,9 +164,64 @@ const userData: User = {
 #### 4. Teacher Comments
 Educate readers about **domain-specific financial concepts**.
 
-**Current Usage**: ⚠️ None yet (add when implementing calculation logic)
+**Current Usage**: ✅ Used in performance metrics service (performanceService.ts)
 
-**Recommended Usage** (for future portfolio calculations):
+**Example from Performance Metrics** (lib/services/performanceService.ts):
+```typescript
+/**
+ * Calculate Time-Weighted Return (TWR) - preferred metric for portfolio performance.
+ *
+ * TWR uses geometric linking to eliminate the effect of cash flow timing:
+ * For each month: Ri = (End NW - Cash Flow) / Start NW - 1
+ * TWR = [(1 + R1) × (1 + R2) × ... × (1 + Rn)] - 1
+ * Annualized TWR = (1 + TWR)^(12/months) - 1
+ *
+ * This metric is superior to simple ROI because it isolates investment
+ * performance from the timing of contributions/withdrawals.
+ */
+export function calculateTimeWeightedReturn(
+  snapshots: MonthlySnapshot[],
+  cashFlows: CashFlowData[]
+): number | null {
+  // Implementation...
+}
+
+/**
+ * Calculate Money-Weighted Return (IRR) using Newton-Raphson method.
+ *
+ * IRR finds the discount rate where NPV of all cash flows equals zero:
+ * NPV = -Start NW + Σ(CFi / (1+r)^ti) + End NW / (1+r)^T = 0
+ *
+ * Newton-Raphson iteration: rn+1 = rn - NPV(rn) / NPV'(rn)
+ * Converges in ~100 iterations for typical portfolios.
+ *
+ * Unlike TWR, IRR shows the actual investor return considering when
+ * money was added/withdrawn (useful for self-assessment).
+ */
+export function calculateIRR(
+  startNW: number,
+  endNW: number,
+  cashFlows: CashFlowData[],
+  numberOfMonths: number
+): number | null {
+  // Implementation with Newton-Raphson solver...
+}
+
+/**
+ * Calculate Sharpe Ratio - risk-adjusted performance metric.
+ *
+ * Formula: (Portfolio Return - Risk-Free Rate) / Portfolio Volatility
+ *
+ * Interpretation:
+ * - Sharpe > 1.0: Good risk-adjusted returns
+ * - Sharpe > 2.0: Excellent risk-adjusted returns
+ * - Sharpe < 0: Portfolio underperforms risk-free rate
+ *
+ * Risk-free rate retrieved from user's asset allocation settings.
+ */
+```
+
+**Other Financial Concepts**:
 ```typescript
 /**
  * Calculate asset allocation using the target percentage method.
@@ -180,7 +235,7 @@ Educate readers about **domain-specific financial concepts**.
  */
 ```
 
-**When to Use**: Explain financial concepts (FIRE, asset allocation), algorithms, or Firebase patterns
+**When to Use**: Explain financial concepts (ROI, CAGR, TWR, IRR, Sharpe Ratio, FIRE, asset allocation), complex algorithms (Newton-Raphson), or Firebase patterns
 
 #### 5. Guide Comments
 Help readers navigate **complex setup sequences** or **multi-step processes**.
@@ -375,6 +430,40 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 - Modify Tailwind classes directly on components (don't create wrappers)
 - Use `cn()` utility for conditional classes: `cn('base-class', condition && 'conditional-class')`
 
+**Tooltip Pattern** (Important):
+If Radix UI Tooltip has positioning issues, use custom implementation:
+```typescript
+// ✅ Custom tooltip with click interaction and proper positioning
+const [showTooltip, setShowTooltip] = useState(false);
+const tooltipRef = useRef<HTMLDivElement>(null);
+
+// Click-outside detection
+useEffect(() => {
+  const handleClickOutside = (event: MouseEvent) => {
+    if (tooltipRef.current && !tooltipRef.current.contains(event.target as Node)) {
+      setShowTooltip(false);
+    }
+  };
+  if (showTooltip) {
+    document.addEventListener('mousedown', handleClickOutside);
+  }
+  return () => document.removeEventListener('mousedown', handleClickOutside);
+}, [showTooltip]);
+
+// JSX
+<div className="relative" ref={tooltipRef}>
+  <button onClick={() => setShowTooltip(!showTooltip)}>
+    <HelpCircle className="h-4 w-4" />
+  </button>
+  {showTooltip && (
+    <div className="absolute right-0 top-6 z-50 w-72 rounded-md border bg-popover px-3 py-2 text-sm shadow-md">
+      <p>{tooltipContent}</p>
+    </div>
+  )}
+</div>
+```
+See `components/performance/MetricCard.tsx` for full implementation.
+
 ### Error Handling with Toasts
 
 **Pattern** (using `sonner` library):
@@ -483,19 +572,49 @@ npm run lint         # Run ESLint
 - [ ] Run `npm run lint` before committing
 
 **Key File References**:
-- Type definitions: `types/assets.ts`
+- Type definitions: `types/assets.ts`, `types/performance.ts`
 - Formatting utilities: `lib/utils/formatters.ts`
 - Color constants: `lib/constants/colors.ts`
 - Auth context: `contexts/AuthContext.tsx`
 - Firebase config: `lib/firebase/config.ts`
+- Performance calculations: `lib/services/performanceService.ts`
+- Chart utilities: `lib/services/chartService.ts`
 
 **Adding New Features**:
-1. Define types in `types/assets.ts` (if needed)
-2. Create utility functions in `lib/` (if reusable logic)
-3. Build UI components in `components/`
-4. Add page in `app/dashboard/` (authenticated) or `app/` (public)
-5. Use `ProtectedRoute` for authenticated pages
-6. Test manually (no automated tests yet)
+1. Define types in `types/` (create new file if needed, e.g., `types/performance.ts`)
+2. Create service layer in `lib/services/` (business logic, calculations, data fetching)
+3. Build reusable UI components in `components/` (organized by feature)
+4. Create main page in `app/dashboard/` (authenticated) or `app/` (public)
+5. Update navigation in `components/layout/Sidebar.tsx` and `SecondaryMenuDrawer.tsx`
+6. Use `ProtectedRoute` for authenticated pages (automatic via dashboard layout)
+7. Test manually (no automated tests yet)
+
+**Example: Performance Metrics Feature Implementation**
+```
+1. Created types/performance.ts with:
+   - TimePeriod, PerformanceMetrics, CashFlowData interfaces
+
+2. Created lib/services/performanceService.ts with:
+   - calculateROI(), calculateCAGR(), calculateTimeWeightedReturn()
+   - calculateIRR() (Newton-Raphson solver)
+   - calculateSharpeRatio(), calculateVolatility()
+   - preparePerformanceChartData()
+
+3. Created components/performance/:
+   - MetricCard.tsx (reusable metric display with tooltip)
+   - CustomDateRangeDialog.tsx (date range picker)
+   - PerformanceTooltip.tsx (chart tooltip)
+
+4. Created app/dashboard/performance/page.tsx:
+   - Period selector tabs (YTD, 1Y, 3Y, 5Y, ALL, CUSTOM)
+   - 8 metric cards grid
+   - 2 charts (Net Worth Evolution, Rolling CAGR)
+   - Methodology explanation section
+
+5. Updated navigation:
+   - Added TrendingUp icon to Sidebar.tsx
+   - Added Performance link to SecondaryMenuDrawer.tsx
+```
 
 ---
 

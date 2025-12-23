@@ -49,6 +49,21 @@ Replace spreadsheet-based portfolio management with a modern, automated solution
 - Card-based mobile UI (<768px) with vertical stacking and large text
 - Desktop table layout preserved (≥768px) for detailed data view
 
+**Performance Metrics & Analytics:**
+- Advanced portfolio performance analysis with industry-standard metrics
+- **8 Key Metrics**: ROI, CAGR, Time-Weighted Return (TWR), Money-Weighted Return (IRR), Sharpe Ratio, Volatility, Net Cash Flows, Duration
+- **7 Time Periods**: YTD, 1Y, 3Y, 5Y, All Time, Rolling 12M/36M, Custom Date Range
+- Time-Weighted Return (TWR) as primary metric (eliminates cash flow timing effects)
+- Money-Weighted Return (IRR) using Newton-Raphson iterative solver
+- Sharpe Ratio calculation with configurable risk-free rate from user settings
+- Annualized volatility calculation with outlier filtering (±50% threshold)
+- Interactive charts: Net Worth Evolution (contributions vs returns), Rolling CAGR trends
+- Cash flow integration: Automatic aggregation from expense/income data
+- Clickable metric tooltips with detailed explanations
+- Mobile-responsive grid layout with optimized chart formatting
+- Custom date range selector for flexible period analysis
+- Methodology section explaining calculation formulas and interpretations
+
 **Dividend Tracking & Automation:**
 - Automatic dividend import from Borsa Italiana for Italian stocks/ETFs
 - Manual entry with automatic withholding tax calculation (26% Italian, customizable)
@@ -129,7 +144,7 @@ Replace spreadsheet-based portfolio management with a modern, automated solution
 - Compact chart Y-axis formatting (K/M notation) for improved readability on small screens
 - Responsive bottom navigation bar for mobile portrait mode
 - 4 primary navigation icons: Overview, Assets, Cashflow, Menu
-- Secondary menu drawer with 5 additional sections: Allocation, History, Hall of Fame, FIRE, Settings
+- Secondary menu drawer with 6 additional sections: Allocation, Performance, History, Hall of Fame, FIRE, Settings
 - Intelligent responsive behavior across Desktop, Mobile Landscape, and Mobile Portrait
 - Preserved backward compatibility for desktop and landscape modes
 - **Hall of Fame mobile UI**: Card layout replaces tables on mobile portrait (<768px) with MonthlyRecordCard and YearlyRecordCard components for zero horizontal scroll
