@@ -280,7 +280,9 @@ export async function getCashFlowsForPeriod(
   const monthlyFlows: { [key: string]: { income: number; expenses: number } } = {};
 
   expenses.forEach((expense) => {
-    const date = (expense.date as Timestamp).toDate();
+    const date = expense.date && typeof (expense.date as Timestamp).toDate === 'function'
+      ? (expense.date as Timestamp).toDate()
+      : (expense.date as Date);
     const key = `${getYear(date)}-${getMonth(date)}`;
 
     if (!monthlyFlows[key]) {
