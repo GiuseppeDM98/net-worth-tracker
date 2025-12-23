@@ -108,6 +108,31 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
 - **Year-over-year performance** comparison
 - **CSV export** for external analysis
 
+### 📊 **Performance Metrics & Analytics**
+- **Advanced portfolio performance analysis** with industry-standard metrics
+- **8 Key Metrics** calculated automatically:
+  - **ROI (Return on Investment)**: Simple total return percentage
+  - **CAGR (Compound Annual Growth Rate)**: Annualized growth rate accounting for time
+  - **Time-Weighted Return (TWR)**: Primary performance metric that eliminates cash flow timing effects using geometric linking
+  - **Money-Weighted Return (IRR)**: Internal rate of return using Newton-Raphson iterative solver, shows actual investor return
+  - **Sharpe Ratio**: Risk-adjusted performance metric (excess return per unit of volatility)
+  - **Volatility**: Annualized standard deviation with ±50% outlier filtering
+  - **Net Cash Flows**: Total contributions minus withdrawals
+  - **Duration**: Investment period in months and years
+- **7 Time Periods** for flexible analysis:
+  - Year-to-Date (YTD), 1 Year, 3 Years, 5 Years, All Time
+  - Rolling 12-month and 36-month windows
+  - Custom date range selector for precise period analysis
+- **Automatic cash flow integration**: Derives contributions/withdrawals from expense and income data
+- **Interactive visualizations**:
+  - Net Worth Evolution chart: Shows portfolio growth split into contributions vs investment returns
+  - Rolling CAGR trend chart: Tracks annualized performance over time
+- **Clickable metric tooltips**: Each metric card has detailed explanation accessible via help icon
+- **Sharpe Ratio configuration**: Uses risk-free rate from user's asset allocation settings
+- **Mobile-responsive design**: Optimized grid layout with clean chart formatting
+- **Methodology section**: Built-in explanations of calculation formulas and interpretations
+- **Insufficient data handling**: Clear messaging when period has <2 snapshots or limited data
+
 ### 📄 **PDF Export & Reporting**
 - **Comprehensive portfolio reports** with professional PDF generation
 - **Customizable sections**: Choose which data to include (Portfolio, Allocation, History, Cashflow, FIRE, Summary)
@@ -908,6 +933,145 @@ Set specific assets within "Single Stock":
 - Flexibility to enable tracking only for subcategories where you need detail
 - Maintains consistency with existing allocation tracking UX
 
+### Analyzing Portfolio Performance
+
+The **Performance Metrics** page provides comprehensive analysis of your investment returns using industry-standard financial metrics.
+
+**Getting started:**
+
+1. Navigate to **"Performance"** page from the sidebar
+2. Ensure you have:
+   - At least **2 monthly snapshots** for basic metrics
+   - **Expense tracking data** for accurate cash flow calculations (contributions/withdrawals)
+   - Snapshots spanning your desired analysis period
+
+**Understanding the time periods:**
+
+**Year-to-Date (YTD):**
+- Shows performance from January 1st to today
+- Example: On June 15, 2025 → Analyzes Jan 1 - Jun 15, 2025
+- Best for: Tracking current year progress
+
+**1 Year / 3 Years / 5 Years:**
+- Rolling windows from today backwards
+- Example: If today is Dec 15, 2025 → 1Y analyzes Dec 15, 2024 - Dec 15, 2025
+- Best for: Standard investment performance reporting
+
+**All Time:**
+- Analyzes from your first snapshot to latest snapshot
+- Example: First snapshot Feb 2023 → Analyzes entire 2+ year history
+- Best for: Overall portfolio lifetime performance
+
+**Rolling 12M / 36M:**
+- Shows how CAGR evolves over time with moving windows
+- Chart displays multiple data points instead of single metric
+- Best for: Identifying performance trends and consistency
+
+**Custom Date Range:**
+- Click "CUSTOM" tab → Select specific start and end dates
+- Example: Analyze just Q4 2024 (Oct 1 - Dec 31)
+- Best for: Comparing specific market events or testing strategies
+
+**Reading the metrics:**
+
+**ROI (Return on Investment):**
+- Formula: `(End NW - Start NW - Net Cash Flow) / Start NW × 100`
+- Example: Started with €50k, ended with €60k, contributed €5k → ROI = 10%
+- Meaning: Your investments grew 10% excluding contributions
+- Limitation: Doesn't account for time or when money was added
+
+**CAGR (Compound Annual Growth Rate):**
+- Formula: `((End NW / (Start NW + Net Cash Flow))^(12/months) - 1) × 100`
+- Example: 15% CAGR over 3 years
+- Meaning: Portfolio grew at 15% per year on average
+- Best for: Comparing performance across different time periods
+
+**Time-Weighted Return (TWR)** ⭐ PRIMARY METRIC:
+- Formula: Geometric linking of monthly returns: `[(1+R₁) × (1+R₂) × ... × (1+Rₙ)]^(12/months) - 1`
+- Example: 12.5% TWR annualized
+- Meaning: Isolates investment performance from contribution timing
+- **Why it matters**: If you invested €10k in January and €50k in December, TWR shows your actual investment skill independent of when you had more money invested
+- Industry standard: Professional fund managers are evaluated using TWR
+
+**Money-Weighted Return (IRR):**
+- Formula: Solves NPV equation using Newton-Raphson: `NPV = -Start + Σ(CF/(1+r)^t) + End/(1+r)^T = 0`
+- Example: 10.2% IRR annualized
+- Meaning: Your actual investor return considering when you added/withdrew money
+- **When it differs from TWR**:
+  - If you invested more money right before a market crash → IRR will be lower than TWR
+  - If you invested more during a market bottom → IRR will be higher than TWR
+- Best for: Self-assessment of your personal timing decisions
+
+**Sharpe Ratio:**
+- Formula: `(Portfolio Return - Risk-Free Rate) / Volatility`
+- Example: Sharpe = 1.45
+- Interpretation:
+  - **> 1.0**: Good risk-adjusted returns
+  - **> 2.0**: Excellent risk-adjusted returns
+  - **< 0**: Portfolio underperforms risk-free rate (bonds/savings accounts)
+- Meaning: For every 1% of volatility (risk), you earned 1.45% excess return above the risk-free rate
+- Risk-free rate: Retrieved from your asset allocation settings (default: current government bond rate)
+
+**Volatility:**
+- Formula: `σ_monthly × √12` (annualized standard deviation with ±50% outlier filtering)
+- Example: 15.2% volatility
+- Meaning: Your portfolio typically fluctuates ±15.2% per year
+- Context:
+  - **< 5%**: Very stable (mostly bonds/cash)
+  - **5-15%**: Moderate (balanced portfolio)
+  - **15-25%**: Aggressive (heavy equity)
+  - **> 25%**: Very volatile (crypto, individual stocks)
+
+**Example scenario:**
+
+You started investing in January 2023 with €10,000. It's now December 2025.
+
+**Your data:**
+- Snapshots: 24 months (Jan 2023 - Dec 2025)
+- Current net worth: €45,000
+- Total contributions: €30,000 (€1,250/month average)
+- Net worth growth: €35,000 (€45k - €10k initial)
+- Investment gain: €5,000 (€35k growth - €30k contributions)
+
+**Performance page shows (All Time period):**
+- **ROI**: +16.7% (€5k gain on €30k invested)
+- **CAGR**: +7.8% annualized
+- **TWR**: +8.2% annualized (you picked good investments!)
+- **IRR**: +7.4% annualized (your timing was average, slightly hurt by contributing heavily in 2024 when market was high)
+- **Sharpe Ratio**: 1.3 (good risk-adjusted returns)
+- **Volatility**: 12.1% (typical balanced portfolio)
+- **Net Cash Flows**: +€30,000
+- **Duration**: 24 months (2.0 years)
+
+**Net Worth Evolution Chart:**
+- Blue area: Investment returns (€5k)
+- Green area: Contributions (€30k)
+- Total height: Current net worth (€45k)
+
+**What this tells you:**
+- Your investment selection is solid (TWR 8.2% beats typical 7% market average)
+- Your contribution timing slightly hurt you (IRR 7.4% < TWR 8.2%)
+- Your risk-adjusted returns are good (Sharpe 1.3)
+- Volatility is moderate and acceptable (12.1%)
+- You're on track to reach financial goals
+
+**Using different time periods:**
+
+Click **"1Y"** tab to see just the last 12 months:
+- Maybe 2025 was a great year (CAGR 15%) vs lifetime average (7.8%)
+- Helps identify if recent changes to your strategy are working
+
+Click **"ROLLING_12M"** to see performance consistency:
+- Chart shows your 12-month CAGR calculated month-by-month
+- Spot trends: Is your performance improving? Are there volatility spikes?
+- Identify best/worst rolling 12-month periods
+
+**When metrics show "N/A":**
+- **Insufficient data**: Period has <2 snapshots
+- **Missing cash flows**: No expense/income data (affects IRR accuracy)
+- **Zero values**: Start or end net worth is €0
+- **Calculation errors**: Extreme outliers or data quality issues
+
 ### Tracking FIRE Progress
 
 1. Navigate to **"FIRE"** page
@@ -1278,11 +1442,11 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - ✅ Current Month Quick Filter button in Cashflow tracking for instant access to current month data with one-click filtering
 - ✅ Dividend tracking with automatic Borsa Italiana scraping, manual entry, expense synchronization, and comprehensive analytics
 - ✅ PDF export of comprehensive portfolio reports with customizable sections, dynamic FIRE calculations, and professional formatting
+- ✅ Performance metrics with 8 key indicators (ROI, CAGR, TWR, IRR, Sharpe ratio, volatility) across 7 time periods, interactive charts, and automatic cash flow integration
 
 ### Future Enhancements (Planned 🔜)
 - 🔜 Email notifications (monthly summary)
 - 🔜 Multi-currency full conversion support
-- 🔜 Performance metrics (ROI, IRR, CAGR, Sharpe ratio)
 - 🔜 Internationalization (i18n) for multi-language support
 - 🔜 Monte Carlo: Expand asset allocation to include all asset classes (Equity, Bonds, Commodities, Cryptocurrencies, Real Estate, Cash) with configurable percentages
 - 🔜 Monte Carlo: Calculate historical returns and volatility from user snapshots when sufficient data is available (minimum 24 monthly data points per asset class). Display warning message when data is insufficient for specific asset classes (e.g., "⚠️ Asset X: Limited historical data. Using market averages")
