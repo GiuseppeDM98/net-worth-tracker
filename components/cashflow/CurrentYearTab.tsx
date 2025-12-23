@@ -1,13 +1,11 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
-import { getAllExpenses, calculateTotalIncome, calculateTotalExpenses } from '@/lib/services/expenseService';
+import { calculateTotalIncome, calculateTotalExpenses } from '@/lib/services/expenseService';
 import { Timestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RefreshCw, ChevronLeft, ExternalLink, Info, X } from 'lucide-react';
-import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { format } from 'date-fns';
@@ -60,11 +58,13 @@ interface DrillDownState {
   selectedSubCategory: string | null;
 }
 
-export function CurrentYearTab() {
-  const { user } = useAuth();
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [loading, setLoading] = useState(true);
+interface CurrentYearTabProps {
+  allExpenses: Expense[];
+  loading: boolean;
+  onRefresh: () => Promise<void>;
+}
 
+export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
   // Drill-down state
   const [drillDown, setDrillDown] = useState<DrillDownState>({
     level: 'category',
@@ -95,12 +95,6 @@ export function CurrentYearTab() {
     }
   }, []);
 
-  useEffect(() => {
-    if (user) {
-      loadExpenses();
-    }
-  }, [user]);
-
   // Auto-scroll to the appropriate chart when drill-down changes
   useEffect(() => {
     if (drillDown.level !== 'category' && drillDown.chartType) {
@@ -114,26 +108,13 @@ export function CurrentYearTab() {
     }
   }, [drillDown.level, drillDown.chartType]);
 
-  const loadExpenses = async () => {
-    if (!user) return;
-
-    try {
-      setLoading(true);
-      const data = await getAllExpenses(user.uid);
-      setExpenses(data);
-    } catch (error) {
-      console.error('Error loading expenses:', error);
-      toast.error('Errore nel caricamento delle spese');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Filter expenses for current year only
-  const currentYearExpenses = expenses.filter(expense => {
-    const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
-    return date.getFullYear() === currentYear;
-  });
+  // Filter expenses for current year only using useMemo
+  const currentYearExpenses = useMemo(() => {
+    return allExpenses.filter(expense => {
+      const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
+      return date.getFullYear() === currentYear;
+    });
+  }, [allExpenses, currentYear]);
 
   // Prepare data for expenses by category
   const getExpensesByCategory = (): ChartData[] => {
@@ -552,7 +533,7 @@ export function CurrentYearTab() {
     );
   }
 
-  if (expenses.length === 0) {
+  if (allExpenses.length === 0) {
     return (
       <div className="p-8">
         <div className="text-center">

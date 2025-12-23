@@ -19,16 +19,18 @@ L'app raggiunge **50K+ letture Firebase al giorno** anche con testing moderato, 
 - ✅ **Dashboard Page**: snapshot fetchati 2 volte in pochi secondi
 - ✅ Nessuna libreria di caching (no React Query, no SWR)
 
-### Impatto Stimato Totale
+### Impatto Totale (Aggiornato)
 
-| Pagina/Area | Prima | Dopo | Riduzione |
-|-------------|-------|------|-----------|
-| **Performance Page** | 137 query | 1-2 query | **-99%** ✨ |
-| **Cashflow Page** | 4 query | 1 query | **-75%** |
-| **Dashboard Page** | 3-4 query | 2-3 query | **-33%** |
-| **ExpenseTrackingTab (filtri)** | N query | 0 query | **-100%** |
+| Pagina/Area | Prima | Dopo | Riduzione | Status |
+|-------------|-------|------|-----------|--------|
+| **Performance Page** | 137 query | 1-2 query | **-99%** ✨ | ✅ Completata |
+| **Cashflow Page (load)** | 5 query | 4 query | **-20%** | ✅ Completata |
+| **Cashflow Page (tab switch)** | 1-2 query | 0 query | **-100%** ✨ | ✅ Completata |
+| **Dashboard Page** | 3-4 query | 2-3 query | **-33%** | ⏳ Da fare |
+| **ExpenseTrackingTab (filtri)** | N query | 0 query | **-100%** | ✅ Completata (Sess. 3) |
 
-**Riduzione Complessiva**: **60-70% delle letture Firebase totali**
+**Riduzione Complessiva Attuale**: **~50-55% delle letture Firebase totali**
+**Target Finale Fase 1**: **60-70%** (dopo Priority 3-6)
 
 ---
 
@@ -55,60 +57,37 @@ Ottimizzazioni immediate senza aggiungere React Query.
 
 ---
 
-### 🔲 PRIORITY 2: Cashflow Page Lazy Loading
+### ✅ PRIORITY 2: Cashflow Page Optimization (COMPLETATA)
 
-**Status**: ⏳ Da implementare
-**Impatto**: -75% query (da 4 a 1 query al primo load)
+**Status**: ✅ Implementata il 23/12/2025
+**Impatto**: -100% query su tab switching + Data consistency migliorata
 
-#### Problema
-I 4 tab della Cashflow page sono sempre montati simultaneamente, ognuno fetcha i propri dati anche se invisibile.
+#### Problema Originale
+I 4 tab della Cashflow page erano sempre montati simultaneamente, ognuno fetchava i propri dati anche se invisibile (4-5 query al load). Inoltre, ogni tab aveva `useEffect` autonomo che ri-fetchava dati quando montato (1-2 query per tab switch).
 
-#### Soluzione
-Lazy loading con mount tracking: solo il tab attivo carica i dati, gli altri vengono montati on-demand.
+#### Soluzione Implementata
+**Sessione 2**: Lazy loading con mount tracking
+**Sessione 3**: Tab Caching con pattern "Lift State Up" + Batch Fetching
 
-#### Prompt per l'Implementazione
+1. Data fetching centralizzato nel parent (`cashflow/page.tsx`)
+2. Batch fetch con `Promise.all` di tutte le risorse in parallelo
+3. Children ricevono dati come props (controlled components)
+4. In-memory filtering invece di query Firestore
+5. Callback `onRefresh()` per triggare re-fetch dal parent
 
-```
-Implementa la Priority 2: Cashflow Page Lazy Loading seguendo il piano in docs/firebase-optimization-plan.md
+**Risultati**:
+- Primo load: 4 query in parallelo (invece di 5 sequenziali)
+- Tab switching: **0 query** (dati già in cache)
+- Data consistency: tutti i tab usano lo stesso dataset (single source of truth)
 
-Devi modificare app/dashboard/cashflow/page.tsx per:
+#### File Modificati
+- `app/dashboard/cashflow/page.tsx` (centralized data fetching, batch Promise.all)
+- `components/cashflow/ExpenseTrackingTab.tsx` (props interface, in-memory filtering)
+- `components/dividends/DividendTrackingTab.tsx` (props interface, removed autonomous fetching)
+- `components/cashflow/CurrentYearTab.tsx` (props interface, useMemo filtering)
+- `components/cashflow/TotalHistoryTab.tsx` (props interface, allExpenses direct usage)
 
-1. Aggiungere state tracking:
-   - mountedTabs: Set<string> inizializzato con ['tracking']
-   - activeTab: string per tracciare il tab attivo
-
-2. Implementare handleTabChange():
-   - Aggiorna activeTab
-   - Aggiungi il nuovo tab a mountedTabs (usando new Set)
-
-3. Render condizionale per i tab:
-   - "tracking" sempre montato (default)
-   - "dividends", "current-year", "total-history" montati solo se in mountedTabs
-
-4. Collegare handler a Tabs component con onValueChange
-
-Vincolo: "Storico Totale" DEVE caricare tutte le spese (non aggiungere limiti).
-
-Test: Verifica con DevTools Network che solo 1 query viene eseguita al primo load, non 4.
-
-DOPO IMPLEMENTAZIONE:
-Aggiorna docs/changelog.md aggiungendo una nuova sezione per questa sessione con:
-- Data sessione
-- Priority 2 completata
-- File modificato: app/dashboard/cashflow/page.tsx (linee modificate)
-- Modifiche implementate (state tracking, handleTabChange, render condizionale)
-- Risultati attesi (-75% query)
-- Testing status (link a docs/testing-guide.md sezione Priority 2)
-```
-
-#### File da Modificare
-- `app/dashboard/cashflow/page.tsx` (linee 10-63)
-
-#### Test Critici
-- [ ] Primo load: solo "Tracciamento" fetcha dati (1 query, non 4)
-- [ ] Click "Dividendi": fetcha dividendi (1 query)
-- [ ] Switch back "Tracciamento": nessuna query (già montato)
-- [ ] "Storico Totale": carica TUTTE le spese come richiesto
+**Dettagli**: Vedi `docs/changelog.md` Sessioni 2 e 3 per implementazione completa
 
 ---
 
@@ -221,60 +200,25 @@ Aggiorna docs/changelog.md aggiungendo una nuova sezione per questa sessione con
 
 ---
 
-### 🔲 PRIORITY 5: ExpenseTrackingTab In-Memory Filtering
+### ✅ PRIORITY 5: ExpenseTrackingTab In-Memory Filtering (COMPLETATA)
 
-**Status**: ⏳ Da implementare
+**Status**: ✅ Implementata il 23/12/2025 (parte di Sessione 3)
 **Impatto**: -100% query su cambio filtri
 
 #### Problema
-Due useEffect: uno carica TUTTE le spese, un altro carica spese filtrate. Ogni cambio anno/mese ri-fetcha da Firestore.
+Due useEffect: uno carica TUTTE le spese, un altro carica spese filtrate. Ogni cambio anno/mese ri-fetchava da Firestore.
 
-#### Soluzione
-Single fetch + filtraggio in-memory con useMemo.
+#### Soluzione Implementata
+Implementata come parte del Tab Caching (Sessione 3):
+1. ExpenseTrackingTab riceve `allExpenses` come prop dal parent
+2. Filtering in-memory con `useEffect` (linee 59-73)
+3. Zero query Firestore su cambio filtri (anno/mese)
+4. Tutti i dati già in cache nel parent component
 
-#### Prompt per l'Implementazione
+#### File Modificati
+- `components/cashflow/ExpenseTrackingTab.tsx` (in-memory filtering implementation)
 
-```
-Implementa la Priority 5: ExpenseTrackingTab In-Memory Filtering seguendo il piano in docs/firebase-optimization-plan.md
-
-Devi modificare components/cashflow/ExpenseTrackingTab.tsx per:
-
-1. Eliminare secondo useEffect che chiama loadExpenses():
-   - Rimuovere l'intero useEffect che dipende da [user, selectedYear, selectedMonth]
-
-2. Modificare il primo useEffect:
-   - Rinominare loadAllExpensesForYears() in loadAllExpenses()
-   - Fetchare SOLO con getAllExpenses() (no getExpensesByMonth)
-
-3. Creare filtered expenses con useMemo:
-   - Filtrare allExpenses per selectedYear e selectedMonth
-   - Dipendenze: [allExpenses, selectedYear, selectedMonth]
-   - Logica: expenseYear === selectedYear && (month === 'all' || expenseMonth === parseInt(selectedMonth))
-
-4. Usare filtered expenses per rendering:
-   - Sostituire lo state expenses con il valore memoizzato
-
-Test: Verifica che cambio anno/mese non generi query Firebase (solo filtraggio client-side).
-
-DOPO IMPLEMENTAZIONE:
-Aggiorna docs/changelog.md aggiungendo una nuova sezione per questa sessione con:
-- Data sessione
-- Priority 5 completata
-- File modificato: components/cashflow/ExpenseTrackingTab.tsx (linee modificate)
-- Modifiche implementate (eliminato secondo useEffect, useMemo filtering)
-- Risultati attesi (-100% query su cambio filtri)
-- Testing status (link a docs/testing-guide.md sezione Priority 5)
-```
-
-#### File da Modificare
-- `components/cashflow/ExpenseTrackingTab.tsx` (linee 160-171)
-
-#### Test Critici
-- [ ] Load tab: 1 query (getAllExpenses)
-- [ ] Cambio anno: nessuna query (filtraggio in-memory)
-- [ ] Cambio mese: nessuna query (filtraggio in-memory)
-- [ ] Aggiungi spesa: 1 query per refresh
-- [ ] Bottoni anno disponibili popolati correttamente
+**Dettagli**: Vedi `docs/changelog.md` Sessione 3 per implementazione completa
 
 ---
 
@@ -549,13 +493,20 @@ Aggiorna docs/changelog.md aggiungendo una nuova sezione per questa sessione con
 - Record durante navigazione
 - Verificare riduzione render count dopo Priority 6
 
-### Obiettivi Misurabili
+### Obiettivi Misurabili (Progressi)
 
-- ✅ Performance Page: da 100+ a 1-2 query
-- ✅ Cashflow Page: da 4 a 1 query al primo load
-- ✅ Daily Firebase reads: da 50K a 15-20K
+**Completati:**
+- ✅ Performance Page: da 137 a 1-2 query (**-99%**)
+- ✅ Cashflow Page primo load: da 5 a 4 query (**-20%**)
+- ✅ Cashflow Page tab switching: da 1-2 a 0 query (**-100%**)
+- ✅ ExpenseTrackingTab filtri: da N a 0 query (**-100%**)
 - ✅ Nessun degrado UX (tempi caricamento uguali o migliori)
 - ✅ Zero bug/regression nei calcoli
+- ✅ TypeScript compilation senza errori
+
+**In Corso:**
+- ⏳ Daily Firebase reads: da 50K a ~25-27K (stimato con Priority 1,2,5 completate)
+- ⏳ Target finale: 15-20K (dopo Priority 3,4,6)
 
 ---
 
@@ -573,16 +524,20 @@ Aggiorna docs/changelog.md aggiungendo una nuova sezione per questa sessione con
 Ogni ottimizzazione è isolata e può essere rollback indipendentemente:
 
 ```bash
-# Performance service
+# Priority 1: Performance service
 git checkout lib/services/performanceService.ts
 
-# Cashflow lazy loading
+# Priority 2 + 5: Cashflow page optimization (lazy loading + tab caching)
 git checkout app/dashboard/cashflow/page.tsx
+git checkout components/cashflow/ExpenseTrackingTab.tsx
+git checkout components/dividends/DividendTrackingTab.tsx
+git checkout components/cashflow/CurrentYearTab.tsx
+git checkout components/cashflow/TotalHistoryTab.tsx
 
-# Dashboard cache
+# Priority 3: Dashboard cache (quando implementata)
 git checkout app/dashboard/page.tsx
 
-# Memoization
+# Priority 6: Memoization (quando implementata)
 git checkout components/expenses/ExpenseTable.tsx components/dividends/DividendTable.tsx
 ```
 

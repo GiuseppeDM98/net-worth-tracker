@@ -1,10 +1,8 @@
 'use client';
 
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
 import { Expense, ExpenseCategory, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
-import { getAllExpenses, getExpensesByMonth, getExpensesByDateRange, calculateTotalIncome, calculateTotalExpenses, calculateNetBalance, calculateIncomeExpenseRatio } from '@/lib/services/expenseService';
-import { getAllCategories } from '@/lib/services/expenseCategoryService';
+import { calculateTotalIncome, calculateTotalExpenses, calculateNetBalance, calculateIncomeExpenseRatio } from '@/lib/services/expenseService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +10,6 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Plus, TrendingUp, TrendingDown, Wallet, RefreshCw, Filter, ChevronDown, Scale, Check, X } from 'lucide-react';
-import { toast } from 'sonner';
 import { ExpenseDialog } from '@/components/expenses/ExpenseDialog';
 import { ExpenseTable } from '@/components/expenses/ExpenseTable';
 import { cn } from '@/lib/utils';
@@ -32,13 +29,17 @@ const MONTHS = [
   { value: '12', label: 'Dicembre' },
 ];
 
-export function ExpenseTrackingTab() {
-  const { user } = useAuth();
+interface ExpenseTrackingTabProps {
+  allExpenses: Expense[];
+  categories: ExpenseCategory[];
+  loading: boolean;
+  onRefresh: () => Promise<void>;
+}
+
+export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh }: ExpenseTrackingTabProps) {
   const currentYear = new Date().getFullYear();
   const currentMonth = String(new Date().getMonth() + 1); // 1-based month (1-12)
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [allExpenses, setAllExpenses] = useState<Expense[]>([]); // Keep all expenses for year calculation
-  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
@@ -49,7 +50,6 @@ export function ExpenseTrackingTab() {
   const [selectedType, setSelectedType] = useState<string>('all');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [selectedSubCategoryId, setSelectedSubCategoryId] = useState<string>('all');
-  const [categories, setCategories] = useState<ExpenseCategory[]>([]);
 
   // Search states for comboboxes
   const [searchQueryType, setSearchQueryType] = useState<string>('');
@@ -149,26 +149,26 @@ export function ExpenseTrackingTab() {
   // Check if any filter is active
   const hasActiveFilters = selectedMonth !== 'all' || selectedType !== 'all' || selectedCategoryId !== 'all' || selectedSubCategoryId !== 'all';
 
-  // Load categories
+  // Filter expenses based on selectedYear and selectedMonth (in-memory filtering)
   useEffect(() => {
-    if (user) {
-      loadCategories();
+    if (!allExpenses.length) {
+      setExpenses([]);
+      return;
     }
-  }, [user]);
 
-  // Load all expenses in background to get available years
-  useEffect(() => {
-    if (user) {
-      loadAllExpensesForYears();
-    }
-  }, [user]);
+    const filtered = allExpenses.filter(expense => {
+      const date = expense.date instanceof Date ? expense.date : expense.date.toDate();
+      const expenseYear = date.getFullYear();
+      const expenseMonth = date.getMonth() + 1; // 1-based
 
-  // Load filtered expenses based on selected year and month
-  useEffect(() => {
-    if (user) {
-      loadExpenses();
-    }
-  }, [user, selectedYear, selectedMonth]);
+      if (expenseYear !== selectedYear) return false;
+      if (selectedMonth !== 'all' && expenseMonth !== parseInt(selectedMonth)) return false;
+
+      return true;
+    });
+
+    setExpenses(filtered);
+  }, [allExpenses, selectedYear, selectedMonth]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -188,55 +188,6 @@ export function ExpenseTrackingTab() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const loadCategories = async () => {
-    if (!user) return;
-
-    try {
-      const data = await getAllCategories(user.uid);
-      setCategories(data);
-    } catch (error) {
-      console.error('Error loading categories:', error);
-      toast.error('Errore nel caricamento delle categorie');
-    }
-  };
-
-  const loadAllExpensesForYears = async () => {
-    if (!user) return;
-
-    try {
-      const data = await getAllExpenses(user.uid);
-      setAllExpenses(data);
-    } catch (error) {
-      console.error('Error loading all expenses for years:', error);
-    }
-  };
-
-  const loadExpenses = async () => {
-    if (!user) return;
-
-    try {
-      setLoading(true);
-      let data: Expense[];
-
-      if (selectedMonth !== 'all') {
-        // Filter by specific month and year
-        data = await getExpensesByMonth(user.uid, selectedYear, parseInt(selectedMonth));
-      } else {
-        // Filter by year only
-        const startDate = new Date(selectedYear, 0, 1);
-        const endDate = new Date(selectedYear, 11, 31, 23, 59, 59);
-        data = await getExpensesByDateRange(user.uid, startDate, endDate);
-      }
-
-      setExpenses(data);
-    } catch (error) {
-      console.error('Error loading expenses:', error);
-      toast.error('Errore nel caricamento delle spese');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleAddExpense = () => {
     setEditingExpense(null);
     setDialogOpen(true);
@@ -253,10 +204,8 @@ export function ExpenseTrackingTab() {
   };
 
   const handleSuccess = async () => {
-    // Reload filtered expenses
-    await loadExpenses();
-    // Also reload all expenses to update available years
-    await loadAllExpensesForYears();
+    // Trigger parent refresh (re-fetch all data)
+    await onRefresh();
   };
 
   const formatCurrency = (amount: number): string => {
@@ -783,7 +732,7 @@ export function ExpenseTrackingTab() {
           <ExpenseTable
             expenses={filteredExpenses}
             onEdit={handleEditExpense}
-            onRefresh={loadExpenses}
+            onRefresh={onRefresh}
           />
         </CardContent>
       </Card>
