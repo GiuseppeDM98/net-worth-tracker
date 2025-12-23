@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getAllPerformanceData, calculatePerformanceForPeriod, preparePerformanceChartData, getSnapshotsForPeriod } from '@/lib/services/performanceService';
 import { getUserSnapshots } from '@/lib/services/snapshotService';
 import { PerformanceData, PerformanceMetrics, TimePeriod } from '@/types/performance';
+import { MonthlySnapshot } from '@/types/assets';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,7 @@ export default function PerformancePage() {
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('YTD');
   const [showCustomDateDialog, setShowCustomDateDialog] = useState(false);
+  const [cachedSnapshots, setCachedSnapshots] = useState<MonthlySnapshot[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -45,6 +47,11 @@ export default function PerformancePage() {
 
     try {
       setLoading(true);
+
+      // Fetch snapshots UNA volta e cachali
+      const snapshots = await getUserSnapshots(user.uid);
+      setCachedSnapshots(snapshots);
+
       const data = await getAllPerformanceData(user.uid);
       setPerformanceData(data);
     } catch (error) {
@@ -56,13 +63,13 @@ export default function PerformancePage() {
   };
 
   const handleCustomDateRange = async (startDate: Date, endDate: Date) => {
-    if (!user || !performanceData) return;
+    if (!user || !performanceData || cachedSnapshots.length === 0) return;
 
     try {
-      const snapshots = await getUserSnapshots(user.uid);
+      // Usa snapshot cachati invece di fetchare di nuovo
       const customMetrics = await calculatePerformanceForPeriod(
         user.uid,
-        snapshots,
+        cachedSnapshots,  // ✅ Usa cache
         'CUSTOM',
         performanceData.ytd.riskFreeRate,
         startDate,
@@ -96,15 +103,15 @@ export default function PerformancePage() {
     }
   };
 
-  const getChartData = async () => {
-    if (!user || !performanceData) return [];
+  const getChartData = () => {  // ✅ Non più async!
+    if (!performanceData || cachedSnapshots.length === 0) return [];
 
     const metrics = getCurrentMetrics();
     if (!metrics) return [];
 
-    const snapshots = await getUserSnapshots(user.uid);
+    // Usa snapshot cachati invece di fetchare
     const periodSnapshots = getSnapshotsForPeriod(
-      snapshots,
+      cachedSnapshots,  // ✅ Usa cache
       metrics.timePeriod,
       metrics.startDate,
       metrics.endDate
@@ -116,10 +123,11 @@ export default function PerformancePage() {
   const [chartData, setChartData] = useState<any[]>([]);
 
   useEffect(() => {
-    if (performanceData && user) {
-      getChartData().then(setChartData);
+    if (performanceData && cachedSnapshots.length > 0) {
+      const data = getChartData();  // ✅ Ora sincrono!
+      setChartData(data);
     }
-  }, [performanceData, selectedPeriod, user]);
+  }, [performanceData, selectedPeriod, cachedSnapshots]);
 
   const metrics = getCurrentMetrics();
 
