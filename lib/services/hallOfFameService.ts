@@ -78,6 +78,7 @@ function calculateMonthlyRecords(
 
     // Calculate net worth difference between consecutive months
     const netWorthDiff = current.totalNetWorth - previous.totalNetWorth;
+    const previousNetWorth = previous.totalNetWorth;
 
     // Filter expenses for the current month to aggregate income/expense totals
     const monthExpenses = expenses.filter(expense => {
@@ -96,6 +97,7 @@ function calculateMonthlyRecords(
       month: current.month,
       monthYear: formatMonthYear(current.month, current.year),
       netWorthDiff,
+      previousNetWorth,
       totalIncome,
       totalExpenses,
       ...(current.note && { note: current.note }),
@@ -144,6 +146,7 @@ function calculateYearlyRecords(
 
     // Calculate annual net worth change (last month - first month of the year)
     const netWorthDiff = lastSnapshot.totalNetWorth - firstSnapshot.totalNetWorth;
+    const startOfYearNetWorth = firstSnapshot.totalNetWorth;
 
     // Filter all expenses for this year to calculate annual income/expense totals
     const yearExpenses = expenses.filter(expense => {
@@ -159,6 +162,7 @@ function calculateYearlyRecords(
     yearlyRecords.push({
       year,
       netWorthDiff,
+      startOfYearNetWorth,
       totalIncome,
       totalExpenses,
     });

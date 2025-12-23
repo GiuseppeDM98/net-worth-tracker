@@ -43,7 +43,9 @@ Replace spreadsheet-based portfolio management with a modern, automated solution
 - Personal financial records of all time
 - Best/worst months by net worth growth, income, and expenses (Top 20)
 - Best/worst years by annual performance (Top 10)
+- Percentage growth columns for net worth rankings (month-over-month and year-over-year)
 - Automatic ranking updates with each new snapshot
+- Mobile-optimized responsive layout with horizontal scrollable tables
 
 **Dividend Tracking & Automation:**
 - Automatic dividend import from Borsa Italiana for Italian stocks/ETFs
@@ -859,8 +861,10 @@ Firestore listeners → Auto-refresh asset list
 - Automatic price updates (skip cash, real estate, manual-only assets)
 - Liquid vs illiquid classification
 - G/P (Gain/Loss) column with absolute and percentage values
+- **Portfolio weight percentage**: "Peso in %" column showing each asset's weight on total portfolio (desktop and mobile)
 - TER tracking with weighted portfolio average
 - Manual price override for non-tradeable assets
+- Mobile-optimized card layout with collapsible details
 
 ---
 
@@ -1451,6 +1455,147 @@ YAxis tickFormatter={(value) => formatCurrencyCompact(value)}
 - [ ] Haptic feedback on iOS devices
 - [ ] PWA (Progressive Web App) manifest for "Add to Home Screen"
 - [ ] Offline mode with service workers
+
+---
+
+### 8. Hall of Fame - Personal Financial Rankings
+
+**Purpose:** Track personal financial records with best/worst months and years across net worth growth, income, and expenses.
+
+**Key Components:**
+
+- **Hall of Fame page** (`app/dashboard/hall-of-fame/page.tsx`):
+  - Four monthly rankings (Top 20 each): Best/worst months by net worth growth, best months by income, worst months by expenses
+  - Four yearly rankings (Top 10 each): Best/worst years by net worth growth, best years by income, worst years by expenses
+  - **Percentage growth columns**: Month-over-month and year-over-year percentage calculations for net worth rankings
+  - Recalculate button to manually trigger ranking updates
+  - Mobile-optimized responsive grid layout
+  - Optional note display for monthly records with icon tooltip
+
+- **MonthlyTable component**:
+  - Displays monthly rankings with rank, month/year, value, percentage (conditional), and notes
+  - Percentage column appears only for `netWorthDiff` rankings
+  - Formula: `(netWorthDiff / previousNetWorth) * 100`
+  - Responsive: `w-12 sm:w-16` for rank column, `min-w-[80px]` for month, `whitespace-nowrap` for values
+  - Horizontal scroll on small screens with `overflow-y-auto` and `max-h-[400px]`
+
+- **YearlyTable component**:
+  - Displays yearly rankings with rank, year, value, and percentage (conditional)
+  - Percentage column appears only for `netWorthDiff` rankings
+  - Formula: `(netWorthDiff / startOfYearNetWorth) * 100`
+  - Responsive sizing similar to MonthlyTable
+
+**Key Services:**
+
+- **hallOfFameService.ts** (`lib/services/hallOfFameService.ts`):
+  - Client-side service using Firebase SDK
+  - `getHallOfFameData(userId)`: Retrieves pre-calculated rankings from Firestore
+  - `updateHallOfFame(userId)`: Recalculates all rankings from snapshots and expenses
+  - `calculateMonthlyRecords()`: Computes month-over-month changes with `previousNetWorth`
+  - `calculateYearlyRecords()`: Computes year-over-year changes with `startOfYearNetWorth`
+
+- **hallOfFameService.server.ts** (`lib/services/hallOfFameService.server.ts`):
+  - Server-side service using Firebase Admin SDK
+  - Used by `/api/hall-of-fame/recalculate` API route
+  - Same calculation logic as client-side service
+  - Batch operations for all users during cron jobs
+
+**Data Model:**
+
+```typescript
+MonthlyRecord {
+  year: number
+  month: number                // 1-12
+  monthYear: string            // "MM/YYYY" format
+  netWorthDiff: number         // Month-over-month NW change
+  previousNetWorth: number     // NW of previous month (for % calculation)
+  totalIncome: number          // Income for this month
+  totalExpenses: number        // Expenses for this month
+  note?: string                // Optional snapshot note
+}
+
+YearlyRecord {
+  year: number
+  netWorthDiff: number         // Year-over-year NW change
+  startOfYearNetWorth: number  // NW at start of year (for % calculation)
+  totalIncome: number          // Total annual income
+  totalExpenses: number        // Total annual expenses
+}
+
+HallOfFameData {
+  userId: string
+  bestMonthsByNetWorthGrowth: MonthlyRecord[]    // Top 20, netWorthDiff > 0
+  bestMonthsByIncome: MonthlyRecord[]            // Top 20
+  worstMonthsByNetWorthDecline: MonthlyRecord[]  // Top 20, netWorthDiff < 0
+  worstMonthsByExpenses: MonthlyRecord[]         // Top 20
+  bestYearsByNetWorthGrowth: YearlyRecord[]      // Top 10, netWorthDiff > 0
+  bestYearsByIncome: YearlyRecord[]              // Top 10
+  worstYearsByNetWorthDecline: YearlyRecord[]    // Top 10, netWorthDiff < 0
+  worstYearsByExpenses: YearlyRecord[]           // Top 10
+  updatedAt: Date
+}
+```
+
+**Pages:** `app/dashboard/hall-of-fame/page.tsx`
+
+**API Routes:**
+- `POST /api/hall-of-fame/recalculate`: Manually trigger Hall of Fame recalculation
+
+**Data Flow:**
+
+```
+Automated Update:
+Cron job creates monthly snapshot → Calls updateHallOfFame(userId)
+  ↓
+  - Fetch all user snapshots
+  - Fetch all user expenses
+  - Calculate monthly records (with previousNetWorth)
+  - Calculate yearly records (with startOfYearNetWorth)
+  - Generate rankings (filter, sort, slice to Top 20/10)
+  - Save to Firestore /hall-of-fame/{userId}
+
+Manual Recalculation:
+User clicks "Ricalcola Rankings" → POST /api/hall-of-fame/recalculate
+  ↓
+  - hallOfFameService.server.updateHallOfFame(userId)
+  - Same calculation logic as automated update
+  - Returns success response
+
+Page Load:
+User navigates to Hall of Fame → getHallOfFameData(userId)
+  ↓
+  - Fetch pre-calculated data from /hall-of-fame/{userId}
+  - Render tables with percentage columns for netWorthDiff rankings
+```
+
+**Key Features:**
+
+- **Percentage growth tracking**: See month-over-month and year-over-year percentage changes for net worth rankings
+- **Conditional percentage display**: Percentage column appears only in "Differenza NW" tables (not in Income/Expenses tables)
+- **Smart percentage calculation**: Shows `+X.XX%` for growth, `-X.XX%` for decline, handles zero-division gracefully
+- **Automatic ranking updates**: Hall of Fame recalculated automatically when new monthly snapshots are created
+- **Manual recalculation**: Users can trigger on-demand ranking updates via "Ricalcola Rankings" button
+- **Mobile-optimized layout**: Responsive grid (1 column on mobile, 2 columns on desktop), horizontal scrollable tables
+- **Top performers only**: Top 20 months and Top 10 years to focus on significant events
+- **Note integration**: Monthly records can display optional notes from snapshots with tooltip icon
+
+**Mobile Optimizations:**
+
+- **Responsive grid**: `grid-cols-1 lg:grid-cols-2` (single column on mobile, two columns on large screens)
+- **Spacing**: `gap-4 sm:gap-6` for tighter spacing on mobile
+- **Padding**: `p-4 sm:p-6 lg:p-8` for progressive padding scaling
+- **Header**: Flexbox column on mobile (`flex-col sm:flex-row`), full-width button on mobile (`w-full sm:w-auto`)
+- **Table columns**: Smaller rank column on mobile (`w-12 sm:w-16`), minimum widths to prevent excessive compression
+- **Text sizing**: Responsive titles (`text-2xl sm:text-3xl`), responsive icons (`h-6 w-6 sm:h-8 sm:w-8`)
+- **Horizontal scroll**: Tables wrapped in `max-h-[400px] overflow-y-auto` for long rankings
+
+**Technical Implementation:**
+
+- **Dual service pattern**: Client (`hallOfFameService.ts`) and server (`hallOfFameService.server.ts`) versions share identical calculation logic
+- **Pre-calculated rankings**: Data computed once and cached in Firestore, page loads are instant (no expensive calculations)
+- **Incremental updates**: Only recalculate when snapshots/expenses change (manual or cron-triggered)
+- **Type safety**: Complete TypeScript interfaces in `types/hall-of-fame.ts`
+- **Firestore collection**: `/hall-of-fame` with document ID = `userId`
 
 ---
 

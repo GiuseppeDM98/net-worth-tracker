@@ -26,6 +26,7 @@ import {
 
 interface AssetCardProps {
   asset: Asset;
+  totalValue: number;
   onEdit: (asset: Asset) => void;
   onDelete: (assetId: string) => void;
   onCalculateTaxes?: (asset: Asset) => void;
@@ -46,6 +47,7 @@ const formatAssetName = (name: string): string => {
 
 export function AssetCard({
   asset,
+  totalValue,
   onEdit,
   onDelete,
   onCalculateTaxes,
@@ -104,7 +106,7 @@ export function AssetCard({
 
         {/* Valore Totale e G/P (prominenti) */}
         <div className="mb-3 p-3 bg-gray-50 rounded-lg">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center mb-2">
             <div>
               <p className="text-xs text-gray-500">Valore Totale</p>
               <p className="text-lg font-bold text-gray-900">
@@ -159,6 +161,12 @@ export function AssetCard({
                 </div>
               </div>
             )}
+          </div>
+          <div className="pt-2 border-t border-gray-200">
+            <p className="text-xs text-gray-500">Peso in %</p>
+            <p className="text-sm font-semibold text-blue-600">
+              {totalValue > 0 ? `${((value / totalValue) * 100).toFixed(2)}%` : '-'}
+            </p>
           </div>
         </div>
 

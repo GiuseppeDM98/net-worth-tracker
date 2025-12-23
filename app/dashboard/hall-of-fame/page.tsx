@@ -132,15 +132,15 @@ export default function HallOfFamePage() {
   }
 
   return (
-    <div className="p-8 space-y-8">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Trophy className="h-8 w-8 text-yellow-500" />
+          <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+            <Trophy className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-500" />
             Hall of Fame
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-muted-foreground mt-1 text-sm sm:text-base">
             I tuoi migliori e peggiori record finanziari
           </p>
         </div>
@@ -148,7 +148,7 @@ export default function HallOfFamePage() {
           onClick={handleRecalculate}
           disabled={recalculating}
           variant="outline"
-          className="gap-2"
+          className="gap-2 w-full sm:w-auto"
         >
           {recalculating ? (
             <>
@@ -166,8 +166,8 @@ export default function HallOfFamePage() {
 
       {/* Ranking Mensili */}
       <div>
-        <h2 className="text-2xl font-semibold mb-4">Ranking Mensili (Top 20)</h2>
-        <div className="grid gap-6 md:grid-cols-2">
+        <h2 className="text-xl sm:text-2xl font-semibold mb-4">Ranking Mensili (Top 20)</h2>
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
           {/* Miglior Mese: Differenza NW */}
           <Card>
             <CardHeader>
@@ -236,8 +236,8 @@ export default function HallOfFamePage() {
 
       {/* Ranking Annuali */}
       <div>
-        <h2 className="text-2xl font-semibold mb-4">Ranking Annuali (Top 10)</h2>
-        <div className="grid gap-6 md:grid-cols-2">
+        <h2 className="text-xl sm:text-2xl font-semibold mb-4">Ranking Annuali (Top 10)</h2>
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
           {/* Miglior Anno: Differenza NW */}
           <Card>
             <CardHeader>
@@ -325,30 +325,46 @@ function MonthlyTable({
     );
   }
 
+  const showPercentage = valueKey === 'netWorthDiff';
+
   return (
     <div className="max-h-[400px] overflow-y-auto">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-16">Rank</TableHead>
-            <TableHead>Mese</TableHead>
-            <TableHead className="text-right">Valore</TableHead>
+            <TableHead className="w-12 sm:w-16">Rank</TableHead>
+            <TableHead className="min-w-[80px]">Mese</TableHead>
+            <TableHead className="text-right min-w-[100px]">Valore</TableHead>
+            {showPercentage && (
+              <TableHead className="text-right min-w-[70px]">%</TableHead>
+            )}
             <TableHead className="w-12 text-center">Note</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {records.map((record, index) => (
-            <TableRow key={`${record.year}-${record.month}`}>
-              <TableCell className="font-medium">{index + 1}</TableCell>
-              <TableCell>{record.monthYear}</TableCell>
-              <TableCell className="text-right font-mono">
-                {formatCurrency(record[valueKey] as number)}
-              </TableCell>
-              <TableCell className="text-center">
-                <NoteIconCell note={record.note} monthYear={record.monthYear} />
-              </TableCell>
-            </TableRow>
-          ))}
+          {records.map((record, index) => {
+            const percentage = showPercentage && record.previousNetWorth > 0
+              ? (record.netWorthDiff / record.previousNetWorth) * 100
+              : 0;
+
+            return (
+              <TableRow key={`${record.year}-${record.month}`}>
+                <TableCell className="font-medium">{index + 1}</TableCell>
+                <TableCell className="whitespace-nowrap">{record.monthYear}</TableCell>
+                <TableCell className="text-right font-mono whitespace-nowrap">
+                  {formatCurrency(record[valueKey] as number)}
+                </TableCell>
+                {showPercentage && (
+                  <TableCell className="text-right font-mono text-sm whitespace-nowrap">
+                    {percentage >= 0 ? '+' : ''}{percentage.toFixed(2)}%
+                  </TableCell>
+                )}
+                <TableCell className="text-center">
+                  <NoteIconCell note={record.note} monthYear={record.monthYear} />
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </div>
@@ -373,26 +389,42 @@ function YearlyTable({
     );
   }
 
+  const showPercentage = valueKey === 'netWorthDiff';
+
   return (
     <div className="max-h-[400px] overflow-y-auto">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-16">Rank</TableHead>
-            <TableHead>Anno</TableHead>
-            <TableHead className="text-right">Valore</TableHead>
+            <TableHead className="w-12 sm:w-16">Rank</TableHead>
+            <TableHead className="min-w-[60px]">Anno</TableHead>
+            <TableHead className="text-right min-w-[100px]">Valore</TableHead>
+            {showPercentage && (
+              <TableHead className="text-right min-w-[70px]">%</TableHead>
+            )}
           </TableRow>
         </TableHeader>
         <TableBody>
-          {records.map((record, index) => (
-            <TableRow key={record.year}>
-              <TableCell className="font-medium">{index + 1}</TableCell>
-              <TableCell>{record.year}</TableCell>
-              <TableCell className="text-right font-mono">
-                {formatCurrency(record[valueKey] as number)}
-              </TableCell>
-            </TableRow>
-          ))}
+          {records.map((record, index) => {
+            const percentage = showPercentage && record.startOfYearNetWorth > 0
+              ? (record.netWorthDiff / record.startOfYearNetWorth) * 100
+              : 0;
+
+            return (
+              <TableRow key={record.year}>
+                <TableCell className="font-medium">{index + 1}</TableCell>
+                <TableCell>{record.year}</TableCell>
+                <TableCell className="text-right font-mono whitespace-nowrap">
+                  {formatCurrency(record[valueKey] as number)}
+                </TableCell>
+                {showPercentage && (
+                  <TableCell className="text-right font-mono text-sm whitespace-nowrap">
+                    {percentage >= 0 ? '+' : ''}{percentage.toFixed(2)}%
+                  </TableCell>
+                )}
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </div>

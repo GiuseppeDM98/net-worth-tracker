@@ -91,6 +91,7 @@ function calculateMonthlyRecords(
 
     // Calcola differenza NW
     const netWorthDiff = current.totalNetWorth - previous.totalNetWorth;
+    const previousNetWorth = previous.totalNetWorth;
 
     // Filtra spese del mese corrente
     const monthExpenses = expenses.filter(expense => {
@@ -109,6 +110,7 @@ function calculateMonthlyRecords(
       month: current.month,
       monthYear: formatMonthYear(current.month, current.year),
       netWorthDiff,
+      previousNetWorth,
       totalIncome,
       totalExpenses,
       ...(current.note && { note: current.note }),
@@ -150,6 +152,7 @@ function calculateYearlyRecords(
 
     // Calcola differenza NW annuale
     const netWorthDiff = lastSnapshot.totalNetWorth - firstSnapshot.totalNetWorth;
+    const startOfYearNetWorth = firstSnapshot.totalNetWorth;
 
     // Filtra spese dell'anno
     const yearExpenses = expenses.filter(expense => {
@@ -165,6 +168,7 @@ function calculateYearlyRecords(
     yearlyRecords.push({
       year,
       netWorthDiff,
+      startOfYearNetWorth,
       totalIncome,
       totalExpenses,
     });

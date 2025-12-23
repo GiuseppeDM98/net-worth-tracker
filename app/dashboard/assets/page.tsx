@@ -284,6 +284,7 @@ export default function AssetsPage() {
                   <AssetCard
                     key={asset.id}
                     asset={asset}
+                    totalValue={totalValue}
                     onEdit={handleEdit}
                     onDelete={handleDelete}
                     onCalculateTaxes={
@@ -310,6 +311,7 @@ export default function AssetsPage() {
                     <TableHead className="text-right">PMC</TableHead>
                     <TableHead className="text-right">TER</TableHead>
                     <TableHead className="text-right">Valore Totale</TableHead>
+                    <TableHead className="text-right">Peso in %</TableHead>
                     <TableHead className="text-right">G/P</TableHead>
                     <TableHead>Ultimo Aggiornamento</TableHead>
                     <TableHead className="text-right">Azioni</TableHead>
@@ -392,6 +394,9 @@ export default function AssetsPage() {
                             formatCurrency(value)
                           )}
                         </TableCell>
+                        <TableCell className="text-right font-medium text-blue-600">
+                          {totalValue > 0 ? `${((value / totalValue) * 100).toFixed(2)}%` : '-'}
+                        </TableCell>
                         <TableCell className="text-right">
                           {asset.averageCost ? (
                             (() => {
@@ -457,6 +462,9 @@ export default function AssetsPage() {
                     </TableCell>
                     <TableCell className="text-right font-semibold">
                       {formatCurrency(totalValue)}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold text-blue-600">
+                      100.00%
                     </TableCell>
                     <TableCell className="text-right font-semibold">
                       {(() => {
