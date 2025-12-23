@@ -2,11 +2,12 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { PieChart, History, Trophy, Flame, Settings } from 'lucide-react';
+import { PieChart, History, Trophy, Flame, Settings, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const secondaryNavigation = [
   { name: 'Allocation', href: '/dashboard/allocation', icon: PieChart },
+  { name:'Performance', href: '/dashboard/performance', icon: TrendingUp },
   { name: 'History', href: '/dashboard/history', icon: History },
   { name: 'Hall of Fame', href: '/dashboard/hall-of-fame', icon: Trophy },
   { name: 'FIRE e Simulazioni', href: '/dashboard/fire-simulations', icon: Flame },

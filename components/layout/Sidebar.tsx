@@ -14,6 +14,7 @@ import {
   Flame,
   Trophy,
   Dices,
+  TrendingUp,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -29,6 +30,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Assets', href: '/dashboard/assets', icon: Wallet },
     { name: 'Allocation', href: '/dashboard/allocation', icon: PieChart },
+    { name: 'Performance', href: '/dashboard/performance', icon: TrendingUp },
     { name: 'History', href: '/dashboard/history', icon: History },
     { name: 'Hall of Fame', href: '/dashboard/hall-of-fame', icon: Trophy },
     { name: 'FIRE e Simulazioni', href: '/dashboard/fire-simulations', icon: Flame },
