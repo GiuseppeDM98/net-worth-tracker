@@ -80,6 +80,9 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
   // Info alert dismissal state
   const [showDrillDownInfo, setShowDrillDownInfo] = useState(true);
 
+  // Responsive state for mobile-specific chart rendering
+  const [isMobile, setIsMobile] = useState(false);
+
   // Refs for auto-scroll on drill-down
   const expensesChartRef = useRef<HTMLDivElement>(null);
   const incomeChartRef = useRef<HTMLDivElement>(null);
@@ -93,6 +96,15 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
     if (dismissed === 'true') {
       setShowDrillDownInfo(false);
     }
+  }, []);
+
+  // Track mobile breakpoint to optimize chart density and legends
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 639px)');
+    const handleChange = () => setIsMobile(media.matches);
+    handleChange();
+    media.addEventListener('change', handleChange);
+    return () => media.removeEventListener('change', handleChange);
   }, []);
 
   // Auto-scroll to the appropriate chart when drill-down changes
@@ -503,6 +515,43 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
     localStorage.setItem('drillDownInfoDismissed', 'true');
   };
 
+  const pieChartHeight = isMobile ? 320 : 500;
+  const pieOuterRadius = isMobile ? 110 : 140;
+  const lineChartHeight = isMobile ? 260 : 350;
+  const xAxisProps = isMobile
+    ? { angle: -45, textAnchor: 'end' as const, height: 60, interval: 0 }
+    : { interval: 'preserveStartEnd' as const };
+  const axisTickProps = { fontSize: isMobile ? 10 : 12 };
+
+  const renderLegendItems = (
+    items: ChartData[],
+    onItemClick?: (item: ChartData) => void,
+    className?: string,
+    maxItems?: number
+  ) => {
+    const filteredItems = items
+      .filter(item => item.percentage >= 5)
+      .sort((a, b) => b.value - a.value);
+    const visibleItems = maxItems ? filteredItems.slice(0, maxItems) : filteredItems;
+    const baseClassName = isMobile ? 'mt-4 flex flex-wrap gap-3' : 'pl-5';
+    return (
+      <div className={`${baseClassName} ${className || ''}`.trim()}>
+        {visibleItems.map((item, index) => (
+          <div
+            key={`legend-item-${index}`}
+            className={`flex items-center gap-2 text-sm ${onItemClick ? 'cursor-pointer' : ''}`}
+            onClick={onItemClick ? () => onItemClick(item) : undefined}
+          >
+            <div className="h-3.5 w-3.5 flex-shrink-0 rounded-sm" style={{ backgroundColor: item.color }} />
+            <span className="text-muted-foreground">
+              {item.name} ({item.percentage.toFixed(1)}%)
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   const expensesByCategoryData = getExpensesByCategory();
   const incomeByCategoryData = getIncomeByCategory();
   const expensesByTypeData = getExpensesByType();
@@ -583,19 +632,19 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
       )}
 
       {/* Charts Grid */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
         {/* Expenses by Category - Interactive Drill-Down */}
         {(expensesByCategoryData.length > 0 || (drillDown.chartType === 'expenses' && drillDown.level !== 'category')) && (
           <Card ref={expensesChartRef} className="md:col-span-2">
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
                   {drillDown.chartType === 'expenses' && drillDown.level !== 'category' && (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={handleBack}
-                      className="gap-1"
+                      className="w-full justify-start gap-1 sm:w-auto"
                     >
                       <ChevronLeft className="h-4 w-4" />
                       Indietro
@@ -614,19 +663,20 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
             <CardContent>
               {/* Level 1: Category Pie Chart */}
               {drillDown.level === 'category' && expensesByCategoryData.length > 0 && (
-                <ResponsiveContainer width="100%" height={500}>
+                <ResponsiveContainer width="100%" height={pieChartHeight}>
                   <RechartsPC>
                     <Pie
                       data={expensesByCategoryData as any}
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={(entry: any) =>
-                        entry.percentage >= 5
-                          ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
-                          : ''
-                      }
-                      outerRadius={140}
+                      label={!isMobile
+                        ? (entry: any) =>
+                          entry.percentage >= 5
+                            ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
+                            : ''
+                        : false}
+                      outerRadius={pieOuterRadius}
                       fill="#8884d8"
                       dataKey="value"
                       onClick={(data: any) => handleCategoryClick(data, 'expenses')}
@@ -649,44 +699,15 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                       }}
                     />
                     <Legend
-                      layout="vertical"
-                      align="right"
-                      verticalAlign="middle"
-                      content={() => {
-                        const filteredData = expensesByCategoryData
-                          .filter(d => d.percentage >= 5)
-                          .sort((a, b) => b.value - a.value);
-                        return (
-                          <div style={{ paddingLeft: '20px' }}>
-                            {filteredData.map((entry, index) => (
-                              <div
-                                key={`legend-item-${index}`}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  marginBottom: '8px',
-                                  fontSize: '14px',
-                                  cursor: 'pointer',
-                                }}
-                                onClick={() => handleCategoryClick(entry, 'expenses')}
-                              >
-                                <div
-                                  style={{
-                                    width: '14px',
-                                    height: '14px',
-                                    backgroundColor: entry.color,
-                                    marginRight: '8px',
-                                    flexShrink: 0,
-                                  }}
-                                />
-                                <span style={{ color: '#374151' }}>
-                                  {entry.name} ({entry.percentage.toFixed(1)}%)
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      }}
+                      layout={isMobile ? 'horizontal' : 'vertical'}
+                      align={isMobile ? 'center' : 'right'}
+                      verticalAlign={isMobile ? 'bottom' : 'middle'}
+                      content={() => renderLegendItems(
+                        expensesByCategoryData,
+                        entry => handleCategoryClick(entry, 'expenses'),
+                        undefined,
+                        isMobile ? 3 : undefined
+                      )}
                     />
                   </RechartsPC>
                 </ResponsiveContainer>
@@ -694,19 +715,20 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
 
               {/* Level 2: Subcategory Pie Chart */}
               {drillDown.level === 'subcategory' && drillDown.chartType === 'expenses' && currentSubcategoriesData.length > 0 && (
-                <ResponsiveContainer width="100%" height={500}>
+                <ResponsiveContainer width="100%" height={pieChartHeight}>
                   <RechartsPC>
                     <Pie
                       data={currentSubcategoriesData as any}
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={(entry: any) =>
-                        entry.percentage >= 5
-                          ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
-                          : ''
-                      }
-                      outerRadius={140}
+                      label={!isMobile
+                        ? (entry: any) =>
+                          entry.percentage >= 5
+                            ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
+                            : ''
+                        : false}
+                      outerRadius={pieOuterRadius}
                       fill="#8884d8"
                       dataKey="value"
                       onClick={(data: any) => handleSubcategoryClick(data)}
@@ -729,44 +751,10 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                       }}
                     />
                     <Legend
-                      layout="vertical"
-                      align="right"
-                      verticalAlign="middle"
-                      content={() => {
-                        const filteredData = currentSubcategoriesData
-                          .filter(d => d.percentage >= 5)
-                          .sort((a, b) => b.value - a.value);
-                        return (
-                          <div style={{ paddingLeft: '20px' }}>
-                            {filteredData.map((entry, index) => (
-                              <div
-                                key={`legend-item-${index}`}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  marginBottom: '8px',
-                                  fontSize: '14px',
-                                  cursor: 'pointer',
-                                }}
-                                onClick={() => handleSubcategoryClick(entry)}
-                              >
-                                <div
-                                  style={{
-                                    width: '14px',
-                                    height: '14px',
-                                    backgroundColor: entry.color,
-                                    marginRight: '8px',
-                                    flexShrink: 0,
-                                  }}
-                                />
-                                <span style={{ color: '#374151' }}>
-                                  {entry.name} ({entry.percentage.toFixed(1)}%)
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      }}
+                      layout={isMobile ? 'horizontal' : 'vertical'}
+                      align={isMobile ? 'center' : 'right'}
+                      verticalAlign={isMobile ? 'bottom' : 'middle'}
+                      content={() => renderLegendItems(currentSubcategoriesData, entry => handleSubcategoryClick(entry))}
                     />
                   </RechartsPC>
                 </ResponsiveContainer>
@@ -775,7 +763,40 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
               {/* Level 3: Expense List */}
               {drillDown.level === 'expenseList' && drillDown.chartType === 'expenses' && currentFilteredExpenses.length > 0 && (
                 <div className="space-y-4">
-                  <div className="rounded-md border">
+                  <div className="space-y-3 sm:hidden">
+                    {currentFilteredExpenses.map((expense) => {
+                      const date = expense.date instanceof Date
+                        ? expense.date
+                        : (expense.date as Timestamp).toDate();
+                      return (
+                        <div key={expense.id} className="rounded-md border p-3">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">
+                              {format(date, 'dd/MM/yyyy', { locale: it })}
+                            </span>
+                            <span className="font-medium text-red-600">
+                              {formatCurrency(expense.amount)}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            {expense.notes || '-'}
+                          </p>
+                          {expense.link && (
+                            <a
+                              href={expense.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-2 inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+                            >
+                              Apri link
+                              <ExternalLink className="h-4 w-4" />
+                            </a>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="hidden rounded-md border sm:block">
                     <div className="max-h-[500px] overflow-y-auto">
                       <table className="w-full">
                         <thead className="sticky top-0 bg-muted/50 border-b">
@@ -840,14 +861,14 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
         {(incomeByCategoryData.length > 0 || (drillDown.chartType === 'income' && drillDown.level !== 'category')) && (
           <Card ref={incomeChartRef} className="md:col-span-2">
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
                   {drillDown.chartType === 'income' && drillDown.level !== 'category' && (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={handleBack}
-                      className="gap-1"
+                      className="w-full justify-start gap-1 sm:w-auto"
                     >
                       <ChevronLeft className="h-4 w-4" />
                       Indietro
@@ -866,19 +887,20 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
             <CardContent>
               {/* Level 1: Category Pie Chart */}
               {drillDown.level === 'category' && incomeByCategoryData.length > 0 && (
-                <ResponsiveContainer width="100%" height={500}>
+                <ResponsiveContainer width="100%" height={pieChartHeight}>
                   <RechartsPC>
                     <Pie
                       data={incomeByCategoryData as any}
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={(entry: any) =>
-                        entry.percentage >= 5
-                          ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
-                          : ''
-                      }
-                      outerRadius={140}
+                      label={!isMobile
+                        ? (entry: any) =>
+                          entry.percentage >= 5
+                            ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
+                            : ''
+                        : false}
+                      outerRadius={pieOuterRadius}
                       fill="#8884d8"
                       dataKey="value"
                       onClick={(data: any) => handleCategoryClick(data, 'income')}
@@ -901,44 +923,10 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                       }}
                     />
                     <Legend
-                      layout="vertical"
-                      align="right"
-                      verticalAlign="middle"
-                      content={() => {
-                        const filteredData = incomeByCategoryData
-                          .filter(d => d.percentage >= 5)
-                          .sort((a, b) => b.value - a.value);
-                        return (
-                          <div style={{ paddingLeft: '20px' }}>
-                            {filteredData.map((entry, index) => (
-                              <div
-                                key={`legend-item-${index}`}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  marginBottom: '8px',
-                                  fontSize: '14px',
-                                  cursor: 'pointer',
-                                }}
-                                onClick={() => handleCategoryClick(entry, 'income')}
-                              >
-                                <div
-                                  style={{
-                                    width: '14px',
-                                    height: '14px',
-                                    backgroundColor: entry.color,
-                                    marginRight: '8px',
-                                    flexShrink: 0,
-                                  }}
-                                />
-                                <span style={{ color: '#374151' }}>
-                                  {entry.name} ({entry.percentage.toFixed(1)}%)
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      }}
+                      layout={isMobile ? 'horizontal' : 'vertical'}
+                      align={isMobile ? 'center' : 'right'}
+                      verticalAlign={isMobile ? 'bottom' : 'middle'}
+                      content={() => renderLegendItems(incomeByCategoryData, entry => handleCategoryClick(entry, 'income'))}
                     />
                   </RechartsPC>
                 </ResponsiveContainer>
@@ -946,19 +934,20 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
 
               {/* Level 2: Subcategory Pie Chart */}
               {drillDown.level === 'subcategory' && drillDown.chartType === 'income' && currentSubcategoriesData.length > 0 && (
-                <ResponsiveContainer width="100%" height={500}>
+                <ResponsiveContainer width="100%" height={pieChartHeight}>
                   <RechartsPC>
                     <Pie
                       data={currentSubcategoriesData as any}
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={(entry: any) =>
-                        entry.percentage >= 5
-                          ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
-                          : ''
-                      }
-                      outerRadius={140}
+                      label={!isMobile
+                        ? (entry: any) =>
+                          entry.percentage >= 5
+                            ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
+                            : ''
+                        : false}
+                      outerRadius={pieOuterRadius}
                       fill="#8884d8"
                       dataKey="value"
                       onClick={(data: any) => handleSubcategoryClick(data)}
@@ -981,44 +970,10 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                       }}
                     />
                     <Legend
-                      layout="vertical"
-                      align="right"
-                      verticalAlign="middle"
-                      content={() => {
-                        const filteredData = currentSubcategoriesData
-                          .filter(d => d.percentage >= 5)
-                          .sort((a, b) => b.value - a.value);
-                        return (
-                          <div style={{ paddingLeft: '20px' }}>
-                            {filteredData.map((entry, index) => (
-                              <div
-                                key={`legend-item-${index}`}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  marginBottom: '8px',
-                                  fontSize: '14px',
-                                  cursor: 'pointer',
-                                }}
-                                onClick={() => handleSubcategoryClick(entry)}
-                              >
-                                <div
-                                  style={{
-                                    width: '14px',
-                                    height: '14px',
-                                    backgroundColor: entry.color,
-                                    marginRight: '8px',
-                                    flexShrink: 0,
-                                  }}
-                                />
-                                <span style={{ color: '#374151' }}>
-                                  {entry.name} ({entry.percentage.toFixed(1)}%)
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      }}
+                      layout={isMobile ? 'horizontal' : 'vertical'}
+                      align={isMobile ? 'center' : 'right'}
+                      verticalAlign={isMobile ? 'bottom' : 'middle'}
+                      content={() => renderLegendItems(currentSubcategoriesData, entry => handleSubcategoryClick(entry))}
                     />
                   </RechartsPC>
                 </ResponsiveContainer>
@@ -1027,7 +982,40 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
               {/* Level 3: Expense List */}
               {drillDown.level === 'expenseList' && drillDown.chartType === 'income' && currentFilteredExpenses.length > 0 && (
                 <div className="space-y-4">
-                  <div className="rounded-md border">
+                  <div className="space-y-3 sm:hidden">
+                    {currentFilteredExpenses.map((expense) => {
+                      const date = expense.date instanceof Date
+                        ? expense.date
+                        : (expense.date as Timestamp).toDate();
+                      return (
+                        <div key={expense.id} className="rounded-md border p-3">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">
+                              {format(date, 'dd/MM/yyyy', { locale: it })}
+                            </span>
+                            <span className="font-medium text-green-600">
+                              {formatCurrency(expense.amount)}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            {expense.notes || '-'}
+                          </p>
+                          {expense.link && (
+                            <a
+                              href={expense.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-2 inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+                            >
+                              Apri link
+                              <ExternalLink className="h-4 w-4" />
+                            </a>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="hidden rounded-md border sm:block">
                     <div className="max-h-[500px] overflow-y-auto">
                       <table className="w-full">
                         <thead className="sticky top-0 bg-muted/50 border-b">
@@ -1095,19 +1083,20 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
               <CardTitle>Spese per Tipo</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={500}>
+              <ResponsiveContainer width="100%" height={pieChartHeight}>
                 <RechartsPC>
                   <Pie
                     data={expensesByTypeData as any}
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={(entry: any) =>
-                      entry.percentage >= 5
-                        ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
-                        : ''
-                    }
-                    outerRadius={140}
+                    label={!isMobile
+                      ? (entry: any) =>
+                        entry.percentage >= 5
+                          ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
+                          : ''
+                      : false}
+                    outerRadius={pieOuterRadius}
                     fill="#8884d8"
                     dataKey="value"
                   >
@@ -1124,42 +1113,10 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                     }}
                   />
                   <Legend
-                    layout="vertical"
-                    align="right"
-                    verticalAlign="middle"
-                    content={() => {
-                      const filteredData = expensesByTypeData
-                        .filter(d => d.percentage >= 5)
-                        .sort((a, b) => b.value - a.value);
-                      return (
-                        <div style={{ paddingLeft: '20px' }}>
-                          {filteredData.map((entry, index) => (
-                            <div
-                              key={`legend-item-${index}`}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                marginBottom: '8px',
-                                fontSize: '14px',
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: '14px',
-                                  height: '14px',
-                                  backgroundColor: entry.color,
-                                  marginRight: '8px',
-                                  flexShrink: 0,
-                                }}
-                              />
-                              <span style={{ color: '#374151' }}>
-                                {entry.name} ({entry.percentage.toFixed(1)}%)
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    }}
+                    layout={isMobile ? 'horizontal' : 'vertical'}
+                    align={isMobile ? 'center' : 'right'}
+                    verticalAlign={isMobile ? 'bottom' : 'middle'}
+                    content={() => renderLegendItems(expensesByTypeData)}
                   />
                 </RechartsPC>
               </ResponsiveContainer>
@@ -1183,11 +1140,11 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
               </div>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
+              <ResponsiveContainer width="100%" height={lineChartHeight}>
                 {showMonthlyTrendPercentage ? (
                   <LineChart data={monthlyTrendData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
+                    <XAxis dataKey="month" tick={axisTickProps} {...xAxisProps} />
                     <YAxis tickFormatter={(value) => `${value.toFixed(0)}%`} domain={[0, 100]} />
                     <Tooltip
                       formatter={(value: number) => `${value.toFixed(2)}%`}
@@ -1205,7 +1162,7 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                 ) : (
                   <LineChart data={monthlyTrendData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
+                    <XAxis dataKey="month" tick={axisTickProps} {...xAxisProps} />
                     <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                     <Tooltip
                       formatter={(value: number) => formatCurrency(value)}
@@ -1233,10 +1190,10 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
               <CardTitle>Trend Mensile Spese per Tipo</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
+              <ResponsiveContainer width="100%" height={lineChartHeight}>
                 <LineChart data={monthlyExpensesByType.data}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
+                  <XAxis dataKey="month" tick={axisTickProps} {...xAxisProps} />
                   <YAxis tickFormatter={(value) => `€${value.toLocaleString('it-IT')}`} />
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
@@ -1263,10 +1220,10 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
               <CardTitle>Trend Mensile Spese per Categoria (Top 5)</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
+              <ResponsiveContainer width="100%" height={lineChartHeight}>
                 <LineChart data={monthlyExpensesByCategory.data}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
+                  <XAxis dataKey="month" tick={axisTickProps} {...xAxisProps} />
                   <YAxis tickFormatter={(value) => `€${value.toLocaleString('it-IT')}`} />
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
@@ -1299,10 +1256,10 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
               <CardTitle>Trend Mensile Entrate per Categoria (Top 5)</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
+              <ResponsiveContainer width="100%" height={lineChartHeight}>
                 <LineChart data={monthlyIncomeByCategory.data}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
+                  <XAxis dataKey="month" tick={axisTickProps} {...xAxisProps} />
                   <YAxis tickFormatter={(value) => `€${value.toLocaleString('it-IT')}`} />
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
