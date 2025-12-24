@@ -1,10 +1,8 @@
 'use client';
 
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
 import { Expense, ExpenseCategory, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
-import { getAllExpenses, getExpensesByMonth, getExpensesByDateRange, calculateTotalIncome, calculateTotalExpenses, calculateNetBalance, calculateIncomeExpenseRatio } from '@/lib/services/expenseService';
-import { getAllCategories } from '@/lib/services/expenseCategoryService';
+import { calculateTotalIncome, calculateTotalExpenses, calculateNetBalance, calculateIncomeExpenseRatio } from '@/lib/services/expenseService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,9 +10,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Plus, TrendingUp, TrendingDown, Wallet, RefreshCw, Filter, ChevronDown, Scale, Check, X } from 'lucide-react';
-import { toast } from 'sonner';
 import { ExpenseDialog } from '@/components/expenses/ExpenseDialog';
 import { ExpenseTable } from '@/components/expenses/ExpenseTable';
+import { ExpenseCard } from '@/components/expenses/ExpenseCard';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 const MONTHS = [
@@ -32,13 +31,17 @@ const MONTHS = [
   { value: '12', label: 'Dicembre' },
 ];
 
-export function ExpenseTrackingTab() {
-  const { user } = useAuth();
+interface ExpenseTrackingTabProps {
+  allExpenses: Expense[];
+  categories: ExpenseCategory[];
+  loading: boolean;
+  onRefresh: () => Promise<void>;
+}
+
+export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh }: ExpenseTrackingTabProps) {
   const currentYear = new Date().getFullYear();
   const currentMonth = String(new Date().getMonth() + 1); // 1-based month (1-12)
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [allExpenses, setAllExpenses] = useState<Expense[]>([]); // Keep all expenses for year calculation
-  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
@@ -49,7 +52,6 @@ export function ExpenseTrackingTab() {
   const [selectedType, setSelectedType] = useState<string>('all');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [selectedSubCategoryId, setSelectedSubCategoryId] = useState<string>('all');
-  const [categories, setCategories] = useState<ExpenseCategory[]>([]);
 
   // Search states for comboboxes
   const [searchQueryType, setSearchQueryType] = useState<string>('');
@@ -149,26 +151,26 @@ export function ExpenseTrackingTab() {
   // Check if any filter is active
   const hasActiveFilters = selectedMonth !== 'all' || selectedType !== 'all' || selectedCategoryId !== 'all' || selectedSubCategoryId !== 'all';
 
-  // Load categories
+  // Filter expenses based on selectedYear and selectedMonth (in-memory filtering)
   useEffect(() => {
-    if (user) {
-      loadCategories();
+    if (!allExpenses.length) {
+      setExpenses([]);
+      return;
     }
-  }, [user]);
 
-  // Load all expenses in background to get available years
-  useEffect(() => {
-    if (user) {
-      loadAllExpensesForYears();
-    }
-  }, [user]);
+    const filtered = allExpenses.filter(expense => {
+      const date = expense.date instanceof Date ? expense.date : expense.date.toDate();
+      const expenseYear = date.getFullYear();
+      const expenseMonth = date.getMonth() + 1; // 1-based
 
-  // Load filtered expenses based on selected year and month
-  useEffect(() => {
-    if (user) {
-      loadExpenses();
-    }
-  }, [user, selectedYear, selectedMonth]);
+      if (expenseYear !== selectedYear) return false;
+      if (selectedMonth !== 'all' && expenseMonth !== parseInt(selectedMonth)) return false;
+
+      return true;
+    });
+
+    setExpenses(filtered);
+  }, [allExpenses, selectedYear, selectedMonth]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -188,55 +190,6 @@ export function ExpenseTrackingTab() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const loadCategories = async () => {
-    if (!user) return;
-
-    try {
-      const data = await getAllCategories(user.uid);
-      setCategories(data);
-    } catch (error) {
-      console.error('Error loading categories:', error);
-      toast.error('Errore nel caricamento delle categorie');
-    }
-  };
-
-  const loadAllExpensesForYears = async () => {
-    if (!user) return;
-
-    try {
-      const data = await getAllExpenses(user.uid);
-      setAllExpenses(data);
-    } catch (error) {
-      console.error('Error loading all expenses for years:', error);
-    }
-  };
-
-  const loadExpenses = async () => {
-    if (!user) return;
-
-    try {
-      setLoading(true);
-      let data: Expense[];
-
-      if (selectedMonth !== 'all') {
-        // Filter by specific month and year
-        data = await getExpensesByMonth(user.uid, selectedYear, parseInt(selectedMonth));
-      } else {
-        // Filter by year only
-        const startDate = new Date(selectedYear, 0, 1);
-        const endDate = new Date(selectedYear, 11, 31, 23, 59, 59);
-        data = await getExpensesByDateRange(user.uid, startDate, endDate);
-      }
-
-      setExpenses(data);
-    } catch (error) {
-      console.error('Error loading expenses:', error);
-      toast.error('Errore nel caricamento delle spese');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleAddExpense = () => {
     setEditingExpense(null);
     setDialogOpen(true);
@@ -253,10 +206,97 @@ export function ExpenseTrackingTab() {
   };
 
   const handleSuccess = async () => {
-    // Reload filtered expenses
-    await loadExpenses();
-    // Also reload all expenses to update available years
-    await loadAllExpensesForYears();
+    // Trigger parent refresh (re-fetch all data)
+    await onRefresh();
+  };
+
+  /**
+   * Handle expense deletion with smart confirmations
+   * Reused logic from ExpenseTable.tsx
+   */
+  const handleDeleteExpense = async (expense: Expense) => {
+    // Check if this is an installment expense
+    if (expense.isInstallment && expense.installmentParentId) {
+      const confirmMessage =
+        `Questa è la rata ${expense.installmentNumber}/${expense.installmentTotal}. Vuoi eliminare:\n\n` +
+        `[SOLO QUESTA RATA] - Solo questa rata singola\n` +
+        `[TUTTE LE RATE] - Tutte le ${expense.installmentTotal} rate\n\n` +
+        `Clicca OK per eliminare solo questa rata, Annulla per tornare indietro.`;
+
+      const deleteSingle = window.confirm(confirmMessage);
+
+      if (deleteSingle) {
+        await deleteSingleExpense(expense.id);
+      } else {
+        const deleteAll = window.confirm(`Vuoi eliminare TUTTE le ${expense.installmentTotal} rate?`);
+        if (deleteAll) {
+          await deleteAllInstallmentExpenses(expense.installmentParentId);
+        }
+      }
+    }
+    // Check if this is a recurring expense
+    else if (expense.isRecurring && expense.recurringParentId) {
+      const confirmMessage =
+        `Questa è una voce ricorrente. Vuoi eliminare:\n\n` +
+        `[SOLO QUESTA] - Solo questa voce singola\n` +
+        `[TUTTE] - Tutte le voci ricorrenti correlate\n\n` +
+        `Clicca OK per eliminare solo questa, Annulla per tornare indietro.`;
+
+      const deleteSingle = window.confirm(confirmMessage);
+
+      if (deleteSingle) {
+        await deleteSingleExpense(expense.id);
+      } else {
+        const deleteAll = window.confirm('Vuoi eliminare TUTTE le voci ricorrenti correlate?');
+        if (deleteAll) {
+          await deleteAllRecurringExpenses(expense.recurringParentId);
+        }
+      }
+    } else {
+      // Regular expense
+      const confirmDelete = window.confirm(
+        `Sei sicuro di voler eliminare questa voce?${expense.notes ? `\n\n"${expense.notes}"` : ''}`
+      );
+      if (confirmDelete) {
+        await deleteSingleExpense(expense.id);
+      }
+    }
+  };
+
+  const deleteSingleExpense = async (expenseId: string) => {
+    try {
+      const { deleteExpense } = await import('@/lib/services/expenseService');
+      await deleteExpense(expenseId);
+      toast.success('Voce eliminata con successo');
+      await onRefresh();
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+      toast.error("Errore nell'eliminazione della voce");
+    }
+  };
+
+  const deleteAllRecurringExpenses = async (recurringParentId: string) => {
+    try {
+      const { deleteRecurringExpenses } = await import('@/lib/services/expenseService');
+      await deleteRecurringExpenses(recurringParentId);
+      toast.success('Tutte le voci ricorrenti sono state eliminate');
+      await onRefresh();
+    } catch (error) {
+      console.error('Error deleting recurring expenses:', error);
+      toast.error("Errore nell'eliminazione delle voci ricorrenti");
+    }
+  };
+
+  const deleteAllInstallmentExpenses = async (installmentParentId: string) => {
+    try {
+      const { deleteInstallmentExpenses } = await import('@/lib/services/expenseService');
+      await deleteInstallmentExpenses(installmentParentId);
+      toast.success('Tutte le rate sono state eliminate');
+      await onRefresh();
+    } catch (error) {
+      console.error('Error deleting installment expenses:', error);
+      toast.error("Errore nell'eliminazione delle rate");
+    }
   };
 
   const formatCurrency = (amount: number): string => {
@@ -391,11 +431,20 @@ export function ExpenseTrackingTab() {
             Gestisci le tue entrate e uscite
           </p>
         </div>
-        <Button onClick={handleAddExpense}>
+        <Button onClick={handleAddExpense} className="hidden sm:flex">
           <Plus className="mr-2 h-4 w-4" />
           Nuova Spesa
         </Button>
       </div>
+
+      {/* Mobile FAB - Fixed bottom-right */}
+      <Button
+        onClick={handleAddExpense}
+        className="fixed bottom-24 right-4 z-40 h-14 w-14 rounded-full shadow-lg sm:hidden"
+        aria-label="Nuova Spesa"
+      >
+        <Plus className="h-6 w-6" />
+      </Button>
 
       {/* Statistics Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -770,7 +819,7 @@ export function ExpenseTrackingTab() {
         </Card>
       </Collapsible>
 
-      {/* Expenses Table */}
+      {/* Expenses - Desktop Table / Mobile Cards */}
       <Card>
         <CardHeader>
           <CardTitle>
@@ -780,11 +829,42 @@ export function ExpenseTrackingTab() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ExpenseTable
-            expenses={filteredExpenses}
-            onEdit={handleEditExpense}
-            onRefresh={loadExpenses}
-          />
+          {/* Desktop: Table */}
+          <div className="hidden md:block">
+            <ExpenseTable
+              expenses={filteredExpenses}
+              onEdit={handleEditExpense}
+              onRefresh={onRefresh}
+            />
+          </div>
+
+          {/* Mobile: Cards */}
+          <div className="md:hidden space-y-3">
+            {filteredExpenses.length === 0 ? (
+              <div className="rounded-md border border-dashed p-8 text-center">
+                <p className="text-muted-foreground">Nessuna voce trovata</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Clicca su "Nuova Spesa" per aggiungere la prima voce
+                </p>
+              </div>
+            ) : (
+              <>
+                {filteredExpenses.slice(0, 20).map((expense) => (
+                  <ExpenseCard
+                    key={expense.id}
+                    expense={expense}
+                    onEdit={handleEditExpense}
+                    onDelete={handleDeleteExpense}
+                  />
+                ))}
+                {filteredExpenses.length > 20 && (
+                  <p className="text-sm text-muted-foreground text-center pt-2">
+                    Visualizzate 20 di {filteredExpenses.length} voci. Usa i filtri per ridurre i risultati.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
         </CardContent>
       </Card>
 

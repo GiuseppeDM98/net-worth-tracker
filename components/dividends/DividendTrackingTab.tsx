@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Dividend, DividendType } from '@/types/dividend';
 import { Asset } from '@/types/assets';
-import { getAllAssets } from '@/lib/services/assetService';
 import { DividendDialog } from './DividendDialog';
 import { DividendTable } from './DividendTable';
 import { DividendStats } from './DividendStats';
@@ -31,12 +30,16 @@ const dividendTypeLabels: Record<DividendType, string> = {
   final: 'Finale',
 };
 
-export function DividendTrackingTab() {
+interface DividendTrackingTabProps {
+  dividends: Dividend[];
+  assets: Asset[];
+  loading: boolean;
+  onRefresh: () => Promise<void>;
+}
+
+export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: DividendTrackingTabProps) {
   const { user } = useAuth();
-  const [dividends, setDividends] = useState<Dividend[]>([]);
   const [filteredDividends, setFilteredDividends] = useState<Dividend[]>([]);
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [loading, setLoading] = useState(true);
   const [scraping, setScraping] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedDividend, setSelectedDividend] = useState<Dividend | null>(null);
@@ -47,50 +50,10 @@ export function DividendTrackingTab() {
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
 
-  useEffect(() => {
-    if (user) {
-      loadData();
-    }
-  }, [user]);
-
   // Apply filters whenever dividends or filter values change
   useEffect(() => {
     applyFilters();
   }, [dividends, assetFilter, typeFilter, startDate, endDate]);
-
-  const loadData = async () => {
-    if (!user) return;
-
-    try {
-      setLoading(true);
-      const [dividendsData, assetsData] = await Promise.all([
-        fetchDividends(),
-        getAllAssets(user.uid),
-      ]);
-
-      setDividends(dividendsData);
-      setAssets(assetsData.filter((a) => a.assetClass === 'equity'));
-    } catch (error) {
-      console.error('Error loading data:', error);
-      toast.error('Errore nel caricamento dei dati');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchDividends = async (): Promise<Dividend[]> => {
-    if (!user) throw new Error('User not authenticated');
-
-    const response = await fetch(`/api/dividends?userId=${user.uid}`);
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Errore nel caricamento dei dividendi');
-    }
-
-    const data = await response.json();
-    return data.dividends || [];
-  };
 
   const applyFilters = () => {
     let filtered = [...dividends];
@@ -132,8 +95,8 @@ export function DividendTrackingTab() {
     setSelectedDividend(null);
   };
 
-  const handleDialogSuccess = () => {
-    loadData();
+  const handleDialogSuccess = async () => {
+    await onRefresh();
   };
 
   const handleScrapeAll = async () => {
@@ -187,7 +150,7 @@ export function DividendTrackingTab() {
 
       if (successCount > 0) {
         toast.success(`Scaricati dividendi per ${successCount} asset`);
-        loadData();
+        await onRefresh();
       } else {
         toast.warning('Nessun nuovo dividendo trovato');
       }
@@ -425,7 +388,7 @@ export function DividendTrackingTab() {
       <DividendTable
         dividends={filteredDividends}
         onEdit={handleEdit}
-        onRefresh={loadData}
+        onRefresh={onRefresh}
       />
 
       {/* Dividend Dialog */}

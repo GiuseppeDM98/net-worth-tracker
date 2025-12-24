@@ -1,14 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useState } from 'react';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
-import { getAllExpenses, calculateIncomeExpenseRatio } from '@/lib/services/expenseService';
+import { calculateIncomeExpenseRatio } from '@/lib/services/expenseService';
 import { Timestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
-import { toast } from 'sonner';
 import {
   ResponsiveContainer,
   Tooltip,
@@ -38,41 +36,22 @@ const COLORS = [
   '#14b8a6', // teal
 ];
 
-export function TotalHistoryTab() {
-  const { user } = useAuth();
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [loading, setLoading] = useState(true);
+interface TotalHistoryTabProps {
+  allExpenses: Expense[];
+  loading: boolean;
+  onRefresh: () => Promise<void>;
+}
 
+export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) {
   // Percentage toggles for trend charts
   const [showMonthlyTrendPercentage, setShowMonthlyTrendPercentage] = useState(false);
   const [showYearlyTrendPercentage, setShowYearlyTrendPercentage] = useState(false);
-
-  useEffect(() => {
-    if (user) {
-      loadExpenses();
-    }
-  }, [user]);
-
-  const loadExpenses = async () => {
-    if (!user) return;
-
-    try {
-      setLoading(true);
-      const data = await getAllExpenses(user.uid);
-      setExpenses(data);
-    } catch (error) {
-      console.error('Error loading expenses:', error);
-      toast.error('Errore nel caricamento delle spese');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Prepare monthly trend data (all years, all months)
   const getMonthlyTrend = () => {
     const monthlyMap = new Map<string, { income: number; expenses: number; sortKey: string }>();
 
-    expenses.forEach((expense: Expense) => {
+    allExpenses.forEach((expense: Expense) => {
       const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
       const monthKey = `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getFullYear()).slice(-2)}`;
       const sortKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -115,7 +94,7 @@ export function TotalHistoryTab() {
   const getYearlyTrend = () => {
     const yearlyMap = new Map<number, { income: number; expenses: number }>();
 
-    expenses.forEach((expense: Expense) => {
+    allExpenses.forEach((expense: Expense) => {
       const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
       const year = date.getFullYear();
 
@@ -156,7 +135,7 @@ export function TotalHistoryTab() {
   const getMonthlyExpensesByType = () => {
     const monthlyMap = new Map<string, Record<string, number | string>>();
 
-    expenses
+    allExpenses
       .filter((e: Expense) => e.type !== 'income')
       .forEach((expense: Expense) => {
         const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
@@ -186,7 +165,7 @@ export function TotalHistoryTab() {
   const getYearlyExpensesByType = () => {
     const yearlyMap = new Map<number, Record<string, number>>();
 
-    expenses
+    allExpenses
       .filter((e: Expense) => e.type !== 'income')
       .forEach((expense: Expense) => {
         const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
@@ -215,7 +194,7 @@ export function TotalHistoryTab() {
   const getMonthlyExpensesByCategory = () => {
     // First, get top 5 expense categories overall
     const categoryTotals = new Map<string, number>();
-    expenses
+    allExpenses
       .filter((e: Expense) => e.type !== 'income')
       .forEach((expense: Expense) => {
         const current = categoryTotals.get(expense.categoryName) || 0;
@@ -230,7 +209,7 @@ export function TotalHistoryTab() {
     // Now build monthly data
     const monthlyMap = new Map<string, Record<string, number | string>>();
 
-    expenses
+    allExpenses
       .filter((e: Expense) => e.type !== 'income')
       .forEach((expense: Expense) => {
         const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
@@ -262,7 +241,7 @@ export function TotalHistoryTab() {
   const getYearlyExpensesByCategory = () => {
     // First, get top 5 expense categories overall
     const categoryTotals = new Map<string, number>();
-    expenses
+    allExpenses
       .filter((e: Expense) => e.type !== 'income')
       .forEach((expense: Expense) => {
         const current = categoryTotals.get(expense.categoryName) || 0;
@@ -277,7 +256,7 @@ export function TotalHistoryTab() {
     // Now build yearly data
     const yearlyMap = new Map<number, Record<string, number>>();
 
-    expenses
+    allExpenses
       .filter((e: Expense) => e.type !== 'income')
       .forEach((expense: Expense) => {
         const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
@@ -308,7 +287,7 @@ export function TotalHistoryTab() {
   const getMonthlyIncomeByCategory = () => {
     // First, get top 5 income categories overall
     const categoryTotals = new Map<string, number>();
-    expenses
+    allExpenses
       .filter((e: Expense) => e.type === 'income')
       .forEach((expense: Expense) => {
         const current = categoryTotals.get(expense.categoryName) || 0;
@@ -323,7 +302,7 @@ export function TotalHistoryTab() {
     // Now build monthly data
     const monthlyMap = new Map<string, Record<string, number | string>>();
 
-    expenses
+    allExpenses
       .filter((e: Expense) => e.type === 'income')
       .forEach((expense: Expense) => {
         const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
@@ -355,7 +334,7 @@ export function TotalHistoryTab() {
   const getYearlyIncomeByCategory = () => {
     // First, get top 5 income categories overall
     const categoryTotals = new Map<string, number>();
-    expenses
+    allExpenses
       .filter((e: Expense) => e.type === 'income')
       .forEach((expense: Expense) => {
         const current = categoryTotals.get(expense.categoryName) || 0;
@@ -370,7 +349,7 @@ export function TotalHistoryTab() {
     // Now build yearly data
     const yearlyMap = new Map<number, Record<string, number>>();
 
-    expenses
+    allExpenses
       .filter((e: Expense) => e.type === 'income')
       .forEach((expense: Expense) => {
         const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
@@ -402,7 +381,7 @@ export function TotalHistoryTab() {
     const yearlyMap = new Map<number, Expense[]>();
 
     // Group expenses by year
-    expenses.forEach((expense: Expense) => {
+    allExpenses.forEach((expense: Expense) => {
       const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
       const year = date.getFullYear();
 
@@ -451,7 +430,7 @@ export function TotalHistoryTab() {
     );
   }
 
-  if (expenses.length === 0) {
+  if (allExpenses.length === 0) {
     return (
       <div className="p-8">
         <div className="text-center">

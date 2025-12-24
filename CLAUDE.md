@@ -31,6 +31,12 @@ Replace spreadsheet-based portfolio management with a modern, automated solution
 - Advanced hierarchical filtering system (Type → Category → Subcategory)
 - Visual analytics: interactive three-level drill-down charts
 - Income-to-expense ratio metric with financial health indicators
+- **React Query Integration:**
+  - Automatic data caching with `useExpenses()` and `useExpenseCategories()` hooks
+  - Prevents duplicate API requests across tabs
+  - Auto-refetch on window focus for data freshness
+  - Global cache invalidation on create/edit/delete operations
+  - Query keys centralized in `lib/query/queryKeys.ts`
 
 **FIRE Calculator & Tracker:**
 - Safe Withdrawal Rate configuration (4% rule based on Trinity Study)
@@ -148,6 +154,24 @@ Replace spreadsheet-based portfolio management with a modern, automated solution
 - Intelligent responsive behavior across Desktop, Mobile Landscape, and Mobile Portrait
 - Preserved backward compatibility for desktop and landscape modes
 - **Hall of Fame mobile UI**: Card layout replaces tables on mobile portrait (<768px) with MonthlyRecordCard and YearlyRecordCard components for zero horizontal scroll
+- **Cashflow Page Mobile Optimizations:**
+  - **Mobile card layout** (<768px): Compact `ExpenseCard` component with collapsible details
+    - Always visible: Date, Type badge, Amount with icon
+    - Collapsible: Notes, installment info, external links
+    - Smart delete confirmations for recurring/installment expenses
+  - **FAB button** (<640px): Floating Action Button for "Nuova Spesa" fixed bottom-right
+    - Position: `fixed bottom-24 right-4` (avoids bottom navigation overlap)
+    - Size: 56×56px (standard FAB, touch-friendly)
+    - Desktop: Traditional top-right button with icon + text
+  - **Icon-only tabs** (<640px): Compact tab navigation showing only icons
+    - 4 tabs: Tracciamento (Receipt), Dividendi (Coins), Anno Corrente (Trending Up), Storico Totale (Bar Chart)
+    - Desktop (≥640px): Full icon + text labels
+    - Saves ~60px width per tab on mobile
+  - **Dialog spacing optimization**: Responsive form spacing in `ExpenseDialog`
+    - Mobile (<640px): `space-y-4` (16px gaps) reduces total height by ~208px (17%)
+    - Desktop (≥640px): `space-y-6` (24px gaps) maintains readability
+    - Improves UX when mobile keyboard is visible
+  - **Responsive breakpoint**: `sm` (640px) consistent across all optimizations
 
 **Localization:**
 - 🇮🇹 Fully Italian UI
@@ -183,6 +207,7 @@ Replace spreadsheet-based portfolio management with a modern, automated solution
 | **Price Data** | yahoo-finance2 | 3.10.1 | Financial price API from Yahoo Finance |
 | **Charts** | Recharts | 3.3.0 | Interactive charts and visualizations |
 | **HTML Parsing** | cheerio | 1.0.0 | Lightweight HTML parsing for Borsa Italiana dividend scraping (serverless-compatible) |
+| **State Management** | @tanstack/react-query | 5.x | Data fetching, caching, server state management |
 | **Form Management** | react-hook-form | 7.66.0 | Form handling |
 | **Validation** | zod | 4.1.12 | Schema validation |
 | **Date Utilities** | date-fns | 4.1.0 | Date manipulation (Italian locale) |

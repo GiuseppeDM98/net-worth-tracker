@@ -387,7 +387,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
           {/* Tipo di Voce */}
           <div className="space-y-2">
             <Label htmlFor="type">Tipo di Voce *</Label>
