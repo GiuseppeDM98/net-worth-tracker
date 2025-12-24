@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Asset, MonthlySnapshot } from '@/types/assets';
+import { MonthlySnapshot } from '@/types/assets';
 import {
-  getAllAssets,
   calculateTotalValue,
   calculateLiquidNetWorth,
   calculateIlliquidNetWorth,
@@ -21,10 +20,8 @@ import {
   prepareAssetClassDistributionData,
   prepareAssetDistributionData,
 } from '@/lib/services/chartService';
-import { getUserSnapshots, calculateMonthlyChange, calculateYearlyChange } from '@/lib/services/snapshotService';
-import { getExpenseStats } from '@/lib/services/expenseService';
+import { calculateMonthlyChange, calculateYearlyChange } from '@/lib/services/snapshotService';
 import { updateHallOfFame } from '@/lib/services/hallOfFameService';
-import { ExpenseStats } from '@/types/expenses';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PieChart as PieChartComponent } from '@/components/ui/pie-chart';
 import { Button } from '@/components/ui/button';
@@ -38,112 +35,110 @@ import {
 } from '@/components/ui/dialog';
 import { Wallet, TrendingUp, PieChart, DollarSign, Camera, TrendingDown, Receipt } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAssets } from '@/lib/hooks/useAssets';
+import { useSnapshots } from '@/lib/hooks/useSnapshots';
+import { useExpenseStats } from '@/lib/hooks/useExpenseStats';
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  // React Query hooks - automatic parallel data fetching with caching
+  const { data: assets = [], isLoading: loadingAssets } = useAssets(user?.uid);
+  const { data: snapshots = [], isLoading: loadingSnapshots } = useSnapshots(user?.uid);
+  const { data: expenseStats, isLoading: loadingExpenses } = useExpenseStats(user?.uid);
+
+  const loading = loadingAssets || loadingSnapshots;
+
   const [creatingSnapshot, setCreatingSnapshot] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [existingSnapshot, setExistingSnapshot] = useState<MonthlySnapshot | null>(null);
-  const [monthlyVariation, setMonthlyVariation] = useState<{
-    value: number;
-    percentage: number;
-  } | null>(null);
-  const [yearlyVariation, setYearlyVariation] = useState<{
-    value: number;
-    percentage: number;
-  } | null>(null);
-  const [expenseStats, setExpenseStats] = useState<ExpenseStats | null>(null);
-  const [loadingExpenses, setLoadingExpenses] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      loadAssets();
-      loadExpenseStats();
+  // Memoize portfolio calculations
+  const portfolioMetrics = useMemo(() => ({
+    totalValue: calculateTotalValue(assets),
+    liquidNetWorth: calculateLiquidNetWorth(assets),
+    illiquidNetWorth: calculateIlliquidNetWorth(assets),
+    assetCount: assets.length,
+    unrealizedGains: calculateTotalUnrealizedGains(assets),
+    estimatedTaxes: calculateTotalEstimatedTaxes(assets),
+    liquidEstimatedTaxes: calculateLiquidEstimatedTaxes(assets),
+    grossTotal: calculateGrossTotal(assets),
+    netTotal: calculateNetTotal(assets),
+    portfolioTER: calculatePortfolioWeightedTER(assets),
+    annualPortfolioCost: calculateAnnualPortfolioCost(assets),
+  }), [assets]);
+
+  // Memoize variation calculations
+  const variations = useMemo(() => {
+    if (snapshots.length === 0) return { monthly: null, yearly: null };
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+
+    // Check if a snapshot exists for the current month
+    const currentMonthSnapshot = snapshots.find(
+      (s) => s.year === currentYear && s.month === currentMonth
+    );
+
+    let currentNetWorth: number;
+    let previousSnapshot: MonthlySnapshot | null;
+
+    if (currentMonthSnapshot) {
+      // Use the current month's snapshot
+      currentNetWorth = currentMonthSnapshot.totalNetWorth;
+      // Previous month is the second-to-last snapshot
+      previousSnapshot = snapshots.length > 1
+        ? snapshots[snapshots.length - 2]
+        : null;
+    } else {
+      // No current month snapshot, use live portfolio value
+      currentNetWorth = portfolioMetrics.totalValue;
+      // Previous month is the most recent snapshot
+      previousSnapshot = snapshots[snapshots.length - 1];
     }
-  }, [user]);
 
-  const loadAssets = async () => {
-    if (!user) return;
+    const monthlyVariation = previousSnapshot
+      ? calculateMonthlyChange(currentNetWorth, previousSnapshot)
+      : null;
 
-    try {
-      setLoading(true);
-      const data = await getAllAssets(user.uid);
-      setAssets(data);
+    const yearlyVariation = calculateYearlyChange(currentNetWorth, snapshots);
 
-      // Calculate monthly variation
-      const snapshots = await getUserSnapshots(user.uid);
-      if (snapshots.length > 0) {
-        const now = new Date();
-        const currentYear = now.getFullYear();
-        const currentMonth = now.getMonth() + 1;
+    return { monthly: monthlyVariation, yearly: yearlyVariation };
+  }, [snapshots, portfolioMetrics.totalValue]);
 
-        // Check if a snapshot exists for the current month
-        const currentMonthSnapshot = snapshots.find(
-          (s) => s.year === currentYear && s.month === currentMonth
-        );
+  // Memoize chart data
+  const chartData = useMemo(() => {
+    const assetClassData = prepareAssetClassDistributionData(assets);
+    const assetData = prepareAssetDistributionData(assets);
 
-        let currentNetWorth: number;
-        let previousSnapshot: MonthlySnapshot | null;
+    const liquidityData = [
+      {
+        name: 'Liquido',
+        value: portfolioMetrics.liquidNetWorth,
+        percentage: portfolioMetrics.totalValue > 0
+          ? (portfolioMetrics.liquidNetWorth / portfolioMetrics.totalValue) * 100
+          : 0,
+        color: '#10b981', // green
+      },
+      {
+        name: 'Illiquido',
+        value: portfolioMetrics.illiquidNetWorth,
+        percentage: portfolioMetrics.totalValue > 0
+          ? (portfolioMetrics.illiquidNetWorth / portfolioMetrics.totalValue) * 100
+          : 0,
+        color: '#f59e0b', // amber
+      },
+    ];
 
-        if (currentMonthSnapshot) {
-          // Use the current month's snapshot
-          currentNetWorth = currentMonthSnapshot.totalNetWorth;
-          // Previous month is the second-to-last snapshot
-          previousSnapshot = snapshots.length > 1
-            ? snapshots[snapshots.length - 2]
-            : null;
-        } else {
-          // No current month snapshot, use live portfolio value
-          currentNetWorth = calculateTotalValue(data);
-          // Previous month is the most recent snapshot
-          previousSnapshot = snapshots[snapshots.length - 1];
-        }
-
-        if (previousSnapshot) {
-          const variation = calculateMonthlyChange(currentNetWorth, previousSnapshot);
-          setMonthlyVariation(variation);
-        } else {
-          setMonthlyVariation(null);
-        }
-
-        // Calculate yearly variation (YTD - Year to Date)
-        const yearlyVariationData = calculateYearlyChange(currentNetWorth, snapshots);
-        setYearlyVariation(yearlyVariationData);
-      } else {
-        setMonthlyVariation(null);
-        setYearlyVariation(null);
-      }
-    } catch (error) {
-      console.error('Error loading assets:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadExpenseStats = async () => {
-    if (!user) return;
-
-    try {
-      setLoadingExpenses(true);
-      const stats = await getExpenseStats(user.uid);
-      setExpenseStats(stats);
-    } catch (error) {
-      console.error('Error loading expense stats:', error);
-      // Non mostriamo toast error per non disturbare l'utente
-      setExpenseStats(null);
-    } finally {
-      setLoadingExpenses(false);
-    }
-  };
+    return { assetClassData, assetData, liquidityData };
+  }, [assets, portfolioMetrics.liquidNetWorth, portfolioMetrics.illiquidNetWorth, portfolioMetrics.totalValue]);
 
   const handleCreateSnapshot = async () => {
     if (!user) return;
 
     // Check if snapshot for current month already exists
     try {
-      const snapshots = await getUserSnapshots(user.uid);
       const now = new Date();
       const currentYear = now.getFullYear();
       const currentMonth = now.getMonth() + 1;
@@ -203,8 +198,8 @@ export default function DashboardPage() {
           // Don't show error to user - Hall of Fame update is non-critical
         }
 
-        // Refresh assets to update monthly/yearly variation cards
-        await loadAssets();
+        // Note: React Query will automatically refetch snapshots
+        // due to cache invalidation if implemented
       } else {
         toast.error(result.error || 'Errore nella creazione dello snapshot');
       }
@@ -218,46 +213,14 @@ export default function DashboardPage() {
     }
   };
 
-  const totalValue = calculateTotalValue(assets);
-  const liquidNetWorth = calculateLiquidNetWorth(assets);
-  const illiquidNetWorth = calculateIlliquidNetWorth(assets);
-  const assetCount = assets.length;
-
-  // Cost basis tracking calculations
-  const unrealizedGains = calculateTotalUnrealizedGains(assets);
-  const estimatedTaxes = calculateTotalEstimatedTaxes(assets);
-  const liquidEstimatedTaxes = calculateLiquidEstimatedTaxes(assets);
-  const grossTotal = calculateGrossTotal(assets);
-  const netTotal = calculateNetTotal(assets);
-  const liquidNetTotal = liquidNetWorth - liquidEstimatedTaxes;
+  // Calculate derived values for display
+  const liquidNetTotal = portfolioMetrics.liquidNetWorth - portfolioMetrics.liquidEstimatedTaxes;
 
   // Check if any asset has cost basis tracking enabled
   const hasCostBasisTracking = assets.some(a => (a.averageCost && a.averageCost > 0) || (a.taxRate && a.taxRate > 0));
 
-  // TER calculations
-  const portfolioTER = calculatePortfolioWeightedTER(assets);
-  const annualPortfolioCost = calculateAnnualPortfolioCost(assets);
+  // Check if any asset has TER tracking
   const hasTERTracking = assets.some(a => a.totalExpenseRatio && a.totalExpenseRatio > 0);
-
-  // Prepare chart data
-  const assetClassData = prepareAssetClassDistributionData(assets);
-  const assetData = prepareAssetDistributionData(assets);
-
-  // Prepare liquidity chart data
-  const liquidityData = [
-    {
-      name: 'Liquido',
-      value: liquidNetWorth,
-      percentage: totalValue > 0 ? (liquidNetWorth / totalValue) * 100 : 0,
-      color: '#10b981', // green
-    },
-    {
-      name: 'Illiquido',
-      value: illiquidNetWorth,
-      percentage: totalValue > 0 ? (illiquidNetWorth / totalValue) * 100 : 0,
-      color: '#f59e0b', // amber
-    },
-  ];
 
   if (loading) {
     return (
@@ -278,7 +241,7 @@ export default function DashboardPage() {
         </div>
         <Button
           onClick={handleCreateSnapshot}
-          disabled={creatingSnapshot || assetCount === 0}
+          disabled={creatingSnapshot || portfolioMetrics.assetCount === 0}
           variant="default"
         >
           <Camera className="mr-2 h-4 w-4" />
@@ -293,9 +256,9 @@ export default function DashboardPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalValue)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(portfolioMetrics.totalValue)}</div>
             <p className="text-xs text-muted-foreground">
-              {assetCount === 0 ? 'Aggiungi assets per iniziare' : `${assetCount} asset${assetCount !== 1 ? 's' : ''}`}
+              {portfolioMetrics.assetCount === 0 ? 'Aggiungi assets per iniziare' : `${portfolioMetrics.assetCount} asset${portfolioMetrics.assetCount !== 1 ? 's' : ''}`}
             </p>
           </CardContent>
         </Card>
@@ -306,7 +269,7 @@ export default function DashboardPage() {
             <Wallet className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(liquidNetWorth)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(portfolioMetrics.liquidNetWorth)}</div>
           </CardContent>
         </Card>
 
@@ -316,9 +279,9 @@ export default function DashboardPage() {
             <PieChart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{assetCount}</div>
+            <div className="text-2xl font-bold">{portfolioMetrics.assetCount}</div>
             <p className="text-xs text-muted-foreground">
-              {assetCount === 0 ? 'Nessun asset presente' : 'Asset in portafoglio'}
+              {portfolioMetrics.assetCount === 0 ? 'Nessun asset presente' : 'Asset in portafoglio'}
             </p>
           </CardContent>
         </Card>
@@ -336,7 +299,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-blue-600">
-                  {formatCurrency(netTotal)}
+                  {formatCurrency(portfolioMetrics.netTotal)}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Dopo tasse stimate
@@ -369,9 +332,9 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className={`text-2xl font-bold ${
-                  unrealizedGains >= 0 ? 'text-green-600' : 'text-red-600'
+                  portfolioMetrics.unrealizedGains >= 0 ? 'text-green-600' : 'text-red-600'
                 }`}>
-                  {unrealizedGains >= 0 ? '+' : ''}{formatCurrency(unrealizedGains)}
+                  {portfolioMetrics.unrealizedGains >= 0 ? '+' : ''}{formatCurrency(portfolioMetrics.unrealizedGains)}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Guadagno/perdita rispetto al costo medio
@@ -386,7 +349,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-orange-600">
-                  {formatCurrency(estimatedTaxes)}
+                  {formatCurrency(portfolioMetrics.estimatedTaxes)}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Imposte su plusvalenze non realizzate
@@ -405,17 +368,17 @@ export default function DashboardPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {monthlyVariation ? (
+            {variations.monthly ? (
               <>
                 <div className={`text-2xl font-bold ${
-                  monthlyVariation.value >= 0 ? 'text-green-600' : 'text-red-600'
+                  variations.monthly.value >= 0 ? 'text-green-600' : 'text-red-600'
                 }`}>
-                  {monthlyVariation.value >= 0 ? '+' : ''}{formatCurrency(monthlyVariation.value)}
+                  {variations.monthly.value >= 0 ? '+' : ''}{formatCurrency(variations.monthly.value)}
                 </div>
                 <p className={`text-xs ${
-                  monthlyVariation.percentage >= 0 ? 'text-green-600' : 'text-red-600'
+                  variations.monthly.percentage >= 0 ? 'text-green-600' : 'text-red-600'
                 }`}>
-                  {monthlyVariation.percentage >= 0 ? '+' : ''}{monthlyVariation.percentage.toFixed(2)}%
+                  {variations.monthly.percentage >= 0 ? '+' : ''}{variations.monthly.percentage.toFixed(2)}%
                 </p>
               </>
             ) : (
@@ -435,17 +398,17 @@ export default function DashboardPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {yearlyVariation ? (
+            {variations.yearly ? (
               <>
                 <div className={`text-2xl font-bold ${
-                  yearlyVariation.value >= 0 ? 'text-green-600' : 'text-red-600'
+                  variations.yearly.value >= 0 ? 'text-green-600' : 'text-red-600'
                 }`}>
-                  {yearlyVariation.value >= 0 ? '+' : ''}{formatCurrency(yearlyVariation.value)}
+                  {variations.yearly.value >= 0 ? '+' : ''}{formatCurrency(variations.yearly.value)}
                 </div>
                 <p className={`text-xs ${
-                  yearlyVariation.percentage >= 0 ? 'text-green-600' : 'text-red-600'
+                  variations.yearly.percentage >= 0 ? 'text-green-600' : 'text-red-600'
                 }`}>
-                  {yearlyVariation.percentage >= 0 ? '+' : ''}{yearlyVariation.percentage.toFixed(2)}%
+                  {variations.yearly.percentage >= 0 ? '+' : ''}{variations.yearly.percentage.toFixed(2)}%
                 </p>
               </>
             ) : (
@@ -529,7 +492,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-purple-600">
-                {portfolioTER.toFixed(2)}%
+                {portfolioMetrics.portfolioTER.toFixed(2)}%
               </div>
               <p className="text-xs text-muted-foreground">
                 Total Expense Ratio medio ponderato
@@ -544,7 +507,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-orange-600">
-                {formatCurrency(annualPortfolioCost)}
+                {formatCurrency(portfolioMetrics.annualPortfolioCost)}
               </div>
               <p className="text-xs text-muted-foreground">
                 Costi di gestione annuali stimati
@@ -560,7 +523,7 @@ export default function DashboardPage() {
             <CardTitle>Distribuzione per Asset Class</CardTitle>
           </CardHeader>
           <CardContent>
-            <PieChartComponent data={assetClassData} />
+            <PieChartComponent data={chartData.assetClassData} />
           </CardContent>
         </Card>
 
@@ -569,7 +532,7 @@ export default function DashboardPage() {
             <CardTitle>Distribuzione per Asset</CardTitle>
           </CardHeader>
           <CardContent>
-            <PieChartComponent data={assetData} />
+            <PieChartComponent data={chartData.assetData} />
           </CardContent>
         </Card>
       </div>
@@ -581,7 +544,7 @@ export default function DashboardPage() {
             <CardTitle>Liquidità Portfolio</CardTitle>
           </CardHeader>
           <CardContent>
-            <PieChartComponent data={liquidityData} />
+            <PieChartComponent data={chartData.liquidityData} />
           </CardContent>
         </Card>
       </div>

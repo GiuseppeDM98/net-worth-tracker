@@ -1,16 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Asset } from '@/types/assets';
 import {
-  getAllAssets,
-  deleteAsset,
   calculateAssetValue,
   calculateTotalValue,
   calculateUnrealizedGains,
 } from '@/lib/services/assetService';
 import { formatCurrency, formatNumber } from '@/lib/services/chartService';
+import { useAssets, useDeleteAsset } from '@/lib/hooks/useAssets';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query/queryKeys';
 import { getAssetClassColor } from '@/lib/constants/colors';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -53,34 +54,17 @@ const formatAssetName = (name: string): string => {
 
 export default function AssetsPage() {
   const { user } = useAuth();
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
+  // React Query hooks - automatic caching and invalidation
+  const { data: assets = [], isLoading: loading, refetch } = useAssets(user?.uid);
+  const deleteAssetMutation = useDeleteAsset(user?.uid || '');
+
   const [updating, setUpdating] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [taxCalculatorOpen, setTaxCalculatorOpen] = useState(false);
   const [calculatingAsset, setCalculatingAsset] = useState<Asset | null>(null);
-
-  useEffect(() => {
-    if (user) {
-      loadAssets();
-    }
-  }, [user]);
-
-  const loadAssets = async () => {
-    if (!user) return;
-
-    try {
-      setLoading(true);
-      const data = await getAllAssets(user.uid);
-      setAssets(data);
-    } catch (error) {
-      console.error('Error loading assets:', error);
-      toast.error('Errore nel caricamento degli asset');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleUpdatePrices = async () => {
     if (!user) return;
@@ -103,7 +87,8 @@ export default function AssetsPage() {
               : ''
           }`
         );
-        await loadAssets();
+        // React Query refetch - will update all pages using useAssets
+        await refetch();
       } else {
         toast.error('Errore nell\'aggiornamento dei prezzi');
       }
@@ -123,9 +108,9 @@ export default function AssetsPage() {
     }
 
     try {
-      await deleteAsset(assetId, user.uid);
+      // Use React Query mutation - will auto-invalidate cache on success
+      await deleteAssetMutation.mutateAsync(assetId);
       toast.success('Asset eliminato con successo');
-      await loadAssets();
     } catch (error) {
       console.error('Error deleting asset:', error);
       toast.error('Errore nell\'eliminazione dell\'asset');
@@ -140,7 +125,10 @@ export default function AssetsPage() {
   const handleDialogClose = () => {
     setDialogOpen(false);
     setEditingAsset(null);
-    loadAssets();
+    // Invalidate assets cache globally - will update all pages using useAssets
+    if (user?.uid) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
+    }
   };
 
   const handleCalculateTaxes = (asset: Asset) => {
