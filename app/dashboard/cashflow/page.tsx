@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Wallet, Receipt, TrendingUp, BarChart3, Coins } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ExpenseTrackingTab } from '@/components/cashflow/ExpenseTrackingTab';
@@ -8,64 +9,77 @@ import { CurrentYearTab } from '@/components/cashflow/CurrentYearTab';
 import { TotalHistoryTab } from '@/components/cashflow/TotalHistoryTab';
 import { DividendTrackingTab } from '@/components/dividends/DividendTrackingTab';
 import { useAuth } from '@/contexts/AuthContext';
-import { Expense, ExpenseCategory } from '@/types/expenses';
 import { Dividend } from '@/types/dividend';
 import { Asset } from '@/types/assets';
-import { getAllExpenses } from '@/lib/services/expenseService';
-import { getAllCategories } from '@/lib/services/expenseCategoryService';
+import { useExpenses, useExpenseCategories } from '@/lib/hooks/useExpenses';
+import { queryKeys } from '@/lib/query/queryKeys';
 import { getAllAssets } from '@/lib/services/assetService';
 import { toast } from 'sonner';
 
 export default function CashflowPage() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   const [mountedTabs, setMountedTabs] = useState<Set<string>>(new Set(['tracking']));
   const [activeTab, setActiveTab] = useState<string>('tracking');
 
-  // Centralized data cache
-  const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
-  const [categories, setCategories] = useState<ExpenseCategory[]>([]);
+  // React Query hooks for expenses and categories
+  const { data: allExpenses = [], isLoading: expensesLoading } = useExpenses(user?.uid);
+  const { data: categories = [], isLoading: categoriesLoading } = useExpenseCategories(user?.uid);
+
+  // Manual state for other tabs data (dividends, assets)
   const [dividends, setDividends] = useState<Dividend[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [dataLoaded, setDataLoaded] = useState(false);
+  const [otherDataLoading, setOtherDataLoading] = useState(false);
+  const [otherDataLoaded, setOtherDataLoaded] = useState(false);
 
-  const loadAllData = async () => {
-    if (!user || dataLoaded) return; // Skip if already loaded
+  const loading = expensesLoading || categoriesLoading || otherDataLoading;
+
+  // Load dividends and assets only when their tabs are mounted
+  const loadOtherData = async () => {
+    if (!user || otherDataLoaded) return;
 
     try {
-      setLoading(true);
+      setOtherDataLoading(true);
 
-      // Batch fetch in parallel (single Promise.all)
-      const [expensesData, categoriesData, dividendsData, assetsData] = await Promise.all([
-        getAllExpenses(user.uid),
-        getAllCategories(user.uid),
-        fetch(`/api/dividends?userId=${user.uid}`).then(r => r.json()).then(d => d.dividends || []),
+      // Fetch only dividends and assets (expenses/categories handled by React Query)
+      const [dividendsData, assetsData] = await Promise.all([
+        fetch(`/api/dividends?userId=${user.uid}`)
+          .then(r => r.json())
+          .then(d => d.dividends || []),
         getAllAssets(user.uid),
       ]);
 
-      setAllExpenses(expensesData);
-      setCategories(categoriesData);
       setDividends(dividendsData);
       setAssets(assetsData.filter(a => a.assetClass === 'equity')); // Only equity for dividends
-      setDataLoaded(true);
+      setOtherDataLoaded(true);
     } catch (error) {
-      console.error('Error loading cashflow data:', error);
+      console.error('Error loading dividend/asset data:', error);
       toast.error('Errore nel caricamento dei dati');
     } finally {
-      setLoading(false);
+      setOtherDataLoading(false);
     }
   };
 
   useEffect(() => {
-    if (user && !dataLoaded) {
-      loadAllData();
+    const needsOtherData = mountedTabs.has('dividends');
+    if (user && needsOtherData && !otherDataLoaded) {
+      loadOtherData();
     }
-  }, [user, dataLoaded]);
+  }, [user, mountedTabs, otherDataLoaded]);
 
   const handleRefresh = async () => {
-    setDataLoaded(false); // Force re-fetch
-    await loadAllData();
+    // Invalidate React Query caches for expenses and categories
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.expenses.all(user?.uid || ''),
+    });
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.expenses.categories(user?.uid || ''),
+    });
+
+    // Force re-fetch of other data (dividends, assets)
+    setOtherDataLoaded(false);
+    await loadOtherData();
   };
 
   const handleTabChange = (value: string) => {
@@ -91,19 +105,19 @@ export default function CashflowPage() {
         <TabsList className="grid w-full max-w-4xl grid-cols-4">
           <TabsTrigger value="tracking" className="flex items-center gap-2">
             <Receipt className="h-4 w-4" />
-            Tracciamento
+            <span className="hidden sm:inline">Tracciamento</span>
           </TabsTrigger>
           <TabsTrigger value="dividends" className="flex items-center gap-2">
             <Coins className="h-4 w-4" />
-            Dividendi
+            <span className="hidden sm:inline">Dividendi</span>
           </TabsTrigger>
           <TabsTrigger value="current-year" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
-            Anno Corrente
+            <span className="hidden sm:inline">Anno Corrente</span>
           </TabsTrigger>
           <TabsTrigger value="total-history" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
-            Storico Totale
+            <span className="hidden sm:inline">Storico Totale</span>
           </TabsTrigger>
         </TabsList>
 

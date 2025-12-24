@@ -317,6 +317,7 @@ This section documents patterns and conventions unique to the Net Worth Tracker 
 - **Framework**: Next.js 16 (App Router) + TypeScript 5
 - **Database**: Firebase Firestore (NoSQL)
 - **Authentication**: Firebase Auth (email/password + Google OAuth)
+- **State Management**: @tanstack/react-query (server state), React Context (auth state)
 - **UI**: Tailwind CSS + shadcn/ui components
 - **Charts**: Recharts library
 - **Deployment**: Vercel (serverless functions + edge runtime)
@@ -464,6 +465,126 @@ useEffect(() => {
 ```
 See `components/performance/MetricCard.tsx` for full implementation.
 
+### React Query Data Fetching Patterns
+
+**Pattern** (server state management with automatic caching):
+
+This app uses **@tanstack/react-query** for server state management (Firestore data), separate from React Context which handles auth state.
+
+**When to Use React Query**:
+- ✅ Fetching Firestore collections/documents (expenses, categories, assets, snapshots)
+- ✅ Data that needs caching to prevent duplicate requests
+- ✅ Data shared across multiple components/tabs
+- ❌ Local UI state (use `useState`)
+- ❌ Authentication state (use `AuthContext`)
+
+**Step 1: Centralized Query Keys** (`lib/query/queryKeys.ts`)
+
+```typescript
+export const queryKeys = {
+  expenses: {
+    all: (userId: string) => ['expenses', userId] as const,
+    categories: (userId: string) => ['expense-categories', userId] as const,
+  },
+  assets: {
+    all: (userId: string) => ['assets', userId] as const,
+  },
+} as const;
+```
+
+**Why**: Centralized keys prevent typos and enable type-safe cache invalidation.
+
+**Step 2: Custom Hook Wrapping Service** (`lib/hooks/useExpenses.ts`)
+
+```typescript
+'use client';
+
+import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query/queryKeys';
+import { getAllExpenses } from '@/lib/services/expenseService';
+
+export function useExpenses(userId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.expenses.all(userId || ''),
+    queryFn: () => getAllExpenses(userId!),
+    enabled: !!userId, // Only run when user is authenticated
+  });
+}
+```
+
+**Key Configuration**:
+- `enabled: !!userId` - Prevents query when user not authenticated
+- No `staleTime` - Uses React Query defaults (immediate background refetch on focus)
+- Service layer (`getAllExpenses`) handles Firestore logic
+
+**Step 3: Use Hook in Component**
+
+```typescript
+'use client';
+
+import { useAuth } from '@/contexts/AuthContext';
+import { useExpenses } from '@/lib/hooks/useExpenses';
+
+export function MyComponent() {
+  const { user } = useAuth();
+  const { data: expenses = [], isLoading } = useExpenses(user?.uid);
+
+  if (isLoading) return <LoadingSpinner />;
+
+  return <div>{/* Render expenses */}</div>;
+}
+```
+
+**Benefits**:
+- Automatic caching (no duplicate requests)
+- Auto-refetch on window focus (data freshness)
+- Shared cache across components (no prop drilling needed)
+- Loading/error states built-in
+
+**Step 4: Cache Invalidation on Mutations**
+
+```typescript
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query/queryKeys';
+
+const queryClient = useQueryClient();
+
+const handleRefresh = async () => {
+  await queryClient.invalidateQueries({
+    queryKey: queryKeys.expenses.all(user?.uid || ''),
+  });
+};
+```
+
+**When to Invalidate**:
+- After create/update/delete operations
+- When forcing a manual refresh
+- Global invalidation updates all components using the same query
+
+**Current Implementations**:
+- ✅ `useExpenses()` - Expense tracking data
+- ✅ `useExpenseCategories()` - Category data
+- ✅ `useAssets()` - Portfolio assets (with mutations: `useCreateAsset`, `useUpdateAsset`, `useDeleteAsset`)
+- ✅ `useSnapshots()` - Historical net worth snapshots
+
+**Example from Codebase** (app/dashboard/cashflow/page.tsx):
+```typescript
+const { user } = useAuth();
+const queryClient = useQueryClient();
+
+// React Query replaces manual useState + useEffect
+const { data: allExpenses = [], isLoading: expensesLoading } = useExpenses(user?.uid);
+const { data: categories = [], isLoading: categoriesLoading } = useExpenseCategories(user?.uid);
+
+const loading = expensesLoading || categoriesLoading;
+
+const handleRefresh = async () => {
+  // Invalidate caches instead of manual refetch
+  await queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all(user?.uid || '') });
+  await queryClient.invalidateQueries({ queryKey: queryKeys.expenses.categories(user?.uid || '') });
+};
+```
+
 ### Error Handling with Toasts
 
 **Pattern** (using `sonner` library):
@@ -582,12 +703,14 @@ npm run lint         # Run ESLint
 
 **Adding New Features**:
 1. Define types in `types/` (create new file if needed, e.g., `types/performance.ts`)
-2. Create service layer in `lib/services/` (business logic, calculations, data fetching)
-3. Build reusable UI components in `components/` (organized by feature)
-4. Create main page in `app/dashboard/` (authenticated) or `app/` (public)
-5. Update navigation in `components/layout/Sidebar.tsx` and `SecondaryMenuDrawer.tsx`
-6. Use `ProtectedRoute` for authenticated pages (automatic via dashboard layout)
-7. Test manually (no automated tests yet)
+2. Create service layer in `lib/services/` (business logic, Firestore queries, calculations)
+3. Create React Query hook in `lib/hooks/` if data needs caching (wrap service with useQuery)
+4. Add query key to `lib/query/queryKeys.ts` for centralized cache management
+5. Build reusable UI components in `components/` (organized by feature)
+6. Create main page in `app/dashboard/` (authenticated) or `app/` (public)
+7. Update navigation in `components/layout/Sidebar.tsx` and `SecondaryMenuDrawer.tsx`
+8. Use `ProtectedRoute` for authenticated pages (automatic via dashboard layout)
+9. Test manually (no automated tests yet)
 
 **Example: Performance Metrics Feature Implementation**
 ```
