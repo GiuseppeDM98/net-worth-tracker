@@ -673,6 +673,22 @@ setCount(count + 1);
 
 ---
 
+## Recent Mobile Chart Patterns (Cashflow)
+
+- **Mobile detection**: Use `matchMedia('(max-width: 639px)')` in client components to gate mobile-only behavior.
+- **Chart density control**: Slice monthly datasets to the last 24 months on mobile with a toggle for full history.
+- **Axis compacting**: Apply rotated ticks and smaller font sizes for `XAxis` on mobile.
+- **Legend trimming**: Use custom `Legend` content to cap items to top 3 on mobile for category charts.
+- **UI layout**: Drill-down lists use cards on mobile; tables remain for desktop.
+
+## Common Errors to Avoid (Learned This Session)
+
+- Rendering full historical monthly series on mobile without a toggle.
+- Leaving dense legends/labels enabled on mobile (pie labels, long legend lists).
+- Using default axis ticks on mobile for long time series (overlap and unreadable).
+
+---
+
 ## Quick Reference
 
 **Common Commands**:

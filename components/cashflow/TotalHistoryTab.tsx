@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { calculateIncomeExpenseRatio } from '@/lib/services/expenseService';
 import { Timestamp } from 'firebase/firestore';
@@ -46,6 +46,16 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
   // Percentage toggles for trend charts
   const [showMonthlyTrendPercentage, setShowMonthlyTrendPercentage] = useState(false);
   const [showYearlyTrendPercentage, setShowYearlyTrendPercentage] = useState(false);
+  const [showFullMonthlyHistory, setShowFullMonthlyHistory] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 639px)');
+    const handleChange = () => setIsMobile(media.matches);
+    handleChange();
+    media.addEventListener('change', handleChange);
+    return () => media.removeEventListener('change', handleChange);
+  }, []);
 
   // Prepare monthly trend data (all years, all months)
   const getMonthlyTrend = () => {
@@ -417,6 +427,46 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
   const yearlyIncomeByCategory = getYearlyIncomeByCategory();
   const yearlyIncomeExpenseRatioData = getYearlyIncomeExpenseRatio();
 
+  const lineChartHeight = isMobile ? 260 : 350;
+  const xAxisProps = isMobile
+    ? { angle: -45, textAnchor: 'end' as const, height: 60, interval: 0 }
+    : { interval: 'preserveStartEnd' as const };
+  const axisTickProps = { fontSize: isMobile ? 10 : 12 };
+  const recentMonthsLimit = 24;
+
+  const filterRecentMonths = <T extends { sortKey?: string | number }>(data: T[], months: number) => {
+    if (data.length <= months) return data;
+    return data.slice(-months);
+  };
+
+  const monthlyTrendChartData = isMobile && !showFullMonthlyHistory
+    ? filterRecentMonths(monthlyTrendData, recentMonthsLimit)
+    : monthlyTrendData;
+  const monthlyExpensesByTypeChartData = isMobile && !showFullMonthlyHistory
+    ? filterRecentMonths(monthlyExpensesByType, recentMonthsLimit)
+    : monthlyExpensesByType;
+  const monthlyExpensesByCategoryChartData = isMobile && !showFullMonthlyHistory
+    ? filterRecentMonths(monthlyExpensesByCategory.data, recentMonthsLimit)
+    : monthlyExpensesByCategory.data;
+  const monthlyIncomeByCategoryChartData = isMobile && !showFullMonthlyHistory
+    ? filterRecentMonths(monthlyIncomeByCategory.data, recentMonthsLimit)
+    : monthlyIncomeByCategory.data;
+
+  const renderLegendContent = (maxItems?: number) => (props: any) => {
+    const payload = props?.payload || [];
+    const items = maxItems ? payload.slice(0, maxItems) : payload;
+    return (
+      <div className={isMobile ? 'mt-3 flex flex-wrap gap-3' : ''}>
+        {items.map((entry: any) => (
+          <div key={entry.value} className="flex items-center gap-2 text-sm">
+            <span className="h-3.5 w-3.5 rounded-sm" style={{ backgroundColor: entry.color }} />
+            <span className="text-muted-foreground">{entry.value}</span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="p-8">
@@ -464,23 +514,34 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
         {monthlyTrendData.length > 0 && (
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <CardTitle>Trend Mensile</CardTitle>
-                <Button
+                <div className="flex flex-wrap items-center gap-2">
+                  {isMobile && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowFullMonthlyHistory(!showFullMonthlyHistory)}
+                    >
+                      {showFullMonthlyHistory ? 'Ultimi 24 mesi' : 'Mostra tutto'}
+                    </Button>
+                  )}
+                  <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setShowMonthlyTrendPercentage(!showMonthlyTrendPercentage)}
                 >
                   {showMonthlyTrendPercentage ? '€ Valori Assoluti' : '% Percentuali'}
                 </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
+              <ResponsiveContainer width="100%" height={lineChartHeight}>
                 {showMonthlyTrendPercentage ? (
-                  <LineChart data={monthlyTrendData}>
+                  <LineChart data={monthlyTrendChartData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
+                    <XAxis dataKey="month" tick={axisTickProps} {...xAxisProps} />
                     <YAxis tickFormatter={(value) => `${value.toFixed(0)}%`} domain={[0, 100]} />
                     <Tooltip
                       formatter={(value: number) => `${value.toFixed(2)}%`}
@@ -491,14 +552,14 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
                       }}
                     />
                     <Legend />
-                    <Line type="monotone" dataKey="Entrate %" stroke="#10b981" strokeWidth={2} name="Entrate %" />
-                    <Line type="monotone" dataKey="Spese %" stroke="#ef4444" strokeWidth={2} name="Spese %" />
-                    <Line type="monotone" dataKey="Saving Rate %" stroke="#3b82f6" strokeWidth={2} name="Saving Rate %" />
+                    <Line type="monotone" dataKey="Entrate %" stroke="#10b981" strokeWidth={2} name="Entrate %" dot={!isMobile} />
+                    <Line type="monotone" dataKey="Spese %" stroke="#ef4444" strokeWidth={2} name="Spese %" dot={!isMobile} />
+                    <Line type="monotone" dataKey="Saving Rate %" stroke="#3b82f6" strokeWidth={2} name="Saving Rate %" dot={!isMobile} />
                   </LineChart>
                 ) : (
-                  <LineChart data={monthlyTrendData}>
+                  <LineChart data={monthlyTrendChartData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
+                    <XAxis dataKey="month" tick={axisTickProps} {...xAxisProps} />
                     <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                     <Tooltip
                       formatter={(value: number) => formatCurrency(value)}
@@ -509,9 +570,9 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
                       }}
                     />
                     <Legend />
-                    <Line type="monotone" dataKey="Entrate" stroke="#10b981" strokeWidth={2} />
-                    <Line type="monotone" dataKey="Spese" stroke="#ef4444" strokeWidth={2} />
-                    <Line type="monotone" dataKey="Netto" stroke="#3b82f6" strokeWidth={2} />
+                    <Line type="monotone" dataKey="Entrate" stroke="#10b981" strokeWidth={2} dot={!isMobile} />
+                    <Line type="monotone" dataKey="Spese" stroke="#ef4444" strokeWidth={2} dot={!isMobile} />
+                    <Line type="monotone" dataKey="Netto" stroke="#3b82f6" strokeWidth={2} dot={!isMobile} />
                   </LineChart>
                 )}
               </ResponsiveContainer>
@@ -535,11 +596,11 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
               </div>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
+              <ResponsiveContainer width="100%" height={lineChartHeight}>
                 {showYearlyTrendPercentage ? (
                   <LineChart data={yearlyTrendData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="year" />
+                    <XAxis dataKey="year" tick={axisTickProps} {...xAxisProps} />
                     <YAxis tickFormatter={(value) => `${value.toFixed(0)}%`} domain={[0, 100]} />
                     <Tooltip
                       formatter={(value: number) => `${value.toFixed(2)}%`}
@@ -550,14 +611,14 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
                       }}
                     />
                     <Legend />
-                    <Line type="monotone" dataKey="Entrate %" stroke="#10b981" strokeWidth={2} name="Entrate %" />
-                    <Line type="monotone" dataKey="Spese %" stroke="#ef4444" strokeWidth={2} name="Spese %" />
-                    <Line type="monotone" dataKey="Saving Rate %" stroke="#3b82f6" strokeWidth={2} name="Saving Rate %" />
+                    <Line type="monotone" dataKey="Entrate %" stroke="#10b981" strokeWidth={2} name="Entrate %" dot={!isMobile} />
+                    <Line type="monotone" dataKey="Spese %" stroke="#ef4444" strokeWidth={2} name="Spese %" dot={!isMobile} />
+                    <Line type="monotone" dataKey="Saving Rate %" stroke="#3b82f6" strokeWidth={2} name="Saving Rate %" dot={!isMobile} />
                   </LineChart>
                 ) : (
                   <LineChart data={yearlyTrendData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="year" />
+                    <XAxis dataKey="year" tick={axisTickProps} {...xAxisProps} />
                     <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                     <Tooltip
                       formatter={(value: number) => formatCurrency(value)}
@@ -568,9 +629,9 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
                       }}
                     />
                     <Legend />
-                    <Line type="monotone" dataKey="Entrate" stroke="#10b981" strokeWidth={2} />
-                    <Line type="monotone" dataKey="Spese" stroke="#ef4444" strokeWidth={2} />
-                    <Line type="monotone" dataKey="Netto" stroke="#3b82f6" strokeWidth={2} />
+                    <Line type="monotone" dataKey="Entrate" stroke="#10b981" strokeWidth={2} dot={!isMobile} />
+                    <Line type="monotone" dataKey="Spese" stroke="#ef4444" strokeWidth={2} dot={!isMobile} />
+                    <Line type="monotone" dataKey="Netto" stroke="#3b82f6" strokeWidth={2} dot={!isMobile} />
                   </LineChart>
                 )}
               </ResponsiveContainer>
@@ -585,10 +646,10 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
               <CardTitle>Rapporto Entrate/Spese Annuale</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
+              <ResponsiveContainer width="100%" height={lineChartHeight}>
                 <LineChart data={yearlyIncomeExpenseRatioData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="year" />
+                  <XAxis dataKey="year" tick={axisTickProps} {...xAxisProps} />
                   <YAxis
                     tickFormatter={(value) => value.toFixed(2)}
                     domain={[0, 'auto']}
@@ -601,7 +662,7 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
                       borderRadius: '4px',
                     }}
                   />
-                  <Legend />
+                  <Legend content={renderLegendContent(isMobile ? 3 : undefined)} />
                   {/* Colored zones */}
                   <ReferenceArea y1={1.2} y2={5} fill="#10b981" fillOpacity={0.1} />
                   <ReferenceArea y1={0.8} y2={1.2} fill="#eab308" fillOpacity={0.1} />
@@ -645,13 +706,24 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
         {monthlyExpensesByType.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Trend Mensile Spese per Tipo</CardTitle>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle>Trend Mensile Spese per Tipo</CardTitle>
+                {isMobile && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowFullMonthlyHistory(!showFullMonthlyHistory)}
+                  >
+                    {showFullMonthlyHistory ? 'Ultimi 24 mesi' : 'Mostra tutto'}
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
-                <LineChart data={monthlyExpensesByType}>
+              <ResponsiveContainer width="100%" height={lineChartHeight}>
+                <LineChart data={monthlyExpensesByTypeChartData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
+                  <XAxis dataKey="month" tick={axisTickProps} {...xAxisProps} />
                   <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
@@ -661,10 +733,10 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
                       borderRadius: '4px',
                     }}
                   />
-                  <Legend />
-                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.fixed} stroke="#3b82f6" strokeWidth={2} />
-                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.variable} stroke="#8b5cf6" strokeWidth={2} />
-                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.debt} stroke="#f59e0b" strokeWidth={2} />
+                  <Legend content={renderLegendContent(isMobile ? 3 : undefined)} />
+                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.fixed} stroke="#3b82f6" strokeWidth={2} dot={!isMobile} />
+                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.variable} stroke="#8b5cf6" strokeWidth={2} dot={!isMobile} />
+                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.debt} stroke="#f59e0b" strokeWidth={2} dot={!isMobile} />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
@@ -678,10 +750,10 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
               <CardTitle>Trend Annuale Spese per Tipo</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
+              <ResponsiveContainer width="100%" height={lineChartHeight}>
                 <LineChart data={yearlyExpensesByType}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="year" />
+                  <XAxis dataKey="year" tick={axisTickProps} {...xAxisProps} />
                   <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
@@ -691,10 +763,10 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
                       borderRadius: '4px',
                     }}
                   />
-                  <Legend />
-                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.fixed} stroke="#3b82f6" strokeWidth={2} />
-                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.variable} stroke="#8b5cf6" strokeWidth={2} />
-                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.debt} stroke="#f59e0b" strokeWidth={2} />
+                  <Legend content={renderLegendContent(isMobile ? 3 : undefined)} />
+                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.fixed} stroke="#3b82f6" strokeWidth={2} dot={!isMobile} />
+                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.variable} stroke="#8b5cf6" strokeWidth={2} dot={!isMobile} />
+                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.debt} stroke="#f59e0b" strokeWidth={2} dot={!isMobile} />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
@@ -705,13 +777,24 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
         {monthlyExpensesByCategory.data.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Trend Mensile Spese per Categoria (Top 5)</CardTitle>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle>Trend Mensile Spese per Categoria (Top 5)</CardTitle>
+                {isMobile && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowFullMonthlyHistory(!showFullMonthlyHistory)}
+                  >
+                    {showFullMonthlyHistory ? 'Ultimi 24 mesi' : 'Mostra tutto'}
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
-                <LineChart data={monthlyExpensesByCategory.data}>
+              <ResponsiveContainer width="100%" height={lineChartHeight}>
+                <LineChart data={monthlyExpensesByCategoryChartData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
+                  <XAxis dataKey="month" tick={axisTickProps} {...xAxisProps} />
                   <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
@@ -721,7 +804,7 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
                       borderRadius: '4px',
                     }}
                   />
-                  <Legend />
+                  <Legend content={renderLegendContent(isMobile ? 3 : undefined)} />
                   {monthlyExpensesByCategory.categories.filter(cat => cat !== 'Altro').map((category, index) => (
                     <Line
                       key={category}
@@ -744,10 +827,10 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
               <CardTitle>Trend Annuale Spese per Categoria (Top 5)</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
+              <ResponsiveContainer width="100%" height={lineChartHeight}>
                 <LineChart data={yearlyExpensesByCategory.data}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="year" />
+                  <XAxis dataKey="year" tick={axisTickProps} {...xAxisProps} />
                   <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
@@ -777,13 +860,24 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
         {monthlyIncomeByCategory.data.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Trend Mensile Entrate per Categoria (Top 5)</CardTitle>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle>Trend Mensile Entrate per Categoria (Top 5)</CardTitle>
+                {isMobile && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowFullMonthlyHistory(!showFullMonthlyHistory)}
+                  >
+                    {showFullMonthlyHistory ? 'Ultimi 24 mesi' : 'Mostra tutto'}
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
-                <LineChart data={monthlyIncomeByCategory.data}>
+              <ResponsiveContainer width="100%" height={lineChartHeight}>
+                <LineChart data={monthlyIncomeByCategoryChartData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
+                  <XAxis dataKey="month" tick={axisTickProps} {...xAxisProps} />
                   <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
@@ -816,10 +910,10 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
               <CardTitle>Trend Annuale Entrate per Categoria (Top 5)</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
+              <ResponsiveContainer width="100%" height={lineChartHeight}>
                 <LineChart data={yearlyIncomeByCategory.data}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="year" />
+                  <XAxis dataKey="year" tick={axisTickProps} {...xAxisProps} />
                   <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
@@ -848,3 +942,8 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
     </div>
   );
 }
+
+
+
+
+

@@ -1642,4 +1642,31 @@ User navigates to Hall of Fame → getHallOfFameData(userId)
 
 ---
 
+## Current Status (Latest Session)
+
+- **Architecture status**: Next.js App Router + Firebase + React Query + Recharts; no new dependencies added.
+- **Cashflow mobile UX**: Focused on mobile readability for charts and drill-downs; desktop layouts unchanged.
+
+## Implemented in This Session
+
+- **Current Year (Cashflow)**: Responsive chart sizing, compact axes, mobile legend layout, pie labels disabled on mobile, drill-down expense list uses cards on mobile with desktop table preserved, mobile-friendly back button.
+- **Legend density**: "Spese per Categoria" legend capped to top 3 items on mobile.
+- **Total History (Cashflow)**: Mobile toggle for full history vs last 24 months on monthly charts, compact axes/height, dots disabled on mobile, legends capped to top 3 items on category trend charts.
+
+## Key Technical Decisions
+
+- **Mobile detection**: `matchMedia('(max-width: 639px)')` used in client components to gate mobile-only rendering and toggles.
+- **Chart density control**: Monthly datasets are sliced to last 24 months on mobile; desktop remains unfiltered.
+- **Legend control**: Custom legend renderer used to cap items on mobile for category-heavy charts.
+
+## Stack & Dependencies
+
+- **Unchanged**: Next.js 16, TypeScript, Firebase, React Query, Recharts, Tailwind, shadcn/ui.
+
+## Known Issues / Risks
+
+- **Legend truncation**: Mobile legends show top 3 items only; users must tap chart/tooltip for full detail.
+
+---
+
 *Auto-generated document - Version 1.0*
