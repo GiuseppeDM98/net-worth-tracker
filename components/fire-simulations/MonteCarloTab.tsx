@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAllAssets, calculateTotalValue, calculateLiquidNetWorth } from '@/lib/services/assetService';
 import { getSettings } from '@/lib/services/assetAllocationService';
@@ -11,7 +12,7 @@ import {
   getDefaultMarketParameters,
 } from '@/lib/services/monteCarloService';
 import { formatCurrencyCompact } from '@/lib/services/chartService';
-import { Asset, MonteCarloParams, MonteCarloResults, HistoricalReturnsData } from '@/types/assets';
+import { MonteCarloParams, MonteCarloResults } from '@/types/assets';
 import { toast } from 'sonner';
 import { Dices } from 'lucide-react';
 import { SimulationChart } from '@/components/monte-carlo/SimulationChart';
@@ -22,14 +23,38 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export function MonteCarloTab() {
   const { user } = useAuth();
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [totalNetWorth, setTotalNetWorth] = useState(0);
-  const [liquidNetWorth, setLiquidNetWorth] = useState(0);
-  const [historicalReturns, setHistoricalReturns] = useState<HistoricalReturnsData | null>(null);
-  const [availableSnapshotCount, setAvailableSnapshotCount] = useState(0);
   const [results, setResults] = useState<MonteCarloResults | null>(null);
-  const [loading, setLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
+
+  // Fetch assets data (will be cached)
+  const { data: assets, isLoading: isLoadingAssets } = useQuery({
+    queryKey: ['assets', user?.uid],
+    queryFn: () => getAllAssets(user!.uid),
+    enabled: !!user,
+    staleTime: 300000, // 5 minutes
+  });
+
+  // Fetch settings data (will be cached)
+  const { data: settings, isLoading: isLoadingSettings } = useQuery({
+    queryKey: ['settings', user?.uid],
+    queryFn: () => getSettings(user!.uid),
+    enabled: !!user,
+    staleTime: 300000, // 5 minutes
+  });
+
+  // Fetch snapshots data
+  const { data: snapshots, isLoading: isLoadingSnapshots } = useQuery({
+    queryKey: ['snapshots', user?.uid],
+    queryFn: () => getUserSnapshots(user!.uid),
+    enabled: !!user,
+    staleTime: 300000, // 5 minutes
+  });
+
+  // Derived data calculations
+  const totalNetWorth = assets ? calculateTotalValue(assets) : 0;
+  const liquidNetWorth = assets ? calculateLiquidNetWorth(assets) : 0;
+  const availableSnapshotCount = snapshots ? snapshots.filter((s) => !s.isDummy).length : 0;
+  const historicalReturns = snapshots ? calculateHistoricalReturns(snapshots) : null;
 
   const defaultMarketParams = getDefaultMarketParameters();
 
@@ -50,92 +75,48 @@ export function MonteCarloTab() {
     numberOfSimulations: 10000,
   });
 
+  // Effect to update params when data loads
   useEffect(() => {
-    if (user) {
-      loadData();
-    }
-  }, [user]);
-
-  const loadData = async () => {
-    if (!user) return;
-
-    try {
-      setLoading(true);
-
-      // Load assets, settings, and snapshots
-      const [assetsData, settingsData, snapshots] = await Promise.all([
-        getAllAssets(user.uid),
-        getSettings(user.uid),
-        getUserSnapshots(user.uid),
-      ]);
-
-      setAssets(assetsData);
-
-      // Calculate net worth
-      const total = calculateTotalValue(assetsData);
-      const liquid = calculateLiquidNetWorth(assetsData);
-      setTotalNetWorth(total);
-      setLiquidNetWorth(liquid);
-
-      // Count real (non-dummy) snapshots
-      const realSnapshotsCount = snapshots.filter((s) => !s.isDummy).length;
-      setAvailableSnapshotCount(realSnapshotsCount);
-
-      // Calculate historical returns if enough snapshots
-      const historicalData = calculateHistoricalReturns(snapshots);
-      setHistoricalReturns(historicalData);
-
-      // Pre-populate parameters
-      const plannedExpenses = settingsData?.plannedAnnualExpenses || 30000;
-
+    if (totalNetWorth > 0 && settings) {
       setParams((prev) => ({
         ...prev,
-        initialPortfolio: total,
-        annualWithdrawal: plannedExpenses,
+        initialPortfolio: totalNetWorth,
+        annualWithdrawal: settings.plannedAnnualExpenses || 30000,
       }));
-    } catch (error) {
-      console.error('Error loading data:', error);
-      toast.error('Errore nel caricamento dei dati');
-    } finally {
-      setLoading(false);
+    } else if (totalNetWorth > 0) {
+      setParams((prev) => ({
+        ...prev,
+        initialPortfolio: totalNetWorth,
+      }));
     }
-  };
+  }, [totalNetWorth, settings]);
 
   const handleRunSimulation = () => {
-    // Validate parameters
     if (params.initialPortfolio <= 0) {
       toast.error('Inserisci un patrimonio iniziale valido');
       return;
     }
-
     if (params.annualWithdrawal <= 0) {
       toast.error('Inserisci un prelievo annuale valido');
       return;
     }
-
     if (Math.abs(params.equityPercentage + params.bondsPercentage - 100) > 0.01) {
       toast.error('La somma di Equity e Bonds deve essere 100%');
       return;
     }
-
     if (params.retirementYears < 1 || params.retirementYears > 60) {
       toast.error('Gli anni di pensionamento devono essere tra 1 e 60');
       return;
     }
 
-    // Run simulation
     try {
       setIsRunning(true);
       toast.info('Esecuzione simulazione in corso...');
-
-      // Run simulation in a setTimeout to allow UI to update
       setTimeout(() => {
         try {
           const simulationResults = runMonteCarloSimulation(params);
           setResults(simulationResults);
-          toast.success(
-            `Simulazione completata! Tasso di successo: ${simulationResults.successRate.toFixed(1)}%`
-          );
+          toast.success(`Simulazione completata! Tasso di successo: ${simulationResults.successRate.toFixed(1)}%`);
         } catch (error) {
           console.error('Error running simulation:', error);
           toast.error('Errore durante la simulazione');
@@ -145,12 +126,12 @@ export function MonteCarloTab() {
       }, 100);
     } catch (error) {
       console.error('Error starting simulation:', error);
-      toast.error('Errore durante l\'avvio della simulazione');
+      toast.error("Errore durante l'avvio della simulazione");
       setIsRunning(false);
     }
   };
 
-  if (loading) {
+  if (isLoadingAssets || isLoadingSettings || isLoadingSnapshots) {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="text-gray-500">Caricamento...</div>

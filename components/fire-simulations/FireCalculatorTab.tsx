@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAllAssets, calculateTotalValue } from '@/lib/services/assetService';
 import { getSettings, setSettings, getDefaultTargets } from '@/lib/services/assetAllocationService';
-import { getFIREData, FIREMetrics, MonthlyFIREData, PlannedFIREMetrics, calculatePlannedFIREMetrics } from '@/lib/services/fireService';
+import { getFIREData, calculatePlannedFIREMetrics } from '@/lib/services/fireService';
 import { formatCurrency, formatCurrencyCompact, formatPercentage } from '@/lib/services/chartService';
-import { Asset } from '@/types/assets';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,123 +23,96 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
+import { Settings } from '@/types/settings';
 
 export function FireCalculatorTab() {
   const { user } = useAuth();
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [withdrawalRate, setWithdrawalRate] = useState<number>(4.0);
+  const queryClient = useQueryClient();
+
   const [tempWithdrawalRate, setTempWithdrawalRate] = useState<string>('4.0');
-  const [plannedAnnualExpenses, setPlannedAnnualExpenses] = useState<number | null>(null);
   const [tempPlannedAnnualExpenses, setTempPlannedAnnualExpenses] = useState<string>('');
-  const [fireMetrics, setFireMetrics] = useState<FIREMetrics | null>(null);
-  const [plannedFireMetrics, setPlannedFireMetrics] = useState<PlannedFIREMetrics | null>(null);
-  const [chartData, setChartData] = useState<MonthlyFIREData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+
+  // Fetch settings data
+  const { data: settings, isLoading: isLoadingSettings } = useQuery<Settings | null>({
+    queryKey: ['settings', user?.uid],
+    queryFn: () => getSettings(user!.uid),
+    enabled: !!user,
+    staleTime: 300000, // 5 minutes
+  });
+
+  // Fetch assets data
+  const { data: assets, isLoading: isLoadingAssets } = useQuery({
+    queryKey: ['assets', user?.uid],
+    queryFn: () => getAllAssets(user!.uid),
+    enabled: !!user,
+    staleTime: 300000, // 5 minutes
+  });
+
+  const withdrawalRate = settings?.withdrawalRate ?? 4.0;
+  const plannedAnnualExpenses = settings?.plannedAnnualExpenses ?? null;
+  const currentNetWorth = assets ? calculateTotalValue(assets) : 0;
+
+  // Fetch FIRE data, dependent on assets and settings
+  const { data: fireData, isLoading: isLoadingFIRE } = useQuery({
+    queryKey: ['fireData', user?.uid, currentNetWorth, withdrawalRate],
+    queryFn: () => getFIREData(user!.uid, currentNetWorth, withdrawalRate),
+    enabled: !!user && !!assets && currentNetWorth > 0,
+    staleTime: 300000, // 5 minutes
+  });
+
+  const fireMetrics = fireData?.metrics;
+  const chartData = fireData?.chartData ?? [];
+
+  // Calculate planned metrics, dependent on fireData and settings
+  const plannedFireMetrics =
+    plannedAnnualExpenses && plannedAnnualExpenses > 0 && currentNetWorth > 0
+      ? calculatePlannedFIREMetrics(currentNetWorth, plannedAnnualExpenses, withdrawalRate)
+      : null;
 
   useEffect(() => {
-    if (user) {
-      loadData();
+    if (settings) {
+      setTempWithdrawalRate((settings.withdrawalRate ?? 4.0).toString());
+      setTempPlannedAnnualExpenses(settings.plannedAnnualExpenses ? settings.plannedAnnualExpenses.toString() : '');
     }
-  }, [user]);
+  }, [settings]);
 
-  const loadData = async () => {
-    if (!user) return;
-
-    try {
-      setLoading(true);
-
-      // Load assets and settings
-      const [assetsData, settingsData] = await Promise.all([
-        getAllAssets(user.uid),
-        getSettings(user.uid),
-      ]);
-
-      setAssets(assetsData);
-
-      // Get withdrawal rate from settings or use default
-      const wr = settingsData?.withdrawalRate ?? 4.0;
-      setWithdrawalRate(wr);
-      setTempWithdrawalRate(wr.toString());
-
-      // Get planned annual expenses from settings
-      const pae = settingsData?.plannedAnnualExpenses ?? null;
-      setPlannedAnnualExpenses(pae);
-      setTempPlannedAnnualExpenses(pae ? pae.toString() : '');
-
-      // Calculate current net worth
-      const currentNetWorth = calculateTotalValue(assetsData);
-
-      // Get FIRE data
-      const fireData = await getFIREData(user.uid, currentNetWorth, wr);
-      setFireMetrics(fireData.metrics);
-      setChartData(fireData.chartData);
-
-      // Calculate planned FIRE metrics if plannedAnnualExpenses is set
-      if (pae && pae > 0) {
-        const plannedMetrics = calculatePlannedFIREMetrics(currentNetWorth, pae, wr);
-        setPlannedFireMetrics(plannedMetrics);
-      } else {
-        setPlannedFireMetrics(null);
-      }
-
-    } catch (error) {
-      console.error('Error loading FIRE data:', error);
-      toast.error('Errore nel caricamento dei dati FIRE');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSaveSettings = async () => {
-    if (!user) return;
-
-    try {
-      setSaving(true);
-      const newWR = parseFloat(tempWithdrawalRate);
-      const newPAE = tempPlannedAnnualExpenses.trim() !== '' ? parseFloat(tempPlannedAnnualExpenses) : null;
-
-      if (isNaN(newWR) || newWR <= 0 || newWR > 100) {
-        toast.error('Inserisci un Withdrawal Rate valido tra 0 e 100');
-        return;
-      }
-
-      if (newPAE !== null && (isNaN(newPAE) || newPAE < 0)) {
-        toast.error('Inserisci spese annuali previste valide (numero positivo)');
-        return;
-      }
-
-      // Get current settings
-      const currentSettings = await getSettings(user.uid);
-
-      // Update settings with new withdrawal rate and planned expenses
-      await setSettings(user.uid, {
-        userAge: currentSettings?.userAge,
-        riskFreeRate: currentSettings?.riskFreeRate,
-        withdrawalRate: newWR,
-        plannedAnnualExpenses: newPAE ?? undefined,
-        // Preserve dividend settings
-        dividendIncomeCategoryId: currentSettings?.dividendIncomeCategoryId,
-        dividendIncomeSubCategoryId: currentSettings?.dividendIncomeSubCategoryId,
-        targets: currentSettings?.targets || getDefaultTargets(),
+  const mutation = useMutation({
+    mutationFn: (newSettings: { withdrawalRate: number; plannedAnnualExpenses?: number }) => {
+      return setSettings(user!.uid, {
+        ...settings,
+        targets: settings?.targets || getDefaultTargets(),
+        ...newSettings,
       });
-
-      setWithdrawalRate(newWR);
-      setPlannedAnnualExpenses(newPAE);
+    },
+    onSuccess: () => {
       toast.success('Impostazioni FIRE salvate con successo');
-
-      // Reload data with new settings
-      await loadData();
-
-    } catch (error) {
+      // Invalidate and refetch settings
+      queryClient.invalidateQueries({ queryKey: ['settings', user?.uid] });
+    },
+    onError: (error) => {
       console.error('Error saving FIRE settings:', error);
       toast.error('Errore nel salvataggio delle impostazioni FIRE');
-    } finally {
-      setSaving(false);
+    },
+  });
+
+  const handleSaveSettings = () => {
+    const newWR = parseFloat(tempWithdrawalRate);
+    const newPAE = tempPlannedAnnualExpenses.trim() !== '' ? parseFloat(tempPlannedAnnualExpenses) : undefined;
+
+    if (isNaN(newWR) || newWR <= 0 || newWR > 100) {
+      toast.error('Inserisci un Withdrawal Rate valido tra 0 e 100');
+      return;
     }
+
+    if (newPAE !== undefined && (isNaN(newPAE) || newPAE < 0)) {
+      toast.error('Inserisci spese annuali previste valide (numero positivo)');
+      return;
+    }
+
+    mutation.mutate({ withdrawalRate: newWR, plannedAnnualExpenses: newPAE });
   };
 
-  if (loading) {
+  if (isLoadingSettings || isLoadingAssets || (currentNetWorth > 0 && isLoadingFIRE)) {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="text-gray-500">Caricamento...</div>
@@ -156,6 +129,9 @@ export function FireCalculatorTab() {
             <Percent className="h-5 w-5" />
             Impostazioni FIRE
           </CardTitle>
+          <CardDescription>
+            Configura i parametri per il calcolo del tuo percorso FIRE.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2 mb-4">
@@ -194,10 +170,10 @@ export function FireCalculatorTab() {
           </div>
           <Button
             onClick={handleSaveSettings}
-            disabled={saving}
+            disabled={mutation.isPending}
             className="w-full md:w-auto"
           >
-            {saving ? 'Salvataggio...' : 'Salva Impostazioni'}
+            {mutation.isPending ? 'Salvataggio...' : 'Salva Impostazioni'}
           </Button>
         </CardContent>
       </Card>
@@ -248,7 +224,7 @@ export function FireCalculatorTab() {
                     <div
                       className="h-full bg-gradient-to-r from-green-400 to-green-600 transition-all"
                       style={{
-                        width: `${Math.min(fireMetrics.progressToFI, 100)}%`,
+                        width: `${Math.min(fireMetrics.progressToFI * 100, 100)}%`,
                       }}
                     />
                   </div>
@@ -264,7 +240,7 @@ export function FireCalculatorTab() {
           </div>
 
           {/* Planned Metrics Section (if plannedAnnualExpenses is set) */}
-          {plannedFireMetrics && (
+          {plannedFireMetrics && fireMetrics && (
             <>
               <div className="mt-8">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">🎯 Metriche Previste</h2>
@@ -315,7 +291,7 @@ export function FireCalculatorTab() {
                         <div
                           className="h-full bg-gradient-to-r from-purple-400 to-purple-600 transition-all"
                           style={{
-                            width: `${Math.min(plannedFireMetrics.plannedProgressToFI, 100)}%`,
+                            width: `${Math.min(plannedFireMetrics.plannedProgressToFI * 100, 100)}%`,
                           }}
                         />
                       </div>
