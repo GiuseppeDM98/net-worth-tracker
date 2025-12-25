@@ -117,20 +117,22 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
   - **Money-Weighted Return (IRR)**: Internal rate of return using Newton-Raphson iterative solver, shows actual investor return
   - **Sharpe Ratio**: Risk-adjusted performance metric (excess return per unit of volatility)
   - **Volatility**: Annualized standard deviation with ±50% outlier filtering
-  - **Net Cash Flows**: Total contributions minus withdrawals
-  - **Duration**: Investment period in months and years
+  - **Net Cash Flows**: Total contributions minus withdrawals with detailed income/expense breakdown
+  - **Duration**: Investment period in months and years with accurate inclusive counting
 - **7 Time Periods** for flexible analysis:
   - Year-to-Date (YTD), 1 Year, 3 Years, 5 Years, All Time
   - Rolling 12-month and 36-month windows
   - Custom date range selector for precise period analysis
+- **Temporal accuracy**: Cash flows and portfolio values properly aligned to end-of-month snapshots
+- **Enhanced Contributi Netti card**: Shows detailed breakdown (Entrate | Uscite) for full transparency
+- **Comprehensive tooltips**: Each metric includes detailed explanations, formulas, and interpretation guidelines
 - **Automatic cash flow integration**: Derives contributions/withdrawals from expense and income data
 - **Interactive visualizations**:
   - Net Worth Evolution chart: Shows portfolio growth split into contributions vs investment returns
   - Rolling CAGR trend chart: Tracks annualized performance over time
-- **Clickable metric tooltips**: Each metric card has detailed explanation accessible via help icon
 - **Sharpe Ratio configuration**: Uses risk-free rate from user's asset allocation settings
 - **Mobile-responsive design**: Optimized grid layout with clean chart formatting
-- **Methodology section**: Built-in explanations of calculation formulas and interpretations
+- **Methodology section**: Includes "Periodi Temporali e Snapshot" with concrete examples explaining YTD vs 1Y difference
 - **Insufficient data handling**: Clear messaging when period has <2 snapshots or limited data
 
 ### 📄 **PDF Export & Reporting**

@@ -260,12 +260,13 @@ export function calculateVolatility(
 }
 
 /**
- * Calculate months difference between two dates
+ * Calculate number of months between two dates (inclusive)
+ * Example: Jan 2025 to Dec 2025 = 12 months (not 11)
  */
 function calculateMonthsDifference(date1: Date, date2: Date): number {
   const years = date1.getFullYear() - date2.getFullYear();
   const months = date1.getMonth() - date2.getMonth();
-  return years * 12 + months;
+  return years * 12 + months + 1; // +1 to include both start and end month
 }
 
 /**
@@ -286,13 +287,13 @@ export function getSnapshotsForPeriod(
       startDate = new Date(now.getFullYear(), 0, 1); // Jan 1
       break;
     case '1Y':
-      startDate = new Date(now.getFullYear(), now.getMonth() - 12, 1);
+      startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1); // Last 12 months
       break;
     case '3Y':
-      startDate = new Date(now.getFullYear(), now.getMonth() - 36, 1);
+      startDate = new Date(now.getFullYear(), now.getMonth() - 35, 1); // Last 36 months
       break;
     case '5Y':
-      startDate = new Date(now.getFullYear(), now.getMonth() - 60, 1);
+      startDate = new Date(now.getFullYear(), now.getMonth() - 59, 1); // Last 60 months
       break;
     case 'ALL':
       return allSnapshots.filter(s => !s.isDummy); // Return all non-dummy snapshots
@@ -452,6 +453,8 @@ export async function calculatePerformanceForPeriod(
     totalContributions: 0,
     totalWithdrawals: 0,
     netCashFlow: 0,
+    totalIncome: 0,
+    totalExpenses: 0,
     numberOfMonths: 0,
     hasInsufficientData: true,
   };
@@ -471,7 +474,7 @@ export async function calculatePerformanceForPeriod(
   const endSnapshot = sortedSnapshots[sortedSnapshots.length - 1];
 
   const startDate = new Date(startSnapshot.year, startSnapshot.month - 1, 1);
-  const endDate = new Date(endSnapshot.year, endSnapshot.month - 1, 1);
+  const endDate = new Date(endSnapshot.year, endSnapshot.month, 0); // Last day of month
   const numberOfMonths = calculateMonthsDifference(endDate, startDate);
 
   // Get cash flows for period - use pre-fetched if available, otherwise fetch
@@ -482,7 +485,15 @@ export async function calculatePerformanceForPeriod(
   // Calculate net cash flow totals
   let totalContributions = 0;
   let totalWithdrawals = 0;
+  let totalIncome = 0;
+  let totalExpenses = 0;
+
   cashFlows.forEach(cf => {
+    // Sum all income and expenses
+    totalIncome += cf.income;
+    totalExpenses += cf.expenses;
+
+    // Calculate contributions/withdrawals based on net cash flow
     if (cf.netCashFlow > 0) {
       totalContributions += cf.netCashFlow;
     } else {
@@ -540,6 +551,8 @@ export async function calculatePerformanceForPeriod(
     totalContributions,
     totalWithdrawals,
     netCashFlow,
+    totalIncome,
+    totalExpenses,
     numberOfMonths,
     hasInsufficientData: false,
   };
