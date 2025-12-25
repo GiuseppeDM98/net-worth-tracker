@@ -287,13 +287,13 @@ export function getSnapshotsForPeriod(
       startDate = new Date(now.getFullYear(), 0, 1); // Jan 1
       break;
     case '1Y':
-      startDate = new Date(now.getFullYear(), now.getMonth() - 12, 1);
+      startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1); // Last 12 months
       break;
     case '3Y':
-      startDate = new Date(now.getFullYear(), now.getMonth() - 36, 1);
+      startDate = new Date(now.getFullYear(), now.getMonth() - 35, 1); // Last 36 months
       break;
     case '5Y':
-      startDate = new Date(now.getFullYear(), now.getMonth() - 60, 1);
+      startDate = new Date(now.getFullYear(), now.getMonth() - 59, 1); // Last 60 months
       break;
     case 'ALL':
       return allSnapshots.filter(s => !s.isDummy); // Return all non-dummy snapshots
