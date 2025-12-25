@@ -390,12 +390,20 @@ export default function PerformancePage() {
               <h4 className="font-semibold mb-1">Periodi Temporali e Snapshot</h4>
               <p className="text-muted-foreground">
                 <strong>Snapshot Automatici:</strong> Vengono creati automaticamente alla fine di ogni mese (dal 28 al 31) e catturano lo stato del portafoglio a quella data. I dati di patrimonio e cash flow sono allineati alla fine del mese.
+                <br /><br />
+                <strong>YTD (Year-to-Date):</strong> Dall&apos;inizio dell&apos;anno corrente (1° gennaio) fino all&apos;ultimo snapshot disponibile. La durata varia da 1 a 12 mesi a seconda del mese corrente.
                 <br />
-                <strong>YTD (Year-to-Date):</strong> Dall&apos;inizio dell&apos;anno (1° gennaio) fino all&apos;ultimo giorno del mese dell&apos;ultimo snapshot disponibile.
-                <br />
-                <strong>1Y/3Y/5Y:</strong> Ultimi 12/36/60 mesi dalla data attuale, allineati all&apos;ultimo snapshot disponibile.
+                <strong>1Y/3Y/5Y (Ultimi N Anni):</strong> Ultimi 12/36/60 mesi completi dalla data attuale, sempre basati su mesi interi (dal 1° all&apos;ultimo giorno del mese).
                 <br />
                 <strong>Storico:</strong> Tutti i dati disponibili dall&apos;inizio del tracciamento.
+                <br /><br />
+                <em>Esempio (se oggi è dicembre 2025):</em>
+                <br />
+                • YTD = gen-dic 2025 (12 mesi) | 1Y = gen-dic 2025 (12 mesi) → identici
+                <br />
+                <em>Esempio (se oggi è luglio 2025):</em>
+                <br />
+                • YTD = gen-lug 2025 (7 mesi) | 1Y = ago 2024-lug 2025 (12 mesi) → diversi
               </p>
             </div>
             <div>
