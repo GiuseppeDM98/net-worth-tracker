@@ -260,12 +260,13 @@ export function calculateVolatility(
 }
 
 /**
- * Calculate months difference between two dates
+ * Calculate number of months between two dates (inclusive)
+ * Example: Jan 2025 to Dec 2025 = 12 months (not 11)
  */
 function calculateMonthsDifference(date1: Date, date2: Date): number {
   const years = date1.getFullYear() - date2.getFullYear();
   const months = date1.getMonth() - date2.getMonth();
-  return years * 12 + months;
+  return years * 12 + months + 1; // +1 to include both start and end month
 }
 
 /**
