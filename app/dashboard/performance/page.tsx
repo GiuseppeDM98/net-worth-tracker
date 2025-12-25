@@ -238,7 +238,7 @@ export default function PerformancePage() {
             value={metrics.roi}
             format="percentage"
             description="Rendimento complessivo (senza annualizzazione)"
-            tooltip="Misura il guadagno/perdita totale del periodo. Formula: (Valore Finale - Valore Iniziale - Contributi Netti) / Valore Iniziale × 100. Non tiene conto della durata dell'investimento, quindi non confrontabile tra periodi diversi."
+            tooltip="Misura il guadagno/perdita totale del periodo selezionato. Formula: (Valore Finale - Valore Iniziale - Contributi Netti) / Valore Iniziale × 100. IMPORTANTE: Il valore cambia tra periodi diversi (YTD, 1Y, 3Y) perché calcola rendimenti su durate diverse. Per confrontare periodi diversi usa CAGR o TWR che sono annualizzati."
           />
           <MetricCard
             title="CAGR"
@@ -293,7 +293,7 @@ export default function PerformancePage() {
             value={metrics.numberOfMonths}
             format="months"
             description={`Da ${metrics.startDate.toLocaleDateString('it-IT')} a ${metrics.endDate.toLocaleDateString('it-IT')}`}
-            tooltip="Periodo di tempo coperto dall'analisi. La data di inizio è il primo giorno del mese del primo snapshot disponibile nel periodo selezionato. La data di fine è il primo giorno del mese dell'ultimo snapshot disponibile (gli snapshot vengono sempre creati il 1° del mese)."
+            tooltip="Periodo di tempo coperto dall'analisi. La data di inizio è il primo giorno del mese del primo snapshot disponibile. La data di fine è l'ultimo giorno del mese dell'ultimo snapshot disponibile. Gli snapshot automatici vengono creati alla fine di ogni mese (28-31) e includono tutti i cash flow fino a quella data."
           />
         </div>
 
@@ -387,12 +387,13 @@ export default function PerformancePage() {
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             <div>
-              <h4 className="font-semibold mb-1">Periodi Temporali</h4>
+              <h4 className="font-semibold mb-1">Periodi Temporali e Snapshot</h4>
               <p className="text-muted-foreground">
-                <strong>YTD (Year-to-Date):</strong> Dall&apos;inizio dell&apos;anno (1° gennaio) fino al primo giorno dell&apos;ultimo snapshot disponibile.
-                Gli snapshot sono sempre creati il primo giorno del mese.
+                <strong>Snapshot Automatici:</strong> Vengono creati automaticamente alla fine di ogni mese (dal 28 al 31) e catturano lo stato del portafoglio a quella data. I dati di patrimonio e cash flow sono allineati alla fine del mese.
                 <br />
-                <strong>1Y/3Y/5Y:</strong> Ultimi 12/36/60 mesi dalla data attuale.
+                <strong>YTD (Year-to-Date):</strong> Dall&apos;inizio dell&apos;anno (1° gennaio) fino all&apos;ultimo giorno del mese dell&apos;ultimo snapshot disponibile.
+                <br />
+                <strong>1Y/3Y/5Y:</strong> Ultimi 12/36/60 mesi dalla data attuale, allineati all&apos;ultimo snapshot disponibile.
                 <br />
                 <strong>Storico:</strong> Tutti i dati disponibili dall&apos;inizio del tracciamento.
               </p>

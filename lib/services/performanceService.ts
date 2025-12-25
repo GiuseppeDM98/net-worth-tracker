@@ -473,7 +473,7 @@ export async function calculatePerformanceForPeriod(
   const endSnapshot = sortedSnapshots[sortedSnapshots.length - 1];
 
   const startDate = new Date(startSnapshot.year, startSnapshot.month - 1, 1);
-  const endDate = new Date(endSnapshot.year, endSnapshot.month - 1, 1);
+  const endDate = new Date(endSnapshot.year, endSnapshot.month, 0); // Last day of month
   const numberOfMonths = calculateMonthsDifference(endDate, startDate);
 
   // Get cash flows for period - use pre-fetched if available, otherwise fetch
