@@ -42,6 +42,8 @@ export interface PerformanceMetrics {
   totalContributions: number;        // Sum of positive net cash flows
   totalWithdrawals: number;          // Sum of negative net cash flows
   netCashFlow: number;               // Total contributions - withdrawals
+  totalIncome: number;               // Sum of all income in period
+  totalExpenses: number;             // Sum of all expenses in period
   numberOfMonths: number;            // Number of months in period
 
   // Data availability flags

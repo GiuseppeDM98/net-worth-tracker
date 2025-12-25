@@ -452,6 +452,8 @@ export async function calculatePerformanceForPeriod(
     totalContributions: 0,
     totalWithdrawals: 0,
     netCashFlow: 0,
+    totalIncome: 0,
+    totalExpenses: 0,
     numberOfMonths: 0,
     hasInsufficientData: true,
   };
@@ -482,7 +484,15 @@ export async function calculatePerformanceForPeriod(
   // Calculate net cash flow totals
   let totalContributions = 0;
   let totalWithdrawals = 0;
+  let totalIncome = 0;
+  let totalExpenses = 0;
+
   cashFlows.forEach(cf => {
+    // Sum all income and expenses
+    totalIncome += cf.income;
+    totalExpenses += cf.expenses;
+
+    // Calculate contributions/withdrawals based on net cash flow
     if (cf.netCashFlow > 0) {
       totalContributions += cf.netCashFlow;
     } else {
@@ -540,6 +550,8 @@ export async function calculatePerformanceForPeriod(
     totalContributions,
     totalWithdrawals,
     netCashFlow,
+    totalIncome,
+    totalExpenses,
     numberOfMonths,
     hasInsufficientData: false,
   };

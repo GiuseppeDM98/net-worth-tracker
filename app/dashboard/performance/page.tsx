@@ -238,14 +238,14 @@ export default function PerformancePage() {
             value={metrics.roi}
             format="percentage"
             description="Rendimento complessivo (senza annualizzazione)"
-            tooltip="ROI = (Valore Finale - Valore Iniziale - Flussi di Cassa) / Valore Iniziale"
+            tooltip="Misura il guadagno/perdita totale del periodo. Formula: (Valore Finale - Valore Iniziale - Contributi Netti) / Valore Iniziale × 100. Non tiene conto della durata dell'investimento, quindi non confrontabile tra periodi diversi."
           />
           <MetricCard
             title="CAGR"
             value={metrics.cagr}
             format="percentage"
             description="Tasso di crescita annuale composto"
-            tooltip="CAGR considera i flussi di cassa e annualizza il rendimento"
+            tooltip="Rendimento medio annuo che il portafoglio avrebbe dovuto avere per passare dal valore iniziale (+ contributi) al valore finale. Utile per confrontare periodi di durata diversa. Considera i flussi di cassa ma non il loro timing."
             isPrimary
           />
           <MetricCard
@@ -253,7 +253,7 @@ export default function PerformancePage() {
             value={metrics.timeWeightedReturn}
             format="percentage"
             description="Rendimento time-weighted (annualizzato)"
-            tooltip="TWR elimina l'effetto dei flussi di cassa. Metrica ideale per confrontare performance."
+            tooltip="Metrica raccomandata per valutare la performance. Elimina l'effetto del timing dei contributi/prelievi, mostrando la vera capacità di generare rendimento. Ideale per confrontare con benchmark o altri portafogli. Calcolo: rendimenti mensili collegati geometricamente e annualizzati."
             isPrimary
           />
           <MetricCard
@@ -261,7 +261,7 @@ export default function PerformancePage() {
             value={metrics.sharpeRatio}
             format="number"
             description="Rendimento aggiustato per il rischio"
-            tooltip="Sharpe Ratio = (Rendimento - Tasso Risk-Free) / Volatilità. Valori > 1 sono buoni."
+            tooltip={`Misura quanto rendimento extra si ottiene per ogni unità di rischio assunto. Formula: (TWR - Tasso Risk-Free ${formatPercentage(metrics.riskFreeRate)}) / Volatilità. Interpretazione: <1 = scarso, 1-2 = buono, 2-3 = molto buono, >3 = eccellente.`}
           />
         </div>
 
@@ -272,27 +272,28 @@ export default function PerformancePage() {
             value={metrics.volatility}
             format="percentage"
             description="Deviazione standard annualizzata"
-            tooltip="Misura la variabilità dei rendimenti. Valori bassi indicano minore rischio."
+            tooltip="Misura la variabilità dei rendimenti mensili (quanto 'ballano' i risultati). Valori bassi = investimento più stabile e prevedibile. Valori alti = maggiori oscillazioni e rischio. Calcolata sui rendimenti mensili ed espressa in forma annualizzata (× √12)."
           />
           <MetricCard
             title="Money-Weighted Return (IRR)"
             value={metrics.moneyWeightedReturn}
             format="percentage"
             description="Tasso interno di rendimento"
-            tooltip="IRR considera il timing dei flussi di cassa. Mostra il rendimento reale dell'investitore."
+            tooltip="Rendimento personale dell'investitore che tiene conto di QUANDO hai investito o prelevato denaro. Se investi molto prima di una crescita = IRR alto. Se investi prima di un calo = IRR basso. Usa questa metrica per capire quanto hai guadagnato TU con le TUE decisioni di timing."
           />
           <MetricCard
             title="Contributi Netti"
             value={metrics.netCashFlow}
             format="currency"
-            description={`${formatCurrency(metrics.totalContributions)} - ${formatCurrency(metrics.totalWithdrawals)}`}
-            tooltip="Differenza tra contributi (entrate) e prelievi (uscite)"
+            description={`Entrate: ${formatCurrency(metrics.totalIncome)} | Uscite: ${formatCurrency(metrics.totalExpenses)}`}
+            tooltip="Differenza netta tra tutte le entrate (stipendi, dividendi, altri redditi) e uscite (spese quotidiane, acquisti) registrate nella sezione Cashflow. Valore positivo = stai risparmiando, negativo = stai spendendo più di quanto guadagni. NON include variazioni del valore degli investimenti."
           />
           <MetricCard
             title="Durata"
             value={metrics.numberOfMonths}
             format="months"
             description={`Da ${metrics.startDate.toLocaleDateString('it-IT')} a ${metrics.endDate.toLocaleDateString('it-IT')}`}
+            tooltip="Periodo di tempo coperto dall'analisi. La data di inizio è il primo giorno del mese del primo snapshot disponibile nel periodo selezionato. La data di fine è il primo giorno del mese dell'ultimo snapshot disponibile (gli snapshot vengono sempre creati il 1° del mese)."
           />
         </div>
 
@@ -385,6 +386,17 @@ export default function PerformancePage() {
             <CardTitle>Note Metodologiche</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
+            <div>
+              <h4 className="font-semibold mb-1">Periodi Temporali</h4>
+              <p className="text-muted-foreground">
+                <strong>YTD (Year-to-Date):</strong> Dall&apos;inizio dell&apos;anno (1° gennaio) fino al primo giorno dell&apos;ultimo snapshot disponibile.
+                Gli snapshot sono sempre creati il primo giorno del mese.
+                <br />
+                <strong>1Y/3Y/5Y:</strong> Ultimi 12/36/60 mesi dalla data attuale.
+                <br />
+                <strong>Storico:</strong> Tutti i dati disponibili dall&apos;inizio del tracciamento.
+              </p>
+            </div>
             <div>
               <h4 className="font-semibold mb-1">Time-Weighted Return (Raccomandato)</h4>
               <p className="text-muted-foreground">
