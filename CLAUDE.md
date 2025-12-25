@@ -64,11 +64,15 @@ Replace spreadsheet-based portfolio management with a modern, automated solution
 - Sharpe Ratio calculation with configurable risk-free rate from user settings
 - Annualized volatility calculation with outlier filtering (±50% threshold)
 - Interactive charts: Net Worth Evolution (contributions vs returns), Rolling CAGR trends
-- Cash flow integration: Automatic aggregation from expense/income data
-- Clickable metric tooltips with detailed explanations
+- Cash flow integration: Automatic aggregation from expense/income data with temporal alignment
+- **Enhanced Contributi Netti card**: Shows detailed breakdown (Entrate | Uscite) for full transparency
+- **Comprehensive tooltips**: Each metric includes detailed explanations, formulas, and interpretation guidelines
+- **Temporal accuracy**: Cash flows and portfolio values are properly aligned to end-of-month snapshots
+- **Accurate time periods**: YTD (year-to-date) vs 1Y/3Y/5Y (rolling periods) with clear examples
+- **Inclusive month calculations**: Correct duration counting (Jan-Dec = 12 months, not 11)
 - Mobile-responsive grid layout with optimized chart formatting
 - Custom date range selector for flexible period analysis
-- Methodology section explaining calculation formulas and interpretations
+- Methodology section with "Periodi Temporali e Snapshot" explaining snapshot timing and period calculations
 
 **Dividend Tracking & Automation:**
 - Automatic dividend import from Borsa Italiana for Italian stocks/ETFs
@@ -1645,13 +1649,22 @@ User navigates to Hall of Fame → getHallOfFameData(userId)
 ## Current Status (Latest Session)
 
 - **Architecture status**: Next.js App Router + Firebase + React Query + Recharts; no new dependencies added.
-- **Cashflow mobile UX**: Focused on mobile readability for charts and drill-downs; desktop layouts unchanged.
+- **Performance page**: Major accuracy improvements with bug fixes for temporal alignment, month calculations, and time period logic.
 
 ## Implemented in This Session
 
-- **Current Year (Cashflow)**: Responsive chart sizing, compact axes, mobile legend layout, pie labels disabled on mobile, drill-down expense list uses cards on mobile with desktop table preserved, mobile-friendly back button.
-- **Legend density**: "Spese per Categoria" legend capped to top 3 items on mobile.
-- **Total History (Cashflow)**: Mobile toggle for full history vs last 24 months on monthly charts, compact axes/height, dots disabled on mobile, legends capped to top 3 items on category trend charts.
+- **Performance Page Bug Fixes**:
+  - Fixed critical temporal mismatch: Cash flows now correctly aligned to end-of-month snapshots (not start-of-month)
+  - Fixed month calculation off-by-one: Jan-Dec now correctly shows 12 months (was showing 11)
+  - Fixed time period calculations: 1Y/3Y/5Y now show exact months (1Y was showing 13 instead of 12)
+  - Added totalIncome and totalExpenses to PerformanceMetrics type for detailed breakdown
+- **Enhanced Contributi Netti Card**: Shows "Entrate: €X | Uscite: €Y" instead of just "€X - €Y"
+- **Comprehensive Tooltips**: All 8 metrics now have detailed explanations with formulas and interpretation guidelines
+- **Improved Documentation**:
+  - Added "Periodi Temporali e Snapshot" section with concrete examples
+  - Clarified YTD vs 1Y difference (YTD = year-to-date, 1Y = rolling 12 months)
+  - Explained snapshot creation timing (28-31 of each month)
+  - Added examples showing when YTD and 1Y are identical vs different
 
 ## Key Technical Decisions
 
