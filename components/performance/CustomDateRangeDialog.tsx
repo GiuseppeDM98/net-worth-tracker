@@ -32,8 +32,12 @@ export function CustomDateRangeDialog({
       return;
     }
 
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    // Crea date in timezone locale (non UTC) per evitare problemi di offset
+    const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
+    const start = new Date(startYear, startMonth - 1, startDay);
+
+    const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
+    const end = new Date(endYear, endMonth - 1, endDay);
 
     if (start >= end) {
       toast.error('La data di inizio deve essere precedente alla data di fine');
