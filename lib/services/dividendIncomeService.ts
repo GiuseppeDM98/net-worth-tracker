@@ -9,6 +9,7 @@ import { toDate } from '@/lib/utils/dateHelpers';
 /**
  * Create an expense entry from a dividend
  * Returns the created expense ID
+ * Uses EUR-converted amount if available, otherwise uses original currency
  */
 export async function createExpenseFromDividend(
   dividend: Dividend,
@@ -21,6 +22,12 @@ export async function createExpenseFromDividend(
     const now = Timestamp.now();
     const paymentDate = toDate(dividend.paymentDate);
 
+    // Determine amount and currency to use
+    // Prefer EUR-converted amount if available (for non-EUR dividends)
+    const useEurAmount = dividend.currency.toUpperCase() !== 'EUR' && dividend.netAmountEur !== undefined;
+    const expenseAmount = useEurAmount ? dividend.netAmountEur! : dividend.netAmount;
+    const expenseCurrency = useEurAmount ? 'EUR' : dividend.currency;
+
     // Create expense with dividend data using Admin SDK
     const expenseData = {
       userId: dividend.userId,
@@ -29,12 +36,12 @@ export async function createExpenseFromDividend(
       categoryName,
       subCategoryId: subCategoryId || null,
       subCategoryName: subCategoryName || null,
-      amount: dividend.netAmount, // Use net amount (after tax)
-      currency: dividend.currency,
+      amount: expenseAmount, // Use EUR amount if available, otherwise net amount
+      currency: expenseCurrency, // EUR if converted, otherwise original currency
       date: Timestamp.fromDate(paymentDate),
       notes: `Dividendo ${dividend.assetTicker} - ${dividend.assetName}${
-        dividend.notes ? ` | ${dividend.notes}` : ''
-      }`,
+        useEurAmount ? ` (${dividend.netAmount.toFixed(2)} ${dividend.currency} convertiti)` : ''
+      }${dividend.notes ? ` | ${dividend.notes}` : ''}`,
       createdAt: now,
       updatedAt: now,
     };
@@ -46,6 +53,7 @@ export async function createExpenseFromDividend(
       expenseId: expenseRef.id,
     } as any);
 
+    console.log(`[dividendIncomeService] Created expense in ${expenseCurrency} (amount: ${expenseAmount.toFixed(2)})`);
     return expenseRef.id;
   } catch (error) {
     console.error('Error creating expense from dividend:', error);
@@ -55,6 +63,7 @@ export async function createExpenseFromDividend(
 
 /**
  * Update an existing expense entry from a dividend
+ * Uses EUR-converted amount if available, otherwise uses original currency
  */
 export async function updateExpenseFromDividend(
   dividend: Dividend,
@@ -65,18 +74,26 @@ export async function updateExpenseFromDividend(
   try {
     const paymentDate = toDate(dividend.paymentDate);
 
+    // Determine amount and currency to use
+    // Prefer EUR-converted amount if available (for non-EUR dividends)
+    const useEurAmount = dividend.currency.toUpperCase() !== 'EUR' && dividend.netAmountEur !== undefined;
+    const expenseAmount = useEurAmount ? dividend.netAmountEur! : dividend.netAmount;
+    const expenseCurrency = useEurAmount ? 'EUR' : dividend.currency;
+
     // Update expense using Admin SDK
     await adminDb.collection('expenses').doc(expenseId).update({
-      amount: dividend.netAmount, // Use net amount (after tax)
-      currency: dividend.currency,
+      amount: expenseAmount, // Use EUR amount if available, otherwise net amount
+      currency: expenseCurrency, // EUR if converted, otherwise original currency
       date: Timestamp.fromDate(paymentDate),
       notes: `Dividendo ${dividend.assetTicker} - ${dividend.assetName}${
-        dividend.notes ? ` | ${dividend.notes}` : ''
-      }`,
+        useEurAmount ? ` (${dividend.netAmount.toFixed(2)} ${dividend.currency} convertiti)` : ''
+      }${dividend.notes ? ` | ${dividend.notes}` : ''}`,
       categoryName,
       subCategoryName: subCategoryName || null,
       updatedAt: Timestamp.now(),
     });
+
+    console.log(`[dividendIncomeService] Updated expense in ${expenseCurrency} (amount: ${expenseAmount.toFixed(2)})`);
   } catch (error) {
     console.error('Error updating expense from dividend:', error);
     throw new Error('Failed to update expense from dividend');

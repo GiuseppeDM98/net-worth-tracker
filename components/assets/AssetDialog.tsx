@@ -466,14 +466,17 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
             <Input
               id="isin"
               {...register('isin')}
-              placeholder="IT0003128367"
-              disabled={selectedType !== 'stock' || selectedAssetClass !== 'equity'}
+              placeholder="IE00B3RBWM25"
+              disabled={
+                (selectedType !== 'stock' && selectedType !== 'etf') ||
+                selectedAssetClass !== 'equity'
+              }
             />
             {errors.isin && (
               <p className="text-sm text-red-500">{errors.isin.message}</p>
             )}
             <p className="text-xs text-muted-foreground">
-              Necessario solo per azioni italiane su Borsa Italiana
+              Necessario per azioni ed ETF quotati su Borsa Italiana con dividendi
             </p>
           </div>
 

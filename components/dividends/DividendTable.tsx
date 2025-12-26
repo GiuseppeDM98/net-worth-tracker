@@ -13,7 +13,13 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Trash2, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Edit, Trash2, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
@@ -50,6 +56,53 @@ export function DividendTable({ dividends, onEdit, onRefresh }: DividendTablePro
 
   const formatDate = (date: Date | string | Timestamp): string => {
     return format(toDate(date), 'dd/MM/yyyy', { locale: it });
+  };
+
+  /**
+   * Helper component to display amount with EUR conversion if available
+   */
+  const AmountWithConversion = ({
+    originalAmount,
+    eurAmount,
+    currency,
+    textColor = '',
+  }: {
+    originalAmount: number;
+    eurAmount?: number;
+    currency: string;
+    textColor?: string;
+  }) => {
+    const isEur = currency.toUpperCase() === 'EUR';
+    const hasConversion = !isEur && eurAmount !== undefined;
+
+    if (isEur || !hasConversion) {
+      // Show original amount only
+      return (
+        <span className={textColor}>
+          {formatCurrency(originalAmount, currency)}
+        </span>
+      );
+    }
+
+    // Show EUR amount with tooltip showing original
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className={`flex items-center justify-end gap-1 ${textColor} cursor-help`}>
+              <span>{formatCurrency(eurAmount, 'EUR')}</span>
+              <Info className="h-3 w-3 text-muted-foreground" />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="left">
+            <div className="text-xs space-y-1">
+              <div>Originale: {formatCurrency(originalAmount, currency)}</div>
+              <div className="text-muted-foreground">Convertito al tasso corrente</div>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
   };
 
   const handleDelete = async (dividend: Dividend) => {
@@ -237,13 +290,27 @@ export function DividendTable({ dividends, onEdit, onRefresh }: DividendTablePro
                 </TableCell>
                 <TableCell className="text-right text-sm">{dividend.quantity}</TableCell>
                 <TableCell className="text-right font-medium">
-                  {formatCurrency(dividend.grossAmount)}
+                  <AmountWithConversion
+                    originalAmount={dividend.grossAmount}
+                    eurAmount={dividend.grossAmountEur}
+                    currency={dividend.currency}
+                  />
                 </TableCell>
-                <TableCell className="text-right font-medium text-red-600">
-                  {formatCurrency(dividend.taxAmount)}
+                <TableCell className="text-right font-medium">
+                  <AmountWithConversion
+                    originalAmount={dividend.taxAmount}
+                    eurAmount={dividend.taxAmountEur}
+                    currency={dividend.currency}
+                    textColor="text-red-600"
+                  />
                 </TableCell>
-                <TableCell className="text-right font-medium text-green-600">
-                  {formatCurrency(dividend.netAmount)}
+                <TableCell className="text-right font-medium">
+                  <AmountWithConversion
+                    originalAmount={dividend.netAmount}
+                    eurAmount={dividend.netAmountEur}
+                    currency={dividend.currency}
+                    textColor="text-green-600"
+                  />
                 </TableCell>
                 <TableCell>
                   <Badge
