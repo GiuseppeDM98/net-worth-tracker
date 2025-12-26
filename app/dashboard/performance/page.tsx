@@ -327,7 +327,7 @@ export default function PerformancePage() {
                     stackId="1"
                     stroke="#82ca9d"
                     fill="#82ca9d"
-                    name="Rendimenti"
+                    name="Guadagni/Perdite"
                   />
                   <Line
                     type="monotone"
@@ -386,6 +386,32 @@ export default function PerformancePage() {
             <CardTitle>Note Metodologiche</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
+            <div>
+              <h4 className="font-semibold mb-1">Grafico: Evoluzione Patrimonio</h4>
+              <p className="text-muted-foreground">
+                Questo grafico mostra la composizione del patrimonio nel tempo, separando visivamente due componenti:
+                <br /><br />
+                <strong>Contributi (area blu):</strong> La somma cumulativa di tutti i flussi di cassa netti (entrate - uscite) registrati nella sezione Cashflow. Rappresenta quanto denaro hai effettivamente versato o prelevato nel tempo.
+                <br />
+                <strong>Guadagni/Perdite (area verde):</strong> La differenza tra il patrimonio totale e i contributi cumulativi. Mostra quanto valore è stato generato (o perso) dagli investimenti grazie alle variazioni di prezzo degli asset.
+                <br />
+                <strong>Patrimonio Totale (linea arancione):</strong> Il net worth complessivo, dato dalla somma di contributi + guadagni/perdite.
+                <br /><br />
+                <em>Interpretazione:</em> Se l&apos;area verde cresce, i tuoi investimenti stanno generando rendimenti positivi. Se si riduce, stai perdendo valore sugli investimenti. Questo grafico ti permette di vedere quanto del patrimonio attuale deriva dal risparmio (contributi) rispetto agli investimenti (guadagni/perdite).
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-1">Grafico: CAGR Rolling 12 Mesi</h4>
+              <p className="text-muted-foreground">
+                Questo grafico mostra l&apos;andamento del rendimento annualizzato calcolato su finestre mobili di 12 mesi consecutive.
+                <br /><br />
+                <strong>Finestra Mobile (Rolling):</strong> Per ogni punto del grafico viene calcolato il CAGR (Compound Annual Growth Rate) considerando i 12 mesi precedenti. Ad esempio, il punto di aprile 2025 mostra il CAGR del periodo maggio 2024 - aprile 2025.
+                <br />
+                <strong>Utilità:</strong> Permette di vedere se la performance sta migliorando o peggiorando nel tempo, eliminando l&apos;effetto di singoli mesi fortunati/sfortunati. È più stabile del rendimento mensile ma più reattivo del rendimento totale dall&apos;inizio.
+                <br /><br />
+                <em>Interpretazione:</em> Una linea in salita indica che la performance è in miglioramento nelle ultime 12 mesi. Una linea in discesa segnala un peggioramento. Le oscillazioni riflettono la volatilità del portafoglio.
+              </p>
+            </div>
             <div>
               <h4 className="font-semibold mb-1">Periodi Temporali e Snapshot</h4>
               <p className="text-muted-foreground">
