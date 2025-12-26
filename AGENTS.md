@@ -673,7 +673,9 @@ setCount(count + 1);
 
 ---
 
-## Recent Mobile Chart Patterns (Cashflow)
+## Mobile Optimization Patterns
+
+### Chart Optimizations (Cashflow, Performance)
 
 - **Mobile detection**: Use `matchMedia('(max-width: 639px)')` in client components to gate mobile-only behavior.
 - **Chart density control**: Slice monthly datasets to the last 24 months on mobile with a toggle for full history.
@@ -681,11 +683,85 @@ setCount(count + 1);
 - **Legend trimming**: Use custom `Legend` content to cap items to top 3 on mobile for category charts.
 - **UI layout**: Drill-down lists use cards on mobile; tables remain for desktop.
 
-## Common Errors to Avoid (Learned This Session)
+### Form/Settings Page Patterns (Settings)
 
+**When optimizing complex form pages for mobile, follow these patterns:**
+
+1. **Responsive Spacing Reduction**:
+   - Container: `space-y-4 sm:space-y-6` (saves ~80-120px total height)
+   - Card padding: `p-4 sm:p-6` (saves ~32px per card)
+   - Section margins: `mt-4 sm:mt-8`
+
+2. **Button Stacking**:
+   - Action button containers: `flex flex-col sm:flex-row gap-2 w-full sm:w-auto`
+   - Individual buttons: `w-full sm:w-auto`
+   - Benefit: Larger touch targets (56px height minimum), thumb-friendly
+
+3. **Section Header Stacking**:
+   - Headers with actions: `flex-col sm:flex-row items-start sm:items-center justify-between gap-3`
+   - Action buttons: `w-full sm:w-auto`
+   - Prevents text overflow and horizontal scroll
+
+4. **Touch-Friendly Spacing**:
+   - Increase gap between adjacent action buttons: `gap-2` → `gap-3`
+   - Prevents accidental taps on small touch targets
+
+5. **Nested Section Optimization**:
+   - Reduce left margin/padding for nested content on mobile
+   - Sub-containers: `p-2 sm:p-3`
+   - Indentation: `ml-3 sm:ml-6`, `pl-2 sm:pl-4`
+   - Nested lists: `ml-2 sm:ml-4`
+
+6. **Label Wrapping with Inline Links**:
+   - Container: `flex-col sm:flex-row items-start sm:items-center`
+   - Label: Add `block` class to force proper multi-line wrapping
+   - Switch/Checkbox: Add `shrink-0` to prevent compression
+   - Fixes awkward text wrapping when labels contain inline links
+
+7. **Breakpoint Choice**:
+   - Use `sm:` (640px) for form-heavy pages with inputs
+   - Use `md:` (768px) or custom for visual content (charts, images)
+   - Settings needs more horizontal space sooner → `sm:`
+
+**Pattern Example** (from Settings page):
+```tsx
+{/* Mobile: Stack vertically, Desktop: Horizontal */}
+<div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+  <Button className="w-full sm:w-auto">Action 1</Button>
+  <Button className="w-full sm:w-auto">Action 2</Button>
+</div>
+
+{/* Reduced spacing on mobile */}
+<div className="space-y-4 sm:space-y-6">
+  <Card>
+    <CardContent className="p-4 sm:p-6">
+      {/* Content */}
+    </CardContent>
+  </Card>
+</div>
+
+{/* Label with inline link - proper wrapping */}
+<div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+  <Switch className="shrink-0" />
+  <Label className="text-sm block">
+    Some text with <a href="...">inline link</a>
+  </Label>
+</div>
+```
+
+## Common Errors to Avoid
+
+### Mobile Chart Errors
 - Rendering full historical monthly series on mobile without a toggle.
 - Leaving dense legends/labels enabled on mobile (pie labels, long legend lists).
 - Using default axis ticks on mobile for long time series (overlap and unreadable).
+
+### Mobile Form/Layout Errors
+- Fixed spacing/padding without responsive variants (wastes precious vertical space).
+- Small adjacent buttons without sufficient gap (causes accidental taps).
+- Label+Switch/Checkbox without proper wrapping (text wraps awkwardly with inline links).
+- Using only `flex-row` for button groups (forces horizontal scroll on narrow screens).
+- Forgetting `w-full sm:w-auto` on stacked buttons (buttons become tiny on mobile).
 
 ---
 
