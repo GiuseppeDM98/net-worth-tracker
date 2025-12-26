@@ -988,8 +988,9 @@ export default function SettingsPage() {
                 checked={autoCalculate}
                 onCheckedChange={setAutoCalculate}
                 disabled={userAge === undefined || riskFreeRate === undefined}
+                className="shrink-0"
               />
-              <Label htmlFor="autoCalculate" className="text-sm">
+              <Label htmlFor="autoCalculate" className="text-sm block">
                 Calcola automaticamente % Azioni e Obbligazioni (Formula di{' '}
                 <a
                   href="https://www.youtube.com/channel/UCNp1e5n6rlnfm5aWbHe3cJw"
