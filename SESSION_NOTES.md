@@ -39,6 +39,10 @@ Ottimizzare la pagina Settings (`app/dashboard/settings/page.tsx`) per dispositi
 7. ✅ **Main header responsive**: Migliorato layout top page
    - `flex-col sm:flex-row items-start sm:items-center justify-between gap-4`
 
+8. ✅ **Auto-calculate formula switch**: Fix layout testo con link
+   - Container: `flex-col sm:flex-row items-start sm:items-center`
+   - Previene text wrapping strano del link "The Bull" su mobile
+
 **Breakpoint utilizzato**: `sm:` (640px)
 - Mobile: <640px (portrait e landscape)
 - Desktop: ≥640px
