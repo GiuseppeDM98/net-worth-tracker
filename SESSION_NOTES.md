@@ -41,6 +41,8 @@ Ottimizzare la pagina Settings (`app/dashboard/settings/page.tsx`) per dispositi
 
 8. ✅ **Auto-calculate formula switch**: Fix layout testo con link
    - Container: `flex-col sm:flex-row items-start sm:items-center`
+   - Label: `block` per forzare wrapping corretto testo multilinea
+   - Switch: `shrink-0` per prevenire ridimensionamento
    - Previene text wrapping strano del link "The Bull" su mobile
 
 **Breakpoint utilizzato**: `sm:` (640px)
