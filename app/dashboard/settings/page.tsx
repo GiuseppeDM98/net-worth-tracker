@@ -919,20 +919,20 @@ export default function SettingsPage() {
   const isValidTotal = Math.abs(total - 100) < 0.01;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Impostazioni</h1>
           <p className="mt-2 text-gray-600">
             Configura i tuoi target di allocazione del portafoglio
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleReset}>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Button variant="outline" onClick={handleReset} className="w-full sm:w-auto">
             <RotateCcw className="mr-2 h-4 w-4" />
             Ripristina Default
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
+          <Button onClick={handleSave} disabled={saving} className="w-full sm:w-auto">
             <Save className="mr-2 h-4 w-4" />
             {saving ? 'Salvataggio...' : 'Salva'}
           </Button>
@@ -944,8 +944,8 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle>Impostazioni Utente</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-6">
+        <CardContent className="p-4 sm:p-6">
+          <div className="space-y-4 sm:space-y-6">
             <div className="grid gap-6 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="userAge">Età (anni)</Label>
@@ -1046,7 +1046,7 @@ export default function SettingsPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 sm:p-6">
           <div className="grid gap-6 md:grid-cols-2">
             {assetClasses.map((assetClass) => {
               const isAutoCalculated = autoCalculate && (assetClass === 'equity' || assetClass === 'bonds');
@@ -1165,7 +1165,7 @@ export default function SettingsPage() {
               </div>
             </CardHeader>
             {state.expanded && state.subCategoryEnabled && (
-              <CardContent>
+              <CardContent className="p-4 sm:p-6">
                 <div className="space-y-4">
                   {/* Sub-Targets */}
                   <div className="space-y-3">
@@ -1177,7 +1177,7 @@ export default function SettingsPage() {
                         const isValidSpecificTotal = Math.abs(specificAssetTotal - 100) < 0.01;
 
                         return (
-                          <div key={originalIndex} className="space-y-3 border rounded-lg p-3 bg-gray-50">
+                          <div key={originalIndex} className="space-y-3 border rounded-lg p-2 sm:p-3 bg-gray-50">
                             {/* Main subcategory row */}
                             <div className="flex items-center gap-3">
                               <div className="flex-1">
@@ -1230,7 +1230,7 @@ export default function SettingsPage() {
 
                             {/* Specific Assets Section */}
                             {target.name && (
-                              <div className="ml-6 space-y-3 border-l-2 border-blue-200 pl-4">
+                              <div className="ml-3 sm:ml-6 space-y-3 border-l-2 border-blue-200 pl-2 sm:pl-4">
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2">
                                     <Switch
@@ -1281,7 +1281,7 @@ export default function SettingsPage() {
                                     </Button>
 
                                     {target.expanded && (
-                                      <div className="space-y-2 ml-4">
+                                      <div className="space-y-2 ml-2 sm:ml-4">
                                         {target.specificAssets && target.specificAssets.map((specificAsset, specificIndex) => (
                                           <div key={specificIndex} className="flex items-center gap-2">
                                             <Input
@@ -1400,20 +1400,20 @@ export default function SettingsPage() {
       </div>
 
       {/* Expense Categories Management Section */}
-      <Card className="mt-8">
+      <Card className="mt-4 sm:mt-8">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Receipt className="h-5 w-5" />
               <CardTitle>Impostazioni Tracciamento Spese</CardTitle>
             </div>
-            <Button onClick={handleAddExpenseCategory} size="sm">
+            <Button onClick={handleAddExpenseCategory} size="sm" className="w-full sm:w-auto">
               <Plus className="mr-2 h-4 w-4" />
               Nuova Categoria
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 sm:p-6">
           {loadingCategories ? (
             <p className="text-sm text-muted-foreground">Caricamento categorie...</p>
           ) : (
@@ -1451,7 +1451,7 @@ export default function SettingsPage() {
                                 )}
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-3">
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -1480,14 +1480,14 @@ export default function SettingsPage() {
       </Card>
 
       {/* Dividend Settings Section */}
-      <Card className="mt-8">
+      <Card className="mt-4 sm:mt-8">
         <CardHeader>
           <div className="flex items-center gap-2">
             <Coins className="h-5 w-5 text-green-600" />
             <CardTitle>Impostazioni Dividendi</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-6">
           <p className="text-sm text-muted-foreground">
             Configura la categoria per le entrate automatiche da dividendi
           </p>
@@ -1599,14 +1599,14 @@ export default function SettingsPage() {
 
       {/* Development Features Section */}
       {enableTestSnapshots && (
-        <Card className="mt-8 border-orange-200 bg-orange-50">
+        <Card className="mt-4 sm:mt-8 border-orange-200 bg-orange-50">
           <CardHeader>
             <div className="flex items-center gap-2">
               <FlaskConical className="h-5 w-5 text-orange-600" />
               <CardTitle className="text-orange-900">Funzionalità di Sviluppo</CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="p-4 sm:p-6 space-y-4">
             <div className="rounded-lg bg-orange-100 border border-orange-300 p-4">
               <p className="text-sm text-orange-900 font-semibold">⚠️ Attenzione</p>
               <p className="text-sm text-orange-800 mt-1">
