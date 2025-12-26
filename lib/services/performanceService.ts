@@ -299,7 +299,8 @@ export function getSnapshotsForPeriod(
       return allSnapshots.filter(s => !s.isDummy); // Return all non-dummy snapshots
     case 'CUSTOM':
       if (!customStartDate || !customEndDate) return [];
-      startDate = customStartDate;
+      // Normalizza al primo giorno del mese in timezone locale per allineamento con snapshots
+      startDate = new Date(customStartDate.getFullYear(), customStartDate.getMonth(), 1);
       endDate = customEndDate;
       break;
     default:
