@@ -123,7 +123,15 @@ Estendere dividend tracking automatico agli ETF con gestione conversione valuta 
   - Funzione `scrapeDividendsByIsin()` ora accetta parametro `assetType` (default 'stock')
   - URL selezionato dinamicamente: `assetType === 'etf' ? ETF_URL : STOCK_URL`
   - Aggiornati tutti i call sites: API route `/api/dividends/scrape` e cron job `/api/cron/daily-dividend-processing`
-- **Test**: VWRL.MI (IE00B3RBWM25) pronto per test finale con URL corretto
+- **Test**: VWRL.MI (IE00B3RBWM25) funziona correttamente ✅
+
+**#2 - DividendDialog date conversion error** (fix post-test)
+- **Problema**: Cliccando su Edit nella tabella dividendi, errore "dividend.exDate.toDate is not a function"
+- **Causa**: Dividendi caricati da API hanno date serializzate come stringhe in JSON, non Date/Timestamp objects
+- **Fix**: Sostituito logica manuale `instanceof Date` / cast a `Timestamp` con helper `toDate()` da `dateHelpers.ts`
+- **Helper `toDate()`**: Gestisce tutti i formati (Date, Timestamp, string ISO, undefined/null)
+- **File modificato**: `components/dividends/DividendDialog.tsx`
+- **Test**: Modificare dividendo esistente funziona correttamente ✅
 
 ## Nuove Dipendenze
 Nessuna - usata solo API pubblica Frankfurter (no package npm richiesto).
