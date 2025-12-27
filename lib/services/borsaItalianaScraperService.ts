@@ -1,7 +1,10 @@
 import * as cheerio from 'cheerio';
 import { ScrapedDividend, DividendType } from '@/types/dividend';
+import { AssetType } from '@/types/assets';
 
-const BORSA_ITALIANA_BASE_URL = 'https://www.borsaitaliana.it/borsa/quotazioni/azioni/elenco-completo-dividendi.html';
+// Base URLs for different asset types
+const BORSA_ITALIANA_STOCK_URL = 'https://www.borsaitaliana.it/borsa/quotazioni/azioni/elenco-completo-dividendi.html';
+const BORSA_ITALIANA_ETF_URL = 'https://www.borsaitaliana.it/borsa/etf/dividendi.html';
 
 /**
  * Check if a string looks like a date in DD/MM/YY or DD/MM/YYYY format
@@ -71,11 +74,15 @@ function parseItalianNumber(numberString: string): number {
  * Scrape dividends by ISIN from Borsa Italiana website
  * Returns array of scraped dividend data
  */
-export async function scrapeDividendsByIsin(isin: string): Promise<ScrapedDividend[]> {
+export async function scrapeDividendsByIsin(
+  isin: string,
+  assetType: AssetType = 'stock'
+): Promise<ScrapedDividend[]> {
   try {
-    // Construct URL with ISIN parameter
-    const url = `${BORSA_ITALIANA_BASE_URL}?isin=${isin}&lang=it`;
-    console.log(`[Scraper] Fetching URL: ${url}`);
+    // Select correct URL based on asset type
+    const baseUrl = assetType === 'etf' ? BORSA_ITALIANA_ETF_URL : BORSA_ITALIANA_STOCK_URL;
+    const url = `${baseUrl}?isin=${isin}&lang=it`;
+    console.log(`[Scraper] Fetching URL for ${assetType.toUpperCase()}: ${url}`);
 
     // Fetch HTML
     const response = await fetch(url);

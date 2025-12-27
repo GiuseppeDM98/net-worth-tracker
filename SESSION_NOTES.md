@@ -95,7 +95,9 @@ Estendere dividend tracking automatico agli ETF con gestione conversione valuta 
 3. `lib/services/dividendService.ts` - Conversione automatica create/update
 4. `components/dividends/DividendTable.tsx` - Visualizzazione EUR con tooltip
 5. `lib/services/dividendIncomeService.ts` - Expense in EUR quando possibile
-6. `lib/services/borsaItalianaScraperService.ts` - Fix ETF vs Stock table detection (2 iterazioni)
+6. `lib/services/borsaItalianaScraperService.ts` - Fix ETF vs Stock table detection + URL routing (3 iterazioni)
+7. `app/api/dividends/scrape/route.ts` - Passa asset.type a scraper
+8. `app/api/cron/daily-dividend-processing/route.ts` - Passa asset.type a scraper
 
 ## Bug Risolti
 
@@ -106,14 +108,22 @@ Estendere dividend tracking automatico agli ETF con gestione conversione valuta 
   - `isDateFormat()` validator per riconoscere date DD/MM/YY
   - Ricerca dinamica per contenuto
   - Logging debug
-- **Fix #2 (finale)**: Rilevamento formato + parser dedicati
+- **Fix #2**: Rilevamento formato + parser dedicati
   - Pulizia whitespace (`\t\n\r`) nelle celle
   - Auto-detect: 4 celle = ETF, 7+ celle = Stock
   - **ETF**: posizioni fisse (Cell 0=ex-date, 1=amount, 2=currency, 3=payment-date)
   - **Stock**: pattern matching dinamico
   - Mapping valuta italiana ("Dollaro Usa" → "USD")
   - Tipo dividendo ETF sempre "ordinary" (nessuna colonna tipo in tabella ETF)
-- **Test**: VWRL.MI (IE00B3RBWM25) funziona con dividendi USD
+- **Fix #3 (finale - URL routing)**: URL hardcodato per sole azioni
+  - **Problema identificato da utente**: URL usato era `https://www.borsaitaliana.it/borsa/azioni/listino-a-z.html` invece di `https://www.borsaitaliana.it/borsa/etf/dividendi.html`
+  - Cambiato da singolo `BORSA_ITALIANA_BASE_URL` a due costanti separate
+  - `BORSA_ITALIANA_STOCK_URL`: `/borsa/quotazioni/azioni/elenco-completo-dividendi.html`
+  - `BORSA_ITALIANA_ETF_URL`: `/borsa/etf/dividendi.html`
+  - Funzione `scrapeDividendsByIsin()` ora accetta parametro `assetType` (default 'stock')
+  - URL selezionato dinamicamente: `assetType === 'etf' ? ETF_URL : STOCK_URL`
+  - Aggiornati tutti i call sites: API route `/api/dividends/scrape` e cron job `/api/cron/daily-dividend-processing`
+- **Test**: VWRL.MI (IE00B3RBWM25) pronto per test finale con URL corretto
 
 ## Nuove Dipendenze
 Nessuna - usata solo API pubblica Frankfurter (no package npm richiesto).

@@ -81,9 +81,9 @@ export async function GET(request: NextRequest) {
         // Scrape dividends for each asset
         for (const asset of assetsWithIsin) {
           try {
-            console.log(`Scraping dividends for ${asset.ticker} (ISIN: ${asset.isin})`);
+            console.log(`Scraping dividends for ${asset.ticker} (ISIN: ${asset.isin}, Type: ${asset.type})`);
 
-            const scrapedDividends = await scrapeDividendsByIsin(asset.isin!);
+            const scrapedDividends = await scrapeDividendsByIsin(asset.isin!, asset.type);
 
             if (scrapedDividends.length === 0) {
               continue;
