@@ -606,6 +606,202 @@ try {
 - Log full error to console for debugging
 - Use `toast.loading()` for long operations
 
+### Date Handling with Firestore
+
+**CRITICAL**: API responses serialize Firestore Timestamps as ISO strings, not Date objects.
+
+**Problem**:
+```typescript
+// ❌ WRONG - Will fail if dividend.exDate is a string from API
+const exDate = dividend.exDate instanceof Date
+  ? dividend.exDate
+  : (dividend.exDate as Timestamp).toDate();
+```
+
+**Solution**: Always use `toDate()` helper from `lib/utils/dateHelpers.ts`:
+```typescript
+// ✅ CORRECT - Handles Date, Timestamp, string, undefined/null
+import { toDate } from '@/lib/utils/dateHelpers';
+
+const exDate = toDate(dividend.exDate);
+const paymentDate = toDate(dividend.paymentDate);
+```
+
+**The `toDate()` helper handles**:
+- `Date` objects → returns as-is
+- `Timestamp` objects → calls `.toDate()`
+- ISO strings → `new Date(string)`
+- `undefined`/`null` → returns `new Date()`
+
+**When to use**:
+- ✅ Reading dates from API responses
+- ✅ Converting Firestore data in components
+- ✅ Formatting dates for display
+- ❌ NOT needed for form inputs (already Date objects)
+
+**Example from DividendDialog.tsx**:
+```typescript
+useEffect(() => {
+  if (dividend) {
+    // Use toDate helper instead of manual instanceof checks
+    const exDate = toDate(dividend.exDate);
+    const paymentDate = toDate(dividend.paymentDate);
+
+    reset({ exDate, paymentDate, ...otherFields });
+  }
+}, [dividend]);
+```
+
+### Currency Conversion (Dividends)
+
+**Service**: `lib/services/currencyConversionService.ts` - Frankfurter API integration
+
+**Features**:
+- Converts USD/GBP/CHF to EUR (app's base currency)
+- 24-hour in-memory cache to reduce API calls
+- Graceful fallback to stale cache if API fails
+- No npm package needed (uses native fetch)
+
+**Usage Pattern**:
+```typescript
+import { convertToEur, convertMultipleToEur } from '@/lib/services/currencyConversionService';
+
+// Single conversion
+const amountEur = await convertToEur(100, 'USD'); // ~92 EUR
+
+// Batch conversion (efficient)
+const [gross, tax, net] = await convertMultipleToEur([100, 26, 74], 'USD');
+```
+
+**Integration Example** (from dividendService.ts):
+```typescript
+// Auto-convert if currency is not EUR
+if (dividendData.currency.toUpperCase() !== 'EUR') {
+  try {
+    const exchangeRate = await getExchangeRateToEur(dividendData.currency);
+    const [grossEur, taxEur, netEur] = await convertMultipleToEur(
+      [grossAmount, taxAmount, netAmount],
+      dividendData.currency
+    );
+
+    // Store both original and EUR amounts
+    dividendDoc = {
+      ...dividendDoc,
+      grossAmountEur: grossEur,
+      taxAmountEur: taxEur,
+      netAmountEur: netEur,
+      exchangeRate: exchangeRate, // For audit trail
+    };
+  } catch (error) {
+    // Graceful degradation - continue without EUR conversion
+    console.error('Currency conversion failed:', error);
+  }
+}
+```
+
+**UI Display Pattern** (from DividendTable.tsx):
+```typescript
+// Show EUR with tooltip for original currency
+{dividend.currency !== 'EUR' && dividend.netAmountEur ? (
+  <Tooltip>
+    <TooltipTrigger>
+      <div className="flex items-center gap-1">
+        <span>{formatCurrency(dividend.netAmountEur, 'EUR')}</span>
+        <Info className="h-3 w-3" />
+      </div>
+    </TooltipTrigger>
+    <TooltipContent>
+      Originale: {formatCurrency(dividend.netAmount, dividend.currency)}
+    </TooltipContent>
+  </Tooltip>
+) : (
+  formatCurrency(dividend.netAmount, dividend.currency)
+)}
+```
+
+**Key Decisions**:
+- EUR amounts are **optional fields** (only present if currency !== EUR)
+- Exchange rate saved for transparency and audit
+- Expenses created using EUR amounts when available (app's base currency)
+- Original amounts preserved and shown in tooltips
+
+### Borsa Italiana Scraper (Dividend Tracking)
+
+**Service**: `lib/services/borsaItalianaScraperService.ts` - cheerio-based web scraping
+
+**CRITICAL**: ETF and Stock dividend pages have different HTML table structures.
+
+**Function Signature**:
+```typescript
+scrapeDividendsByIsin(isin: string, assetType: AssetType): Promise<ScrapedDividend[]>
+```
+
+**URL Routing**:
+- **Stocks**: `https://www.borsaitaliana.it/borsa/quotazioni/azioni/elenco-completo-dividendi.html?isin={ISIN}`
+- **ETFs**: `https://www.borsaitaliana.it/borsa/etf/dividendi.html?isin={ISIN}&lang=it`
+
+**Table Structure Detection**:
+```typescript
+// ETF tables: 4 columns (ex-date, amount, currency, payment-date)
+// Stock tables: 7+ columns (includes type, notes, etc.)
+
+const cellTexts = cells.map(cell => $(cell).text().trim()).get();
+const isETFTable = cellTexts.length === 4;
+const isStockTable = cellTexts.length >= 7;
+
+if (isETFTable) {
+  // Fixed positions: Cell 0=ex-date, 1=amount, 2=currency, 3=payment-date
+  exDateText = cellTexts[0];
+  dividendPerShareText = cellTexts[1];
+  currencyText = cellTexts[2]; // "Dollaro Usa" → map to "USD"
+  paymentDateText = cellTexts[3];
+  dividendType = 'ordinary'; // ETF tables don't have type column
+}
+```
+
+**Key Differences**:
+| Feature | Stock Table | ETF Table |
+|---------|-------------|-----------|
+| Columns | 7+ columns | 4 columns |
+| Parsing | Pattern matching with `isDateFormat()` | Fixed positions |
+| Currency | 3-letter code (USD) | Italian name ("Dollaro Usa") |
+| Dividend Type | Has type column | Always "ordinary" |
+| Whitespace | Clean | Excessive `\t\n\r` - requires cleaning |
+
+**Currency Mapping** (ETF only):
+```typescript
+const CURRENCY_MAPPING: Record<string, string> = {
+  'Dollaro Usa': 'USD',
+  'Sterlina': 'GBP',
+  'Franco Svizzero': 'CHF',
+  'Euro': 'EUR',
+};
+```
+
+**Common Errors**:
+- ❌ Using hardcoded cell positions for both ETF and Stock (ETF positions differ)
+- ❌ Forgetting to pass `assetType` parameter to scraper (defaults to 'stock')
+- ❌ Not cleaning whitespace from ETF table cells (`\t\n\r`)
+- ❌ Expecting dividend type in ETF tables (doesn't exist)
+
+**Calling from API Routes**:
+```typescript
+// ✅ CORRECT - Pass asset.type
+const scrapedDividends = await scrapeDividendsByIsin(asset.isin, asset.type);
+
+// ❌ WRONG - Missing assetType (defaults to stock URL)
+const scrapedDividends = await scrapeDividendsByIsin(asset.isin);
+```
+
+**Example Integration** (from `/api/dividends/scrape/route.ts`):
+```typescript
+// Fetch asset to get type
+const asset = await getAssetById(assetId);
+
+// Pass type to scraper for correct URL
+const scrapedDividends = await scrapeDividendsByIsin(asset.isin, asset.type);
+```
+
 ### Color Conventions
 
 **Asset Class Colors** (from `lib/constants/colors.ts`):
@@ -751,6 +947,27 @@ setCount(count + 1);
 
 ## Common Errors to Avoid
 
+### Date Handling Errors
+- ❌ Manual `instanceof Date` checks for API data (use `toDate()` helper instead)
+- ❌ Calling `.toDate()` on strings (will crash - strings don't have this method)
+- ❌ Assuming Firestore Timestamps in API responses (they're serialized as ISO strings)
+- ✅ Always use `toDate()` from `lib/utils/dateHelpers.ts` for date conversions
+
+### Currency Conversion Errors
+- ❌ Hardcoding currency conversions (exchange rates change daily)
+- ❌ Not handling conversion failures gracefully (API can be down)
+- ❌ Forgetting to store exchange rate for audit trail
+- ❌ Not showing original amounts in UI (users want transparency)
+- ✅ Use `currencyConversionService.ts` with try-catch and fallback
+
+### Dividend Scraper Errors
+- ❌ Using hardcoded URL for all asset types (ETF URL differs from Stock URL)
+- ❌ Not passing `assetType` parameter to `scrapeDividendsByIsin()`
+- ❌ Using hardcoded cell positions without checking table structure
+- ❌ Not cleaning whitespace from ETF table cells
+- ❌ Expecting dividend type column in ETF tables (doesn't exist)
+- ✅ Pass `asset.type` to scraper, detect table format, handle both cases
+
 ### Mobile Chart Errors
 - Rendering full historical monthly series on mobile without a toggle.
 - Leaving dense legends/labels enabled on mobile (pie labels, long legend lists).
@@ -785,13 +1002,17 @@ npm run lint         # Run ESLint
 - [ ] Run `npm run lint` before committing
 
 **Key File References**:
-- Type definitions: `types/assets.ts`, `types/performance.ts`
+- Type definitions: `types/assets.ts`, `types/performance.ts`, `types/dividend.ts`
 - Formatting utilities: `lib/utils/formatters.ts`
+- Date utilities: `lib/utils/dateHelpers.ts` (includes `toDate()` helper)
 - Color constants: `lib/constants/colors.ts`
 - Auth context: `contexts/AuthContext.tsx`
 - Firebase config: `lib/firebase/config.ts`
 - Performance calculations: `lib/services/performanceService.ts`
 - Chart utilities: `lib/services/chartService.ts`
+- Currency conversion: `lib/services/currencyConversionService.ts`
+- Dividend scraper: `lib/services/borsaItalianaScraperService.ts`
+- Dividend service: `lib/services/dividendService.ts`
 
 **Adding New Features**:
 1. Define types in `types/` (create new file if needed, e.g., `types/performance.ts`)
