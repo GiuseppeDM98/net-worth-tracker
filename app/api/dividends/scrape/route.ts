@@ -68,8 +68,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Scrape dividend data
-    console.log(`Scraping dividends for asset ${asset.ticker} (ISIN: ${asset.isin})`);
-    const scrapedDividends = await scrapeDividendsByIsin(asset.isin);
+    console.log(`Scraping dividends for asset ${asset.ticker} (ISIN: ${asset.isin}, Type: ${asset.type})`);
+    const scrapedDividends = await scrapeDividendsByIsin(asset.isin, asset.type);
 
     if (scrapedDividends.length === 0) {
       return NextResponse.json({

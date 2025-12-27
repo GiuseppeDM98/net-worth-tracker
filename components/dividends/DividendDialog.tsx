@@ -30,6 +30,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { toDate } from '@/lib/utils/dateHelpers';
 
 const dividendSchema = z.object({
   assetId: z.string().min(1, 'Asset è obbligatorio'),
@@ -149,12 +150,9 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
   // Reset form when dividend changes or dialog opens
   useEffect(() => {
     if (dividend) {
-      const exDate = dividend.exDate instanceof Date
-        ? dividend.exDate
-        : (dividend.exDate as Timestamp).toDate();
-      const paymentDate = dividend.paymentDate instanceof Date
-        ? dividend.paymentDate
-        : (dividend.paymentDate as Timestamp).toDate();
+      // Use toDate helper to handle Date, Timestamp, or string formats
+      const exDate = toDate(dividend.exDate);
+      const paymentDate = toDate(dividend.paymentDate);
 
       reset({
         assetId: dividend.assetId,

@@ -1450,6 +1450,11 @@ See the [LICENSE](./LICENSE) file for the full license text.
 - 🔜 Email notifications (monthly summary)
 - 🔜 Multi-currency full conversion support
 - 🔜 Internationalization (i18n) for multi-language support
+- 🔜 Configurable dividend withholding tax rate: Currently hardcoded at 26% (Italian rate) for automatic dividend scraping. Future enhancement would add global tax rate configuration in user settings with per-dividend override capability. This would support:
+  - Different withholding rates for foreign dividends without double taxation treaties
+  - Distinction between "regime amministrato" (broker-managed) vs "regime dichiarativo" (self-reported) tax regimes
+  - Country-specific tax rates for international portfolios
+  - Note: Manual dividend entry already allows tax rate editing; this enhancement would extend configurability to automatic scraping
 - 🔜 Monte Carlo: Expand asset allocation to include all asset classes (Equity, Bonds, Commodities, Cryptocurrencies, Real Estate, Cash) with configurable percentages
 - 🔜 Monte Carlo: Calculate historical returns and volatility from user snapshots when sufficient data is available (minimum 24 monthly data points per asset class). Display warning message when data is insufficient for specific asset classes (e.g., "⚠️ Asset X: Limited historical data. Using market averages")
 - 🔜 Dummy snapshot generator: Add Commodity asset class generation (currently set to 0%) to match all available asset classes
