@@ -4,6 +4,15 @@ import { ScrapedDividend, DividendType } from '@/types/dividend';
 const BORSA_ITALIANA_BASE_URL = 'https://www.borsaitaliana.it/borsa/quotazioni/azioni/elenco-completo-dividendi.html';
 
 /**
+ * Check if a string looks like a date in DD/MM/YY or DD/MM/YYYY format
+ */
+function isDateFormat(str: string): boolean {
+  const trimmed = str.trim();
+  // Match DD/MM/YY or DD/MM/YYYY
+  return /^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(trimmed);
+}
+
+/**
  * Parse Italian date format (DD/MM/YY or DD/MM/YYYY) to Date object
  */
 function parseItalianDate(dateString: string): Date {
@@ -112,35 +121,100 @@ export async function scrapeDividendsByIsin(isin: string): Promise<ScrapedDivide
       try {
         const cells = $(row).find('td');
 
-        if (cells.length < 7) {
-          // Skip rows that don't have enough data
+        // Debug: Log cell contents for first row to understand structure
+        if (i === 0) {
+          console.log(`[Scraper] First row cell count: ${cells.length}`);
+          cells.each((cellIndex, cell) => {
+            const cellText = $(cell).text().trim();
+            console.log(`[Scraper] Cell ${cellIndex}: "${cellText}"`);
+          });
+        }
+
+        if (cells.length < 5) {
+          // Skip rows that don't have enough data (need at least: amount, currency, 2 dates, type)
           return;
         }
 
-        // Extract data from table cells based on Borsa Italiana structure:
-        // Cell 0: Azioni (stock type - ignored)
-        // Cell 1: Div. Cda (proposed dividend - ignored)
-        // Cell 2: Div. Ass. (final dividend per share - THIS IS WHAT WE NEED)
-        // Cell 3: Divisa (currency)
-        // Cell 4: Stacco (ex-date in DD/MM/YY format)
-        // Cell 5: Pagamento (payment date in DD/MM/YY format)
-        // Cell 6: Tipo Dividendo (dividend type)
+        // Extract all cell texts
+        const cellTexts = cells.map((_, cell) => $(cell).text().trim()).get();
 
-        const dividendPerShareText = $(cells[2]).text().trim() || '';
-        const currencyText = $(cells[3]).text().trim() || '';
-        const exDateText = $(cells[4]).text().trim() || '';
-        const paymentDateText = $(cells[5]).text().trim() || '';
-        const typeText = $(cells[6]).text().trim() || '';
+        // Find date cells by pattern matching
+        let exDateText = '';
+        let paymentDateText = '';
+        let exDateIndex = -1;
+        let paymentDateIndex = -1;
 
-        // Parse dates (DD/MM/YY format)
+        cellTexts.forEach((text, index) => {
+          if (isDateFormat(text)) {
+            if (exDateIndex === -1) {
+              exDateText = text;
+              exDateIndex = index;
+            } else if (paymentDateIndex === -1) {
+              paymentDateText = text;
+              paymentDateIndex = index;
+            }
+          }
+        });
+
+        // Validate we found both dates
+        if (!exDateText || !paymentDateText) {
+          console.warn(`[Scraper] Row ${i}: Could not find both dates, skipping`, cellTexts);
+          return;
+        }
+
+        // Find dividend amount (look for decimal number with comma)
+        let dividendPerShareText = '';
+        for (const text of cellTexts) {
+          if (/^\d+[.,]\d+$/.test(text) || /^\d+$/.test(text)) {
+            // This looks like a number
+            const num = parseItalianNumber(text);
+            if (num > 0 && num < 1000) { // Reasonable dividend range
+              dividendPerShareText = text;
+              break;
+            }
+          }
+        }
+
+        if (!dividendPerShareText) {
+          console.warn(`[Scraper] Row ${i}: Could not find dividend amount, skipping`, cellTexts);
+          return;
+        }
+
+        // Find currency (usually "EUR", "USD", "EURO", "DOLLARO USA", etc.)
+        let currencyText = 'EUR'; // Default
+        for (const text of cellTexts) {
+          const upper = text.toUpperCase();
+          if (upper === 'EUR' || upper === 'EURO') {
+            currencyText = 'EUR';
+            break;
+          } else if (upper === 'USD' || upper.includes('DOLLAR')) {
+            currencyText = 'USD';
+            break;
+          } else if (upper === 'GBP' || upper.includes('STERL')) {
+            currencyText = 'GBP';
+            break;
+          } else if (upper === 'CHF' || upper.includes('FRANC')) {
+            currencyText = 'CHF';
+            break;
+          }
+        }
+
+        // Find dividend type (last text cell usually)
+        let typeText = 'ordinario';
+        const lastCell = cellTexts[cellTexts.length - 1];
+        if (lastCell && lastCell.length > 0 && !/^\d/.test(lastCell) && !isDateFormat(lastCell)) {
+          typeText = lastCell;
+        }
+
+        // Parse dates
         const exDate = parseItalianDate(exDateText);
         const paymentDate = parseItalianDate(paymentDateText);
 
         // Parse dividend per share
         const dividendPerShare = parseItalianNumber(dividendPerShareText);
 
-        // Parse type (convert "EURO" to "EUR")
-        const currency = currencyText.toUpperCase() === 'EURO' ? 'EUR' : currencyText;
+        // Parse currency and type
+        const currency = currencyText.toUpperCase() === 'EURO' ? 'EUR' : currencyText.toUpperCase();
         const dividendType = parseDividendType(typeText);
 
         // Validate parsed data
@@ -150,10 +224,10 @@ export async function scrapeDividendsByIsin(isin: string): Promise<ScrapedDivide
           isNaN(dividendPerShare) ||
           dividendPerShare <= 0
         ) {
-          console.warn(`Invalid dividend data in row, skipping:`, {
-            exDateText,
-            paymentDateText,
-            dividendPerShareText,
+          console.warn(`[Scraper] Row ${i}: Invalid parsed data, skipping:`, {
+            exDate,
+            paymentDate,
+            dividendPerShare,
           });
           return;
         }
@@ -165,8 +239,19 @@ export async function scrapeDividendsByIsin(isin: string): Promise<ScrapedDivide
           currency,
           dividendType,
         });
+
+        // Log successful parse
+        if (i < 3) {
+          console.log(`[Scraper] Row ${i} parsed:`, {
+            exDate: exDateText,
+            paymentDate: paymentDateText,
+            dividendPerShare: dividendPerShareText,
+            currency,
+            type: dividendType,
+          });
+        }
       } catch (rowError) {
-        console.warn('Error parsing dividend row:', rowError);
+        console.warn(`[Scraper] Error parsing row ${i}:`, rowError);
         // Continue processing other rows
       }
     });
