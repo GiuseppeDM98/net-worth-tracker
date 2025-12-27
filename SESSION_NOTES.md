@@ -95,18 +95,25 @@ Estendere dividend tracking automatico agli ETF con gestione conversione valuta 
 3. `lib/services/dividendService.ts` - Conversione automatica create/update
 4. `components/dividends/DividendTable.tsx` - Visualizzazione EUR con tooltip
 5. `lib/services/dividendIncomeService.ts` - Expense in EUR quando possibile
+6. `lib/services/borsaItalianaScraperService.ts` - Fix ETF vs Stock table detection (2 iterazioni)
 
 ## Bug Risolti
 
 **#1 - Scraper ETF con struttura tabella diversa** (fix durante test)
-- **Problema**: Lo scraper falliva con ETF (errore "Invalid date format: 7,05")
-- **Causa**: Posizioni celle hardcoded per azioni, ma ETF hanno tabella con struttura diversa
-- **Fix**: Pattern matching intelligente invece di posizioni fisse
+- **Problema**: Lo scraper falliva con ETF (errore "Invalid date format: 7,05", "Could not find both dates")
+- **Causa**: Tabelle ETF hanno 4 colonne, tabelle Stock hanno 7+ colonne con struttura completamente diversa
+- **Fix #1**: Pattern matching intelligente (tentativo iniziale)
   - `isDateFormat()` validator per riconoscere date DD/MM/YY
-  - Ricerca dinamica per date, importi, valute per contenuto
-  - Logging debug per prima riga
-  - Skip graceful di righe invalide
-- **Test**: VWRL.MI (IE00B3RBWM25) ora funziona correttamente
+  - Ricerca dinamica per contenuto
+  - Logging debug
+- **Fix #2 (finale)**: Rilevamento formato + parser dedicati
+  - Pulizia whitespace (`\t\n\r`) nelle celle
+  - Auto-detect: 4 celle = ETF, 7+ celle = Stock
+  - **ETF**: posizioni fisse (Cell 0=ex-date, 1=amount, 2=currency, 3=payment-date)
+  - **Stock**: pattern matching dinamico
+  - Mapping valuta italiana ("Dollaro Usa" → "USD")
+  - Tipo dividendo ETF sempre "ordinary" (nessuna colonna tipo in tabella ETF)
+- **Test**: VWRL.MI (IE00B3RBWM25) funziona con dividendi USD
 
 ## Nuove Dipendenze
 Nessuna - usata solo API pubblica Frankfurter (no package npm richiesto).
