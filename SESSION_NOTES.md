@@ -97,7 +97,16 @@ Estendere dividend tracking automatico agli ETF con gestione conversione valuta 
 5. `lib/services/dividendIncomeService.ts` - Expense in EUR quando possibile
 
 ## Bug Risolti
-Nessun bug risolto - feature completamente nuova.
+
+**#1 - Scraper ETF con struttura tabella diversa** (fix durante test)
+- **Problema**: Lo scraper falliva con ETF (errore "Invalid date format: 7,05")
+- **Causa**: Posizioni celle hardcoded per azioni, ma ETF hanno tabella con struttura diversa
+- **Fix**: Pattern matching intelligente invece di posizioni fisse
+  - `isDateFormat()` validator per riconoscere date DD/MM/YY
+  - Ricerca dinamica per date, importi, valute per contenuto
+  - Logging debug per prima riga
+  - Skip graceful di righe invalide
+- **Test**: VWRL.MI (IE00B3RBWM25) ora funziona correttamente
 
 ## Nuove Dipendenze
 Nessuna - usata solo API pubblica Frankfurter (no package npm richiesto).
@@ -125,8 +134,8 @@ Gli utenti possono ora:
 - Note expense: "Dividendo VWCE.DE - Vanguard FTSE All-World (100.00 USD convertiti)"
 
 ## Test Necessari
-- [ ] Creare asset ETF con ISIN
-- [ ] Testare scraper Borsa Italiana su ETF
-- [ ] Verificare conversione USD → EUR in dividendService
-- [ ] Controllare visualizzazione tooltip in DividendTable
-- [ ] Verificare expense creata con importo EUR corretto
+- [x] Creare asset ETF con ISIN ✅ (testato da utente con VWRL.MI)
+- [x] Testare scraper Borsa Italiana su ETF ✅ (fix applicato, pattern matching funziona)
+- [ ] Verificare conversione USD → EUR in dividendService (prossimo test)
+- [ ] Controllare visualizzazione tooltip in DividendTable (prossimo test)
+- [ ] Verificare expense creata con importo EUR corretto (prossimo test)
