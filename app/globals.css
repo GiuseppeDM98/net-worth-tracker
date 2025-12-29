@@ -43,7 +43,7 @@
   --radius-xl: calc(var(--radius) + 4px);
 
   /* Custom breakpoint for desktop (avoid iPad Mini landscape = 1024px) */
-  --breakpoint-desktop: 1025px;
+  --breakpoint-desktop: 1440px;
 }
 
 :root {
