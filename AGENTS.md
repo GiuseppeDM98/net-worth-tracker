@@ -980,6 +980,80 @@ setCount(count + 1);
 - Using only `flex-row` for button groups (forces horizontal scroll on narrow screens).
 - Forgetting `w-full sm:w-auto` on stacked buttons (buttons become tiny on mobile).
 
+### React Query Cache Invalidation Errors
+
+**Critical Pattern**: When a mutation updates data in Firestore, you MUST invalidate ALL related React Query caches that depend on that data, even indirect dependencies.
+
+**Common Mistake - Incomplete Cache Invalidation**:
+```typescript
+// ❌ WRONG - Only invalidates direct cache
+export function useCreateSnapshot(userId: string) {
+  return useMutation({
+    mutationFn: createSnapshot,
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.snapshots.all(userId)
+      });
+      // Missing: assets cache invalidation!
+    }
+  });
+}
+```
+
+**Why This Fails**:
+- Snapshot creation API calls `updateUserAssetPrices()` → updates asset prices in Firestore
+- UI displays values calculated from `assets` cache, not `snapshots` cache
+- Only invalidating `snapshots` cache leaves `assets` cache stale
+- Result: UI shows old values even though Firestore was updated
+
+**Correct Pattern - Dual Cache Invalidation**:
+```typescript
+// ✅ CORRECT - Invalidates ALL related caches
+export function useCreateSnapshot(userId: string) {
+  return useMutation({
+    mutationFn: createSnapshot,
+    onSuccess: () => {
+      // Invalidate direct cache
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.snapshots.all(userId)
+      });
+
+      // CRITICAL: Also invalidate indirect dependencies
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.assets.all(userId)
+      });
+    }
+  });
+}
+```
+
+**How to Identify Indirect Dependencies**:
+1. Check what data the UI actually displays (look for `useMemo` dependencies)
+2. Trace back through the mutation's API endpoint to see what Firestore collections it modifies
+3. Invalidate caches for ALL modified collections, not just the primary one
+
+**Example from Codebase** (Overview page):
+```typescript
+// UI depends on assets, not snapshots
+const portfolioMetrics = useMemo(() => ({
+  totalValue: calculateTotalValue(assets),  // ← FROM ASSETS
+  // ...
+}), [assets]); // ← Only re-runs when 'assets' changes
+
+// Snapshot API updates both collections
+POST /api/portfolio/snapshot
+  → updateUserAssetPrices() // Updates assets collection
+  → createSnapshot()        // Creates snapshot document
+
+// Therefore: BOTH caches must be invalidated
+```
+
+**Red Flags to Watch For**:
+- ❌ API endpoint modifies multiple Firestore collections but only one cache is invalidated
+- ❌ UI displays data from collection A but mutation only invalidates collection B
+- ❌ Comment in code says "will automatically refetch if implemented" but no invalidation code exists
+- ✅ Trace data flow: API → Firestore → Cache → UI to find all dependencies
+
 ---
 
 ## Quick Reference

@@ -1742,25 +1742,33 @@ User navigates to Hall of Fame → getHallOfFameData(userId)
 ## Current Status (Latest Session)
 
 - **Architecture status**: Next.js App Router + Firebase + React Query + Recharts + Frankfurter API (external, no npm package).
-- **Dividend tracking**: ETF support with automatic currency conversion (USD/GBP/CHF → EUR).
-- **Bug fixes**: Scraper URL routing for ETFs, date conversion in DividendDialog.
+- **React Query integration**: Complete mutation hook pattern for snapshots with dual cache invalidation.
+- **Overview page**: Fixed automatic refresh after snapshot creation (bug resolved).
 
 ## Implemented in This Session
 
-- **ETF Dividend Tracking with Currency Conversion** (2025-12-26):
-  - **New service**: `currencyConversionService.ts` - Frankfurter API integration with 24h cache
-  - **ISIN for ETFs**: Enabled ISIN field in AssetDialog for ETF type assets
-  - **Automatic conversion**: Dividends in USD/GBP/CHF auto-converted to EUR on create/update
-  - **Visual feedback**: DividendTable shows EUR amounts with tooltips displaying original currency
-  - **EUR expenses**: Income entries created in EUR with original amount in notes
-  - **Scraper updates**:
-    - Dual URL routing (Stock URL vs ETF URL based on asset type)
-    - Table format detection (4-col ETF vs 7+-col Stock)
-    - Pattern matching for flexible parsing
-  - **Bug fix #1**: Scraper URL hardcoded for stocks only - added `assetType` parameter
-  - **Bug fix #2**: DividendDialog date conversion error - replaced manual logic with `toDate()` helper
-  - **Files modified**: 9 files (1 created, 8 modified)
-  - **Testing**: VWRL.MI (ETF with USD dividends) working correctly
+- **Overview Page Snapshot Refresh Fix** (2025-12-29):
+  - **Problem**: Overview page didn't refresh automatically after creating a manual snapshot via "Crea Snapshot" button
+  - **Root cause #1**: Missing React Query cache invalidation after snapshot creation (only comment existed in code)
+  - **Root cause #2**: Overview displays values from `assets` cache, not `snapshots` cache - snapshot API updates asset prices but assets cache wasn't invalidated
+  - **Solution**: Created `useCreateSnapshot()` mutation hook with **dual cache invalidation** (snapshots + assets)
+  - **New hook**: `lib/hooks/useSnapshots.ts` - Added `useCreateSnapshot()` mutation hook (+76 lines)
+  - **Pattern applied**: React Query mutation pattern (consistent with `useAssets`, `useExpenses`)
+  - **Key insight**:
+    - Overview page: `portfolioMetrics = useMemo(() => calculateTotalValue(assets), [assets])`
+    - Snapshot API calls `updateUserAssetPrices()` → updates Firestore assets
+    - Therefore: BOTH caches must be invalidated (snapshots + assets)
+  - **Fix implementation**:
+    ```typescript
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.snapshots.all(userId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(userId) }); // ← Critical
+    }
+    ```
+  - **Files modified**: 2 files
+    - `lib/hooks/useSnapshots.ts`: Added mutation hook with dual invalidation
+    - `app/dashboard/page.tsx`: Use mutation hook instead of manual fetch
+  - **Testing**: ✅ Confirmed Overview page now refreshes automatically after snapshot creation
 
 ## Key Technical Decisions
 
@@ -1781,6 +1789,10 @@ User navigates to Hall of Fame → getHallOfFameData(userId)
 - **Legend truncation**: Mobile legends show top 3 items only; users must tap chart/tooltip for full detail.
 - **Currency conversion**: Relies on external Frankfurter API; has 24h cache + stale fallback but could fail if API down for extended period.
 - **Date serialization**: API responses serialize Firestore Timestamps as ISO strings; always use `toDate()` helper for conversions.
+
+## Recently Fixed Issues
+
+- ✅ **Overview page refresh** (2025-12-29): Fixed automatic refresh after snapshot creation - was caused by incomplete cache invalidation (only snapshots invalidated, not assets)
 
 ---
 

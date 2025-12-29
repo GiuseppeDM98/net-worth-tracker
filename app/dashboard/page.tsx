@@ -36,7 +36,7 @@ import {
 import { Wallet, TrendingUp, PieChart, DollarSign, Camera, TrendingDown, Receipt } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAssets } from '@/lib/hooks/useAssets';
-import { useSnapshots } from '@/lib/hooks/useSnapshots';
+import { useSnapshots, useCreateSnapshot } from '@/lib/hooks/useSnapshots';
 import { useExpenseStats } from '@/lib/hooks/useExpenseStats';
 
 export default function DashboardPage() {
@@ -46,6 +46,7 @@ export default function DashboardPage() {
   const { data: assets = [], isLoading: loadingAssets } = useAssets(user?.uid);
   const { data: snapshots = [], isLoading: loadingSnapshots } = useSnapshots(user?.uid);
   const { data: expenseStats, isLoading: loadingExpenses } = useExpenseStats(user?.uid);
+  const createSnapshotMutation = useCreateSnapshot(user?.uid || '');
 
   const loading = loadingAssets || loadingSnapshots;
 
@@ -171,38 +172,24 @@ export default function DashboardPage() {
         id: 'snapshot-creation',
       });
 
-      const response = await fetch('/api/portfolio/snapshot', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: user.uid,
-        }),
-      });
-
-      const result = await response.json();
+      // Use mutation hook to create snapshot
+      const result = await createSnapshotMutation.mutateAsync({});
 
       // Dismiss loading toast
       toast.dismiss('snapshot-creation');
 
-      if (result.success) {
-        toast.success(result.message);
+      toast.success(result.message);
 
-        // Update Hall of Fame after successful snapshot creation
-        try {
-          await updateHallOfFame(user.uid);
-          console.log('Hall of Fame updated successfully');
-        } catch (error) {
-          console.error('Error updating Hall of Fame:', error);
-          // Don't show error to user - Hall of Fame update is non-critical
-        }
-
-        // Note: React Query will automatically refetch snapshots
-        // due to cache invalidation if implemented
-      } else {
-        toast.error(result.error || 'Errore nella creazione dello snapshot');
+      // Update Hall of Fame after successful snapshot creation
+      try {
+        await updateHallOfFame(user.uid);
+        console.log('Hall of Fame updated successfully');
+      } catch (error) {
+        console.error('Error updating Hall of Fame:', error);
+        // Don't show error to user - Hall of Fame update is non-critical
       }
+
+      // React Query automatically refetches snapshots via cache invalidation in the mutation hook
     } catch (error) {
       console.error('Error creating snapshot:', error);
       toast.dismiss('snapshot-creation');
