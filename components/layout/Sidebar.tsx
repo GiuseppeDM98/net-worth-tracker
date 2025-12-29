@@ -49,23 +49,23 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     <div
       className={cn(
         'flex h-full w-64 flex-col bg-gray-900 text-white transition-transform duration-300 ease-in-out',
-        // Desktop (≥lg): sempre relativo, sempre visibile
-        'lg:relative lg:translate-x-0',
-        // Mobile landscape SOLO (< lg + landscape): fixed, slide in/out
-        'max-lg:landscape:fixed max-lg:landscape:inset-y-0 max-lg:landscape:left-0 max-lg:landscape:z-50',
-        // Mobile portrait SOLO (< lg + portrait): nascosta
-        'max-lg:portrait:hidden',
+        // Desktop (≥desktop): sempre relativo, sempre visibile
+        'desktop:relative desktop:translate-x-0',
+        // Mobile landscape SOLO (< desktop + landscape): fixed, slide in/out
+        'max-desktop:landscape:fixed max-desktop:landscape:inset-y-0 max-desktop:landscape:left-0 max-desktop:landscape:z-50',
+        // Mobile portrait SOLO (< desktop + portrait): nascosta
+        'max-desktop:portrait:hidden',
         // Show/hide su mobile landscape
-        isOpen ? 'translate-x-0' : 'max-lg:landscape:-translate-x-full'
+        isOpen ? 'translate-x-0' : 'max-desktop:landscape:-translate-x-full'
       )}
     >
       {/* Desktop header (hidden on mobile since we show it in the hamburger menu bar) */}
-      <div className="hidden lg:flex h-16 items-center px-6">
+      <div className="hidden desktop:flex h-16 items-center px-6">
         <h1 className="text-xl font-bold">Portfolio Tracker</h1>
       </div>
 
       {/* Mobile header */}
-      <div className="flex lg:hidden h-16 items-center px-6 border-b border-gray-800">
+      <div className="flex desktop:hidden h-16 items-center px-6 border-b border-gray-800">
         <h1 className="text-xl font-bold">Portfolio Tracker</h1>
       </div>
 

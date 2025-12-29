@@ -1421,38 +1421,50 @@ This means:
 
 | Device Mode | Screen Size | Orientation | Navigation UI |
 |-------------|-------------|-------------|---------------|
-| **Desktop** | ≥1024px | Any | Sidebar lateral (always visible) |
-| **Mobile Landscape** | <1024px | Landscape | Sidebar with hamburger toggle |
-| **Mobile Portrait** | <1024px | Portrait | Bottom navigation + drawer |
+| **Desktop** | ≥1025px | Any | Sidebar lateral (always visible) |
+| **Mobile Landscape** | <1025px | Landscape | Sidebar with hamburger toggle |
+| **Mobile Portrait** | <1025px | Portrait | Bottom navigation + drawer |
+
+**Note:** Custom breakpoint `desktop: 1025px` (instead of default `lg: 1024px`) fixes iPad Mini landscape (1024px) being treated as desktop. This ensures iPad Mini landscape (1024x768) correctly displays mobile landscape UI with hamburger menu.
 
 **Technical Implementation:**
 
 The implementation uses Tailwind CSS v4 responsive utilities with careful combination of breakpoint and orientation variants:
 
 ```typescript
-// CRITICAL: Use max-lg: prefix to limit orientation variants to mobile only
+// CRITICAL: Use max-desktop: prefix to limit orientation variants to mobile only
 
 // Bottom Navigation - Mobile Portrait ONLY
-<nav className="lg:hidden max-lg:portrait:flex max-lg:landscape:hidden">
+<nav className="desktop:hidden max-desktop:portrait:flex max-desktop:landscape:hidden">
 
 // Sidebar - Desktop always visible, Mobile Portrait hidden, Mobile Landscape toggle
 <div className={cn(
-  'lg:relative lg:translate-x-0',                    // Desktop: always visible
-  'max-lg:landscape:fixed max-lg:landscape:z-50',    // Mobile Landscape: fixed with toggle
-  'max-lg:portrait:hidden',                          // Mobile Portrait: hidden
-  isOpen ? 'translate-x-0' : 'max-lg:landscape:-translate-x-full'
+  'desktop:relative desktop:translate-x-0',                    // Desktop: always visible
+  'max-desktop:landscape:fixed max-desktop:landscape:z-50',    // Mobile Landscape: fixed with toggle
+  'max-desktop:portrait:hidden',                               // Mobile Portrait: hidden
+  isOpen ? 'translate-x-0' : 'max-desktop:landscape:-translate-x-full'
 )}>
 
 // Main content padding - Bottom nav spacing on Mobile Portrait
-<main className="lg:pb-6 max-lg:portrait:pb-20 max-lg:landscape:pb-6">
+<main className="desktop:pb-6 max-desktop:portrait:pb-20 max-desktop:landscape:pb-6">
 ```
 
-**Why `max-lg:` prefix is critical:**
+**Custom Breakpoint Definition** (in `app/globals.css`):
+```css
+@theme inline {
+  /* ... other theme variables ... */
+
+  /* Custom breakpoint for desktop (avoid iPad Mini landscape = 1024px) */
+  --breakpoint-desktop: 1025px;
+}
+```
+
+**Why `max-desktop:` prefix is critical:**
 - `landscape:` and `portrait:` apply to ALL screen sizes, including desktop
 - Desktop monitors are typically in landscape orientation
-- Without `max-lg:`, `landscape:fixed` overrides `lg:relative` on desktop
-- `max-lg:portrait:` = "Only on screens <1024px AND portrait"
-- `max-lg:landscape:` = "Only on screens <1024px AND landscape"
+- Without `max-desktop:`, `landscape:fixed` overrides `desktop:relative` on desktop
+- `max-desktop:portrait:` = "Only on screens <1025px AND portrait"
+- `max-desktop:landscape:` = "Only on screens <1025px AND landscape"
 
 **Chart Formatting Examples:**
 
@@ -1742,39 +1754,40 @@ User navigates to Hall of Fame → getHallOfFameData(userId)
 ## Current Status (Latest Session)
 
 - **Architecture status**: Next.js App Router + Firebase + React Query + Recharts + Frankfurter API (external, no npm package).
-- **React Query integration**: Complete mutation hook pattern for snapshots with dual cache invalidation.
-- **Overview page**: Fixed automatic refresh after snapshot creation (bug resolved).
+- **Mobile optimizations**: Custom breakpoint `desktop: 1025px` fixes iPad Mini landscape navigation UI.
+- **Responsive navigation**: iPad Mini landscape (1024px) now correctly displays mobile UI with hamburger menu.
 
 ## Implemented in This Session
 
-- **Overview Page Snapshot Refresh Fix** (2025-12-29):
-  - **Problem**: Overview page didn't refresh automatically after creating a manual snapshot via "Crea Snapshot" button
-  - **Root cause #1**: Missing React Query cache invalidation after snapshot creation (only comment existed in code)
-  - **Root cause #2**: Overview displays values from `assets` cache, not `snapshots` cache - snapshot API updates asset prices but assets cache wasn't invalidated
-  - **Solution**: Created `useCreateSnapshot()` mutation hook with **dual cache invalidation** (snapshots + assets)
-  - **New hook**: `lib/hooks/useSnapshots.ts` - Added `useCreateSnapshot()` mutation hook (+76 lines)
-  - **Pattern applied**: React Query mutation pattern (consistent with `useAssets`, `useExpenses`)
-  - **Key insight**:
-    - Overview page: `portfolioMetrics = useMemo(() => calculateTotalValue(assets), [assets])`
-    - Snapshot API calls `updateUserAssetPrices()` → updates Firestore assets
-    - Therefore: BOTH caches must be invalidated (snapshots + assets)
-  - **Fix implementation**:
-    ```typescript
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.snapshots.all(userId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(userId) }); // ← Critical
-    }
-    ```
-  - **Files modified**: 2 files
-    - `lib/hooks/useSnapshots.ts`: Added mutation hook with dual invalidation
-    - `app/dashboard/page.tsx`: Use mutation hook instead of manual fetch
-  - **Testing**: ✅ Confirmed Overview page now refreshes automatically after snapshot creation
+- **iPad Mini Landscape Navigation UI Fix** (2025-12-29):
+  - **Problem**: iPad Mini in landscape mode (1024px width) displayed desktop sidebar instead of mobile hamburger menu
+  - **Root cause**: Tailwind `lg:` breakpoint uses `min-width: 1024px`, which **includes** 1024px (not exclusive)
+  - **Solution**: Created custom breakpoint `desktop: 1025px` to replace `lg:` in navigation components
+  - **Breakpoint definition**: Added `--breakpoint-desktop: 1025px` in `app/globals.css` using Tailwind v4 `@theme inline` syntax
+  - **Files modified**: 4 files, 19 occurrences `lg:` → `desktop:`
+    - `app/globals.css`: Added custom breakpoint (+2 lines)
+    - `app/dashboard/layout.tsx`: 7 occurrences replaced (3 lines modified)
+    - `components/layout/Sidebar.tsx`: 9 occurrences replaced (5 lines modified)
+    - `components/layout/BottomNavigation.tsx`: 3 occurrences replaced (1 line modified)
+  - **Key changes**:
+    - `lg:hidden` → `desktop:hidden`
+    - `max-lg:landscape:` → `max-desktop:landscape:`
+    - `max-lg:portrait:` → `max-desktop:portrait:`
+  - **Benefits**:
+    - ✅ iPad Mini landscape (1024px) → Mobile landscape UI (hamburger menu)
+    - ✅ Desktop (≥1025px) → Desktop UI (sidebar always visible)
+    - ✅ Zero breaking changes for other breakpoints or components
+    - ✅ Semantic naming (`desktop` more explicit than `lg`)
+  - **Testing**: ✅ Build completed successfully, no compilation errors
+  - **Documentation updated**: `CLAUDE.md` section "Mobile Optimizations" updated with new breakpoint and fix details
 
 ## Key Technical Decisions
 
-- **Breakpoint consistency**: `sm:` (640px) chosen for Settings page form inputs (more space-sensitive than visual content)
+- **Custom desktop breakpoint**: `desktop: 1025px` instead of `lg: 1024px` to fix iPad Mini landscape edge case
+- **Tailwind v4 breakpoint syntax**: Custom breakpoints defined in `globals.css` with `@theme inline`, not in `tailwind.config.js`
+- **Breakpoint choice**: 1025px ensures iPad Mini landscape (1024px) is treated as mobile, while desktop (≥1025px) gets full sidebar
 - **Additive-only changes**: All optimizations use Tailwind responsive variants, zero breaking changes
-- **Desktop preservation**: ≥640px screens remain completely unchanged
+- **Desktop preservation**: ≥1025px screens remain completely unchanged
 
 ## Stack & Dependencies
 
@@ -1792,7 +1805,7 @@ User navigates to Hall of Fame → getHallOfFameData(userId)
 
 ## Recently Fixed Issues
 
-- ✅ **Overview page refresh** (2025-12-29): Fixed automatic refresh after snapshot creation - was caused by incomplete cache invalidation (only snapshots invalidated, not assets)
+- ✅ **iPad Mini landscape navigation** (2025-12-29): Fixed iPad Mini landscape (1024px) showing desktop sidebar instead of mobile hamburger menu - created custom breakpoint `desktop: 1025px` to replace `lg: 1024px`
 
 ---
 

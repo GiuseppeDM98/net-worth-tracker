@@ -864,8 +864,40 @@ setCount(count + 1);
 
 ### Tailwind CSS
 - **Utility-First**: Prefer utility classes over custom CSS
-- **Responsive**: Use responsive prefixes (`md:`, `lg:`) for breakpoints
+- **Responsive**: Use responsive prefixes (`sm:`, `md:`, `desktop:`) for breakpoints
 - **Dark Mode**: Not implemented yet (use `next-themes` when needed)
+
+**Custom Breakpoints (Tailwind v4)**:
+
+This project uses **Tailwind CSS v4** with a custom `desktop` breakpoint to fix iPad Mini landscape edge case.
+
+```css
+/* app/globals.css */
+@theme inline {
+  /* ... other theme variables ... */
+
+  /* Custom breakpoint: desktop at 1025px (not default lg: 1024px) */
+  --breakpoint-desktop: 1025px;
+}
+```
+
+**Usage**:
+```tsx
+// Use 'desktop:' instead of 'lg:' for desktop-specific styles
+<div className="desktop:flex desktop:items-center">
+
+// Use 'max-desktop:' for mobile/tablet styles (< 1025px)
+<div className="max-desktop:block max-desktop:portrait:hidden">
+
+// Combine with orientation variants
+<nav className="desktop:hidden max-desktop:landscape:flex">
+```
+
+**Important Notes**:
+- ✅ Custom breakpoints in Tailwind v4 are defined in `globals.css` with `@theme inline`
+- ❌ NOT in `tailwind.config.js` (this is v3 syntax and doesn't work in v4)
+- ✅ Use semantic names (`desktop` not `custom-lg`)
+- ✅ Project uses `desktop: 1025px` to exclude iPad Mini landscape (1024px) from desktop UI
 
 ---
 
@@ -979,6 +1011,58 @@ setCount(count + 1);
 - Label+Switch/Checkbox without proper wrapping (text wraps awkwardly with inline links).
 - Using only `flex-row` for button groups (forces horizontal scroll on narrow screens).
 - Forgetting `w-full sm:w-auto` on stacked buttons (buttons become tiny on mobile).
+
+### Responsive Breakpoint Errors
+
+**Critical iPad Mini Edge Case**: Device width exactly equal to standard breakpoint (1024px).
+
+**Problem**:
+- iPad Mini landscape is **exactly 1024px** wide
+- Tailwind `lg:` breakpoint uses `@media (min-width: 1024px)`
+- This means `lg:` styles **include** 1024px (≥, not >)
+- Result: iPad Mini landscape gets desktop UI instead of mobile UI
+
+**Symptoms**:
+- iPad Mini landscape (1024x768) shows desktop sidebar instead of hamburger menu
+- Tablet devices with width = breakpoint threshold display wrong UI
+
+**Root Cause**:
+```css
+/* Tailwind default breakpoint (inclusive) */
+@media (min-width: 1024px) {  /* ← Includes 1024px! */
+  .lg\:hidden { display: none; }
+}
+```
+
+**Solution**: Custom breakpoint offset by 1px
+```css
+/* app/globals.css - Tailwind v4 syntax */
+@theme inline {
+  /* Custom breakpoint excludes iPad Mini landscape (1024px) */
+  --breakpoint-desktop: 1025px;
+}
+```
+
+**Usage**:
+```tsx
+// ❌ WRONG - iPad Mini landscape (1024px) gets desktop UI
+<nav className="lg:hidden max-lg:portrait:flex">
+
+// ✅ CORRECT - iPad Mini landscape (1024px) gets mobile UI
+<nav className="desktop:hidden max-desktop:portrait:flex">
+```
+
+**Key Insights**:
+- ❌ Don't assume breakpoints are exclusive (they're inclusive: ≥)
+- ❌ Don't test only at breakpoint-1px (e.g., 1023px); test at exact breakpoint (1024px)
+- ✅ Use semantic names (`desktop` not `custom-lg`) for clarity
+- ✅ Tailwind v4: Define custom breakpoints in `globals.css` with `@theme inline`, NOT `tailwind.config.js`
+- ✅ Document edge cases for common devices (iPad Mini, iPad Pro, Surface tablets)
+
+**Affected Files** (when implementing custom breakpoint):
+- `app/globals.css`: Add custom breakpoint definition
+- Navigation components: Replace `lg:` with `desktop:` throughout
+- Comments: Update to reflect new breakpoint name (e.g., "Desktop (≥desktop)" not "Desktop (≥lg)")
 
 ### React Query Cache Invalidation Errors
 

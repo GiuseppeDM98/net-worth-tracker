@@ -21,7 +21,7 @@ export default function DashboardLayout({
         {/* Mobile sidebar backdrop */}
         {sidebarOpen && (
           <div
-            className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+            className="fixed inset-0 z-40 bg-black/50 desktop:hidden"
             onClick={() => setSidebarOpen(false)}
           />
         )}
@@ -32,7 +32,7 @@ export default function DashboardLayout({
         {/* Main content */}
         <div className="flex flex-1 flex-col overflow-hidden">
           {/* Mobile hamburger menu - solo landscape */}
-          <div className="flex items-center gap-4 bg-white px-4 py-3 lg:hidden max-lg:portrait:hidden max-lg:landscape:flex border-b">
+          <div className="flex items-center gap-4 bg-white px-4 py-3 desktop:hidden max-desktop:portrait:hidden max-desktop:landscape:flex border-b">
             <Button
               variant="ghost"
               size="sm"
@@ -45,7 +45,7 @@ export default function DashboardLayout({
           </div>
 
           <Header />
-          <main className="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-6 lg:pb-6 max-lg:portrait:pb-20 max-lg:landscape:pb-6">
+          <main className="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-6 desktop:pb-6 max-desktop:portrait:pb-20 max-desktop:landscape:pb-6">
             {children}
           </main>
         </div>

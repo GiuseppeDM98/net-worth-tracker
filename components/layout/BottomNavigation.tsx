@@ -20,7 +20,7 @@ export function BottomNavigation() {
   return (
     <>
       {/* Bottom Navigation Bar - Solo mobile portrait */}
-      <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-gray-200 lg:hidden max-lg:portrait:flex max-lg:landscape:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-gray-200 desktop:hidden max-desktop:portrait:flex max-desktop:landscape:hidden">
         <div className="flex items-center justify-around w-full h-16">
           {primaryNavigation.map((item) => {
             const isActive = pathname === item.href;
