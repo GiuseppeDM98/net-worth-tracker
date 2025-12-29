@@ -40,7 +40,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
   const handleLinkClick = () => {
     // Close sidebar on mobile after navigation
-    if (onClose && window.innerWidth < 1024) {
+    if (onClose && window.innerWidth < 1440) {
       onClose();
     }
   };

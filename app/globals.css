@@ -42,7 +42,7 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  /* Custom breakpoint for desktop (avoid iPad Mini landscape = 1024px) */
+  /* Custom breakpoint for desktop (avoid iPad Mini landscape = 1440px) */
   --breakpoint-desktop: 1440px;
 }
 
