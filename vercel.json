@@ -2,13 +2,11 @@
   "crons": [
     {
       "path": "/api/cron/monthly-snapshot",
-      "schedule": "25 22 * * *",
-      "description": "Snapshot mensile portfolio - Ogni giorno alle 22:00 UTC (23:00 CET / 00:00 CEST)"
+      "schedule": "25 22 * * *"
     },
     {
       "path": "/api/cron/daily-dividend-processing",
-      "schedule": "0 0 * * *",
-      "description": "Elaborazione dividendi giornaliera - Ogni giorno a mezzanotte UTC (01:00 CET / 02:00 CEST)"
+      "schedule": "0 0 * * *"
     }
   ]
 }
