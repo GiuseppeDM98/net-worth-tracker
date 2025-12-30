@@ -1149,6 +1149,54 @@ const endDate = new Date(year, month, 0, 23, 59, 59, 999);
 - Leaving dense legends/labels enabled on mobile (pie labels, long legend lists).
 - Using default axis ticks on mobile for long time series (overlap and unreadable).
 
+### Chart YAxis Formatter Errors (CRITICAL)
+
+**Problem**: Using `formatCurrency()` for Y-axis labels in monetary charts creates very wide labels that compress the chart area on mobile devices.
+
+**Symptom**:
+- Y-axis labels like "€1.234.567" (12+ characters) compress chart on mobile portrait
+- Chart becomes unreadable with limited horizontal space
+- Inconsistency with other pages (e.g., History page uses compact format)
+
+**Root Cause**:
+```typescript
+// ❌ WRONG - Full currency format creates wide labels
+<YAxis tickFormatter={(value) => formatCurrency(value).replace(',00', '')} />
+
+// Output: €1.234.567 (12+ characters)
+// Mobile impact: Chart area compressed, hard to read
+```
+
+**Solution**:
+```typescript
+// ✅ CORRECT - Use compact notation for readability
+<YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
+
+// Output: €1,5 Mln (8 characters)
+// Mobile impact: Readable on all devices, no compression
+```
+
+**Formatter Behavior**:
+| Value | formatCurrency() | formatCurrencyCompact() |
+|-------|-----------------|------------------------|
+| 250 | €250,00 | €250 |
+| 5,000 | €5.000,00 | €5k |
+| 850,000 | €850.000,00 | €850k |
+| 1,500,000 | €1.500.000,00 | **€1,5 Mln** ✓ |
+
+**Where to Check**:
+- Any YAxis in Recharts charts with monetary values
+- Search pattern: `<YAxis.*formatCurrency`
+- Reference: `app/dashboard/history/page.tsx` (line 441) - uses `formatCurrencyCompact` ✓
+
+**Fixed Locations** (2025-12-30):
+- ✅ `app/dashboard/performance/page.tsx` line 323 - "Evoluzione Patrimonio" chart YAxis
+
+**Prevention**:
+- Always use `formatCurrencyCompact()` for Y-axis labels in monetary charts
+- Reserve `formatCurrency()` only for tooltips, cards, or tables where full precision is needed
+- Test on mobile portrait (< 768px) to verify readability
+
 ### Mobile Form/Layout Errors
 - Fixed spacing/padding without responsive variants (wastes precious vertical space).
 - Small adjacent buttons without sufficient gap (causes accidental taps).

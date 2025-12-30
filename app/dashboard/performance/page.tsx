@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { getAllPerformanceData, calculatePerformanceForPeriod, preparePerformanceChartData, getSnapshotsForPeriod } from '@/lib/services/performanceService';
 import { getUserSnapshots } from '@/lib/services/snapshotService';
 import { PerformanceData, PerformanceMetrics, TimePeriod } from '@/types/performance';
@@ -11,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, TrendingUp, Info } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatCurrency, formatPercentage } from '@/lib/services/chartService';
+import { formatCurrency, formatPercentage, formatCurrencyCompact } from '@/lib/services/chartService';
 import {
   LineChart,
   Line,
@@ -35,6 +36,10 @@ export default function PerformancePage() {
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('YTD');
   const [showCustomDateDialog, setShowCustomDateDialog] = useState(false);
   const [cachedSnapshots, setCachedSnapshots] = useState<MonthlySnapshot[]>([]);
+
+  // Responsive breakpoints
+  const isMobile = useMediaQuery('(max-width: 767px)');
+  const isLandscape = useMediaQuery('(min-width: 568px) and (max-height: 500px) and (orientation: landscape)');
 
   useEffect(() => {
     if (user) {
@@ -128,6 +133,13 @@ export default function PerformancePage() {
       setChartData(data);
     }
   }, [performanceData, selectedPeriod, cachedSnapshots]);
+
+  // Responsive helper function
+  const getChartHeight = () => {
+    if (isLandscape) return 300;
+    if (isMobile) return 280;
+    return 400;
+  };
 
   const metrics = getCurrentMetrics();
 
@@ -297,20 +309,18 @@ export default function PerformancePage() {
           />
         </div>
 
-        {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-          {/* Net Worth Evolution Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Evoluzione Patrimonio</CardTitle>
-              <CardDescription>Patrimonio vs Contributi Cumulativi</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
+        {/* Net Worth Evolution Chart */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Evoluzione Patrimonio</CardTitle>
+            <CardDescription>Patrimonio vs Contributi Cumulativi</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={getChartHeight()}>
                 <AreaChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
-                  <YAxis tickFormatter={(value) => formatCurrency(value).replace(',00', '')} />
+                  <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                   <Tooltip content={<PerformanceTooltip />} />
                   <Legend />
                   <Area
@@ -327,7 +337,7 @@ export default function PerformancePage() {
                     stackId="1"
                     stroke="#82ca9d"
                     fill="#82ca9d"
-                    name="Guadagni/Perdite"
+                    name="Investimenti"
                   />
                   <Line
                     type="monotone"
@@ -342,17 +352,17 @@ export default function PerformancePage() {
             </CardContent>
           </Card>
 
-          {/* Rolling CAGR Chart */}
-          {performanceData.rolling12M.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>CAGR Rolling 12 Mesi</CardTitle>
-                <CardDescription>
-                  Evoluzione del rendimento annualizzato su finestra mobile
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+        {/* Rolling CAGR Chart */}
+        {performanceData.rolling12M.length > 0 && (
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>CAGR Rolling 12 Mesi</CardTitle>
+              <CardDescription>
+                Evoluzione del rendimento annualizzato su finestra mobile
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={getChartHeight()}>
                   <LineChart data={performanceData.rolling12M}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis
@@ -378,7 +388,6 @@ export default function PerformancePage() {
               </CardContent>
             </Card>
           )}
-        </div>
 
         {/* Methodology Section */}
         <Card className="mt-6">
@@ -393,11 +402,11 @@ export default function PerformancePage() {
                 <br /><br />
                 <strong>Contributi (area blu):</strong> La somma cumulativa di tutti i flussi di cassa netti (entrate - uscite) registrati nella sezione Cashflow. Rappresenta quanto denaro hai effettivamente versato o prelevato nel tempo.
                 <br />
-                <strong>Guadagni/Perdite (area verde):</strong> La differenza tra il patrimonio totale e i contributi cumulativi. Mostra quanto valore è stato generato (o perso) dagli investimenti grazie alle variazioni di prezzo degli asset.
+                <strong>Investimenti (area verde):</strong> La differenza tra il patrimonio totale e i contributi cumulativi. Mostra quanto valore è stato generato (o perso) dagli investimenti grazie alle variazioni di prezzo degli asset.
                 <br />
-                <strong>Patrimonio Totale (linea arancione):</strong> Il net worth complessivo, dato dalla somma di contributi + guadagni/perdite.
+                <strong>Patrimonio Totale (linea arancione):</strong> Il net worth complessivo, dato dalla somma di contributi + investimenti.
                 <br /><br />
-                <em>Interpretazione:</em> Se l&apos;area verde cresce, i tuoi investimenti stanno generando rendimenti positivi. Se si riduce, stai perdendo valore sugli investimenti. Questo grafico ti permette di vedere quanto del patrimonio attuale deriva dal risparmio (contributi) rispetto agli investimenti (guadagni/perdite).
+                <em>Interpretazione:</em> Se l&apos;area verde cresce, i tuoi investimenti stanno generando rendimenti positivi. Se si riduce, stai perdendo valore sugli investimenti. Questo grafico ti permette di vedere quanto del patrimonio attuale deriva dal risparmio (contributi) rispetto agli investimenti.
               </p>
             </div>
             <div>

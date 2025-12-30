@@ -76,7 +76,9 @@ Replace spreadsheet-based portfolio management with a modern, automated solution
 - **Temporal accuracy**: Cash flows and portfolio values are properly aligned to end-of-month snapshots
 - **Accurate time periods**: YTD (year-to-date) vs 1Y/3Y/5Y (rolling periods) with clear examples
 - **Inclusive month calculations**: Correct duration counting (Jan-Dec = 12 months, not 11)
-- Mobile-responsive grid layout with optimized chart formatting
+- **Full-width chart layout**: Main charts (Evoluzione Patrimonio, CAGR Rolling 12M) displayed at full width for better readability
+- **Responsive chart heights**: Dynamic sizing based on device (280px mobile portrait, 300px landscape, 400px desktop)
+- **Compact Y-axis formatting**: Uses `formatCurrencyCompact()` for readable axis labels (€1,5 Mln vs €1.234.567)
 - Custom date range selector for flexible period analysis
 - Methodology section with "Periodi Temporali e Snapshot" explaining snapshot timing and period calculations
 
@@ -1824,24 +1826,38 @@ User navigates to Hall of Fame → getHallOfFameData(userId)
 - **Architecture status**: Next.js App Router + Firebase + React Query + Recharts + Frankfurter API (external, no npm package).
 - **Mobile optimizations**: Custom breakpoint `desktop: 1025px` fixes iPad Mini landscape navigation UI.
 - **Responsive navigation**: iPad Mini landscape (1024px) now correctly displays mobile UI with hamburger menu.
-- **Latest fix**: Performance metrics timestamp bug resolved (2025-12-30) - fixed €373,81 discrepancy between Performance and Cashflow pages caused by missing timestamp in endDate calculations.
+- **Latest enhancements** (2025-12-30):
+  - Performance page charts now full-width with responsive heights (280-400px based on device)
+  - Y-axis formatting improved with compact notation (€1,5 Mln vs €1.234.567) for better mobile readability
 
 ## Implemented in This Session
 
-- **Performance Metrics Timestamp Bug Fix** (2025-12-30):
-  - **Problem**: Performance page showed expenses €37.273,67 instead of €37.647,48 (Cashflow page)
-  - **Discrepancy**: €373,81 missing from Performance calculations
-  - **Root cause**: `endDate` created with timestamp `00:00:00` instead of `23:59:59.999` in 3 functions
-  - **Impact**: Expenses created on last day of month with timestamp > midnight were excluded from Performance page
-  - **Files modified** (1 file, 3 lines):
-    - `lib/services/performanceService.ts`:
-      - Line 478: `calculatePerformanceForPeriod()` - primary fix for all timeframes (YTD, 1Y, 3Y, 5Y, ALL, CUSTOM)
-      - Line 585: `getAllPerformanceData()` - query optimization for batch fetching
-      - Line 640: `calculateRollingPeriods()` - rolling 12M and 36M calculations
-  - **Fix applied**: Changed `new Date(year, month, 0)` → `new Date(year, month, 0, 23, 59, 59, 999)` on all 3 lines
-  - **Result**: All timeframes now show correct expense totals matching Cashflow page
-  - **User confirmation**: Discrepancy of €373,81 was a single expense on 31/12/2025 ✅
-  - **Testing**: `npm run build` successful (5.8s, zero TypeScript errors)
+- **Performance Page Chart Enhancements** (2025-12-30):
+  - **Feature 1 - Full-Width Chart Layout**:
+    - Converted 2-column grid layout to full-width stacked charts
+    - Matches History page pattern for consistency
+    - Charts: "Evoluzione Patrimonio" and "CAGR Rolling 12 Mesi"
+  - **Feature 2 - Responsive Chart Heights**:
+    - Added dynamic height calculation based on device orientation
+    - Mobile portrait (<768px): 280px
+    - Mobile landscape (568-767px): 300px
+    - Desktop (≥1024px): 400px
+    - Uses `useMediaQuery` hook + `getChartHeight()` helper
+  - **Feature 3 - Improved Y-Axis Visibility**:
+    - Replaced `formatCurrency()` with `formatCurrencyCompact()` for Y-axis labels
+    - Old: €1.234.567 (12+ characters, compressed chart on mobile)
+    - New: €1,5 Mln (8 characters, readable on all devices)
+  - **Files modified**:
+    - `app/dashboard/performance/page.tsx`:
+      - Added `useMediaQuery` import
+      - Added responsive hooks (isMobile, isLandscape)
+      - Added `getChartHeight()` helper function
+      - Removed grid wrapper, added `className="mt-6"` to Cards
+      - Updated both charts to use `height={getChartHeight()}`
+      - Changed YAxis formatter to `formatCurrencyCompact()`
+      - Added `formatCurrencyCompact` to imports
+  - **Total changes**: 1 file, 1 import added, 2 hooks added, 1 helper function added, 9 lines modified
+  - **Testing**: `npm run build` successful (7.6s, zero TypeScript errors)
 
 ## Key Technical Decisions
 
@@ -1855,6 +1871,8 @@ User navigates to Hall of Fame → getHallOfFameData(userId)
 - **Color coding logic** (2025-12-30): Sequential month-over-month comparison (not year-over-year) for more intuitive price trend visualization
 - **Lazy-loading tabs** (2025-12-30): `mountedTabs` Set pattern from cashflow page - only render tab content after first user click to save memory/CPU
 - **Date range timestamp precision** (2025-12-30): Always use full timestamp `23:59:59.999` for `endDate` in range queries to include entire last day - using `00:00:00` (default) excludes expenses created after midnight on last day of period
+- **Responsive Chart Height Pattern** (2025-12-30): Duplicate `getChartHeight()` helper in each page instead of shared utility - function is trivial (3 lines), only 2 pages use it, avoids unnecessary coupling, easier to customize per-page
+- **Chart Formatter Consistency** (2025-12-30): Use `formatCurrencyCompact()` for all Y-axis labels in monetary charts - provides compact notation (€1,5 Mln vs €1.234.567), prevents mobile chart compression, aligns Performance page with History page pattern
 
 ## Stack & Dependencies
 
@@ -1872,6 +1890,7 @@ User navigates to Hall of Fame → getHallOfFameData(userId)
 
 ## Recently Fixed Issues
 
+- ✅ **Performance chart Y-axis visibility** (2025-12-30): Replaced `formatCurrency()` with `formatCurrencyCompact()` for Y-axis labels - old format (€1.234.567) was too wide and compressed mobile charts, new format (€1,5 Mln) is compact and readable on all devices (2 lines modified in `performance/page.tsx`)
 - ✅ **Performance metrics timestamp bug** (2025-12-30): Fixed €373,81 discrepancy between Performance and Cashflow pages - `endDate` was using `00:00:00` instead of `23:59:59.999`, excluding expenses created after midnight on last day of period (3 lines modified in `performanceService.ts`)
 - ✅ **iPad Mini landscape navigation** (2025-12-29): Fixed iPad Mini landscape (1024px) showing desktop sidebar instead of mobile hamburger menu - created custom breakpoint `desktop: 1025px` to replace `lg: 1024px`
 
