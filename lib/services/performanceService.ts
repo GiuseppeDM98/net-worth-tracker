@@ -475,7 +475,7 @@ export async function calculatePerformanceForPeriod(
   const endSnapshot = sortedSnapshots[sortedSnapshots.length - 1];
 
   const startDate = new Date(startSnapshot.year, startSnapshot.month - 1, 1);
-  const endDate = new Date(endSnapshot.year, endSnapshot.month, 0); // Last day of month
+  const endDate = new Date(endSnapshot.year, endSnapshot.month, 0, 23, 59, 59, 999); // Last day of month
   const numberOfMonths = calculateMonthsDifference(endDate, startDate);
 
   // Get cash flows for period - use pre-fetched if available, otherwise fetch
@@ -582,7 +582,7 @@ export async function getAllPerformanceData(userId: string): Promise<Performance
     const firstSnapshot = sortedSnapshots[0];
     const lastSnapshot = sortedSnapshots[sortedSnapshots.length - 1];
     const overallStartDate = new Date(firstSnapshot.year, firstSnapshot.month - 1, 1);
-    const overallEndDate = new Date(lastSnapshot.year, lastSnapshot.month, 0); // Last day of month
+    const overallEndDate = new Date(lastSnapshot.year, lastSnapshot.month, 0, 23, 59, 59, 999); // Last day of month
     allExpenses = await getExpensesByDateRange(userId, overallStartDate, overallEndDate);
   }
 
@@ -637,7 +637,7 @@ async function calculateRollingPeriods(
   const firstSnapshot = sortedSnapshots[0];
   const lastSnapshot = sortedSnapshots[sortedSnapshots.length - 1];
   const overallStartDate = new Date(firstSnapshot.year, firstSnapshot.month - 1, 1);
-  const overallEndDate = new Date(lastSnapshot.year, lastSnapshot.month, 0); // Last day of month
+  const overallEndDate = new Date(lastSnapshot.year, lastSnapshot.month, 0, 23, 59, 59, 999); // Last day of month
 
   const allExpenses = await getExpensesByDateRange(userId, overallStartDate, overallEndDate);
 

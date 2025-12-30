@@ -1824,54 +1824,24 @@ User navigates to Hall of Fame → getHallOfFameData(userId)
 - **Architecture status**: Next.js App Router + Firebase + React Query + Recharts + Frankfurter API (external, no npm package).
 - **Mobile optimizations**: Custom breakpoint `desktop: 1025px` fixes iPad Mini landscape navigation UI.
 - **Responsive navigation**: iPad Mini landscape (1024px) now correctly displays mobile UI with hamburger menu.
-- **Latest feature**: Asset price history tabs implemented (2025-12-30) - visualize historical asset prices from monthly snapshots with color-coded month-over-month comparisons.
+- **Latest fix**: Performance metrics timestamp bug resolved (2025-12-30) - fixed €373,81 discrepancy between Performance and Cashflow pages caused by missing timestamp in endDate calculations.
 
 ## Implemented in This Session
 
-- **Asset Price History Tabs** (2025-12-30):
-  - **Objective**: Add two new tabs to assets page for visualizing historical asset prices from monthly snapshots
-  - **Key Discovery**: `MonthlySnapshot.byAsset[]` already contains all price data - NO database schema changes needed!
-  - **Files created** (3 files, 813 lines total):
-    - `lib/utils/assetPriceHistoryUtils.ts` (227 lines): Data transformation utilities
-      - `transformPriceHistoryData()`: Converts snapshots → table format with color coding
-      - `calculateColorCode()`: Month-over-month price comparison logic
-      - `formatMonthLabel()`: Italian date formatting (Gen 2025, Feb 2025, etc.)
-      - TypeScript interfaces: `MonthPriceCell`, `AssetPriceHistoryRow`, `PriceHistoryTableData`
-    - `components/assets/AssetManagementTab.tsx` (437 lines): Extracted existing asset table
-      - Props-based architecture: `{ assets, loading, onRefresh }`
-      - All CRUD operations, state management, modals
-      - Mobile card + desktop table layouts
-    - `components/assets/AssetPriceHistoryTable.tsx` (149 lines): Historical price table
-      - Reusable for both tabs (filterYear prop: undefined = all, number = specific year)
-      - Color-coded cells: green (↑), red (↓), neutral (first/unchanged)
-      - Sticky first column + header for mobile scroll
-      - "Venduto" badge for deleted assets
-      - Empty state handling
-  - **File modified**:
-    - `app/dashboard/assets/page.tsx`: Converted to 3-tab layout with lazy-loading
-      - Tab 1: "Gestione Asset" (always mounted)
-      - Tab 2: "Anno Corrente" (lazy, filterYear=2025)
-      - Tab 3: "Storico Totale" (lazy, filterYear=undefined)
-      - Pattern: `mountedTabs` Set + `handleTabChange()` + `handleRefresh()` invalidates both caches
-  - **Technical patterns applied**:
-    - Lazy-loading tabs: Only render tab content after first click (saves memory/CPU)
-    - useMemo optimization: Cache `transformPriceHistoryData()` result
-    - React Query integration: `useAssets()` + `useSnapshots()` with cache invalidation
-    - Sticky columns: z-index layers (header z-20, first column z-10)
-    - Color coding algorithm: Sequential month-over-month comparison, reset chain on missing asset
-    - Italian localization: date-fns with 'it' locale
-  - **User decisions collected**:
-    - Tab name: "Gestione Asset" (not "Assets" or "Portafoglio")
-    - Deleted assets: Show always with "Venduto" badge
-    - Missing month: Display "-" (dash)
-    - Row ordering: Alphabetically by ticker
-  - **Testing**: ✅ `npm run build` succeeded (5.6s, zero TypeScript errors)
-  - **Benefits**:
-    - ✅ Visualize price evolution month-by-month
-    - ✅ Identify price trends with color coding
-    - ✅ Track deleted assets historically
-    - ✅ Mobile-friendly with horizontal scroll
-    - ✅ Zero database migrations needed
+- **Performance Metrics Timestamp Bug Fix** (2025-12-30):
+  - **Problem**: Performance page showed expenses €37.273,67 instead of €37.647,48 (Cashflow page)
+  - **Discrepancy**: €373,81 missing from Performance calculations
+  - **Root cause**: `endDate` created with timestamp `00:00:00` instead of `23:59:59.999` in 3 functions
+  - **Impact**: Expenses created on last day of month with timestamp > midnight were excluded from Performance page
+  - **Files modified** (1 file, 3 lines):
+    - `lib/services/performanceService.ts`:
+      - Line 478: `calculatePerformanceForPeriod()` - primary fix for all timeframes (YTD, 1Y, 3Y, 5Y, ALL, CUSTOM)
+      - Line 585: `getAllPerformanceData()` - query optimization for batch fetching
+      - Line 640: `calculateRollingPeriods()` - rolling 12M and 36M calculations
+  - **Fix applied**: Changed `new Date(year, month, 0)` → `new Date(year, month, 0, 23, 59, 59, 999)` on all 3 lines
+  - **Result**: All timeframes now show correct expense totals matching Cashflow page
+  - **User confirmation**: Discrepancy of €373,81 was a single expense on 31/12/2025 ✅
+  - **Testing**: `npm run build` successful (5.8s, zero TypeScript errors)
 
 ## Key Technical Decisions
 
@@ -1884,6 +1854,7 @@ User navigates to Hall of Fame → getHallOfFameData(userId)
 - **Reusable table component** (2025-12-30): Single `AssetPriceHistoryTable` component with optional `filterYear` prop serves both "Current Year" and "Total History" tabs
 - **Color coding logic** (2025-12-30): Sequential month-over-month comparison (not year-over-year) for more intuitive price trend visualization
 - **Lazy-loading tabs** (2025-12-30): `mountedTabs` Set pattern from cashflow page - only render tab content after first user click to save memory/CPU
+- **Date range timestamp precision** (2025-12-30): Always use full timestamp `23:59:59.999` for `endDate` in range queries to include entire last day - using `00:00:00` (default) excludes expenses created after midnight on last day of period
 
 ## Stack & Dependencies
 
@@ -1901,6 +1872,7 @@ User navigates to Hall of Fame → getHallOfFameData(userId)
 
 ## Recently Fixed Issues
 
+- ✅ **Performance metrics timestamp bug** (2025-12-30): Fixed €373,81 discrepancy between Performance and Cashflow pages - `endDate` was using `00:00:00` instead of `23:59:59.999`, excluding expenses created after midnight on last day of period (3 lines modified in `performanceService.ts`)
 - ✅ **iPad Mini landscape navigation** (2025-12-29): Fixed iPad Mini landscape (1024px) showing desktop sidebar instead of mobile hamburger menu - created custom breakpoint `desktop: 1025px` to replace `lg: 1024px`
 
 ---

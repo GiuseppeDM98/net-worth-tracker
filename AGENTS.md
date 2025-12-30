@@ -1083,6 +1083,52 @@ This project uses **Tailwind CSS v4** with a custom `desktop` breakpoint to fix 
 - ❌ Assuming Firestore Timestamps in API responses (they're serialized as ISO strings)
 - ✅ Always use `toDate()` from `lib/utils/dateHelpers.ts` for date conversions
 
+### Date Range Query Errors (CRITICAL)
+
+**Problem**: Using `new Date(year, month, 0)` for `endDate` in range queries excludes records from the last day of the period.
+
+**Symptom**:
+- Discrepancies between pages showing same data with different query logic
+- Example: Performance page showed €37.273,67 expenses while Cashflow showed €37.647,48 (€373,81 difference)
+- Missing data from last day of month (e.g., expenses created on 31/12/2025 after midnight)
+
+**Root Cause**:
+```typescript
+// ❌ WRONG - Creates endDate with timestamp 00:00:00 (midnight)
+const endDate = new Date(year, month, 0);
+
+// This means:
+// - For December 2025: endDate = 31 Dec 2025 00:00:00
+// - Firestore query: where('date', '<=', endDate)
+// - Expense created 31 Dec 2025 at 14:30 → EXCLUDED (14:30 > 00:00)
+```
+
+**Solution**:
+```typescript
+// ✅ CORRECT - Include entire last day with full timestamp
+const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+
+// This means:
+// - For December 2025: endDate = 31 Dec 2025 23:59:59.999
+// - Firestore query: where('date', '<=', endDate)
+// - Expense created 31 Dec 2025 at 14:30 → INCLUDED ✅
+```
+
+**Where to Check**:
+- Any function creating date ranges for Firestore queries
+- Any code using `new Date(..., 0)` for last day of month
+- Pattern to search: `new Date\([^)]*,\s*0\)\s*;` (regex)
+
+**Fixed Locations** (2025-12-30):
+- ✅ `lib/services/performanceService.ts` line 478 - `calculatePerformanceForPeriod()`
+- ✅ `lib/services/performanceService.ts` line 585 - `getAllPerformanceData()`
+- ✅ `lib/services/performanceService.ts` line 640 - `calculateRollingPeriods()`
+
+**Prevention**:
+- Always use `23, 59, 59, 999` parameters when creating `endDate` for range queries
+- Check `expenseService.ts` line 79 as reference implementation (already correct)
+- When adding new date range queries, grep codebase for existing patterns to copy
+
 ### Currency Conversion Errors
 - ❌ Hardcoding currency conversions (exchange rates change daily)
 - ❌ Not handling conversion failures gracefully (API can be down)
