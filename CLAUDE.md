@@ -16,6 +16,12 @@ Replace spreadsheet-based portfolio management with a modern, automated solution
 - Cost basis tracking with unrealized gains calculation and tax estimation
 - TER (Total Expense Ratio) tracking for cost-conscious investing
 - Composite assets for pension funds and mixed-allocation investments
+- **Asset Price History Tabs**: Two dedicated tabs for historical price visualization
+  - Current Year tab: Month-by-month price evolution for current year
+  - Total History tab: Complete historical prices across all snapshots
+  - Color-coded cells: Green (price increase), red (price decrease), neutral (first month/unchanged)
+  - Deleted assets shown with "Venduto" badge for transparency
+  - Mobile-optimized with sticky first column and horizontal scroll
 
 **Historical Analysis:**
 - Automated monthly snapshots via scheduled cron jobs
@@ -877,7 +883,7 @@ This section documents the 5 core features of the application, their key compone
 
 ### 1. Portfolio Management (Assets)
 
-**Purpose:** Manage multi-asset class portfolio with automatic price updates and comprehensive tracking.
+**Purpose:** Manage multi-asset class portfolio with automatic price updates, comprehensive tracking, and historical price visualization.
 
 **Key Components:**
 - **AssetDialog.tsx** (`components/assets/AssetDialog.tsx`):
@@ -889,6 +895,28 @@ This section documents the 5 core features of the application, their key compone
   - Composite asset allocation (mixed pension funds)
   - Auto/manual price update toggle
   - Form validation with react-hook-form + zod
+
+- **AssetManagementTab.tsx** (`components/assets/AssetManagementTab.tsx`):
+  - Extracted asset management table component (previously inline in page.tsx)
+  - Manages CRUD operations: create, update, delete assets
+  - Mobile card layout and desktop table layout
+  - Integrated modals: AssetDialog, TaxCalculatorModal
+  - Props-based architecture: receives assets, loading state, onRefresh callback
+  - State management for editing, dialogs, updating prices
+
+- **AssetPriceHistoryTable.tsx** (`components/assets/AssetPriceHistoryTable.tsx`):
+  - Reusable table component for displaying historical asset prices
+  - Props: assets, snapshots, optional filterYear, loading, onRefresh
+  - Month columns (Gen 2025, Feb 2025, etc.) with asset rows (ticker + name)
+  - Color-coded price cells based on month-over-month comparison:
+    - Green background: price increased from previous month
+    - Red background: price decreased from previous month
+    - Neutral/gray: first month, unchanged, or asset absent
+  - Percentage change display below price (e.g., +12.34%)
+  - "Venduto" badge for deleted assets (assets no longer in portfolio)
+  - Sticky first column (asset name) and sticky header for scroll navigation
+  - Empty state when no snapshots available
+  - useMemo optimization for data transformation
 
 **Key Services:**
 - **assetService.ts** (`lib/services/assetService.ts`):
@@ -903,16 +931,47 @@ This section documents the 5 core features of the application, their key compone
   - Ticker symbol formatting (.DE, .MI, .L suffixes)
   - Batch price fetching for efficiency
 
-**Page:** `app/dashboard/assets/page.tsx`
+**Key Utilities:**
+- **assetPriceHistoryUtils.ts** (`lib/utils/assetPriceHistoryUtils.ts`):
+  - Data transformation: `transformPriceHistoryData(snapshots, assets, filterYear?)`
+    - Converts monthly snapshots into table-ready format
+    - Filters snapshots by year (optional, for "Current Year" tab)
+    - Builds chronological month columns (Gen 2025, Feb 2025, etc.)
+    - Collects all unique assets (current + deleted from historical snapshots)
+    - Builds price history rows with color coding logic
+    - Sorts assets alphabetically by ticker
+  - Color coding: `calculateColorCode(currentPrice, previousPrice)`
+    - Returns 'green' if price > previous month
+    - Returns 'red' if price < previous month
+    - Returns 'neutral' if first month, unchanged, or no previous price
+  - Date formatting: `formatMonthLabel(year, month)` with Italian locale (date-fns)
+  - Helper: `getCurrentYear()` for default year filter
+  - TypeScript interfaces:
+    - `MonthPriceCell`: { price, colorCode, change? }
+    - `AssetPriceHistoryRow`: { assetId, ticker, name, isDeleted, months }
+    - `PriceHistoryTableData`: { assets, monthColumns }
+
+**Page:** `app/dashboard/assets/page.tsx` (3 tabs with lazy-loading pattern)
 
 **Data Flow:**
 ```
+Tab 1 - Asset Management:
 User → AssetDialog → assetService.createAsset() → Firestore /assets
 User clicks "Update Prices" → /api/prices/update → yahooFinanceService → Update Firestore
 Firestore listeners → Auto-refresh asset list
+
+Tab 2 - Current Year / Tab 3 - Total History:
+Page load → useAssets(userId) + useSnapshots(userId) → React Query cached data
+Tab click → mountedTabs Set updated → Lazy-load AssetPriceHistoryTable
+Component render → useMemo(transformPriceHistoryData) → Table format
+User clicks "Aggiorna" → handleRefresh() → Invalidate both assets and snapshots cache
 ```
 
 **Key Features:**
+- **Three-tab interface** with lazy-loading pattern:
+  - **Tab 1 - "Gestione Asset"**: Traditional asset management (always mounted)
+  - **Tab 2 - "Anno Corrente"**: Current year price history (lazy-loaded on first click)
+  - **Tab 3 - "Storico Totale"**: Complete historical prices (lazy-loaded on first click)
 - Real-time portfolio valuation
 - Automatic price updates (skip cash, real estate, manual-only assets)
 - Liquid vs illiquid classification
@@ -921,6 +980,15 @@ Firestore listeners → Auto-refresh asset list
 - TER tracking with weighted portfolio average
 - Manual price override for non-tradeable assets
 - Mobile-optimized card layout with collapsible details
+- **Historical price visualization**:
+  - Month-by-month price evolution table (columns = months, rows = assets)
+  - Color-coded price changes: green (increase), red (decrease), neutral (first/unchanged)
+  - Percentage change display vs previous month
+  - Deleted assets marked with "Venduto" badge
+  - Asset absent in month shown as "-"
+  - Alphabetically sorted by ticker
+  - Sticky first column and header for mobile scroll
+  - Data sourced from `MonthlySnapshot.byAsset[]` field (no DB changes needed)
 
 ---
 
@@ -1756,30 +1824,54 @@ User navigates to Hall of Fame → getHallOfFameData(userId)
 - **Architecture status**: Next.js App Router + Firebase + React Query + Recharts + Frankfurter API (external, no npm package).
 - **Mobile optimizations**: Custom breakpoint `desktop: 1025px` fixes iPad Mini landscape navigation UI.
 - **Responsive navigation**: iPad Mini landscape (1024px) now correctly displays mobile UI with hamburger menu.
+- **Latest feature**: Asset price history tabs implemented (2025-12-30) - visualize historical asset prices from monthly snapshots with color-coded month-over-month comparisons.
 
 ## Implemented in This Session
 
-- **iPad Mini Landscape Navigation UI Fix** (2025-12-29):
-  - **Problem**: iPad Mini in landscape mode (1024px width) displayed desktop sidebar instead of mobile hamburger menu
-  - **Root cause**: Tailwind `lg:` breakpoint uses `min-width: 1024px`, which **includes** 1024px (not exclusive)
-  - **Solution**: Created custom breakpoint `desktop: 1025px` to replace `lg:` in navigation components
-  - **Breakpoint definition**: Added `--breakpoint-desktop: 1025px` in `app/globals.css` using Tailwind v4 `@theme inline` syntax
-  - **Files modified**: 4 files, 19 occurrences `lg:` → `desktop:`
-    - `app/globals.css`: Added custom breakpoint (+2 lines)
-    - `app/dashboard/layout.tsx`: 7 occurrences replaced (3 lines modified)
-    - `components/layout/Sidebar.tsx`: 9 occurrences replaced (5 lines modified)
-    - `components/layout/BottomNavigation.tsx`: 3 occurrences replaced (1 line modified)
-  - **Key changes**:
-    - `lg:hidden` → `desktop:hidden`
-    - `max-lg:landscape:` → `max-desktop:landscape:`
-    - `max-lg:portrait:` → `max-desktop:portrait:`
+- **Asset Price History Tabs** (2025-12-30):
+  - **Objective**: Add two new tabs to assets page for visualizing historical asset prices from monthly snapshots
+  - **Key Discovery**: `MonthlySnapshot.byAsset[]` already contains all price data - NO database schema changes needed!
+  - **Files created** (3 files, 813 lines total):
+    - `lib/utils/assetPriceHistoryUtils.ts` (227 lines): Data transformation utilities
+      - `transformPriceHistoryData()`: Converts snapshots → table format with color coding
+      - `calculateColorCode()`: Month-over-month price comparison logic
+      - `formatMonthLabel()`: Italian date formatting (Gen 2025, Feb 2025, etc.)
+      - TypeScript interfaces: `MonthPriceCell`, `AssetPriceHistoryRow`, `PriceHistoryTableData`
+    - `components/assets/AssetManagementTab.tsx` (437 lines): Extracted existing asset table
+      - Props-based architecture: `{ assets, loading, onRefresh }`
+      - All CRUD operations, state management, modals
+      - Mobile card + desktop table layouts
+    - `components/assets/AssetPriceHistoryTable.tsx` (149 lines): Historical price table
+      - Reusable for both tabs (filterYear prop: undefined = all, number = specific year)
+      - Color-coded cells: green (↑), red (↓), neutral (first/unchanged)
+      - Sticky first column + header for mobile scroll
+      - "Venduto" badge for deleted assets
+      - Empty state handling
+  - **File modified**:
+    - `app/dashboard/assets/page.tsx`: Converted to 3-tab layout with lazy-loading
+      - Tab 1: "Gestione Asset" (always mounted)
+      - Tab 2: "Anno Corrente" (lazy, filterYear=2025)
+      - Tab 3: "Storico Totale" (lazy, filterYear=undefined)
+      - Pattern: `mountedTabs` Set + `handleTabChange()` + `handleRefresh()` invalidates both caches
+  - **Technical patterns applied**:
+    - Lazy-loading tabs: Only render tab content after first click (saves memory/CPU)
+    - useMemo optimization: Cache `transformPriceHistoryData()` result
+    - React Query integration: `useAssets()` + `useSnapshots()` with cache invalidation
+    - Sticky columns: z-index layers (header z-20, first column z-10)
+    - Color coding algorithm: Sequential month-over-month comparison, reset chain on missing asset
+    - Italian localization: date-fns with 'it' locale
+  - **User decisions collected**:
+    - Tab name: "Gestione Asset" (not "Assets" or "Portafoglio")
+    - Deleted assets: Show always with "Venduto" badge
+    - Missing month: Display "-" (dash)
+    - Row ordering: Alphabetically by ticker
+  - **Testing**: ✅ `npm run build` succeeded (5.6s, zero TypeScript errors)
   - **Benefits**:
-    - ✅ iPad Mini landscape (1024px) → Mobile landscape UI (hamburger menu)
-    - ✅ Desktop (≥1025px) → Desktop UI (sidebar always visible)
-    - ✅ Zero breaking changes for other breakpoints or components
-    - ✅ Semantic naming (`desktop` more explicit than `lg`)
-  - **Testing**: ✅ Build completed successfully, no compilation errors
-  - **Documentation updated**: `CLAUDE.md` section "Mobile Optimizations" updated with new breakpoint and fix details
+    - ✅ Visualize price evolution month-by-month
+    - ✅ Identify price trends with color coding
+    - ✅ Track deleted assets historically
+    - ✅ Mobile-friendly with horizontal scroll
+    - ✅ Zero database migrations needed
 
 ## Key Technical Decisions
 
@@ -1788,6 +1880,10 @@ User navigates to Hall of Fame → getHallOfFameData(userId)
 - **Breakpoint choice**: 1025px ensures iPad Mini landscape (1024px) is treated as mobile, while desktop (≥1025px) gets full sidebar
 - **Additive-only changes**: All optimizations use Tailwind responsive variants, zero breaking changes
 - **Desktop preservation**: ≥1025px screens remain completely unchanged
+- **Asset price history data source** (2025-12-30): Use existing `MonthlySnapshot.byAsset[]` field instead of creating new data model - zero database migrations needed
+- **Reusable table component** (2025-12-30): Single `AssetPriceHistoryTable` component with optional `filterYear` prop serves both "Current Year" and "Total History" tabs
+- **Color coding logic** (2025-12-30): Sequential month-over-month comparison (not year-over-year) for more intuitive price trend visualization
+- **Lazy-loading tabs** (2025-12-30): `mountedTabs` Set pattern from cashflow page - only render tab content after first user click to save memory/CPU
 
 ## Stack & Dependencies
 

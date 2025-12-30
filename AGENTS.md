@@ -585,6 +585,104 @@ const handleRefresh = async () => {
 };
 ```
 
+### Tab Patterns with Lazy Loading
+
+**Pattern** (from cashflow and assets pages): Implement multi-tab interfaces that defer rendering of expensive content until user interaction.
+
+**Problem**: Complex tabs with data transformations, API calls, or heavy rendering can slow down initial page load.
+
+**Solution**: Use `mountedTabs` Set to track which tabs have been visited, and conditionally render `<TabsContent>` only after first click.
+
+**Implementation**:
+```typescript
+'use client';
+
+import { useState } from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+export function MyTabbedPage() {
+  // Track which tabs have been mounted (visited)
+  const [mountedTabs, setMountedTabs] = useState<Set<string>>(
+    new Set(['default-tab']) // First tab always mounted
+  );
+  const [activeTab, setActiveTab] = useState<string>('default-tab');
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    // Add to mounted set when clicked (never remove)
+    setMountedTabs((prev) => new Set(prev).add(value));
+  };
+
+  return (
+    <Tabs value={activeTab} onValueChange={handleTabChange}>
+      <TabsList>
+        <TabsTrigger value="default-tab">Always Loaded</TabsTrigger>
+        <TabsTrigger value="lazy-tab-1">Lazy Tab 1</TabsTrigger>
+        <TabsTrigger value="lazy-tab-2">Lazy Tab 2</TabsTrigger>
+      </TabsList>
+
+      {/* Always mounted - no wrapper */}
+      <TabsContent value="default-tab">
+        <ExpensiveComponent1 />
+      </TabsContent>
+
+      {/* Lazy-loaded - only mounts after first click */}
+      {mountedTabs.has('lazy-tab-1') && (
+        <TabsContent value="lazy-tab-1">
+          <ExpensiveComponent2 />
+        </TabsContent>
+      )}
+
+      {mountedTabs.has('lazy-tab-2') && (
+        <TabsContent value="lazy-tab-2">
+          <ExpensiveComponent3 />
+        </TabsContent>
+      )}
+    </Tabs>
+  );
+}
+```
+
+**Benefits**:
+- ✅ Faster initial page load (only first tab renders)
+- ✅ Reduced memory usage (unvisited tabs never allocate resources)
+- ✅ Preserved state (once mounted, tabs stay mounted on subsequent visits)
+- ✅ Better UX (no re-rendering when switching between visited tabs)
+
+**When to Use**:
+- ✅ Tabs with heavy data transformations (e.g., `useMemo` with complex calculations)
+- ✅ Tabs with large datasets (e.g., historical snapshots, price tables)
+- ✅ Tabs with chart rendering (Recharts can be expensive)
+- ❌ Simple tabs with minimal rendering cost (premature optimization)
+
+**Example from Codebase** (app/dashboard/assets/page.tsx):
+```typescript
+// Tab 1: Always mounted (default active tab)
+<TabsContent value="management">
+  <AssetManagementTab {...props} />
+</TabsContent>
+
+// Tab 2: Lazy-loaded when first clicked
+{mountedTabs.has('current-year') && (
+  <TabsContent value="current-year">
+    <AssetPriceHistoryTable filterYear={getCurrentYear()} {...props} />
+  </TabsContent>
+)}
+
+// Tab 3: Lazy-loaded when first clicked
+{mountedTabs.has('total-history') && (
+  <TabsContent value="total-history">
+    <AssetPriceHistoryTable {...props} />
+  </TabsContent>
+)}
+```
+
+**Important Notes**:
+- The first/default tab should NOT use lazy-loading (always visible on page load)
+- Use `new Set([...])` in `useState` initializer to pre-mount default tab
+- Never remove tabs from `mountedTabs` Set (preserve state across tab switches)
+- Combine with `useMemo` inside tab components for additional performance optimization
+
 ### Error Handling with Toasts
 
 **Pattern** (using `sonner` library):
@@ -1163,6 +1261,7 @@ npm run lint         # Run ESLint
 - Type definitions: `types/assets.ts`, `types/performance.ts`, `types/dividend.ts`
 - Formatting utilities: `lib/utils/formatters.ts`
 - Date utilities: `lib/utils/dateHelpers.ts` (includes `toDate()` helper)
+- Asset price history utilities: `lib/utils/assetPriceHistoryUtils.ts` (snapshot data transformation, color coding)
 - Color constants: `lib/constants/colors.ts`
 - Auth context: `contexts/AuthContext.tsx`
 - Firebase config: `lib/firebase/config.ts`
@@ -1208,6 +1307,62 @@ npm run lint         # Run ESLint
 5. Updated navigation:
    - Added TrendingUp icon to Sidebar.tsx
    - Added Performance link to SecondaryMenuDrawer.tsx
+```
+
+**Example: Asset Price History Tabs (Refactoring + New Feature)**
+```
+Context: Add historical price visualization to existing assets page
+
+Key Discovery: MonthlySnapshot.byAsset[] already contains price data
+            → NO database schema changes needed!
+
+1. Created lib/utils/assetPriceHistoryUtils.ts (227 lines):
+   - transformPriceHistoryData(snapshots, assets, filterYear?)
+     → Converts snapshot data to table format
+     → Filters by year (optional, for "Current Year" tab)
+     → Builds month columns chronologically
+     → Collects all unique assets (current + historical)
+     → Calculates color codes (month-over-month comparison)
+     → Sorts alphabetically by ticker
+   - calculateColorCode(currentPrice, previousPrice)
+     → green: price increased, red: decreased, neutral: first/unchanged
+   - formatMonthLabel(year, month) with Italian locale (Gen 2025, Feb 2025)
+   - TypeScript interfaces: MonthPriceCell, AssetPriceHistoryRow, PriceHistoryTableData
+
+2. Created components/assets/AssetManagementTab.tsx (437 lines):
+   - Extracted existing asset management table (refactoring)
+   - Props-based: { assets, loading, onRefresh }
+   - All CRUD operations, state, modals preserved
+   - Removed local useAssets() hook (now receives props)
+
+3. Created components/assets/AssetPriceHistoryTable.tsx (149 lines):
+   - Reusable table component with optional filterYear prop
+   - Color-coded price cells (green/red/neutral backgrounds)
+   - Percentage change display vs previous month
+   - "Venduto" badge for deleted assets
+   - Sticky first column + header (mobile scroll)
+   - Empty state handling
+   - useMemo optimization for data transformation
+
+4. Modified app/dashboard/assets/page.tsx:
+   - Converted to 3-tab layout with lazy-loading pattern
+   - Tab 1: "Gestione Asset" (always mounted)
+   - Tab 2: "Anno Corrente" (lazy, filterYear=2025)
+   - Tab 3: "Storico Totale" (lazy, filterYear=undefined)
+   - mountedTabs Set + handleTabChange() + handleRefresh()
+   - Added useSnapshots() hook for historical data
+
+5. Testing:
+   - npm run build → ✅ Compiled successfully (5.6s, 0 errors)
+
+Key Patterns Applied:
+- Lazy-loading tabs (mountedTabs Set pattern)
+- useMemo optimization (cache transformed data)
+- React Query cache invalidation (both assets and snapshots)
+- Sticky columns with z-index layers (header z-20, column z-10)
+- Color coding algorithm (sequential month-over-month comparison)
+- Italian date formatting (date-fns with 'it' locale)
+- Reusable components with props (AssetPriceHistoryTable serves 2 tabs)
 ```
 
 ---
