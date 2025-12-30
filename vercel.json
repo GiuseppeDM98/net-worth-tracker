@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/monthly-snapshot",
-      "schedule": "25 22 * * *"
+      "schedule": "30 21 * * *"
     },
     {
       "path": "/api/cron/daily-dividend-processing",
