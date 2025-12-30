@@ -1,21 +1,4 @@
 {
-  "_comments": {
-    "note": "JSON non supporta commenti nativi, quindi usiamo questo campo per documentazione",
-    "sintassi_cron": "minuto ora giorno mese giorno-settimana",
-    "esempi_comuni": {
-      "ogni_giorno_mezzanotte_utc": "0 0 * * *",
-      "ogni_giorno_10am_utc": "0 10 * * *",
-      "ogni_giorno_10am_italia_inverno_cet": "0 9 * * * (10 AM CET = 9 AM UTC)",
-      "ogni_giorno_10am_italia_estate_cest": "0 8 * * * (10 AM CEST = 8 AM UTC)",
-      "ogni_lunedi_9am_utc": "0 9 * * 1",
-      "ogni_primo_del_mese_mezzanotte": "0 0 1 * *",
-      "ogni_15_minuti": "*/15 * * * *",
-      "ogni_ora": "0 * * * *",
-      "ogni_domenica_23_30_utc": "30 23 * * 0"
-    },
-    "timezone": "IMPORTANTE: Vercel Cron usa sempre UTC. Per orari locali italiani, sottrai 1 ora (inverno CET) o 2 ore (estate CEST)",
-    "riferimento": "https://crontab.guru per testare espressioni cron"
-  },
   "crons": [
     {
       "path": "/api/cron/monthly-snapshot",
