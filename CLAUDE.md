@@ -16,12 +16,16 @@ Replace spreadsheet-based portfolio management with a modern, automated solution
 - Cost basis tracking with unrealized gains calculation and tax estimation
 - TER (Total Expense Ratio) tracking for cost-conscious investing
 - Composite assets for pension funds and mixed-allocation investments
-- **Asset Price History Tabs**: Two dedicated tabs for historical price visualization
-  - Current Year tab: Month-by-month price evolution for current year
-  - Total History tab: Complete historical prices across all snapshots
-  - Color-coded cells: Green (price increase), red (price decrease), neutral (first month/unchanged)
-  - Deleted assets shown with "Venduto" badge for transparency
-  - Mobile-optimized with sticky first column and horizontal scroll
+- **Asset Price History Tabs**: Five dedicated tabs for historical price and value visualization
+  - **Prezzi Anno Corrente**: Month-by-month price evolution for current year (2025)
+  - **Prezzi Storici+**: Historical prices from November 2025 onwards (when real data tracking started)
+  - **Valori Anno Corrente**: Month-by-month total values for current year with total row at bottom
+  - **Valori Storici+**: Historical total values from November 2025 onwards with total row
+  - **Conditional Display Logic**: Assets with price = 1 (e.g., cash/liquidity) automatically show totalValue instead of price in all tabs
+  - **Color-coded cells**: Green (increase), red (decrease), neutral (first month/unchanged) - compares same metric (price-to-price or value-to-value)
+  - **Deleted assets**: Shown with "Venduto" badge for transparency but excluded from total row calculations
+  - **Mobile-optimized**: Tabs scroll horizontally on mobile (<1025px), sticky first column and horizontal table scroll
+  - **Desktop layout**: 5-column grid layout for tabs (≥1025px)
 
 **Historical Analysis:**
 - Automated monthly snapshots via scheduled cron jobs
@@ -1826,38 +1830,42 @@ User navigates to Hall of Fame → getHallOfFameData(userId)
 - **Architecture status**: Next.js App Router + Firebase + React Query + Recharts + Frankfurter API (external, no npm package).
 - **Mobile optimizations**: Custom breakpoint `desktop: 1025px` fixes iPad Mini landscape navigation UI.
 - **Responsive navigation**: iPad Mini landscape (1024px) now correctly displays mobile UI with hamburger menu.
-- **Latest enhancements** (2025-12-30):
-  - Performance page charts now full-width with responsive heights (280-400px based on device)
-  - Y-axis formatting improved with compact notation (€1,5 Mln vs €1.234.567) for better mobile readability
+- **Latest enhancements** (2025-12-31):
+  - Asset Price History expanded from 2 to 5 tabs with conditional display logic
+  - Total value display mode with automatic total row calculation
+  - FilterStartDate support for November 2025+ filtering (real data tracking start)
+  - Conditional display: Assets with price = 1 show totalValue automatically
 
 ## Implemented in This Session
 
-- **Performance Page Chart Enhancements** (2025-12-30):
-  - **Feature 1 - Full-Width Chart Layout**:
-    - Converted 2-column grid layout to full-width stacked charts
-    - Matches History page pattern for consistency
-    - Charts: "Evoluzione Patrimonio" and "CAGR Rolling 12 Mesi"
-  - **Feature 2 - Responsive Chart Heights**:
-    - Added dynamic height calculation based on device orientation
-    - Mobile portrait (<768px): 280px
-    - Mobile landscape (568-767px): 300px
-    - Desktop (≥1024px): 400px
-    - Uses `useMediaQuery` hook + `getChartHeight()` helper
-  - **Feature 3 - Improved Y-Axis Visibility**:
-    - Replaced `formatCurrency()` with `formatCurrencyCompact()` for Y-axis labels
-    - Old: €1.234.567 (12+ characters, compressed chart on mobile)
-    - New: €1,5 Mln (8 characters, readable on all devices)
-  - **Files modified**:
-    - `app/dashboard/performance/page.tsx`:
-      - Added `useMediaQuery` import
-      - Added responsive hooks (isMobile, isLandscape)
-      - Added `getChartHeight()` helper function
-      - Removed grid wrapper, added `className="mt-6"` to Cards
-      - Updated both charts to use `height={getChartHeight()}`
-      - Changed YAxis formatter to `formatCurrencyCompact()`
-      - Added `formatCurrencyCompact` to imports
-  - **Total changes**: 1 file, 1 import added, 2 hooks added, 1 helper function added, 9 lines modified
-  - **Testing**: `npm run build` successful (7.6s, zero TypeScript errors)
+- **Asset Price History Enhancement - 5 Tabs with Value Tracking** (2025-12-31):
+  - **Feature 1 - Conditional Display Logic**:
+    - Assets with `price = 1` (e.g., cash, liquidity) automatically show `totalValue` instead of price in ALL tabs
+    - Unified logic: `displayMode === 'totalValue' || cell.price === 1`
+    - Applied to both "Prezzi" and "Valori" tabs for consistency
+  - **Feature 2 - FilterStartDate Support**:
+    - New `AssetHistoryDateFilter` type: `{ year: number, month: number }`
+    - Filters snapshots from specific month onwards (e.g., November 2025 = real data start)
+    - Priority: `filterStartDate` > `filterYear` when both provided
+    - Logic: `if (year < filterYear) return false; if (year === filterYear && month < filterMonth) return false;`
+  - **Feature 3 - Total Value Display Mode**:
+    - New `displayMode: 'price' | 'totalValue'` prop for AssetPriceHistoryTable
+    - When `displayMode = 'totalValue'`: Always shows totalValue for ALL assets
+    - Automatic total row calculation: Sums totalValue across all non-deleted assets
+    - Total row: Sticky bottom footer with background muted, excluded from lazy-loading
+  - **Feature 4 - 5-Tab Layout**:
+    - **Tab 1 - Gestione Asset**: Unchanged (always mounted)
+    - **Tab 2 - Prezzi Anno Corrente**: filterYear=2025, displayMode="price", showTotalRow=false
+    - **Tab 3 - Prezzi Nov 2025+**: filterStartDate={year:2025, month:11}, displayMode="price", showTotalRow=false
+    - **Tab 4 - Valori Anno Corrente**: filterYear=2025, displayMode="totalValue", showTotalRow=true
+    - **Tab 5 - Valori Storici+**: filterStartDate={year:2025, month:11}, displayMode="totalValue", showTotalRow=true
+    - Responsive: Horizontal scroll mobile (<1025px), Grid 5-col desktop (≥1025px)
+  - **Files modified** (4 files, ~205 lines added):
+    - `types/assets.ts`: +3 new types (AssetHistoryDisplayMode, AssetHistoryDateFilter, AssetHistoryTotalRow)
+    - `lib/utils/assetPriceHistoryUtils.ts`: +90 lines (filterStartDate, displayMode, totalRow calc, fallback totalValue)
+    - `components/assets/AssetPriceHistoryTable.tsx`: +40 lines (conditional display, TableFooter, total row rendering)
+    - `app/dashboard/assets/page.tsx`: +60 lines (5 tabs, responsive TabsList, icon imports)
+  - **Testing**: `npm run build` successful (6.9s, zero TypeScript errors)
 
 ## Key Technical Decisions
 
@@ -1873,6 +1881,12 @@ User navigates to Hall of Fame → getHallOfFameData(userId)
 - **Date range timestamp precision** (2025-12-30): Always use full timestamp `23:59:59.999` for `endDate` in range queries to include entire last day - using `00:00:00` (default) excludes expenses created after midnight on last day of period
 - **Responsive Chart Height Pattern** (2025-12-30): Duplicate `getChartHeight()` helper in each page instead of shared utility - function is trivial (3 lines), only 2 pages use it, avoids unnecessary coupling, easier to customize per-page
 - **Chart Formatter Consistency** (2025-12-30): Use `formatCurrencyCompact()` for all Y-axis labels in monetary charts - provides compact notation (€1,5 Mln vs €1.234.567), prevents mobile chart compression, aligns Performance page with History page pattern
+- **Asset Price History Conditional Display** (2025-12-31): Show `totalValue` when `displayMode === 'totalValue'` OR `cell.price === 1` - unified logic handles both "Valori" tabs (always totalValue) and "Prezzi" tabs (totalValue only for cash/liquidity assets with price=1), implemented in [AssetPriceHistoryTable.tsx](components/assets/AssetPriceHistoryTable.tsx:142-145)
+- **FilterStartDate Priority** (2025-12-31): `filterStartDate` parameter takes precedence over `filterYear` when both are provided - allows precise date filtering (e.g., November 2025+) while maintaining backward compatibility with year-only filtering, implemented with early return in [assetPriceHistoryUtils.ts](lib/utils/assetPriceHistoryUtils.ts:130-138)
+- **Total Row Asset Filtering** (2025-12-31): Exclude assets with `isDeleted: true` from total row calculations - sold assets don't contribute to current portfolio value but still appear in table for historical transparency, avoids inflating totals with assets no longer held, implemented in [assetPriceHistoryUtils.ts](lib/utils/assetPriceHistoryUtils.ts:272)
+- **Color Coding Metric Consistency** (2025-12-31): Always compare same metric for month-over-month changes - price vs previousPrice when `displayMode='price'`, totalValue vs previousTotalValue when `displayMode='totalValue'` - prevents meaningless comparisons between different magnitudes (e.g., €50 price vs €40,000 totalValue), ensures percentage changes are accurate, implemented in [assetPriceHistoryUtils.ts](lib/utils/assetPriceHistoryUtils.ts:228-231)
+- **TotalValue Fallback Calculation** (2025-12-31): Calculate `totalValue = price × quantity` on-the-fly for old snapshots missing the field - provides backward compatibility with snapshots created before totalValue field was added to schema, transparent to users, no database migration needed, implemented in [assetPriceHistoryUtils.ts](lib/utils/assetPriceHistoryUtils.ts:225)
+- **Five-Tab Responsive Layout** (2025-12-31): Asset Price History page uses horizontal scroll on mobile (<1025px) and grid 5-column layout on desktop (≥1025px) - 5 tabs (Gestione + 2 Prezzi + 2 Valori) don't fit in mobile viewport, horizontal scroll is industry standard (iOS/Android apps), implemented with `overflow-x-auto` + `desktop:grid desktop:grid-cols-5` in [assets/page.tsx](app/dashboard/assets/page.tsx)
 
 ## Stack & Dependencies
 

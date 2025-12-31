@@ -1,12 +1,20 @@
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
-import type { Asset, MonthlySnapshot } from '@/types/assets';
+import type {
+  Asset,
+  MonthlySnapshot,
+  AssetHistoryDisplayMode,
+  AssetHistoryDateFilter,
+  AssetHistoryTotalRow
+} from '@/types/assets';
 
 /**
- * Price data for a single month in the history table
+ * Data for a single month in the history table
+ * Renamed from MonthPriceCell to support both price and totalValue display
  */
-export interface MonthPriceCell {
+export interface MonthDataCell {
   price: number | null; // Null if asset didn't exist in that month
+  totalValue: number | null; // Total value (quantity × price), null if asset didn't exist
   colorCode: 'green' | 'red' | 'neutral';
   change?: number; // Percentage change vs previous month
 }
@@ -20,7 +28,7 @@ export interface AssetPriceHistoryRow {
   name: string;
   isDeleted: boolean; // True if asset not in current portfolio
   months: {
-    [monthKey: string]: MonthPriceCell; // monthKey: "2025-1", "2025-2", etc.
+    [monthKey: string]: MonthDataCell; // monthKey: "2025-1", "2025-2", etc.
   };
 }
 
@@ -35,6 +43,7 @@ export interface PriceHistoryTableData {
     year: number;
     month: number;
   }[];
+  totalRow?: AssetHistoryTotalRow; // Optional total row for totalValue display mode
 }
 
 /**
@@ -95,26 +104,46 @@ export function getCurrentYear(): number {
  * Transform snapshots into price history table data
  *
  * Algorithm:
- * 1. Filter snapshots by year (if specified)
+ * 1. Filter snapshots by year or start date (if specified)
  * 2. Build month columns (chronological order)
  * 3. Collect all unique assets (current + deleted from snapshots)
- * 4. For each asset, build price history row with color coding
- * 5. Sort assets alphabetically by ticker
+ * 4. For each asset, build price/value history row with color coding
+ * 5. Calculate total row if displayMode is 'totalValue'
+ * 6. Sort assets alphabetically by ticker
  *
  * @param snapshots - All user snapshots from Firestore
  * @param currentAssets - Current assets in portfolio
  * @param filterYear - Optional year filter (undefined = show all years)
+ * @param filterStartDate - Optional start date filter (overrides filterYear if provided)
+ * @param displayMode - Display mode: 'price' or 'totalValue' (default: 'price')
  * @returns Transformed table data ready for rendering
  */
 export function transformPriceHistoryData(
   snapshots: MonthlySnapshot[],
   currentAssets: Asset[],
-  filterYear?: number
+  filterYear?: number,
+  filterStartDate?: AssetHistoryDateFilter,
+  displayMode: AssetHistoryDisplayMode = 'price'
 ): PriceHistoryTableData {
-  // Step 1: Filter snapshots by year if specified
-  const filteredSnapshots = filterYear
-    ? snapshots.filter((s) => s.year === filterYear)
-    : snapshots;
+  // Step 1: Filter snapshots by start date or year if specified
+  const filteredSnapshots = snapshots.filter((snapshot) => {
+    // filterStartDate takes precedence over filterYear
+    if (filterStartDate) {
+      const snapshotYear = snapshot.year;
+      const snapshotMonth = snapshot.month;
+
+      if (snapshotYear < filterStartDate.year) return false;
+      if (snapshotYear === filterStartDate.year && snapshotMonth < filterStartDate.month) return false;
+      return true;
+    }
+
+    // Existing year filter
+    if (filterYear) {
+      return snapshot.year === filterYear;
+    }
+
+    return true;
+  });
 
   // Step 2: Build month columns (chronological order)
   // Sort snapshots by year, then month
@@ -161,13 +190,14 @@ export function transformPriceHistoryData(
     });
   });
 
-  // Step 4: Build price history rows
+  // Step 4: Build price/value history rows
   const assetRows: AssetPriceHistoryRow[] = [];
 
   allAssetIds.forEach((assetId) => {
     const metadata = assetMetadata.get(assetId)!;
-    const months: { [monthKey: string]: MonthPriceCell } = {};
+    const months: { [monthKey: string]: MonthDataCell } = {};
     let previousPrice: number | null = null; // Track for color coding
+    let previousTotalValue: number | null = null; // Track for color coding
 
     monthColumns.forEach((monthCol) => {
       // Find snapshot for this month
@@ -184,26 +214,37 @@ export function transformPriceHistoryData(
         // Asset didn't exist in this month
         months[monthCol.key] = {
           price: null,
+          totalValue: null,
           colorCode: 'neutral',
         };
         previousPrice = null; // Reset comparison chain
+        previousTotalValue = null;
       } else {
         const currentPrice = snapshotAsset.price;
-        const colorCode = calculateColorCode(currentPrice, previousPrice);
+        // Fallback: calculate totalValue if missing in snapshot (for old data)
+        const currentTotalValue = snapshotAsset.totalValue ?? (snapshotAsset.price * snapshotAsset.quantity);
 
-        // Calculate percentage change
+        // Determine which value to use for color coding based on displayMode
+        const currentValue = displayMode === 'price' ? currentPrice : currentTotalValue;
+        const previousValue = displayMode === 'price' ? previousPrice : previousTotalValue;
+
+        const colorCode = calculateColorCode(currentValue, previousValue);
+
+        // Calculate percentage change based on displayMode
         const change =
-          previousPrice !== null
-            ? ((currentPrice - previousPrice) / previousPrice) * 100
+          previousValue !== null
+            ? ((currentValue - previousValue) / previousValue) * 100
             : undefined;
 
         months[monthCol.key] = {
           price: currentPrice,
+          totalValue: currentTotalValue,
           colorCode,
           change,
         };
 
         previousPrice = currentPrice;
+        previousTotalValue = currentTotalValue;
       }
     });
 
@@ -219,8 +260,35 @@ export function transformPriceHistoryData(
   // Step 5: Sort assets alphabetically by ticker (Italian locale)
   assetRows.sort((a, b) => a.ticker.localeCompare(b.ticker, 'it'));
 
+  // Step 6: Calculate total row only for totalValue mode
+  let totalRow: AssetHistoryTotalRow | undefined;
+  if (displayMode === 'totalValue') {
+    const totals: { [monthKey: string]: number } = {};
+
+    monthColumns.forEach((monthCol) => {
+      let monthTotal = 0;
+
+      assetRows.forEach((assetRow) => {
+        if (!assetRow.isDeleted) {  // Exclude deleted assets from total
+          const cell = assetRow.months[monthCol.key];
+          if (cell?.totalValue !== null && cell?.totalValue !== undefined) {
+            monthTotal += cell.totalValue;
+          }
+        }
+      });
+
+      totals[monthCol.key] = monthTotal;
+    });
+
+    totalRow = {
+      monthColumns: monthColumns.map(col => col.label),
+      totals,
+    };
+  }
+
   return {
     assets: assetRows,
     monthColumns,
+    totalRow,
   };
 }

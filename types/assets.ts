@@ -248,3 +248,18 @@ export interface HistoricalReturnsData {
   startDate: string;
   endDate: string;
 }
+
+// Asset Price History Types
+export type AssetHistoryDisplayMode = 'price' | 'totalValue';
+
+export interface AssetHistoryDateFilter {
+  year: number;
+  month: number; // 1-12
+}
+
+export interface AssetHistoryTotalRow {
+  monthColumns: string[];
+  totals: {
+    [monthKey: string]: number;
+  };
+}

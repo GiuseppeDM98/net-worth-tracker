@@ -1,7 +1,12 @@
 'use client';
 
 import { useMemo } from 'react';
-import type { Asset, MonthlySnapshot } from '@/types/assets';
+import type {
+  Asset,
+  MonthlySnapshot,
+  AssetHistoryDisplayMode,
+  AssetHistoryDateFilter
+} from '@/types/assets';
 import { transformPriceHistoryData } from '@/lib/utils/assetPriceHistoryUtils';
 import { formatCurrency, formatNumber } from '@/lib/services/chartService';
 import { Button } from '@/components/ui/button';
@@ -13,6 +18,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableFooter,
 } from '@/components/ui/table';
 import { RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -21,6 +27,9 @@ interface AssetPriceHistoryTableProps {
   assets: Asset[];
   snapshots: MonthlySnapshot[];
   filterYear?: number; // undefined = show all years
+  filterStartDate?: AssetHistoryDateFilter; // Optional start date filter (overrides filterYear)
+  displayMode?: AssetHistoryDisplayMode; // 'price' or 'totalValue' (default: 'price')
+  showTotalRow?: boolean; // Show total row at bottom (default: false)
   loading: boolean;
   onRefresh: () => Promise<void>;
 }
@@ -36,16 +45,19 @@ export function AssetPriceHistoryTable({
   assets,
   snapshots,
   filterYear,
+  filterStartDate,
+  displayMode = 'price',
+  showTotalRow = false,
   loading,
   onRefresh,
 }: AssetPriceHistoryTableProps) {
   // Transform snapshot data into table format
   const tableData = useMemo(
-    () => transformPriceHistoryData(snapshots, assets, filterYear),
-    [snapshots, assets, filterYear]
+    () => transformPriceHistoryData(snapshots, assets, filterYear, filterStartDate, displayMode),
+    [snapshots, assets, filterYear, filterStartDate, displayMode]
   );
 
-  const { assets: assetRows, monthColumns } = tableData;
+  const { assets: assetRows, monthColumns, totalRow } = tableData;
 
   return (
     <div className="space-y-4">
@@ -117,7 +129,7 @@ export function AssetPriceHistoryTable({
                       <TableCell
                         key={month.key}
                         className={cn(
-                          'text-right',
+                          'text-right min-w-[100px]',
                           cell.price === null ? 'text-gray-400' : colorClasses[cell.colorCode]
                         )}
                       >
@@ -125,9 +137,21 @@ export function AssetPriceHistoryTable({
                           <span className="text-gray-400">-</span>
                         ) : (
                           <div>
-                            <div className="font-medium">{formatCurrency(cell.price)}</div>
+                            {/* CONDITIONAL DISPLAY LOGIC */}
+                            <div className="font-medium">
+                              {displayMode === 'totalValue' || cell.price === 1
+                                ? formatCurrency(cell.totalValue || 0)  // Show totalValue if mode=totalValue OR price=1
+                                : formatCurrency(cell.price)             // Otherwise show price
+                              }
+                            </div>
                             {cell.change !== undefined && (
-                              <div className="text-xs mt-0.5">
+                              <div
+                                className={cn(
+                                  'text-xs mt-0.5',
+                                  cell.change > 0 && 'text-green-600',
+                                  cell.change < 0 && 'text-red-600'
+                                )}
+                              >
                                 {cell.change > 0 ? '+' : ''}
                                 {formatNumber(cell.change, 2)}%
                               </div>
@@ -140,6 +164,25 @@ export function AssetPriceHistoryTable({
                 </TableRow>
               ))}
             </TableBody>
+
+            {/* Total Row - Only shown if showTotalRow is true */}
+            {showTotalRow && totalRow && (
+              <TableFooter>
+                <TableRow className="bg-muted/50 font-bold">
+                  <TableCell className="sticky left-0 bg-muted z-10">
+                    Totale
+                  </TableCell>
+                  {monthColumns.map((monthCol) => {
+                    const total = totalRow.totals[monthCol.key] || 0;
+                    return (
+                      <TableCell key={monthCol.key} className="text-right min-w-[100px]">
+                        {formatCurrency(total)}
+                      </TableCell>
+                    );
+                  })}
+                </TableRow>
+              </TableFooter>
+            )}
           </Table>
         )}
       </div>

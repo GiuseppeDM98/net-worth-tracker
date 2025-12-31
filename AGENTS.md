@@ -1403,60 +1403,84 @@ npm run lint         # Run ESLint
    - Added Performance link to SecondaryMenuDrawer.tsx
 ```
 
-**Example: Asset Price History Tabs (Refactoring + New Feature)**
+**Example: Asset Price History Tabs (5-Tab Implementation with Conditional Display)**
 ```
-Context: Add historical price visualization to existing assets page
+Context: Enhance asset price history with value tracking and conditional display
 
-Key Discovery: MonthlySnapshot.byAsset[] already contains price data
+Key Discovery: MonthlySnapshot.byAsset[] already contains both price AND totalValue
             → NO database schema changes needed!
 
-1. Created lib/utils/assetPriceHistoryUtils.ts (227 lines):
-   - transformPriceHistoryData(snapshots, assets, filterYear?)
-     → Converts snapshot data to table format
-     → Filters by year (optional, for "Current Year" tab)
-     → Builds month columns chronologically
-     → Collects all unique assets (current + historical)
-     → Calculates color codes (month-over-month comparison)
-     → Sorts alphabetically by ticker
-   - calculateColorCode(currentPrice, previousPrice)
-     → green: price increased, red: decreased, neutral: first/unchanged
-   - formatMonthLabel(year, month) with Italian locale (Gen 2025, Feb 2025)
-   - TypeScript interfaces: MonthPriceCell, AssetPriceHistoryRow, PriceHistoryTableData
+User Requirements (2025-12-31):
+1. Assets with price=1 (cash/liquidity) show totalValue instead of price (ALL tabs)
+2. Filter "Storico" tabs to November 2025+ (when real price tracking started)
+3. Create 2 new "Valori" tabs showing totalValue for ALL assets + total row
 
-2. Created components/assets/AssetManagementTab.tsx (437 lines):
-   - Extracted existing asset management table (refactoring)
-   - Props-based: { assets, loading, onRefresh }
-   - All CRUD operations, state, modals preserved
-   - Removed local useAssets() hook (now receives props)
+Final Implementation: 5 tabs total
+- Tab 1: Gestione Asset (CRUD operations, always mounted)
+- Tab 2: Prezzi Anno Corrente (prices with conditional display)
+- Tab 3: Prezzi da Nov 2025 (prices with filterStartDate + conditional display)
+- Tab 4: Valori Anno Corrente (totalValue for all assets + total row)
+- Tab 5: Valori da Nov 2025 (totalValue + filterStartDate + total row)
 
-3. Created components/assets/AssetPriceHistoryTable.tsx (149 lines):
-   - Reusable table component with optional filterYear prop
-   - Color-coded price cells (green/red/neutral backgrounds)
-   - Percentage change display vs previous month
-   - "Venduto" badge for deleted assets
-   - Sticky first column + header (mobile scroll)
-   - Empty state handling
-   - useMemo optimization for data transformation
+1. Updated types/assets.ts (+15 lines):
+   - AssetHistoryDisplayMode = 'price' | 'totalValue'
+   - AssetHistoryDateFilter { year: number; month: number }
+   - AssetHistoryTotalRow { monthColumns: string[]; totals: {...} }
 
-4. Modified app/dashboard/assets/page.tsx:
-   - Converted to 3-tab layout with lazy-loading pattern
-   - Tab 1: "Gestione Asset" (always mounted)
-   - Tab 2: "Anno Corrente" (lazy, filterYear=2025)
-   - Tab 3: "Storico Totale" (lazy, filterYear=undefined)
-   - mountedTabs Set + handleTabChange() + handleRefresh()
-   - Added useSnapshots() hook for historical data
+2. Updated lib/utils/assetPriceHistoryUtils.ts (+90 lines):
+   - Renamed MonthPriceCell → MonthDataCell, added totalValue field
+   - transformPriceHistoryData() signature:
+     → Added filterStartDate parameter (takes precedence over filterYear)
+     → Added displayMode parameter ('price' | 'totalValue')
+   - Extract BOTH price and totalValue from snapshots
+   - Fallback: totalValue ?? (price × quantity) for old snapshots
+   - Color coding based on displayMode (price vs price OR totalValue vs totalValue)
+   - Total row calculation: sum totalValue for non-deleted assets only
+
+3. Updated components/assets/AssetPriceHistoryTable.tsx (+40 lines):
+   - Added 3 new props: filterStartDate, displayMode, showTotalRow
+   - Conditional display logic in cell rendering:
+     → displayMode === 'totalValue' OR cell.price === 1 → show totalValue
+     → Otherwise show price
+   - Total row rendering with TableFooter (sticky left column, muted background)
+   - useMemo updated to pass all new parameters
+
+4. Updated app/dashboard/assets/page.tsx (+60 lines):
+   - Converted from 3-tab to 5-tab layout
+   - Added TrendingUp and BarChart3 icon imports
+   - Responsive TabsList:
+     → Mobile (<1025px): Horizontal scroll
+     → Desktop (≥1025px): Grid 5-column layout
+   - Tab configurations:
+     → price-current: filterYear=2025, displayMode="price", showTotalRow=false
+     → price-history: filterStartDate={{year:2025,month:11}}, displayMode="price"
+     → value-current: filterYear=2025, displayMode="totalValue", showTotalRow=true
+     → value-history: filterStartDate={{year:2025,month:11}}, displayMode="totalValue", showTotalRow=true
 
 5. Testing:
-   - npm run build → ✅ Compiled successfully (5.6s, 0 errors)
+   - npm run build → ✅ Compiled successfully (6.9s, 0 errors)
 
 Key Patterns Applied:
-- Lazy-loading tabs (mountedTabs Set pattern)
-- useMemo optimization (cache transformed data)
+- Conditional display logic (unified: displayMode OR price condition)
+- FilterStartDate priority (early return in filtering logic)
+- Total row calculation (exclude deleted assets)
+- Color coding consistency (same metric comparison based on displayMode)
+- Fallback for missing data (totalValue ?? calculated value)
+- Responsive 5-tab layout (horizontal scroll mobile, grid desktop)
+- Lazy-loading tabs (mountedTabs Set pattern, only Tab 1 pre-mounted)
+- useMemo optimization (cache transformed data with all dependencies)
 - React Query cache invalidation (both assets and snapshots)
-- Sticky columns with z-index layers (header z-20, column z-10)
-- Color coding algorithm (sequential month-over-month comparison)
+- Sticky columns with z-index layers (header z-20, column z-10, footer z-10)
 - Italian date formatting (date-fns with 'it' locale)
-- Reusable components with props (AssetPriceHistoryTable serves 2 tabs)
+- Reusable components with props (AssetPriceHistoryTable serves all 4 history tabs)
+
+Key Technical Decisions:
+1. Conditional display applies to BOTH "Prezzi" and "Valori" tabs (not just Valori)
+2. FilterStartDate takes precedence over filterYear (priority logic)
+3. Total row excludes deleted assets (sold assets don't contribute to current value)
+4. Color coding compares same metric (price vs price OR totalValue vs totalValue)
+5. TotalValue fallback for backward compatibility (no migration needed)
+6. 5-tab responsive layout (horizontal scroll mobile, grid desktop)
 ```
 
 ---
