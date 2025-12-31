@@ -619,6 +619,92 @@ While the default setup uses **Firebase + Vercel**, the application can be adapt
 - **Railway**: Docker-based deployment
 - **Self-hosted**: VPS with Docker
 
+### Cron Job Alternatives
+
+If you experience issues with **Vercel Cron Jobs** (common on Hobby plan with unpredictable delays of 15-60+ minutes), you can replace them with **GitHub Actions** for more reliable scheduling.
+
+**Why GitHub Actions?**
+- ✅ **Free** for public repositories (2,000 minutes/month for private repos)
+- ✅ **Reliable timing**: Executes within 1-2 minutes of scheduled time
+- ✅ **Better logging**: Clear execution history and error messages
+- ✅ **No plan limitations**: Works the same on free and paid GitHub accounts
+
+**How to migrate:**
+
+1. **Create workflow file** in your repository:
+   ```bash
+   mkdir -p .github/workflows
+   touch .github/workflows/cron-jobs.yml
+   ```
+
+2. **Add workflow configuration** (`.github/workflows/cron-jobs.yml`):
+   ```yaml
+   name: Scheduled Cron Jobs
+
+   on:
+     schedule:
+       # Monthly snapshot: Every day at 20:00 UTC
+       - cron: '0 20 * * *'
+     workflow_dispatch:  # Allow manual triggering
+
+   jobs:
+     monthly-snapshot:
+       runs-on: ubuntu-latest
+       steps:
+         - name: Call Monthly Snapshot API
+           run: |
+             curl -X GET "${{ secrets.APP_URL }}/api/cron/monthly-snapshot" \
+               -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+               -w "\nHTTP Status: %{http_code}\n"
+
+     daily-dividend-processing:
+       runs-on: ubuntu-latest
+       steps:
+         - name: Call Dividend Processing API
+           run: |
+             curl -X GET "${{ secrets.APP_URL }}/api/cron/daily-dividend-processing" \
+               -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+               -w "\nHTTP Status: %{http_code}\n"
+   ```
+
+3. **Set GitHub Secrets**:
+   - Go to your repo → Settings → Secrets and variables → Actions
+   - Add secrets:
+     - `APP_URL`: Your Vercel app URL (e.g., `https://your-app.vercel.app`)
+     - `CRON_SECRET`: Same value as in your Vercel environment variables
+
+4. **Remove Vercel cron configuration** (optional):
+   - Delete or comment out the `crons` array in `vercel.json`
+   - This prevents duplicate executions
+
+5. **Test manually**:
+   - Go to repo → Actions → "Scheduled Cron Jobs" workflow
+   - Click "Run workflow" to test immediately
+   - Check logs to verify successful execution
+
+**Schedule syntax examples:**
+```yaml
+# Every day at 6:00 UTC (7:00 CET / 8:00 CEST)
+- cron: '0 6 * * *'
+
+# Every day at 22:00 UTC (23:00 CET / 00:00 CEST)
+- cron: '0 22 * * *'
+
+# First day of every month at midnight
+- cron: '0 0 1 * *'
+
+# Multiple schedules for different jobs
+- cron: '0 6 * * *'   # Snapshot at 6:00 UTC
+- cron: '0 12 * * *'  # Dividends at 12:00 UTC
+```
+
+**Notes:**
+- GitHub Actions uses UTC timezone (same as Vercel)
+- Minimum interval: 5 minutes (GitHub limitation)
+- Actual execution may have 1-2 minute delay (much better than Vercel Hobby plan)
+- Logs are kept for 90 days
+- You can keep both Vercel and GitHub Actions active (they won't conflict due to snapshot ID deduplication)
+
 See [Infrastructure Alternatives](./SETUP.md#infrastructure-alternatives) for migration guides.
 
 ---
