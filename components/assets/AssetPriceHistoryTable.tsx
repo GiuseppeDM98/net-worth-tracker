@@ -65,10 +65,10 @@ export function AssetPriceHistoryTable({
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">
-            Storico Prezzi {filterYear || 'Completo'}
+            {displayMode === 'totalValue' ? 'Storico Valori' : 'Storico Prezzi'} {filterYear || 'Completo'}
           </h2>
           <p className="text-sm text-gray-600">
-            Prezzi mensili da snapshot con variazioni month-over-month
+            {displayMode === 'totalValue' ? 'Valori mensili' : 'Prezzi mensili'} da snapshot con variazioni month-over-month
           </p>
         </div>
         <Button onClick={onRefresh} disabled={loading} variant="outline">
