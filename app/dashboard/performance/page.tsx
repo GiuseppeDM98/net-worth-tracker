@@ -78,7 +78,9 @@ export default function PerformancePage() {
         'CUSTOM',
         performanceData.ytd.riskFreeRate,
         startDate,
-        endDate
+        endDate,
+        undefined,  // preFetchedExpenses
+        performanceData.ytd.dividendCategoryId  // ✅ Riusa categoryId dalle settings
       );
 
       setPerformanceData({
@@ -297,8 +299,8 @@ export default function PerformancePage() {
             title="Contributi Netti"
             value={metrics.netCashFlow}
             format="currency"
-            description={`Entrate: ${formatCurrency(metrics.totalIncome)} | Uscite: ${formatCurrency(metrics.totalExpenses)}`}
-            tooltip="Differenza netta tra tutte le entrate (stipendi, dividendi, altri redditi) e uscite (spese quotidiane, acquisti) registrate nella sezione Cashflow. Valore positivo = stai risparmiando, negativo = stai spendendo più di quanto guadagni. NON include variazioni del valore degli investimenti."
+            description={`Entrate: ${formatCurrency(metrics.totalIncome)} | Dividendi: ${formatCurrency(metrics.totalDividendIncome)} | Uscite: ${formatCurrency(metrics.totalExpenses)}`}
+            tooltip={`Differenza netta tra entrate esterne (stipendi, bonus) e uscite (spese quotidiane). I dividendi (${formatCurrency(metrics.totalDividendIncome)}) sono mostrati separatamente perché sono rendimento del portafoglio, non contributi esterni. Valore positivo = stai risparmiando, negativo = stai spendendo più di quanto guadagni.`}
           />
           <MetricCard
             title="Durata"

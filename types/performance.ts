@@ -14,9 +14,10 @@ export type TimePeriod =
 // Cash flow data for a specific period
 export interface CashFlowData {
   date: Date;
-  income: number;
-  expenses: number;
-  netCashFlow: number; // income - expenses
+  income: number;           // Solo entrate ESTERNE (stipendi, bonus, regali) - NO dividendi
+  expenses: number;         // Tutte le uscite
+  dividendIncome: number;   // Solo dividendi (rendimento del portafoglio)
+  netCashFlow: number;      // income - expenses (SENZA dividendi)
 }
 
 // Performance metrics for a single time period
@@ -39,11 +40,13 @@ export interface PerformanceMetrics {
 
   // Supporting data
   riskFreeRate: number;              // From user settings
+  dividendCategoryId?: string;       // Category ID for dividend income (from settings)
   totalContributions: number;        // Sum of positive net cash flows
   totalWithdrawals: number;          // Sum of negative net cash flows
   netCashFlow: number;               // Total contributions - withdrawals
-  totalIncome: number;               // Sum of all income in period
+  totalIncome: number;               // Sum of all income in period (NO dividendi)
   totalExpenses: number;             // Sum of all expenses in period
+  totalDividendIncome: number;       // Sum of all dividend income (rendimento portafoglio)
   numberOfMonths: number;            // Number of months in period
 
   // Data availability flags

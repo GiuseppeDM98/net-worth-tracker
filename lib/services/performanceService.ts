@@ -318,28 +318,40 @@ export function getSnapshotsForPeriod(
 
 /**
  * Aggregate monthly cash flows from expenses
+ * Separates dividend income from other income for accurate performance calculations
+ *
+ * @param dividendCategoryId - Category ID for dividend income (from user settings)
  */
 export async function getCashFlowsForPeriod(
   userId: string,
   startDate: Date,
-  endDate: Date
+  endDate: Date,
+  dividendCategoryId?: string
 ): Promise<CashFlowData[]> {
   const expenses = await getExpensesByDateRange(userId, startDate, endDate);
 
   // Group expenses by month
-  const monthlyMap = new Map<string, { income: number; expenses: number }>();
+  const monthlyMap = new Map<string, { income: number; expenses: number; dividendIncome: number }>();
 
   expenses.forEach(expense => {
     const date = expense.date instanceof Date ? expense.date : expense.date.toDate();
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
     if (!monthlyMap.has(key)) {
-      monthlyMap.set(key, { income: 0, expenses: 0 });
+      monthlyMap.set(key, { income: 0, expenses: 0, dividendIncome: 0 });
     }
 
     const entry = monthlyMap.get(key)!;
+
+    // Separate dividend income from other income
     if (expense.type === 'income') {
-      entry.income += expense.amount;
+      if (dividendCategoryId && expense.categoryId === dividendCategoryId) {
+        // Dividend income (portfolio return)
+        entry.dividendIncome += expense.amount;
+      } else {
+        // External income (salary, bonus, gifts)
+        entry.income += expense.amount;
+      }
     } else {
       entry.expenses += Math.abs(expense.amount);
     }
@@ -353,7 +365,8 @@ export async function getCashFlowsForPeriod(
       date: new Date(year, month - 1, 1),
       income: value.income,
       expenses: value.expenses,
-      netCashFlow: value.income - value.expenses,
+      dividendIncome: value.dividendIncome,
+      netCashFlow: value.income - value.expenses, // SENZA dividendi!
     });
   });
 
@@ -363,16 +376,19 @@ export async function getCashFlowsForPeriod(
 /**
  * Build cash flows from a pre-fetched expense array (in-memory filtering)
  * This eliminates N Firestore queries in rolling period calculations
+ * Separates dividend income from other income for accurate performance calculations
  *
  * @param expenses - Pre-fetched expense array
  * @param startDate - Start date for filtering
  * @param endDate - End date for filtering
+ * @param dividendCategoryId - Category ID for dividend income (from user settings)
  * @returns Array of monthly cash flow data
  */
 export function getCashFlowsFromExpenses(
   expenses: Expense[],
   startDate: Date,
-  endDate: Date
+  endDate: Date,
+  dividendCategoryId?: string
 ): CashFlowData[] {
   // Filter expenses by date range in-memory
   const filtered = expenses.filter(expense => {
@@ -381,19 +397,27 @@ export function getCashFlowsFromExpenses(
   });
 
   // Group expenses by month (same logic as getCashFlowsForPeriod)
-  const monthlyMap = new Map<string, { income: number; expenses: number }>();
+  const monthlyMap = new Map<string, { income: number; expenses: number; dividendIncome: number }>();
 
   filtered.forEach(expense => {
     const date = expense.date instanceof Date ? expense.date : expense.date.toDate();
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
     if (!monthlyMap.has(key)) {
-      monthlyMap.set(key, { income: 0, expenses: 0 });
+      monthlyMap.set(key, { income: 0, expenses: 0, dividendIncome: 0 });
     }
 
     const entry = monthlyMap.get(key)!;
+
+    // Separate dividend income from other income
     if (expense.type === 'income') {
-      entry.income += expense.amount;
+      if (dividendCategoryId && expense.categoryId === dividendCategoryId) {
+        // Dividend income (portfolio return)
+        entry.dividendIncome += expense.amount;
+      } else {
+        // External income (salary, bonus, gifts)
+        entry.income += expense.amount;
+      }
     } else {
       entry.expenses += Math.abs(expense.amount);
     }
@@ -407,7 +431,8 @@ export function getCashFlowsFromExpenses(
       date: new Date(year, month - 1, 1),
       income: value.income,
       expenses: value.expenses,
-      netCashFlow: value.income - value.expenses,
+      dividendIncome: value.dividendIncome,
+      netCashFlow: value.income - value.expenses, // SENZA dividendi!
     });
   });
 
@@ -418,6 +443,7 @@ export function getCashFlowsFromExpenses(
  * Calculate performance metrics for a specific time period
  *
  * @param preFetchedExpenses - Optional pre-fetched expenses array to avoid redundant Firestore queries
+ * @param dividendCategoryId - Category ID for dividend income (from user settings)
  */
 export async function calculatePerformanceForPeriod(
   userId: string,
@@ -426,7 +452,8 @@ export async function calculatePerformanceForPeriod(
   riskFreeRate: number,
   customStartDate?: Date,
   customEndDate?: Date,
-  preFetchedExpenses?: Expense[]
+  preFetchedExpenses?: Expense[],
+  dividendCategoryId?: string
 ): Promise<PerformanceMetrics> {
   // Get snapshots for period
   const snapshots = getSnapshotsForPeriod(
@@ -451,11 +478,13 @@ export async function calculatePerformanceForPeriod(
     sharpeRatio: null,
     volatility: null,
     riskFreeRate,
+    dividendCategoryId,
     totalContributions: 0,
     totalWithdrawals: 0,
     netCashFlow: 0,
     totalIncome: 0,
     totalExpenses: 0,
+    totalDividendIncome: 0,
     numberOfMonths: 0,
     hasInsufficientData: true,
   };
@@ -480,21 +509,23 @@ export async function calculatePerformanceForPeriod(
 
   // Get cash flows for period - use pre-fetched if available, otherwise fetch
   const cashFlows = preFetchedExpenses
-    ? getCashFlowsFromExpenses(preFetchedExpenses, startDate, endDate)
-    : await getCashFlowsForPeriod(userId, startDate, endDate);
+    ? getCashFlowsFromExpenses(preFetchedExpenses, startDate, endDate, dividendCategoryId)
+    : await getCashFlowsForPeriod(userId, startDate, endDate, dividendCategoryId);
 
   // Calculate net cash flow totals
   let totalContributions = 0;
   let totalWithdrawals = 0;
   let totalIncome = 0;
   let totalExpenses = 0;
+  let totalDividendIncome = 0;
 
   cashFlows.forEach(cf => {
-    // Sum all income and expenses
+    // Sum all income and expenses (dividends tracked separately)
     totalIncome += cf.income;
     totalExpenses += cf.expenses;
+    totalDividendIncome += cf.dividendIncome;
 
-    // Calculate contributions/withdrawals based on net cash flow
+    // Calculate contributions/withdrawals based on net cash flow (WITHOUT dividends)
     if (cf.netCashFlow > 0) {
       totalContributions += cf.netCashFlow;
     } else {
@@ -549,11 +580,13 @@ export async function calculatePerformanceForPeriod(
     sharpeRatio,
     volatility,
     riskFreeRate,
+    dividendCategoryId, // Store for reuse in custom date ranges
     totalContributions,
     totalWithdrawals,
     netCashFlow,
     totalIncome,
     totalExpenses,
+    totalDividendIncome,
     numberOfMonths,
     hasInsufficientData: false,
   };
@@ -570,6 +603,7 @@ export async function getAllPerformanceData(userId: string): Promise<Performance
   ]);
 
   const riskFreeRate = settings?.riskFreeRate || 2.5; // Default to 2.5%
+  const dividendCategoryId = settings?.dividendIncomeCategoryId; // For separating dividend income
 
   // OPTIMIZATION: Fetch ALL expenses once for the entire history
   const sortedSnapshots = snapshots.filter(s => !s.isDummy).sort((a, b) => {
@@ -586,18 +620,18 @@ export async function getAllPerformanceData(userId: string): Promise<Performance
     allExpenses = await getExpensesByDateRange(userId, overallStartDate, overallEndDate);
   }
 
-  // Calculate metrics for each period (passing pre-fetched expenses)
+  // Calculate metrics for each period (passing pre-fetched expenses and dividend category ID)
   const [ytd, oneYear, threeYear, fiveYear, allTime] = await Promise.all([
-    calculatePerformanceForPeriod(userId, snapshots, 'YTD', riskFreeRate, undefined, undefined, allExpenses),
-    calculatePerformanceForPeriod(userId, snapshots, '1Y', riskFreeRate, undefined, undefined, allExpenses),
-    calculatePerformanceForPeriod(userId, snapshots, '3Y', riskFreeRate, undefined, undefined, allExpenses),
-    calculatePerformanceForPeriod(userId, snapshots, '5Y', riskFreeRate, undefined, undefined, allExpenses),
-    calculatePerformanceForPeriod(userId, snapshots, 'ALL', riskFreeRate, undefined, undefined, allExpenses),
+    calculatePerformanceForPeriod(userId, snapshots, 'YTD', riskFreeRate, undefined, undefined, allExpenses, dividendCategoryId),
+    calculatePerformanceForPeriod(userId, snapshots, '1Y', riskFreeRate, undefined, undefined, allExpenses, dividendCategoryId),
+    calculatePerformanceForPeriod(userId, snapshots, '3Y', riskFreeRate, undefined, undefined, allExpenses, dividendCategoryId),
+    calculatePerformanceForPeriod(userId, snapshots, '5Y', riskFreeRate, undefined, undefined, allExpenses, dividendCategoryId),
+    calculatePerformanceForPeriod(userId, snapshots, 'ALL', riskFreeRate, undefined, undefined, allExpenses, dividendCategoryId),
   ]);
 
-  // Calculate rolling periods
-  const rolling12M = await calculateRollingPeriods(userId, snapshots, 12, riskFreeRate);
-  const rolling36M = await calculateRollingPeriods(userId, snapshots, 36, riskFreeRate);
+  // Calculate rolling periods (with dividend category ID)
+  const rolling12M = await calculateRollingPeriods(userId, snapshots, 12, riskFreeRate, dividendCategoryId);
+  const rolling36M = await calculateRollingPeriods(userId, snapshots, 36, riskFreeRate, dividendCategoryId);
 
   return {
     ytd,
@@ -615,12 +649,15 @@ export async function getAllPerformanceData(userId: string): Promise<Performance
 
 /**
  * Calculate rolling period performance
+ *
+ * @param dividendCategoryId - Category ID for dividend income (from user settings)
  */
 async function calculateRollingPeriods(
   userId: string,
   allSnapshots: MonthlySnapshot[],
   windowMonths: number,
-  riskFreeRate: number
+  riskFreeRate: number,
+  dividendCategoryId?: string
 ): Promise<RollingPeriodPerformance[]> {
   const sortedSnapshots = allSnapshots
     .filter(s => !s.isDummy)
@@ -653,7 +690,7 @@ async function calculateRollingPeriods(
     // Get snapshots and cash flows for this window
     const windowSnapshots = sortedSnapshots.slice(i - windowMonths, i + 1);
     // OPTIMIZATION: Use in-memory filtering instead of Firestore query
-    const cashFlows = getCashFlowsFromExpenses(allExpenses, periodStartDate, periodEndDate);
+    const cashFlows = getCashFlowsFromExpenses(allExpenses, periodStartDate, periodEndDate, dividendCategoryId);
 
     // Calculate CAGR
     const netCashFlow = cashFlows.reduce((sum, cf) => sum + cf.netCashFlow, 0);

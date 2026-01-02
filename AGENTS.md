@@ -1136,6 +1136,77 @@ const endDate = new Date(year, month, 0, 23, 59, 59, 999);
 - ❌ Not showing original amounts in UI (users want transparency)
 - ✅ Use `currencyConversionService.ts` with try-catch and fallback
 
+### Performance Metrics - Dividend Income Separation (CRITICAL)
+
+**Problem**: Treating dividend income as external contributions instead of portfolio returns leads to mathematically incorrect performance metrics.
+
+**Symptom**:
+- All performance metrics (ROI, CAGR, TWR, IRR, Sharpe Ratio, Volatility) are systematically underestimated
+- Dividends are subtracted from portfolio returns as if they were external contributions (like salary)
+- Example: €100 portfolio + €10 dividend should show 10% return, but shows 0% if dividend treated as external contribution
+
+**Root Cause**:
+```typescript
+// ❌ WRONG - Treats all income the same (dividends + salary)
+if (expense.type === 'income') {
+  entry.income += expense.amount;  // Dividend mixed with salary!
+}
+
+// This causes:
+// - netCashFlow includes dividends (should be external only)
+// - ROI formula subtracts dividends from gain: (endNW - startNW - netCashFlow)
+// - TWR formula subtracts dividends from end value: (endNW - cashFlow) / startNW
+// - Result: Dividends treated as if YOU contributed that money (mathematically incorrect)
+```
+
+**Solution**:
+```typescript
+// ✅ CORRECT - Separate dividend income from external income
+if (expense.type === 'income') {
+  if (dividendCategoryId && expense.categoryId === dividendCategoryId) {
+    entry.dividendIncome += expense.amount;  // Portfolio return (counted in metrics)
+  } else {
+    entry.income += expense.amount;  // External contribution (excluded from metrics)
+  }
+}
+
+// netCashFlow now excludes dividends (only external income - expenses)
+netCashFlow: value.income - value.expenses  // WITHOUT dividends
+```
+
+**Mathematical Correctness** (CFA Institute Standards):
+- **ROI**: `gain = endNW - startNW - netCashFlow` (dividends NOT in netCashFlow ✓)
+- **CAGR**: Adjusted start value excludes dividends from contributions ✓
+- **TWR**: Monthly return = `(endNW - externalCashFlow) / startNW` (dividends NOT subtracted ✓)
+- **IRR**: Cash flows exclude dividends, they're part of final value ✓
+- **Volatility**: Monthly returns include dividend impact as portfolio return ✓
+- **Sharpe**: Based on corrected TWR and volatility ✓
+
+**Where to Check**:
+- Any function aggregating cash flows from expenses
+- Any performance calculation using `netCashFlow`
+- Pattern to search: `type === 'income'` without dividend separation logic
+
+**Implementation** (2026-01-02):
+- ✅ `types/performance.ts` - Added `dividendIncome` field to `CashFlowData` interface
+- ✅ `lib/services/performanceService.ts` - Modified 6 functions:
+  - `getCashFlowsForPeriod()` - Separates dividends via `dividendCategoryId` parameter
+  - `getCashFlowsFromExpenses()` - In-memory version with same logic
+  - `calculatePerformanceForPeriod()` - Tracks `totalDividendIncome` separately
+  - `getAllPerformanceData()` - Fetches `dividendIncomeCategoryId` from settings
+  - `calculateRollingPeriods()` - Passes `dividendCategoryId` for rolling periods
+- ✅ `app/dashboard/performance/page.tsx` - UI shows dividends separately in "Contributi Netti" card
+
+**Prevention**:
+- When adding new performance calculations, ALWAYS separate dividend income from external income
+- Use `dividendIncomeCategoryId` from user settings to identify dividend income
+- Verify metrics align with CFA Institute standards (TWR should not subtract dividends)
+- Test with historical data: dividends should INCREASE metrics (ROI, CAGR, TWR), not decrease them
+
+**Backward Compatibility**:
+- If `dividendIncomeCategoryId` not configured in settings → legacy behavior (all income treated equally)
+- No database migration needed, only affects calculations on-the-fly
+
 ### Dividend Scraper Errors
 - ❌ Using hardcoded URL for all asset types (ETF URL differs from Stock URL)
 - ❌ Not passing `assetType` parameter to `scrapeDividendsByIsin()`

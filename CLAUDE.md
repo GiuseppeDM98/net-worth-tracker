@@ -75,7 +75,8 @@ Replace spreadsheet-based portfolio management with a modern, automated solution
 - Annualized volatility calculation with outlier filtering (±50% threshold)
 - Interactive charts: Net Worth Evolution (contributions vs returns), Rolling CAGR trends
 - Cash flow integration: Automatic aggregation from expense/income data with temporal alignment
-- **Enhanced Contributi Netti card**: Shows detailed breakdown (Entrate | Uscite) for full transparency
+- **Dividend income separation**: Dividends correctly treated as portfolio returns (not external contributions) in all performance calculations - identified via `dividendIncomeCategoryId` from user settings
+- **Enhanced Contributi Netti card**: Shows detailed breakdown (Entrate | Dividendi | Uscite) with dividends displayed separately
 - **Comprehensive tooltips**: Each metric includes detailed explanations, formulas, and interpretation guidelines
 - **Temporal accuracy**: Cash flows and portfolio values are properly aligned to end-of-month snapshots
 - **Accurate time periods**: YTD (year-to-date) vs 1Y/3Y/5Y (rolling periods) with clear examples
@@ -1830,13 +1831,52 @@ User navigates to Hall of Fame → getHallOfFameData(userId)
 - **Architecture status**: Next.js App Router + Firebase + React Query + Recharts + Frankfurter API (external, no npm package).
 - **Mobile optimizations**: Custom breakpoint `desktop: 1025px` fixes iPad Mini landscape navigation UI.
 - **Responsive navigation**: iPad Mini landscape (1024px) now correctly displays mobile UI with hamburger menu.
-- **Latest enhancements** (2025-12-31):
+- **Latest enhancements** (2026-01-02):
+  - **Dividend Income Separation in Performance Metrics**: Dividends now correctly treated as portfolio returns (not external contributions) across all performance calculations
+  - Mathematical accuracy: ROI, CAGR, TWR, IRR, Sharpe Ratio, and Volatility aligned with CFA Institute standards
+  - Backward compatible: Optional `dividendIncomeCategoryId` from user settings enables new behavior
+- **Previous enhancements** (2025-12-31):
   - Asset Price History expanded from 2 to 5 tabs with conditional display logic
   - Total value display mode with automatic total row calculation
   - FilterStartDate support for November 2025+ filtering (real data tracking start)
   - Conditional display: Assets with price = 1 show totalValue automatically
 
 ## Implemented in This Session
+
+- **Dividend Income Separation in Performance Metrics** (2026-01-02):
+  - **Problem Fixed**: Dividends were incorrectly treated as external contributions (like salary) instead of portfolio returns in all performance calculations
+  - **Impact**: ROI, CAGR, TWR, IRR, Sharpe Ratio, and Volatility were mathematically incorrect
+  - **Solution**: Separated dividend income from external income in cash flow calculations
+  - **Implementation Details**:
+    - Added `dividendIncome: number` field to `CashFlowData` interface (types/performance.ts)
+    - Added `totalDividendIncome: number` and `dividendCategoryId?: string` to `PerformanceMetrics` interface
+    - Modified 6 functions in `performanceService.ts` to separate dividend income:
+      1. `getCashFlowsForPeriod()`: Added `dividendCategoryId` parameter, separates dividends from other income
+      2. `getCashFlowsFromExpenses()`: In-memory version with same dividend separation logic
+      3. `calculatePerformanceForPeriod()`: Tracks `totalDividendIncome` separately, passes `dividendCategoryId` to cash flow functions
+      4. `getAllPerformanceData()`: Fetches `dividendIncomeCategoryId` from user settings, passes to all period calculations
+      5. `calculateRollingPeriods()`: Added `dividendCategoryId` parameter for rolling period calculations
+    - Updated Performance page UI to display dividends separately in "Contributi Netti" card
+    - Enhanced tooltip: Explains that dividends are portfolio returns, not external contributions
+  - **Key Logic**:
+    ```typescript
+    // If expense is dividend income → entry.dividendIncome
+    if (expense.type === 'income' && expense.categoryId === dividendCategoryId) {
+      entry.dividendIncome += expense.amount;  // Portfolio return
+    } else if (expense.type === 'income') {
+      entry.income += expense.amount;  // External income (salary, bonus)
+    }
+
+    // netCashFlow excludes dividends (only external income - expenses)
+    netCashFlow: value.income - value.expenses  // WITHOUT dividends
+    ```
+  - **Backward Compatibility**: If `dividendIncomeCategoryId` not configured in settings → legacy behavior (all income treated equally)
+  - **Testing**: Validated with historical snapshots - all metrics (ROI, CAGR, TWR, IRR, Sharpe, Volatility) changed correctly
+  - **Files Modified** (3 files, ~120 lines):
+    - `types/performance.ts`: +2 interface fields (dividendIncome, totalDividendIncome, dividendCategoryId)
+    - `lib/services/performanceService.ts`: 6 functions modified (~100 lines with comments)
+    - `app/dashboard/performance/page.tsx`: MetricCard description and tooltip updated
+  - **Mathematical Correctness**: Now aligned with CFA Institute standards for TWR, IRR, and cash flow treatment
 
 - **Asset Price History Enhancement - 5 Tabs with Value Tracking** (2025-12-31):
   - **Feature 1 - Conditional Display Logic**:
@@ -1869,6 +1909,7 @@ User navigates to Hall of Fame → getHallOfFameData(userId)
 
 ## Key Technical Decisions
 
+- **Dividend Income Separation** (2026-01-02): Separate dividend income from external income in performance calculations using `dividendIncomeCategoryId` from user settings - dividends are portfolio returns (counted in ROI/CAGR/TWR/IRR), not external contributions (excluded from netCashFlow) - mathematically correct per CFA Institute standards, backward compatible (if categoryId not set → legacy behavior), implemented by filtering expenses with `type='income' && categoryId===dividendIncomeCategoryId` in [performanceService.ts](lib/services/performanceService.ts:348-354)
 - **Custom desktop breakpoint**: `desktop: 1025px` instead of `lg: 1024px` to fix iPad Mini landscape edge case
 - **Tailwind v4 breakpoint syntax**: Custom breakpoints defined in `globals.css` with `@theme inline`, not in `tailwind.config.js`
 - **Breakpoint choice**: 1025px ensures iPad Mini landscape (1024px) is treated as mobile, while desktop (≥1025px) gets full sidebar
@@ -1904,6 +1945,7 @@ User navigates to Hall of Fame → getHallOfFameData(userId)
 
 ## Recently Fixed Issues
 
+- ✅ **Dividend income incorrectly treated as external contributions** (2026-01-02): Fixed mathematically incorrect performance metrics - dividends were being subtracted from returns (as if they were salary contributions) instead of counted as portfolio returns - now separated via `dividendIncomeCategoryId` from settings - all 6 metrics (ROI, CAGR, TWR, IRR, Sharpe, Volatility) now aligned with CFA Institute standards (3 files modified: `types/performance.ts`, `performanceService.ts`, `performance/page.tsx`)
 - ✅ **Performance chart Y-axis visibility** (2025-12-30): Replaced `formatCurrency()` with `formatCurrencyCompact()` for Y-axis labels - old format (€1.234.567) was too wide and compressed mobile charts, new format (€1,5 Mln) is compact and readable on all devices (2 lines modified in `performance/page.tsx`)
 - ✅ **Performance metrics timestamp bug** (2025-12-30): Fixed €373,81 discrepancy between Performance and Cashflow pages - `endDate` was using `00:00:00` instead of `23:59:59.999`, excluding expenses created after midnight on last day of period (3 lines modified in `performanceService.ts`)
 - ✅ **iPad Mini landscape navigation** (2025-12-29): Fixed iPad Mini landscape (1024px) showing desktop sidebar instead of mobile hamburger menu - created custom breakpoint `desktop: 1025px` to replace `lg: 1024px`
