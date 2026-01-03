@@ -30,6 +30,8 @@ export interface AssetPriceHistoryRow {
   months: {
     [monthKey: string]: MonthDataCell; // monthKey: "2025-1", "2025-2", etc.
   };
+  ytd?: number; // Year-to-date percentage change (first month → last month of current year)
+  fromStart?: number; // Percentage change from first available month → last available month
 }
 
 /**
@@ -224,13 +226,15 @@ export function transformPriceHistoryData(
         // Fallback: calculate totalValue if missing in snapshot (for old data)
         const currentTotalValue = snapshotAsset.totalValue ?? (snapshotAsset.price * snapshotAsset.quantity);
 
-        // Determine which value to use for color coding based on displayMode
-        const currentValue = displayMode === 'price' ? currentPrice : currentTotalValue;
-        const previousValue = displayMode === 'price' ? previousPrice : previousTotalValue;
+        // Determine which value to use for color coding based on displayMode OR price=1 condition
+        // Use totalValue if displayMode is 'totalValue' OR if price === 1 (cash/liquidity assets)
+        const shouldUseTotalValue = displayMode === 'totalValue' || currentPrice === 1;
+        const currentValue = shouldUseTotalValue ? currentTotalValue : currentPrice;
+        const previousValue = shouldUseTotalValue ? previousTotalValue : previousPrice;
 
         const colorCode = calculateColorCode(currentValue, previousValue);
 
-        // Calculate percentage change based on displayMode
+        // Calculate percentage change based on same logic (aligned with YTD/fromStart)
         const change =
           previousValue !== null
             ? ((currentValue - previousValue) / previousValue) * 100
@@ -248,12 +252,66 @@ export function transformPriceHistoryData(
       }
     });
 
+    // Calculate YTD and fromStart percentage changes
+    let ytd: number | undefined;
+    let fromStart: number | undefined;
+
+    // Get all month entries in chronological order
+    const sortedMonthEntries = monthColumns
+      .map((col) => ({
+        key: col.key,
+        year: col.year,
+        month: col.month,
+        cell: months[col.key],
+      }))
+      .filter((entry) => entry.cell.price !== null || entry.cell.totalValue !== null);
+
+    if (sortedMonthEntries.length >= 2) {
+      // Determine which value to use (price or totalValue)
+      const getValue = (cell: MonthDataCell) => {
+        // Use totalValue if displayMode is 'totalValue' or if price === 1 (cash/liquidity)
+        if (displayMode === 'totalValue' || cell.price === 1) {
+          return cell.totalValue;
+        }
+        return cell.price;
+      };
+
+      // Calculate YTD (year-to-date): first month → last month of current year
+      const currentYear = new Date().getFullYear();
+      const currentYearEntries = sortedMonthEntries.filter((e) => e.year === currentYear);
+
+      if (currentYearEntries.length >= 2) {
+        const firstEntry = currentYearEntries[0];
+        const lastEntry = currentYearEntries[currentYearEntries.length - 1];
+
+        const firstValue = getValue(firstEntry.cell);
+        const lastValue = getValue(lastEntry.cell);
+
+        if (firstValue !== null && lastValue !== null && firstValue !== 0) {
+          ytd = ((lastValue - firstValue) / firstValue) * 100;
+        }
+      }
+
+      // Calculate fromStart: first available month → last available month
+      const firstEntry = sortedMonthEntries[0];
+      const lastEntry = sortedMonthEntries[sortedMonthEntries.length - 1];
+
+      const firstValue = getValue(firstEntry.cell);
+      const lastValue = getValue(lastEntry.cell);
+
+      if (firstValue !== null && lastValue !== null && firstValue !== 0) {
+        fromStart = ((lastValue - firstValue) / firstValue) * 100;
+      }
+    }
+
     assetRows.push({
       assetId,
       ticker: metadata.ticker,
       name: metadata.name,
       isDeleted: metadata.isDeleted,
       months,
+      ytd,
+      fromStart,
     });
   });
 

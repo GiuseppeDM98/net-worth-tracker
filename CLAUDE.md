@@ -1831,11 +1831,16 @@ User navigates to Hall of Fame → getHallOfFameData(userId)
 - **Architecture status**: Next.js App Router + Firebase + React Query + Recharts + Frankfurter API (external, no npm package).
 - **Mobile optimizations**: Custom breakpoint `desktop: 1025px` fixes iPad Mini landscape navigation UI.
 - **Responsive navigation**: iPad Mini landscape (1024px) now correctly displays mobile UI with hamburger menu.
-- **Latest enhancements** (2026-01-02):
+- **Latest enhancements** (2026-01-03):
+  - **Cashflow Charts 2025+ Filter**: Historical trend charts in "Storico Totale" tab now exclude bulk-imported pre-2025 data for cleaner visualizations
+  - **YTD & From Start Columns**: Asset Price History tables now display year-to-date and from-start percentage changes for performance tracking
+  - **Month-over-month % Fix**: Assets with price=1 (cash/liquidity) now correctly calculate percentage changes based on totalValue instead of price
+  - Conditional percentage logic: Aligns month-over-month, YTD, and From Start calculations for consistency
+- **Previous enhancements** (2026-01-02):
   - **Dividend Income Separation in Performance Metrics**: Dividends now correctly treated as portfolio returns (not external contributions) across all performance calculations
   - Mathematical accuracy: ROI, CAGR, TWR, IRR, Sharpe Ratio, and Volatility aligned with CFA Institute standards
   - Backward compatible: Optional `dividendIncomeCategoryId` from user settings enables new behavior
-- **Previous enhancements** (2025-12-31):
+- **Earlier enhancements** (2025-12-31):
   - Asset Price History expanded from 2 to 5 tabs with conditional display logic
   - Total value display mode with automatic total row calculation
   - FilterStartDate support for November 2025+ filtering (real data tracking start)
@@ -1843,42 +1848,48 @@ User navigates to Hall of Fame → getHallOfFameData(userId)
 
 ## Implemented in This Session
 
-- **Dividend Income Separation in Performance Metrics** (2026-01-02):
-  - **Problem Fixed**: Dividends were incorrectly treated as external contributions (like salary) instead of portfolio returns in all performance calculations
-  - **Impact**: ROI, CAGR, TWR, IRR, Sharpe Ratio, and Volatility were mathematically incorrect
-  - **Solution**: Separated dividend income from external income in cash flow calculations
-  - **Implementation Details**:
-    - Added `dividendIncome: number` field to `CashFlowData` interface (types/performance.ts)
-    - Added `totalDividendIncome: number` and `dividendCategoryId?: string` to `PerformanceMetrics` interface
-    - Modified 6 functions in `performanceService.ts` to separate dividend income:
-      1. `getCashFlowsForPeriod()`: Added `dividendCategoryId` parameter, separates dividends from other income
-      2. `getCashFlowsFromExpenses()`: In-memory version with same dividend separation logic
-      3. `calculatePerformanceForPeriod()`: Tracks `totalDividendIncome` separately, passes `dividendCategoryId` to cash flow functions
-      4. `getAllPerformanceData()`: Fetches `dividendIncomeCategoryId` from user settings, passes to all period calculations
-      5. `calculateRollingPeriods()`: Added `dividendCategoryId` parameter for rolling period calculations
-    - Updated Performance page UI to display dividends separately in "Contributi Netti" card
-    - Enhanced tooltip: Explains that dividends are portfolio returns, not external contributions
-  - **Key Logic**:
-    ```typescript
-    // If expense is dividend income → entry.dividendIncome
-    if (expense.type === 'income' && expense.categoryId === dividendCategoryId) {
-      entry.dividendIncome += expense.amount;  // Portfolio return
-    } else if (expense.type === 'income') {
-      entry.income += expense.amount;  // External income (salary, bonus)
-    }
+- **Cashflow Charts 2025+ Filter & Asset Price History YTD/From Start Columns** (2026-01-03):
+  - **Feature 1 - Cashflow Charts 2025+ Filter**:
+    - **Problem**: Bulk-imported pre-2025 expenses polluted trend charts with poorly categorized historical data
+    - **Solution**: Filter expenses from 2025 onwards for 6 trend charts in "Storico Totale" tab
+    - **Implementation**:
+      - Created `expensesFrom2025` filter: `allExpenses.filter(e => year >= 2025)`
+      - Modified 6 functions to accept `expenses: Expense[]` parameter instead of using closure
+      - Functions: `getMonthlyExpensesByType()`, `getYearlyExpensesByType()`, `getMonthlyExpensesByCategory()`, `getYearlyExpensesByCategory()`, `getMonthlyIncomeByCategory()`, `getYearlyIncomeByCategory()`
+      - Other 3 functions (`getMonthlyTrend()`, `getYearlyTrend()`, `getYearlyIncomeExpenseRatio()`) unchanged
+    - **Files Modified**: `components/cashflow/TotalHistoryTab.tsx` (~30 lines)
 
-    // netCashFlow excludes dividends (only external income - expenses)
-    netCashFlow: value.income - value.expenses  // WITHOUT dividends
-    ```
-  - **Backward Compatibility**: If `dividendIncomeCategoryId` not configured in settings → legacy behavior (all income treated equally)
-  - **Testing**: Validated with historical snapshots - all metrics (ROI, CAGR, TWR, IRR, Sharpe, Volatility) changed correctly
-  - **Files Modified** (3 files, ~120 lines):
-    - `types/performance.ts`: +2 interface fields (dividendIncome, totalDividendIncome, dividendCategoryId)
-    - `lib/services/performanceService.ts`: 6 functions modified (~100 lines with comments)
-    - `app/dashboard/performance/page.tsx`: MetricCard description and tooltip updated
-  - **Mathematical Correctness**: Now aligned with CFA Institute standards for TWR, IRR, and cash flow treatment
+  - **Feature 2 - YTD & From Start Percentage Columns**:
+    - **Problem**: No quick way to see year-to-date or overall performance for each asset
+    - **Solution**: Added conditional YTD and From Start columns to Asset Price History tables
+    - **Implementation**:
+      - Added `ytd?: number` and `fromStart?: number` fields to `AssetPriceHistoryRow` interface
+      - YTD calculation: `((lastMonth2026 - firstMonth2026) / firstMonth2026) * 100`
+      - From Start calculation: `((lastMonth - Nov2025) / Nov2025) * 100`
+      - Conditional rendering: YTD shown when `filterYear !== undefined`, From Start when `filterStartDate !== undefined`
+      - Color coding: Green (+), Red (-), Gray (neutral)
+      - Visual distinction: Blue background for YTD, Purple for From Start
+    - **Files Modified** (2 files, ~110 lines):
+      - `lib/utils/assetPriceHistoryUtils.ts`: +60 lines (calculation logic)
+      - `components/assets/AssetPriceHistoryTable.tsx`: +50 lines (UI columns)
 
-- **Asset Price History Enhancement - 5 Tabs with Value Tracking** (2025-12-31):
+  - **Bug Fix - Month-over-month % for price=1 Assets**:
+    - **Problem**: Assets with `price=1` (Casa, cash) showed 0.00% change even when totalValue changed significantly
+    - **Cause**: Month-over-month `change` calculation used `price` comparison without considering price=1 special case
+    - **Solution**: Introduced `shouldUseTotalValue` flag to align logic with YTD/fromStart
+    - **Logic**:
+      ```typescript
+      const shouldUseTotalValue = displayMode === 'totalValue' || currentPrice === 1;
+      const currentValue = shouldUseTotalValue ? currentTotalValue : currentPrice;
+      const previousValue = shouldUseTotalValue ? previousTotalValue : previousPrice;
+      const change = ((currentValue - previousValue) / previousValue) * 100;
+      ```
+    - **Impact**: Casa now shows correct +0.87% instead of 0.00% when value increases
+    - **Files Modified**: `lib/utils/assetPriceHistoryUtils.ts` (~6 lines)
+
+  - **Testing**: Zero TypeScript errors, backward compatible, all calculations validated
+
+- **Previous Session - Dividend Income Separation in Performance Metrics** (2026-01-02):
   - **Feature 1 - Conditional Display Logic**:
     - Assets with `price = 1` (e.g., cash, liquidity) automatically show `totalValue` instead of price in ALL tabs
     - Unified logic: `displayMode === 'totalValue' || cell.price === 1`
@@ -1926,6 +1937,9 @@ User navigates to Hall of Fame → getHallOfFameData(userId)
 - **FilterStartDate Priority** (2025-12-31): `filterStartDate` parameter takes precedence over `filterYear` when both are provided - allows precise date filtering (e.g., November 2025+) while maintaining backward compatibility with year-only filtering, implemented with early return in [assetPriceHistoryUtils.ts](lib/utils/assetPriceHistoryUtils.ts:130-138)
 - **Total Row Asset Filtering** (2025-12-31): Exclude assets with `isDeleted: true` from total row calculations - sold assets don't contribute to current portfolio value but still appear in table for historical transparency, avoids inflating totals with assets no longer held, implemented in [assetPriceHistoryUtils.ts](lib/utils/assetPriceHistoryUtils.ts:272)
 - **Color Coding Metric Consistency** (2025-12-31): Always compare same metric for month-over-month changes - price vs previousPrice when `displayMode='price'`, totalValue vs previousTotalValue when `displayMode='totalValue'` - prevents meaningless comparisons between different magnitudes (e.g., €50 price vs €40,000 totalValue), ensures percentage changes are accurate, implemented in [assetPriceHistoryUtils.ts](lib/utils/assetPriceHistoryUtils.ts:228-231)
+- **Cashflow 2025+ Filter Pattern** (2026-01-03): Pass `expenses` parameter to functions instead of using closure over `allExpenses` - modified 6 functions (`getMonthlyExpensesByType()`, `getYearlyExpensesByType()`, `getMonthlyExpensesByCategory()`, `getYearlyExpensesByCategory()`, `getMonthlyIncomeByCategory()`, `getYearlyIncomeByCategory()`) to accept explicit parameter - maintains DRY principle, improves testability, allows filtering without code duplication, implemented in [TotalHistoryTab.tsx](components/cashflow/TotalHistoryTab.tsx)
+- **YTD and From Start Percentage Logic** (2026-01-03): Calculate year-to-date and from-start percentages using `getValue()` helper that respects `displayMode === 'totalValue' || price === 1` condition - ensures assets with price=1 (cash/liquidity) use totalValue for calculations even in "Prezzi" tabs - single source of truth for value selection prevents calculation inconsistencies, implemented in [assetPriceHistoryUtils.ts](lib/utils/assetPriceHistoryUtils.ts:271-277)
+- **shouldUseTotalValue Flag Pattern** (2026-01-03): Use unified `shouldUseTotalValue = displayMode === 'totalValue' || currentPrice === 1` flag for ALL percentage calculations (month-over-month, YTD, fromStart) - aligns logic across all three calculation types, fixes bug where month-over-month used price instead of totalValue for assets with price=1, ensures consistent behavior regardless of calculation context, implemented in [assetPriceHistoryUtils.ts](lib/utils/assetPriceHistoryUtils.ts:229-233)
 - **TotalValue Fallback Calculation** (2025-12-31): Calculate `totalValue = price × quantity` on-the-fly for old snapshots missing the field - provides backward compatibility with snapshots created before totalValue field was added to schema, transparent to users, no database migration needed, implemented in [assetPriceHistoryUtils.ts](lib/utils/assetPriceHistoryUtils.ts:225)
 - **Five-Tab Responsive Layout** (2025-12-31): Asset Price History page uses horizontal scroll on mobile (<1025px) and grid 5-column layout on desktop (≥1025px) - 5 tabs (Gestione + 2 Prezzi + 2 Valori) don't fit in mobile viewport, horizontal scroll is industry standard (iOS/Android apps), implemented with `overflow-x-auto` + `desktop:grid desktop:grid-cols-5` in [assets/page.tsx](app/dashboard/assets/page.tsx)
 

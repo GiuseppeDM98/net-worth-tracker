@@ -1268,6 +1268,83 @@ netCashFlow: value.income - value.expenses  // WITHOUT dividends
 - Reserve `formatCurrency()` only for tooltips, cards, or tables where full precision is needed
 - Test on mobile portrait (< 768px) to verify readability
 
+### Asset Price History Percentage Calculation Errors (CRITICAL)
+
+**Problem**: Month-over-month percentage changes for assets with `price=1` show 0.00% even when `totalValue` changes significantly.
+
+**Symptom**:
+- Assets like "Casa" (real estate) or cash with `price=1` display 0.00% change in monthly columns
+- YTD and From Start columns work correctly (show actual percentage changes)
+- Inconsistency between month-over-month logic and YTD/fromStart logic
+
+**Root Cause**:
+```typescript
+// ❌ WRONG - Always uses price for month-over-month comparison
+const colorCode = calculateColorCode(currentPrice, previousPrice);
+const change = previousPrice !== null
+  ? ((currentPrice - previousPrice) / previousPrice) * 100
+  : undefined;
+
+// Problem:
+// - Casa has price=1 (€1 per unit), but totalValue=€40,000
+// - Month 1: price=1, totalValue=€40,000
+// - Month 2: price=1, totalValue=€40,350
+// - Month-over-month change: (1 - 1) / 1 = 0.00% ❌
+// - Actual change: (40,350 - 40,000) / 40,000 = 0.87% ✓
+```
+
+**Solution**: Use `shouldUseTotalValue` flag for consistent logic
+```typescript
+// ✅ CORRECT - Aligns with YTD/fromStart logic
+const shouldUseTotalValue = displayMode === 'totalValue' || currentPrice === 1;
+const currentValue = shouldUseTotalValue ? currentTotalValue : currentPrice;
+const previousValue = shouldUseTotalValue ? previousTotalValue : previousPrice;
+
+const colorCode = calculateColorCode(currentValue, previousValue);
+const change = previousValue !== null
+  ? ((currentValue - previousValue) / previousValue) * 100
+  : undefined;
+
+// Now Casa shows correct 0.87% when totalValue increases
+```
+
+**Key Pattern**: Unified conditional logic across ALL percentage calculations
+```typescript
+// Single source of truth for value selection
+const getValue = (cell: MonthDataCell) => {
+  // Use totalValue if displayMode is 'totalValue' OR if price === 1 (cash/liquidity)
+  if (displayMode === 'totalValue' || cell.price === 1) {
+    return cell.totalValue;
+  }
+  return cell.price;
+};
+
+// Apply to:
+// 1. Month-over-month change (currentValue vs previousValue)
+// 2. YTD calculation (first month 2026 → last month 2026)
+// 3. From Start calculation (Nov 2025 → last available month)
+```
+
+**Where to Check**:
+- Any code calculating percentage changes for asset price history
+- Pattern to search: `price - previousPrice` without checking `price === 1`
+- File: `lib/utils/assetPriceHistoryUtils.ts`
+
+**Fixed Locations** (2026-01-03):
+- ✅ `lib/utils/assetPriceHistoryUtils.ts` lines 229-241 - Month-over-month change calculation
+- ✅ `lib/utils/assetPriceHistoryUtils.ts` lines 271-305 - YTD and fromStart calculations (already correct)
+
+**Prevention**:
+- When adding new percentage calculations for asset price history, ALWAYS use `shouldUseTotalValue` flag
+- Ensure ALL three calculations (monthly, YTD, fromStart) use same conditional logic
+- Test with assets that have `price=1` (cash, real estate) to verify percentages reflect totalValue changes
+- Never compare price-to-price for assets with `price=1` (meaningless: always 0%)
+
+**Mathematical Correctness**:
+- Assets with `price=1` are priced "per unit" where unit = total value (real estate, cash accounts)
+- Percentage changes MUST reflect `totalValue` variations, not `price` (which is constant at 1)
+- Color coding should also use `totalValue` for consistency (green when value increases, red when decreases)
+
 ### Mobile Form/Layout Errors
 - Fixed spacing/padding without responsive variants (wastes precious vertical space).
 - Small adjacent buttons without sufficient gap (causes accidental taps).

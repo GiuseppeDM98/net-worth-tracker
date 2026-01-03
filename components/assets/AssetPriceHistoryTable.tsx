@@ -101,6 +101,18 @@ export function AssetPriceHistoryTable({
                     {month.label}
                   </TableHead>
                 ))}
+                {/* YTD column - shown only for current year filter */}
+                {filterYear !== undefined && (
+                  <TableHead className="text-right min-w-[100px] bg-blue-50 border-l-2 border-blue-300">
+                    YTD %
+                  </TableHead>
+                )}
+                {/* From Start column - shown only when filterStartDate is set */}
+                {filterStartDate !== undefined && (
+                  <TableHead className="text-right min-w-[100px] bg-purple-50 border-l-2 border-purple-300">
+                    From Start %
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -161,6 +173,52 @@ export function AssetPriceHistoryTable({
                       </TableCell>
                     );
                   })}
+
+                  {/* YTD cell - shown only for current year filter */}
+                  {filterYear !== undefined && (
+                    <TableCell className="text-right min-w-[100px] bg-blue-50 border-l-2 border-blue-300">
+                      {asset.ytd !== undefined ? (
+                        <div className="font-bold">
+                          <span
+                            className={cn(
+                              'text-base',
+                              asset.ytd > 0 && 'text-green-600',
+                              asset.ytd < 0 && 'text-red-600',
+                              asset.ytd === 0 && 'text-gray-600'
+                            )}
+                          >
+                            {asset.ytd > 0 ? '+' : ''}
+                            {formatNumber(asset.ytd, 2)}%
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </TableCell>
+                  )}
+
+                  {/* From Start cell - shown only when filterStartDate is set */}
+                  {filterStartDate !== undefined && (
+                    <TableCell className="text-right min-w-[100px] bg-purple-50 border-l-2 border-purple-300">
+                      {asset.fromStart !== undefined ? (
+                        <div className="font-bold">
+                          <span
+                            className={cn(
+                              'text-base',
+                              asset.fromStart > 0 && 'text-green-600',
+                              asset.fromStart < 0 && 'text-red-600',
+                              asset.fromStart === 0 && 'text-gray-600'
+                            )}
+                          >
+                            {asset.fromStart > 0 ? '+' : ''}
+                            {formatNumber(asset.fromStart, 2)}%
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>
@@ -180,6 +238,13 @@ export function AssetPriceHistoryTable({
                       </TableCell>
                     );
                   })}
+                  {/* Empty cells for YTD and From Start columns in total row */}
+                  {filterYear !== undefined && (
+                    <TableCell className="text-right min-w-[100px] bg-muted border-l-2 border-blue-300"></TableCell>
+                  )}
+                  {filterStartDate !== undefined && (
+                    <TableCell className="text-right min-w-[100px] bg-muted border-l-2 border-purple-300"></TableCell>
+                  )}
                 </TableRow>
               </TableFooter>
             )}

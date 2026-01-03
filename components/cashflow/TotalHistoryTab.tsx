@@ -142,10 +142,10 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
   };
 
   // Prepare monthly trend for expenses by type (all months)
-  const getMonthlyExpensesByType = () => {
+  const getMonthlyExpensesByType = (expenses: Expense[]) => {
     const monthlyMap = new Map<string, Record<string, number | string>>();
 
-    allExpenses
+    expenses
       .filter((e: Expense) => e.type !== 'income')
       .forEach((expense: Expense) => {
         const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
@@ -172,10 +172,10 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
   };
 
   // Prepare yearly trend for expenses by type (years on x-axis)
-  const getYearlyExpensesByType = () => {
+  const getYearlyExpensesByType = (expenses: Expense[]) => {
     const yearlyMap = new Map<number, Record<string, number>>();
 
-    allExpenses
+    expenses
       .filter((e: Expense) => e.type !== 'income')
       .forEach((expense: Expense) => {
         const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
@@ -201,10 +201,10 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
   };
 
   // Prepare monthly trend for expenses by category (top 5, all months)
-  const getMonthlyExpensesByCategory = () => {
+  const getMonthlyExpensesByCategory = (expenses: Expense[]) => {
     // First, get top 5 expense categories overall
     const categoryTotals = new Map<string, number>();
-    allExpenses
+    expenses
       .filter((e: Expense) => e.type !== 'income')
       .forEach((expense: Expense) => {
         const current = categoryTotals.get(expense.categoryName) || 0;
@@ -219,7 +219,7 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
     // Now build monthly data
     const monthlyMap = new Map<string, Record<string, number | string>>();
 
-    allExpenses
+    expenses
       .filter((e: Expense) => e.type !== 'income')
       .forEach((expense: Expense) => {
         const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
@@ -248,10 +248,10 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
   };
 
   // Prepare yearly trend for expenses by category (top 5, years on x-axis)
-  const getYearlyExpensesByCategory = () => {
+  const getYearlyExpensesByCategory = (expenses: Expense[]) => {
     // First, get top 5 expense categories overall
     const categoryTotals = new Map<string, number>();
-    allExpenses
+    expenses
       .filter((e: Expense) => e.type !== 'income')
       .forEach((expense: Expense) => {
         const current = categoryTotals.get(expense.categoryName) || 0;
@@ -266,7 +266,7 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
     // Now build yearly data
     const yearlyMap = new Map<number, Record<string, number>>();
 
-    allExpenses
+    expenses
       .filter((e: Expense) => e.type !== 'income')
       .forEach((expense: Expense) => {
         const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
@@ -294,10 +294,10 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
   };
 
   // Prepare monthly trend for income by category (top 5, all months)
-  const getMonthlyIncomeByCategory = () => {
+  const getMonthlyIncomeByCategory = (expenses: Expense[]) => {
     // First, get top 5 income categories overall
     const categoryTotals = new Map<string, number>();
-    allExpenses
+    expenses
       .filter((e: Expense) => e.type === 'income')
       .forEach((expense: Expense) => {
         const current = categoryTotals.get(expense.categoryName) || 0;
@@ -312,7 +312,7 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
     // Now build monthly data
     const monthlyMap = new Map<string, Record<string, number | string>>();
 
-    allExpenses
+    expenses
       .filter((e: Expense) => e.type === 'income')
       .forEach((expense: Expense) => {
         const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
@@ -341,10 +341,10 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
   };
 
   // Prepare yearly trend for income by category (top 5, years on x-axis)
-  const getYearlyIncomeByCategory = () => {
+  const getYearlyIncomeByCategory = (expenses: Expense[]) => {
     // First, get top 5 income categories overall
     const categoryTotals = new Map<string, number>();
-    allExpenses
+    expenses
       .filter((e: Expense) => e.type === 'income')
       .forEach((expense: Expense) => {
         const current = categoryTotals.get(expense.categoryName) || 0;
@@ -359,7 +359,7 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
     // Now build yearly data
     const yearlyMap = new Map<number, Record<string, number>>();
 
-    allExpenses
+    expenses
       .filter((e: Expense) => e.type === 'income')
       .forEach((expense: Expense) => {
         const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
@@ -417,14 +417,20 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
     return data;
   };
 
+  // Filter expenses from 2025 onwards for trend charts (excludes bulk-imported pre-2025 data)
+  const expensesFrom2025 = allExpenses.filter((expense: Expense) => {
+    const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
+    return date.getFullYear() >= 2025;
+  });
+
   const monthlyTrendData = getMonthlyTrend();
   const yearlyTrendData = getYearlyTrend();
-  const monthlyExpensesByType = getMonthlyExpensesByType();
-  const yearlyExpensesByType = getYearlyExpensesByType();
-  const monthlyExpensesByCategory = getMonthlyExpensesByCategory();
-  const yearlyExpensesByCategory = getYearlyExpensesByCategory();
-  const monthlyIncomeByCategory = getMonthlyIncomeByCategory();
-  const yearlyIncomeByCategory = getYearlyIncomeByCategory();
+  const monthlyExpensesByType = getMonthlyExpensesByType(expensesFrom2025);
+  const yearlyExpensesByType = getYearlyExpensesByType(expensesFrom2025);
+  const monthlyExpensesByCategory = getMonthlyExpensesByCategory(expensesFrom2025);
+  const yearlyExpensesByCategory = getYearlyExpensesByCategory(expensesFrom2025);
+  const monthlyIncomeByCategory = getMonthlyIncomeByCategory(expensesFrom2025);
+  const yearlyIncomeByCategory = getYearlyIncomeByCategory(expensesFrom2025);
   const yearlyIncomeExpenseRatioData = getYearlyIncomeExpenseRatio();
 
   const lineChartHeight = isMobile ? 260 : 350;
