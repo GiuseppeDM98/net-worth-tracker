@@ -66,7 +66,15 @@ Miglioramenti UI per grafici Cashflow e tabelle Asset Price History:
 ---
 
 ## Bug Risolti
-Nessuno (implementazione nuove feature)
+
+### [12:30] - Month-over-month % change per assets con price=1 ✅
+**Problema**: Le variazioni percentuali month-over-month nella tabella mostravano 0,00% per assets con `price=1` (es. Casa) anche quando il `totalValue` cambiava tra i mesi.
+**Causa**: La logica di calcolo del `change` usava sempre `price` quando `displayMode === 'price'`, senza considerare il caso speciale `price === 1`.
+**Soluzione**:
+- Introdotto flag `shouldUseTotalValue = displayMode === 'totalValue' || currentPrice === 1`
+- Allineata logica month-over-month con YTD/fromStart (che già funzionavano correttamente)
+- Ora gli assets con `price=1` mostrano correttamente le variazioni % basate su `totalValue`
+**File**: `lib/utils/assetPriceHistoryUtils.ts` (linee 229-233)
 
 ---
 
