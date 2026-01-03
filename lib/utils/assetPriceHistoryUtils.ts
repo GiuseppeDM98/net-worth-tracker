@@ -226,13 +226,15 @@ export function transformPriceHistoryData(
         // Fallback: calculate totalValue if missing in snapshot (for old data)
         const currentTotalValue = snapshotAsset.totalValue ?? (snapshotAsset.price * snapshotAsset.quantity);
 
-        // Determine which value to use for color coding based on displayMode
-        const currentValue = displayMode === 'price' ? currentPrice : currentTotalValue;
-        const previousValue = displayMode === 'price' ? previousPrice : previousTotalValue;
+        // Determine which value to use for color coding based on displayMode OR price=1 condition
+        // Use totalValue if displayMode is 'totalValue' OR if price === 1 (cash/liquidity assets)
+        const shouldUseTotalValue = displayMode === 'totalValue' || currentPrice === 1;
+        const currentValue = shouldUseTotalValue ? currentTotalValue : currentPrice;
+        const previousValue = shouldUseTotalValue ? previousTotalValue : previousPrice;
 
         const colorCode = calculateColorCode(currentValue, previousValue);
 
-        // Calculate percentage change based on displayMode
+        // Calculate percentage change based on same logic (aligned with YTD/fromStart)
         const change =
           previousValue !== null
             ? ((currentValue - previousValue) / previousValue) * 100
