@@ -50,6 +50,9 @@ export async function getTargets(
 
 /**
  * Set allocation settings for a user (includes targets, age, and risk-free rate)
+ *
+ * IMPORTANT: Uses Firestore merge mode to preserve fields not included in this update.
+ * This prevents data loss when different parts of the app update different settings fields.
  */
 export async function setSettings(
   userId: string,
@@ -85,7 +88,8 @@ export async function setSettings(
       docData.dividendIncomeSubCategoryId = settings.dividendIncomeSubCategoryId;
     }
 
-    await setDoc(targetRef, docData);
+    // Use merge: true to preserve existing fields not included in this update
+    await setDoc(targetRef, docData, { merge: true });
   } catch (error) {
     console.error('Error setting allocation settings:', error);
     throw new Error('Failed to save allocation settings');

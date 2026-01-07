@@ -631,6 +631,9 @@ export default function SettingsPage() {
     try {
       setSaving(true);
 
+      // Fetch current settings to preserve FIRE fields
+      const settingsData = await getSettings(user.uid);
+
       const targets: AssetAllocationTarget = {};
 
       assetClasses.forEach((assetClass) => {
@@ -677,6 +680,9 @@ export default function SettingsPage() {
       await setSettings(user.uid, {
         userAge,
         riskFreeRate,
+        // Preserve FIRE settings
+        withdrawalRate: settingsData?.withdrawalRate,
+        plannedAnnualExpenses: settingsData?.plannedAnnualExpenses,
         targets,
         dividendIncomeCategoryId: dividendIncomeCategoryId || undefined,
         dividendIncomeSubCategoryId: dividendIncomeSubCategoryId || undefined,
