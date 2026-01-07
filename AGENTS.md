@@ -350,6 +350,65 @@ POST /api/portfolio/snapshot
 
 ---
 
+### Firestore setDoc Data Loss (CRITICAL)
+**Symptom**: Settings/data mysteriously disappear after save operations, even though Firestore write succeeds
+
+**Root Cause**: Using `setDoc()` without `{ merge: true }` overwrites entire document, deleting fields not included in current update
+
+```typescript
+// ❌ WRONG - Deletes all other fields
+await setDoc(docRef, { field1: newValue });
+// If document had { field1, field2, field3 }, only field1 remains
+
+// ✅ CORRECT - Merges with existing, preserves other fields
+await setDoc(docRef, { field1: newValue }, { merge: true });
+// Document now has { field1: newValue, field2: old, field3: old }
+```
+
+**When This Happens**:
+- Multiple pages/components update different fields of same document
+- Settings page saves asset allocation while FIRE page saves withdrawal rate
+- Without merge: last save wins, other fields lost
+
+**Solution**:
+1. **Service Layer**: Add `{ merge: true }` to all `setDoc()` calls that update existing documents
+2. **Application Layer**: Fetch current data before save, explicitly preserve unrelated fields
+
+```typescript
+// Application layer pattern (defensive)
+const currentData = await getSettings(userId);
+await setSettings(userId, {
+  // Fields managed by this page
+  fieldA: newValueA,
+  // Explicitly preserve unrelated fields
+  fieldB: currentData?.fieldB,
+  fieldC: currentData?.fieldC,
+});
+```
+
+**Prevention**:
+- Use `{ merge: true }` by default when updating existing documents
+- Only omit merge when intentionally replacing entire document
+- Add JSDoc comments to service functions explaining merge behavior
+- Audit all `setDoc()` calls during code review
+
+**Example from codebase** (assetAllocationService.ts):
+```typescript
+/**
+ * IMPORTANT: Uses Firestore merge mode to preserve fields not included in this update.
+ * This prevents data loss when different parts of the app update different settings fields.
+ */
+export async function setSettings(userId: string, settings: AssetAllocationSettings) {
+  await setDoc(docRef, docData, { merge: true });
+}
+```
+
+**Fixed Locations** (2026-01-07):
+- ✅ `lib/services/assetAllocationService.ts` line 92 - Added merge mode
+- ✅ `app/dashboard/settings/page.tsx` line 635 - Added data preservation
+
+---
+
 ## File References
 
 Key files for common tasks:

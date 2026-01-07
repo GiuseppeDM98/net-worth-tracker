@@ -398,29 +398,27 @@ User clicks "Update Prices" → `/api/prices/update` → updateUserAssetPrices()
 **Mobile:** Custom breakpoint `desktop: 1025px` fixes iPad Mini landscape navigation
 
 **Latest Updates (Gennaio 2026):**
-- Cashflow Charts 2025+ Filter: Excludes pre-2025 bulk imports from trend charts
-- Asset Price History: YTD & From Start percentage columns
-- Month-over-month % Fix: Assets with price=1 now use totalValue correctly
+- Settings Page Data Loss Fix: FIRE settings preserved on save (dual-layer fix)
+- Firestore Merge Mode: All partial updates now use `{ merge: true }`
+- Asset Price History: YTD & From Start columns, cashflow charts 2025+ filter
 - Dividend Income Separation: Correct treatment as portfolio returns in performance metrics
 
-## Implemented in This Session (06/01/2026)
+## Implemented in This Session (07/01/2026)
 
-### Cashflow Charts 2025+ Filter
-- Problem: Bulk pre-2025 expenses polluted trend charts
-- Solution: Filter `expensesFrom2025` for 6 chart functions
-- Modified: `TotalHistoryTab.tsx` (~30 lines)
-
-### Asset Price History YTD/From Start Columns
-- Added conditional percentage columns: YTD (when filterYear set), From Start (when filterStartDate set)
-- Color coding: Green (+), Red (-), Gray (neutral)
-- Modified: `assetPriceHistoryUtils.ts` (+60 lines), `AssetPriceHistoryTable.tsx` (+50 lines)
-
-### Bug Fix: Month-over-month % for price=1 Assets
-- Fixed: Assets with price=1 (cash) now calculate % using totalValue instead of price
-- Unified `shouldUseTotalValue` flag across all percentage calculations
+### Settings Page FIRE Data Loss - FIXED
+- **Problem**: Clicking "Salva" in Settings page lost Safe Withdrawal Rate and Planned Annual Expenses
+- **Root Cause**:
+  1. `handleSave()` didn't preserve FIRE fields when saving asset allocation
+  2. `setSettings()` used `setDoc()` without `{ merge: true }`, overwriting entire Firestore document
+- **Solution**: Dual-layer fix
+  - Application layer: Fetch + preserve FIRE fields in `handleSave()` (settings/page.tsx line 635)
+  - Service layer: Add `{ merge: true }` to `setDoc()` call (assetAllocationService.ts line 92)
+- **Verification**: All 7 `setDoc()` usages audited - only assetAllocationService had the issue
+- **Files Modified**: `settings/page.tsx` (+3 lines), `assetAllocationService.ts` (+6 lines)
 
 ## Key Technical Decisions (Ultimi 2 Mesi)
 
+- **Firestore setDoc Merge Mode** (01/2026): Always use `{ merge: true }` when updating existing documents with partial data - prevents silent data loss when multiple pages update different fields of same document
 - **Dividend Income Separation** (01/2026): Separate dividend income from external contributions using `dividendIncomeCategoryId` - mathematically correct per CFA standards, backward compatible
 - **Cashflow 2025+ Filter Pattern** (01/2026): Pass `expenses` parameter to functions instead of closure - DRY, testable, no duplication
 - **YTD/From Start Percentage** (01/2026): Use `getValue()` helper respecting `displayMode === 'totalValue' || price === 1` - single source of truth for calculations
