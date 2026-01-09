@@ -37,6 +37,7 @@ export interface PerformanceMetrics {
   moneyWeightedReturn: number | null; // IRR / Money-weighted return (%)
   sharpeRatio: number | null;        // Risk-adjusted return
   volatility: number | null;         // Annualized volatility (%)
+  maxDrawdown: number | null;        // Maximum drawdown (%)
 
   // Supporting data
   riskFreeRate: number;              // From user settings

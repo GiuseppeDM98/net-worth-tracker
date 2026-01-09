@@ -17,7 +17,7 @@ Replace spreadsheet-based portfolio management with a modern, automated solution
 - **FIRE Calculator**: Safe Withdrawal Rate configuration (4% Trinity Study), progress tracking, Monte Carlo simulations, historical evolution charts
 - **Historical Analysis**: Automated monthly snapshots via cron jobs, net worth timeline, asset class evolution, YoY comparison, CSV export
 - **Dividend Tracking**: Automatic scraping from Borsa Italiana, multi-currency support (EUR/USD/GBP/CHF) with auto-conversion, expense integration, TTM yield analytics
-- **Performance Metrics**: 8 key metrics (ROI, CAGR, TWR, IRR, Sharpe, Volatility), 7 time periods (YTD, 1Y, 3Y, 5Y, All Time, Rolling 12M/36M, Custom), dividend income separation
+- **Performance Metrics**: 9 key metrics (ROI, CAGR, TWR, IRR, Sharpe, Volatility, Max Drawdown), 7 time periods (YTD, 1Y, 3Y, 5Y, All Time, Rolling 12M/36M, Custom), dividend income separation
 - **Hall of Fame**: Top 20 months and Top 10 years by net worth growth, income, expenses with percentage growth columns, mobile card layout
 - **PDF Export**: 6 customizable sections (Portfolio, Allocation, History, Cashflow, FIRE, Summary), 3 temporal modes (Total/Annual/Monthly), chart embedding
 
@@ -403,37 +403,32 @@ User clicks "Update Prices" → `/api/prices/update` → updateUserAssetPrices()
 - Asset Price History: YTD & From Start columns, cashflow charts 2025+ filter
 - Dividend Income Separation: Correct treatment as portfolio returns in performance metrics
 
-## Implemented in This Session (07/01/2026)
+## Implemented in This Session (09/01/2026)
 
-### 1. Asset Price History - Total Row Percentages
-- **Feature**: Added month-over-month, YTD, and "From Start" percentage calculations to total row in "Valori Anno Corrente" and "Valori Storici" tabs
+### Max Drawdown Metric
+- **Feature**: Added Max Drawdown metric to Performance page with all timeframes (YTD, 1Y, 3Y, 5Y, All Time, Custom)
+- **Definition**: Maximum percentage loss from peak to trough before a new peak is reached
 - **Implementation**:
-  - Extended `AssetHistoryTotalRow` type with optional fields: `monthlyChanges`, `ytd`, `fromStart`
-  - Two-pass calculation in `assetPriceHistoryUtils.ts`: totals first, then percentages
-  - Two-line format: currency value + colored percentage below (green/red/gray)
-  - Edge cases: first month (no percentage), zero base (avoid division by zero)
+  - Added `maxDrawdown: number | null` field to `PerformanceMetrics` interface
+  - Implemented `calculateMaxDrawdown()` function with TWR-style cash flow adjustment
+  - Cash flow adjustment: subtracts cumulative contributions to isolate investment performance
+  - Algorithm: tracks running peak, calculates drawdown at each point, returns most negative value
+  - Returns negative percentage (e.g., -15.5 = 15.5% loss) or `null` if portfolio never declined
+  - UI: third row in Performance page with detailed tooltip explaining calculation
 - **Files Modified**:
-  - `types/assets.ts` (lines 260-271)
-  - `lib/utils/assetPriceHistoryUtils.ts` (lines 321-400)
-  - `components/assets/AssetPriceHistoryTable.tsx` (lines 227-307)
-
-### 2. FIRE Progress Bar Fix
-- **Bug Fixed**: Progress bars always showing 100% even when progress was 72.06% or 19.46%
-- **Root Cause**: Double multiplication by 100 (`progressToFI * 100` when value already in 0-100 range)
-- **Solution**: Removed `* 100` from width calculation in both current (green) and planned (purple) progress bars
-- **Files Modified**: `components/fire-simulations/FireCalculatorTab.tsx` (lines 227, 294)
+  - `types/performance.ts` (line 40)
+  - `lib/services/performanceService.ts` (lines 262-320, 540, 626, 645)
+  - `app/dashboard/performance/page.tsx` (lines 314-323)
 
 ## Key Technical Decisions (Ultimi 2 Mesi)
 
+- **Max Drawdown Cash Flow Adjustment** (01/2026): Use TWR-style adjustment (subtract cumulative contributions) to isolate investment performance - prevents withdrawals/contributions from masking or amplifying real drawdowns
 - **Firestore setDoc Merge Mode** (01/2026): Always use `{ merge: true }` when updating existing documents with partial data - prevents silent data loss when multiple pages update different fields of same document
 - **Dividend Income Separation** (01/2026): Separate dividend income from external contributions using `dividendIncomeCategoryId` - mathematically correct per CFA standards, backward compatible
 - **Cashflow 2025+ Filter Pattern** (01/2026): Pass `expenses` parameter to functions instead of closure - DRY, testable, no duplication
 - **YTD/From Start Percentage** (01/2026): Use `getValue()` helper respecting `displayMode === 'totalValue' || price === 1` - single source of truth for calculations
 - **shouldUseTotalValue Flag** (01/2026): Unified flag for ALL % calculations (month-over-month, YTD, fromStart) - consistent behavior across calculation contexts
 - **Custom Desktop Breakpoint** (12/2025): `desktop: 1025px` instead of `lg: 1024px` - fixes iPad Mini landscape (1024px) edge case
-- **Asset Price History Data Source** (12/2025): Use existing `MonthlySnapshot.byAsset[]` field - zero database migrations needed
-- **Lazy-loading Tabs** (12/2025): `mountedTabs` Set pattern - only render tab content after first user click to save memory
-- **Chart Formatter Consistency** (12/2025): `formatCurrencyCompact()` for Y-axis labels - compact notation (€1,5 Mln) prevents mobile compression
 
 ## Stack & Dependencies
 

@@ -260,6 +260,66 @@ export function calculateVolatility(
 }
 
 /**
+ * Calculate Maximum Drawdown (cash flow adjusted)
+ * Measures the largest peak-to-trough decline in portfolio value
+ * Uses TWR-style adjustment to isolate investment performance
+ *
+ * @param snapshots - Monthly snapshots (sorted chronologically)
+ * @param cashFlows - Monthly cash flows
+ * @returns Maximum drawdown as negative percentage, or null if portfolio never declined
+ */
+export function calculateMaxDrawdown(
+  snapshots: MonthlySnapshot[],
+  cashFlows: CashFlowData[]
+): number | null {
+  if (snapshots.length < 2) return null;
+
+  // Create cash flow lookup map (by YYYY-MM)
+  const cashFlowMap = new Map<string, number>();
+  cashFlows.forEach(cf => {
+    const key = `${cf.date.getFullYear()}-${String(cf.date.getMonth() + 1).padStart(2, '0')}`;
+    cashFlowMap.set(key, cf.netCashFlow);
+  });
+
+  // Calculate adjusted portfolio values (subtract cumulative contributions)
+  let cumulativeCashFlow = 0;
+  const adjustedValues: number[] = [];
+
+  for (const snapshot of snapshots) {
+    const cfKey = `${snapshot.year}-${String(snapshot.month).padStart(2, '0')}`;
+    cumulativeCashFlow += cashFlowMap.get(cfKey) || 0;
+
+    // TWR-style adjustment: isolate investment performance
+    const adjustedValue = snapshot.totalNetWorth - cumulativeCashFlow;
+    adjustedValues.push(adjustedValue);
+  }
+
+  // Track running peak and maximum drawdown
+  let runningPeak = adjustedValues[0];
+  let maxDrawdown = 0; // Start at 0 (no drawdown)
+
+  for (const currentValue of adjustedValues) {
+    // Update peak if new high is reached
+    if (currentValue > runningPeak) {
+      runningPeak = currentValue;
+    }
+
+    // Calculate drawdown from peak (avoid division by zero)
+    if (runningPeak > 0) {
+      const drawdown = ((currentValue - runningPeak) / runningPeak) * 100;
+
+      // Track the most negative drawdown (largest loss)
+      if (drawdown < maxDrawdown) {
+        maxDrawdown = drawdown;
+      }
+    }
+  }
+
+  // Return null if portfolio never declined, otherwise return negative percentage
+  return maxDrawdown === 0 ? null : maxDrawdown;
+}
+
+/**
  * Calculate number of months between two dates (inclusive)
  * Example: Jan 2025 to Dec 2025 = 12 months (not 11)
  */
@@ -477,6 +537,7 @@ export async function calculatePerformanceForPeriod(
     moneyWeightedReturn: null,
     sharpeRatio: null,
     volatility: null,
+    maxDrawdown: null,
     riskFreeRate,
     dividendCategoryId,
     totalContributions: 0,
@@ -562,6 +623,8 @@ export async function calculatePerformanceForPeriod(
 
   const volatility = calculateVolatility(sortedSnapshots, cashFlows);
 
+  const maxDrawdown = calculateMaxDrawdown(sortedSnapshots, cashFlows);
+
   const sharpeRatio = timeWeightedReturn !== null && volatility !== null
     ? calculateSharpeRatio(timeWeightedReturn, riskFreeRate, volatility)
     : null;
@@ -579,6 +642,7 @@ export async function calculatePerformanceForPeriod(
     moneyWeightedReturn,
     sharpeRatio,
     volatility,
+    maxDrawdown,
     riskFreeRate,
     dividendCategoryId, // Store for reuse in custom date ranges
     totalContributions,
