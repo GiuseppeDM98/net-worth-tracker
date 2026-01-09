@@ -224,7 +224,7 @@ export function FireCalculatorTab() {
                     <div
                       className="h-full bg-gradient-to-r from-green-400 to-green-600 transition-all"
                       style={{
-                        width: `${Math.min(fireMetrics.progressToFI * 100, 100)}%`,
+                        width: `${Math.min(fireMetrics.progressToFI, 100)}%`,
                       }}
                     />
                   </div>
@@ -291,7 +291,7 @@ export function FireCalculatorTab() {
                         <div
                           className="h-full bg-gradient-to-r from-purple-400 to-purple-600 transition-all"
                           style={{
-                            width: `${Math.min(plannedFireMetrics.plannedProgressToFI * 100, 100)}%`,
+                            width: `${Math.min(plannedFireMetrics.plannedProgressToFI, 100)}%`,
                           }}
                         />
                       </div>

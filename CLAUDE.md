@@ -405,16 +405,23 @@ User clicks "Update Prices" → `/api/prices/update` → updateUserAssetPrices()
 
 ## Implemented in This Session (07/01/2026)
 
-### Settings Page FIRE Data Loss - FIXED
-- **Problem**: Clicking "Salva" in Settings page lost Safe Withdrawal Rate and Planned Annual Expenses
-- **Root Cause**:
-  1. `handleSave()` didn't preserve FIRE fields when saving asset allocation
-  2. `setSettings()` used `setDoc()` without `{ merge: true }`, overwriting entire Firestore document
-- **Solution**: Dual-layer fix
-  - Application layer: Fetch + preserve FIRE fields in `handleSave()` (settings/page.tsx line 635)
-  - Service layer: Add `{ merge: true }` to `setDoc()` call (assetAllocationService.ts line 92)
-- **Verification**: All 7 `setDoc()` usages audited - only assetAllocationService had the issue
-- **Files Modified**: `settings/page.tsx` (+3 lines), `assetAllocationService.ts` (+6 lines)
+### 1. Asset Price History - Total Row Percentages
+- **Feature**: Added month-over-month, YTD, and "From Start" percentage calculations to total row in "Valori Anno Corrente" and "Valori Storici" tabs
+- **Implementation**:
+  - Extended `AssetHistoryTotalRow` type with optional fields: `monthlyChanges`, `ytd`, `fromStart`
+  - Two-pass calculation in `assetPriceHistoryUtils.ts`: totals first, then percentages
+  - Two-line format: currency value + colored percentage below (green/red/gray)
+  - Edge cases: first month (no percentage), zero base (avoid division by zero)
+- **Files Modified**:
+  - `types/assets.ts` (lines 260-271)
+  - `lib/utils/assetPriceHistoryUtils.ts` (lines 321-400)
+  - `components/assets/AssetPriceHistoryTable.tsx` (lines 227-307)
+
+### 2. FIRE Progress Bar Fix
+- **Bug Fixed**: Progress bars always showing 100% even when progress was 72.06% or 19.46%
+- **Root Cause**: Double multiplication by 100 (`progressToFI * 100` when value already in 0-100 range)
+- **Solution**: Removed `* 100` from width calculation in both current (green) and planned (purple) progress bars
+- **Files Modified**: `components/fire-simulations/FireCalculatorTab.tsx` (lines 227, 294)
 
 ## Key Technical Decisions (Ultimi 2 Mesi)
 

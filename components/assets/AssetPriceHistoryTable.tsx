@@ -232,18 +232,75 @@ export function AssetPriceHistoryTable({
                   </TableCell>
                   {monthColumns.map((monthCol) => {
                     const total = totalRow.totals[monthCol.key] || 0;
+                    const change = totalRow.monthlyChanges?.[monthCol.key];
+
                     return (
                       <TableCell key={monthCol.key} className="text-right min-w-[100px]">
-                        {formatCurrency(total)}
+                        {/* Currency value (always shown) */}
+                        <div className="font-medium">
+                          {formatCurrency(total)}
+                        </div>
+
+                        {/* Percentage change (only if defined) */}
+                        {change !== undefined && (
+                          <div
+                            className={cn(
+                              'text-xs mt-0.5',
+                              change > 0 && 'text-green-600',
+                              change < 0 && 'text-red-600',
+                              change === 0 && 'text-gray-500'
+                            )}
+                          >
+                            {change > 0 ? '+' : ''}
+                            {formatNumber(change, 2)}%
+                          </div>
+                        )}
                       </TableCell>
                     );
                   })}
-                  {/* Empty cells for YTD and From Start columns in total row */}
+                  {/* YTD column */}
                   {filterYear !== undefined && (
-                    <TableCell className="text-right min-w-[100px] bg-muted border-l-2 border-blue-300"></TableCell>
+                    <TableCell className="text-right min-w-[100px] bg-muted border-l-2 border-blue-300">
+                      {totalRow.ytd !== undefined ? (
+                        <div className="font-bold">
+                          <span
+                            className={cn(
+                              'text-base',
+                              totalRow.ytd > 0 && 'text-green-600',
+                              totalRow.ytd < 0 && 'text-red-600',
+                              totalRow.ytd === 0 && 'text-gray-600'
+                            )}
+                          >
+                            {totalRow.ytd > 0 ? '+' : ''}
+                            {formatNumber(totalRow.ytd, 2)}%
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </TableCell>
                   )}
+                  {/* From Start column */}
                   {filterStartDate !== undefined && (
-                    <TableCell className="text-right min-w-[100px] bg-muted border-l-2 border-purple-300"></TableCell>
+                    <TableCell className="text-right min-w-[100px] bg-muted border-l-2 border-purple-300">
+                      {totalRow.fromStart !== undefined ? (
+                        <div className="font-bold">
+                          <span
+                            className={cn(
+                              'text-base',
+                              totalRow.fromStart > 0 && 'text-green-600',
+                              totalRow.fromStart < 0 && 'text-red-600',
+                              totalRow.fromStart === 0 && 'text-gray-600'
+                            )}
+                          >
+                            {totalRow.fromStart > 0 ? '+' : ''}
+                            {formatNumber(totalRow.fromStart, 2)}%
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </TableCell>
                   )}
                 </TableRow>
               </TableFooter>

@@ -262,4 +262,10 @@ export interface AssetHistoryTotalRow {
   totals: {
     [monthKey: string]: number;
   };
+  // Optional percentage fields for total row
+  monthlyChanges?: {
+    [monthKey: string]: number | undefined;  // undefined = first month (no previous)
+  };
+  ytd?: number;       // Year-to-date % (undefined if <2 months in current year)
+  fromStart?: number; // From start % (undefined if <2 months total)
 }

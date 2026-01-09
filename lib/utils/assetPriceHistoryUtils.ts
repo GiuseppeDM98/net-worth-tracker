@@ -322,7 +322,10 @@ export function transformPriceHistoryData(
   let totalRow: AssetHistoryTotalRow | undefined;
   if (displayMode === 'totalValue') {
     const totals: { [monthKey: string]: number } = {};
+    const monthlyChanges: { [monthKey: string]: number | undefined } = {};
+    let previousMonthTotal: number | null = null;
 
+    // First pass: Calculate monthly totals
     monthColumns.forEach((monthCol) => {
       let monthTotal = 0;
 
@@ -338,9 +341,61 @@ export function transformPriceHistoryData(
       totals[monthCol.key] = monthTotal;
     });
 
+    // Second pass: Calculate month-over-month percentages
+    monthColumns.forEach((monthCol) => {
+      const currentTotal = totals[monthCol.key];
+
+      if (previousMonthTotal === null) {
+        // First month: no percentage
+        monthlyChanges[monthCol.key] = undefined;
+      } else if (previousMonthTotal === 0) {
+        // Avoid division by zero
+        monthlyChanges[monthCol.key] = undefined;
+      } else {
+        // Calculate percentage change
+        monthlyChanges[monthCol.key] =
+          ((currentTotal - previousMonthTotal) / previousMonthTotal) * 100;
+      }
+
+      previousMonthTotal = currentTotal;
+    });
+
+    // Calculate YTD percentage
+    let ytd: number | undefined = undefined;
+    const currentYear = new Date().getFullYear();
+    const currentYearMonths = monthColumns.filter(col => col.year === currentYear);
+
+    if (currentYearMonths.length >= 2) {
+      const firstMonthKey = currentYearMonths[0].key;
+      const lastMonthKey = currentYearMonths[currentYearMonths.length - 1].key;
+      const firstTotal = totals[firstMonthKey];
+      const lastTotal = totals[lastMonthKey];
+
+      if (firstTotal > 0) {  // Avoid division by zero
+        ytd = ((lastTotal - firstTotal) / firstTotal) * 100;
+      }
+    }
+
+    // Calculate From Start percentage
+    let fromStart: number | undefined = undefined;
+
+    if (monthColumns.length >= 2) {
+      const firstMonthKey = monthColumns[0].key;
+      const lastMonthKey = monthColumns[monthColumns.length - 1].key;
+      const firstTotal = totals[firstMonthKey];
+      const lastTotal = totals[lastMonthKey];
+
+      if (firstTotal > 0) {  // Avoid division by zero
+        fromStart = ((lastTotal - firstTotal) / firstTotal) * 100;
+      }
+    }
+
     totalRow = {
       monthColumns: monthColumns.map(col => col.label),
       totals,
+      monthlyChanges,
+      ytd,
+      fromStart,
     };
   }
 
