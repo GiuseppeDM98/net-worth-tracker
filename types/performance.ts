@@ -38,6 +38,7 @@ export interface PerformanceMetrics {
   sharpeRatio: number | null;        // Risk-adjusted return
   volatility: number | null;         // Annualized volatility (%)
   maxDrawdown: number | null;        // Maximum drawdown (%)
+  drawdownDuration: number | null;   // Max drawdown recovery time (months)
 
   // Supporting data
   riskFreeRate: number;              // From user settings

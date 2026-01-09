@@ -311,7 +311,7 @@ export default function PerformancePage() {
           />
         </div>
 
-        {/* Metrics Cards - Row 3 - Max Drawdown */}
+        {/* Metrics Cards - Row 3 - Max Drawdown & Drawdown Duration */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
           <MetricCard
             title="Max Drawdown"
@@ -319,6 +319,14 @@ export default function PerformancePage() {
             format="percentage"
             description="Massima perdita percentuale dal picco"
             tooltip="Misura la peggiore perdita (da picco a valle) che il portafoglio ha subito nel periodo selezionato. Esempio: se il portafoglio valeva €100.000 e scese a €85.000 prima di recuperare, il Max Drawdown è -15%. Calcolo aggiustato per flussi di cassa (sottratte le contribuzioni cumulative) per isolare la performance degli investimenti. Valori vicini allo 0% = portafoglio stabile, valori molto negativi = alta volatilità al ribasso."
+          />
+
+          <MetricCard
+            title="Durata Drawdown"
+            value={metrics.drawdownDuration}
+            format="months"
+            description="Tempo di recupero dal Max Drawdown"
+            tooltip="Misura il tempo (in mesi) necessario per recuperare completamente dalla perdita più grande (Max Drawdown). Esempio: se il portafoglio perde il 15% a gennaio e recupera a dicembre, la durata è 11 mesi. Questo indicatore misura la resilienza del portafoglio: durate brevi indicano rapido recupero, durate lunghe segnalano lenta ripresa. Calcolo aggiustato per flussi di cassa per isolare la performance degli investimenti. Se il portafoglio è ancora in drawdown, mostra la durata dall'ultimo picco."
           />
         </div>
 

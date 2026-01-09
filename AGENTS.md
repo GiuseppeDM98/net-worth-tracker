@@ -277,6 +277,36 @@ await setDoc(docRef, { field1: newValue }, { merge: true });
 
 ---
 
+### Cash Flow Adjustment Mismatch in Correlated Metrics (CRITICAL)
+**Symptom**: Max Drawdown shows -15% at month 5, but Drawdown Duration counts from month 3 (different peak), creating confusion
+
+**Cause**: Using different cash flow adjustment logic in correlated metrics (e.g., Max Drawdown vs Drawdown Duration)
+
+**Solution**: Use identical TWR-style cash flow adjustment for correlated metrics (see `calculateMaxDrawdown()` and `calculateDrawdownDuration()` for reference pattern):
+```typescript
+// Build cash flow map: YYYY-MM → netCashFlow
+const cashFlowMap = new Map<string, number>();
+cashFlows.forEach(cf => {
+  const key = `${cf.date.getFullYear()}-${String(cf.date.getMonth() + 1).padStart(2, '0')}`;
+  cashFlowMap.set(key, cf.netCashFlow);
+});
+
+// Calculate adjusted values: totalNetWorth - cumulative contributions
+let cumulativeCashFlow = 0;
+const adjustedValues: number[] = [];
+for (const snapshot of snapshots) {
+  const cfKey = `${snapshot.year}-${String(snapshot.month).padStart(2, '0')}`;
+  cumulativeCashFlow += cashFlowMap.get(cfKey) || 0;
+  adjustedValues.push(snapshot.totalNetWorth - cumulativeCashFlow);
+}
+```
+
+**Prevention**: Reuse exact adjustment logic for drawdown-related metrics; verify alignment with test (Max Drawdown at month X → duration counts from same peak); extract to helper if >3 uses
+
+**Where**: `calculateMaxDrawdown()`, `calculateDrawdownDuration()`, future drawdown metrics
+
+---
+
 ## File References
 
 Key files for common tasks:
@@ -290,5 +320,5 @@ Key files for common tasks:
 
 ---
 
-**Last updated**: 2026-01-07
+**Last updated**: 2026-01-09
 **Reduced from**: 1646 lines → 333 lines (~80% reduction)

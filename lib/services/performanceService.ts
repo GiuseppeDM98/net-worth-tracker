@@ -320,6 +320,104 @@ export function calculateMaxDrawdown(
 }
 
 /**
+ * Calculate Drawdown Duration (cash flow adjusted)
+ * Measures the time (in months) from the initial peak to complete recovery of the deepest Max Drawdown
+ * Uses TWR-style adjustment to isolate investment performance
+ *
+ * @param snapshots - Monthly snapshots (sorted chronologically)
+ * @param cashFlows - Monthly cash flows
+ * @returns Duration in months, or null if portfolio never declined
+ *
+ * @example
+ * Portfolio drops 15% from Jan (index 0) to Apr (index 3), recovers to new peak on Dec (index 11)
+ * Duration = 11 months (from Jan peak to Dec recovery)
+ */
+export function calculateDrawdownDuration(
+  snapshots: MonthlySnapshot[],
+  cashFlows: CashFlowData[]
+): number | null {
+  // STEP 1: Early exit for insufficient data
+  if (snapshots.length < 2) return null;
+
+  // STEP 2: Create cash flow adjustment map (identical to Max Drawdown)
+  const cashFlowMap = new Map<string, number>();
+  cashFlows.forEach(cf => {
+    const key = `${cf.date.getFullYear()}-${String(cf.date.getMonth() + 1).padStart(2, '0')}`;
+    cashFlowMap.set(key, cf.netCashFlow);
+  });
+
+  // STEP 3: Calculate TWR-adjusted values (identical to Max Drawdown)
+  let cumulativeCashFlow = 0;
+  const adjustedValues: number[] = [];
+
+  for (const snapshot of snapshots) {
+    const cfKey = `${snapshot.year}-${String(snapshot.month).padStart(2, '0')}`;
+    cumulativeCashFlow += cashFlowMap.get(cfKey) || 0;
+    const adjustedValue = snapshot.totalNetWorth - cumulativeCashFlow;
+    adjustedValues.push(adjustedValue);
+  }
+
+  // STEP 4: Track drawdown periods and identify Max Drawdown period
+  let runningPeak = adjustedValues[0];
+  let peakIndex = 0;                    // Index of current running peak
+  let maxDrawdown = 0;                  // Most negative drawdown percentage
+  let maxDrawdownPeakIndex = 0;         // Index where Max Drawdown period started
+  let maxDrawdownTroughIndex = 0;       // Index where Max Drawdown bottomed
+
+  for (let i = 0; i < adjustedValues.length; i++) {
+    const currentValue = adjustedValues[i];
+
+    // Update peak if new high reached
+    if (currentValue > runningPeak) {
+      runningPeak = currentValue;
+      peakIndex = i;
+    }
+
+    // Calculate current drawdown percentage
+    if (runningPeak > 0) {
+      const currentDrawdown = ((currentValue - runningPeak) / runningPeak) * 100;
+
+      // Track the most negative drawdown (Max Drawdown)
+      if (currentDrawdown < maxDrawdown) {
+        maxDrawdown = currentDrawdown;
+        maxDrawdownPeakIndex = peakIndex;      // Save peak index for this drawdown
+        maxDrawdownTroughIndex = i;            // Save trough index
+      }
+    }
+  }
+
+  // STEP 5: If no drawdown occurred, return null
+  if (maxDrawdown === 0) {
+    return null;
+  }
+
+  // STEP 6: Find recovery point (when adjustedValue >= peak value)
+  const peakValue = adjustedValues[maxDrawdownPeakIndex];
+  let recoveryIndex: number | null = null;
+
+  for (let i = maxDrawdownTroughIndex + 1; i < adjustedValues.length; i++) {
+    if (adjustedValues[i] >= peakValue) {
+      recoveryIndex = i;
+      break;  // Found first recovery point
+    }
+  }
+
+  // STEP 7: Calculate duration
+  let duration: number;
+
+  if (recoveryIndex === null) {
+    // Still in drawdown - calculate duration from peak to present
+    duration = (adjustedValues.length - 1) - maxDrawdownPeakIndex;
+  } else {
+    // Recovered - calculate duration from peak to recovery
+    duration = recoveryIndex - maxDrawdownPeakIndex;
+  }
+
+  // STEP 8: Return duration (minimum 1 month for edge cases)
+  return Math.max(1, duration);
+}
+
+/**
  * Calculate number of months between two dates (inclusive)
  * Example: Jan 2025 to Dec 2025 = 12 months (not 11)
  */
@@ -538,6 +636,7 @@ export async function calculatePerformanceForPeriod(
     sharpeRatio: null,
     volatility: null,
     maxDrawdown: null,
+    drawdownDuration: null,
     riskFreeRate,
     dividendCategoryId,
     totalContributions: 0,
@@ -625,6 +724,8 @@ export async function calculatePerformanceForPeriod(
 
   const maxDrawdown = calculateMaxDrawdown(sortedSnapshots, cashFlows);
 
+  const drawdownDuration = calculateDrawdownDuration(sortedSnapshots, cashFlows);
+
   const sharpeRatio = timeWeightedReturn !== null && volatility !== null
     ? calculateSharpeRatio(timeWeightedReturn, riskFreeRate, volatility)
     : null;
@@ -643,6 +744,7 @@ export async function calculatePerformanceForPeriod(
     sharpeRatio,
     volatility,
     maxDrawdown,
+    drawdownDuration,
     riskFreeRate,
     dividendCategoryId, // Store for reuse in custom date ranges
     totalContributions,

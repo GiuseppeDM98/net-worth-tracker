@@ -420,8 +420,25 @@ User clicks "Update Prices" → `/api/prices/update` → updateUserAssetPrices()
   - `lib/services/performanceService.ts` (lines 262-320, 540, 626, 645)
   - `app/dashboard/performance/page.tsx` (lines 314-323)
 
+### Drawdown Duration Metric
+- **Feature**: Added Drawdown Duration metric to Performance page with all timeframes (YTD, 1Y, 3Y, 5Y, All Time, Custom)
+- **Definition**: Time (in months) from the initial peak to complete recovery of the deepest Max Drawdown
+- **Implementation**:
+  - Added `drawdownDuration: number | null` field to `PerformanceMetrics` interface
+  - Implemented `calculateDrawdownDuration()` function with identical TWR-style cash flow adjustment to Max Drawdown
+  - Cash flow adjustment: subtracts cumulative contributions to isolate investment performance (ensures alignment with Max Drawdown)
+  - Algorithm: tracks peak/trough indices for Max Drawdown period, finds recovery point (when adjusted value >= peak value), calculates duration
+  - Returns duration in months (≥1) or `null` if portfolio never declined
+  - Handles ongoing drawdowns: returns duration from peak to present if not yet recovered
+  - UI: third row in Performance page next to Max Drawdown, format "months" displays as "1a 3m" for 15 months
+- **Files Modified**:
+  - `types/performance.ts` (line 41)
+  - `lib/services/performanceService.ts` (lines 322-418, 639, 727, 747)
+  - `app/dashboard/performance/page.tsx` (lines 324-330)
+
 ## Key Technical Decisions (Ultimi 2 Mesi)
 
+- **Drawdown Duration Alignment** (01/2026): Use identical TWR-style cash flow adjustment to Max Drawdown to ensure both metrics analyze the same drawdown period - critical for metric coherence, returns duration from peak to present for ongoing drawdowns
 - **Max Drawdown Cash Flow Adjustment** (01/2026): Use TWR-style adjustment (subtract cumulative contributions) to isolate investment performance - prevents withdrawals/contributions from masking or amplifying real drawdowns
 - **Firestore setDoc Merge Mode** (01/2026): Always use `{ merge: true }` when updating existing documents with partial data - prevents silent data loss when multiple pages update different fields of same document
 - **Dividend Income Separation** (01/2026): Separate dividend income from external contributions using `dividendIncomeCategoryId` - mathematically correct per CFA standards, backward compatible
