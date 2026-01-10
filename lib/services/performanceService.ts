@@ -6,11 +6,47 @@ import {
   TimePeriod,
   PerformanceData,
   RollingPeriodPerformance,
-  PerformanceChartData
+  PerformanceChartData,
+  MonthlyReturnHeatmapData,
+  UnderwaterDrawdownData
 } from '@/types/performance';
 import { getExpensesByDateRange } from './expenseService';
 import { getUserSnapshots } from './snapshotService';
 import { getSettings } from './assetAllocationService';
+
+/**
+ * Format month and year to MM/YY format (e.g., "04/25")
+ * @param year - Full year (e.g., 2025)
+ * @param month - Month (1-12)
+ */
+function formatMonthYear(year: number, month: number): string {
+  const monthStr = String(month).padStart(2, '0');
+  const yearStr = String(year).slice(-2);  // Last 2 digits
+  return `${monthStr}/${yearStr}`;
+}
+
+/**
+ * Format a period from start to end (or "Presente" if ongoing)
+ * @param startYear - Start year
+ * @param startMonth - Start month (1-12)
+ * @param endYear - End year (null if ongoing)
+ * @param endMonth - End month (1-12, null if ongoing)
+ */
+function formatPeriod(
+  startYear: number,
+  startMonth: number,
+  endYear: number | null,
+  endMonth: number | null
+): string {
+  const start = formatMonthYear(startYear, startMonth);
+
+  if (endYear === null || endMonth === null) {
+    return `${start} - Presente`;
+  }
+
+  const end = formatMonthYear(endYear, endMonth);
+  return `${start} - ${end}`;
+}
 
 /**
  * Calculate ROI for a period
@@ -260,6 +296,312 @@ export function calculateVolatility(
 }
 
 /**
+ * Calculate Maximum Drawdown (cash flow adjusted)
+ * Measures the largest peak-to-trough decline in portfolio value
+ * Uses TWR-style adjustment to isolate investment performance
+ *
+ * @param snapshots - Monthly snapshots (sorted chronologically)
+ * @param cashFlows - Monthly cash flows
+ * @returns Object with maximum drawdown percentage and trough date, or null values if portfolio never declined
+ */
+export function calculateMaxDrawdown(
+  snapshots: MonthlySnapshot[],
+  cashFlows: CashFlowData[]
+): { value: number | null; troughDate: string | null } {
+  if (snapshots.length < 2) return { value: null, troughDate: null };
+
+  // Create cash flow lookup map (by YYYY-MM)
+  const cashFlowMap = new Map<string, number>();
+  cashFlows.forEach(cf => {
+    const key = `${cf.date.getFullYear()}-${String(cf.date.getMonth() + 1).padStart(2, '0')}`;
+    cashFlowMap.set(key, cf.netCashFlow);
+  });
+
+  // Calculate adjusted portfolio values (subtract cumulative contributions)
+  let cumulativeCashFlow = 0;
+  const adjustedValues: number[] = [];
+
+  for (const snapshot of snapshots) {
+    const cfKey = `${snapshot.year}-${String(snapshot.month).padStart(2, '0')}`;
+    cumulativeCashFlow += cashFlowMap.get(cfKey) || 0;
+
+    // TWR-style adjustment: isolate investment performance
+    const adjustedValue = snapshot.totalNetWorth - cumulativeCashFlow;
+    adjustedValues.push(adjustedValue);
+  }
+
+  // Track running peak and maximum drawdown
+  let runningPeak = adjustedValues[0];
+  let maxDrawdown = 0; // Start at 0 (no drawdown)
+  let maxDrawdownTroughIndex = 0; // Track trough index for max drawdown
+
+  for (let i = 0; i < adjustedValues.length; i++) {
+    const currentValue = adjustedValues[i];
+
+    // Update peak if new high is reached
+    if (currentValue > runningPeak) {
+      runningPeak = currentValue;
+    }
+
+    // Calculate drawdown from peak (avoid division by zero)
+    if (runningPeak > 0) {
+      const drawdown = ((currentValue - runningPeak) / runningPeak) * 100;
+
+      // Track the most negative drawdown (largest loss)
+      if (drawdown < maxDrawdown) {
+        maxDrawdown = drawdown;
+        maxDrawdownTroughIndex = i; // Save index of trough
+      }
+    }
+  }
+
+  // STEP 9: Extract trough date if drawdown occurred
+  if (maxDrawdown === 0) {
+    return { value: null, troughDate: null };
+  }
+
+  const troughSnapshot = snapshots[maxDrawdownTroughIndex];
+  const troughDate = formatMonthYear(troughSnapshot.year, troughSnapshot.month);
+
+  return {
+    value: maxDrawdown,  // Negative percentage (e.g., -15.5)
+    troughDate          // MM/YY format (e.g., "04/25")
+  };
+}
+
+/**
+ * Calculate Drawdown Duration (cash flow adjusted)
+ * Measures the time (in months) from the initial peak to complete recovery of the deepest Max Drawdown
+ * Uses TWR-style adjustment to isolate investment performance
+ *
+ * @param snapshots - Monthly snapshots (sorted chronologically)
+ * @param cashFlows - Monthly cash flows
+ * @returns Object with duration in months and period range, or null values if portfolio never declined
+ *
+ * @example
+ * Portfolio drops 15% from Jan (index 0) to Apr (index 3), recovers to new peak on Dec (index 11)
+ * Duration = 11 months (from Jan peak to Dec recovery)
+ */
+export function calculateDrawdownDuration(
+  snapshots: MonthlySnapshot[],
+  cashFlows: CashFlowData[]
+): { duration: number | null; period: string | null } {
+  // STEP 1: Early exit for insufficient data
+  if (snapshots.length < 2) return { duration: null, period: null };
+
+  // STEP 2: Create cash flow adjustment map (identical to Max Drawdown)
+  const cashFlowMap = new Map<string, number>();
+  cashFlows.forEach(cf => {
+    const key = `${cf.date.getFullYear()}-${String(cf.date.getMonth() + 1).padStart(2, '0')}`;
+    cashFlowMap.set(key, cf.netCashFlow);
+  });
+
+  // STEP 3: Calculate TWR-adjusted values (identical to Max Drawdown)
+  let cumulativeCashFlow = 0;
+  const adjustedValues: number[] = [];
+
+  for (const snapshot of snapshots) {
+    const cfKey = `${snapshot.year}-${String(snapshot.month).padStart(2, '0')}`;
+    cumulativeCashFlow += cashFlowMap.get(cfKey) || 0;
+    const adjustedValue = snapshot.totalNetWorth - cumulativeCashFlow;
+    adjustedValues.push(adjustedValue);
+  }
+
+  // STEP 4: Track drawdown periods and identify Max Drawdown period
+  let runningPeak = adjustedValues[0];
+  let peakIndex = 0;                    // Index of current running peak
+  let maxDrawdown = 0;                  // Most negative drawdown percentage
+  let maxDrawdownPeakIndex = 0;         // Index where Max Drawdown period started
+  let maxDrawdownTroughIndex = 0;       // Index where Max Drawdown bottomed
+
+  for (let i = 0; i < adjustedValues.length; i++) {
+    const currentValue = adjustedValues[i];
+
+    // Update peak if new high reached
+    if (currentValue > runningPeak) {
+      runningPeak = currentValue;
+      peakIndex = i;
+    }
+
+    // Calculate current drawdown percentage
+    if (runningPeak > 0) {
+      const currentDrawdown = ((currentValue - runningPeak) / runningPeak) * 100;
+
+      // Track the most negative drawdown (Max Drawdown)
+      if (currentDrawdown < maxDrawdown) {
+        maxDrawdown = currentDrawdown;
+        maxDrawdownPeakIndex = peakIndex;      // Save peak index for this drawdown
+        maxDrawdownTroughIndex = i;            // Save trough index
+      }
+    }
+  }
+
+  // STEP 5: If no drawdown occurred, return null
+  if (maxDrawdown === 0) {
+    return { duration: null, period: null };
+  }
+
+  // STEP 6: Find recovery point (when adjustedValue >= peak value)
+  const peakValue = adjustedValues[maxDrawdownPeakIndex];
+  let recoveryIndex: number | null = null;
+
+  for (let i = maxDrawdownTroughIndex + 1; i < adjustedValues.length; i++) {
+    if (adjustedValues[i] >= peakValue) {
+      recoveryIndex = i;
+      break;  // Found first recovery point
+    }
+  }
+
+  // STEP 7: Calculate duration (inclusive of both peak and recovery months)
+  let duration: number;
+
+  if (recoveryIndex === null) {
+    // Still in drawdown - calculate duration from peak to present (inclusive)
+    duration = (adjustedValues.length - 1) - maxDrawdownPeakIndex + 1;
+  } else {
+    // Recovered - calculate duration from peak to recovery (inclusive)
+    duration = recoveryIndex - maxDrawdownPeakIndex + 1;  // +1 for inclusive count
+  }
+
+  // STEP 9: Extract peak and recovery dates for period label
+  const peakSnapshot = snapshots[maxDrawdownPeakIndex];
+  let recoverySnapshot: MonthlySnapshot | null = null;
+
+  if (recoveryIndex !== null) {
+    recoverySnapshot = snapshots[recoveryIndex];
+  }
+
+  const period = formatPeriod(
+    peakSnapshot.year,
+    peakSnapshot.month,
+    recoverySnapshot?.year ?? null,
+    recoverySnapshot?.month ?? null
+  );
+
+  return {
+    duration: Math.max(1, duration),  // Duration in months (≥1)
+    period                            // Range (e.g., "01/25 - 12/25" or "01/25 - Presente")
+  };
+}
+
+/**
+ * Calculate Recovery Time (cash flow adjusted)
+ * Measures the time (in months) from the trough (lowest point) to complete recovery
+ * Uses TWR-style adjustment to isolate investment performance
+ *
+ * @param snapshots - Monthly snapshots (sorted chronologically)
+ * @param cashFlows - Monthly cash flows
+ * @returns Object with duration in months and period range, or null values if portfolio never declined
+ *
+ * @example
+ * Portfolio drops 15% from Jan (index 0) to Apr (index 3), recovers to peak on Dec (index 11)
+ * Drawdown Duration = 11 months (Jan peak → Dec recovery)
+ * Recovery Time = 8 months (Apr trough → Dec recovery)
+ */
+export function calculateRecoveryTime(
+  snapshots: MonthlySnapshot[],
+  cashFlows: CashFlowData[]
+): { duration: number | null; period: string | null } {
+  // STEP 1: Early exit for insufficient data
+  if (snapshots.length < 2) return { duration: null, period: null };
+
+  // STEP 2: Create cash flow adjustment map (IDENTICAL to Max Drawdown & Drawdown Duration)
+  const cashFlowMap = new Map<string, number>();
+  cashFlows.forEach(cf => {
+    const key = `${cf.date.getFullYear()}-${String(cf.date.getMonth() + 1).padStart(2, '0')}`;
+    cashFlowMap.set(key, cf.netCashFlow);
+  });
+
+  // STEP 3: Calculate TWR-adjusted values (IDENTICAL to Max Drawdown & Drawdown Duration)
+  let cumulativeCashFlow = 0;
+  const adjustedValues: number[] = [];
+
+  for (const snapshot of snapshots) {
+    const cfKey = `${snapshot.year}-${String(snapshot.month).padStart(2, '0')}`;
+    cumulativeCashFlow += cashFlowMap.get(cfKey) || 0;
+    const adjustedValue = snapshot.totalNetWorth - cumulativeCashFlow;
+    adjustedValues.push(adjustedValue);
+  }
+
+  // STEP 4: Track drawdown periods and identify Max Drawdown period (IDENTICAL to Drawdown Duration)
+  let runningPeak = adjustedValues[0];
+  let peakIndex = 0;                    // Index of current running peak
+  let maxDrawdown = 0;                  // Most negative drawdown percentage
+  let maxDrawdownPeakIndex = 0;         // Index where Max Drawdown period started
+  let maxDrawdownTroughIndex = 0;       // Index where Max Drawdown bottomed
+
+  for (let i = 0; i < adjustedValues.length; i++) {
+    const currentValue = adjustedValues[i];
+
+    // Update peak if new high reached
+    if (currentValue > runningPeak) {
+      runningPeak = currentValue;
+      peakIndex = i;
+    }
+
+    // Calculate current drawdown percentage
+    if (runningPeak > 0) {
+      const currentDrawdown = ((currentValue - runningPeak) / runningPeak) * 100;
+
+      // Track the most negative drawdown (Max Drawdown)
+      if (currentDrawdown < maxDrawdown) {
+        maxDrawdown = currentDrawdown;
+        maxDrawdownPeakIndex = peakIndex;      // Save peak index for this drawdown
+        maxDrawdownTroughIndex = i;            // Save trough index
+      }
+    }
+  }
+
+  // STEP 5: If no drawdown occurred, return null
+  if (maxDrawdown === 0) {
+    return { duration: null, period: null };
+  }
+
+  // STEP 6: Find recovery point (when adjustedValue >= peak value)
+  const peakValue = adjustedValues[maxDrawdownPeakIndex];
+  let recoveryIndex: number | null = null;
+
+  for (let i = maxDrawdownTroughIndex + 1; i < adjustedValues.length; i++) {
+    if (adjustedValues[i] >= peakValue) {
+      recoveryIndex = i;
+      break;  // Found first recovery point
+    }
+  }
+
+  // STEP 7: Calculate Recovery Time (from TROUGH to recovery, inclusive)
+  let recoveryTime: number;
+
+  if (recoveryIndex === null) {
+    // Still in drawdown - calculate duration from trough to present (inclusive)
+    recoveryTime = (adjustedValues.length - 1) - maxDrawdownTroughIndex + 1;
+  } else {
+    // Recovered - calculate duration from TROUGH to recovery (inclusive)
+    // KEY DIFFERENCE: Drawdown Duration uses maxDrawdownPeakIndex, Recovery Time uses maxDrawdownTroughIndex
+    recoveryTime = recoveryIndex - maxDrawdownTroughIndex + 1;  // +1 for inclusive count
+  }
+
+  // STEP 9: Extract trough and recovery dates for period label
+  const troughSnapshot = snapshots[maxDrawdownTroughIndex];
+  let recoverySnapshot: MonthlySnapshot | null = null;
+
+  if (recoveryIndex !== null) {
+    recoverySnapshot = snapshots[recoveryIndex];
+  }
+
+  const period = formatPeriod(
+    troughSnapshot.year,
+    troughSnapshot.month,
+    recoverySnapshot?.year ?? null,
+    recoverySnapshot?.month ?? null
+  );
+
+  return {
+    duration: Math.max(1, recoveryTime),  // Duration in months (≥1)
+    period                                // Range (e.g., "04/25 - 12/25" or "04/25 - Presente")
+  };
+}
+
+/**
  * Calculate number of months between two dates (inclusive)
  * Example: Jan 2025 to Dec 2025 = 12 months (not 11)
  */
@@ -477,6 +819,12 @@ export async function calculatePerformanceForPeriod(
     moneyWeightedReturn: null,
     sharpeRatio: null,
     volatility: null,
+    maxDrawdown: null,
+    drawdownDuration: null,
+    recoveryTime: null,
+    maxDrawdownDate: undefined,
+    drawdownPeriod: undefined,
+    recoveryPeriod: undefined,
     riskFreeRate,
     dividendCategoryId,
     totalContributions: 0,
@@ -562,6 +910,12 @@ export async function calculatePerformanceForPeriod(
 
   const volatility = calculateVolatility(sortedSnapshots, cashFlows);
 
+  const maxDrawdownResult = calculateMaxDrawdown(sortedSnapshots, cashFlows);
+
+  const drawdownDurationResult = calculateDrawdownDuration(sortedSnapshots, cashFlows);
+
+  const recoveryTimeResult = calculateRecoveryTime(sortedSnapshots, cashFlows);
+
   const sharpeRatio = timeWeightedReturn !== null && volatility !== null
     ? calculateSharpeRatio(timeWeightedReturn, riskFreeRate, volatility)
     : null;
@@ -579,6 +933,12 @@ export async function calculatePerformanceForPeriod(
     moneyWeightedReturn,
     sharpeRatio,
     volatility,
+    maxDrawdown: maxDrawdownResult.value,
+    drawdownDuration: drawdownDurationResult.duration,
+    recoveryTime: recoveryTimeResult.duration,
+    maxDrawdownDate: maxDrawdownResult.troughDate ?? undefined,
+    drawdownPeriod: drawdownDurationResult.period ?? undefined,
+    recoveryPeriod: recoveryTimeResult.period ?? undefined,
     riskFreeRate,
     dividendCategoryId, // Store for reuse in custom date ranges
     totalContributions,
@@ -752,4 +1112,166 @@ export function preparePerformanceChartData(
       returns: snapshot.totalNetWorth - cumulativeContributions,
     };
   });
+}
+
+/**
+ * Prepare monthly returns heatmap data
+ * Calculates month-over-month returns adjusted for cash flows
+ *
+ * Formula: monthlyReturn = ((current NW - cash flow) / previous NW - 1) × 100
+ *
+ * @param snapshots - Monthly snapshots (will be sorted chronologically)
+ * @param cashFlows - Monthly cash flows
+ * @returns Array of yearly data with monthly returns
+ */
+export function prepareMonthlyReturnsHeatmap(
+  snapshots: MonthlySnapshot[],
+  cashFlows: CashFlowData[]
+): MonthlyReturnHeatmapData[] {
+  if (snapshots.length < 2) return [];
+
+  // Sort snapshots chronologically
+  const sortedSnapshots = [...snapshots].sort((a, b) => {
+    if (a.year !== b.year) return a.year - b.year;
+    return a.month - b.month;
+  });
+
+  // Create cash flow lookup map (by YYYY-MM)
+  const cashFlowMap = new Map<string, number>();
+  cashFlows.forEach(cf => {
+    const key = `${cf.date.getFullYear()}-${String(cf.date.getMonth() + 1).padStart(2, '0')}`;
+    cashFlowMap.set(key, cf.netCashFlow);
+  });
+
+  // Calculate monthly returns
+  const monthlyReturnsMap = new Map<string, number>(); // key: "YYYY-MM", value: return %
+
+  for (let i = 1; i < sortedSnapshots.length; i++) {
+    const prevSnapshot = sortedSnapshots[i - 1];
+    const currSnapshot = sortedSnapshots[i];
+
+    const startNW = prevSnapshot.totalNetWorth;
+    const endNW = currSnapshot.totalNetWorth;
+
+    if (startNW === 0) continue; // Skip if zero starting value
+
+    // Get cash flow for current month
+    const cfKey = `${currSnapshot.year}-${String(currSnapshot.month).padStart(2, '0')}`;
+    const cashFlow = cashFlowMap.get(cfKey) || 0;
+
+    // Calculate monthly return: (End NW - Cash Flow) / Start NW - 1
+    const monthlyReturn = ((endNW - cashFlow) / startNW - 1) * 100;
+
+    monthlyReturnsMap.set(cfKey, monthlyReturn);
+  }
+
+  // Group by year and organize by month
+  const yearMap = new Map<number, Map<number, number | null>>();
+
+  // Initialize all years found in snapshots
+  sortedSnapshots.forEach(snapshot => {
+    if (!yearMap.has(snapshot.year)) {
+      yearMap.set(snapshot.year, new Map());
+    }
+  });
+
+  // Populate monthly returns
+  monthlyReturnsMap.forEach((returnValue, key) => {
+    const [year, month] = key.split('-').map(Number);
+    const yearData = yearMap.get(year);
+    if (yearData) {
+      yearData.set(month, returnValue);
+    }
+  });
+
+  // Convert to output format
+  const heatmapData: MonthlyReturnHeatmapData[] = [];
+
+  Array.from(yearMap.entries())
+    .sort((a, b) => a[0] - b[0]) // Sort by year ascending
+    .forEach(([year, monthsMap]) => {
+      const months = [];
+      for (let month = 1; month <= 12; month++) {
+        months.push({
+          month,
+          return: monthsMap.get(month) ?? null, // null if no data for that month
+        });
+      }
+
+      heatmapData.push({ year, months });
+    });
+
+  return heatmapData;
+}
+
+/**
+ * Prepare underwater drawdown chart data
+ * Shows current drawdown from running peak (cash flow adjusted)
+ *
+ * - Value is 0% when portfolio is at all-time high
+ * - Value is negative when portfolio is below previous peak
+ *
+ * Uses TWR-style adjustment to isolate investment performance
+ *
+ * @param snapshots - Monthly snapshots (will be sorted chronologically)
+ * @param cashFlows - Monthly cash flows
+ * @returns Array of underwater drawdown data points
+ */
+export function prepareUnderwaterDrawdownData(
+  snapshots: MonthlySnapshot[],
+  cashFlows: CashFlowData[]
+): UnderwaterDrawdownData[] {
+  if (snapshots.length < 1) return [];
+
+  // Sort snapshots chronologically
+  const sortedSnapshots = [...snapshots].sort((a, b) => {
+    if (a.year !== b.year) return a.year - b.year;
+    return a.month - b.month;
+  });
+
+  // Create cash flow lookup map (by YYYY-MM) - IDENTICAL to Max Drawdown calculation
+  const cashFlowMap = new Map<string, number>();
+  cashFlows.forEach(cf => {
+    const key = `${cf.date.getFullYear()}-${String(cf.date.getMonth() + 1).padStart(2, '0')}`;
+    cashFlowMap.set(key, cf.netCashFlow);
+  });
+
+  // Calculate adjusted portfolio values (subtract cumulative contributions)
+  let cumulativeCashFlow = 0;
+  const adjustedValues: { value: number; snapshot: MonthlySnapshot }[] = [];
+
+  for (const snapshot of sortedSnapshots) {
+    const cfKey = `${snapshot.year}-${String(snapshot.month).padStart(2, '0')}`;
+    cumulativeCashFlow += cashFlowMap.get(cfKey) || 0;
+
+    // TWR-style adjustment: isolate investment performance
+    const adjustedValue = snapshot.totalNetWorth - cumulativeCashFlow;
+    adjustedValues.push({ value: adjustedValue, snapshot });
+  }
+
+  // Track running peak and calculate drawdown at each point
+  let runningPeak = adjustedValues[0].value;
+  const underwaterData: UnderwaterDrawdownData[] = [];
+
+  for (const { value, snapshot } of adjustedValues) {
+    // Update peak if new high is reached
+    if (value > runningPeak) {
+      runningPeak = value;
+    }
+
+    // Calculate current drawdown from peak
+    let drawdown = 0; // Default to 0% (at peak)
+    if (runningPeak > 0 && value < runningPeak) {
+      drawdown = ((value - runningPeak) / runningPeak) * 100; // Negative value
+    }
+
+    underwaterData.push({
+      date: `${String(snapshot.month).padStart(2, '0')}/${String(snapshot.year).slice(-2)}`,
+      drawdown: Math.min(0, drawdown), // Ensure ≤ 0
+      year: snapshot.year,
+      month: snapshot.month,
+    });
+  }
+
+  return underwaterData;
 }

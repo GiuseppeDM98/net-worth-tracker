@@ -37,6 +37,14 @@ export interface PerformanceMetrics {
   moneyWeightedReturn: number | null; // IRR / Money-weighted return (%)
   sharpeRatio: number | null;        // Risk-adjusted return
   volatility: number | null;         // Annualized volatility (%)
+  maxDrawdown: number | null;        // Maximum drawdown (%)
+  drawdownDuration: number | null;   // Max drawdown recovery time (months)
+  recoveryTime: number | null;       // Recovery time from trough (months)
+
+  // Temporal context for drawdown metrics
+  maxDrawdownDate?: string;          // Trough month (e.g., "04/25")
+  drawdownPeriod?: string;           // Peak to recovery range (e.g., "01/25 - 12/25" or "01/25 - Presente")
+  recoveryPeriod?: string;           // Trough to recovery range (e.g., "04/25 - 12/25" or "04/25 - Presente")
 
   // Supporting data
   riskFreeRate: number;              // From user settings
@@ -89,4 +97,21 @@ export interface PerformanceChartData {
   contributions: number;  // Cumulative
   returns: number;        // Returns portion (netWorth - contributions)
   [key: string]: any;     // For Recharts compatibility
+}
+
+// Monthly returns heatmap data
+export interface MonthlyReturnHeatmapData {
+  year: number;
+  months: {
+    month: number;           // 1-12 (Gen to Dic)
+    return: number | null;   // % return for that month (null if no data)
+  }[];
+}
+
+// Underwater drawdown chart data
+export interface UnderwaterDrawdownData {
+  date: string;              // MM/YY format
+  drawdown: number;          // Always ≤ 0 (e.g., -15.5 for -15.5% drawdown)
+  year: number;
+  month: number;
 }

@@ -1,8 +1,7 @@
-# AI Agent Guidelines - Net Worth Tracker
+# AI Agent Guidelines - Net Worth Tracker (Lean)
 
-Project-specific patterns and recurring errors for Net Worth Tracker codebase.
-
-For general architecture, tech stack, and feature documentation, see [CLAUDE.md](CLAUDE.md).
+Project-specific conventions and recurring pitfalls for Net Worth Tracker.
+For architecture and status, see [CLAUDE.md](CLAUDE.md).
 
 ---
 
@@ -10,285 +9,97 @@ For general architecture, tech stack, and feature documentation, see [CLAUDE.md]
 
 ### Italian Localization
 - All user-facing text in Italian
-- Use `formatCurrency()` for EUR formatting (€1.234,56)
+- Use `formatCurrency()` for EUR formatting (e.g. €1.234,56)
 - Use `formatDate()` for DD/MM/YYYY format
 - **All code comments in English only**
 
 ### Firebase Date Handling
-- Always use `toDate()` helper from `lib/utils/dateHelpers.ts`
-- API responses serialize Firestore Timestamps as ISO strings, not Date objects
-- Never use manual `instanceof Date` checks for API data
+- Always use `toDate()` from `lib/utils/dateHelpers.ts`
+- API responses serialize Firestore Timestamps as ISO strings
+- Never use manual `instanceof Date` checks on API data
 
 ### Custom Tailwind Breakpoint
 - Use `desktop:` (1025px) instead of `lg:` (1024px)
-- Excludes iPad Mini landscape (exactly 1024px) from desktop UI
-- **Tailwind v4**: Define in `app/globals.css` with `@theme inline`, NOT `tailwind.config.js`
+- Define in `app/globals.css` with `@theme inline`
 
 ---
 
 ## Key Patterns
 
 ### React Query Cache Invalidation
-**MUST invalidate ALL related caches** (direct + indirect dependencies):
+Invalidate all related caches (direct + indirect) after mutations.
 ```typescript
-// Snapshot creation updates BOTH collections
-export function useCreateSnapshot(userId: string) {
-  return useMutation({
-    mutationFn: createSnapshot,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.snapshots.all(userId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(userId) }); // Critical!
-    }
-  });
-}
-```
-Trace: API → Firestore → Cache → UI to find all dependencies
-
-### Lazy-Loading Tabs (mountedTabs Pattern)
-```typescript
-const [mountedTabs, setMountedTabs] = useState<Set<string>>(new Set(['default-tab']));
-const handleTabChange = (value: string) => {
-  setActiveTab(value);
-  setMountedTabs((prev) => new Set(prev).add(value)); // Never remove!
-};
-
-// Lazy-load tabs
-{mountedTabs.has('lazy-tab') && (
-  <TabsContent value="lazy-tab">
-    <ExpensiveComponent />
-  </TabsContent>
-)}
-```
-- First tab always mounted
-- Others mount on first click
-- Never remove from Set (preserve state)
-
-### Date Range Queries (Firestore)
-End date MUST include full day:
-```typescript
-// ✅ CORRECT
-const endDate = new Date(year, month, 0, 23, 59, 59, 999);
-
-// ❌ WRONG - Excludes records after midnight
-const endDate = new Date(year, month, 0);
-```
-
-### Borsa Italiana Scraper
-- ETF and Stock tables have **DIFFERENT structures** (4 vs 7+ columns)
-- Must pass `assetType` parameter to `scrapeDividendsByIsin(asset.isin, asset.type)`
-- ETF: Italian currency names ("Dollaro Usa" → "USD" via mapping)
-- Stock: 3-letter codes directly
-
-### Currency Conversion (Dividends)
-- Use `currencyConversionService.ts` (Frankfurter API)
-- 24h in-memory cache with stale fallback
-- Always store `exchangeRate` for audit trail
-- UI: Show EUR with tooltip for original currency
-
----
-
-## Common Errors to Avoid
-
-### Date Range Query Errors (CRITICAL)
-**Symptom**: Missing last day records in Firestore queries
-
-**Root Cause**: Using `new Date(year, month, 0)` excludes records after midnight
-
-```typescript
-// ❌ WRONG - Excludes last day records
-const endDate = new Date(year, month, 0);
-
-// ✅ CORRECT - Include entire last day
-const endDate = new Date(year, month, 0, 23, 59, 59, 999);
-```
-
-**Prevention**: Always use `23, 59, 59, 999` parameters for end-of-period queries
-
----
-
-### Performance Metrics - Dividend Income Separation (CRITICAL)
-**Symptom**: All performance metrics (ROI, CAGR, TWR, IRR, Sharpe) systematically underestimated
-
-**Root Cause**: Treating dividend income as external contributions instead of portfolio returns
-
-```typescript
-// ❌ WRONG - Mixes dividends with salary
-if (expense.type === 'income') {
-  entry.income += expense.amount;  // Dividend + salary lumped together
-}
-// Result: netCashFlow includes dividends (mathematically incorrect)
-// TWR formula subtracts dividends: (endNW - cashFlow) / startNW
-
-// ✅ CORRECT - Separate dividend income from external income
-if (expense.type === 'income') {
-  if (dividendCategoryId && expense.categoryId === dividendCategoryId) {
-    entry.dividendIncome += expense.amount;  // Portfolio return (not external)
-  } else {
-    entry.income += expense.amount;  // External contribution
-  }
-}
-netCashFlow: income - expenses  // WITHOUT dividends (external only)
-```
-
-**Mathematical Correctness** (CFA Institute Standards):
-- **ROI**: `gain = endNW - startNW - netCashFlow` (dividends NOT in netCashFlow ✓)
-- **TWR**: Monthly return = `(endNW - externalCashFlow) / startNW` (dividends NOT subtracted ✓)
-- **IRR**: Cash flows exclude dividends, they're part of final value ✓
-
-**Where to Check**:
-- Any function aggregating cash flows from expenses
-- Pattern to search: `type === 'income'` without dividend separation logic
-
-**Implementation** (2026-01-02):
-- ✅ Added `dividendIncome` field to `CashFlowData` interface
-- ✅ Modified `getCashFlowsForPeriod()` with `dividendCategoryId` parameter
-- ✅ All 6 calculation functions updated in `performanceService.ts`
-
-**Prevention**:
-- When aggregating cash flows, ALWAYS separate dividends using `dividendIncomeCategoryId` from settings
-- Verify TWR doesn't subtract dividends from end value
-- Test: dividends should INCREASE metrics (ROI, CAGR), not decrease them
-
-**Backward Compatibility**: If `dividendIncomeCategoryId` not configured → legacy behavior (all income treated equally)
-
----
-
-### Asset Price History Percentage Errors (CRITICAL)
-**Symptom**: Assets with `price=1` (cash, real estate) show 0.00% change even when `totalValue` changes significantly
-
-**Root Cause**: Using price for percentage calculations when price is constant at 1
-
-```typescript
-// ❌ WRONG - Always 0% for price=1 assets
-const change = (currentPrice - previousPrice) / previousPrice * 100;
-
-// ✅ CORRECT - Use shouldUseTotalValue flag
-const shouldUseTotalValue = displayMode === 'totalValue' || currentPrice === 1;
-const currentValue = shouldUseTotalValue ? currentTotalValue : currentPrice;
-const change = (currentValue - previousValue) / previousValue * 100;
-```
-
-**Prevention**: Apply `shouldUseTotalValue` flag to ALL % calculations (monthly, YTD, fromStart), test with `price=1` assets
-
----
-
-### Responsive Breakpoint Edge Case (iPad Mini)
-**Symptom**: iPad Mini landscape (1024px) shows desktop UI instead of mobile UI
-
-**Root Cause**: Tailwind `lg:` breakpoint is inclusive (≥1024px)
-
-```css
-/* ✅ Custom breakpoint in app/globals.css */
-@theme inline {
-  --breakpoint-desktop: 1025px;
-}
-```
-
-**Prevention**: Always use `desktop:` not `lg:`, test at exact 1024px breakpoint
-
----
-
-### Chart YAxis Formatter (Mobile Compression)
-**Symptom**: Y-axis labels too wide compress chart area on mobile
-
-**Root Cause**: Using `formatCurrency()` creates 12+ character strings
-
-```typescript
-// ❌ WRONG - €1.234.567 (too wide)
-<YAxis tickFormatter={(value) => formatCurrency(value)} />
-
-// ✅ CORRECT - €1,5 Mln (compact)
-<YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
-```
-
-**Prevention**: Use `formatCurrencyCompact()` for Y-axis, `formatCurrency()` only for tooltips/tables
-
----
-
-### React Query Incomplete Cache Invalidation
-**Symptom**: UI shows stale data after mutation even though Firestore was updated
-
-**Root Cause**: Only invalidating direct cache, missing indirect dependencies
-
-```typescript
-// ❌ WRONG - Snapshot API updates assets, but only snapshots cache invalidated
-onSuccess: () => {
-  queryClient.invalidateQueries({ queryKey: queryKeys.snapshots.all(userId) });
-  // Missing: assets cache!
-}
-
-// ✅ CORRECT - Invalidate ALL modified collections
 onSuccess: () => {
   queryClient.invalidateQueries({ queryKey: queryKeys.snapshots.all(userId) });
   queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(userId) });
 }
 ```
 
-**Prevention**: Trace API endpoint to find ALL Firestore collections modified, invalidate all related caches
+### Lazy-Loading Tabs (mountedTabs)
+Never remove from `mountedTabs` once added to preserve state.
 
----
-
-### Firestore setDoc Data Loss (CRITICAL)
-**Symptom**: Settings/data mysteriously disappear after save operations
-
-**Root Cause**: Using `setDoc()` without `{ merge: true }` overwrites entire document
-
+### Date Range Queries (Firestore)
+End date must include full day:
 ```typescript
-// ❌ WRONG - Deletes all other fields
-await setDoc(docRef, { field1: newValue });
-
-// ✅ CORRECT - Merges with existing
-await setDoc(docRef, { field1: newValue }, { merge: true });
+const endDate = new Date(year, month, 0, 23, 59, 59, 999);
 ```
 
-**Prevention**: Use `{ merge: true }` by default when updating existing documents, audit all `setDoc()` calls
+### Asset Price History %
+For assets with `price === 1` or `displayMode === 'totalValue'`, compute % using total value.
+
+### Borsa Italiana Scraper
+- ETF and Stock tables have different structures
+- Pass `assetType` to `scrapeDividendsByIsin(asset.isin, asset.type)`
+
+### Currency Conversion (Dividends)
+- Use `currencyConversionService.ts` (Frankfurter API)
+- Cache 24h and store `exchangeRate` for audit
+
+### Chart Y Axis
+Use `formatCurrencyCompact()` for Y axis labels on mobile to avoid layout compression.
 
 ---
 
-### Double Percentage Multiplication (CRITICAL)
-**Symptom**: UI displays correct percentage value but progress bars/charts show 100% (or wrong visual representation)
+## Common Errors to Avoid
 
-**Root Cause**: Multiplying by 100 a value already in percentage range (0-100 instead of 0-1)
-
+### Date Range Query Errors
+**Sintomo**: Manca l'ultimo giorno nei risultati Firestore
+**Causa**: `new Date(year, month, 0)` taglia dopo mezzanotte
+**Soluzione**:
 ```typescript
-// ❌ WRONG - progressToFI already returns 72.06 (0-100 range)
-<div style={{ width: `${Math.min(fireMetrics.progressToFI * 100, 100)}%` }} />
-// Result: 72.06 * 100 = 7206 → Math.min(7206, 100) = 100% (always full)
-
-// ✅ CORRECT - Use value directly
-<div style={{ width: `${Math.min(fireMetrics.progressToFI, 100)}%` }} />
-// Result: 72.06 → Math.min(72.06, 100) = 72.06% (correct)
+const endDate = new Date(year, month, 0, 23, 59, 59, 999);
 ```
+**Prevenzione**: Sempre includere `23, 59, 59, 999` per fine periodo
 
-**Where to Check**:
-- Progress bar width calculations with percentage values
-- Chart scales using service-returned percentages
-- Pattern: Verify if service returns 0-1 (decimal) or 0-100 (percentage)
-  - `fireService.ts`: Returns 0-100 → DON'T multiply
-  - `formatPercentage()`: Expects 0-100, multiplies internally by 100
+### React Query Incomplete Cache Invalidation
+**Sintomo**: UI mostra dati stale dopo una mutation
+**Causa**: Invalidazione solo della cache diretta
+**Soluzione**:
+```typescript
+onSuccess: () => {
+  queryClient.invalidateQueries({ queryKey: queryKeys.snapshots.all(userId) });
+  queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(userId) });
+}
+```
+**Prevenzione**: Traccia API -> Firestore -> cache e invalida tutte le dipendenze
 
-**Prevention**:
-- Check service return type before applying `* 100`
-- Test with values <10% to spot full bars immediately
-- Ensure text display and visual width use same value
-
-**Fixed Locations** (2026-01-07):
-- ✅ `components/fire-simulations/FireCalculatorTab.tsx` lines 227, 294
-
----
-
-## File References
-
-Key files for common tasks:
-- **Date utilities**: `lib/utils/dateHelpers.ts` (`toDate()` helper)
-- **Formatters**: `lib/utils/formatters.ts` (`formatCurrency`, `formatCurrencyCompact`, `formatDate`)
-- **Asset price history**: `lib/utils/assetPriceHistoryUtils.ts` (snapshot transformation, color coding)
-- **Performance calculations**: `lib/services/performanceService.ts` (ROI, CAGR, TWR, IRR, Sharpe)
-- **Currency conversion**: `lib/services/currencyConversionService.ts` (Frankfurter API)
-- **Dividend scraper**: `lib/services/borsaItalianaScraperService.ts` (ETF vs Stock handling)
-- **Query keys**: `lib/query/queryKeys.ts` (centralized React Query keys)
+### Firestore setDoc Data Loss
+**Sintomo**: Campi scompaiono dopo save parziali
+**Causa**: `setDoc()` senza `{ merge: true }`
+**Soluzione**:
+```typescript
+await setDoc(docRef, payload, { merge: true });
+```
+**Prevenzione**: Usa merge per ogni update parziale
 
 ---
 
-**Last updated**: 2026-01-07
-**Reduced from**: 1646 lines → 333 lines (~80% reduction)
+## Key Files
+- Date helpers: `lib/utils/dateHelpers.ts`
+- Formatters: `lib/utils/formatters.ts`
+- Asset history utils: `lib/utils/assetPriceHistoryUtils.ts`
+- Performance service: `lib/services/performanceService.ts`
+- Currency conversion: `lib/services/currencyConversionService.ts`
+- Query keys: `lib/query/queryKeys.ts`
+
+**Last updated**: 2026-01-10

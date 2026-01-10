@@ -496,6 +496,10 @@ function MonthlyRecordCard({
   valueKey: keyof MonthlyRecord;
   formatCurrency: (amount: number) => string;
 }) {
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+  const isCurrentMonth = record.year === currentYear && record.month === currentMonth;
   const showPercentage = valueKey === 'netWorthDiff';
   const value = record[valueKey] as number;
 
@@ -512,7 +516,11 @@ function MonthlyRecordCard({
   const percentageColor = percentage >= 0 ? 'text-green-600' : 'text-red-600';
 
   return (
-    <div className="p-3 bg-muted/50 rounded-lg border">
+    <div
+      className={`p-3 rounded-lg border ${
+        isCurrentMonth ? 'bg-amber-50/70 border-amber-200' : 'bg-muted/50'
+      }`}
+    >
       {/* Row 1: Rank badge + Month + Note icon */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
@@ -555,6 +563,8 @@ function YearlyRecordCard({
   valueKey: keyof YearlyRecord;
   formatCurrency: (amount: number) => string;
 }) {
+  const currentYear = new Date().getFullYear();
+  const isCurrentYear = record.year === currentYear;
   const showPercentage = valueKey === 'netWorthDiff';
   const value = record[valueKey] as number;
 
@@ -571,7 +581,11 @@ function YearlyRecordCard({
   const percentageColor = percentage >= 0 ? 'text-green-600' : 'text-red-600';
 
   return (
-    <div className="p-3 bg-muted/50 rounded-lg border">
+    <div
+      className={`p-3 rounded-lg border ${
+        isCurrentYear ? 'bg-amber-50/70 border-amber-200' : 'bg-muted/50'
+      }`}
+    >
       {/* Row 1: Rank badge + Year */}
       <div className="flex items-center gap-2 mb-2">
         <Badge variant="outline" className="px-2 py-0.5 text-xs font-semibold">
@@ -618,6 +632,9 @@ function MonthlyTable({
   }
 
   const showPercentage = valueKey === 'netWorthDiff';
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
 
   return (
     <div className="max-h-[400px] overflow-y-auto">
@@ -638,9 +655,13 @@ function MonthlyTable({
             const percentage = showPercentage && record.previousNetWorth > 0
               ? (record.netWorthDiff / record.previousNetWorth) * 100
               : 0;
+            const isCurrentMonth = record.year === currentYear && record.month === currentMonth;
 
             return (
-              <TableRow key={`${record.year}-${record.month}`}>
+              <TableRow
+                key={`${record.year}-${record.month}`}
+                className={isCurrentMonth ? 'bg-amber-50/70 hover:bg-amber-50/80' : undefined}
+              >
                 <TableCell className="font-medium">{index + 1}</TableCell>
                 <TableCell className="whitespace-nowrap">{record.monthYear}</TableCell>
                 <TableCell className="text-right font-mono whitespace-nowrap">
@@ -682,6 +703,7 @@ function YearlyTable({
   }
 
   const showPercentage = valueKey === 'netWorthDiff';
+  const currentYear = new Date().getFullYear();
 
   return (
     <div className="max-h-[400px] overflow-y-auto">
@@ -701,9 +723,13 @@ function YearlyTable({
             const percentage = showPercentage && record.startOfYearNetWorth > 0
               ? (record.netWorthDiff / record.startOfYearNetWorth) * 100
               : 0;
+            const isCurrentYear = record.year === currentYear;
 
             return (
-              <TableRow key={record.year}>
+              <TableRow
+                key={record.year}
+                className={isCurrentYear ? 'bg-amber-50/70 hover:bg-amber-50/80' : undefined}
+              >
                 <TableCell className="font-medium">{index + 1}</TableCell>
                 <TableCell>{record.year}</TableCell>
                 <TableCell className="text-right font-mono whitespace-nowrap">
