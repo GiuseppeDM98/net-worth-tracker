@@ -320,5 +320,5 @@ Key files for common tasks:
 
 ---
 
-**Last updated**: 2026-01-09
-**Reduced from**: 1646 lines → 333 lines (~80% reduction)
+**Last updated**: 2026-01-10
+**Reduced from**: 1646 lines → 324 lines (~80% reduction)

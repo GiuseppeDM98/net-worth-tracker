@@ -39,6 +39,12 @@ export interface PerformanceMetrics {
   volatility: number | null;         // Annualized volatility (%)
   maxDrawdown: number | null;        // Maximum drawdown (%)
   drawdownDuration: number | null;   // Max drawdown recovery time (months)
+  recoveryTime: number | null;       // Recovery time from trough (months)
+
+  // Temporal context for drawdown metrics
+  maxDrawdownDate?: string;          // Trough month (e.g., "04/25")
+  drawdownPeriod?: string;           // Peak to recovery range (e.g., "01/25 - 12/25" or "01/25 - Presente")
+  recoveryPeriod?: string;           // Trough to recovery range (e.g., "04/25 - 12/25" or "04/25 - Presente")
 
   // Supporting data
   riskFreeRate: number;              // From user settings

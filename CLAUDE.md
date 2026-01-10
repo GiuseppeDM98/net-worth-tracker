@@ -17,7 +17,7 @@ Replace spreadsheet-based portfolio management with a modern, automated solution
 - **FIRE Calculator**: Safe Withdrawal Rate configuration (4% Trinity Study), progress tracking, Monte Carlo simulations, historical evolution charts
 - **Historical Analysis**: Automated monthly snapshots via cron jobs, net worth timeline, asset class evolution, YoY comparison, CSV export
 - **Dividend Tracking**: Automatic scraping from Borsa Italiana, multi-currency support (EUR/USD/GBP/CHF) with auto-conversion, expense integration, TTM yield analytics
-- **Performance Metrics**: 9 key metrics (ROI, CAGR, TWR, IRR, Sharpe, Volatility, Max Drawdown), 7 time periods (YTD, 1Y, 3Y, 5Y, All Time, Rolling 12M/36M, Custom), dividend income separation
+- **Performance Metrics**: 10 key metrics (ROI, CAGR, TWR, IRR, Sharpe, Volatility, Max Drawdown, Drawdown Duration, Recovery Time), 7 time periods (YTD, 1Y, 3Y, 5Y, All Time, Rolling 12M/36M, Custom), dividend income separation
 - **Hall of Fame**: Top 20 months and Top 10 years by net worth growth, income, expenses with percentage growth columns, mobile card layout
 - **PDF Export**: 6 customizable sections (Portfolio, Allocation, History, Cashflow, FIRE, Summary), 3 temporal modes (Total/Annual/Monthly), chart embedding
 
@@ -403,43 +403,35 @@ User clicks "Update Prices" → `/api/prices/update` → updateUserAssetPrices()
 - Asset Price History: YTD & From Start columns, cashflow charts 2025+ filter
 - Dividend Income Separation: Correct treatment as portfolio returns in performance metrics
 
-## Implemented in This Session (09/01/2026)
+## Implemented in This Session
 
-### Max Drawdown Metric
-- **Feature**: Added Max Drawdown metric to Performance page with all timeframes (YTD, 1Y, 3Y, 5Y, All Time, Custom)
-- **Definition**: Maximum percentage loss from peak to trough before a new peak is reached
+### Drawdown Metrics Suite (09-10/01/2026)
+- **Features**: Complete drawdown analysis with 3 metrics - Max Drawdown, Drawdown Duration, Recovery Time
+- **Definitions**:
+  - **Max Drawdown**: Maximum % loss from peak to trough (-15.5% = 15.5% loss)
+  - **Drawdown Duration**: Months from peak to full recovery (descent + ascent)
+  - **Recovery Time**: Months from trough to full recovery (ascent only)
+  - Relationship: `Drawdown Duration = Descent Time + Recovery Time`
 - **Implementation**:
-  - Added `maxDrawdown: number | null` field to `PerformanceMetrics` interface
-  - Implemented `calculateMaxDrawdown()` function with TWR-style cash flow adjustment
-  - Cash flow adjustment: subtracts cumulative contributions to isolate investment performance
-  - Algorithm: tracks running peak, calculates drawdown at each point, returns most negative value
-  - Returns negative percentage (e.g., -15.5 = 15.5% loss) or `null` if portfolio never declined
-  - UI: third row in Performance page with detailed tooltip explaining calculation
+  - TWR-style cash flow adjustment (subtract cumulative contributions) for all three metrics - ensures coherence
+  - Tracks peak/trough indices, handles ongoing drawdowns (shows "Presente" if not recovered)
+  - Returns null if portfolio never declined
+  - UI: Row 3 in Performance page, format "months" (displays as "1a 3m" for 15 months)
+- **Temporal Context** (10/01/2026):
+  - Added 3 optional fields: `maxDrawdownDate` (trough month), `drawdownPeriod` (peak→recovery), `recoveryPeriod` (trough→recovery)
+  - Format: MM/YY (e.g., "04/25") for single dates, "01/25 - 07/25" or "01/25 - Presente" for periods
+  - MetricCard subtitle shows temporal context below main value
+  - **Inclusive Duration Fix**: Durations now match displayed periods (e.g., "01/25 - 07/25" = 7 months, not 6)
 - **Files Modified**:
-  - `types/performance.ts` (line 40)
-  - `lib/services/performanceService.ts` (lines 262-320, 540, 626, 645)
-  - `app/dashboard/performance/page.tsx` (lines 314-323)
-
-### Drawdown Duration Metric
-- **Feature**: Added Drawdown Duration metric to Performance page with all timeframes (YTD, 1Y, 3Y, 5Y, All Time, Custom)
-- **Definition**: Time (in months) from the initial peak to complete recovery of the deepest Max Drawdown
-- **Implementation**:
-  - Added `drawdownDuration: number | null` field to `PerformanceMetrics` interface
-  - Implemented `calculateDrawdownDuration()` function with identical TWR-style cash flow adjustment to Max Drawdown
-  - Cash flow adjustment: subtracts cumulative contributions to isolate investment performance (ensures alignment with Max Drawdown)
-  - Algorithm: tracks peak/trough indices for Max Drawdown period, finds recovery point (when adjusted value >= peak value), calculates duration
-  - Returns duration in months (≥1) or `null` if portfolio never declined
-  - Handles ongoing drawdowns: returns duration from peak to present if not yet recovered
-  - UI: third row in Performance page next to Max Drawdown, format "months" displays as "1a 3m" for 15 months
-- **Files Modified**:
-  - `types/performance.ts` (line 41)
-  - `lib/services/performanceService.ts` (lines 322-418, 639, 727, 747)
-  - `app/dashboard/performance/page.tsx` (lines 324-330)
+  - `types/performance.ts` (lines 40-47)
+  - `lib/services/performanceService.ts` (drawdown functions, temporal helpers, integration)
+  - `components/performance/MetricCard.tsx` (subtitle prop)
+  - `app/dashboard/performance/page.tsx` (UI with temporal data)
 
 ## Key Technical Decisions (Ultimi 2 Mesi)
 
-- **Drawdown Duration Alignment** (01/2026): Use identical TWR-style cash flow adjustment to Max Drawdown to ensure both metrics analyze the same drawdown period - critical for metric coherence, returns duration from peak to present for ongoing drawdowns
-- **Max Drawdown Cash Flow Adjustment** (01/2026): Use TWR-style adjustment (subtract cumulative contributions) to isolate investment performance - prevents withdrawals/contributions from masking or amplifying real drawdowns
+- **Inclusive Duration Calculation** (01/2026): Drawdown durations calculated as inclusive count (both start and end months) instead of interval count - ensures visual consistency between duration values and displayed periods (e.g., "01/25 - 07/25" = 7 months, not 6) - all durations increased by +1 month for user's mental model alignment
+- **Drawdown Metrics Alignment** (01/2026): Use identical TWR-style cash flow adjustment (subtract cumulative contributions) for Max Drawdown, Drawdown Duration, and Recovery Time - ensures all three metrics analyze the same drawdown period, critical for metric coherence - Recovery Time calculates from TROUGH, Drawdown Duration from PEAK
 - **Firestore setDoc Merge Mode** (01/2026): Always use `{ merge: true }` when updating existing documents with partial data - prevents silent data loss when multiple pages update different fields of same document
 - **Dividend Income Separation** (01/2026): Separate dividend income from external contributions using `dividendIncomeCategoryId` - mathematically correct per CFA standards, backward compatible
 - **Cashflow 2025+ Filter Pattern** (01/2026): Pass `expenses` parameter to functions instead of closure - DRY, testable, no duplication

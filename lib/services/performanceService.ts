@@ -13,6 +13,40 @@ import { getUserSnapshots } from './snapshotService';
 import { getSettings } from './assetAllocationService';
 
 /**
+ * Format month and year to MM/YY format (e.g., "04/25")
+ * @param year - Full year (e.g., 2025)
+ * @param month - Month (1-12)
+ */
+function formatMonthYear(year: number, month: number): string {
+  const monthStr = String(month).padStart(2, '0');
+  const yearStr = String(year).slice(-2);  // Last 2 digits
+  return `${monthStr}/${yearStr}`;
+}
+
+/**
+ * Format a period from start to end (or "Presente" if ongoing)
+ * @param startYear - Start year
+ * @param startMonth - Start month (1-12)
+ * @param endYear - End year (null if ongoing)
+ * @param endMonth - End month (1-12, null if ongoing)
+ */
+function formatPeriod(
+  startYear: number,
+  startMonth: number,
+  endYear: number | null,
+  endMonth: number | null
+): string {
+  const start = formatMonthYear(startYear, startMonth);
+
+  if (endYear === null || endMonth === null) {
+    return `${start} - Presente`;
+  }
+
+  const end = formatMonthYear(endYear, endMonth);
+  return `${start} - ${end}`;
+}
+
+/**
  * Calculate ROI for a period
  * Formula: ((End NW - Start NW - Net Cash Flows) / Start NW) * 100
  *
@@ -266,13 +300,13 @@ export function calculateVolatility(
  *
  * @param snapshots - Monthly snapshots (sorted chronologically)
  * @param cashFlows - Monthly cash flows
- * @returns Maximum drawdown as negative percentage, or null if portfolio never declined
+ * @returns Object with maximum drawdown percentage and trough date, or null values if portfolio never declined
  */
 export function calculateMaxDrawdown(
   snapshots: MonthlySnapshot[],
   cashFlows: CashFlowData[]
-): number | null {
-  if (snapshots.length < 2) return null;
+): { value: number | null; troughDate: string | null } {
+  if (snapshots.length < 2) return { value: null, troughDate: null };
 
   // Create cash flow lookup map (by YYYY-MM)
   const cashFlowMap = new Map<string, number>();
@@ -297,8 +331,11 @@ export function calculateMaxDrawdown(
   // Track running peak and maximum drawdown
   let runningPeak = adjustedValues[0];
   let maxDrawdown = 0; // Start at 0 (no drawdown)
+  let maxDrawdownTroughIndex = 0; // Track trough index for max drawdown
 
-  for (const currentValue of adjustedValues) {
+  for (let i = 0; i < adjustedValues.length; i++) {
+    const currentValue = adjustedValues[i];
+
     // Update peak if new high is reached
     if (currentValue > runningPeak) {
       runningPeak = currentValue;
@@ -311,12 +348,23 @@ export function calculateMaxDrawdown(
       // Track the most negative drawdown (largest loss)
       if (drawdown < maxDrawdown) {
         maxDrawdown = drawdown;
+        maxDrawdownTroughIndex = i; // Save index of trough
       }
     }
   }
 
-  // Return null if portfolio never declined, otherwise return negative percentage
-  return maxDrawdown === 0 ? null : maxDrawdown;
+  // STEP 9: Extract trough date if drawdown occurred
+  if (maxDrawdown === 0) {
+    return { value: null, troughDate: null };
+  }
+
+  const troughSnapshot = snapshots[maxDrawdownTroughIndex];
+  const troughDate = formatMonthYear(troughSnapshot.year, troughSnapshot.month);
+
+  return {
+    value: maxDrawdown,  // Negative percentage (e.g., -15.5)
+    troughDate          // MM/YY format (e.g., "04/25")
+  };
 }
 
 /**
@@ -326,7 +374,7 @@ export function calculateMaxDrawdown(
  *
  * @param snapshots - Monthly snapshots (sorted chronologically)
  * @param cashFlows - Monthly cash flows
- * @returns Duration in months, or null if portfolio never declined
+ * @returns Object with duration in months and period range, or null values if portfolio never declined
  *
  * @example
  * Portfolio drops 15% from Jan (index 0) to Apr (index 3), recovers to new peak on Dec (index 11)
@@ -335,9 +383,9 @@ export function calculateMaxDrawdown(
 export function calculateDrawdownDuration(
   snapshots: MonthlySnapshot[],
   cashFlows: CashFlowData[]
-): number | null {
+): { duration: number | null; period: string | null } {
   // STEP 1: Early exit for insufficient data
-  if (snapshots.length < 2) return null;
+  if (snapshots.length < 2) return { duration: null, period: null };
 
   // STEP 2: Create cash flow adjustment map (identical to Max Drawdown)
   const cashFlowMap = new Map<string, number>();
@@ -388,7 +436,7 @@ export function calculateDrawdownDuration(
 
   // STEP 5: If no drawdown occurred, return null
   if (maxDrawdown === 0) {
-    return null;
+    return { duration: null, period: null };
   }
 
   // STEP 6: Find recovery point (when adjustedValue >= peak value)
@@ -402,19 +450,153 @@ export function calculateDrawdownDuration(
     }
   }
 
-  // STEP 7: Calculate duration
+  // STEP 7: Calculate duration (inclusive of both peak and recovery months)
   let duration: number;
 
   if (recoveryIndex === null) {
-    // Still in drawdown - calculate duration from peak to present
-    duration = (adjustedValues.length - 1) - maxDrawdownPeakIndex;
+    // Still in drawdown - calculate duration from peak to present (inclusive)
+    duration = (adjustedValues.length - 1) - maxDrawdownPeakIndex + 1;
   } else {
-    // Recovered - calculate duration from peak to recovery
-    duration = recoveryIndex - maxDrawdownPeakIndex;
+    // Recovered - calculate duration from peak to recovery (inclusive)
+    duration = recoveryIndex - maxDrawdownPeakIndex + 1;  // +1 for inclusive count
   }
 
-  // STEP 8: Return duration (minimum 1 month for edge cases)
-  return Math.max(1, duration);
+  // STEP 9: Extract peak and recovery dates for period label
+  const peakSnapshot = snapshots[maxDrawdownPeakIndex];
+  let recoverySnapshot: MonthlySnapshot | null = null;
+
+  if (recoveryIndex !== null) {
+    recoverySnapshot = snapshots[recoveryIndex];
+  }
+
+  const period = formatPeriod(
+    peakSnapshot.year,
+    peakSnapshot.month,
+    recoverySnapshot?.year ?? null,
+    recoverySnapshot?.month ?? null
+  );
+
+  return {
+    duration: Math.max(1, duration),  // Duration in months (≥1)
+    period                            // Range (e.g., "01/25 - 12/25" or "01/25 - Presente")
+  };
+}
+
+/**
+ * Calculate Recovery Time (cash flow adjusted)
+ * Measures the time (in months) from the trough (lowest point) to complete recovery
+ * Uses TWR-style adjustment to isolate investment performance
+ *
+ * @param snapshots - Monthly snapshots (sorted chronologically)
+ * @param cashFlows - Monthly cash flows
+ * @returns Object with duration in months and period range, or null values if portfolio never declined
+ *
+ * @example
+ * Portfolio drops 15% from Jan (index 0) to Apr (index 3), recovers to peak on Dec (index 11)
+ * Drawdown Duration = 11 months (Jan peak → Dec recovery)
+ * Recovery Time = 8 months (Apr trough → Dec recovery)
+ */
+export function calculateRecoveryTime(
+  snapshots: MonthlySnapshot[],
+  cashFlows: CashFlowData[]
+): { duration: number | null; period: string | null } {
+  // STEP 1: Early exit for insufficient data
+  if (snapshots.length < 2) return { duration: null, period: null };
+
+  // STEP 2: Create cash flow adjustment map (IDENTICAL to Max Drawdown & Drawdown Duration)
+  const cashFlowMap = new Map<string, number>();
+  cashFlows.forEach(cf => {
+    const key = `${cf.date.getFullYear()}-${String(cf.date.getMonth() + 1).padStart(2, '0')}`;
+    cashFlowMap.set(key, cf.netCashFlow);
+  });
+
+  // STEP 3: Calculate TWR-adjusted values (IDENTICAL to Max Drawdown & Drawdown Duration)
+  let cumulativeCashFlow = 0;
+  const adjustedValues: number[] = [];
+
+  for (const snapshot of snapshots) {
+    const cfKey = `${snapshot.year}-${String(snapshot.month).padStart(2, '0')}`;
+    cumulativeCashFlow += cashFlowMap.get(cfKey) || 0;
+    const adjustedValue = snapshot.totalNetWorth - cumulativeCashFlow;
+    adjustedValues.push(adjustedValue);
+  }
+
+  // STEP 4: Track drawdown periods and identify Max Drawdown period (IDENTICAL to Drawdown Duration)
+  let runningPeak = adjustedValues[0];
+  let peakIndex = 0;                    // Index of current running peak
+  let maxDrawdown = 0;                  // Most negative drawdown percentage
+  let maxDrawdownPeakIndex = 0;         // Index where Max Drawdown period started
+  let maxDrawdownTroughIndex = 0;       // Index where Max Drawdown bottomed
+
+  for (let i = 0; i < adjustedValues.length; i++) {
+    const currentValue = adjustedValues[i];
+
+    // Update peak if new high reached
+    if (currentValue > runningPeak) {
+      runningPeak = currentValue;
+      peakIndex = i;
+    }
+
+    // Calculate current drawdown percentage
+    if (runningPeak > 0) {
+      const currentDrawdown = ((currentValue - runningPeak) / runningPeak) * 100;
+
+      // Track the most negative drawdown (Max Drawdown)
+      if (currentDrawdown < maxDrawdown) {
+        maxDrawdown = currentDrawdown;
+        maxDrawdownPeakIndex = peakIndex;      // Save peak index for this drawdown
+        maxDrawdownTroughIndex = i;            // Save trough index
+      }
+    }
+  }
+
+  // STEP 5: If no drawdown occurred, return null
+  if (maxDrawdown === 0) {
+    return { duration: null, period: null };
+  }
+
+  // STEP 6: Find recovery point (when adjustedValue >= peak value)
+  const peakValue = adjustedValues[maxDrawdownPeakIndex];
+  let recoveryIndex: number | null = null;
+
+  for (let i = maxDrawdownTroughIndex + 1; i < adjustedValues.length; i++) {
+    if (adjustedValues[i] >= peakValue) {
+      recoveryIndex = i;
+      break;  // Found first recovery point
+    }
+  }
+
+  // STEP 7: Calculate Recovery Time (from TROUGH to recovery, inclusive)
+  let recoveryTime: number;
+
+  if (recoveryIndex === null) {
+    // Still in drawdown - calculate duration from trough to present (inclusive)
+    recoveryTime = (adjustedValues.length - 1) - maxDrawdownTroughIndex + 1;
+  } else {
+    // Recovered - calculate duration from TROUGH to recovery (inclusive)
+    // KEY DIFFERENCE: Drawdown Duration uses maxDrawdownPeakIndex, Recovery Time uses maxDrawdownTroughIndex
+    recoveryTime = recoveryIndex - maxDrawdownTroughIndex + 1;  // +1 for inclusive count
+  }
+
+  // STEP 9: Extract trough and recovery dates for period label
+  const troughSnapshot = snapshots[maxDrawdownTroughIndex];
+  let recoverySnapshot: MonthlySnapshot | null = null;
+
+  if (recoveryIndex !== null) {
+    recoverySnapshot = snapshots[recoveryIndex];
+  }
+
+  const period = formatPeriod(
+    troughSnapshot.year,
+    troughSnapshot.month,
+    recoverySnapshot?.year ?? null,
+    recoverySnapshot?.month ?? null
+  );
+
+  return {
+    duration: Math.max(1, recoveryTime),  // Duration in months (≥1)
+    period                                // Range (e.g., "04/25 - 12/25" or "04/25 - Presente")
+  };
 }
 
 /**
@@ -637,6 +819,10 @@ export async function calculatePerformanceForPeriod(
     volatility: null,
     maxDrawdown: null,
     drawdownDuration: null,
+    recoveryTime: null,
+    maxDrawdownDate: undefined,
+    drawdownPeriod: undefined,
+    recoveryPeriod: undefined,
     riskFreeRate,
     dividendCategoryId,
     totalContributions: 0,
@@ -722,9 +908,11 @@ export async function calculatePerformanceForPeriod(
 
   const volatility = calculateVolatility(sortedSnapshots, cashFlows);
 
-  const maxDrawdown = calculateMaxDrawdown(sortedSnapshots, cashFlows);
+  const maxDrawdownResult = calculateMaxDrawdown(sortedSnapshots, cashFlows);
 
-  const drawdownDuration = calculateDrawdownDuration(sortedSnapshots, cashFlows);
+  const drawdownDurationResult = calculateDrawdownDuration(sortedSnapshots, cashFlows);
+
+  const recoveryTimeResult = calculateRecoveryTime(sortedSnapshots, cashFlows);
 
   const sharpeRatio = timeWeightedReturn !== null && volatility !== null
     ? calculateSharpeRatio(timeWeightedReturn, riskFreeRate, volatility)
@@ -743,8 +931,12 @@ export async function calculatePerformanceForPeriod(
     moneyWeightedReturn,
     sharpeRatio,
     volatility,
-    maxDrawdown,
-    drawdownDuration,
+    maxDrawdown: maxDrawdownResult.value,
+    drawdownDuration: drawdownDurationResult.duration,
+    recoveryTime: recoveryTimeResult.duration,
+    maxDrawdownDate: maxDrawdownResult.troughDate ?? undefined,
+    drawdownPeriod: drawdownDurationResult.period ?? undefined,
+    recoveryPeriod: recoveryTimeResult.period ?? undefined,
     riskFreeRate,
     dividendCategoryId, // Store for reuse in custom date ranges
     totalContributions,

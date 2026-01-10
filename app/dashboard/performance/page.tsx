@@ -316,6 +316,7 @@ export default function PerformancePage() {
           <MetricCard
             title="Max Drawdown"
             value={metrics.maxDrawdown}
+            subtitle={metrics.maxDrawdownDate}
             format="percentage"
             description="Massima perdita percentuale dal picco"
             tooltip="Misura la peggiore perdita (da picco a valle) che il portafoglio ha subito nel periodo selezionato. Esempio: se il portafoglio valeva €100.000 e scese a €85.000 prima di recuperare, il Max Drawdown è -15%. Calcolo aggiustato per flussi di cassa (sottratte le contribuzioni cumulative) per isolare la performance degli investimenti. Valori vicini allo 0% = portafoglio stabile, valori molto negativi = alta volatilità al ribasso."
@@ -324,9 +325,19 @@ export default function PerformancePage() {
           <MetricCard
             title="Durata Drawdown"
             value={metrics.drawdownDuration}
+            subtitle={metrics.drawdownPeriod}
             format="months"
             description="Tempo di recupero dal Max Drawdown"
             tooltip="Misura il tempo (in mesi) necessario per recuperare completamente dalla perdita più grande (Max Drawdown). Esempio: se il portafoglio perde il 15% a gennaio e recupera a dicembre, la durata è 11 mesi. Questo indicatore misura la resilienza del portafoglio: durate brevi indicano rapido recupero, durate lunghe segnalano lenta ripresa. Calcolo aggiustato per flussi di cassa per isolare la performance degli investimenti. Se il portafoglio è ancora in drawdown, mostra la durata dall'ultimo picco."
+          />
+
+          <MetricCard
+            title="Recovery Time"
+            value={metrics.recoveryTime}
+            subtitle={metrics.recoveryPeriod}
+            format="months"
+            description="Tempo di risalita dalla valle"
+            tooltip="Misura il tempo (in mesi) necessario per recuperare dal punto più basso (trough) del Max Drawdown fino al completo recupero. A differenza della Durata Drawdown (che parte dal picco iniziale), questa metrica misura SOLO la fase di risalita. Esempio: se il portafoglio scende per 6 mesi e poi risale per 9 mesi, Recovery Time = 9 mesi (Durata Drawdown = 15 mesi). Utile per valutare la velocità di recupero dopo aver toccato il fondo. Calcolo aggiustato per flussi di cassa per isolare la performance degli investimenti."
           />
         </div>
 

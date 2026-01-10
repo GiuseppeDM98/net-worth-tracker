@@ -8,6 +8,7 @@ interface MetricCardProps {
   title: string;
   value: number | null;
   format: 'percentage' | 'currency' | 'number' | 'months';
+  subtitle?: string;
   description?: string;
   tooltip?: string;
   isPrimary?: boolean;
@@ -17,6 +18,7 @@ export function MetricCard({
   title,
   value,
   format,
+  subtitle,
   description,
   tooltip,
   isPrimary = false,
@@ -95,6 +97,11 @@ export function MetricCard({
         <div className={cn('text-2xl font-bold', getValueColor(value))}>
           {formatValue(value)}
         </div>
+        {subtitle && (
+          <p className="text-xs text-muted-foreground mt-1 font-medium">
+            {subtitle}
+          </p>
+        )}
         {description && (
           <CardDescription className="mt-1 text-xs">{description}</CardDescription>
         )}
