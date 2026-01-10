@@ -4,8 +4,9 @@
 Net Worth Tracker is a Next.js app for Italian investors to track net worth, assets, cashflow, dividends, performance metrics, and historical snapshots with Firebase.
 
 ## Current Status
-- Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase
+- Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz
 - Feature ultimo mese: Heatmap Rendimenti Mensili e Grafico Underwater (Drawdown) nella pagina Performance con calcoli TWR-adjusted
+- Ultima fix: Timezone bug in Hall of Fame (entries showing in wrong month server-side vs client-side)
 - In corso ora: nessuna attivita attiva nota
 - Completamento: n/d (da confermare)
 
@@ -14,6 +15,15 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Service layer in `lib/services/*` (Firestore client/admin, scraping, metriche).
 - Utility in `lib/utils/*` (formatters, date helpers, asset history).
 - React Query per caching e invalidazioni post-mutation.
+
+### Timezone Handling
+- All date operations use Europe/Rome timezone (Italian investors)
+- Helper functions in `lib/utils/dateHelpers.ts`:
+  - `getItalyDate()` - Convert to Italy timezone
+  - `getItalyMonth()` - Extract month (1-12) in Italy timezone
+  - `getItalyYear()` - Extract year in Italy timezone
+  - `getItalyMonthYear()` - Extract both month and year
+- Ensures consistent behavior across client (browser) and server (Vercel UTC)
 
 ## Key Features (Active)
 - Portfolio multi-asset con aggiornamento prezzi Yahoo Finance.
@@ -33,7 +43,6 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Known Issues (Active)
 - Etichette legenda su mobile troncate (top 3 elementi).
 - Conversione valuta dipende da Frankfurter API (fallback su cache, ma possibile failure prolungata).
-- API serialize Firestore Timestamps come ISO strings: usare `toDate()`.
 
 ## Next Steps (Prossime 1-2 sessioni)
 - Testing e refining dei nuovi grafici Performance (heatmap e underwater) su mobile/tablet.
@@ -47,4 +56,4 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Date helpers: `lib/utils/dateHelpers.ts`
 - Formatters: `lib/utils/formatters.ts`
 
-**Last updated**: 2026-01-10
+**Last updated**: 2026-01-10 (timezone fix implemented)

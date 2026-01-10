@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Trophy, TrendingUp, TrendingDown, DollarSign, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { NoteIconCell } from '@/components/hall-of-fame/NoteIconCell';
+import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
 
 export default function HallOfFamePage() {
   const { user } = useAuth();
@@ -496,9 +497,7 @@ function MonthlyRecordCard({
   valueKey: keyof MonthlyRecord;
   formatCurrency: (amount: number) => string;
 }) {
-  const now = new Date();
-  const currentMonth = now.getMonth() + 1;
-  const currentYear = now.getFullYear();
+  const { month: currentMonth, year: currentYear } = getItalyMonthYear();
   const isCurrentMonth = record.year === currentYear && record.month === currentMonth;
   const showPercentage = valueKey === 'netWorthDiff';
   const value = record[valueKey] as number;
@@ -632,9 +631,7 @@ function MonthlyTable({
   }
 
   const showPercentage = valueKey === 'netWorthDiff';
-  const now = new Date();
-  const currentMonth = now.getMonth() + 1;
-  const currentYear = now.getFullYear();
+  const { month: currentMonth, year: currentYear } = getItalyMonthYear();
 
   return (
     <div className="max-h-[400px] overflow-y-auto">

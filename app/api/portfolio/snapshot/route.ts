@@ -62,9 +62,9 @@ export async function POST(request: NextRequest) {
     })) as Asset[];
 
     // Calculate snapshot data
-    const now = new Date();
-    const snapshotYear = year ?? now.getFullYear();
-    const snapshotMonth = month ?? now.getMonth() + 1; // 1-12
+    const { month: currentMonth, year: currentYear } = (await import('@/lib/utils/dateHelpers')).getItalyMonthYear();
+    const snapshotYear = year ?? currentYear;
+    const snapshotMonth = month ?? currentMonth;
 
     const totalNetWorth = calculateTotalValue(assets);
     const liquidNetWorth = calculateLiquidNetWorth(assets);

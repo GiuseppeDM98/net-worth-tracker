@@ -18,6 +18,7 @@ import {
   calculateIlliquidNetWorth,
 } from './assetService';
 import { calculateCurrentAllocation } from './assetAllocationService';
+import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
 
 const SNAPSHOTS_COLLECTION = 'monthly-snapshots';
 
@@ -31,9 +32,9 @@ export async function createSnapshot(
   month?: number
 ): Promise<string> {
   try {
-    const now = new Date();
-    const snapshotYear = year ?? now.getFullYear();
-    const snapshotMonth = month ?? now.getMonth() + 1; // 1-12
+    const { month: currentMonth, year: currentYear } = getItalyMonthYear();
+    const snapshotYear = year ?? currentYear;
+    const snapshotMonth = month ?? currentMonth;
 
     const totalNetWorth = calculateTotalValue(assets);
     const liquidNetWorth = calculateLiquidNetWorth(assets);

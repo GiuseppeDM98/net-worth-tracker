@@ -5,6 +5,7 @@ import { MonthlySnapshot } from '@/types/assets';
 import { getUserSnapshots } from './snapshotService';
 import { getAllExpenses, calculateTotalIncome, calculateTotalExpenses } from './expenseService';
 import { Expense } from '@/types/expenses';
+import { getItalyMonthYear, getItalyYear } from '@/lib/utils/dateHelpers';
 
 const COLLECTION_NAME = 'hall-of-fame';
 const MAX_MONTHLY_RECORDS = 20;
@@ -85,8 +86,8 @@ function calculateMonthlyRecords(
       const expenseDate = expense.date instanceof Date
         ? expense.date
         : expense.date.toDate();
-      return expenseDate.getFullYear() === current.year &&
-             expenseDate.getMonth() + 1 === current.month;
+      const { month, year } = getItalyMonthYear(expenseDate);
+      return year === current.year && month === current.month;
     });
 
     const totalIncome = calculateTotalIncome(monthExpenses);
@@ -153,7 +154,7 @@ function calculateYearlyRecords(
       const expenseDate = expense.date instanceof Date
         ? expense.date
         : expense.date.toDate();
-      return expenseDate.getFullYear() === year;
+      return getItalyYear(expenseDate) === year;
     });
 
     const totalIncome = calculateTotalIncome(yearExpenses);

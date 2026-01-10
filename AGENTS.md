@@ -13,10 +13,12 @@ For architecture and status, see [CLAUDE.md](CLAUDE.md).
 - Use `formatDate()` for DD/MM/YYYY format
 - **All code comments in English only**
 
-### Firebase Date Handling
+### Firebase Date Handling & Timezone
 - Always use `toDate()` from `lib/utils/dateHelpers.ts`
 - API responses serialize Firestore Timestamps as ISO strings
 - Never use manual `instanceof Date` checks on API data
+- **For month/year extraction**: Use `getItalyMonth()`, `getItalyYear()`, `getItalyMonthYear()` (not `Date.getMonth()`)
+- **Ensures consistency**: Server (UTC) and client (browser) produce same results
 
 ### Custom Tailwind Breakpoint
 - Use `desktop:` (1025px) instead of `lg:` (1024px)
@@ -91,6 +93,21 @@ onSuccess: () => {
 await setDoc(docRef, payload, { merge: true });
 ```
 **Prevenzione**: Usa merge per ogni update parziale
+
+### Timezone Boundary Bugs (Server vs Client)
+**Sintomo**: Entries appaiono in mese/anno sbagliato quando operazioni eseguite da server (Vercel/UTC) vs localhost (CET/CEST)
+**Causa**: JavaScript `Date.getMonth()` e `getFullYear()` usano timezone locale. Server (UTC) e client (CET) estraggono valori diversi vicino a mezzanotte
+**Soluzione**:
+```typescript
+// ❌ WRONG - timezone-dependent
+const month = new Date().getMonth() + 1;
+const year = new Date().getFullYear();
+
+// ✅ CORRECT - always uses Italy timezone
+import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
+const { month, year } = getItalyMonthYear();
+```
+**Prevenzione**: Never use `Date.getMonth()` or `getFullYear()` directly. Always use timezone helpers from `dateHelpers.ts`. Test con `TZ=UTC npm run dev` per simulare production.
 
 ---
 

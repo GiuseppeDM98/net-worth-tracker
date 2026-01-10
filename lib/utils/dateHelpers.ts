@@ -1,4 +1,8 @@
 import { Timestamp } from 'firebase/firestore';
+import { toZonedTime } from 'date-fns-tz';
+
+// Target timezone for Italian investors
+export const ITALY_TIMEZONE = 'Europe/Rome';
 
 /**
  * Convert Firestore Timestamp or Date to Date object
@@ -13,6 +17,45 @@ export function toDate(date: Date | Timestamp | string | undefined | null): Date
   }
   console.warn('Unable to convert date:', date);
   return new Date();
+}
+
+/**
+ * Get date converted to Italy timezone (Europe/Rome)
+ * Ensures consistent month/year extraction across client and server
+ */
+export function getItalyDate(date: Date | Timestamp | string | undefined | null = new Date()): Date {
+  const dateObj = toDate(date);
+  return toZonedTime(dateObj, ITALY_TIMEZONE);
+}
+
+/**
+ * Extract month (1-12) from date in Italy timezone
+ * Use this instead of date.getMonth() to ensure consistent behavior
+ */
+export function getItalyMonth(date: Date | Timestamp | string | undefined | null = new Date()): number {
+  const italyDate = getItalyDate(date);
+  return italyDate.getMonth() + 1; // Returns 1-12
+}
+
+/**
+ * Extract year from date in Italy timezone
+ * Use this instead of date.getFullYear() to ensure consistent behavior
+ */
+export function getItalyYear(date: Date | Timestamp | string | undefined | null = new Date()): number {
+  const italyDate = getItalyDate(date);
+  return italyDate.getFullYear();
+}
+
+/**
+ * Extract both month and year from date in Italy timezone
+ * Efficient helper for cases where both values are needed
+ */
+export function getItalyMonthYear(date: Date | Timestamp | string | undefined | null = new Date()): { month: number; year: number } {
+  const italyDate = getItalyDate(date);
+  return {
+    month: italyDate.getMonth() + 1,
+    year: italyDate.getFullYear()
+  };
 }
 
 /**

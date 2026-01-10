@@ -20,6 +20,7 @@ import {
   MonthlyExpenseSummary,
   ExpenseType
 } from '@/types/expenses';
+import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
 
 const EXPENSES_COLLECTION = 'expenses';
 
@@ -554,9 +555,7 @@ export async function getMonthlyExpenseSummary(
  */
 export async function getExpenseStats(userId: string): Promise<ExpenseStats> {
   try {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
+    const { month: currentMonth, year: currentYear } = getItalyMonthYear();
 
     // Calculate previous month
     let previousYear = currentYear;
