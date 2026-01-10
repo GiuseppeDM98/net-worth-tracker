@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase
-- Feature ultimo mese: drawdown metrics allineate TWR, separazione dividendi nei cash flow, evidenza mese/anno corrente in Hall of Fame
+- Feature ultimo mese: Heatmap Rendimenti Mensili e Grafico Underwater (Drawdown) nella pagina Performance con calcoli TWR-adjusted
 - In corso ora: nessuna attivita attiva nota
 - Completamento: n/d (da confermare)
 
@@ -19,7 +19,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Portfolio multi-asset con aggiornamento prezzi Yahoo Finance.
 - Cashflow con categorie, filtri e statistiche.
 - Snapshot mensili automatici + storico e CSV export.
-- Performance metrics (ROI, CAGR, TWR, IRR, Sharpe, drawdown suite).
+- Performance metrics (ROI, CAGR, TWR, IRR, Sharpe, drawdown suite) con heatmap rendimenti mensili e grafico underwater.
 - Dividendi multi-currency con conversione EUR e scraping Borsa Italiana.
 - Hall of Fame con ranking mensili/annuali e highlight del periodo corrente.
 - FIRE calculator e Monte Carlo.
@@ -36,15 +36,15 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - API serialize Firestore Timestamps come ISO strings: usare `toDate()`.
 
 ## Next Steps (Prossime 1-2 sessioni)
-- Confermare colore e contrasto highlight Hall of Fame su temi chiaro/scuro.
-- Aggiungere indicazione visiva di periodo corrente nelle card/tabelle se tema cambia.
-- Rivedere eventuali altri touchpoint che usano mese/anno corrente per coerenza UI.
+- Testing e refining dei nuovi grafici Performance (heatmap e underwater) su mobile/tablet.
+- Ottimizzazioni UI/UX basate su feedback utente.
 
 ## Key Files
-- Hall of Fame UI: `app/dashboard/hall-of-fame/page.tsx`
+- Performance page: `app/dashboard/performance/page.tsx`
 - Performance metrics: `lib/services/performanceService.ts`
+- Performance charts: `components/performance/MonthlyReturnsHeatmap.tsx`, `components/performance/UnderwaterDrawdownChart.tsx`
+- Hall of Fame UI: `app/dashboard/hall-of-fame/page.tsx`
 - Date helpers: `lib/utils/dateHelpers.ts`
 - Formatters: `lib/utils/formatters.ts`
-- Query keys: `lib/query/queryKeys.ts`
 
 **Last updated**: 2026-01-10

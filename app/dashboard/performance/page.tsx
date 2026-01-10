@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
-import { getAllPerformanceData, calculatePerformanceForPeriod, preparePerformanceChartData, getSnapshotsForPeriod } from '@/lib/services/performanceService';
+import { getAllPerformanceData, calculatePerformanceForPeriod, preparePerformanceChartData, getSnapshotsForPeriod, prepareMonthlyReturnsHeatmap, prepareUnderwaterDrawdownData } from '@/lib/services/performanceService';
 import { getUserSnapshots } from '@/lib/services/snapshotService';
-import { PerformanceData, PerformanceMetrics, TimePeriod } from '@/types/performance';
+import { PerformanceData, PerformanceMetrics, TimePeriod, MonthlyReturnHeatmapData, UnderwaterDrawdownData } from '@/types/performance';
 import { MonthlySnapshot } from '@/types/assets';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -28,6 +28,8 @@ import {
 import { CustomDateRangeDialog } from '@/components/performance/CustomDateRangeDialog';
 import { MetricCard } from '@/components/performance/MetricCard';
 import { PerformanceTooltip } from '@/components/performance/PerformanceTooltip';
+import { MonthlyReturnsHeatmap } from '@/components/performance/MonthlyReturnsHeatmap';
+import { UnderwaterDrawdownChart } from '@/components/performance/UnderwaterDrawdownChart';
 
 export default function PerformancePage() {
   const { user } = useAuth();
@@ -128,11 +130,30 @@ export default function PerformancePage() {
   };
 
   const [chartData, setChartData] = useState<any[]>([]);
+  const [heatmapData, setHeatmapData] = useState<MonthlyReturnHeatmapData[]>([]);
+  const [underwaterData, setUnderwaterData] = useState<UnderwaterDrawdownData[]>([]);
 
   useEffect(() => {
     if (performanceData && cachedSnapshots.length > 0) {
       const data = getChartData();  // ✅ Ora sincrono!
       setChartData(data);
+
+      // Calculate heatmap and underwater data
+      const metrics = getCurrentMetrics();
+      if (metrics) {
+        const periodSnapshots = getSnapshotsForPeriod(
+          cachedSnapshots,
+          metrics.timePeriod,
+          metrics.startDate,
+          metrics.endDate
+        );
+
+        const heatmap = prepareMonthlyReturnsHeatmap(periodSnapshots, metrics.cashFlows);
+        setHeatmapData(heatmap);
+
+        const underwater = prepareUnderwaterDrawdownData(periodSnapshots, metrics.cashFlows);
+        setUnderwaterData(underwater);
+      }
     }
   }, [performanceData, selectedPeriod, cachedSnapshots]);
 
@@ -421,6 +442,32 @@ export default function PerformancePage() {
             </Card>
           )}
 
+        {/* Monthly Returns Heatmap */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Heatmap Rendimenti Mensili</CardTitle>
+            <CardDescription>
+              Andamento mensile dei rendimenti per anno (aggiustato per flussi di cassa)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <MonthlyReturnsHeatmap data={heatmapData} />
+          </CardContent>
+        </Card>
+
+        {/* Underwater Drawdown Chart */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Grafico Underwater (Drawdown)</CardTitle>
+            <CardDescription>
+              Distanza percentuale dal massimo storico del portafoglio
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <UnderwaterDrawdownChart data={underwaterData} height={getChartHeight()} />
+          </CardContent>
+        </Card>
+
         {/* Methodology Section */}
         <Card className="mt-6">
           <CardHeader>
@@ -451,6 +498,30 @@ export default function PerformancePage() {
                 <strong>Utilità:</strong> Permette di vedere se la performance sta migliorando o peggiorando nel tempo, eliminando l&apos;effetto di singoli mesi fortunati/sfortunati. È più stabile del rendimento mensile ma più reattivo del rendimento totale dall&apos;inizio.
                 <br /><br />
                 <em>Interpretazione:</em> Una linea in salita indica che la performance è in miglioramento nelle ultime 12 mesi. Una linea in discesa segnala un peggioramento. Le oscillazioni riflettono la volatilità del portafoglio.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-1">Grafico: Heatmap Rendimenti Mensili</h4>
+              <p className="text-muted-foreground">
+                Questo grafico mostra i rendimenti percentuali mese per mese, organizzati per anno. Ogni cella rappresenta il rendimento di un singolo mese.
+                <br /><br />
+                <strong>Calcolo:</strong> Il rendimento mensile è calcolato come ((Patrimonio Fine Mese - Flussi di Cassa) / Patrimonio Inizio Mese - 1) × 100. I flussi di cassa sono sottratti per isolare la performance degli investimenti.
+                <br />
+                <strong>Colori:</strong> Verde = rendimenti positivi, Rosso = rendimenti negativi. L&apos;intensità del colore aumenta con l&apos;ampiezza del rendimento (±5% soglia per colori più scuri).
+                <br /><br />
+                <em>Interpretazione:</em> Questo grafico aiuta a identificare pattern stagionali e mesi storicamente difficili o favorevoli. Ad esempio, se gennaio è spesso verde e settembre spesso rosso, potresti notare una stagionalità nel portafoglio.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-1">Grafico: Underwater (Drawdown)</h4>
+              <p className="text-muted-foreground">
+                Questo grafico mostra quanto il portafoglio si trova &quot;sotto&quot; il suo massimo storico (drawdown). L&apos;area rossa indica la distanza percentuale dal picco precedente.
+                <br /><br />
+                <strong>Funzionamento:</strong> Quando il portafoglio raggiunge un nuovo massimo storico, il grafico torna a 0%. Quando il portafoglio scende, il grafico mostra la percentuale di perdita rispetto al picco. Calcolo aggiustato per flussi di cassa per isolare la performance degli investimenti.
+                <br />
+                <strong>Utilità:</strong> Visualizza rapidamente quanto tempo impiega il portafoglio a recuperare dopo le perdite. Periodi lunghi &quot;sott&apos;acqua&quot; (area rossa estesa) indicano lenti recuperi. Questo si collega alle metriche &quot;Durata Drawdown&quot; e &quot;Recovery Time&quot; mostrate sopra.
+                <br /><br />
+                <em>Interpretazione:</em> Un grafico che tocca spesso lo 0% indica un portafoglio che raggiunge frequentemente nuovi massimi (buon segno). Lunghe immersioni indicano periodi prolungati di sottoperformance rispetto ai picchi precedenti.
               </p>
             </div>
             <div>

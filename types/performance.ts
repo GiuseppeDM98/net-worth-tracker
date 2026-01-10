@@ -98,3 +98,20 @@ export interface PerformanceChartData {
   returns: number;        // Returns portion (netWorth - contributions)
   [key: string]: any;     // For Recharts compatibility
 }
+
+// Monthly returns heatmap data
+export interface MonthlyReturnHeatmapData {
+  year: number;
+  months: {
+    month: number;           // 1-12 (Gen to Dic)
+    return: number | null;   // % return for that month (null if no data)
+  }[];
+}
+
+// Underwater drawdown chart data
+export interface UnderwaterDrawdownData {
+  date: string;              // MM/YY format
+  drawdown: number;          // Always ≤ 0 (e.g., -15.5 for -15.5% drawdown)
+  year: number;
+  month: number;
+}

@@ -6,7 +6,9 @@ import {
   TimePeriod,
   PerformanceData,
   RollingPeriodPerformance,
-  PerformanceChartData
+  PerformanceChartData,
+  MonthlyReturnHeatmapData,
+  UnderwaterDrawdownData
 } from '@/types/performance';
 import { getExpensesByDateRange } from './expenseService';
 import { getUserSnapshots } from './snapshotService';
@@ -1110,4 +1112,166 @@ export function preparePerformanceChartData(
       returns: snapshot.totalNetWorth - cumulativeContributions,
     };
   });
+}
+
+/**
+ * Prepare monthly returns heatmap data
+ * Calculates month-over-month returns adjusted for cash flows
+ *
+ * Formula: monthlyReturn = ((current NW - cash flow) / previous NW - 1) × 100
+ *
+ * @param snapshots - Monthly snapshots (will be sorted chronologically)
+ * @param cashFlows - Monthly cash flows
+ * @returns Array of yearly data with monthly returns
+ */
+export function prepareMonthlyReturnsHeatmap(
+  snapshots: MonthlySnapshot[],
+  cashFlows: CashFlowData[]
+): MonthlyReturnHeatmapData[] {
+  if (snapshots.length < 2) return [];
+
+  // Sort snapshots chronologically
+  const sortedSnapshots = [...snapshots].sort((a, b) => {
+    if (a.year !== b.year) return a.year - b.year;
+    return a.month - b.month;
+  });
+
+  // Create cash flow lookup map (by YYYY-MM)
+  const cashFlowMap = new Map<string, number>();
+  cashFlows.forEach(cf => {
+    const key = `${cf.date.getFullYear()}-${String(cf.date.getMonth() + 1).padStart(2, '0')}`;
+    cashFlowMap.set(key, cf.netCashFlow);
+  });
+
+  // Calculate monthly returns
+  const monthlyReturnsMap = new Map<string, number>(); // key: "YYYY-MM", value: return %
+
+  for (let i = 1; i < sortedSnapshots.length; i++) {
+    const prevSnapshot = sortedSnapshots[i - 1];
+    const currSnapshot = sortedSnapshots[i];
+
+    const startNW = prevSnapshot.totalNetWorth;
+    const endNW = currSnapshot.totalNetWorth;
+
+    if (startNW === 0) continue; // Skip if zero starting value
+
+    // Get cash flow for current month
+    const cfKey = `${currSnapshot.year}-${String(currSnapshot.month).padStart(2, '0')}`;
+    const cashFlow = cashFlowMap.get(cfKey) || 0;
+
+    // Calculate monthly return: (End NW - Cash Flow) / Start NW - 1
+    const monthlyReturn = ((endNW - cashFlow) / startNW - 1) * 100;
+
+    monthlyReturnsMap.set(cfKey, monthlyReturn);
+  }
+
+  // Group by year and organize by month
+  const yearMap = new Map<number, Map<number, number | null>>();
+
+  // Initialize all years found in snapshots
+  sortedSnapshots.forEach(snapshot => {
+    if (!yearMap.has(snapshot.year)) {
+      yearMap.set(snapshot.year, new Map());
+    }
+  });
+
+  // Populate monthly returns
+  monthlyReturnsMap.forEach((returnValue, key) => {
+    const [year, month] = key.split('-').map(Number);
+    const yearData = yearMap.get(year);
+    if (yearData) {
+      yearData.set(month, returnValue);
+    }
+  });
+
+  // Convert to output format
+  const heatmapData: MonthlyReturnHeatmapData[] = [];
+
+  Array.from(yearMap.entries())
+    .sort((a, b) => a[0] - b[0]) // Sort by year ascending
+    .forEach(([year, monthsMap]) => {
+      const months = [];
+      for (let month = 1; month <= 12; month++) {
+        months.push({
+          month,
+          return: monthsMap.get(month) ?? null, // null if no data for that month
+        });
+      }
+
+      heatmapData.push({ year, months });
+    });
+
+  return heatmapData;
+}
+
+/**
+ * Prepare underwater drawdown chart data
+ * Shows current drawdown from running peak (cash flow adjusted)
+ *
+ * - Value is 0% when portfolio is at all-time high
+ * - Value is negative when portfolio is below previous peak
+ *
+ * Uses TWR-style adjustment to isolate investment performance
+ *
+ * @param snapshots - Monthly snapshots (will be sorted chronologically)
+ * @param cashFlows - Monthly cash flows
+ * @returns Array of underwater drawdown data points
+ */
+export function prepareUnderwaterDrawdownData(
+  snapshots: MonthlySnapshot[],
+  cashFlows: CashFlowData[]
+): UnderwaterDrawdownData[] {
+  if (snapshots.length < 1) return [];
+
+  // Sort snapshots chronologically
+  const sortedSnapshots = [...snapshots].sort((a, b) => {
+    if (a.year !== b.year) return a.year - b.year;
+    return a.month - b.month;
+  });
+
+  // Create cash flow lookup map (by YYYY-MM) - IDENTICAL to Max Drawdown calculation
+  const cashFlowMap = new Map<string, number>();
+  cashFlows.forEach(cf => {
+    const key = `${cf.date.getFullYear()}-${String(cf.date.getMonth() + 1).padStart(2, '0')}`;
+    cashFlowMap.set(key, cf.netCashFlow);
+  });
+
+  // Calculate adjusted portfolio values (subtract cumulative contributions)
+  let cumulativeCashFlow = 0;
+  const adjustedValues: { value: number; snapshot: MonthlySnapshot }[] = [];
+
+  for (const snapshot of sortedSnapshots) {
+    const cfKey = `${snapshot.year}-${String(snapshot.month).padStart(2, '0')}`;
+    cumulativeCashFlow += cashFlowMap.get(cfKey) || 0;
+
+    // TWR-style adjustment: isolate investment performance
+    const adjustedValue = snapshot.totalNetWorth - cumulativeCashFlow;
+    adjustedValues.push({ value: adjustedValue, snapshot });
+  }
+
+  // Track running peak and calculate drawdown at each point
+  let runningPeak = adjustedValues[0].value;
+  const underwaterData: UnderwaterDrawdownData[] = [];
+
+  for (const { value, snapshot } of adjustedValues) {
+    // Update peak if new high is reached
+    if (value > runningPeak) {
+      runningPeak = value;
+    }
+
+    // Calculate current drawdown from peak
+    let drawdown = 0; // Default to 0% (at peak)
+    if (runningPeak > 0 && value < runningPeak) {
+      drawdown = ((value - runningPeak) / runningPeak) * 100; // Negative value
+    }
+
+    underwaterData.push({
+      date: `${String(snapshot.month).padStart(2, '0')}/${String(snapshot.year).slice(-2)}`,
+      drawdown: Math.min(0, drawdown), // Ensure ≤ 0
+      year: snapshot.year,
+      month: snapshot.month,
+    });
+  }
+
+  return underwaterData;
 }
