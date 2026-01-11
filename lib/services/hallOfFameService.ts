@@ -5,7 +5,7 @@ import { MonthlySnapshot } from '@/types/assets';
 import { getUserSnapshots } from './snapshotService';
 import { getAllExpenses, calculateTotalIncome, calculateTotalExpenses } from './expenseService';
 import { Expense } from '@/types/expenses';
-import { getItalyMonthYear, getItalyYear } from '@/lib/utils/dateHelpers';
+import { getItalyMonthYear, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
 
 const COLLECTION_NAME = 'hall-of-fame';
 const MAX_MONTHLY_RECORDS = 20;
@@ -32,7 +32,7 @@ export async function getHallOfFameData(userId: string): Promise<HallOfFameData 
     const data = docSnap.data();
     return {
       ...data,
-      updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : data.updatedAt,
+      updatedAt: toDate(data.updatedAt),
     } as HallOfFameData;
   } catch (error) {
     console.error('Error fetching Hall of Fame data:', error);
@@ -83,10 +83,7 @@ function calculateMonthlyRecords(
 
     // Filter expenses for the current month to aggregate income/expense totals
     const monthExpenses = expenses.filter(expense => {
-      const expenseDate = expense.date instanceof Date
-        ? expense.date
-        : expense.date.toDate();
-      const { month, year } = getItalyMonthYear(expenseDate);
+      const { month, year } = getItalyMonthYear(toDate(expense.date));
       return year === current.year && month === current.month;
     });
 
@@ -131,32 +128,30 @@ function calculateYearlyRecords(
     return acc;
   }, {} as Record<number, MonthlySnapshot[]>);
 
+  const expensesByYear = expenses.reduce((acc, expense) => {
+    const year = getItalyYear(toDate(expense.date));
+    if (!acc[year]) {
+      acc[year] = [];
+    }
+    acc[year].push(expense);
+    return acc;
+  }, {} as Record<number, Expense[]>);
+
   const yearlyRecords: YearlyRecord[] = [];
+  const years = new Set<number>([
+    ...Object.keys(snapshotsByYear).map(Number),
+    ...Object.keys(expensesByYear).map(Number),
+  ]);
 
-  for (const [yearStr, yearSnapshots] of Object.entries(snapshotsByYear)) {
-    const year = parseInt(yearStr);
-
-    // Sort snapshots within the year by month
-    const sorted = yearSnapshots.sort((a, b) => a.month - b.month);
-
-    // Skip years with less than 2 months of data (can't calculate year-over-year change)
-    if (sorted.length < 2) continue;
-
+  for (const year of Array.from(years).sort((a, b) => a - b)) {
+    const yearSnapshots = snapshotsByYear[year] ?? [];
+    const sorted = [...yearSnapshots].sort((a, b) => a.month - b.month);
+    const hasNetWorthData = sorted.length >= 2;
     const firstSnapshot = sorted[0];
     const lastSnapshot = sorted[sorted.length - 1];
-
-    // Calculate annual net worth change (last month - first month of the year)
-    const netWorthDiff = lastSnapshot.totalNetWorth - firstSnapshot.totalNetWorth;
-    const startOfYearNetWorth = firstSnapshot.totalNetWorth;
-
-    // Filter all expenses for this year to calculate annual income/expense totals
-    const yearExpenses = expenses.filter(expense => {
-      const expenseDate = expense.date instanceof Date
-        ? expense.date
-        : expense.date.toDate();
-      return getItalyYear(expenseDate) === year;
-    });
-
+    const netWorthDiff = hasNetWorthData ? lastSnapshot.totalNetWorth - firstSnapshot.totalNetWorth : 0;
+    const startOfYearNetWorth = hasNetWorthData ? firstSnapshot.totalNetWorth : 0;
+    const yearExpenses = expensesByYear[year] ?? [];
     const totalIncome = calculateTotalIncome(yearExpenses);
     const totalExpenses = Math.abs(calculateTotalExpenses(yearExpenses));
 

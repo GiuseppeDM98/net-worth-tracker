@@ -4,7 +4,7 @@ import { HallOfFameData, MonthlyRecord, YearlyRecord } from '@/types/hall-of-fam
 import { MonthlySnapshot } from '@/types/assets';
 import { calculateTotalIncome, calculateTotalExpenses } from './expenseService';
 import { Expense } from '@/types/expenses';
-import { getItalyMonthYear, getItalyYear } from '@/lib/utils/dateHelpers';
+import { getItalyMonthYear, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
 
 const COLLECTION_NAME = 'hall-of-fame';
 const SNAPSHOTS_COLLECTION = 'monthly-snapshots';
@@ -28,7 +28,7 @@ async function getUserSnapshotsServer(userId: string): Promise<MonthlySnapshot[]
       const data = doc.data();
       return {
         ...data,
-        createdAt: data.createdAt?.toDate() || new Date(),
+        createdAt: toDate(data.createdAt),
       };
     }) as MonthlySnapshot[];
   } catch (error) {
@@ -53,9 +53,9 @@ async function getAllExpensesServer(userId: string): Promise<Expense[]> {
       return {
         id: doc.id,
         ...data,
-        date: data.date?.toDate() || new Date(),
-        createdAt: data.createdAt?.toDate() || new Date(),
-        updatedAt: data.updatedAt?.toDate() || new Date(),
+        date: toDate(data.date),
+        createdAt: toDate(data.createdAt),
+        updatedAt: toDate(data.updatedAt),
       };
     }) as Expense[];
   } catch (error) {
@@ -96,10 +96,7 @@ function calculateMonthlyRecords(
 
     // Filtra spese del mese corrente
     const monthExpenses = expenses.filter(expense => {
-      const expenseDate = expense.date instanceof Date
-        ? expense.date
-        : expense.date.toDate();
-      const { month, year } = getItalyMonthYear(expenseDate);
+      const { month, year } = getItalyMonthYear(toDate(expense.date));
       return year === current.year && month === current.month;
     });
 
@@ -137,32 +134,30 @@ function calculateYearlyRecords(
     return acc;
   }, {} as Record<number, MonthlySnapshot[]>);
 
+  const expensesByYear = expenses.reduce((acc, expense) => {
+    const year = getItalyYear(toDate(expense.date));
+    if (!acc[year]) {
+      acc[year] = [];
+    }
+    acc[year].push(expense);
+    return acc;
+  }, {} as Record<number, Expense[]>);
+
   const yearlyRecords: YearlyRecord[] = [];
+  const years = new Set<number>([
+    ...Object.keys(snapshotsByYear).map(Number),
+    ...Object.keys(expensesByYear).map(Number),
+  ]);
 
-  for (const [yearStr, yearSnapshots] of Object.entries(snapshotsByYear)) {
-    const year = parseInt(yearStr);
-
-    // Ordina per mese
-    const sorted = yearSnapshots.sort((a, b) => a.month - b.month);
-
-    // Controlla se abbiamo almeno gennaio e un altro mese per calcolare la differenza
-    if (sorted.length < 2) continue;
-
+  for (const year of Array.from(years).sort((a, b) => a - b)) {
+    const yearSnapshots = snapshotsByYear[year] ?? [];
+    const sorted = [...yearSnapshots].sort((a, b) => a.month - b.month);
+    const hasNetWorthData = sorted.length >= 2;
     const firstSnapshot = sorted[0];
     const lastSnapshot = sorted[sorted.length - 1];
-
-    // Calcola differenza NW annuale
-    const netWorthDiff = lastSnapshot.totalNetWorth - firstSnapshot.totalNetWorth;
-    const startOfYearNetWorth = firstSnapshot.totalNetWorth;
-
-    // Filtra spese dell'anno
-    const yearExpenses = expenses.filter(expense => {
-      const expenseDate = expense.date instanceof Date
-        ? expense.date
-        : expense.date.toDate();
-      return getItalyYear(expenseDate) === year;
-    });
-
+    const netWorthDiff = hasNetWorthData ? lastSnapshot.totalNetWorth - firstSnapshot.totalNetWorth : 0;
+    const startOfYearNetWorth = hasNetWorthData ? firstSnapshot.totalNetWorth : 0;
+    const yearExpenses = expensesByYear[year] ?? [];
     const totalIncome = calculateTotalIncome(yearExpenses);
     const totalExpenses = Math.abs(calculateTotalExpenses(yearExpenses));
 

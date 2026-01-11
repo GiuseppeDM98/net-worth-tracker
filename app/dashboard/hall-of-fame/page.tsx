@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Trophy, TrendingUp, TrendingDown, DollarSign, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { NoteIconCell } from '@/components/hall-of-fame/NoteIconCell';
-import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
+import { getItalyMonthYear, getItalyYear } from '@/lib/utils/dateHelpers';
 
 export default function HallOfFamePage() {
   const { user } = useAuth();
@@ -501,10 +501,12 @@ function MonthlyRecordCard({
   const isCurrentMonth = record.year === currentYear && record.month === currentMonth;
   const showPercentage = valueKey === 'netWorthDiff';
   const value = record[valueKey] as number;
+  const isExpenseValue = valueKey === 'totalExpenses';
+  const displayValue = isExpenseValue ? -Math.abs(value) : value;
 
   // Color coding
-  const isPositive = value > 0;
-  const isNegative = value < 0;
+  const isPositive = displayValue > 0;
+  const isNegative = displayValue < 0;
   const valueColor = isPositive ? 'text-green-600' : isNegative ? 'text-red-600' : 'text-gray-900';
 
   // Percentage calculation (if needed)
@@ -535,7 +537,7 @@ function MonthlyRecordCard({
       <div className="flex items-center justify-between pt-2 border-t">
         <div>
           <p className={`text-lg font-bold ${valueColor}`}>
-            {isPositive ? '+' : ''}{formatCurrency(value)}
+            {isPositive ? '+' : ''}{formatCurrency(displayValue)}
           </p>
         </div>
         {showPercentage && (
@@ -562,14 +564,16 @@ function YearlyRecordCard({
   valueKey: keyof YearlyRecord;
   formatCurrency: (amount: number) => string;
 }) {
-  const currentYear = new Date().getFullYear();
+  const currentYear = getItalyYear();
   const isCurrentYear = record.year === currentYear;
   const showPercentage = valueKey === 'netWorthDiff';
   const value = record[valueKey] as number;
+  const isExpenseValue = valueKey === 'totalExpenses';
+  const displayValue = isExpenseValue ? -Math.abs(value) : value;
 
   // Color coding
-  const isPositive = value > 0;
-  const isNegative = value < 0;
+  const isPositive = displayValue > 0;
+  const isNegative = displayValue < 0;
   const valueColor = isPositive ? 'text-green-600' : isNegative ? 'text-red-600' : 'text-gray-900';
 
   // Percentage calculation (if needed)
@@ -597,7 +601,7 @@ function YearlyRecordCard({
       <div className="flex items-center justify-between pt-2 border-t">
         <div>
           <p className={`text-lg font-bold ${valueColor}`}>
-            {isPositive ? '+' : ''}{formatCurrency(value)}
+            {isPositive ? '+' : ''}{formatCurrency(displayValue)}
           </p>
         </div>
         {showPercentage && (
@@ -632,6 +636,7 @@ function MonthlyTable({
 
   const showPercentage = valueKey === 'netWorthDiff';
   const { month: currentMonth, year: currentYear } = getItalyMonthYear();
+  const isExpenseValue = valueKey === 'totalExpenses';
 
   return (
     <div className="max-h-[400px] overflow-y-auto">
@@ -662,7 +667,11 @@ function MonthlyTable({
                 <TableCell className="font-medium">{index + 1}</TableCell>
                 <TableCell className="whitespace-nowrap">{record.monthYear}</TableCell>
                 <TableCell className="text-right font-mono whitespace-nowrap">
-                  {formatCurrency(record[valueKey] as number)}
+                  {formatCurrency(
+                    isExpenseValue
+                      ? -Math.abs(record[valueKey] as number)
+                      : (record[valueKey] as number)
+                  )}
                 </TableCell>
                 {showPercentage && (
                   <TableCell className="text-right font-mono text-sm whitespace-nowrap">
@@ -700,7 +709,8 @@ function YearlyTable({
   }
 
   const showPercentage = valueKey === 'netWorthDiff';
-  const currentYear = new Date().getFullYear();
+  const currentYear = getItalyYear();
+  const isExpenseValue = valueKey === 'totalExpenses';
 
   return (
     <div className="max-h-[400px] overflow-y-auto">
@@ -730,7 +740,11 @@ function YearlyTable({
                 <TableCell className="font-medium">{index + 1}</TableCell>
                 <TableCell>{record.year}</TableCell>
                 <TableCell className="text-right font-mono whitespace-nowrap">
-                  {formatCurrency(record[valueKey] as number)}
+                  {formatCurrency(
+                    isExpenseValue
+                      ? -Math.abs(record[valueKey] as number)
+                      : (record[valueKey] as number)
+                  )}
                 </TableCell>
                 {showPercentage && (
                   <TableCell className="text-right font-mono text-sm whitespace-nowrap">

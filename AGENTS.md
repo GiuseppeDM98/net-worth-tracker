@@ -46,6 +46,9 @@ End date must include full day:
 const endDate = new Date(year, month, 0, 23, 59, 59, 999);
 ```
 
+### Hall of Fame Annual Rankings
+Include years that have expenses even if they have fewer than 2 snapshots (NW diff stays 0).
+
 ### Asset Price History %
 For assets with `price === 1` or `displayMode === 'totalValue'`, compute % using total value.
 

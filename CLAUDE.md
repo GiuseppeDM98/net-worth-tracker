@@ -6,7 +6,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz
 - Feature ultimo mese: Heatmap Rendimenti Mensili e Grafico Underwater (Drawdown) nella pagina Performance con calcoli TWR-adjusted
-- Ultima fix: Timezone bug in Hall of Fame (entries showing in wrong month server-side vs client-side)
+- Ultima fix: Hall of Fame (segno/colore spese su mobile + anni con sole spese inclusi nei ranking annuali)
 - In corso ora: nessuna attivita attiva nota
 - Completamento: n/d (da confermare)
 
@@ -56,4 +56,4 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Date helpers: `lib/utils/dateHelpers.ts`
 - Formatters: `lib/utils/formatters.ts`
 
-**Last updated**: 2026-01-10 (timezone fix implemented)
+**Last updated**: 2026-01-11
