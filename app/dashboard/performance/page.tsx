@@ -533,7 +533,12 @@ export default function PerformancePage() {
                   />
                   <YAxis tickFormatter={(value) => value.toFixed(2)} />
                   <Tooltip
-                    formatter={(value: number | null) => (value === null || Number.isNaN(value) ? 'n/d' : value.toFixed(2))}
+                    formatter={(value) => {
+                      if (typeof value !== 'number' || Number.isNaN(value)) {
+                        return 'n/d';
+                      }
+                      return value.toFixed(2);
+                    }}
                     labelFormatter={(date) => new Date(date).toLocaleDateString('it-IT')}
                   />
                   <Legend formatter={(value) => String(value).replace(/^\d+\.\s*/, '')} />
