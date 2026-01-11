@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz
-- Feature ultimo mese: Heatmap Rendimenti Mensili e Grafico Underwater (Drawdown) nella pagina Performance con calcoli TWR-adjusted
-- Ultima fix: Hall of Fame (segno/colore spese su mobile + anni con sole spese inclusi nei ranking annuali)
+- Feature ultimo mese: Grafico Sharpe Ratio Rolling 12M e medie mobili 3M su grafici Rolling (CAGR/Sharpe) in Performance
+- Ultima fix: Legenda grafico Sharpe Rolling con ordine corretto e formato standard
 - In corso ora: nessuna attivita attiva nota
 - Completamento: n/d (da confermare)
 
@@ -29,7 +29,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Portfolio multi-asset con aggiornamento prezzi Yahoo Finance.
 - Cashflow con categorie, filtri e statistiche.
 - Snapshot mensili automatici + storico e CSV export.
-- Performance metrics (ROI, CAGR, TWR, IRR, Sharpe, drawdown suite) con heatmap rendimenti mensili e grafico underwater.
+- Performance metrics (ROI, CAGR, TWR, IRR, Sharpe, drawdown suite) con heatmap rendimenti mensili, grafico underwater e rolling CAGR/Sharpe con medie mobili.
 - Dividendi multi-currency con conversione EUR e scraping Borsa Italiana.
 - Hall of Fame con ranking mensili/annuali e highlight del periodo corrente.
 - FIRE calculator e Monte Carlo.
@@ -45,7 +45,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Conversione valuta dipende da Frankfurter API (fallback su cache, ma possibile failure prolungata).
 
 ## Next Steps (Prossime 1-2 sessioni)
-- Testing e refining dei nuovi grafici Performance (heatmap e underwater) su mobile/tablet.
+- Verificare su mobile/tablet i grafici Rolling (CAGR/Sharpe) e la leggibilita delle legende.
 - Ottimizzazioni UI/UX basate su feedback utente.
 
 ## Key Files

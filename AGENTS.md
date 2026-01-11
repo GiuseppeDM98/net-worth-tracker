@@ -122,4 +122,4 @@ const { month, year } = getItalyMonthYear();
 - Currency conversion: `lib/services/currencyConversionService.ts`
 - Query keys: `lib/query/queryKeys.ts`
 
-**Last updated**: 2026-01-10
+**Last updated**: 2026-01-11

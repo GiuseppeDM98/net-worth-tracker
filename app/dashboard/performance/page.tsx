@@ -164,7 +164,70 @@ export default function PerformancePage() {
     return 400;
   };
 
+  const rollingCagrMaWindowMonths = 3;
+  const rollingSharpeMaWindowMonths = 3;
+
+  const getRollingCagrData = (currentMetrics: PerformanceMetrics | null) => {
+    if (!performanceData) {
+      return [];
+    }
+
+    const sourceData = performanceData.rolling12M;
+
+    const filteredData = currentMetrics
+      ? sourceData.filter((entry) => {
+          const entryDate = new Date(entry.periodEndDate);
+          return entryDate >= currentMetrics.startDate && entryDate <= currentMetrics.endDate;
+        })
+      : sourceData;
+
+    return filteredData.map((entry, index) => {
+      const startIndex = Math.max(0, index - rollingCagrMaWindowMonths + 1);
+      const windowValues = filteredData
+        .slice(startIndex, index + 1)
+        .map((item) => item.cagr)
+        .filter((value) => Number.isFinite(value));
+
+      const cagrMA = windowValues.length > 0
+        ? windowValues.reduce((sum, value) => sum + value, 0) / windowValues.length
+        : null;
+
+      return { ...entry, cagrMA };
+    });
+  };
+
+  const getRollingSharpeData = (currentMetrics: PerformanceMetrics | null) => {
+    if (!performanceData) {
+      return [];
+    }
+
+    const sourceData = performanceData.rolling12M;
+
+    const filteredData = currentMetrics
+      ? sourceData.filter((entry) => {
+          const entryDate = new Date(entry.periodEndDate);
+          return entryDate >= currentMetrics.startDate && entryDate <= currentMetrics.endDate;
+        })
+      : sourceData;
+
+    return filteredData.map((entry, index) => {
+      const startIndex = Math.max(0, index - rollingSharpeMaWindowMonths + 1);
+      const windowValues = filteredData
+        .slice(startIndex, index + 1)
+        .map((item) => item.sharpeRatio)
+        .filter((value): value is number => value !== null);
+
+      const sharpeRatioMA = windowValues.length > 0
+        ? windowValues.reduce((sum, value) => sum + value, 0) / windowValues.length
+        : null;
+
+      return { ...entry, sharpeRatioMA };
+    });
+  };
+
   const metrics = getCurrentMetrics();
+  const rollingCagrData = getRollingCagrData(metrics);
+  const rollingSharpeData = getRollingSharpeData(metrics);
 
   if (loading) {
     return (
@@ -406,7 +469,7 @@ export default function PerformancePage() {
           </Card>
 
         {/* Rolling CAGR Chart */}
-        {performanceData.rolling12M.length > 0 && (
+        {rollingCagrData.length > 0 && (
           <Card className="mt-6">
             <CardHeader>
               <CardTitle>CAGR Rolling 12 Mesi</CardTitle>
@@ -416,7 +479,7 @@ export default function PerformancePage() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={getChartHeight()}>
-                  <LineChart data={performanceData.rolling12M}>
+                  <LineChart data={rollingCagrData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis
                       dataKey="periodEndDate"
@@ -436,11 +499,66 @@ export default function PerformancePage() {
                       name="CAGR 12M"
                       dot={false}
                     />
+                    <Line
+                      type="monotone"
+                      dataKey="cagrMA"
+                      stroke="#82ca9d"
+                      strokeWidth={2}
+                      name={`Media Mobile ${rollingCagrMaWindowMonths}M`}
+                      strokeDasharray="6 4"
+                      dot={false}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
           )}
+
+        {/* Rolling Sharpe Ratio Chart */}
+        {rollingSharpeData.length > 0 && (
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>Sharpe Ratio Rolling 12 Mesi</CardTitle>
+              <CardDescription>
+                Evoluzione del rapporto rischio-rendimento su finestra mobile
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={getChartHeight()}>
+                <LineChart data={rollingSharpeData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="periodEndDate"
+                    tickFormatter={(date) => new Date(date).toLocaleDateString('it-IT', { month: 'short', year: '2-digit' })}
+                  />
+                  <YAxis tickFormatter={(value) => value.toFixed(2)} />
+                  <Tooltip
+                    formatter={(value: number | null) => (value === null || Number.isNaN(value) ? 'n/d' : value.toFixed(2))}
+                    labelFormatter={(date) => new Date(date).toLocaleDateString('it-IT')}
+                  />
+                  <Legend formatter={(value) => String(value).replace(/^\d+\.\s*/, '')} />
+                  <Line
+                    type="monotone"
+                    dataKey="sharpeRatio"
+                    stroke="#ff7300"
+                    strokeWidth={2}
+                    name="1. Sharpe 12M"
+                    dot={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="sharpeRatioMA"
+                    stroke="#82ca9d"
+                    strokeWidth={2}
+                    name={`2. Media Mobile ${rollingSharpeMaWindowMonths}M`}
+                    strokeDasharray="6 4"
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Monthly Returns Heatmap */}
         <Card className="mt-6">
@@ -495,9 +613,27 @@ export default function PerformancePage() {
                 <br /><br />
                 <strong>Finestra Mobile (Rolling):</strong> Per ogni punto del grafico viene calcolato il CAGR (Compound Annual Growth Rate) considerando i 12 mesi precedenti. Ad esempio, il punto di aprile 2025 mostra il CAGR del periodo maggio 2024 - aprile 2025.
                 <br />
+                <strong>Media Mobile:</strong> La linea tratteggiata è una media mobile a 3 mesi che smussa le oscillazioni e aiuta a leggere il trend.
+                <br />
                 <strong>Utilità:</strong> Permette di vedere se la performance sta migliorando o peggiorando nel tempo, eliminando l&apos;effetto di singoli mesi fortunati/sfortunati. È più stabile del rendimento mensile ma più reattivo del rendimento totale dall&apos;inizio.
                 <br /><br />
-                <em>Interpretazione:</em> Una linea in salita indica che la performance è in miglioramento nelle ultime 12 mesi. Una linea in discesa segnala un peggioramento. Le oscillazioni riflettono la volatilità del portafoglio.
+                <em>Interpretazione:</em> Una linea in salita indica che la performance è in miglioramento negli ultimi 12 mesi. Una linea in discesa segnala un peggioramento. Le oscillazioni riflettono la volatilità del portafoglio.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-1">Grafico: Sharpe Ratio Rolling</h4>
+              <p className="text-muted-foreground">
+                Questo grafico mostra l&apos;andamento del rapporto rischio-rendimento (Sharpe Ratio) calcolato su finestre mobili.
+                <br /><br />
+                <strong>Finestra Mobile (Rolling):</strong> Ogni punto rappresenta lo Sharpe Ratio calcolato sui 12 mesi precedenti.
+                <br />
+                <strong>Media Mobile:</strong> La linea tratteggiata è una media mobile a 3 mesi che smussa le oscillazioni e aiuta a leggere il trend.
+                <br />
+                <strong>Calcolo:</strong> (Rendimento TWR - tasso risk-free) / volatilità. Il tasso risk-free deriva dalle impostazioni utente, con fallback a un valore di default.
+                <br />
+                <strong>Utilità:</strong> Evidenzia come cambia nel tempo l&apos;efficienza del portafoglio nel generare rendimento per unità di rischio.
+                <br /><br />
+                <em>Interpretazione:</em> Valori più alti indicano un miglior rapporto rischio-rendimento. Variazioni ampie possono riflettere periodi di volatilità elevata o rendimenti instabili.
               </p>
             </div>
             <div>
