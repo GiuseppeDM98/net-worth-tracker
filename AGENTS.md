@@ -121,5 +121,6 @@ const { month, year } = getItalyMonthYear();
 - Performance service: `lib/services/performanceService.ts`
 - Currency conversion: `lib/services/currencyConversionService.ts`
 - Query keys: `lib/query/queryKeys.ts`
+- Cashflow charts: `components/cashflow/TotalHistoryTab.tsx`, `components/cashflow/CurrentYearTab.tsx`
 
 **Last updated**: 2026-01-11

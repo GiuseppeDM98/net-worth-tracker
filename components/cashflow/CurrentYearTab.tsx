@@ -3,7 +3,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { calculateTotalIncome, calculateTotalExpenses } from '@/lib/services/expenseService';
-import { Timestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RefreshCw, ChevronLeft, ExternalLink, Info, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,8 +23,10 @@ import {
   CartesianGrid,
   LineChart,
   Line,
+  ReferenceLine,
 } from 'recharts';
 import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
+import { getItalyMonthYear, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
 
 interface ChartData {
   name: string;
@@ -88,7 +89,7 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
   const incomeChartRef = useRef<HTMLDivElement>(null);
 
   // Get current year
-  const currentYear = new Date().getFullYear();
+  const currentYear = getItalyYear();
 
   // Load alert dismissal state from localStorage
   useEffect(() => {
@@ -122,10 +123,7 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
 
   // Filter expenses for current year only using useMemo
   const currentYearExpenses = useMemo(() => {
-    return allExpenses.filter(expense => {
-      const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
-      return date.getFullYear() === currentYear;
-    });
+    return allExpenses.filter(expense => getItalyYear(toDate(expense.date)) === currentYear);
   }, [allExpenses, currentYear]);
 
   // Prepare data for expenses by category
@@ -221,9 +219,10 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
     const monthlyMap = new Map<string, { income: number; expenses: number; sortKey: string }>();
 
     currentYearExpenses.forEach(expense => {
-      const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
-      const monthKey = `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getFullYear()).slice(-2)}`;
-      const sortKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const date = toDate(expense.date);
+      const { month, year } = getItalyMonthYear(date);
+      const monthKey = `${String(month).padStart(2, '0')}/${String(year).slice(-2)}`;
+      const sortKey = `${year}-${String(month).padStart(2, '0')}`;
 
       const current = monthlyMap.get(monthKey) || { income: 0, expenses: 0, sortKey };
 
@@ -248,9 +247,9 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
           Entrate: values.income,
           Spese: values.expenses,
           Netto: values.income - values.expenses,
-          'Entrate %': incomePercentage,
-          'Spese %': expensesPercentage,
-          'Saving Rate %': savingRate,
+          'Entrate %': Math.min(100, Math.max(0, incomePercentage)),
+          'Spese %': Math.min(100, Math.max(0, expensesPercentage)),
+          'Saving Rate %': Math.min(100, Math.max(-100, savingRate)),
           sortKey: values.sortKey,
         };
       })
@@ -273,7 +272,7 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
     currentYearExpenses
       .filter(e => e.type !== 'income')
       .forEach(expense => {
-        const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
+        const date = toDate(expense.date);
         const monthKey = `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getFullYear()).slice(-2)}`;
         const sortKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
@@ -318,7 +317,7 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
     currentYearExpenses
       .filter(e => e.type !== 'income')
       .forEach(expense => {
-        const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
+        const date = toDate(expense.date);
         const monthKey = `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getFullYear()).slice(-2)}`;
         const sortKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
@@ -365,7 +364,7 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
     currentYearExpenses
       .filter(e => e.type === 'income')
       .forEach(expense => {
-        const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
+        const date = toDate(expense.date);
         const monthKey = `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getFullYear()).slice(-2)}`;
         const sortKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
@@ -556,6 +555,12 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
   const incomeByCategoryData = getIncomeByCategory();
   const expensesByTypeData = getExpensesByType();
   const monthlyTrendData = getMonthlyTrend();
+  const monthlyTrendPercentData = monthlyTrendData.map((item) => ({
+    month: item.month,
+    'Entrate %': item['Entrate %'],
+    'Spese %': item['Spese %'],
+    'Saving Rate %': item['Saving Rate %'],
+  }));
   const monthlyExpensesByType = getMonthlyExpensesByType();
   const monthlyExpensesByCategory = getMonthlyExpensesByCategory();
   const monthlyIncomeByCategory = getMonthlyIncomeByCategory();
@@ -765,9 +770,7 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                 <div className="space-y-4">
                   <div className="space-y-3 sm:hidden">
                     {currentFilteredExpenses.map((expense) => {
-                      const date = expense.date instanceof Date
-                        ? expense.date
-                        : (expense.date as Timestamp).toDate();
+                      const date = toDate(expense.date);
                       return (
                         <div key={expense.id} className="rounded-md border p-3">
                           <div className="flex items-center justify-between text-sm">
@@ -809,9 +812,7 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                         </thead>
                         <tbody>
                           {currentFilteredExpenses.map((expense) => {
-                            const date = expense.date instanceof Date
-                              ? expense.date
-                              : (expense.date as Timestamp).toDate();
+                            const date = toDate(expense.date);
                             return (
                               <tr key={expense.id} className="border-b hover:bg-muted/30">
                                 <td className="px-4 py-3 text-sm">
@@ -984,9 +985,7 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                 <div className="space-y-4">
                   <div className="space-y-3 sm:hidden">
                     {currentFilteredExpenses.map((expense) => {
-                      const date = expense.date instanceof Date
-                        ? expense.date
-                        : (expense.date as Timestamp).toDate();
+                      const date = toDate(expense.date);
                       return (
                         <div key={expense.id} className="rounded-md border p-3">
                           <div className="flex items-center justify-between text-sm">
@@ -1028,9 +1027,7 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                         </thead>
                         <tbody>
                           {currentFilteredExpenses.map((expense) => {
-                            const date = expense.date instanceof Date
-                              ? expense.date
-                              : (expense.date as Timestamp).toDate();
+                            const date = toDate(expense.date);
                             return (
                               <tr key={expense.id} className="border-b hover:bg-muted/30">
                                 <td className="px-4 py-3 text-sm">
@@ -1142,10 +1139,14 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
             <CardContent>
               <ResponsiveContainer width="100%" height={lineChartHeight}>
                 {showMonthlyTrendPercentage ? (
-                  <LineChart data={monthlyTrendData}>
+                  <LineChart data={monthlyTrendPercentData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" tick={axisTickProps} {...xAxisProps} />
-                    <YAxis tickFormatter={(value) => `${value.toFixed(0)}%`} domain={[0, 100]} />
+                    <YAxis
+                      tickFormatter={(value) => `${value.toFixed(0)}%`}
+                      domain={[-100, 100]}
+                      allowDataOverflow
+                    />
                     <Tooltip
                       formatter={(value: number) => `${value.toFixed(2)}%`}
                       contentStyle={{
@@ -1155,6 +1156,7 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                       }}
                     />
                     <Legend />
+                    <ReferenceLine y={0} stroke="#6b7280" strokeDasharray="4 4" />
                     <Line type="monotone" dataKey="Entrate %" stroke="#10b981" strokeWidth={2} name="Entrate %" />
                     <Line type="monotone" dataKey="Spese %" stroke="#ef4444" strokeWidth={2} name="Spese %" />
                     <Line type="monotone" dataKey="Saving Rate %" stroke="#3b82f6" strokeWidth={2} name="Saving Rate %" />

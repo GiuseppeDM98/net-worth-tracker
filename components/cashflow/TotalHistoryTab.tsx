@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { calculateIncomeExpenseRatio } from '@/lib/services/expenseService';
-import { Timestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
@@ -22,6 +21,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
+import { getItalyMonthYear, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
 
 const COLORS = [
   '#3b82f6', // blue
@@ -57,14 +57,18 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
     return () => media.removeEventListener('change', handleChange);
   }, []);
 
+  const clampPercentage = (value: number, min: number, max: number) =>
+    Math.min(max, Math.max(min, value));
+
   // Prepare monthly trend data (all years, all months)
   const getMonthlyTrend = () => {
     const monthlyMap = new Map<string, { income: number; expenses: number; sortKey: string }>();
 
     allExpenses.forEach((expense: Expense) => {
-      const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
-      const monthKey = `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getFullYear()).slice(-2)}`;
-      const sortKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const date = toDate(expense.date);
+      const { month, year } = getItalyMonthYear(date);
+      const monthKey = `${String(month).padStart(2, '0')}/${String(year).slice(-2)}`;
+      const sortKey = `${year}-${String(month).padStart(2, '0')}`;
 
       const current = monthlyMap.get(monthKey) || { income: 0, expenses: 0, sortKey };
 
@@ -82,16 +86,16 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
         const total = values.income + values.expenses;
         const incomePercentage = total > 0 ? (values.income / total) * 100 : 0;
         const expensesPercentage = total > 0 ? (values.expenses / total) * 100 : 0;
-        const savingRate = values.income > 0 ? ((values.income - values.expenses) / values.income) * 100 : 0;
+        const rawSavingRate = values.income > 0 ? ((values.income - values.expenses) / values.income) * 100 : 0;
 
         return {
           month,
           Entrate: values.income,
           Spese: values.expenses,
           Netto: values.income - values.expenses,
-          'Entrate %': incomePercentage,
-          'Spese %': expensesPercentage,
-          'Saving Rate %': savingRate,
+          'Entrate %': clampPercentage(incomePercentage, 0, 100),
+          'Spese %': clampPercentage(expensesPercentage, 0, 100),
+          'Saving Rate %': clampPercentage(rawSavingRate, -100, 100),
           sortKey: values.sortKey,
         };
       })
@@ -105,8 +109,8 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
     const yearlyMap = new Map<number, { income: number; expenses: number }>();
 
     allExpenses.forEach((expense: Expense) => {
-      const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
-      const year = date.getFullYear();
+      const date = toDate(expense.date);
+      const year = getItalyYear(date);
 
       const current = yearlyMap.get(year) || { income: 0, expenses: 0 };
 
@@ -124,16 +128,16 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
         const total = values.income + values.expenses;
         const incomePercentage = total > 0 ? (values.income / total) * 100 : 0;
         const expensesPercentage = total > 0 ? (values.expenses / total) * 100 : 0;
-        const savingRate = values.income > 0 ? ((values.income - values.expenses) / values.income) * 100 : 0;
+        const rawSavingRate = values.income > 0 ? ((values.income - values.expenses) / values.income) * 100 : 0;
 
         return {
           year: year.toString(),
           Entrate: values.income,
           Spese: values.expenses,
           Netto: values.income - values.expenses,
-          'Entrate %': incomePercentage,
-          'Spese %': expensesPercentage,
-          'Saving Rate %': savingRate,
+          'Entrate %': clampPercentage(incomePercentage, 0, 100),
+          'Spese %': clampPercentage(expensesPercentage, 0, 100),
+          'Saving Rate %': clampPercentage(rawSavingRate, -100, 100),
         };
       })
       .sort((a, b) => parseInt(a.year) - parseInt(b.year));
@@ -148,9 +152,10 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
     expenses
       .filter((e: Expense) => e.type !== 'income')
       .forEach((expense: Expense) => {
-        const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
-        const monthKey = `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getFullYear()).slice(-2)}`;
-        const sortKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const date = toDate(expense.date);
+        const { month, year } = getItalyMonthYear(date);
+        const monthKey = `${String(month).padStart(2, '0')}/${String(year).slice(-2)}`;
+        const sortKey = `${year}-${String(month).padStart(2, '0')}`;
 
         if (!monthlyMap.has(monthKey)) {
           monthlyMap.set(monthKey, { sortKey });
@@ -178,8 +183,8 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
     expenses
       .filter((e: Expense) => e.type !== 'income')
       .forEach((expense: Expense) => {
-        const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
-        const year = date.getFullYear();
+        const date = toDate(expense.date);
+        const year = getItalyYear(date);
 
         if (!yearlyMap.has(year)) {
           yearlyMap.set(year, {});
@@ -222,9 +227,10 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
     expenses
       .filter((e: Expense) => e.type !== 'income')
       .forEach((expense: Expense) => {
-        const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
-        const monthKey = `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getFullYear()).slice(-2)}`;
-        const sortKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const date = toDate(expense.date);
+        const { month, year } = getItalyMonthYear(date);
+        const monthKey = `${String(month).padStart(2, '0')}/${String(year).slice(-2)}`;
+        const sortKey = `${year}-${String(month).padStart(2, '0')}`;
 
         if (!monthlyMap.has(monthKey)) {
           monthlyMap.set(monthKey, { sortKey, Altro: 0 });
@@ -269,8 +275,8 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
     expenses
       .filter((e: Expense) => e.type !== 'income')
       .forEach((expense: Expense) => {
-        const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
-        const year = date.getFullYear();
+        const date = toDate(expense.date);
+        const year = getItalyYear(date);
 
         if (!yearlyMap.has(year)) {
           yearlyMap.set(year, { Altro: 0 });
@@ -315,9 +321,10 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
     expenses
       .filter((e: Expense) => e.type === 'income')
       .forEach((expense: Expense) => {
-        const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
-        const monthKey = `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getFullYear()).slice(-2)}`;
-        const sortKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const date = toDate(expense.date);
+        const { month, year } = getItalyMonthYear(date);
+        const monthKey = `${String(month).padStart(2, '0')}/${String(year).slice(-2)}`;
+        const sortKey = `${year}-${String(month).padStart(2, '0')}`;
 
         if (!monthlyMap.has(monthKey)) {
           monthlyMap.set(monthKey, { sortKey, Altro: 0 });
@@ -362,8 +369,8 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
     expenses
       .filter((e: Expense) => e.type === 'income')
       .forEach((expense: Expense) => {
-        const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
-        const year = date.getFullYear();
+        const date = toDate(expense.date);
+        const year = getItalyYear(date);
 
         if (!yearlyMap.has(year)) {
           yearlyMap.set(year, { Altro: 0 });
@@ -392,8 +399,8 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
 
     // Group expenses by year
     allExpenses.forEach((expense: Expense) => {
-      const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
-      const year = date.getFullYear();
+      const date = toDate(expense.date);
+      const year = getItalyYear(date);
 
       if (!yearlyMap.has(year)) {
         yearlyMap.set(year, []);
@@ -419,8 +426,8 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
 
   // Filter expenses from 2025 onwards for trend charts (excludes bulk-imported pre-2025 data)
   const expensesFrom2025 = allExpenses.filter((expense: Expense) => {
-    const date = expense.date instanceof Date ? expense.date : (expense.date as Timestamp).toDate();
-    return date.getFullYear() >= 2025;
+    const date = toDate(expense.date);
+    return getItalyYear(date) >= 2025;
   });
 
   const monthlyTrendData = getMonthlyTrend();
@@ -448,6 +455,12 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
   const monthlyTrendChartData = isMobile && !showFullMonthlyHistory
     ? filterRecentMonths(monthlyTrendData, recentMonthsLimit)
     : monthlyTrendData;
+  const monthlyTrendPercentChartData = monthlyTrendChartData.map((item) => ({
+    month: item.month,
+    'Entrate %': item['Entrate %'],
+    'Spese %': item['Spese %'],
+    'Saving Rate %': item['Saving Rate %'],
+  }));
   const monthlyExpensesByTypeChartData = isMobile && !showFullMonthlyHistory
     ? filterRecentMonths(monthlyExpensesByType, recentMonthsLimit)
     : monthlyExpensesByType;
@@ -457,6 +470,12 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
   const monthlyIncomeByCategoryChartData = isMobile && !showFullMonthlyHistory
     ? filterRecentMonths(monthlyIncomeByCategory.data, recentMonthsLimit)
     : monthlyIncomeByCategory.data;
+  const yearlyTrendPercentChartData = yearlyTrendData.map((item) => ({
+    year: item.year,
+    'Entrate %': item['Entrate %'],
+    'Spese %': item['Spese %'],
+    'Saving Rate %': item['Saving Rate %'],
+  }));
 
   const renderLegendContent = (maxItems?: number) => (props: any) => {
     const payload = props?.payload || [];
@@ -545,23 +564,28 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
             <CardContent>
               <ResponsiveContainer width="100%" height={lineChartHeight}>
                 {showMonthlyTrendPercentage ? (
-                  <LineChart data={monthlyTrendChartData}>
+                  <LineChart data={monthlyTrendPercentChartData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" tick={axisTickProps} {...xAxisProps} />
-                    <YAxis tickFormatter={(value) => `${value.toFixed(0)}%`} domain={[0, 100]} />
-                    <Tooltip
-                      formatter={(value: number) => `${value.toFixed(2)}%`}
-                      contentStyle={{
-                        backgroundColor: 'white',
-                        border: '1px solid #ccc',
-                        borderRadius: '4px',
-                      }}
+                    <YAxis
+                      tickFormatter={(value) => `${value.toFixed(0)}%`}
+                      domain={[-100, 100]}
+                      allowDataOverflow
                     />
-                    <Legend />
-                    <Line type="monotone" dataKey="Entrate %" stroke="#10b981" strokeWidth={2} name="Entrate %" dot={!isMobile} />
-                    <Line type="monotone" dataKey="Spese %" stroke="#ef4444" strokeWidth={2} name="Spese %" dot={!isMobile} />
-                    <Line type="monotone" dataKey="Saving Rate %" stroke="#3b82f6" strokeWidth={2} name="Saving Rate %" dot={!isMobile} />
-                  </LineChart>
+                  <Tooltip
+                    formatter={(value: number) => `${value.toFixed(2)}%`}
+                    contentStyle={{
+                      backgroundColor: 'white',
+                      border: '1px solid #ccc',
+                      borderRadius: '4px',
+                    }}
+                  />
+                  <Legend />
+                  <ReferenceLine y={0} stroke="#6b7280" strokeDasharray="4 4" />
+                  <Line type="monotone" dataKey="Entrate %" stroke="#10b981" strokeWidth={2} name="Entrate %" dot={!isMobile} />
+                  <Line type="monotone" dataKey="Spese %" stroke="#ef4444" strokeWidth={2} name="Spese %" dot={!isMobile} />
+                  <Line type="monotone" dataKey="Saving Rate %" stroke="#3b82f6" strokeWidth={2} name="Saving Rate %" dot={!isMobile} />
+                </LineChart>
                 ) : (
                   <LineChart data={monthlyTrendChartData}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -604,23 +628,28 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
             <CardContent>
               <ResponsiveContainer width="100%" height={lineChartHeight}>
                 {showYearlyTrendPercentage ? (
-                  <LineChart data={yearlyTrendData}>
+                  <LineChart data={yearlyTrendPercentChartData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="year" tick={axisTickProps} {...xAxisProps} />
-                    <YAxis tickFormatter={(value) => `${value.toFixed(0)}%`} domain={[0, 100]} />
-                    <Tooltip
-                      formatter={(value: number) => `${value.toFixed(2)}%`}
-                      contentStyle={{
-                        backgroundColor: 'white',
-                        border: '1px solid #ccc',
-                        borderRadius: '4px',
-                      }}
+                    <YAxis
+                      tickFormatter={(value) => `${value.toFixed(0)}%`}
+                      domain={[-100, 100]}
+                      allowDataOverflow
                     />
-                    <Legend />
-                    <Line type="monotone" dataKey="Entrate %" stroke="#10b981" strokeWidth={2} name="Entrate %" dot={!isMobile} />
-                    <Line type="monotone" dataKey="Spese %" stroke="#ef4444" strokeWidth={2} name="Spese %" dot={!isMobile} />
-                    <Line type="monotone" dataKey="Saving Rate %" stroke="#3b82f6" strokeWidth={2} name="Saving Rate %" dot={!isMobile} />
-                  </LineChart>
+                  <Tooltip
+                    formatter={(value: number) => `${value.toFixed(2)}%`}
+                    contentStyle={{
+                      backgroundColor: 'white',
+                      border: '1px solid #ccc',
+                      borderRadius: '4px',
+                    }}
+                  />
+                  <Legend />
+                  <ReferenceLine y={0} stroke="#6b7280" strokeDasharray="4 4" />
+                  <Line type="monotone" dataKey="Entrate %" stroke="#10b981" strokeWidth={2} name="Entrate %" dot={!isMobile} />
+                  <Line type="monotone" dataKey="Spese %" stroke="#ef4444" strokeWidth={2} name="Spese %" dot={!isMobile} />
+                  <Line type="monotone" dataKey="Saving Rate %" stroke="#3b82f6" strokeWidth={2} name="Saving Rate %" dot={!isMobile} />
+                </LineChart>
                 ) : (
                   <LineChart data={yearlyTrendData}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -948,8 +977,3 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
     </div>
   );
 }
-
-
-
-
-
