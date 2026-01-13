@@ -68,6 +68,23 @@ export interface DividendStats {
       count: number;
     };
   };
+  // YOC (Yield on Cost) fields - optional for backward compatibility
+  portfolioYieldOnCost?: number;
+  totalCostBasis?: number;
+  yieldOnCostAssets?: YieldOnCostAsset[];
+}
+
+export interface YieldOnCostAsset {
+  assetId: string;
+  assetTicker: string;
+  assetName: string;
+  quantity: number;
+  averageCost: number;
+  currentPrice: number;
+  ttmGrossDividends: number;
+  yocPercentage: number;
+  currentYieldPercentage: number;
+  difference: number;
 }
 
 export interface ScrapedDividend {

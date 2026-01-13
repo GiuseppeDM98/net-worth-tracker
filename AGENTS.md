@@ -123,4 +123,4 @@ const { month, year } = getItalyMonthYear();
 - Query keys: `lib/query/queryKeys.ts`
 - Cashflow charts: `components/cashflow/TotalHistoryTab.tsx`, `components/cashflow/CurrentYearTab.tsx`
 
-**Last updated**: 2026-01-11
+**Last updated**: 2026-01-13

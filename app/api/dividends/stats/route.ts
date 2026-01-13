@@ -6,6 +6,7 @@ import {
   getAllDividends
 } from '@/lib/services/dividendService';
 import { adminDb } from '@/lib/firebase/admin';
+import { YieldOnCostAsset } from '@/types/dividend';
 
 /**
  * GET /api/dividends/stats
@@ -60,8 +61,11 @@ export async function GET(request: NextRequest) {
 
     const userAssets = assetsSnapshot.docs.map(doc => ({
       id: doc.id,
+      ticker: doc.data().ticker || '',
+      name: doc.data().name || '',
       quantity: doc.data().quantity || 0,
       currentPrice: doc.data().currentPrice || 0,
+      averageCost: doc.data().averageCost,
     }));
     const assetsMap = new Map(userAssets.map(a => [a.id, a]));
 
@@ -155,6 +159,78 @@ export async function GET(request: NextRequest) {
       averageYield = (ttmTotalGross / portfolioValueWithDividends) * 100;
     }
 
+    // Calculate Yield on Cost (YOC) for assets with cost basis
+    let portfolioYieldOnCost: number | undefined;
+    let totalCostBasis: number | undefined;
+    let yieldOnCostAssets: YieldOnCostAsset[] | undefined;
+
+    if (ttmDividends.length > 0) {
+      // 1. Group TTM dividends by asset
+      const ttmByAsset = new Map<string, number>();
+      ttmDividends.forEach(div => {
+        const current = ttmByAsset.get(div.assetId) || 0;
+        ttmByAsset.set(div.assetId, current + div.grossAmount);
+      });
+
+      // 2. Calculate per-asset YOC for assets with cost basis
+      const yocAssetsList: YieldOnCostAsset[] = [];
+
+      userAssets.forEach(asset => {
+        const ttmGross = ttmByAsset.get(asset.id);
+
+        // Only include assets with: averageCost, quantity > 0, and TTM dividends
+        if (
+          asset.averageCost &&
+          asset.averageCost > 0 &&
+          asset.quantity > 0 &&
+          ttmGross &&
+          ttmGross > 0
+        ) {
+          const costBasis = asset.quantity * asset.averageCost;
+          const currentValue = asset.quantity * asset.currentPrice;
+
+          const yocPercentage = (ttmGross / costBasis) * 100;
+          const currentYieldPercentage = currentValue > 0
+            ? (ttmGross / currentValue) * 100
+            : 0;
+          const difference = yocPercentage - currentYieldPercentage;
+
+          yocAssetsList.push({
+            assetId: asset.id,
+            assetTicker: asset.ticker,
+            assetName: asset.name,
+            quantity: asset.quantity,
+            averageCost: asset.averageCost,
+            currentPrice: asset.currentPrice,
+            ttmGrossDividends: ttmGross,
+            yocPercentage,
+            currentYieldPercentage,
+            difference,
+          });
+        }
+      });
+
+      // 3. Calculate portfolio-level YOC if we have valid assets
+      if (yocAssetsList.length > 0) {
+        yocAssetsList.sort((a, b) => b.yocPercentage - a.yocPercentage);
+
+        const portfolioCostBasis = yocAssetsList.reduce(
+          (sum, asset) => sum + (asset.quantity * asset.averageCost),
+          0
+        );
+        const portfolioTtmDividends = yocAssetsList.reduce(
+          (sum, asset) => sum + asset.ttmGrossDividends,
+          0
+        );
+
+        if (portfolioCostBasis > 0) {
+          portfolioYieldOnCost = (portfolioTtmDividends / portfolioCostBasis) * 100;
+          totalCostBasis = portfolioCostBasis;
+          yieldOnCostAssets = yocAssetsList;
+        }
+      }
+    }
+
     const stats = {
       period: {
         totalGross: periodStats.totalGross,
@@ -173,6 +249,12 @@ export async function GET(request: NextRequest) {
       byAsset,
       byYear,
       byMonth,
+      // Include YOC data only if available
+      ...(portfolioYieldOnCost !== undefined && {
+        portfolioYieldOnCost,
+        totalCostBasis,
+        yieldOnCostAssets,
+      }),
     };
 
     return NextResponse.json({

@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz
-- Feature ultimo mese: Grafico Sharpe Ratio Rolling 12M e medie mobili 3M su grafici Rolling (CAGR/Sharpe) in Performance
-- Ultima fix: Grafici Cashflow (Storico Totale + Anno Corrente) in modalità % con scala corretta, clamp e linea zero
+- Feature ultimo mese: Yield on Cost (YOC) analysis con metric card e tabella dettagliata per asset
+- Ultima fix: Aggiunte spiegazioni "dividendi lordi TTM (12 mesi)" nella UI YOC per chiarezza calcolo
 - In corso ora: nessuna attivita attiva nota
 - Completamento: n/d (da confermare)
 
@@ -30,7 +30,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Cashflow con categorie, filtri e statistiche.
 - Snapshot mensili automatici + storico e CSV export.
 - Performance metrics (ROI, CAGR, TWR, IRR, Sharpe, drawdown suite) con heatmap rendimenti mensili, grafico underwater e rolling CAGR/Sharpe con medie mobili.
-- Dividendi multi-currency con conversione EUR e scraping Borsa Italiana.
+- Dividendi multi-currency con conversione EUR, scraping Borsa Italiana, e Yield on Cost (YOC) analysis.
 - Hall of Fame con ranking mensili/annuali e highlight del periodo corrente.
 - FIRE calculator e Monte Carlo.
 
@@ -53,8 +53,10 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Performance metrics: `lib/services/performanceService.ts`
 - Performance charts: `components/performance/MonthlyReturnsHeatmap.tsx`, `components/performance/UnderwaterDrawdownChart.tsx`
 - Cashflow charts: `components/cashflow/TotalHistoryTab.tsx`, `components/cashflow/CurrentYearTab.tsx`
+- Dividends stats: `app/api/dividends/stats/route.ts`, `components/dividends/DividendStats.tsx`
+- Dividend types: `types/dividend.ts`
 - Hall of Fame UI: `app/dashboard/hall-of-fame/page.tsx`
 - Date helpers: `lib/utils/dateHelpers.ts`
 - Formatters: `lib/utils/formatters.ts`
 
-**Last updated**: 2026-01-11
+**Last updated**: 2026-01-13
