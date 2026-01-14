@@ -1,6 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getQuote } from '@/lib/services/yahooFinanceService';
 
+/**
+ * GET /api/prices/quote
+ *
+ * Fetch real-time price quote for a single ticker from Yahoo Finance
+ *
+ * Query Parameters:
+ *   @param ticker - Stock/ETF ticker symbol (e.g., "AAPL", "VOO")
+ *
+ * Response:
+ *   {
+ *     symbol: string,
+ *     price: number,
+ *     currency: string,
+ *     name: string,
+ *     exchange: string
+ *   }
+ *
+ * Related:
+ *   - yahooFinanceService.ts: Quote fetching implementation
+ */
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;

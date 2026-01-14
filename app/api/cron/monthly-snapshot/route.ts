@@ -2,6 +2,36 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { updateHallOfFame } from '@/lib/services/hallOfFameService.server';
 
+/**
+ * GET /api/cron/monthly-snapshot
+ *
+ * Monthly automated snapshot creation cron job
+ * Scheduled execution: 1st of each month at 00:00 UTC via Vercel Cron
+ *
+ * Orchestration Pattern:
+ *   - Fetches all users from database
+ *   - For each user: Calls /api/portfolio/snapshot internally
+ *   - After each snapshot: Updates Hall of Fame rankings
+ *   - Collects results and errors for monitoring
+ *
+ * Why internal fetch instead of direct service calls?
+ *   - Reuses existing snapshot logic (price updates, calculations)
+ *   - Maintains single source of truth for snapshot creation
+ *   - Simplifies error handling and response formatting
+ *
+ * Error Handling:
+ *   - Non-blocking: One user's failure doesn't stop others
+ *   - Hall of Fame update failures are logged but don't fail the job
+ *   - Returns summary of successes and failures
+ *
+ * Security:
+ *   - Requires CRON_SECRET via Authorization header
+ *   - Uses Admin SDK for cross-user operations
+ *
+ * Related:
+ *   - portfolio/snapshot/route.ts: Called internally for each user
+ *   - hallOfFameService.server.ts: Ranking updates after snapshots
+ */
 export async function GET(request: NextRequest) {
   try {
     // Verify cron secret

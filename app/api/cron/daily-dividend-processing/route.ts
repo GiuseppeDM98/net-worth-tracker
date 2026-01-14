@@ -10,9 +10,34 @@ import { Asset } from '@/types/assets';
 
 /**
  * GET /api/cron/daily-dividend-processing
- * Vercel cron job that processes dividends with payment date = today
- * Creates expense entries for paid dividends if user has configured dividend income category
- * Runs daily at 00:00 UTC
+ *
+ * Daily automated dividend processing cron job
+ * Scheduled execution: 00:00 UTC via Vercel Cron
+ *
+ * Two-Phase Architecture:
+ *   Phase 1: Dividend Discovery (Scraping)
+ *     - Scrapes Borsa Italiana for dividend announcements
+ *     - Creates dividend entries for all users with equity assets
+ *     - 60-day lookback window to catch recent ex-dates
+ *
+ *   Phase 2: Expense Creation (Accounting)
+ *     - Finds dividends with paymentDate = today
+ *     - Creates cashflow expense entries for paid dividends
+ *     - Requires user to have dividendIncomeCategoryId configured
+ *
+ * Security:
+ *   - Requires CRON_SECRET via Authorization header
+ *   - Uses Admin SDK for cross-user operations
+ *
+ * Error Handling:
+ *   - Non-blocking: failures for one user/asset don't stop processing
+ *   - All errors logged but not returned to client
+ *   - Returns summary statistics for monitoring
+ *
+ * Related:
+ *   - dividends/scrape/route.ts: Manual per-asset scraping
+ *   - dividendIncomeService.ts: Expense creation logic
+ *   - borsaItalianaScraperService.ts: Scraping implementation
  */
 export async function GET(request: NextRequest) {
   try {
@@ -48,7 +73,12 @@ export async function GET(request: NextRequest) {
     let scrapingErrorsCount = 0;
     let newDividendsCount = 0;
 
-    // Define lookback window (60 days)
+    // 60-day lookback window: balance between catching recent dividends
+    // and avoiding excessive scraping of historical data
+    // Rationale:
+    //   - Most dividend announcements appear 30-60 days before payment
+    //   - Covers quarterly dividends with typical 45-day ex-date to payment gap
+    //   - Reduces scraping load vs. all-time historical scraping
     const sixtyDaysAgo = new Date();
     sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
@@ -90,9 +120,19 @@ export async function GET(request: NextRequest) {
               continue;
             }
 
-            // Filter dividends:
-            // 1. Ex-date within last 60 days
-            // 2. Ex-date on or after asset creation
+            // Dividend Eligibility Filter (Two-Part Test)
+            //
+            // Part 1: 60-day recency check (div.exDate >= sixtyDaysAgo)
+            //   Ensures we only import recent announcements, not full history
+            //
+            // Part 2: Asset ownership check (div.exDate >= asset.createdAt)
+            //   Critical: Only track dividends for assets owned before/on ex-date
+            //   Example: If you buy AAPL today, you're NOT eligible for dividends
+            //   with ex-dates last week (you didn't own it then)
+            //
+            //   Financial concept: Ex-dividend date = ownership cutoff
+            //   Own stock on ex-date → eligible for dividend
+            //   Buy after ex-date → not eligible
             const relevantDividends = scrapedDividends.filter((div) => {
               return div.exDate >= sixtyDaysAgo && isDateOnOrAfter(div.exDate, asset.createdAt);
             });
@@ -111,7 +151,10 @@ export async function GET(request: NextRequest) {
 
                 // Calculate amounts
                 const grossAmount = scrapedDiv.dividendPerShare * asset.quantity;
-                const taxAmount = grossAmount * 0.26; // Italian withholding tax
+                // Italian capital gains withholding tax rate (26%)
+                // Applied to dividend gross amounts for Italian tax residents
+                // Reference: Italian Legislative Decree 461/1997, Art. 27
+                const taxAmount = grossAmount * 0.26;
                 const netAmount = grossAmount - taxAmount;
 
                 // Create dividend data
@@ -164,7 +207,17 @@ export async function GET(request: NextRequest) {
     // ==================== PHASE 2: EXPENSE CREATION FOR PAID DIVIDENDS ====================
     console.log('Phase 2: Starting expense creation for paid dividends...');
 
-    // Calculate today's date range (00:00 to 23:59)
+    // ========== Phase 2: Date Range Setup ==========
+    //
+    // Goal: Find dividends with paymentDate exactly matching today
+    //
+    // Strategy: Create Firestore Timestamp range covering full day
+    //   todayStart:  2024-01-15T00:00:00.000Z
+    //   todayEnd:    2024-01-15T23:59:59.999Z
+    //
+    // This ensures we catch dividends regardless of time component
+    // and process each dividend exactly once (yesterday's run won't catch it,
+    // tomorrow's run won't catch it)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayEnd = new Date(today);
@@ -183,7 +236,18 @@ export async function GET(request: NextRequest) {
       const userId = userDoc.id;
 
       try {
-        // Get user settings
+        // Check if user has configured dividend income tracking
+        //
+        // User settings (stored in assetAllocationTargets collection):
+        //   - dividendIncomeCategoryId: Which expense category to use
+        //   - dividendIncomeSubCategoryId: Optional subcategory
+        //
+        // Why stored in assetAllocationTargets?
+        //   - Historical: This was the first user settings collection
+        //   - Contains other portfolio configuration (target allocations)
+        //   - TODO: Consider migrating to dedicated userSettings collection
+        //
+        // If not configured: Skip expense creation (dividends still tracked)
         const settingsRef = adminDb.collection('assetAllocationTargets').doc(userId);
         const settingsDoc = await settingsRef.get();
 
@@ -245,14 +309,29 @@ export async function GET(request: NextRequest) {
           const dividend = dividendDoc.data();
           const dividendId = dividendDoc.id;
 
-          // Skip if already has linked expense
+          // Idempotency check: Skip if expense already created
+          //
+          // Prevents duplicate expense creation if:
+          //   - Cron job runs multiple times on same day (Vercel retry)
+          //   - User manually created expense via UI
+          //   - Previous run partially failed and is being retried
+          //
+          // The expenseId field acts as a processing flag
           if (dividend.expenseId) {
             console.log(`Dividend ${dividendId} already has linked expense, skipping`);
             continue;
           }
 
           try {
-            // Transform Firestore data to Dividend type
+            // Transform raw Firestore document to typed Dividend object
+            //
+            // Required because Admin SDK returns Firestore-native types:
+            //   - Timestamp objects (not Date)
+            //   - DocumentReference (not string IDs)
+            //   - Undefined for missing fields (not null)
+            //
+            // The .toDate() calls convert Firestore Timestamp → JavaScript Date
+            // so dividendIncomeService can work with standard Date objects
             const dividendData = {
               id: dividendId,
               userId,

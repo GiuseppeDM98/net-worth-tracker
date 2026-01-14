@@ -1,6 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { updateUserAssetPrices } from '@/lib/helpers/priceUpdater';
 
+/**
+ * POST /api/prices/update
+ *
+ * Update current prices for all user assets from Yahoo Finance
+ *
+ * Request Body:
+ *   {
+ *     userId: string  // Required
+ *   }
+ *
+ * Response:
+ *   {
+ *     success: boolean,
+ *     message: string,
+ *     updatedCount: number,
+ *     failedTickers: string[]
+ *   }
+ *
+ * Related:
+ *   - priceUpdater.ts: Price fetching implementation
+ *   - yahooFinanceService.ts: API integration
+ */
 export async function POST(request: NextRequest) {
   try {
     // Get user ID from request

@@ -14,8 +14,28 @@ import { DividendFormData } from '@/types/dividend';
 
 /**
  * PUT /api/dividends/[dividendId]
- * Body: { updates: Partial<DividendFormData> }
- * Updates a dividend and optionally updates linked expense entry
+ *
+ * Update dividend with automatic linked expense synchronization
+ *
+ * Request Body:
+ *   {
+ *     updates: Partial<DividendFormData>  // Fields to update
+ *   }
+ *
+ * Expense Synchronization:
+ *   If dividend has linked expense (expenseId exists):
+ *     - Automatically updates corresponding expense entry
+ *     - Synchronizes amount, date, and description
+ *     - Non-blocking: expense update failure doesn't fail dividend update
+ *
+ * Response:
+ *   {
+ *     success: boolean,
+ *     message: string
+ *   }
+ *
+ * Related:
+ *   - dividendIncomeService.ts: Expense synchronization logic
  */
 export async function PUT(
   request: NextRequest,
@@ -98,7 +118,23 @@ export async function PUT(
 
 /**
  * DELETE /api/dividends/[dividendId]
- * Deletes a dividend and optionally deletes linked expense entry
+ *
+ * Delete dividend with cascading linked expense deletion
+ *
+ * Cascade Logic:
+ *   If dividend has linked expense (expenseId exists):
+ *     - Deletes the linked expense first
+ *     - Then deletes the dividend
+ *     - Non-blocking: expense deletion failure doesn't prevent dividend deletion
+ *
+ * Response:
+ *   {
+ *     success: boolean,
+ *     message: string
+ *   }
+ *
+ * Related:
+ *   - dividendIncomeService.ts: Expense deletion logic
  */
 export async function DELETE(
   request: NextRequest,
