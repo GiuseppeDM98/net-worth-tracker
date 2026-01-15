@@ -1,5 +1,22 @@
 'use client';
 
+/**
+ * ExpenseCard Component
+ *
+ * Mobile-friendly card component for displaying individual expense entries.
+ * Features collapsible details section for notes, links, and installment information.
+ *
+ * Design:
+ * - Compact header with amount, type badge, and category
+ * - Expandable details section (hidden by default to save space)
+ * - Color-coded badges and icons for quick visual scanning
+ * - Edit/Delete actions accessible from card footer
+ *
+ * @param expense - Expense data to display
+ * @param onEdit - Callback to open edit dialog
+ * @param onDelete - Callback to handle deletion (may trigger confirmation)
+ */
+
 import { useState } from 'react';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { Card, CardContent } from '@/components/ui/card';
@@ -37,6 +54,19 @@ const formatDate = (date: Date | string | Timestamp): string => {
   return format(dateObj, 'dd/MM/yyyy', { locale: it });
 };
 
+/**
+ * Teacher Comment: Badge Color Mapping
+ *
+ * Color scheme for expense type badges:
+ * - Income (green): Positive cash flow, success color
+ * - Fixed (blue): Stable, predictable expenses (rent, subscriptions)
+ * - Variable (purple): Flexible expenses that vary month-to-month (groceries, entertainment)
+ * - Debt (orange): Warning color for loan/credit payments requiring attention
+ * - Default (gray): Fallback for any undefined types
+ *
+ * Using Tailwind's 100-level backgrounds with 800-level text provides good
+ * contrast and readability while maintaining visual hierarchy.
+ */
 const getTypeBadgeColor = (type: ExpenseType): string => {
   switch (type) {
     case 'income':

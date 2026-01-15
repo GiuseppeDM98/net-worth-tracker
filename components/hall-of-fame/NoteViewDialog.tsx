@@ -1,5 +1,17 @@
 'use client';
 
+/**
+ * NoteViewDialog Component
+ *
+ * Simple read-only dialog for displaying full note text from Hall of Fame entries.
+ * Uses whitespace-pre-wrap to preserve line breaks and formatting from user input.
+ *
+ * @param open - Controls dialog visibility
+ * @param onOpenChange - Callback when dialog open state changes
+ * @param monthYear - Formatted date string for dialog title (e.g., "Jan 2024")
+ * @param note - Full note text to display
+ */
+
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 

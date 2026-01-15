@@ -1,5 +1,45 @@
 'use client';
 
+/**
+ * MonteCarloTab Component
+ *
+ * Monte Carlo simulation interface for retirement planning and portfolio analysis.
+ *
+ * Design Approach - Three Parameter Sources (Teacher Comment):
+ *
+ * The simulation can use return/volatility parameters from three different sources:
+ *
+ * 1. Market Defaults ('market'):
+ *    - Industry-standard historical averages (e.g., 7% equity return, 15% equity volatility)
+ *    - Suitable for users without historical data or who want conservative estimates
+ *    - Based on long-term market performance (S&P 500, bond indices)
+ *
+ * 2. Historical Data ('historical'):
+ *    - Calculated from user's own snapshot history
+ *    - Uses calculateHistoricalReturns() to derive actual portfolio returns and volatility
+ *    - Only available if user has sufficient snapshot history (6+ months recommended)
+ *    - Most accurate for users with long tracking history
+ *
+ * 3. Custom ('custom'):
+ *    - User manually enters their own assumptions
+ *    - Allows testing optimistic/pessimistic scenarios
+ *    - Useful for sensitivity analysis
+ *
+ * Monte Carlo Method:
+ * Runs N simulations (default 10,000) of portfolio performance over retirement years.
+ * Each simulation uses random sampling from normal distributions defined by return/volatility params.
+ * Success rate = % of simulations where portfolio doesn't run out before retirement ends.
+ *
+ * Key Features:
+ * - Auto-prefill portfolio value from user's current net worth
+ * - Auto-prefill annual withdrawal from planned expenses (if set)
+ * - Portfolio allocation validation (equity + bonds must equal 100%)
+ * - Withdrawal adjustment modes: inflation-adjusted or fixed
+ * - Rich visualization: percentile chart, distribution chart, success rate card
+ *
+ * @returns Tab component with parameter form, simulation button, and results visualization
+ */
+
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,9 +62,16 @@ import { DistributionChart } from '@/components/monte-carlo/DistributionChart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export function MonteCarloTab() {
+  // ========== State and Data Fetching ==========
+
   const { user } = useAuth();
   const [results, setResults] = useState<MonteCarloResults | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+
+  /**
+   * React Query Integration: All three queries run in parallel and are cached for 5 minutes.
+   * This prevents redundant API calls when switching between tabs or re-rendering.
+   */
 
   // Fetch assets data (will be cached)
   const { data: assets, isLoading: isLoadingAssets } = useQuery({
@@ -42,7 +89,7 @@ export function MonteCarloTab() {
     staleTime: 300000, // 5 minutes
   });
 
-  // Fetch snapshots data
+  // Fetch snapshots data for historical returns calculation
   const { data: snapshots, isLoading: isLoadingSnapshots } = useQuery({
     queryKey: ['snapshots', user?.uid],
     queryFn: () => getUserSnapshots(user!.uid),
@@ -56,8 +103,26 @@ export function MonteCarloTab() {
   const availableSnapshotCount = snapshots ? snapshots.filter((s) => !s.isDummy).length : 0;
   const historicalReturns = snapshots ? calculateHistoricalReturns(snapshots) : null;
 
+  // ========== Parameter Initialization ==========
+
   const defaultMarketParams = getDefaultMarketParameters();
 
+  /**
+   * Teacher Comment: Smart Parameter Initialization
+   *
+   * Initial params use sensible defaults:
+   * - portfolioSource: 'total' (use total net worth, not just liquid)
+   * - initialPortfolio: 0 (will be auto-filled from totalNetWorth in useEffect)
+   * - retirementYears: 30 (common planning horizon)
+   * - equity/bonds: 60/40 (classic balanced portfolio allocation)
+   * - annualWithdrawal: 30000 (placeholder, will be auto-filled from settings)
+   * - parameterSource: 'market' (default to conservative market averages)
+   * - numberOfSimulations: 10000 (good balance of accuracy vs performance)
+   *
+   * Why initialize with 0 for initialPortfolio?
+   * Assets query might not be loaded yet. The useEffect below will populate it
+   * once data arrives, avoiding premature simulation runs with incomplete data.
+   */
   const [params, setParams] = useState<MonteCarloParams>({
     portfolioSource: 'total',
     initialPortfolio: 0,
@@ -75,7 +140,14 @@ export function MonteCarloTab() {
     numberOfSimulations: 10000,
   });
 
-  // Effect to update params when data loads
+  /**
+   * Auto-fill portfolio value and withdrawal from user data.
+   *
+   * Why this effect depends on totalNetWorth and settings?
+   * - Both values come from async queries that may not be loaded on mount
+   * - We want to update params once data arrives, but not on every render
+   * - Dependency array ensures we only update when these specific values change
+   */
   useEffect(() => {
     if (totalNetWorth > 0 && settings) {
       setParams((prev) => ({
@@ -91,7 +163,10 @@ export function MonteCarloTab() {
     }
   }, [totalNetWorth, settings]);
 
+  // ========== Simulation Logic ==========
+
   const handleRunSimulation = () => {
+    // Validation: Ensure all required parameters are valid before running
     if (params.initialPortfolio <= 0) {
       toast.error('Inserisci un patrimonio iniziale valido');
       return;
@@ -100,6 +175,15 @@ export function MonteCarloTab() {
       toast.error('Inserisci un prelievo annuale valido');
       return;
     }
+
+    /**
+     * Why Math.abs() with 0.01 tolerance instead of strict === 100?
+     *
+     * Floating point arithmetic can cause small precision errors. For example,
+     * 60 + 40 might actually be 99.99999999999999 due to JavaScript's number
+     * representation. Using absolute difference with small tolerance (0.01%)
+     * accounts for these precision issues while still validating the sum is 100%.
+     */
     if (Math.abs(params.equityPercentage + params.bondsPercentage - 100) > 0.01) {
       toast.error('La somma di Equity e Bonds deve essere 100%');
       return;
@@ -112,6 +196,18 @@ export function MonteCarloTab() {
     try {
       setIsRunning(true);
       toast.info('Esecuzione simulazione in corso...');
+
+      /**
+       * Why setTimeout with 100ms delay?
+       *
+       * Monte Carlo simulation with 10,000 runs is CPU-intensive and can block
+       * the main thread for 1-2 seconds, freezing the UI. By wrapping in setTimeout,
+       * we give the browser a chance to render the "running" state (spinner, disabled
+       * button) before the heavy computation starts. This provides visual feedback
+       * that something is happening, improving perceived performance.
+       *
+       * Alternative would be to use Web Workers, but that adds significant complexity.
+       */
       setTimeout(() => {
         try {
           const simulationResults = runMonteCarloSimulation(params);
@@ -131,6 +227,8 @@ export function MonteCarloTab() {
     }
   };
 
+  // ========== Render ==========
+
   if (isLoadingAssets || isLoadingSettings || isLoadingSnapshots) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -141,7 +239,7 @@ export function MonteCarloTab() {
 
   return (
     <div className="space-y-6">
-      {/* Info Card */}
+      {/* ========== Information Card ========== */}
       <Card className="bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200">
         <CardHeader>
           <CardTitle className="text-lg">ℹ️ Come Funzionano le Simulazioni</CardTitle>

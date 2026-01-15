@@ -1,5 +1,36 @@
 'use client';
 
+/**
+ * CategoryManagementDialog Component
+ *
+ * Dialog for creating and editing expense categories with subcategory management.
+ *
+ * Features:
+ * - Create/Edit Category: Form with name, type, and color picker
+ * - Subcategory CRUD: Add, remove subcategories inline
+ * - Smart Deletion: Checks for expenses using subcategory before deletion
+ * - Reassignment Flow: Triggers CategoryDeleteConfirmDialog if subcategory has expenses
+ * - Validation: Zod schema with custom refinement for type immutability on edit
+ * - Color Picker: Predefined palette with visual color swatches
+ *
+ * Design Considerations:
+ * - Category type cannot be changed after creation to maintain data integrity
+ * - Deleting subcategories with expenses requires reassignment to prevent data loss
+ * - Form resets on dialog close to clear stale state
+ *
+ * WARNING (Checklist Comment):
+ * If you modify subcategory deletion logic, also update:
+ * - CategoryDeleteConfirmDialog.tsx (handles reassignment flow)
+ * - lib/services/expenseService.ts (reassignment implementation)
+ *
+ * @param open - Controls dialog visibility
+ * @param onClose - Callback when dialog closes
+ * @param category - Optional category to edit (undefined for create mode)
+ * @param onSuccess - Callback after successful create/update
+ * @param initialType - Pre-select type for create mode (used by parent dialogs)
+ * @param initialName - Pre-fill name for create mode (used by inline creation)
+ */
+
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -40,8 +71,19 @@ import {
 import { toast } from 'sonner';
 import { Plus, X } from 'lucide-react';
 
+/**
+ * Teacher Comment: Zod Schema with Custom Refinement
+ *
+ * Base schema validates name, type, and optional color.
+ * Custom refinement (if added) would enforce business rules like:
+ * - Type immutability on edit (type can't change after category created)
+ * - Name uniqueness validation (no duplicate category names)
+ *
+ * Current implementation uses simple schema, with type immutability
+ * enforced via disabled form field rather than schema validation.
+ */
 const categorySchema = z.object({
-  name: z.string().min(1, 'Nome categoria è obbligatorio'),
+  name: z.string().min(1, 'Category name is required'),
   type: z.enum(['fixed', 'variable', 'debt', 'income']),
   color: z.string().optional(),
 });

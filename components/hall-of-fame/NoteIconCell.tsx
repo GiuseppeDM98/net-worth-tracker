@@ -1,5 +1,15 @@
 'use client';
 
+/**
+ * NoteIconCell Component
+ *
+ * Renders a clickable icon button for viewing notes in Hall of Fame rankings.
+ * Displays an amber message icon when a note exists, or a spacer div for alignment when no note is present.
+ *
+ * @param note - Optional note text to display in dialog
+ * @param monthYear - Formatted date string for dialog title (e.g., "Jan 2024")
+ */
+
 import { useState } from 'react';
 import { MessageSquare } from 'lucide-react';
 import { NoteViewDialog } from './NoteViewDialog';
@@ -13,7 +23,7 @@ export function NoteIconCell({ note, monthYear }: NoteIconCellProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
 
   if (!note) {
-    return <div className="w-8" />; // Spacer per allineamento
+    return <div className="w-8" />; // Spacer for alignment when no note exists
   }
 
   return (

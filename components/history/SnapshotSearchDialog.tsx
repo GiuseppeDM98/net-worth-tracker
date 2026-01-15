@@ -1,5 +1,32 @@
 'use client';
 
+/**
+ * SnapshotSearchDialog Component
+ *
+ * Dialog for searching snapshots and adding/editing notes for financial events.
+ *
+ * Features:
+ * - Searchable Snapshot Dropdown: Find snapshots by date/amount
+ * - Note Management: Add/edit notes up to 500 characters with visual feedback
+ * - Character Counter: Color-coded remaining characters (warning at 50 remaining)
+ * - Amber Highlighting: Snapshots with existing notes highlighted in dropdown
+ * - Formatted Display: Italian date format (MMMM yyyy) with currency formatting
+ *
+ * Note Use Cases:
+ * - Document significant financial events (bonus received, large purchase)
+ * - Explain anomalies in net worth (market crash, inheritance)
+ * - Track milestones (reached savings goal, paid off debt)
+ *
+ * Teacher Comment: Snapshot ID Format
+ * Snapshot IDs use format "YYYY-MM" (e.g., "2024-01" for January 2024).
+ * To extract year/month: const [year, month] = id.split('-').map(Number);
+ *
+ * @param open - Controls dialog visibility
+ * @param onOpenChange - Callback when dialog open state changes
+ * @param snapshots - Array of snapshots to choose from
+ * @param onSave - Async callback with year, month, note to save to database
+ */
+
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';

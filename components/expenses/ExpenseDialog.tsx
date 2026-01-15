@@ -1,5 +1,34 @@
 'use client';
 
+/**
+ * ExpenseDialog Component
+ *
+ * Comprehensive expense creation and editing dialog with advanced features:
+ *
+ * Design Approach:
+ * - Form validation using Zod with custom refinement for complex installment logic
+ * - Two installment modes: auto-calculate (splits total evenly) vs manual (custom amounts per installment)
+ * - Conditional field visibility based on expense type and feature toggles
+ * - Inline category and subcategory creation without leaving the dialog
+ * - React Hook Form integration with Controller for date fields
+ *
+ * Key Features:
+ * - Installment System: Create multiple monthly installments with intelligent amount splitting
+ * - Recurring Expenses: Generate multiple expense entries for consecutive months (debt type only)
+ * - Category Management: Filter categories by type, create new categories, add subcategories on-the-fly
+ * - Smart Defaults: Auto-populate recurring day from selected date, prefill installment total from amount field
+ *
+ * Trade-offs:
+ * - Installments and recurring expenses are mutually exclusive to prevent confusion
+ * - Expense type cannot be changed after creation to maintain data integrity
+ * - Date parsing uses local midnight (T00:00:00) to avoid timezone issues with date-only inputs
+ *
+ * @param open - Controls dialog visibility
+ * @param onClose - Callback when dialog closes
+ * @param expense - Optional expense to edit (undefined for new expense creation)
+ * @param onSuccess - Optional callback after successful save
+ */
+
 import { useEffect, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -41,6 +70,25 @@ import { it } from 'date-fns/locale';
 import { Plus } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/formatters';
 
+/**
+ * Expense form validation schema with custom refinement for installments.
+ *
+ * Custom Refinement Logic (Teacher Comment):
+ * When isInstallment is true, we need different required fields based on installment mode:
+ *
+ * 1. Auto mode requires:
+ *    - installmentCount (min 2 installments)
+ *    - installmentTotalAmount (total amount to split)
+ *    The system will automatically split the total evenly across installments
+ *
+ * 2. Manual mode requires:
+ *    - installmentCount (min 2 installments)
+ *    - installmentAmounts array with exact length matching count
+ *    User provides custom amount for each installment
+ *
+ * This refinement runs after base schema validation and provides context-aware
+ * validation that Zod's declarative schema alone cannot express.
+ */
 const expenseSchema = z.object({
   type: z.enum(['fixed', 'variable', 'debt', 'income']),
   categoryId: z.string().min(1, 'Categoria è obbligatoria'),
@@ -60,14 +108,17 @@ const expenseSchema = z.object({
   installmentAmounts: z.array(z.number()).optional(),
   installmentStartDate: z.date().optional(),
 }).refine((data) => {
-  // Validazione custom: se isInstallment=true, campi richiesti
+  // Custom validation: when isInstallment is true, validate mode-specific required fields
   if (data.isInstallment) {
+    // All installments must have at least 2 payments
     if (!data.installmentCount || data.installmentCount < 2) {
       return false;
     }
+    // Auto mode needs total amount to split
     if (data.installmentMode === 'auto' && !data.installmentTotalAmount) {
       return false;
     }
+    // Manual mode needs exactly one amount per installment
     if (data.installmentMode === 'manual' &&
         (!data.installmentAmounts || data.installmentAmounts.length !== data.installmentCount)) {
       return false;
@@ -75,7 +126,7 @@ const expenseSchema = z.object({
   }
   return true;
 }, {
-  message: "Campi installment incompleti o non validi"
+  message: "Installment fields incomplete or invalid"
 });
 
 type ExpenseFormValues = z.infer<typeof expenseSchema>;
@@ -139,6 +190,9 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
   }, [open, user]);
 
   // Reset subcategory when category changes
+  // Why: Subcategories belong to specific categories. When user changes category,
+  // the previously selected subcategory is no longer valid for the new category,
+  // so we clear it to prevent data inconsistency. Only applies to new expenses.
   useEffect(() => {
     if (!expense) {
       setValue('subCategoryId', '');
@@ -193,6 +247,10 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
   }, [expense, reset, open]);
 
   // Auto-set recurring day when date changes
+  // Why: When user enables recurring expenses and selects a date, we automatically
+  // set the recurring day to match the selected date's day-of-month. This provides
+  // a sensible default (e.g., if they pick Jan 15, recurring entries should be on the 15th).
+  // Only applies to new expenses to avoid changing existing recurring patterns.
   useEffect(() => {
     if (selectedDate && selectedIsRecurring && !expense) {
       setValue('recurringDay', selectedDate.getDate());
@@ -346,34 +404,66 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
   const availableCategories = getAvailableCategories();
   const availableSubCategories = getAvailableSubCategories();
 
-  // Helper: Calcola data N-esima rata (mensile)
+  /**
+   * Calculate the date for the Nth installment based on monthly intervals.
+   *
+   * @param startDate - The date of the first installment
+   * @param monthOffset - Number of months to add (0 for first installment, 1 for second, etc.)
+   * @returns Date for the specified installment
+   */
   const calculateInstallmentDate = (startDate: Date, monthOffset: number): Date => {
     const date = new Date(startDate);
     date.setMonth(date.getMonth() + monthOffset);
     return date;
   };
 
-  // Helper Component: Preview divisione automatica rate
+  /**
+   * InstallmentPreview - Preview component showing how total amount will be split across installments.
+   *
+   * Installment Splitting Algorithm (Teacher Comment):
+   *
+   * Problem: When dividing a total amount by installment count, we often get non-terminating decimals
+   * (e.g., 100 / 3 = 33.333...). We need to split into discrete amounts that sum exactly to the total.
+   *
+   * Solution:
+   * 1. Calculate per-installment amount: total / count
+   * 2. Floor to 2 decimal places using Math.floor(amount * 100) / 100
+   *    Why floor instead of round? We want to ensure we don't exceed the total.
+   * 3. Calculate remainder: total - (baseAmount * count)
+   * 4. Add entire remainder to the LAST installment
+   *    Why last? Puts any difference at the end, making first N-1 installments identical
+   *
+   * Example: 100 EUR split 3 ways
+   * - Base: Math.floor(33.333... * 100) / 100 = 33.33
+   * - Remainder: 100 - (33.33 * 3) = 100 - 99.99 = 0.01
+   * - Result: 33.33, 33.33, 33.34 (last gets +0.01)
+   *
+   * Edge Case: If remainder < 0.01 (essentially zero due to floating point), all installments are equal.
+   *
+   * @param total - Total amount to split
+   * @param count - Number of installments
+   * @returns JSX showing the split (e.g., "2 installments of €50.00 + 1 installment of €50.01")
+   */
   const InstallmentPreview = ({ total, count }: { total: number; count: number }) => {
     const perInstallment = total / count;
-    const baseAmount = Math.floor(perInstallment * 100) / 100; // Arrotonda per difetto
+    const baseAmount = Math.floor(perInstallment * 100) / 100; // Round down to 2 decimals
     const remainder = total - (baseAmount * count);
     const lastAmount = baseAmount + remainder;
 
-    // Se tutte le rate sono uguali (remainder trascurabile)
+    // If all installments are equal (remainder negligible due to floating point)
     if (Math.abs(remainder) < 0.01) {
       return (
         <p className="text-sm">
-          {count} rate da {formatCurrency(baseAmount)}
+          {count} installments of {formatCurrency(baseAmount)}
         </p>
       );
     }
 
-    // Se c'è una differenza, mostra la divisione
+    // If there's a difference, show the split
     const identicalCount = count - 1;
     return (
       <p className="text-sm">
-        {identicalCount} rate da {formatCurrency(baseAmount)} + 1 rata da {formatCurrency(lastAmount)}
+        {identicalCount} installments of {formatCurrency(baseAmount)} + 1 installment of {formatCurrency(lastAmount)}
       </p>
     );
   };
@@ -388,6 +478,8 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
+          {/* ========== Basic Information Section ========== */}
+
           {/* Tipo di Voce */}
           <div className="space-y-2">
             <Label htmlFor="type">Tipo di Voce *</Label>
@@ -549,6 +641,8 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
             </div>
           )}
 
+          {/* ========== Amount and Date Section ========== */}
+
           {/* Importo */}
           <div className="space-y-2">
             <Label htmlFor="amount">
@@ -585,8 +679,13 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
                   value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
                   onChange={(e) => {
                     const dateString = e.target.value;
-                    // Browser garantisce formato yyyy-MM-dd quando onChange viene chiamato
+                    // Browser guarantees yyyy-MM-dd format when onChange is called
                     if (dateString) {
+                      // Why append 'T00:00:00':
+                      // HTML date inputs return date-only strings like "2024-01-15"
+                      // new Date("2024-01-15") parses as UTC midnight, which may shift to
+                      // previous day in some timezones. Appending T00:00:00 forces parsing
+                      // as local midnight, ensuring the date stays as selected.
                       const date = new Date(dateString + 'T00:00:00');
                       if (!isNaN(date.getTime())) {
                         field.onChange(date);
@@ -601,6 +700,8 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
               <p className="text-sm text-red-500">{errors.date.message}</p>
             )}
           </div>
+
+          {/* ========== Optional Details Section ========== */}
 
           {/* Note */}
           <div className="space-y-2">
@@ -631,14 +732,16 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
             </p>
           </div>
 
-          {/* Acquisto Rateale (tutte le categorie) */}
+          {/* ========== Advanced Features Section ========== */}
+
+          {/* Installment Purchase (all categories) */}
           {!expense && (
             <div className="space-y-4 border rounded-md p-4 bg-muted/50">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="isInstallment">Acquisto rateale</Label>
+                  <Label htmlFor="isInstallment">Installment Purchase</Label>
                   <p className="text-sm text-muted-foreground">
-                    Crea automaticamente rate mensili con importi personalizzati
+                    Automatically create monthly installments with customizable amounts
                   </p>
                 </div>
                 <Switch
@@ -647,11 +750,12 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
                   onCheckedChange={(checked) => {
                     setValue('isInstallment', checked);
                     if (checked) {
+                      // Why: Installments and recurring are mutually exclusive to avoid confusion
                       setValue('isRecurring', false);
                       setValue('installmentMode', 'auto');
                       setValue('installmentStartDate', watch('date'));
 
-                      // Pre-compila importo totale con l'importo già inserito
+                      // Prefill total amount from the amount field if already entered
                       const currentAmount = watch('amount');
                       if (currentAmount && currentAmount > 0) {
                         setValue('installmentTotalAmount', currentAmount);
@@ -833,7 +937,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
             </div>
           )}
 
-          {/* Ricorrenza (solo per debiti) */}
+          {/* Recurring Expenses (debt type only) */}
           {selectedType === 'debt' && !expense && (
             <div className="space-y-4 border rounded-md p-4 bg-muted/50">
               <div className="flex items-center justify-between">

@@ -1,5 +1,46 @@
 'use client';
 
+/**
+ * FireCalculatorTab Component
+ *
+ * FIRE (Financial Independence Retire Early) calculator interface displaying
+ * current and planned metrics for retirement planning.
+ *
+ * Design Approach - Dependent Query Pattern (Teacher Comment):
+ *
+ * The component uses a three-tier query dependency chain:
+ * 1. settings query (independent)
+ * 2. assets query (independent)
+ * 3. fireData query (depends on both #1 and #2 being loaded)
+ *
+ * Why? fireData calculation requires currentNetWorth (from assets) and
+ * withdrawalRate (from settings). React Query's 'enabled' flag prevents
+ * fireData query from running until dependencies are ready, avoiding
+ * unnecessary API calls with incomplete data.
+ *
+ * Key Metrics Displayed:
+ * - Current Metrics:
+ *   - FIRE Number: Net worth needed to retire (annual expenses / withdrawal rate)
+ *   - Progress %: (current net worth / FIRE number) * 100
+ *   - Current Allowances: Annual/monthly/daily spending based on safe withdrawal rate
+ *   - Withdrawal Rate: % of portfolio withdrawn annually (default 4%)
+ *   - Years of Expenses: How long current net worth would last at current spending
+ *
+ * - Planned Metrics (optional, if user sets plannedAnnualExpenses):
+ *   - Shows same metrics calculated with planned expenses instead of current
+ *   - Helps users model lifestyle changes or expense reductions in retirement
+ *
+ * - Historical Chart:
+ *   - Line chart showing income, expenses, monthly allowance evolution over time
+ *   - Visualizes progress toward FIRE goal
+ *
+ * Settings Mutation:
+ * User can edit withdrawal rate and planned expenses, triggering cache invalidation
+ * and automatic recalculation of all dependent metrics.
+ *
+ * @returns Tab component with metric cards, settings form, and historical chart
+ */
+
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';

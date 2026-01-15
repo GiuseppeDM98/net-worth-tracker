@@ -1,5 +1,39 @@
 'use client';
 
+/**
+ * CategoryDeleteConfirmDialog Component
+ *
+ * Confirmation dialog for deleting expense categories or subcategories that have associated expenses.
+ * Prevents data loss by requiring user to reassign expenses to a different category before deletion.
+ *
+ * Features:
+ * - Reassignment Flow: Forces user to select a new category/subcategory for affected expenses
+ * - Searchable Dropdown: Filter categories with search query, create new categories inline
+ * - Smart Auto-Selection: Auto-selects category when only one option available
+ * - Subcategory Support: Handles both category deletion and subcategory deletion scenarios
+ * - Local State Management: Maintains local category list to reflect inline category creation
+ *
+ * Flow:
+ * 1. User attempts to delete category/subcategory with N expenses
+ * 2. Dialog shows warning with expense count
+ * 3. User searches and selects replacement category (and optionally subcategory)
+ * 4. Confirmation triggers reassignment in parent component
+ * 5. Original category/subcategory is deleted after reassignment completes
+ *
+ * WARNING (Checklist Comment):
+ * If you modify the category reassignment logic here, also update:
+ * - CategoryManagementDialog.tsx (parent dialog that triggers this)
+ * - lib/services/expenseCategoryService.ts (reassignment implementation)
+ *
+ * @param open - Controls dialog visibility
+ * @param onClose - Callback when dialog closes
+ * @param onConfirm - Callback with new category/subcategory IDs for reassignment
+ * @param categoryToDelete - Category being deleted (contains metadata)
+ * @param expenseCount - Number of expenses affected by deletion
+ * @param allCategories - Full list of categories for reassignment options
+ * @param subCategoryToDelete - Optional subcategory being deleted (undefined for category deletion)
+ */
+
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -55,20 +89,37 @@ export function CategoryDeleteConfirmDialog({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
+  // ========== State Management ==========
+
   // New category creation dialog state
   const [createCategoryDialogOpen, setCreateCategoryDialogOpen] = useState(false);
+  // Why local categories: We need to track inline category creation without forcing parent re-render
   const [localCategories, setLocalCategories] = useState<ExpenseCategory[]>(allCategories);
 
   // Ref for click outside detection
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Filter out the category being deleted (memoized to prevent useEffect triggers)
+  // ========== Filtering Logic ==========
+
+  /**
+   * Teacher Comment: Memoization Strategy for Category Filtering
+   *
+   * Why useMemo here? The filtering logic is used as a dependency in multiple useEffects.
+   * Without memoization, the filtered array would be recreated on every render, causing
+   * those useEffects to run unnecessarily and potentially creating infinite loops.
+   *
+   * By memoizing, we ensure the reference stays stable unless the actual dependencies
+   * (localCategories or categoryToDelete.id) change, preventing unnecessary effect triggers.
+   */
   const availableCategories = useMemo(
     () => localCategories.filter(cat => cat.id !== categoryToDelete.id),
     [localCategories, categoryToDelete.id]
   );
 
-  // Filter categories based on search query
+  /**
+   * Filter categories based on user's search query.
+   * Returns all available categories if search is empty, otherwise filters by name match.
+   */
   const filteredCategories = useMemo(() => {
     if (!searchQuery.trim()) {
       return availableCategories;
@@ -93,10 +144,18 @@ export function CategoryDeleteConfirmDialog({
     setLocalCategories(allCategories);
   }, [allCategories]);
 
+  // ========== Dialog Lifecycle Effects ==========
+
   useEffect(() => {
     // Reset selections when dialog opens/closes
     if (open) {
-      // If there's only one category available (subcategory deletion case), auto-select it
+      /**
+       * Why auto-select when only one category?
+       *
+       * Common scenario: User is deleting a subcategory, and all expenses belong to
+       * the parent category. There's only one category available (the parent), so we
+       * auto-select it to save the user a click. This improves UX for the most common case.
+       */
       if (availableCategories.length === 1) {
         setSelectedCategoryId(availableCategories[0].id);
       } else {
@@ -108,7 +167,14 @@ export function CategoryDeleteConfirmDialog({
     }
   }, [open, availableCategories]);
 
-  // Close dropdown when clicking outside
+  /**
+   * Why click-outside detection for dropdown?
+   *
+   * The searchable dropdown stays open while user types. Without click-outside handling,
+   * the dropdown would stay open even if user clicks elsewhere in the dialog, creating
+   * a poor UX. This effect adds a global listener to close the dropdown when clicking
+   * outside its bounds, matching standard dropdown behavior users expect.
+   */
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -127,20 +193,32 @@ export function CategoryDeleteConfirmDialog({
     setIsDropdownOpen(false);
   };
 
+  // ========== Event Handlers ==========
+
   const handleSelectCategory = (categoryId: string) => {
     setSelectedCategoryId(categoryId);
-    setSelectedSubCategoryId(''); // Reset subcategory when category changes
+    // Why reset subcategory: Subcategories belong to specific categories, so when
+    // user changes category, previous subcategory selection is no longer valid
+    setSelectedSubCategoryId('');
     setIsDropdownOpen(false);
-    setSearchQuery(''); // Clear search after selection
+    setSearchQuery(''); // Clear search for better UX on next open
   };
 
+  /**
+   * Handle inline category creation from dropdown.
+   *
+   * Why auto-select newly created category:
+   * User created the category specifically for reassignment, so we auto-select it
+   * to save them from having to search and select it manually. We find the newest
+   * category by sorting by creation timestamp.
+   */
   const handleCategoryCreated = async () => {
-    // Reload categories from database
+    // Reload categories from database to get the newly created one
     if (user) {
       const updatedCategories = await getAllCategories(user.uid);
       setLocalCategories(updatedCategories);
 
-      // Auto-select the newly created category (last one in the list)
+      // Auto-select the newly created category (most recent by timestamp)
       const newestCategory = updatedCategories
         .filter(cat => cat.id !== categoryToDelete.id)
         .sort((a, b) => {
@@ -188,9 +266,12 @@ export function CategoryDeleteConfirmDialog({
     ? subCategoryToDelete.name
     : categoryToDelete.name;
 
+  // ========== Render ==========
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
+        {/* ========== Header Section ========== */}
         <DialogHeader>
           <div className="flex items-center gap-2 text-amber-600 mb-2">
             <AlertTriangle className="h-5 w-5" />
@@ -213,6 +294,7 @@ export function CategoryDeleteConfirmDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {/* ========== Reassignment Selection Section ========== */}
         <div className="space-y-4 py-4">
           {/* Category Selection - Only show if multiple categories available */}
           {availableCategories.length > 1 && (

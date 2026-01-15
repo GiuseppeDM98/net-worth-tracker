@@ -1,5 +1,29 @@
 'use client';
 
+/**
+ * ExpenseTable Component
+ *
+ * Paginated, sortable table for displaying and managing expense entries.
+ *
+ * Features:
+ * - Pagination: 10 items per page with navigation controls
+ * - Sortable Amount Column: 3-state cycle (none → desc → asc → none)
+ * - Smart Deletion: Handles three deletion types with confirmation dialogs
+ *   1. Single expense deletion
+ *   2. Recurring expense series deletion (delete one or delete all)
+ *   3. Installment series deletion (delete one or delete all)
+ * - Visual Indicators: Icons for recurring expenses, badges for installments, colored amounts
+ * - External Links: Clickable icons for expense attachments
+ *
+ * Pagination Behavior:
+ * - Resets to page 1 when data changes (add/delete) or sort changes
+ * - Maintains current page when navigating back from edit dialog
+ *
+ * @param expenses - Array of expenses to display (pre-filtered by parent)
+ * @param onEdit - Callback to open edit dialog for an expense
+ * @param onRefresh - Callback to refresh expense list after deletion
+ */
+
 import { useState, useMemo, useEffect } from 'react';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { deleteExpense, deleteRecurringExpenses, deleteInstallmentExpenses } from '@/lib/services/expenseService';
@@ -28,9 +52,13 @@ interface ExpenseTableProps {
 }
 
 export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps) {
+  // ========== State Management ==========
+
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState<'asc' | 'desc' | null>(null);
+
+  // ========== Formatting Utilities ==========
 
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('it-IT', {
@@ -44,6 +72,33 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
     return format(dateObj, 'dd/MM/yyyy', { locale: it });
   };
 
+  // ========== Delete Handlers ==========
+
+  /**
+   * Teacher Comment: Three Types of Expense Deletion
+   *
+   * The system supports three distinct deletion flows:
+   *
+   * 1. Installment Expenses (isInstallment && installmentParentId):
+   *    - Created when user splits a purchase into multiple monthly payments
+   *    - Each installment is a separate expense with shared installmentParentId
+   *    - User can delete single installment OR all installments in the series
+   *    - Example: User bought a €300 item in 3 installments of €100 each
+   *
+   * 2. Recurring Expenses (isRecurring && recurringParentId):
+   *    - Created when user wants same expense repeated for N months
+   *    - Each month is a separate expense with shared recurringParentId
+   *    - User can delete single month OR all months in the series
+   *    - Example: User created 12 monthly gym membership payments
+   *
+   * 3. Regular Expenses:
+   *    - Single, standalone expense with no series relationship
+   *    - Simple confirmation and deletion
+   *
+   * Why two-step confirmation for series deletion?
+   * First confirm deletes single item (safe default), second confirm required
+   * for batch deletion to prevent accidental data loss.
+   */
   const handleDelete = async (expense: Expense) => {
     // Check if this is an installment expense
     if (expense.isInstallment && expense.installmentParentId) {
@@ -156,15 +211,43 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
     }
   };
 
-  // Calculate pagination
+  // ========== Pagination and Sorting Logic ==========
+
+  /**
+   * Teacher Comment: Pagination Calculation
+   *
+   * Pagination uses offset-based slicing:
+   * - ITEMS_PER_PAGE = 10 (constant)
+   * - totalPages = ceil(totalItems / 10)
+   * - startIndex = (currentPage - 1) * 10
+   * - endIndex = startIndex + 10
+   *
+   * Example: 25 expenses, page 2
+   * - totalPages = ceil(25 / 10) = 3
+   * - startIndex = (2 - 1) * 10 = 10
+   * - endIndex = 10 + 10 = 20
+   * - slice(10, 20) returns items 10-19 (indices), showing expenses 11-20 (1-indexed)
+   */
   const totalPages = Math.ceil(expenses.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
 
-  // Sort expenses based on sortBy state
+  /**
+   * Teacher Comment: Three-State Sorting Cycle
+   *
+   * Amount column cycles through three states when clicked:
+   * 1. null (no sort) → Shows expenses in original date order
+   * 2. 'desc' (high to low) → Largest expenses first
+   * 3. 'asc' (low to high) → Smallest expenses first
+   * 4. Click again → back to null
+   *
+   * Why three states instead of two?
+   * Users may want to see the original date-ordered list without sorting by amount.
+   * A third "reset" state lets them return to the default view.
+   */
   const sortedExpenses = useMemo(() => {
     if (sortBy === null) {
-      return expenses; // No sort: keep date order
+      return expenses; // No sort: keep date order from parent
     }
 
     const sorted = [...expenses]; // Copy to avoid mutation
@@ -180,12 +263,26 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
     return sortedExpenses.slice(startIndex, endIndex);
   }, [sortedExpenses, startIndex, endIndex]);
 
-  // Reset to page 1 when expenses array length changes (add/delete) or sort changes
+  /**
+   * Why reset to page 1 when expenses.length or sortBy changes?
+   *
+   * - If expenses.length changes (add/delete), staying on page 3 might show empty results
+   * - If sort changes, the "page 3" items are now completely different items, confusing UX
+   *
+   * Better to reset to page 1 so user sees the top of the newly sorted/filtered list.
+   */
   useEffect(() => {
     setCurrentPage(1);
   }, [expenses.length, sortBy]);
 
-  // Reset sort when expenses change (new filters applied)
+  /**
+   * Why reset sort when expenses array changes?
+   *
+   * The expenses prop is pre-filtered by parent (e.g., by month, type, category).
+   * When filters change, user likely wants to see the new filtered data in default
+   * date order, not in whatever sort state was previously active. Clearing sort
+   * provides a predictable "reset" behavior when switching filters.
+   */
   useEffect(() => {
     setSortBy(null);
   }, [expenses]);
@@ -198,13 +295,21 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
     setCurrentPage((prev: number) => Math.min(totalPages, prev + 1));
   };
 
+  // ========== Event Handlers ==========
+
+  /**
+   * Handle amount column header click to cycle through sort states.
+   * Cycle: null → desc → asc → null
+   */
   const handleSortByAmount = () => {
     setSortBy(prevSort => {
-      if (prevSort === null) return 'desc';
-      if (prevSort === 'desc') return 'asc';
-      return null; // Reset to no sort
+      if (prevSort === null) return 'desc'; // First click: high to low
+      if (prevSort === 'desc') return 'asc'; // Second click: low to high
+      return null; // Third click: reset to date order
     });
   };
+
+  // ========== Render ==========
 
   if (expenses.length === 0) {
     return (
@@ -221,6 +326,7 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
     <div className="space-y-4">
       <div className="rounded-md border">
         <Table>
+          {/* ========== Table Header ========== */}
           <TableHeader>
             <TableRow>
               <TableHead className="w-[100px]">Data</TableHead>
@@ -243,6 +349,8 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
               <TableHead className="w-[100px] text-right">Azioni</TableHead>
             </TableRow>
           </TableHeader>
+
+          {/* ========== Table Body ========== */}
           <TableBody>
             {paginatedExpenses.map((expense: Expense) => (
             <TableRow key={expense.id}>
@@ -314,6 +422,8 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
                     variant="ghost"
                     size="sm"
                     onClick={() => onEdit(expense)}
+                    // Why disable during deletion: Prevents concurrent edit/delete operations
+                    // that could cause data inconsistency or race conditions
                     disabled={deletingId === expense.id || deletingId === expense.recurringParentId || deletingId === expense.installmentParentId}
                   >
                     <Edit className="h-4 w-4" />
