@@ -1,3 +1,15 @@
+/**
+ * Confirmation dialog for deleting all dummy/test data
+ *
+ * Flow:
+ * 1. Load counts (snapshots, expenses, categories) on dialog open
+ * 2. Display summary to user
+ * 3. Delete all three types in parallel if confirmed (Promise.all)
+ * 4. Trigger callback to refresh parent UI
+ *
+ * Safety: Shows counts before deletion to prevent accidental data loss
+ * Parallel Execution: 3x faster than sequential deletion
+ */
 'use client';
 
 import { useState, useEffect } from 'react';

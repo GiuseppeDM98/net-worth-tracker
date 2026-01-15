@@ -1,3 +1,16 @@
+/**
+ * Manual historical snapshot creation with asset allocation breakdown
+ *
+ * Three Tabs:
+ * 1. General: Year, month, total net worth, liquid/illiquid split
+ * 2. Asset Classes: Breakdown by 6 classes (equity, bonds, crypto, etc.)
+ * 3. Individual Assets: Optional granular detail per asset
+ *
+ * Validation: Three-stage pipeline ensures data integrity
+ * - Stage 1: Parse inputs to numbers
+ * - Stage 2: Validate individual fields
+ * - Stage 3: Cross-validate sums (±0.01 floating-point tolerance)
+ */
 'use client';
 
 import { useState } from 'react';

@@ -1,6 +1,17 @@
+/**
+ * Dividend statistics dashboard with Yield on Cost (YOC) analysis
+ *
+ * Features:
+ * - Metric cards: Total dividends, average, top payer
+ * - Charts: By asset, by type, monthly trend
+ * - YOC Table: Per-asset TTM yield on cost calculation
+ *
+ * Data Source: /api/dividends/stats with optional date range
+ * Conditional Rendering: Cards/charts only show when data exists
+ */
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState} from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DollarSign, TrendingUp, TrendingDown, Percent, Calendar } from 'lucide-react';

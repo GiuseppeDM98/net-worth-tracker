@@ -1,3 +1,36 @@
+/**
+ * Asset Dialog - Create and Edit Assets
+ *
+ * Complex form component for managing portfolio assets with React Hook Form and Zod validation.
+ *
+ * Key Features:
+ * - Dynamic field visibility based on asset type and class
+ * - Intelligent defaults for isLiquid and autoUpdatePrice based on asset characteristics
+ * - Price fetching: manual entry, Yahoo Finance API, or keep existing price
+ * - Composition management for multi-asset portfolios (e.g., funds with multiple holdings)
+ * - Inline subcategory creation without leaving the form
+ * - Outstanding debt tracking for real estate assets
+ * - Cost basis tracking for capital gains calculations
+ * - Total Expense Ratio (TER) for ETFs and funds
+ *
+ * Form State Management:
+ * - 10 useState hooks for UI state (composition, toggles, loading states)
+ * - React Hook Form for form data and validation
+ * - Zod schema for type-safe validation with custom error messages
+ *
+ * Price Resolution Strategy:
+ * 1. Manual price provided → use it directly
+ * 2. Ticker exists + auto-update enabled → fetch from Yahoo Finance API
+ * 3. Editing existing asset → keep current price
+ * 4. No price source → validation error
+ *
+ * Teacher Note - ISIN Format:
+ * ISIN (International Securities Identification Number) format: XX000000000C
+ * - XX: 2-letter country code (e.g., IT for Italy, US for United States)
+ * - 000000000: 9 alphanumeric characters (security identifier)
+ * - C: 1 check digit
+ * Example: IT0003128367 (Italian government bond)
+ */
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -29,15 +62,27 @@ import { Plus, X } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 
 /**
- * Helper to check if asset type requires price updates
+ * Determines if an asset type should fetch automatic price updates
+ *
+ * Asset types with fixed or manual valuations should not auto-update:
+ * - Real estate: Uses property appraisals, not market prices
+ * - Private equity: Valuations done periodically by fund managers
+ * - Cash: Always has price = 1 (no market fluctuation)
+ *
+ * All other asset types (stocks, ETFs, bonds, crypto, commodities) fetch prices
+ * from Yahoo Finance API for real-time portfolio valuation.
+ *
+ * @param assetType - The asset type (stock, etf, bond, crypto, commodity, cash, realestate)
+ * @param subCategory - Optional subcategory (e.g., "Private Equity" within equity class)
+ * @returns true if asset should automatically update prices from Yahoo Finance
  */
 function shouldUpdatePrice(assetType: string, subCategory?: string): boolean {
-  // Real estate and private equity have fixed valuations
+  // Real estate and private equity have fixed valuations (no market price)
   if (assetType === 'realestate' || subCategory === 'Private Equity') {
     return false;
   }
 
-  // Cash always has price = 1
+  // Cash always has price = 1 (no updates needed)
   if (assetType === 'cash') {
     return false;
   }
@@ -45,23 +90,25 @@ function shouldUpdatePrice(assetType: string, subCategory?: string): boolean {
   return true;
 }
 
+// Zod validation schema for asset form
+// Note: .or(z.nan()) allows undefined values for optional numeric fields
 const assetSchema = z.object({
-  ticker: z.string().min(1, 'Ticker è obbligatorio'),
-  name: z.string().min(1, 'Nome è obbligatorio'),
-  isin: z.string().regex(/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/, 'ISIN non valido (formato: IT0003128367)').optional().or(z.literal('')),
+  ticker: z.string().min(1, 'Ticker is required'),
+  name: z.string().min(1, 'Name is required'),
+  isin: z.string().regex(/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/, 'Invalid ISIN format (example: IT0003128367)').optional().or(z.literal('')),
   type: z.enum(['stock', 'etf', 'bond', 'crypto', 'commodity', 'cash', 'realestate']),
   assetClass: z.enum(['equity', 'bonds', 'crypto', 'realestate', 'cash', 'commodity']),
   subCategory: z.string().optional(),
-  currency: z.string().min(1, 'Valuta è obbligatoria'),
-  quantity: z.number().positive('Quantità deve essere positiva'),
-  manualPrice: z.number().positive('Il prezzo deve essere positivo').optional().or(z.nan()),
-  averageCost: z.number().positive('Il costo medio deve essere positivo').optional().or(z.nan()),
-  taxRate: z.number().min(0, 'L\'aliquota fiscale deve essere almeno 0').max(100, 'L\'aliquota fiscale deve essere massimo 100').optional().or(z.nan()),
-  totalExpenseRatio: z.number().min(0, 'Il TER deve essere almeno 0').max(100, 'Il TER deve essere massimo 100').optional().or(z.nan()),
+  currency: z.string().min(1, 'Currency is required'),
+  quantity: z.number().positive('Quantity must be positive'),
+  manualPrice: z.number().positive('Price must be positive').optional().or(z.nan()),
+  averageCost: z.number().positive('Average cost must be positive').optional().or(z.nan()),
+  taxRate: z.number().min(0, 'Tax rate must be at least 0').max(100, 'Tax rate must be at most 100').optional().or(z.nan()),
+  totalExpenseRatio: z.number().min(0, 'TER must be at least 0').max(100, 'TER must be at most 100').optional().or(z.nan()),
   isLiquid: z.boolean().optional(),
   autoUpdatePrice: z.boolean().optional(),
   isComposite: z.boolean().optional(),
-  outstandingDebt: z.number().nonnegative('Il debito non può essere negativo').optional().or(z.nan()),
+  outstandingDebt: z.number().nonnegative('Debt cannot be negative').optional().or(z.nan()),
 });
 
 type AssetFormValues = z.infer<typeof assetSchema>;
@@ -130,18 +177,23 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
   const watchAutoUpdatePrice = watch('autoUpdatePrice');
   const watchIsComposite = watch('isComposite');
 
-  // Determina il default per isLiquid e autoUpdatePrice basato sull'asset class
+  // Set intelligent defaults for isLiquid and autoUpdatePrice based on asset class
+  // Why intelligent defaults? Reduces user errors and form friction.
+  // - Equity/bonds → liquid, auto-update enabled (traded on markets)
+  // - Real estate → not liquid, manual pricing (property appraisals)
+  // - Cash → liquid, no updates (price always 1)
   useEffect(() => {
     if (selectedAssetClass) {
-      // Default intelligente per isLiquid
+      // Default for isLiquid: most assets are liquid except real estate and private equity
       const defaultIsLiquid =
         selectedAssetClass !== 'realestate' &&
         selectedSubCategory !== 'Private Equity';
 
-      // Default intelligente per autoUpdatePrice
+      // Default for autoUpdatePrice: use shouldUpdatePrice logic
       const defaultAutoUpdatePrice = shouldUpdatePrice(selectedType, selectedSubCategory);
 
-      // Imposta solo se non è già stato impostato dall'utente
+      // Only set if user hasn't explicitly changed the value
+      // This preserves user intent when they toggle these fields manually
       if (watchIsLiquid === undefined) {
         setValue('isLiquid', defaultIsLiquid);
       }
@@ -317,11 +369,26 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
     return assetClassConfig.subCategoryConfig.categories || [];
   };
 
+  /**
+   * Validate that composition percentages sum to 100%
+   *
+   * Teacher Note - Floating Point Tolerance:
+   * We use a tolerance of 0.01% instead of exact equality to account for
+   * floating-point rounding errors in JavaScript.
+   *
+   * Examples:
+   * - 33.33% + 33.33% + 33.34% = 100.00% (valid)
+   * - 33.33% + 33.33% + 33.33% = 99.99% (valid with tolerance)
+   * - 30% + 30% + 30% = 90% (invalid - missing 10%)
+   *
+   * @returns true if composition is valid or not enabled
+   */
   const validateComposition = (): boolean => {
     if (!isComposite || composition.length === 0) return true;
 
     const totalPercentage = composition.reduce((sum, comp) => sum + comp.percentage, 0);
 
+    // Check if total is within 0.01% of 100% to account for floating-point errors
     if (Math.abs(totalPercentage - 100) > 0.01) {
       toast.error(`La somma delle percentuali deve essere 100% (attuale: ${totalPercentage.toFixed(2)}%)`);
       return false;
@@ -330,6 +397,15 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
     return true;
   };
 
+  /**
+   * Handle form submission - create or update asset
+   *
+   * Price Resolution Strategy (3 paths):
+   * 1. Manual price provided → use it directly (user knows best)
+   * 2. shouldUpdatePrice=true → fetch from Yahoo Finance API
+   * 3. shouldUpdatePrice=false → use default price of 1 (cash, real estate)
+   * 4. If all fail → set price to 0 as indicator for manual update
+   */
   const onSubmit = async (data: AssetFormValues) => {
     if (!user) return;
 
@@ -347,15 +423,16 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
     try {
       setFetchingPrice(true);
 
-      // Determine current price
+      // Step 1: Determine current price using resolution strategy
       let currentPrice = 1; // Default for cash and fixed-price assets
 
-      // Check if manual price is provided
+      // Path 1: Check if manual price is provided (highest priority)
       if (data.manualPrice && !isNaN(data.manualPrice) && data.manualPrice > 0) {
         currentPrice = data.manualPrice;
         toast.success(`Prezzo manuale impostato: ${currentPrice.toFixed(2)} ${data.currency}`);
       }
-      // Check if we need to fetch price from Yahoo Finance
+      // Path 2: Check if we need to fetch price from Yahoo Finance
+      // This applies to stocks, ETFs, bonds, crypto, and commodities
       else if (shouldUpdatePrice(data.type, data.subCategory)) {
         try {
           const response = await fetch(
@@ -372,7 +449,8 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
             toast.error(
               `Impossibile recuperare il prezzo per ${data.ticker}. Puoi inserire manualmente il prezzo nel campo apposito.`
             );
-            // Use a placeholder price of 0 to indicate it needs manual update
+            // Set price to 0 as indicator that manual update is needed
+            // This allows saving the asset while flagging price as missing
             currentPrice = 0;
           }
         } catch (error) {
@@ -383,6 +461,8 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
           currentPrice = 0;
         }
       }
+      // Path 3: Use default price of 1 for assets that don't need market prices
+      // (cash, real estate, private equity)
 
       const formData: AssetFormData = {
         ticker: data.ticker,

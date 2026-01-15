@@ -1,3 +1,16 @@
+/**
+ * Dividend record creation/editing with automatic calculations
+ *
+ * Auto-Calculations:
+ * - 26% Italian withholding tax (only for new dividends)
+ * - Pre-fill shares from asset quantity (only for new dividends)
+ * - Total amounts (gross/tax/net) computed from per-share values
+ *
+ * Guard Pattern: Auto-calculations disabled in edit mode to preserve user edits.
+ * Without guards, editing gross amount would overwrite custom tax values.
+ *
+ * Form Validation: Zod schema with cross-field refinement (paymentDate >= exDate)
+ */
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -43,6 +56,15 @@ const dividendSchema = z.object({
   currency: z.string().min(1, 'Valuta è obbligatoria'),
   notes: z.string().optional(),
   sourceUrl: z.string().url('Inserisci un URL valido').optional().or(z.literal('')),
+/**
+ * Zod refinement for cross-field validation
+ *
+ * Pattern: .refine() validates multiple fields together
+ * Use case: Ensure payment date is after (or same as) ex-dividend date
+ *
+ * Why separate from field validators? Payment date is valid in isolation,
+ * only invalid relative to ex-date. Refinement checks this relationship.
+ */
 }).refine((data) => data.paymentDate >= data.exDate, {
   message: 'La data di pagamento deve essere successiva o uguale alla data ex-dividendo',
   path: ['paymentDate'],
@@ -128,7 +150,13 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
     }
   };
 
-  // Auto-calculate withholding tax when gross amount changes
+  /**
+   * Auto-calculate 26% Italian withholding tax for NEW dividends only
+   *
+   * Guard: !dividend check prevents overwriting tax in edit mode.
+   * Why? User may have manually adjusted tax (e.g., foreign tax credit).
+   * Auto-calc is a convenience feature, not enforcement.
+   */
   useEffect(() => {
     if (!dividend && grossAmountPerShare > 0) {
       // 26% Italian withholding tax on dividends
@@ -137,7 +165,13 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
     }
   }, [grossAmountPerShare, dividend, setValue]);
 
-  // Pre-fill shares from selected asset
+  /**
+   * Pre-fill shares from asset quantity for NEW dividends only
+   *
+   * Guard: !dividend check prevents overwriting in edit mode.
+   * Why? User may be editing a dividend for fewer shares than currently held
+   * (e.g., past dividend when quantity was different).
+   */
   useEffect(() => {
     if (selectedAssetId && !dividend) {
       const selectedAsset = assets.find((a) => a.id === selectedAssetId);

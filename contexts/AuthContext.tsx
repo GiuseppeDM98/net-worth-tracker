@@ -1,3 +1,29 @@
+/**
+ * Authentication Context for Net Worth Tracker
+ *
+ * Manages user authentication state using Firebase Auth + Firestore dual-storage pattern.
+ *
+ * Architecture:
+ * - displayName is stored in BOTH Firebase Auth profile AND Firestore document
+ *   - Google OAuth users: displayName set in Firebase Auth profile automatically
+ *   - Email/password users: displayName stored in Firestore only
+ *   - Fallback pattern ensures displayName is always available
+ *
+ * - User creation is a two-step process:
+ *   1. Create Firebase Auth user (email/password or Google OAuth)
+ *   2. Create Firestore document with user data (email, displayName, createdAt)
+ *   3. Set default asset allocation (60% equity, 40% bonds)
+ *
+ * - Registration validation:
+ *   - Server-side whitelist checked via /api/auth/check-registration
+ *   - For Google OAuth: validation happens AFTER signInWithPopup (Firebase limitation)
+ *   - If registration denied: cleanup both Auth user AND orphan Firestore doc
+ *
+ * - Race condition handling:
+ *   - Google OAuth can succeed but registration check fail
+ *   - Must cleanup orphan Firestore documents to allow retry
+ *   - See signInWithGoogle() for detailed cleanup logic
+ */
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
@@ -16,6 +42,11 @@ import { auth, db } from '@/lib/firebase/config';
 import { User } from '@/types/assets';
 import { getDefaultTargets, setSettings } from '@/lib/services/assetAllocationService';
 
+/**
+ * Authentication context interface
+ *
+ * Provides authentication state and methods for sign in, sign up, and sign out.
+ */
 interface AuthContextType {
   user: User | null;
   loading: boolean;
@@ -34,6 +65,14 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
 });
 
+/**
+ * Hook to access authentication context
+ *
+ * Must be used within an AuthProvider component.
+ * Throws error if used outside of AuthProvider to catch setup mistakes early.
+ *
+ * @returns AuthContextType with user state and auth methods
+ */
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -53,6 +92,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         let displayName = firebaseUser.displayName;
 
         // If displayName is not in Firebase Auth, try to get it from Firestore
+        // Why dual-lookup? Google OAuth sets displayName in Firebase Auth profile,
+        // but email/password registration stores it in Firestore only.
+        // This fallback ensures displayName is available regardless of signup method.
         if (!displayName) {
           try {
             const userRef = doc(db, 'users', firebaseUser.uid);
@@ -82,12 +124,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
+  /**
+   * Sign in existing user with email and password
+   */
   const signIn = async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
   };
 
+  /**
+   * Register new user with email and password
+   *
+   * Two-step process:
+   * 1. Check registration permissions (server-side whitelist)
+   * 2. Create Firebase Auth user
+   * 3. Create Firestore user document
+   * 4. Set default asset allocation
+   */
   const signUp = async (email: string, password: string, displayName?: string) => {
-    // Server-side validation: check if registration is allowed
+    // Step 1: Check registration permissions (server-side whitelist)
+    // Why check before creating user? Prevents orphan Auth users if registration denied.
     try {
       const response = await fetch('/api/auth/check-registration', {
         method: 'POST',
@@ -104,33 +159,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error(error.message || 'Unable to verify registration permissions.');
     }
 
+    // Step 2: Create Firebase Auth user
     const { user: firebaseUser } = await createUserWithEmailAndPassword(auth, email, password);
 
-    // Update Firebase Auth profile with displayName if provided
+    // Step 3: Update Firebase Auth profile with displayName if provided
     if (displayName) {
       await updateProfile(firebaseUser, {
         displayName: displayName,
       });
     }
 
-    // Create user document in Firestore
+    // Step 4: Create Firestore user document with metadata
     await setDoc(doc(db, 'users', firebaseUser.uid), {
       email: firebaseUser.email,
       displayName: displayName || '',
       createdAt: new Date(),
     });
 
-    // Set default asset allocation (60% equity, 40% bonds)
+    // Step 5: Set default asset allocation (60% equity, 40% bonds)
     await setSettings(firebaseUser.uid, {
       targets: getDefaultTargets(),
     });
   };
 
+  /**
+   * Sign in or register with Google OAuth
+   *
+   * Complex flow with race condition handling:
+   * 1. Trigger Google OAuth popup (Firebase limitation: cannot validate before this)
+   * 2. Check if Firestore document exists (determines new vs returning user)
+   * 3. For new users: validate registration permissions
+   * 4. If denied: cleanup both Firebase Auth user AND any orphan Firestore doc
+   * 5. If allowed: create Firestore document and set default allocation
+   *
+   * Why registration check happens AFTER OAuth?
+   * Firebase signInWithPopup creates Auth user immediately - we can't prevent this.
+   * We must cleanup if registration is denied to allow user to retry later.
+   */
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(auth, provider);
 
     // Check if this is a new user (first time signing in with Google)
+    // Why check Firestore doc existence? If it doesn't exist, this is a registration.
     const userRef = doc(db, 'users', result.user.uid);
     const userSnap = await getDoc(userRef);
 
@@ -145,8 +216,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (!response.ok) {
           // Registration is not allowed - cleanup everything
+          // Why cleanup? Race condition: Firebase Auth succeeded but registration denied.
+          // Without cleanup, user can't retry (Auth user exists but Firestore doesn't).
+          // We must delete BOTH Auth user AND any orphan Firestore doc.
           try {
             // First, check if a Firestore document was created (race condition)
+            // Another process might have created it between our check and now
             const orphanDocSnap = await getDoc(userRef);
             if (orphanDocSnap.exists()) {
               await deleteDoc(userRef);
@@ -158,6 +233,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } catch (deleteError) {
             console.error('[CLEANUP_ERROR]', deleteError);
             // If we couldn't delete the user, sign them out
+            // Prevents stuck state where user sees authenticated UI but has no permissions
             await firebaseSignOut(auth);
           }
 
@@ -178,11 +254,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
       } catch (error: any) {
         // Re-throw the error to be caught by the component
-        throw new Error(error.message || 'Impossibile verificare i permessi di registrazione.');
+        throw new Error(error.message || 'Unable to verify registration permissions.');
       }
     }
   };
 
+  /**
+   * Sign out current user
+   */
   const signOut = async () => {
     await firebaseSignOut(auth);
   };

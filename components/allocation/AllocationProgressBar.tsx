@@ -1,3 +1,21 @@
+/**
+ * Allocation Progress Bar - Visual Progress Indicator for Asset Allocation
+ *
+ * Shows current allocation percentage with target marker (diamond icon).
+ *
+ * Key Features:
+ * - Filled bar shows current percentage (colored by action: green/orange/red)
+ * - Diamond marker indicates target percentage position
+ * - Handles edge case: >100% allocation (overallocated positions)
+ *
+ * Why handle >100% allocation?
+ * If an asset class exceeds 100% of target (e.g., current 120%, target 100%),
+ * we scale the bar width to prevent visual overflow and layout breaks.
+ * This can happen when asset values increase significantly without rebalancing.
+ *
+ * Visual Accessibility:
+ * Color-coded with sufficient contrast for readability (green/orange/red backgrounds).
+ */
 'use client';
 
 import { cn } from '@/lib/utils';
@@ -20,7 +38,7 @@ export function AllocationProgressBar({
   height = 24,
   className,
 }: AllocationProgressBarProps) {
-  // Color mapping based on action
+  // Color mapping based on action (green: OK, orange: buy, red: sell)
   const getColors = (action: 'COMPRA' | 'VENDI' | 'OK') => {
     switch (action) {
       case 'OK':
@@ -34,7 +52,8 @@ export function AllocationProgressBar({
 
   const colors = getColors(action);
 
-  // Handle edge case: percentages > 100%
+  // Handle edge case: percentages > 100% (overallocation)
+  // Scale bar width to prevent overflow and layout breaks
   const maxPercentage = Math.max(currentPercentage, targetPercentage, 100);
   const currentWidth = Math.min((currentPercentage / maxPercentage) * 100, 100);
   const targetPosition = Math.min((targetPercentage / maxPercentage) * 100, 100);

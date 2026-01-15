@@ -1,3 +1,19 @@
+/**
+ * Allocation Sheet - Bottom Sheet Drawer for Allocation Drill-Down
+ *
+ * Mobile-friendly bottom sheet component for hierarchical allocation navigation.
+ *
+ * Features:
+ * - Slides up from bottom (85% viewport height)
+ * - Sticky header with back navigation and close button
+ * - Breadcrumb support for showing navigation path
+ * - Scrollable content area for nested allocation data
+ *
+ * Usage:
+ * - Asset class level → SubCategory level → Specific asset level
+ * - Each level shows allocation breakdown with drill-down capability
+ * - Back button navigates up the hierarchy
+ */
 'use client';
 
 import { ReactNode } from 'react';

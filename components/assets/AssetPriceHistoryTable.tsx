@@ -1,3 +1,29 @@
+/**
+ * Asset Price History Table - Historical Price/Value Tracking from Monthly Snapshots
+ *
+ * Displays historical asset prices or total values across months with visual indicators.
+ *
+ * Key Features:
+ * - Sticky column for asset names (horizontal scroll with fixed first column)
+ * - Dual display mode:
+ *   - Price mode: Shows price per unit (€/share, $/coin, etc.)
+ *   - Total value mode: Shows total position value (quantity × price)
+ * - Color coding for month-over-month changes:
+ *   - Green: Price/value increased vs previous month
+ *   - Red: Price/value decreased vs previous month
+ *   - Gray: Unchanged or first month (no previous data)
+ * - YTD vs fromStart percentage calculations
+ * - Handles deleted assets appearing in old snapshots
+ *
+ * Special Cases:
+ * - Cash assets (price = 1) always show total value instead of price
+ * - Missing prices in snapshots show as "—" (em dash)
+ * - First month for each asset shows gray (no previous month to compare)
+ *
+ * Checklist: If modifying display logic, also check:
+ * - lib/utils/assetPriceHistoryUtils.ts (transformation algorithm)
+ * - Ensure YTD vs fromStart calculation stays in sync
+ */
 'use client';
 
 import { useMemo } from 'react';
@@ -34,7 +60,8 @@ interface AssetPriceHistoryTableProps {
   onRefresh: () => Promise<void>;
 }
 
-// CSS classes for cell color coding
+// CSS classes for color-coded cells (visual accessibility)
+// Green/red backgrounds with sufficient contrast for readability
 const colorClasses = {
   green: 'bg-green-50 text-green-700 font-medium',
   red: 'bg-red-50 text-red-700 font-medium',

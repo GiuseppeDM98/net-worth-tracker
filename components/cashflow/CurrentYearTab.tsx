@@ -1,3 +1,18 @@
+/**
+ * Interactive drill-down expense analysis for current year
+ *
+ * THREE-LEVEL DRILL-DOWN:
+ * Level 1: Category view (e.g., "Food & Dining")
+ * Level 2: Subcategory view (e.g., "Groceries", "Restaurants")
+ * Level 3: Expense list (individual transactions)
+ *
+ * State Machine: DrillDownState tracks current level + selected items
+ * Navigation: Click category → drill to subcategories → drill to expenses
+ *            Back button returns to previous level
+ *
+ * Color Inheritance: Subcategories derive colors from parent category
+ * using brightness adjustment (see deriveSubcategoryColors)
+ */
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
@@ -109,6 +124,8 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
   }, []);
 
   // Auto-scroll to the appropriate chart when drill-down changes
+  // Prevents user confusion when content changes during navigation.
+  // 100ms setTimeout waits for DOM update before scrolling.
   useEffect(() => {
     if (drillDown.level !== 'category' && drillDown.chartType) {
       const targetRef = drillDown.chartType === 'expenses' ? expensesChartRef : incomeChartRef;
@@ -126,7 +143,18 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
     return allExpenses.filter(expense => getItalyYear(toDate(expense.date)) === currentYear);
   }, [allExpenses, currentYear]);
 
-  // Prepare data for expenses by category
+  /**
+   * Aggregate expenses by category name with percentage calculation
+   *
+   * Algorithm:
+   * 1. Filter out income (only expenses)
+   * 2. Create Map<categoryName, amount>
+   * 3. Accumulate amounts by category
+   * 4. Calculate percentages from total
+   * 5. Sort by value descending
+   *
+   * Why Map? O(1) lookups, preserves insertion order for debugging
+   */
   const getExpensesByCategory = (): ChartData[] => {
     const expenseItems = currentYearExpenses.filter(e => e.type !== 'income');
     const total = calculateTotalExpenses(currentYearExpenses);
@@ -247,6 +275,9 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
           Entrate: values.income,
           Spese: values.expenses,
           Netto: values.income - values.expenses,
+          // Clamp percentages to prevent chart rendering bugs:
+          // - Saving Rate can be < -100% (spending > 2x income)
+          // - Charts crash on extreme values outside expected domain (-100 to +100)
           'Entrate %': Math.min(100, Math.max(0, incomePercentage)),
           'Spese %': Math.min(100, Math.max(0, expensesPercentage)),
           'Saving Rate %': Math.min(100, Math.max(-100, savingRate)),
@@ -389,7 +420,18 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
     return { data, categories: [...top5Categories, 'Altro'] };
   };
 
-  // Helper function to derive subcategory colors from parent category color
+  /**
+   * Color derivation algorithm for subcategory visualization
+   *
+   * Algorithm:
+   * 1. Parse parent color from hex to RGB
+   * 2. Calculate brightness factor (index * 0.15)
+   * 3. Adjust RGB channels: gradually darken for each item
+   * 4. Convert back to hex
+   *
+   * Why? Subcategories should visually relate to parent but remain distinct.
+   * Brightness range: 1.0 (full) to 0.55 (darkened) of parent color.
+   */
   const deriveSubcategoryColors = (baseColor: string, count: number): string[] => {
     // Parse hex color to RGB
     const hex = baseColor.replace('#', '');

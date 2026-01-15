@@ -1,3 +1,14 @@
+/**
+ * Dividend tracking with filtering, CSV export, and Borsa Italiana scraping
+ *
+ * Features:
+ * - Multi-filter: Asset, Type, Date Range
+ * - CSV Export: Proper escaping for Excel/Sheets compatibility
+ * - Borsa Italiana Scraping: Sequential API calls to avoid rate limits
+ *
+ * Scraping Strategy: Sequential (not parallel) to prevent server overload
+ * and potential IP blocking from Borsa Italiana.
+ */
 'use client';
 
 import { useEffect, useState } from 'react';

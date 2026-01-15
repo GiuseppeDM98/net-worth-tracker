@@ -1,3 +1,15 @@
+/**
+ * Historical trend analysis across all years
+ *
+ * Dual Aggregation: Monthly and Yearly views
+ * - Monthly: All months across all years
+ * - Yearly: One data point per year
+ *
+ * Pattern Duplication: getMonthlyX and getYearlyX functions share logic
+ * but operate on different time granularities (month vs year key).
+ *
+ * Mobile Optimization: 24-month limit for mobile to prevent chart overcrowding
+ */
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -57,10 +69,25 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
     return () => media.removeEventListener('change', handleChange);
   }, []);
 
+  /**
+   * Clamp percentage to valid chart domain
+   * Prevents rendering bugs when values exceed expected range (0-100 or -100 to +100)
+   */
   const clampPercentage = (value: number, min: number, max: number) =>
     Math.min(max, Math.max(min, value));
 
-  // Prepare monthly trend data (all years, all months)
+  /**
+   * Aggregate all months with income, expenses, and saving rate
+   *
+   * Algorithm:
+   * 1. Create Map<"YYYY-MM", amounts>
+   * 2. Iterate expenses/income, accumulate by month key
+   * 3. Calculate saving rate: (income - expenses) / income
+   * 4. Clamp percentages to valid chart domain
+   * 5. Sort by month ascending
+   *
+   * Why Map? Efficient O(1) lookups for accumulation
+   */
   const getMonthlyTrend = () => {
     const monthlyMap = new Map<string, { income: number; expenses: number; sortKey: string }>();
 

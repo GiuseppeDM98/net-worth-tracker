@@ -1,6 +1,9 @@
-// components/dashboard/ExportPDFButton.tsx
-// Button component for triggering PDF export dialog
-
+/**
+ * PDF export trigger button for portfolio snapshots
+ *
+ * Simple wrapper that opens PDFExportDialog modal.
+ * Dialog handles the actual PDF generation logic.
+ */
 'use client';
 
 import { useState } from 'react';

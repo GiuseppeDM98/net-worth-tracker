@@ -1,3 +1,19 @@
+/**
+ * Allocation Card - Displays Asset Class Allocation Progress
+ *
+ * Shows current vs target allocation percentage with action badges.
+ *
+ * Action Indicators:
+ * - COMPRA (Buy): Current < Target → need to buy more (orange)
+ * - VENDI (Sell): Current > Target → need to sell some (red)
+ * - OK (Balanced): Current ≈ Target → allocation is balanced (green)
+ *
+ * Features:
+ * - AllocationProgressBar visualization with target marker
+ * - Difference banner showing how much to buy/sell
+ * - Drill-down capability for hierarchical allocation view (asset class → subcategory → specific asset)
+ * - Responsive card layout for mobile and desktop
+ */
 'use client';
 
 import { AllocationData } from '@/types/assets';

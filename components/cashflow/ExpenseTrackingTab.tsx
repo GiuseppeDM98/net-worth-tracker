@@ -1,3 +1,20 @@
+/**
+ * Expense tracking with hierarchical filtering and smart deletion
+ *
+ * FILTER ARCHITECTURE:
+ * Two-stage filtering system:
+ * - Stage 1 (Time): Year → Month
+ * - Stage 2 (Hierarchy): Type → Category → Subcategory
+ *
+ * Cascading Reset Pattern:
+ * - Changing Type resets Category + Subcategory
+ * - Changing Category resets Subcategory only
+ * - Prevents invalid combinations (e.g., Type="income" + Category="rent")
+ *
+ * Custom Dropdowns:
+ * Native <select> lacks search. Custom implementation uses refs for
+ * click-outside detection to match native UX.
+ */
 'use client';
 
 import { useEffect, useState, useMemo, useRef } from 'react';
@@ -38,6 +55,13 @@ interface ExpenseTrackingTabProps {
   onRefresh: () => Promise<void>;
 }
 
+/**
+ * CHECKLIST: When adding new ExpenseType values:
+ * 1. Update EXPENSE_TYPE_LABELS in types/expenses.ts
+ * 2. Add color mapping in ExpenseCard.tsx badge colors
+ * 3. Update typeOptions array in this file (line ~310)
+ * 4. Add type validation in ExpenseDialog schema
+ */
 export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh }: ExpenseTrackingTabProps) {
   const currentYear = new Date().getFullYear();
   const currentMonth = String(new Date().getMonth() + 1); // 1-based month (1-12)
@@ -48,7 +72,8 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [filtersOpen, setFiltersOpen] = useState<boolean>(true);
 
-  // New filter states
+  // Separate state for each filter level enables independent reset logic.
+  // Single state object would complicate cascading resets (Type → Category → Subcategory).
   const [selectedType, setSelectedType] = useState<string>('all');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [selectedSubCategoryId, setSelectedSubCategoryId] = useState<string>('all');
@@ -63,7 +88,13 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [isSubCategoryDropdownOpen, setIsSubCategoryDropdownOpen] = useState(false);
 
-  // Refs for click outside detection
+  /**
+   * Refs for click-outside detection on custom dropdowns
+   *
+   * Pattern: Listen for document mousedown, check if click target is outside ref
+   * Why mousedown? Fires before blur, prevents race condition with item selection
+   * See useEffect at line ~192 for implementation
+   */
   const typeDropdownRef = useRef<HTMLDivElement>(null);
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
   const subCategoryDropdownRef = useRef<HTMLDivElement>(null);
@@ -92,7 +123,19 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
     setSelectedMonth(currentMonth);
   };
 
-  // Handler functions for filter selections
+  /**
+   * Cascading filter reset handler
+   *
+   * Reset Rules:
+   * - Close dropdown (user made selection)
+   * - Clear search query
+   * - Reset downstream filters (Category + Subcategory)
+   *
+   * Why? Prevents invalid combinations when Type changes.
+   * Example: User selects Type="fixed" → Category="rent" → Subcategory="mortgage"
+   *          Then changes Type to "income"
+   *          Result: Category and Subcategory reset (income has different categories)
+   */
   const handleSelectType = (type: string) => {
     setSelectedType(type);
     setIsTypeDropdownOpen(false);
@@ -126,7 +169,9 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
     setSearchQuerySubCategory('');
   };
 
-  // Handler to clear individual filters
+  // Clearing Type also clears dependent filters AND their search queries.
+  // Prevents "phantom selections" where UI shows "all" but search input
+  // retains previous query text.
   const handleClearType = () => {
     setSelectedType('all');
     setSelectedCategoryId('all');
@@ -172,7 +217,15 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
     setExpenses(filtered);
   }, [allExpenses, selectedYear, selectedMonth]);
 
-  // Close dropdowns when clicking outside
+  /**
+   * Click-outside handler for custom dropdowns
+   *
+   * Why mousedown instead of click?
+   * - mousedown fires before blur events
+   * - Prevents race condition where blur closes dropdown before click registers
+   *
+   * Memory Management: Return cleanup function removes listener on unmount
+   */
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (typeDropdownRef.current && !typeDropdownRef.current.contains(event.target as Node)) {
@@ -211,8 +264,23 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   };
 
   /**
-   * Handle expense deletion with smart confirmations
-   * Reused logic from ExpenseTable.tsx
+   * Context-aware deletion with two-stage confirmation
+   *
+   * Three Deletion Modes:
+   *
+   * 1. INSTALLMENT EXPENSE (e.g., car payment 6/24):
+   *    First OK → Delete this installment only
+   *    Cancel then OK → Delete all 24 installments
+   *
+   * 2. RECURRING EXPENSE (e.g., Netflix subscription):
+   *    First OK → Delete this occurrence
+   *    Cancel then OK → Delete all recurring entries
+   *
+   * 3. REGULAR EXPENSE:
+   *    Single confirmation with expense details
+   *
+   * Why two-stage? Single prompt is ambiguous ("Delete" = one OR all?).
+   * Two-stage makes intent explicit, reduces accidental bulk deletion.
    */
   const handleDeleteExpense = async (expense: Expense) => {
     // Check if this is an installment expense
@@ -367,7 +435,21 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
     return filtered;
   }, [categories, selectedCategoryId, searchQuerySubCategory]);
 
-  // Apply cumulative filtering (AND logic)
+  /**
+   * Cumulative AND filtering (progressive narrowing)
+   *
+   * Filter Logic: All active filters must match
+   * - Type filter (if not "all") AND
+   * - Category filter (if Type selected) AND
+   * - Subcategory filter (if Category selected)
+   *
+   * Why AND (not OR)?
+   * - OR would show too many results: Type="income" OR Category="groceries"
+   * - AND progressively narrows: Type="income" AND Category="salary"
+   *
+   * Dependency Guards: Category only applies if Type selected (line 448)
+   * This prevents filtering by Category when Type="all" (nonsensical combination).
+   */
   const filteredExpenses = useMemo(() => {
     let filtered = [...expenses];
 

@@ -1,3 +1,21 @@
+/**
+ * Asset Card - Expandable Mobile Card for Individual Asset Display
+ *
+ * Responsive card component showing key metrics for a single portfolio asset.
+ *
+ * Key Features:
+ * - Collapsible details section (toggle with chevron button)
+ * - Color-coded gain/loss display (green: gain, red: loss, gray: no cost basis)
+ * - Special handling for real estate with debt tooltip (shows gross vs net value)
+ * - Manual price indicator (amber background when price needs manual update)
+ * - Tax calculator integration for assets with cost basis tracking
+ *
+ * Why check hasGainLoss before calculating?
+ * Prevents division by zero and NaN errors when:
+ * - averageCost is 0 or undefined (no cost basis tracking)
+ * - Asset was imported without purchase price history
+ * - Cash positions where cost basis doesn't make sense (always 1:1)
+ */
 'use client';
 
 import { useState } from 'react';
@@ -62,6 +80,10 @@ export function AssetCard({
       : new Date();
   const assetClassColor = getAssetClassColor(asset.assetClass);
 
+  // Check if asset has cost basis tracking before calculating gains/losses
+  // Why check first? Prevents division by zero (averageCost = 0) and NaN errors
+  // (missing averageCost). Some assets don't track cost basis (imported positions,
+  // cash accounts, etc.) and should show no gain/loss rather than misleading 0%.
   const hasGainLoss = asset.averageCost && asset.averageCost > 0;
   let gainLoss = 0;
   let gainLossPercentage = 0;

@@ -1,3 +1,16 @@
+/**
+ * Generate dummy/test data for portfolio testing
+ *
+ * Use Cases:
+ * - Testing Hall of Fame rankings
+ * - Testing FIRE calculator with historical data
+ * - Visualizing chart patterns without real data
+ *
+ * Features:
+ * - Configurable growth rate and months
+ * - Optional expense/income data generation
+ * - Cross-validation (expenses < income)
+ */
 'use client';
 
 import { useState } from 'react';
@@ -35,8 +48,21 @@ export function CreateDummySnapshotModal({
   const [generateExpenses, setGenerateExpenses] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
 
+  /**
+   * Sequential validation with early exit pattern
+   *
+   * Validation Order:
+   * 1. Net worth (positive, not NaN)
+   * 2. Growth rate (-100% to any positive %)
+   * 3. Months (1-120, prevents infinite loops)
+   * 4. If generateExpenses enabled:
+   *    - Income (positive)
+   *    - Expenses (positive AND < income)
+   *
+   * Why early exit? Show specific error to user immediately,
+   * don't overwhelm with multiple validation errors at once.
+   */
   const handleGenerate = async () => {
-    // Validate inputs
     const netWorth = parseFloat(initialNetWorth);
     const growthRate = parseFloat(monthlyGrowthRate);
     const months = parseInt(numberOfMonths);

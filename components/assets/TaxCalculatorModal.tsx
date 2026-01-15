@@ -1,3 +1,38 @@
+/**
+ * Tax Calculator Modal - Capital Gains Tax Simulation
+ *
+ * Calculates tax impact for selling partial positions in portfolio assets.
+ *
+ * Teacher Note - Capital Gains Tax Calculation:
+ * =============================================
+ * 1. Sale Value = quantity × current price
+ * 2. Cost Basis = quantity × average cost (PMC - Prezzo Medio di Carico)
+ * 3. Gain/Loss = sale value - cost basis
+ * 4. Tax = gain × (tax rate ÷ 100)  [ONLY if gain > 0, no tax on losses]
+ * 5. Net Proceeds = sale value - tax
+ *
+ * Example (Gain):
+ * - Sell 10 shares at €50 each = €500 sale value
+ * - Bought at €30 each = €300 cost basis
+ * - Gain = €200
+ * - Tax (26%) = €200 × 0.26 = €52
+ * - Net proceeds = €500 - €52 = €448
+ *
+ * Example (Loss):
+ * - Sell 10 shares at €20 each = €200 sale value
+ * - Bought at €30 each = €300 cost basis
+ * - Loss = -€100
+ * - Tax = €0 (no tax on losses, can't get refund)
+ * - Net proceeds = €200 - €0 = €200
+ *
+ * Dual Input Modes:
+ * - Quantity mode: User enters number of units to sell
+ * - Target value mode: User enters desired sale amount, quantity calculated automatically
+ *
+ * Why quantity clamping?
+ * Prevents selling more than owned. If user enters 100 but owns 50, we clamp to 50
+ * and show a warning. Better UX than showing confusing errors.
+ */
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -37,13 +72,20 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
     }
   }, [open]);
 
-  // Calculate values based on input mode
+  /**
+   * Calculate tax impact based on input mode
+   *
+   * Two input paths:
+   * 1. Quantity mode: user enters units → calculate sale value
+   * 2. Target value mode: user enters desired amount → calculate required units
+   */
   const calculateResults = () => {
     let quantity = 0;
 
     if (inputMode === 'quantity') {
       quantity = parseFloat(quantityInput) || 0;
     } else {
+      // Target value mode: reverse calculate quantity from desired sale amount
       const targetValue = parseFloat(targetValueInput) || 0;
       quantity = asset.currentPrice > 0 ? targetValue / asset.currentPrice : 0;
     }
@@ -51,7 +93,9 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
     // Ensure quantity is not negative
     quantity = Math.max(0, quantity);
 
-    // Check if selling more than owned
+    // Clamp quantity to prevent selling more than owned
+    // Why clamp instead of error? Better UX - user might enter large number by mistake,
+    // or target value mode might calculate quantity > owned. Clamping + warning is clearer.
     const exceedsOwned = quantity > asset.quantity;
     const clampedQuantity = Math.min(quantity, asset.quantity);
 
@@ -59,11 +103,20 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
     const averageCost = asset.averageCost || 0;
     const taxRate = asset.taxRate || 0;
 
+    // Step 1-2: Calculate sale value and cost basis
     const saleValue = clampedQuantity * currentPrice;
     const costBasis = clampedQuantity * averageCost;
+
+    // Step 3: Calculate gain or loss
     const gainLoss = saleValue - costBasis;
     const gainLossPercentage = costBasis > 0 ? (gainLoss / costBasis) * 100 : 0;
+
+    // Step 4: Calculate tax (ONLY on gains, not losses)
+    // Why? You can't get a tax refund for investment losses in most tax systems.
+    // Losses can be carried forward to offset future gains, but that's outside this calculator's scope.
     const taxes = gainLoss > 0 ? gainLoss * (taxRate / 100) : 0;
+
+    // Step 5: Calculate net proceeds after tax
     const netProceeds = saleValue - taxes;
 
     return {

@@ -1,3 +1,27 @@
+/**
+ * Asset Management Tab - Main Interface for Portfolio Asset Management
+ *
+ * Primary component for viewing, creating, editing, and deleting portfolio assets.
+ *
+ * Key Features:
+ * - Responsive dual-view layout: table (desktop) + cards (mobile)
+ * - Batch price updates via Yahoo Finance API (POST /api/prices/update)
+ * - Optimistic updates for delete operations (React Query)
+ * - Tax calculator integration for capital gains analysis
+ * - Real-time asset value calculations (quantity × current price)
+ * - Cost basis tracking and unrealized gains display
+ *
+ * State Management:
+ * - 6 useState hooks for UI state (dialogs, modals, loading)
+ * - React Query for cache invalidation after mutations
+ * - Parent refresh callback for coordinating with other tabs
+ *
+ * Why POST /api/prices/update instead of client-side fetching?
+ * - Yahoo Finance rate limits would fail for many assets
+ * - Server can batch requests and implement exponential backoff
+ * - Centralized error handling and response caching
+ * - Prevents CORS issues with third-party APIs
+ */
 'use client';
 
 import { useState } from 'react';
@@ -70,6 +94,19 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
   const [taxCalculatorOpen, setTaxCalculatorOpen] = useState(false);
   const [calculatingAsset, setCalculatingAsset] = useState<Asset | null>(null);
 
+  /**
+   * Batch update prices for all assets via server-side Yahoo Finance API
+   *
+   * Why server-side batch operation?
+   * - Client-side would hit Yahoo Finance rate limits with many assets
+   * - Server can implement retry logic and exponential backoff
+   * - Centralized error handling for failed price fetches
+   * - Avoids CORS issues with third-party financial APIs
+   *
+   * API Contract: POST /api/prices/update
+   * Request: { userId: string }
+   * Response: { updated: number, failed: string[] }
+   */
   const handleUpdatePrices = async () => {
     if (!user) return;
 
@@ -89,7 +126,7 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
             data.failed.length > 0 ? `, ${data.failed.length} falliti` : ''
           }`
         );
-        // Call parent refresh handler
+        // Call parent refresh handler to update all tabs
         await onRefresh();
       } else {
         toast.error("Errore nell'aggiornamento dei prezzi");
@@ -102,6 +139,14 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
     }
   };
 
+  /**
+   * Delete asset with optimistic UI updates
+   *
+   * Uses React Query mutation which automatically:
+   * - Invalidates cache on success (refreshes asset list)
+   * - Rolls back optimistic update on error
+   * - Handles loading/error states
+   */
   const handleDelete = async (assetId: string) => {
     if (!user) return;
 
@@ -127,7 +172,8 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
   const handleDialogClose = () => {
     setDialogOpen(false);
     setEditingAsset(null);
-    // Invalidate assets cache globally - will update all pages using useAssets
+    // Invalidate assets cache globally - updates all pages using useAssets hook
+    // This ensures allocation, performance, and other tabs reflect the changes
     if (user?.uid) {
       queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
     }
@@ -150,18 +196,34 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
 
   const totalValue = calculateTotalValue(assets);
 
-  // Helper function to check if asset requires manual price update
+  /**
+   * Determine if asset requires manual price updates
+   *
+   * Complex decision tree based on asset characteristics:
+   * 1. If autoUpdatePrice explicitly false → manual (user override)
+   * 2. If type is real estate or cash → manual (no market price)
+   * 3. If subcategory is Private Equity → manual (fund valuations)
+   * 4. Otherwise → automatic via Yahoo Finance
+   *
+   * Why this matters?
+   * - Manual assets show "Update Price" button instead of auto-refresh
+   * - Batch price update skips manual assets to avoid API errors
+   * - UI tooltips explain why price can't be automatically fetched
+   *
+   * @param asset - The asset to check
+   * @returns true if asset requires manual price entry
+   */
   const requiresManualPricing = (asset: Asset) => {
-    // If autoUpdatePrice is explicitly set to false
+    // If autoUpdatePrice is explicitly set to false (user override)
     if (asset.autoUpdatePrice === false) {
       return true;
     }
-    // Types that don't support automatic updates
+    // Types that don't support automatic updates (no market price available)
     const manualTypes = ['realestate', 'cash'];
     if (manualTypes.includes(asset.type)) {
       return true;
     }
-    // Private Equity subcategory
+    // Private Equity subcategory (periodic fund valuations, not daily prices)
     if (asset.subCategory === 'Private Equity') {
       return true;
     }

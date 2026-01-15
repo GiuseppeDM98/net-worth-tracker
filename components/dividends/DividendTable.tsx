@@ -1,3 +1,15 @@
+/**
+ * Paginated dividend table with sorting and currency conversion
+ *
+ * Features:
+ * - Three-way sort toggle: asc → desc → default (exDate desc)
+ * - Smart currency display: Shows EUR conversion when available
+ * - Pagination: 50 items per page
+ *
+ * AmountWithConversion Component:
+ * Displays amount with optional EUR conversion in tooltip.
+ * Shows Euro icon when conversion available.
+ */
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
