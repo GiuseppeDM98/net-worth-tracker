@@ -1,3 +1,20 @@
+/**
+ * DASHBOARD LAYOUT
+ *
+ * Provides consistent structure for all dashboard pages.
+ *
+ * STRUCTURE:
+ * - Sidebar: Navigation menu
+ * - Header: Top bar with user info
+ * - Main content area: Child pages render here
+ * - Bottom Navigation: Mobile-only (portrait mode)
+ *
+ * RESPONSIVE BEHAVIOR:
+ * - Desktop (≥1024px): Sidebar always visible, no bottom nav
+ * - Mobile Portrait: Sidebar hidden, bottom nav visible
+ * - Mobile Landscape: Hamburger menu to open sidebar
+ */
+
 'use client';
 
 import { useState } from 'react';

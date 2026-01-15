@@ -1,3 +1,30 @@
+/**
+ * HALL OF FAME PAGE
+ *
+ * Displays top monthly and yearly financial records (best/worst performers).
+ *
+ * DATA SOURCE:
+ * Rankings pre-calculated by backend (hallOfFameService) based on snapshot history.
+ * Recalculation triggered manually via button or automatically after snapshot creation.
+ *
+ * RANKING CATEGORIES:
+ * Monthly (Top 20): Best/Worst Net Worth growth, Best Income, Worst Expenses
+ * Yearly (Top 10): Best/Worst Net Worth growth, Best Income, Worst Expenses
+ *
+ * RESPONSIVE RENDERING:
+ * - Desktop (≥768px): Tables with all details visible
+ * - Mobile (<768px): Cards optimized for touch, key metrics only
+ *
+ * CURRENT PERIOD HIGHLIGHTING:
+ * Yellow background highlights current month/year in rankings to show
+ * where user stands relative to historical performance.
+ *
+ * KEY TRADE-OFFS:
+ * - Pre-calculation vs live: Pre-calc chosen for speed (renders instantly)
+ * - Manual recalc button: Gives user control vs auto-sync complexity
+ * - Expense values shown as negative: Clearer that higher = worse
+ */
+
 'use client';
 
 import { useEffect, useState } from 'react';

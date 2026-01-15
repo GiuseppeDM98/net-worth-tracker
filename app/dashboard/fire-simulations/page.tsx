@@ -1,3 +1,15 @@
+/**
+ * FIRE SIMULATIONS PAGE
+ *
+ * Simple tab wrapper for FIRE (Financial Independence, Retire Early) tools.
+ *
+ * TAB STRUCTURE:
+ * - FIRE Calculator: Calculate retirement readiness
+ * - Monte Carlo: Probabilistic portfolio simulations
+ *
+ * No lazy loading needed - components load quickly.
+ */
+
 'use client';
 
 import { Flame, Dices } from 'lucide-react';

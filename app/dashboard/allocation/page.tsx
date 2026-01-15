@@ -1,3 +1,36 @@
+/**
+ * ALLOCATION PAGE ARCHITECTURE
+ *
+ * Three-level hierarchy for portfolio allocation analysis:
+ * 1. Asset Class (Equity, Bonds, Crypto, Real Estate, Cash, Commodity)
+ * 2. Sub-Category (within each asset class, user-defined like "ETF World", "Italian Bonds")
+ * 3. Specific Assets (theoretical allocation targets within subcategories, NOT linked to real portfolio)
+ *
+ * NAVIGATION PATTERNS:
+ *
+ * DESKTOP (>768px):
+ * - Level 1: Table showing all asset classes with percentages
+ * - Level 2: Separate tables for each asset class's subcategories
+ * - Level 3: Drill-down to dedicated full-page view for specific assets
+ * - Uses URL/component state (drillDown) for navigation
+ *
+ * MOBILE (≤767px):
+ * - Level 1: Cards showing asset classes (touch-friendly)
+ * - Level 2: Bottom sheet with subcategory cards
+ * - Level 3: Bottom sheet with specific asset cards
+ * - Uses sheet state (sheetNav) + breadcrumbs for navigation
+ *
+ * WHY TWO PATTERNS:
+ * - Desktop: Tables show more data density, multiple sections visible at once
+ * - Mobile: Cards easier to tap, sheets prevent scroll confusion
+ * - Trying to unify would compromise both experiences
+ *
+ * KEY TRADE-OFFS:
+ * - Duplicated rendering logic (desktop tables vs mobile cards) for better UX
+ * - Two separate state systems (drillDown vs sheetNav) to isolate concerns
+ * - Specific assets are theoretical targets, NOT linked to real portfolio assets (avoids complexity)
+ */
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -49,14 +82,28 @@ export default function AllocationPage() {
   const [allocation, setAllocation] = useState<AllocationResult | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Desktop drill-down state (for specific assets page)
+  // TWO NAVIGATION STATE SYSTEMS:
+  //
+  // 1. drillDown (desktop): Tracks current page in multi-page navigation
+  //    - Changes component render completely (different page views)
+  //    - State: { level, assetClass, subCategory }
+  //    - Used when screen width > 768px
+  //
+  // 2. sheetNav (mobile): Tracks sheet content without changing main page
+  //    - Sheet slides up from bottom, main page stays underneath
+  //    - State: { isOpen, level, assetClass, subCategory }
+  //    - Used when screen width ≤ 767px
+  //
+  // WHY SEPARATE:
+  // - Desktop: Full page transitions feel natural with tables and lots of data
+  // - Mobile: Sheets allow quick navigation without losing context
+  // - Trying to unify would require complex conditionals and compromise UX
   const [drillDown, setDrillDown] = useState<DrillDownState>({
     level: 'assetClass',
     assetClass: null,
     subCategory: null,
   });
 
-  // Mobile sheet navigation state
   const [sheetNav, setSheetNav] = useState<SheetNavigation>({
     isOpen: false,
     level: null,

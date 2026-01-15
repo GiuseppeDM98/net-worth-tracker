@@ -1,3 +1,32 @@
+/**
+ * SETTINGS PAGE
+ *
+ * Centralized configuration for portfolio targets and preferences.
+ *
+ * CONFIGURATION SECTIONS:
+ * 1. Asset Allocation Targets (3-level hierarchy: Asset Class → Sub-Category → Specific Assets)
+ * 2. Performance Settings (age, risk-free rate for calculations)
+ * 3. Expense Categories (income/expense/dividend categories)
+ * 4. Dividend Sync Configuration
+ *
+ * AUTO-CALCULATION FEATURE:
+ * When enabled, equity and bonds % calculated automatically using rule of thumb:
+ * - Equity = 100 - userAge (younger = more risk tolerance)
+ * - Bonds = remainder after equity + other asset classes
+ * Based on Bogleheads investment principles.
+ *
+ * PERCENTAGE VALIDATION:
+ * - Asset classes must sum to 100% (or remainder if cash uses fixed €)
+ * - Sub-categories must sum to 100% within parent
+ * - Specific assets must sum to 100% within parent sub-category
+ * All validations run on save with clear error messages.
+ *
+ * KEY TRADE-OFFS:
+ * - Complex nested state vs flat structure: Nested chosen to mirror target hierarchy
+ * - Auto-calculation vs manual: Optional auto-calc simplifies for users following standard advice
+ * - Immediate validation vs save-time: Save-time chosen to avoid interrupting user flow
+ */
+
 'use client';
 
 import { useEffect, useState } from 'react';

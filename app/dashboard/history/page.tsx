@@ -46,6 +46,41 @@ import {
 } from 'recharts';
 import { getAssetClassColor } from '@/lib/constants/colors';
 
+/**
+ * HISTORY PAGE ARCHITECTURE
+ *
+ * This page displays historical portfolio analysis with multiple interactive charts.
+ *
+ * DATA FLOW:
+ * 1. Load snapshots + assets + targets from Firebase (parallel fetching)
+ * 2. Transform snapshots → chart data structures using chartService
+ * 3. Render 5 main charts with toggle between percentage and absolute value modes
+ *
+ * CHART TYPES:
+ * - Net Worth Evolution: Line chart showing total portfolio growth over time
+ * - Asset Class Evolution: Stacked area (€) or multi-line (%) showing allocation breakdown
+ * - Liquidity Evolution: Overlapping areas (€) or separate lines (%) for liquid vs illiquid
+ * - YoY Variation: Bar chart showing year-over-year changes
+ * - Current vs Target: Progress bars comparing current allocation to user-defined targets
+ *
+ * RESPONSIVE DESIGN:
+ * - Mobile (<768px): Smaller charts, hidden legends, compact labels
+ * - Landscape: Reduced heights for better fit in constrained viewports
+ * - Desktop: Full charts with legends and optimal sizing
+ *
+ * KEY TRADE-OFFS:
+ * - Chart labels use custom SVG renderers for better visibility vs recharts defaults (more control, readable over chart lines)
+ * - Notes displayed inline on chart vs separate section for immediate context
+ * - Manual snapshot creation available for backfilling historical data vs automatic monthly only
+ * - Dual chart types (stacked area vs line) for mode toggling vs dynamic data transformation (clearer separation of concerns)
+ */
+
+/**
+ * Convert month number (1-12) to Italian month name.
+ *
+ * @param month - Month number where 1 = Gennaio (January), 12 = Dicembre (December)
+ * @returns Italian month name as string
+ */
 const getMonthName = (month: number): string => {
   const months = [
     'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
@@ -91,6 +126,17 @@ export default function HistoryPage() {
     }
   }, [user]);
 
+  /**
+   * Load all data needed for history visualization.
+   *
+   * Fetches in parallel for optimal performance:
+   * - Snapshots: Monthly portfolio snapshots used for all historical charts
+   * - Assets: Current assets needed for allocation comparison view
+   * - Targets: User's allocation targets for comparison (falls back to defaults if not set)
+   *
+   * Snapshots are created automatically at month-end or manually via modal for backfilling.
+   * All three queries run concurrently to minimize loading time.
+   */
   const loadData = async () => {
     if (!user) return;
 
@@ -113,6 +159,16 @@ export default function HistoryPage() {
     }
   };
 
+  /**
+   * Export snapshot history to CSV file for external analysis.
+   *
+   * CSV Format:
+   * - Headers: Data (MM/YYYY), Patrimonio Totale, Patrimonio Liquido, Patrimonio Illiquido
+   * - Values: Raw numbers (not formatted as currency)
+   * - Filename includes timestamp to prevent overwrites
+   *
+   * Downloads file directly to browser's default download location.
+   */
   const handleExportCSV = () => {
     if (snapshots.length === 0) {
       toast.error('Nessun dato da esportare');
@@ -147,12 +203,24 @@ export default function HistoryPage() {
     toast.success('Storico esportato con successo');
   };
 
+  /**
+   * Save user note for a specific snapshot month.
+   *
+   * Uses optimistic update pattern for immediate UI feedback:
+   * 1. Update Firestore first (persists note to database)
+   * 2. Update local state immediately (no need to wait for re-fetch)
+   * 3. Empty notes stored as undefined (Firebase best practice, avoids storing empty strings)
+   *
+   * @param year - Snapshot year
+   * @param month - Snapshot month (1-12)
+   * @param note - User's note text (empty string converted to undefined)
+   */
   const handleSaveNote = async (year: number, month: number, note: string) => {
     if (!user) return;
 
     await updateSnapshotNote(user.uid, year, month, note);
 
-    // Aggiorna stato locale (optimistic update)
+    // Update local state immediately for instant UI feedback (optimistic update)
     setSnapshots((prevSnapshots) =>
       prevSnapshots.map((s) =>
         s.year === year && s.month === month
@@ -166,7 +234,10 @@ export default function HistoryPage() {
   const assetClassHistory = prepareAssetClassHistoryData(snapshots);
   const yoyVariationData = prepareYoYVariationData(snapshots);
 
-  // Prepare liquidity data with percentages
+  // Calculate percentage split of liquid vs illiquid for each snapshot.
+  // This enables the chart toggle between € values and % distribution.
+  // Percentages are pre-calculated here rather than in chart render
+  // to avoid recalculation on every chart update (performance optimization).
   const liquidityHistory = netWorthHistory.map((item) => {
     const total = item.liquidNetWorth + item.illiquidNetWorth;
     return {
@@ -182,6 +253,12 @@ export default function HistoryPage() {
     targets || getDefaultTargets()
   );
 
+  // WARNING: If you add a new asset class, also update:
+  // - ASSET_CLASS_ORDER in lib/services/assetService.ts
+  // - getAssetClassColor() in lib/constants/colors.ts
+  // - AssetClass type definition in types/assets.ts
+  // - Target allocation settings in settings page
+  // Keep all locations in sync to prevent UI inconsistencies!
   const assetClassLabels: Record<string, string> = {
     equity: 'Azioni (Equity)',
     bonds: 'Obbligazioni (Bonds)',
@@ -191,6 +268,10 @@ export default function HistoryPage() {
     commodity: 'Materie Prime (Commodity)',
   };
 
+  // Sort asset classes by predefined order (Equity → Bonds → Crypto → etc.)
+  // rather than alphabetically. This provides consistent UX across all views
+  // and matches the order users expect from finance conventions.
+  // Order defined in ASSET_CLASS_ORDER constant for centralized management.
   const currentVsTargetData = Object.entries(allocation.byAssetClass)
     .sort(([a], [b]) => {
       const orderA = ASSET_CLASS_ORDER[a] || 999;
@@ -204,12 +285,35 @@ export default function HistoryPage() {
       color: getAssetClassColor(assetClass),
     }));
 
-  // Custom label render functions for charts
+  /**
+   * Custom label renderer for net worth chart using SVG.
+   *
+   * WHY CUSTOM RENDERER:
+   * Recharts default labels don't support:
+   * - Background boxes for readability over chart lines
+   * - Border styling for visual hierarchy and emphasis
+   * - Precise positioning control for optimal label placement
+   *
+   * SVG STRUCTURE:
+   * <g> - Group container for rect + text elements
+   *   <rect> - White background with blue border (creates "pill" shape)
+   *   <text> - Currency value centered in rect
+   *
+   * POSITIONING LOGIC:
+   * - x, y coordinates from chart library (data point position)
+   * - rect centered horizontally: x - (textWidth / 2) - padding
+   * - text y-offset: -6px above rect bottom for vertical centering
+   *
+   * ACCESSIBILITY:
+   * - High contrast: dark text (#1F2937) on white background
+   * - Rounded corners (rx=4) for modern, friendly appearance
+   * - 95% opacity allows slight chart visibility through label
+   */
   const renderNetWorthLabelTotal = (props: any) => {
     const { x, y, value } = props;
     const text = formatCurrency(value).replace(/,00$/, '');
     const padding = 6;
-    const textWidth = text.length * 7; // Approximate width
+    const textWidth = text.length * 7; // Approximate width based on font size
 
     return (
       <g>
@@ -309,7 +413,16 @@ export default function HistoryPage() {
     );
   };
 
-  // Asset Class Label Renderers
+  /**
+   * Factory function for asset class label renderers with custom colors.
+   *
+   * Creates a custom SVG label renderer with specified color border.
+   * Same structure as renderNetWorthLabelTotal but allows dynamic color theming.
+   *
+   * @param color - Hex color for border stroke (matches asset class color)
+   * @param offsetY - Vertical offset from data point (default -10, negative = above)
+   * @returns Label render function compatible with Recharts label prop
+   */
   const renderAssetClassLabel = (color: string, offsetY: number = -10) => (props: any) => {
     const { x, y, value } = props;
     if (!value || value === 0) return null;
@@ -441,6 +554,9 @@ export default function HistoryPage() {
                 <YAxis
                   width={getYAxisWidth()}
                   tickFormatter={(value) => formatCurrencyCompact(value)}
+                  // Add 5% padding above/below data range to prevent chart clipping.
+                  // Data points at min/max would otherwise be partially cut off by chart edges.
+                  // Formula: min * 0.95 creates 5% space below, max * 1.05 creates 5% space above.
                   domain={[(dataMin: number) => dataMin * 0.95, (dataMax: number) => dataMax * 1.05]}
                 />
                 <Tooltip
@@ -541,6 +657,30 @@ export default function HistoryPage() {
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-asset-class-evolution">
+              {/*
+                CHART MODE SWITCHING: Percentage vs Absolute Values
+
+                Two fundamentally different chart types for the same data:
+
+                1. PERCENTAGE MODE (LineChart):
+                   - Use case: Compare relative weights over time
+                   - Shows: % of total portfolio for each asset class
+                   - Math: assetValue / totalPortfolio * 100
+                   - Y-axis: Fixed 0-100% range
+                   - Why LineChart: Percentages don't stack (always sum to 100%)
+
+                2. ABSOLUTE MODE (Stacked AreaChart):
+                   - Use case: See actual € growth for each asset class
+                   - Shows: Total € value stacked on top of each other
+                   - Math: Raw asset values in EUR
+                   - Y-axis: Dynamic based on portfolio size
+                   - Why Stacked: Visual representation of total portfolio composition
+
+                TRADE-OFF:
+                Using two separate chart types instead of data transformation
+                because recharts doesn't support dynamic stacking. This duplicates
+                some code but provides clearer separation of concerns and better UX.
+              */}
               {showAssetClassPercentage ? (
                 // Percentage mode: Use LineChart with separate lines
                 <LineChart data={assetClassHistory} margin={getChartMargins()}>

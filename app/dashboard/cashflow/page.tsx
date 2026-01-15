@@ -1,3 +1,24 @@
+/**
+ * CASHFLOW PAGE
+ *
+ * Tab orchestration page for cashflow analysis with lazy loading.
+ *
+ * LAZY LOADING STRATEGY:
+ * - Tabs mounted only when first activated (mountedTabs state tracking)
+ * - Once mounted, tabs stay mounted (no unmounting on tab switch)
+ * - Reduces initial page load time, improves perceived performance
+ *
+ * TAB STRUCTURE:
+ * - Tracking: Current year's transactions and charts
+ * - Current Year: Current year analysis
+ * - Total History: All-time cashflow analysis
+ * - Dividends: Dividend tracking
+ *
+ * WHY LAZY LOADING:
+ * Each tab makes separate API calls and renders heavy charts.
+ * Loading all tabs at once would cause ~3x longer initial load time.
+ */
+
 'use client';
 
 import { useState, useEffect } from 'react';

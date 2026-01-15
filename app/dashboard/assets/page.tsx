@@ -1,3 +1,23 @@
+/**
+ * ASSETS PAGE
+ *
+ * Tab management page for assets with lazy loading and manual data refresh.
+ *
+ * LAZY LOADING PATTERN:
+ * Same strategy as cashflow page:
+ * - Tabs mounted only when first activated
+ * - Once mounted, stay mounted (no re-mounting on switch)
+ * - Improves initial load performance
+ *
+ * TAB STRUCTURE:
+ * - List: Asset table with CRUD operations
+ * - Price History: Historical price charts for all assets
+ *
+ * REFRESH FUNCTIONALITY:
+ * Manual refresh button invalidates React Query cache and refetches all data.
+ * Useful after external price updates or when data seems stale.
+ */
+
 'use client';
 
 import { useState } from 'react';
