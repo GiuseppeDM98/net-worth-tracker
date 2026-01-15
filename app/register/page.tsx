@@ -9,8 +9,17 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import Link from 'next/link';
+// WARNING: Registration behavior depends on APP_CONFIG flags.
+// If you modify these flags, also verify:
+// - Server-side whitelist validation in auth middleware
+// - Email validation logic in signUp()
 import { APP_CONFIG } from '@/lib/constants/appConfig';
 
+// Registration page component with email/password and Google OAuth authentication.
+// Supports three modes based on APP_CONFIG:
+// 1. Open registration (REGISTRATIONS_ENABLED=true)
+// 2. Whitelist-only registration (REGISTRATION_WHITELIST_ENABLED=true)
+// 3. Closed registration (both flags=false) - shows "disabled" UI
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,17 +29,22 @@ export default function RegisterPage() {
   const { signUp, signInWithGoogle } = useAuth();
   const router = useRouter();
 
-  // Check if registrations are completely disabled
+  // Registration access control logic:
+  // - If BOTH flags are disabled -> show "disabled" UI
+  // - If WHITELIST is enabled -> allow only whitelisted emails (validated server-side)
+  // - If REGISTRATIONS is enabled -> allow all emails
   const areRegistrationsDisabled = !APP_CONFIG.REGISTRATIONS_ENABLED && !APP_CONFIG.REGISTRATION_WHITELIST_ENABLED;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate password match
     if (password !== confirmPassword) {
       toast.error('Le password non coincidono');
       return;
     }
 
+    // Validate password length (Firebase requirement: minimum 6 characters)
     if (password.length < 6) {
       toast.error('La password deve essere di almeno 6 caratteri');
       return;
@@ -39,17 +53,23 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
+      // Create user account
       await signUp(email, password, displayName);
       toast.success('Registrazione completata con successo!');
+
+      // Redirect to dashboard
       router.push('/dashboard');
     } catch (error: any) {
       console.error('Registration error:', error);
+      // Show user-friendly error message. Firebase errors are already localized.
       toast.error(error.message || 'Errore durante la registrazione');
     } finally {
       setLoading(false);
     }
   };
 
+  // Handle Google OAuth registration flow.
+  // Uses same signInWithGoogle() method as login - Firebase handles account creation automatically.
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {

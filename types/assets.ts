@@ -1,5 +1,15 @@
 import { Timestamp } from 'firebase/firestore';
 
+// AssetType: Granular classification used in UI (stock, ETF, bond, crypto, etc.)
+// AssetClass: Broad financial categories for allocation analysis (equity, bonds, etc.)
+//
+// Mapping examples:
+// - stock -> equity
+// - etf -> equity (usually) OR bonds (for bond ETFs) - determined by assetClass field
+// - bond -> bonds
+// - crypto -> crypto
+// - cash -> cash
+// - realestate -> realestate
 export type AssetType = 'stock' | 'etf' | 'bond' | 'crypto' | 'commodity' | 'cash' | 'realestate';
 export type AssetClass = 'equity' | 'bonds' | 'crypto' | 'realestate' | 'cash' | 'commodity';
 
@@ -9,6 +19,9 @@ export interface AssetComposition {
   subCategory?: string; // Specific sub-category for this component of the composite asset
 }
 
+// Core asset model representing a single financial holding.
+// Supports stocks, ETFs, bonds, crypto, real estate, cash, commodities.
+// Includes automatic price updates via Yahoo Finance (unless autoUpdatePrice=false).
 export interface Asset {
   id: string;
   userId: string;
@@ -25,8 +38,8 @@ export interface Asset {
   currentPrice: number;
   isLiquid?: boolean; // Default: true - indicates whether the asset is liquid or illiquid
   autoUpdatePrice?: boolean; // Default: true - indicates whether price should be automatically updated via Yahoo Finance
-  composition?: AssetComposition[]; // For composite assets (e.g., pension funds)
-  outstandingDebt?: number; // Outstanding debt for real estate (e.g., mortgage). Net value = value - outstanding debt
+  composition?: AssetComposition[]; // For composite assets (e.g., pension funds with mixed allocation: 60% equity, 40% bonds)
+  outstandingDebt?: number; // Outstanding mortgage/loan for real estate. Net value calculation: value - outstandingDebt
   isin?: string; // ISIN code for dividend scraping (optional)
   lastPriceUpdate: Date | Timestamp;
   createdAt: Date | Timestamp;
@@ -68,6 +81,23 @@ export interface SubCategoryTarget {
   specificAssets?: SpecificAssetAllocation[];
 }
 
+// Asset allocation target structure for portfolio rebalancing.
+//
+// Structure: assetClass -> targetPercentage / subTargets
+// - Top level: asset class (equity, bonds, etc.) with target %
+// - Second level: sub-categories (e.g., "US Stocks", "Emerging Markets") with target % relative to asset class
+// - Third level: specific assets (e.g., "AAPL", "MSFT") with target % relative to sub-category
+//
+// Example:
+// {
+//   "equity": {
+//     targetPercentage: 60,
+//     subTargets: {
+//       "US Stocks": { targetPercentage: 70 },  // 70% of equity = 42% of total portfolio
+//       "Emerging Markets": { targetPercentage: 30 }  // 30% of equity = 18% of total
+//     }
+//   }
+// }
 export interface AssetAllocationTarget {
   [assetClass: string]: {
     targetPercentage: number;
@@ -75,7 +105,7 @@ export interface AssetAllocationTarget {
     fixedAmount?: number;
     subCategoryConfig?: SubCategoryConfig;
     subTargets?: {
-      [subCategory: string]: number | SubCategoryTarget; // Support both old (number) and new (SubCategoryTarget) format
+      [subCategory: string]: number | SubCategoryTarget; // Support both old (number) and new (SubCategoryTarget) format for backward compatibility. Migrate to SubCategoryTarget when possible.
     };
   };
 }

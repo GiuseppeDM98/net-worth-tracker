@@ -10,6 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner';
 import Link from 'next/link';
 
+// Login page component with email/password and Google OAuth authentication.
+// Redirects to /dashboard on successful login.
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,17 +24,23 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      // Authenticate user with email/password
       await signIn(email, password);
       toast.success('Accesso effettuato con successo!');
+
+      // Redirect to dashboard
       router.push('/dashboard');
     } catch (error: any) {
       console.error('Login error:', error);
+      // Show user-friendly error message. Firebase errors are already localized.
       toast.error(error.message || 'Errore durante l\'accesso');
     } finally {
       setLoading(false);
     }
   };
 
+  // Handle Google OAuth authentication flow.
+  // Uses Firebase signInWithPopup for web-based OAuth.
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {

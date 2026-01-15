@@ -30,6 +30,10 @@ export interface SectionSelection {
 // Time Filter Types
 // ============================================
 
+// Time period filters for PDF report generation.
+// - 'total': All available historical data
+// - 'yearly': Full year data (12 months)
+// - 'monthly': Single month data
 export type TimeFilter = 'total' | 'yearly' | 'monthly';
 
 export interface TimeFilterValidation {
@@ -220,7 +224,7 @@ export interface ChartCaptureOptions {
   chartId: string;
   width?: number;
   height?: number;
-  scale?: number;               // Default: 2 for high DPI
+  scale?: number;               // Chart rendering scale for high-DPI displays. Default: 2 (Retina). Use 1 for standard displays.
 }
 
 export const CHART_IDS = {
