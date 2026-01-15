@@ -11,10 +11,23 @@ interface PortfolioSectionProps {
   data: PortfolioData;
 }
 
+/**
+ * Portfolio assets section with automatic pagination for large holdings.
+ *
+ * Multi-page output:
+ * - Asset detail pages: 25 assets per page (prevents PDF overflow)
+ * - Summary page: Top 10 holdings + aggregated metrics (always rendered last)
+ *
+ * Why 25 assets per page?
+ * Balance between information density and readability. With current table styling,
+ * 25 assets fit comfortably on A4 while remaining legible.
+ */
+
+// Maximum assets per page before creating new page
 const ASSETS_PER_PAGE = 25;
 
 /**
- * Paginate assets array into chunks
+ * Splits asset array into paginated chunks of ASSETS_PER_PAGE items.
  */
 function paginateAssets(assets: AssetRow[]): AssetRow[][] {
   const pages: AssetRow[][] = [];
@@ -25,7 +38,8 @@ function paginateAssets(assets: AssetRow[]): AssetRow[][] {
 }
 
 /**
- * Truncate string to max length
+ * Truncates long strings to prevent table overflow.
+ * @param maxLength - Character limit (25 for table cells, 30 for headers)
  */
 function truncate(str: string, maxLength: number): string {
   if (str.length <= maxLength) return str;

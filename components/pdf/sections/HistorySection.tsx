@@ -7,7 +7,16 @@ import { PDFTable } from '../primitives/PDFTable';
 import type { HistoryData, ChartImage } from '@/types/pdf';
 import { formatCurrency, formatPercentage } from '@/lib/services/chartService';
 
-// Helper function to format date from 'YYYY-MM' to 'Gen 2024'
+/**
+ * Formats snapshot date from ISO format to abbreviated Italian month + year.
+ *
+ * Italian month abbreviations used:
+ * Gen (Gennaio), Feb (Febbraio), Mar (Marzo), Apr (Aprile), Mag (Maggio), Giu (Giugno),
+ * Lug (Luglio), Ago (Agosto), Set (Settembre), Ott (Ottobre), Nov (Novembre), Dic (Dicembre)
+ *
+ * @param dateStr - Date string in 'YYYY-MM' format (e.g., '2024-01')
+ * @returns Formatted string like 'Gen 2024'
+ */
 function formatDate(dateStr: string): string {
   const [year, month] = dateStr.split('-');
   const monthNames = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu',
@@ -20,7 +29,34 @@ interface HistorySectionProps {
   chartImages: Map<string, ChartImage>;
 }
 
+/**
+ * Historical performance section displaying net worth evolution and year-over-year comparison.
+ *
+ * Multi-page structure:
+ * - Page 1: Net worth evolution table with overall growth metrics
+ * - Page 2: Year-over-year comparison table (conditionally rendered if data available)
+ *
+ * Key metrics displayed:
+ * - Total Growth: Percentage change from oldest to latest snapshot
+ * - Total Growth Absolute: Currency value of growth
+ * - Oldest Snapshot: Date and value of first recorded snapshot
+ * - Latest Snapshot: Date and value of most recent snapshot
+ *
+ * Net worth evolution table columns:
+ * - Data: Snapshot date (abbreviated Italian month + year)
+ * - Patrimonio Totale: Total net worth (liquid + illiquid)
+ * - Patrimonio Liquido: Liquid assets only
+ * - Patrimonio Illiquido: Illiquid assets (real estate, etc.)
+ *
+ * YoY comparison table shows annual performance by calendar year, comparing
+ * first and last snapshot of each year to calculate growth.
+ *
+ * @param data - Historical net worth data with evolution timeline and YoY comparison
+ * @param chartImages - Pre-captured chart images (currently unused but reserved for future enhancements)
+ */
 export function HistorySection({ data, chartImages }: HistorySectionProps) {
+  // Require minimum 2 snapshots to calculate meaningful growth metrics.
+  // With only 1 snapshot, we can't show evolution, growth rates, or comparisons.
   if (!data || data.netWorthEvolution.length < 2) {
     return (
       <Page size="A4" style={styles.page}>
@@ -77,6 +113,8 @@ export function HistorySection({ data, chartImages }: HistorySectionProps) {
 
               <View style={styles.metricCard}>
                 <Text style={styles.metricLabel}>Primo Snapshot</Text>
+                {/* Format as MM/YYYY (e.g., '01/2023').
+                    padStart(2, '0') ensures single-digit months display as '01' not '1'. */}
                 <Text style={styles.metricValue}>
                   {String(data.oldestSnapshot.month).padStart(2, '0')}/{data.oldestSnapshot.year}
                 </Text>
@@ -115,7 +153,8 @@ export function HistorySection({ data, chartImages }: HistorySectionProps) {
         </View>
       </Page>
 
-      {/* YoY Comparison page */}
+      {/* YoY Comparison page - Second page showing annual performance breakdown.
+          Only renders if YoY data is available (requires snapshots spanning multiple calendar years). */}
       {data.yoyComparison.length > 0 && (
         <Page size="A4" style={styles.page}>
           <View style={styles.header}>
@@ -124,6 +163,19 @@ export function HistorySection({ data, chartImages }: HistorySectionProps) {
           </View>
 
           <View style={styles.content}>
+            {/* Year-over-Year (YoY) comparison methodology (Teacher Comment):
+                Compares portfolio value at beginning and end of each calendar year.
+                For each year:
+                - Start Value: Net worth from first snapshot of that year (Jan or earliest month)
+                - End Value: Net worth from last snapshot of that year (Dec or latest month)
+                - Growth: Absolute difference (End - Start)
+                - Growth %: Percentage change ((End - Start) / Start × 100)
+
+                Example: If 2023 started at €50,000 (Jan snapshot) and ended at €55,000 (Dec snapshot),
+                growth would be €5,000 and growth % would be 10%.
+
+                This differs from calendar-year returns (which use exact Jan 1 / Dec 31 values)
+                because it uses actual snapshot dates, which might be mid-month. */}
             <PDFText variant="subheading">Confronto Year-over-Year</PDFText>
             <PDFTable
               headers={['Anno', 'Valore Iniziale', 'Valore Finale', 'Crescita', '% Crescita']}

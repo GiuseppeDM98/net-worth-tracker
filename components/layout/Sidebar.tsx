@@ -22,10 +22,35 @@ interface SidebarProps {
   onClose?: () => void;
 }
 
+/**
+ * Main navigation sidebar for the dashboard.
+ *
+ * Responsive behavior (progressive enhancement approach):
+ * - Desktop (≥1440px): Always visible, fixed width 256px (w-64), positioned relative
+ * - Mobile landscape (<1440px + landscape): Slide-in overlay (fixed, z-50) controlled by isOpen prop
+ * - Mobile portrait (<1440px + portrait): Hidden (uses BottomNavigation instead)
+ *
+ * Navigation architecture:
+ * - 9 total routes in this sidebar
+ * - 6 of these also appear in SecondaryMenuDrawer (Allocation, Performance, History, Hall of Fame, FIRE, Settings)
+ * - 3 are unique to Sidebar: Overview, Assets, Cashflow
+ * - Mobile portrait gets 3 primary routes in BottomNavigation + 6 secondary in drawer
+ *
+ * Custom Tailwind breakpoints:
+ * - `desktop:` = @media (min-width: 1440px)
+ * - `max-desktop:` = @media (max-width: 1439px)
+ * - `landscape:` and `portrait:` = orientation modifiers
+ *
+ * @param isOpen - Controls sidebar visibility on mobile landscape (ignored on desktop)
+ * @param onClose - Callback to close sidebar, called after navigation on mobile
+ */
 export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const currentYear = new Date().getFullYear();
 
+  // WARNING: If you add/remove navigation items here, also update:
+  // - SecondaryMenuDrawer.tsx (6 secondary items: Allocation, Performance, History, Hall of Fame, FIRE, Settings)
+  // - BottomNavigation.tsx (3 primary items: Overview, Assets, Cashflow)
+  // Total navigation: 9 routes (this sidebar contains all 9)
   const navigation = [
     { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Assets', href: '/dashboard/assets', icon: Wallet },
@@ -38,8 +63,17 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     { name: 'Settings', href: '/dashboard/settings', icon: Settings },
   ];
 
+  /**
+   * Auto-closes sidebar on mobile landscape after navigation.
+   *
+   * Why 1440px threshold?
+   * Matches the Tailwind `desktop:` breakpoint defined in tailwind.config.ts.
+   * On smaller screens, close the overlay sidebar after navigation to free up
+   * screen space and show the selected page content.
+   *
+   * Desktop view keeps sidebar open for persistent navigation.
+   */
   const handleLinkClick = () => {
-    // Close sidebar on mobile after navigation
     if (onClose && window.innerWidth < 1440) {
       onClose();
     }

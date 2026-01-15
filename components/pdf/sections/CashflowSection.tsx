@@ -11,6 +11,29 @@ interface CashflowSectionProps {
   data: CashflowData;
 }
 
+/**
+ * Cashflow section displaying income and expense analysis with financial health indicator.
+ *
+ * Key metrics shown:
+ * - Total income and total expenses
+ * - Net cashflow (income - expenses)
+ * - Savings rate: (Income - Expenses) / Income × 100
+ * - Income-to-expense ratio with color-coded health indicator
+ * - Top 5 expense categories breakdown
+ * - Average monthly savings
+ *
+ * Financial health thresholds based on income-to-expense ratio:
+ * - ≥1.2 (Green): "Ottima salute finanziaria" - Spending only 83% of income or less
+ * - 0.8-1.2 (Yellow): "Equilibrio" - Income and expenses roughly balanced
+ * - <0.8 (Red): "Attenzione: uscite eccessive" - Spending more than 125% of income
+ *
+ * Why these thresholds?
+ * - 1.2 ratio = 20% savings rate, considered healthy for wealth building
+ * - 0.8 ratio = Spending exceeds income by 25%, unsustainable long-term
+ * - Between 0.8-1.2 = Managing expenses but little room for savings
+ *
+ * @param data - Cashflow metrics including income, expenses, categories, and ratios
+ */
 export function CashflowSection({ data }: CashflowSectionProps) {
   if (!data || (data.totalIncome === 0 && data.totalExpenses === 0)) {
     return (
@@ -33,7 +56,14 @@ export function CashflowSection({ data }: CashflowSectionProps) {
     );
   }
 
-  // Determine financial health based on ratio
+  /**
+   * Maps income-to-expense ratio to financial health indicator.
+   *
+   * Thresholds:
+   * - ≥1.2: Excellent (saving 20%+ of income)
+   * - 0.8-1.2: Balanced (roughly break-even)
+   * - <0.8: Warning (overspending by 25%+)
+   */
   const getHealthIndicator = (ratio: number) => {
     if (ratio >= 1.2) return { label: 'Ottima salute finanziaria', color: '#10B981' };
     if (ratio >= 0.8) return { label: 'Equilibrio', color: '#F59E0B' };

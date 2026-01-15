@@ -12,10 +12,23 @@ interface CoverSectionProps {
   timeFilter?: TimeFilter;
 }
 
+/**
+ * Derives report type label from time filter with current date context.
+ *
+ * Capitalization logic:
+ * Italian month names from toLocaleString() are lowercase ("gennaio", "febbraio").
+ * We capitalize the first letter for professional appearance in title context.
+ *
+ * @returns Formatted report type string
+ * - Monthly: "Report Mensile - Gennaio 2024"
+ * - Yearly: "Report Annuale - 2024"
+ * - Total: "Report Totale"
+ */
 function getReportTypeLabel(timeFilter?: TimeFilter): string {
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.toLocaleString('it-IT', { month: 'long' });
+  // Capitalize first letter: "gennaio" → "Gennaio"
   const capitalizedMonth = currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1);
 
   switch (timeFilter) {
@@ -29,6 +42,22 @@ function getReportTypeLabel(timeFilter?: TimeFilter): string {
   }
 }
 
+/**
+ * Professional cover page (title page) for PDF reports.
+ *
+ * Layout:
+ * - Centered design with large title
+ * - Report type badge (monthly/yearly/total) with conditional coloring
+ * - User name as subtitle
+ * - Generation date
+ * - Disclaimer text
+ *
+ * Always rendered first in PDFDocument, not optional.
+ *
+ * @param generatedAt - Report generation timestamp
+ * @param userName - User's display name
+ * @param timeFilter - Report period (total/yearly/monthly)
+ */
 export function CoverSection({ generatedAt, userName, timeFilter }: CoverSectionProps) {
   const formattedDate = format(generatedAt, 'dd/MM/yyyy', { locale: it });
 

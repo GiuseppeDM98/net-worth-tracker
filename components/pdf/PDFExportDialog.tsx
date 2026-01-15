@@ -43,6 +43,35 @@ export interface PDFExportDialogProps {
   allocationTargets: AssetAllocationTarget;
 }
 
+/**
+ * Dialog component for configuring and exporting portfolio reports to PDF.
+ *
+ * Key features:
+ * - Time filter selection (total/yearly/monthly) with availability validation
+ * - Section checkbox selection with descriptions
+ * - Dynamic section disabling based on time filter constraints
+ * - Real-time validation with user feedback
+ * - Loading state during PDF generation
+ *
+ * Time filter constraints:
+ * - Total: All sections available, includes all-time data
+ * - Yearly: All sections available, includes current year data only
+ * - Monthly: FIRE and History sections DISABLED (explained in handleTimeFilterChange)
+ *
+ * Validation flow:
+ * 1. Check user authentication
+ * 2. Filter snapshots based on selected time period
+ * 3. Validate filtered data meets section requirements (e.g., ≥2 snapshots for History)
+ * 4. Validate PDF generation options (all required data present)
+ * 5. Generate PDF with filtered data
+ * 6. Display success/error toast
+ *
+ * @param open - Controls dialog visibility
+ * @param onOpenChange - Callback to update dialog state
+ * @param snapshots - All available monthly snapshots (unfiltered)
+ * @param assets - Current asset holdings
+ * @param allocationTargets - User's asset allocation targets
+ */
 export function PDFExportDialog({
   open,
   onOpenChange,
@@ -54,6 +83,7 @@ export function PDFExportDialog({
   const [loading, setLoading] = useState(false);
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('total');
   const [validation, setValidation] = useState(validateTimeFilterData(snapshots));
+  // All sections default to selected (true)
   const [sections, setSections] = useState<SectionSelection>({
     portfolio: true,
     allocation: true,
@@ -63,7 +93,7 @@ export function PDFExportDialog({
     summary: true,
   });
 
-  // Recalculate validation when snapshots change
+  // Revalidate time filter availability when snapshot data changes
   useEffect(() => {
     setValidation(validateTimeFilterData(snapshots));
   }, [snapshots]);
@@ -72,10 +102,27 @@ export function PDFExportDialog({
     setSections(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
+  /**
+   * Handles time filter changes with automatic section adjustment.
+   *
+   * Time filter behavior:
+   * - Total/Yearly: All sections re-enabled (reset to default checked state)
+   * - Monthly: FIRE and History sections auto-disabled
+   *
+   * Why disable FIRE and History for monthly exports?
+   * - FIRE metrics (Fire Number, years to FI, etc.) are calculated annually based on
+   *   annual expenses and long-term portfolio growth. A single month's data doesn't
+   *   provide meaningful FIRE metrics.
+   * - History section requires multiple time periods for comparison (YoY analysis,
+   *   evolution charts). A single month lacks comparison context.
+   *
+   * User feedback: Toast notification when sections are auto-deselected.
+   */
   const handleTimeFilterChange = (newFilter: TimeFilter) => {
     setTimeFilter(newFilter);
 
-    // If switching to yearly or total, reset all sections to checked
+    // Reset all sections to checked when switching to total or yearly
+    // (user may have previously been on monthly with some sections disabled)
     if (newFilter === 'yearly' || newFilter === 'total') {
       setSections({
         portfolio: true,
@@ -87,7 +134,7 @@ export function PDFExportDialog({
       });
     }
 
-    // Adjust sections if necessary (disable FIRE and history for monthly)
+    // Apply time filter constraints (e.g., disable FIRE/History for monthly)
     const adjustedSections = adjustSectionsForTimeFilter(newFilter, sections);
     if (JSON.stringify(adjustedSections) !== JSON.stringify(sections)) {
       setSections(adjustedSections);
@@ -95,6 +142,23 @@ export function PDFExportDialog({
     }
   };
 
+  /**
+   * Validates and initiates PDF export.
+   *
+   * Multi-stage validation process:
+   * 1. Authentication check (user must be logged in)
+   * 2. Time-based snapshot filtering
+   * 3. Data completeness validation for selected sections
+   * 4. Options structure validation
+   * 5. PDF generation (async, captures charts as images)
+   *
+   * Error handling:
+   * - Validation errors: Show specific message via toast, abort early
+   * - Generation errors: Show generic error message, log to console
+   * - Always set loading=false in finally block
+   *
+   * On success: Close dialog and show success toast
+   */
   const handleExport = async () => {
     if (!user) {
       toast.error('Utente non autenticato');
@@ -104,10 +168,10 @@ export function PDFExportDialog({
     try {
       setLoading(true);
 
-      // Filter snapshots based on timeFilter
+      // Filter snapshots to selected time period (total/yearly/monthly)
       const filteredSnapshots = filterSnapshotsByTime(snapshots, timeFilter);
 
-      // Validate PDF generation
+      // Validate that filtered data meets requirements for selected sections
       try {
         validatePDFGeneration(filteredSnapshots, sections, timeFilter);
       } catch (validationError: any) {
@@ -116,20 +180,21 @@ export function PDFExportDialog({
         return;
       }
 
-      // Validate options
+      // Prepare PDF generation options with filtered data
       const options = {
         userId: user.uid,
         userName: user.displayName || 'Utente',
         sections,
-        snapshots: filteredSnapshots, // Use filtered snapshots
+        snapshots: filteredSnapshots,
         assets,
         allocationTargets,
-        timeFilter, // Pass timeFilter to generator
+        timeFilter,
       };
 
+      // Validate options structure
       validatePDFOptions(options);
 
-      // Generate PDF
+      // Generate PDF (captures charts, processes data, renders document)
       await generatePDF(options);
 
       toast.success('PDF generato con successo');

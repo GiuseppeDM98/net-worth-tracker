@@ -12,6 +12,28 @@ interface AllocationSectionProps {
   chartImage?: ChartImage;
 }
 
+/**
+ * Asset allocation section showing current portfolio distribution and rebalancing recommendations.
+ *
+ * Displays two scenarios based on whether user has set allocation targets:
+ *
+ * Scenario 1: With targets configured
+ * - Current vs Target allocation comparison table
+ * - Rebalancing actions (Buy/Sell badges with amounts)
+ * - Color-coded: Green for buy, Red for sell
+ *
+ * Scenario 2: Without targets configured
+ * - Current allocation table only
+ * - Success indicator when portfolio is balanced (within ±2% threshold)
+ *
+ * Rebalancing threshold: ±2%
+ * Differences smaller than 2% are ignored to avoid recommending tiny adjustments
+ * that aren't worth the transaction costs. For example, if target is 60% and
+ * actual is 61%, no rebalancing is suggested.
+ *
+ * @param data - Allocation data with current percentages, targets, and rebalancing actions
+ * @param chartImage - Optional pie chart visualization (currently unused in this section)
+ */
 export function AllocationSection({ data, chartImage }: AllocationSectionProps) {
   if (!data || data.byAssetClass.length === 0) {
     return (

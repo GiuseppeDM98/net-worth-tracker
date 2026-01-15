@@ -12,6 +12,44 @@ interface SummarySectionProps {
   data: SummaryData;
 }
 
+/**
+ * Summary section providing a one-page overview of all key portfolio metrics.
+ *
+ * Purpose: Final section of PDF report that aggregates critical data from all other sections,
+ * allowing readers to quickly grasp portfolio health without reading the entire document.
+ *
+ * Layout structure:
+ * 1. Key Metrics Grid (9 metrics in 3-column layout):
+ *    - Patrimonio Totale Netto: Total net worth (primary metric, blue highlight)
+ *    - Patrimonio Liquido: Liquid assets only
+ *    - Numero Assets: Total asset count
+ *    - Asset Class Principale: Largest allocation by asset class
+ *    - TER Medio Ponderato: Weighted average expense ratio
+ *    - G/P Non Realizzato: Unrealized gains/losses (green if positive, red if negative)
+ *    - Score Allocazione: Portfolio balance score 0-100 (color-coded by threshold)
+ *    - Progresso FIRE: Progress toward Financial Independence goal
+ *    - Ratio Entrate/Uscite: Income-to-expense ratio (financial health indicator)
+ *
+ * 2. Metadata Section:
+ *    - Generation timestamp
+ *    - Number and list of included sections
+ *
+ * 3. Data Completeness:
+ *    - Historical snapshots count
+ *    - Assets count
+ *    - Cashflow transactions count
+ *
+ * 4. Disclaimer:
+ *    - Legal notice about data accuracy and non-advisory nature
+ *
+ * Color coding for metrics:
+ * - Blue: Primary metric (Total Net Worth)
+ * - Green: Positive/healthy values (good allocation score ≥80, income ratio ≥1.2, positive gains)
+ * - Yellow/Warning: Medium values (allocation score 60-79, income ratio 0.8-1.2)
+ * - Red/Negative: Poor values (allocation score <60, income ratio <0.8, negative gains)
+ *
+ * @param data - Summary data aggregated from all portfolio sections
+ */
 export function SummarySection({ data }: SummarySectionProps) {
   const formattedDate = format(data.generatedAt, 'dd/MM/yyyy HH:mm', { locale: it });
 
@@ -23,7 +61,9 @@ export function SummarySection({ data }: SummarySectionProps) {
       </View>
 
       <View style={styles.content}>
-        {/* Key metrics summary */}
+        {/* Key metrics summary - 9 metrics in 3-column grid layout.
+            Grid uses flexWrap to create rows automatically. Each card is 31.33% wide
+            with 2% right margin, creating 3 columns per row (31.33% × 3 + 2% × 3 ≈ 100%). */}
         <View style={styles.metricsGrid}>
           <View style={styles.metricCard}>
             <Text style={styles.metricLabel}>Patrimonio Totale Netto</Text>
@@ -68,6 +108,14 @@ export function SummarySection({ data }: SummarySectionProps) {
 
           <View style={styles.metricCard}>
             <Text style={styles.metricLabel}>Score Allocazione</Text>
+            {/* Allocation score thresholds (Why Comment):
+                - ≥80 (Green): Well-balanced portfolio, allocation within ±2% of targets for most asset classes
+                - 60-79 (Yellow): Some deviation from targets, may need minor rebalancing soon
+                - <60 (Red): Significant deviation from targets, rebalancing recommended
+
+                Score calculation: 100 - (sum of absolute percentage point deviations from target).
+                Example: If stocks are 3% over target and bonds are 3% under, score = 100 - (3+3) = 94.
+                Lower score indicates more misalignment with target allocation. */}
             <Text style={[
               styles.metricValue,
               data.allocationScore >= 80 ? styles.positive :
@@ -86,6 +134,14 @@ export function SummarySection({ data }: SummarySectionProps) {
 
           <View style={styles.metricCard}>
             <Text style={styles.metricLabel}>Ratio Entrate/Uscite</Text>
+            {/* Income-to-expense ratio thresholds (Why Comment):
+                Mirrors thresholds from CashflowSection for consistency.
+                - ≥1.2 (Green): Excellent financial health - saving 20%+ of income
+                - 0.8-1.2 (Yellow): Balanced - roughly breaking even
+                - <0.8 (Red): Warning - spending exceeds income by 25%+
+
+                Calculation: Total Income / Total Expenses.
+                Example: €3,000 income / €2,500 expenses = 1.2x (healthy, 20% savings rate). */}
             <Text style={[
               styles.metricValue,
               data.incomeToExpenseRatio >= 1.2 ? styles.positive :
@@ -96,7 +152,9 @@ export function SummarySection({ data }: SummarySectionProps) {
           </View>
         </View>
 
-        {/* Metadata */}
+        {/* Metadata - Report generation information and section inclusion details.
+            Lists which sections the user selected for export (Portfolio, Allocation, etc.)
+            to provide context about report scope and completeness. */}
         <View style={styles.metadataSection}>
           <PDFText variant="subheading">Metadata Report</PDFText>
 
@@ -117,7 +175,12 @@ export function SummarySection({ data }: SummarySectionProps) {
           </View>
         </View>
 
-        {/* Data completeness */}
+        {/* Data completeness - Quantifies how much historical and current data is available.
+            Helps readers understand report reliability and whether there's enough data
+            for meaningful analysis:
+            - Snapshots Storici: Number of monthly snapshots captured (more = better historical trends)
+            - Assets: Total number of holdings (portfolio diversification indicator)
+            - Movimenti Cassa: Total cashflow transactions tracked (income + expense entries) */}
         <View style={styles.completenessSection}>
           <PDFText variant="subheading">Completezza Dati</PDFText>
 

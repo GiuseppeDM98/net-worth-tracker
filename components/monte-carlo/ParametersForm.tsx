@@ -19,6 +19,45 @@ interface ParametersFormProps {
   isRunning: boolean;
 }
 
+/**
+ * Comprehensive form for configuring all Monte Carlo simulation parameters.
+ *
+ * Key features:
+ * - Portfolio settings (initial amount, retirement years, annual withdrawal)
+ * - Asset allocation (equity/bonds percentages with auto-complement validation)
+ * - Parameter source toggle (historical data vs market defaults)
+ * - Market parameters (equity/bonds return/volatility, inflation rate)
+ * - Simulation count selector (1,000-50,000)
+ * - Quick-select buttons for net worth values
+ * - Collapsible technical details section
+ *
+ * State management pattern:
+ * This component uses 12 separate useState calls for local input tracking.
+ * Why? To provide smooth UX during user input:
+ * 1. Allow partial/invalid input while typing (e.g., "7." before completing "7.5")
+ * 2. Only validate and sync with parent on blur (handleBlur handlers)
+ * 3. Format display values after validation (Italian locale for currency)
+ * 4. Prevent input field "jumping" during typing due to premature formatting
+ *
+ * Without local state, formatting on every keystroke would cause:
+ * - Cursor position issues (typing "100" might format to "1.00" mid-input)
+ * - Inability to type decimal points or negative signs
+ * - Poor user experience with constant validation interruptions
+ *
+ * Historical vs Market Parameters:
+ * - Historical mode: Uses user's actual portfolio performance (requires ≥24 snapshots)
+ * - Market mode: Uses industry-standard defaults (equity 7%/18%, bonds 3%/6%)
+ * - Toggle auto-populates all return/volatility fields and disables manual editing
+ *
+ * @param params - Current simulation parameters (controlled by parent)
+ * @param onParamsChange - Callback to update parameters in parent
+ * @param onRunSimulation - Callback to trigger simulation execution
+ * @param totalNetWorth - User's total net worth for quick-select
+ * @param liquidNetWorth - User's liquid net worth for quick-select
+ * @param historicalReturns - Calculated returns from user snapshots (null if insufficient data)
+ * @param availableSnapshotCount - Number of snapshots available (min 24 for historical mode)
+ * @param isRunning - Whether simulation is currently executing
+ */
 export function ParametersForm({
   params,
   onParamsChange,
@@ -29,25 +68,30 @@ export function ParametersForm({
   availableSnapshotCount,
   isRunning,
 }: ParametersFormProps) {
+  // ===== Input State Management =====
+  // All numeric input fields maintain local string state to allow partial input during typing.
+  // Values sync with parent params only on blur after validation.
+
+  // Asset allocation inputs (must sum to 100%)
   const [equityInput, setEquityInput] = useState<string>(params.equityPercentage.toString());
   const [bondsInput, setBondsInput] = useState<string>(params.bondsPercentage.toString());
 
-  // Initial portfolio local state for formatted display
+  // Initial portfolio (formatted in Italian locale with decimal places)
   const [initialPortfolioInput, setInitialPortfolioInput] = useState<string>(
     params.initialPortfolio.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   );
 
-  // Market parameters local state
+  // Market parameters (return and volatility for equity and bonds, plus inflation rate)
   const [equityReturnInput, setEquityReturnInput] = useState<string>(params.equityReturn.toFixed(1));
   const [equityVolatilityInput, setEquityVolatilityInput] = useState<string>(params.equityVolatility.toFixed(1));
   const [bondsReturnInput, setBondsReturnInput] = useState<string>(params.bondsReturn.toFixed(1));
   const [bondsVolatilityInput, setBondsVolatilityInput] = useState<string>(params.bondsVolatility.toFixed(1));
   const [inflationRateInput, setInflationRateInput] = useState<string>(params.inflationRate.toFixed(1));
 
-  // Collapsible state for technical details
+  // UI state for collapsible technical details section
   const [showTechnicalDetails, setShowTechnicalDetails] = useState<boolean>(false);
 
-  // Local state for toggle to provide instant visual feedback
+  // Local toggle state for instant visual feedback before parent update
   const [isHistoricalMode, setIsHistoricalMode] = useState<boolean>(params.parameterSource === 'historical');
 
   const isHistoricalAvailable = historicalReturns !== null;
@@ -64,6 +108,10 @@ export function ParametersForm({
     );
   }, [params.initialPortfolio]);
 
+  /**
+   * Generic helper to update a single parameter and trigger parent callback.
+   * Uses TypeScript generics to ensure type safety for all parameter keys.
+   */
   const updateParam = <K extends keyof MonteCarloParams>(
     key: K,
     value: MonteCarloParams[K]
@@ -71,6 +119,10 @@ export function ParametersForm({
     onParamsChange({ ...params, [key]: value });
   };
 
+  /**
+   * Quick-select buttons for portfolio initialization.
+   * Round values to avoid decimal precision issues in calculations.
+   */
   const handleUseTotalPortfolio = () => {
     updateParam('initialPortfolio', Math.round(totalNetWorth));
   };
@@ -78,6 +130,10 @@ export function ParametersForm({
   const handleUseLiquidPortfolio = () => {
     updateParam('initialPortfolio', Math.round(liquidNetWorth));
   };
+
+  // ===== Asset Allocation Handlers =====
+  // Equity and bonds percentages must sum to exactly 100%.
+  // Auto-complement pattern: When user changes equity, bonds automatically adjusts (and vice versa).
 
   const handleEquityChange = (value: string) => {
     setEquityInput(value);
@@ -87,6 +143,11 @@ export function ParametersForm({
     setBondsInput(value);
   };
 
+  /**
+   * Validates equity percentage and auto-complements bonds to sum to 100%.
+   * On blur, if input is valid (0-100), update both percentages.
+   * If invalid, reset input to current param value.
+   */
   const handleEquityBlur = () => {
     const value = parseFloat(equityInput);
     if (!isNaN(value) && value >= 0 && value <= 100) {
@@ -94,10 +155,15 @@ export function ParametersForm({
       updateParam('bondsPercentage', 100 - value);
       setBondsInput((100 - value).toString());
     } else {
+      // Reset to current value if invalid input
       setEquityInput(params.equityPercentage.toString());
     }
   };
 
+  /**
+   * Validates bonds percentage and auto-complements equity to sum to 100%.
+   * Mirror of handleEquityBlur for bonds input.
+   */
   const handleBondsBlur = () => {
     const value = parseFloat(bondsInput);
     if (!isNaN(value) && value >= 0 && value <= 100) {
@@ -105,19 +171,37 @@ export function ParametersForm({
       updateParam('equityPercentage', 100 - value);
       setEquityInput((100 - value).toString());
     } else {
+      // Reset to current value if invalid input
       setBondsInput(params.bondsPercentage.toString());
     }
   };
 
+  // ===== Initial Portfolio Handlers =====
+
   const handleInitialPortfolioChange = (value: string) => {
-    // Allow user to type freely (including partial numbers)
+    // Allow user to type freely (including partial numbers, formatting characters)
     setInitialPortfolioInput(value);
   };
 
+  /**
+   * Parses and validates initial portfolio value from Italian locale format.
+   *
+   * Italian number format: Uses comma as decimal separator (e.g., "1.234,56" = 1234.56)
+   * vs US format which uses period (e.g., "1,234.56" = 1234.56)
+   *
+   * Parsing strategy:
+   * 1. Strip all characters except digits, comma, dot, and minus sign
+   * 2. Replace Italian comma decimal separator with dot for parseFloat()
+   * 3. Validate result is a positive number
+   * 4. Round to integer (fractional currency not needed for portfolio totals)
+   * 5. Format back to Italian locale for display
+   *
+   * Example: User types "50.000,00" → parses as 50000.00 → displays as "50.000,00"
+   */
   const handleInitialPortfolioBlur = () => {
-    // Remove all non-numeric characters except comma and dot
+    // Strip all non-numeric characters except comma (decimal) and dot (thousands) and minus
     const cleanValue = initialPortfolioInput.replace(/[^\d,.-]/g, '');
-    // Replace Italian comma with dot for parsing
+    // Convert Italian decimal separator (comma) to JavaScript standard (dot)
     const normalizedValue = cleanValue.replace(',', '.');
     const value = parseFloat(normalizedValue);
 
@@ -135,7 +219,13 @@ export function ParametersForm({
     }
   };
 
-  // Market parameter handlers
+  // ===== Market Parameter Handlers =====
+
+  /**
+   * Generic blur handler for all market parameters (equity/bonds return/volatility, inflation).
+   * Validates input is within reasonable range (-100% to +100%) before updating.
+   * Formats to 1 decimal place for consistency.
+   */
   const handleMarketParamBlur = (
     paramKey: 'equityReturn' | 'equityVolatility' | 'bondsReturn' | 'bondsVolatility' | 'inflationRate',
     inputValue: string,
@@ -147,33 +237,58 @@ export function ParametersForm({
       updateParam(paramKey, value);
       setInputState(value.toFixed(1));
     } else {
+      // Reset to fallback if invalid
       setInputState(fallbackValue.toFixed(1));
     }
   };
 
+  /**
+   * Toggles between historical and market parameter sources.
+   *
+   * Historical mode (requires ≥24 monthly snapshots):
+   * - Auto-populates equity/bonds return and volatility from user's actual portfolio performance
+   * - Calculated by monteCarloService.calculateHistoricalReturns() from snapshot data
+   * - Input fields become disabled (read-only) to prevent manual editing
+   * - More personalized simulation based on user's actual experience
+   *
+   * Market mode (default):
+   * - Uses industry-standard default parameters:
+   *   * Equity: 7% return, 18% volatility (typical US stock market)
+   *   * Bonds: 3% return, 6% volatility (typical bond market)
+   * - Input fields remain editable for custom parameter tuning
+   * - Inflation rate remains editable in both modes (not derived from historical data)
+   *
+   * Why disable fields in historical mode?
+   * If we calculated parameters from user's data but allowed editing, it's unclear
+   * whether we're using "historical" or "custom" parameters. Forcing read-only
+   * makes it explicit that these values come from actual performance data.
+   *
+   * @param useHistorical - true for historical mode, false for market mode
+   */
   const handleParameterSourceToggle = (useHistorical: boolean) => {
-    // Update local state immediately for instant visual feedback
+    // Update local toggle state immediately for instant visual feedback
     setIsHistoricalMode(useHistorical);
 
     if (useHistorical && historicalReturns) {
+      // Switch to historical mode: populate from user's calculated returns
       updateParam('parameterSource', 'historical');
       updateParam('equityReturn', historicalReturns.equity.mean);
       updateParam('equityVolatility', historicalReturns.equity.volatility);
       updateParam('bondsReturn', historicalReturns.bonds.mean);
       updateParam('bondsVolatility', historicalReturns.bonds.volatility);
-      // Update local state
+      // Sync local input state for display
       setEquityReturnInput(historicalReturns.equity.mean.toFixed(1));
       setEquityVolatilityInput(historicalReturns.equity.volatility.toFixed(1));
       setBondsReturnInput(historicalReturns.bonds.mean.toFixed(1));
       setBondsVolatilityInput(historicalReturns.bonds.volatility.toFixed(1));
     } else {
+      // Switch to market mode: reset to industry-standard defaults
       updateParam('parameterSource', 'market');
-      // Reset to market defaults
       updateParam('equityReturn', 7.0);
       updateParam('equityVolatility', 18.0);
       updateParam('bondsReturn', 3.0);
       updateParam('bondsVolatility', 6.0);
-      // Update local state
+      // Sync local input state for display
       setEquityReturnInput('7.0');
       setEquityVolatilityInput('18.0');
       setBondsReturnInput('3.0');

@@ -10,6 +10,43 @@ interface FireSectionProps {
   data: FireData;
 }
 
+/**
+ * FIRE (Financial Independence, Retire Early) metrics section for PDF reports.
+ *
+ * Key metrics displayed:
+ * 1. FIRE Number: Target portfolio value for financial independence
+ * 2. Progress to FI: Percentage of FIRE Number achieved
+ * 3. Sustainable allowance: Annual/monthly/daily spending from portfolio
+ * 4. Years of expenses covered: How long current portfolio lasts
+ * 5. Current withdrawal rate: Actual spending vs safe threshold
+ *
+ * FIRE Number calculation:
+ * FIRE Number = (100 / Safe Withdrawal Rate) × Annual Expenses
+ *
+ * Examples:
+ * - 4% SWR: FIRE Number = 25x annual expenses (industry standard)
+ * - 3% SWR: FIRE Number = 33.33x annual expenses (more conservative)
+ * - 5% SWR: FIRE Number = 20x annual expenses (more aggressive)
+ *
+ * Trinity Study & 4% Rule (Teacher Comment):
+ * The Trinity Study (1998) analyzed historical portfolio performance to determine
+ * safe withdrawal rates for retirement. Key findings:
+ * - 4% annual withdrawal (adjusted for inflation) had 95%+ success rate
+ * - Based on 30-year retirement period
+ * - Tested on 50/50 stock/bond allocation
+ * - Success = Portfolio didn't run out of money
+ * - Study analyzed US market data from 1926-1995
+ * Reference: https://en.wikipedia.org/wiki/Trinity_study
+ *
+ * The 4% rule became the industry standard for FIRE planning, though individuals
+ * may adjust based on risk tolerance, time horizon, and local market conditions.
+ *
+ * Withdrawal rate warning:
+ * If current withdrawal rate exceeds safe withdrawal rate, display in red to
+ * alert user they're depleting portfolio faster than sustainable.
+ *
+ * @param data - FIRE calculation results from parent component
+ */
 export function FireSection({ data }: FireSectionProps) {
   if (!data) {
     return (
