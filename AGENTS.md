@@ -63,6 +63,9 @@ For assets with `price === 1` or `displayMode === 'totalValue'`, compute % using
 ### Chart Y Axis
 Use `formatCurrencyCompact()` for Y axis labels on mobile to avoid layout compression.
 
+### Chart Data Preparation (chartService)
+Functions in `lib/services/chartService.ts` (e.g., `prepareNetWorthHistoryData()`) already include all relevant fields from snapshots (note, month, year). Always check the prepared data structure before implementing additional filtering or matching logic.
+
 ---
 
 ## Common Errors to Avoid
@@ -123,4 +126,4 @@ const { month, year } = getItalyMonthYear();
 - Query keys: `lib/query/queryKeys.ts`
 - Cashflow charts: `components/cashflow/TotalHistoryTab.tsx`, `components/cashflow/CurrentYearTab.tsx`
 
-**Last updated**: 2026-01-13
+**Last updated**: 2026-01-16

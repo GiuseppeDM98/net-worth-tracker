@@ -42,7 +42,6 @@ import {
   Legend,
   ResponsiveContainer,
   Cell,
-  LabelList,
 } from 'recharts';
 import { getAssetClassColor } from '@/lib/constants/colors';
 
@@ -589,6 +588,16 @@ export default function HistoryPage() {
                   iconSize={isMobile ? 8 : 10}
                   fontSize={isMobile ? 11 : 12}
                 />
+                {/*
+                  NOTES VISUALIZATION PATTERN
+
+                  Notes are no longer rendered as inline labels on the chart.
+                  Instead, when showNotes is true, a dedicated table appears below
+                  this chart showing all snapshots with notes in a readable format.
+
+                  Visual indicators remain: CustomChartDot renders amber dots with
+                  message icons for snapshots that have notes attached.
+                */}
                 <Line
                   type="monotone"
                   dataKey="totalNetWorth"
@@ -598,42 +607,126 @@ export default function HistoryPage() {
                   dot={({ key, ...props }: any) => <CustomChartDot key={key} {...props} isMobile={isMobile} />}
                   activeDot={{ r: 6 }}
                   isAnimationActive={false}
-                >
-                  {showNotes && (
-                    <LabelList
-                      dataKey="note"
-                      position="top"
-                      content={(props: any) => {
-                        // Only render label if note exists
-                        if (!props.value) return null;
-
-                        const note = String(props.value);
-                        const displayText = note.length > 50
-                          ? note.substring(0, 50) + '...'
-                          : note;
-
-                        return (
-                          <text
-                            x={props.x}
-                            y={props.y - 18}
-                            fill="#F59E0B"
-                            fontSize={15}
-                            fontWeight={600}
-                            textAnchor="middle"
-                            style={{ pointerEvents: 'none' }}
-                          >
-                            {displayText}
-                          </text>
-                        );
-                      }}
-                    />
-                  )}
-                </Line>
+                />
               </LineChart>
             </ResponsiveContainer>
           )}
         </CardContent>
       </Card>
+
+      {/*
+        NOTES TABLE PATTERN
+
+        When showNotes is true, display a dedicated table below the chart
+        showing all snapshots with notes in a clean, readable format.
+
+        DESIGN RATIONALE:
+        - Follows the same responsive pattern as cashflow drill-down (CurrentYearTab)
+        - Mobile: Card layout with stacked info
+        - Desktop: Table with sticky header, max-height scrolling
+        - Shows full note text (not truncated like old inline labels)
+        - Sorted newest to oldest for easy scanning
+
+        DATA FILTERING:
+        Filter snapshots to only those with note field present and non-empty.
+        The note field is optional in MonthlySnapshot, stored as undefined when empty
+        (Firebase best practice to avoid storing empty strings).
+      */}
+      {showNotes && (() => {
+        // Filter snapshots that have notes (note field exists and is not empty).
+        // prepareNetWorthHistoryData() already includes note, month, year fields
+        // from the original snapshots, so we can use them directly without
+        // searching through the snapshots array again.
+        const snapshotsWithNotes = netWorthHistory
+          .filter(item => item.note && item.note.trim() !== '')
+          .map(item => ({
+            year: item.year,
+            month: item.month,
+            note: item.note!,
+            date: item.date
+          }))
+          .sort((a, b) => {
+            // Sort by year descending, then by month descending (newest first)
+            if (b.year !== a.year) return b.year - a.year;
+            return b.month - a.month;
+          });
+
+        return (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg sm:text-xl">Note Patrimonio Netto</CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowNotes(false)}
+                  className="text-xs sm:text-sm"
+                >
+                  Chiudi
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {snapshotsWithNotes.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Nessuna nota disponibile
+                </div>
+              ) : (
+                <>
+                  {/* Mobile layout: Card-based */}
+                  <div className="space-y-3 sm:hidden">
+                    {snapshotsWithNotes.map((item) => (
+                      <div key={`${item.year}-${item.month}`} className="rounded-md border p-3">
+                        <div className="font-medium text-sm text-muted-foreground mb-2">
+                          {getMonthName(item.month)} {item.year}
+                        </div>
+                        <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                          {item.note}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop layout: Table with sticky header */}
+                  <div className="hidden sm:block rounded-md border">
+                    <div className="max-h-[500px] overflow-y-auto">
+                      <table className="w-full">
+                        <thead className="sticky top-0 bg-muted/50 border-b">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-sm font-medium w-[200px]">
+                              Periodo
+                            </th>
+                            <th className="px-4 py-3 text-left text-sm font-medium">
+                              Nota
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {snapshotsWithNotes.map((item) => (
+                            <tr key={`${item.year}-${item.month}`} className="border-b hover:bg-muted/30">
+                              <td className="px-4 py-3 text-sm font-medium align-top">
+                                {getMonthName(item.month)} {item.year}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-muted-foreground whitespace-pre-line">
+                                {item.note}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Counter footer */}
+                  <div className="mt-4 text-sm text-muted-foreground">
+                    {snapshotsWithNotes.length} {snapshotsWithNotes.length === 1 ? 'nota trovata' : 'note trovate'}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Asset Class Evolution Chart */}
       <Card>

@@ -118,6 +118,17 @@
 
 ### User Experience Enhancements
 
+- **Net Worth History - Notes Table View**: Improved notes visualization with dedicated responsive table replacing truncated chart labels
+  - **Dedicated table display**: Notes now appear in a clean, readable table below the chart instead of crowded labels on the graph
+  - **Full note visibility**: Complete note text displayed without truncation (previously limited to 50 characters)
+  - **Responsive layout**: Mobile shows card layout with stacked information, desktop displays table with sticky header
+  - **Sorted by date**: Notes automatically sorted from newest to oldest for easy scanning
+  - **Scrollable container**: Desktop table supports vertical scrolling (max 500px) while keeping headers visible
+  - **Note counter**: Footer displays total count (e.g., "3 note trovate") for quick reference
+  - **Clean close button**: Single "Chiudi" button in header to hide the table
+  - **Preserved indicators**: Chart dots still show amber color with message icon for snapshots containing notes
+  - **Better readability**: Eliminates visual clutter on chart while maintaining full note accessibility
+
 - **Hall of Fame - Percentage Growth Columns**: Enhanced financial rankings with percentage calculations for better performance tracking
   - **Month-over-month percentage**: Added "%" column to monthly net worth rankings showing `(netWorthDiff / previousNetWorth) × 100`
   - **Year-over-year percentage**: Added "%" column to yearly net worth rankings showing `(netWorthDiff / startOfYearNetWorth) × 100`

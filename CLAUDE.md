@@ -5,10 +5,10 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz
-- Feature ultimo mese: Yield on Cost (YOC) analysis con metric card e tabella dettagliata per asset
-- Ultima fix: Aggiunte spiegazioni "dividendi lordi TTM (12 mesi)" nella UI YOC per chiarezza calcolo
-- In corso ora: nessuna attivita attiva nota
-- Completamento: n/d (da confermare)
+- Feature ultimo mese: Visualizzazione note patrimonio netto con tabella dedicata responsive (mobile card layout, desktop table con sticky header)
+- Ultima fix: Corretto bug filtraggio note che impediva visualizzazione nella tabella (2026-01-16)
+- In corso ora: nessuna attivita attiva
+- Completamento: n/d
 
 ## Architecture Snapshot
 - App Router con pagine protette sotto `app/dashboard/*`.
@@ -49,6 +49,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Ottimizzazioni UI/UX basate su feedback utente.
 
 ## Key Files
+- History page: `app/dashboard/history/page.tsx`
+- Chart service: `lib/services/chartService.ts`
 - Performance page: `app/dashboard/performance/page.tsx`
 - Performance metrics: `lib/services/performanceService.ts`
 - Performance charts: `components/performance/MonthlyReturnsHeatmap.tsx`, `components/performance/UnderwaterDrawdownChart.tsx`
@@ -59,4 +61,4 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Date helpers: `lib/utils/dateHelpers.ts`
 - Formatters: `lib/utils/formatters.ts`
 
-**Last updated**: 2026-01-13
+**Last updated**: 2026-01-16
