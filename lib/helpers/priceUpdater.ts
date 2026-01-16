@@ -12,7 +12,14 @@ export interface PriceUpdateResult {
 
 /**
  * Update prices for all assets of a user
- * This is used before creating snapshots to ensure fresh data
+ *
+ * This is called before creating snapshots to ensure fresh market data.
+ * Uses two-level filtering:
+ * 1. Asset type capability (e.g., stocks/ETFs support updates; cash/real estate don't)
+ * 2. User preference (autoUpdatePrice flag allows per-asset control)
+ *
+ * @param userId - User ID to update assets for
+ * @returns Update result with count of successful and failed updates
  */
 export async function updateUserAssetPrices(
   userId: string
@@ -36,13 +43,17 @@ export async function updateUserAssetPrices(
     }));
 
     // Filter assets that need price updates
-    // Check both the asset type/subcategory AND the autoUpdatePrice flag
+    // Two-level filtering ensures both capability and user intent:
+    // 1. Type capability: Can this asset type be updated? (stocks: yes, cash: no)
+    // 2. User preference: Does the user want auto-updates for this specific asset?
     const updatableAssets = allAssets.filter((asset: any) => {
       // First check if the asset type supports price updates (e.g., not cash, realestate)
+      // This is type-level filtering: certain asset classes don't have market prices
       const typeSupportsUpdate = shouldUpdatePrice(asset.type, asset.subCategory);
 
       // Then check if the user wants automatic updates for this specific asset
-      // If autoUpdatePrice is undefined (old assets), default to true
+      // Default to true if undefined for backwards compatibility (assets created before this flag existed)
+      // This allows users to disable auto-updates for specific assets even if type supports it
       const wantsAutoUpdate = asset.autoUpdatePrice !== false;
 
       return typeSupportsUpdate && wantsAutoUpdate;

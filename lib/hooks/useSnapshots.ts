@@ -1,14 +1,34 @@
 'use client';
 
+/**
+ * React Query hooks for Snapshot management
+ *
+ * Provides:
+ * - Data fetching with caching (useSnapshots)
+ * - Mutations with automatic cache invalidation (useCreateSnapshot)
+ *
+ * Cache invalidation strategy: After snapshot creation, invalidate both
+ * snapshots AND assets queries since snapshot creation updates asset prices.
+ */
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { getUserSnapshots } from '@/lib/services/snapshotService';
 
+/**
+ * Fetch all snapshots for a user with React Query caching
+ *
+ * Query only runs when userId is defined (enabled: !!userId) to prevent
+ * unnecessary API calls before authentication completes.
+ *
+ * @param userId - User ID (undefined before auth completes)
+ * @returns React Query result with snapshots data, loading state, and error
+ */
 export function useSnapshots(userId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.snapshots.all(userId || ''),
     queryFn: () => getUserSnapshots(userId!),
-    enabled: !!userId,
+    enabled: !!userId, // Only run if userId exists (prevents query before auth)
   });
 }
 
@@ -33,8 +53,17 @@ interface CreateSnapshotResponse {
 }
 
 /**
- * Mutation hook for creating a new snapshot
- * Automatically invalidates the snapshots cache on success
+ * Create a new snapshot with automatic cache invalidation
+ *
+ * After successful snapshot creation, invalidates both snapshots and assets queries
+ * to trigger refetch and show updated data in the UI.
+ *
+ * Cache invalidation rationale:
+ * - Snapshots: New snapshot must appear in historical data
+ * - Assets: Snapshot creation updates asset prices, Overview page shows asset-based values
+ *
+ * @param userId - User ID
+ * @returns React Query mutation with mutate function and status
  */
 export function useCreateSnapshot(userId: string) {
   const queryClient = useQueryClient();

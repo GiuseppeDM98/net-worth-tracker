@@ -10,9 +10,19 @@ import { formatCurrencyCompact } from './chartService';
 
 /**
  * Generate a random number from a normal distribution using Box-Muller transform
+ *
+ * The Box-Muller transform converts two independent uniform random variables (0,1)
+ * into two independent standard normal random variables. This is essential for
+ * Monte Carlo simulations that require normally distributed returns.
+ *
+ * Algorithm: z = √(-2 * ln(u1)) * cos(2π * u2)
+ * where u1, u2 are uniform random variables [0,1]
+ *
  * @param mean - Mean of the distribution
  * @param stdDev - Standard deviation of the distribution
  * @returns Random number from normal distribution
+ *
+ * @see https://en.wikipedia.org/wiki/Box%E2%80%93Muller_transform
  */
 export function randomNormal(mean: number, stdDev: number): number {
   const u1 = Math.random();
@@ -59,7 +69,9 @@ function calculateAssetClassReturns(
     // Calculate monthly return as percentage
     const monthlyReturn = ((currentValue - prevValue) / prevValue) * 100;
 
-    // Filter out extreme values (>50% or <-50% monthly returns likely due to contributions/withdrawals)
+    // Filter out extreme values >±50% which are likely due to large contributions/withdrawals
+    // rather than actual investment performance. These outliers would distort the historical
+    // return distribution used for Monte Carlo simulations.
     if (Math.abs(monthlyReturn) < 50) {
       returns.push(monthlyReturn);
     }
@@ -69,7 +81,14 @@ function calculateAssetClassReturns(
 }
 
 /**
- * Annualize monthly returns
+ * Annualize monthly returns using compound formula
+ *
+ * Converts average monthly return to annualized equivalent using geometric compounding.
+ * Formula: (1 + r_monthly)^12 - 1
+ * This accounts for compounding effects over 12 months.
+ *
+ * @param monthlyReturns - Array of monthly return percentages
+ * @returns Annualized return percentage
  */
 function annualizeReturns(monthlyReturns: number[]): number {
   if (monthlyReturns.length === 0) return 0;
@@ -79,7 +98,14 @@ function annualizeReturns(monthlyReturns: number[]): number {
 }
 
 /**
- * Annualize monthly volatility
+ * Annualize monthly volatility using square-root-of-time scaling
+ *
+ * Converts monthly standard deviation to annualized equivalent.
+ * Formula: σ_annual = σ_monthly × √12
+ * This assumes returns are independent and identically distributed (i.i.d.).
+ *
+ * @param monthlyReturns - Array of monthly return percentages
+ * @returns Annualized volatility percentage
  */
 function annualizeVolatility(monthlyReturns: number[]): number {
   if (monthlyReturns.length < 2) return 0;
@@ -90,6 +116,12 @@ function annualizeVolatility(monthlyReturns: number[]): number {
 
 /**
  * Calculate historical returns from user's monthly snapshots
+ *
+ * Analyzes the user's historical portfolio performance by asset class (equity, bonds)
+ * to derive mean returns and volatility. These parameters feed into Monte Carlo simulations.
+ *
+ * @param snapshots - User's monthly snapshots (including dummy data)
+ * @returns Historical returns data with equity/bonds statistics, or null if insufficient data
  */
 export function calculateHistoricalReturns(
   snapshots: MonthlySnapshot[]
@@ -97,6 +129,7 @@ export function calculateHistoricalReturns(
   // Filter out dummy/test snapshots
   const realSnapshots = snapshots.filter((s) => !s.isDummy);
 
+  // Require at least 24 months (2 years) of data for meaningful statistical analysis
   if (realSnapshots.length < 24) {
     return null;
   }
@@ -116,7 +149,9 @@ export function calculateHistoricalReturns(
     return null;
   }
 
-  // Use market defaults if specific asset class has insufficient data
+  // Use market defaults if specific asset class has insufficient data (<12 months)
+  // This ensures Monte Carlo can run with reasonable assumptions even for new portfolios
+  // or portfolios heavily concentrated in one asset class
   const equityMean = equityReturns.length >= 12 ? annualizeReturns(equityReturns) : 7.0;
   const equityVol = equityReturns.length >= 12 ? annualizeVolatility(equityReturns) : 18.0;
   const bondsMean = bondsReturns.length >= 12 ? annualizeReturns(bondsReturns) : 3.0;
@@ -272,6 +307,16 @@ function createDistribution(
 
 /**
  * Run Monte Carlo simulation with given parameters
+ *
+ * Performs multiple simulations of portfolio performance over retirement years.
+ * Each simulation:
+ * 1. Generates random returns for equity and bonds using normal distribution
+ * 2. Applies weighted portfolio returns
+ * 3. Withdraws annual amount (optionally adjusted for inflation)
+ * 4. Tracks success/failure and portfolio path
+ *
+ * @param params - Simulation parameters (portfolio size, allocation, withdrawal, returns, etc.)
+ * @returns Aggregated results with success rate, percentiles, and distribution
  */
 export function runMonteCarloSimulation(params: MonteCarloParams): MonteCarloResults {
   const simulations: SingleSimulationResult[] = [];
@@ -327,7 +372,14 @@ export function runMonteCarloSimulation(params: MonteCarloParams): MonteCarloRes
 }
 
 /**
- * Get default market parameters
+ * Get default market parameters for Monte Carlo simulations
+ *
+ * These defaults represent long-term historical averages for global markets:
+ * - Equity: 7% return, 18% volatility
+ * - Bonds: 3% return, 6% volatility
+ * - Inflation: 2.5%
+ *
+ * @returns Default market parameter object
  */
 export function getDefaultMarketParameters() {
   return {

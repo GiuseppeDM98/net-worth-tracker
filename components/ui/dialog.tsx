@@ -1,10 +1,20 @@
 "use client"
 
+/**
+ * Dialog Components
+ *
+ * Radix UI dialog primitives with custom Tailwind styling.
+ * Provides modal overlays with backdrop, close button, and structured layout
+ * components (header, footer, title, description).
+ */
+
 import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+
+// === Root Components ===
 
 function Dialog({
   ...props
@@ -46,6 +56,13 @@ function DialogOverlay({
   )
 }
 
+/**
+ * Dialog content container with optional close button.
+ *
+ * Centers the dialog on screen with backdrop overlay. By default, includes
+ * an X icon close button in the top-right corner, which can be disabled by
+ * setting showCloseButton to false (useful for dialogs requiring explicit action).
+ */
 function DialogContent({
   className,
   children,
@@ -66,6 +83,8 @@ function DialogContent({
         {...props}
       >
         {children}
+        {/* Allow dialogs to hide the close button when users must take explicit action
+            (e.g., confirm/cancel buttons) rather than dismissing via X icon */}
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
@@ -79,6 +98,8 @@ function DialogContent({
     </DialogPortal>
   )
 }
+
+// === Layout Components ===
 
 function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (

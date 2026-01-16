@@ -1,3 +1,19 @@
+/**
+ * Yahoo Finance Integration Service
+ *
+ * Provides real-time stock/ETF price quotes using yahoo-finance2 library.
+ *
+ * Features:
+ * - Single ticker quotes: getQuote()
+ * - Batch quotes: getMultipleQuotes() (parallel fetching with Promise.allSettled)
+ * - Ticker search: searchTicker()
+ * - Ticker validation: validateTicker()
+ *
+ * Error Handling Strategy:
+ * Returns null prices on failure rather than throwing errors, allowing callers
+ * to decide how to handle missing data (e.g., keep old price, show warning, etc.).
+ */
+
 import YahooFinance from 'yahoo-finance2';
 
 // Create YahooFinance instance (required in v3+)
@@ -12,6 +28,9 @@ export interface QuoteResult {
 
 /**
  * Get current quote for a single ticker
+ *
+ * @param ticker - Stock/ETF ticker symbol (e.g., "AAPL", "VWCE.DE")
+ * @returns Quote result with price and currency, or null price with error message
  */
 export async function getQuote(ticker: string): Promise<QuoteResult> {
   try {
@@ -44,6 +63,12 @@ export async function getQuote(ticker: string): Promise<QuoteResult> {
 
 /**
  * Get quotes for multiple tickers (batch operation)
+ *
+ * Fetches all tickers in parallel for efficiency. Uses Promise.allSettled
+ * to continue processing even if some tickers fail.
+ *
+ * @param tickers - Array of ticker symbols to fetch
+ * @returns Map of ticker → quote result
  */
 export async function getMultipleQuotes(
   tickers: string[]
@@ -56,6 +81,8 @@ export async function getMultipleQuotes(
     return { ticker, result };
   });
 
+  // Use Promise.allSettled instead of Promise.all to continue processing
+  // even if some tickers fail (e.g., invalid symbols, API timeouts)
   const settled = await Promise.allSettled(promises);
 
   settled.forEach((outcome) => {
@@ -72,6 +99,9 @@ export async function getMultipleQuotes(
 
 /**
  * Validate if a ticker exists and can be fetched
+ *
+ * @param ticker - Ticker symbol to validate
+ * @returns True if ticker exists and has a price, false otherwise
  */
 export async function validateTicker(ticker: string): Promise<boolean> {
   try {
@@ -85,6 +115,9 @@ export async function validateTicker(ticker: string): Promise<boolean> {
 
 /**
  * Search for tickers by name or symbol
+ *
+ * @param query - Search query (company name or ticker symbol)
+ * @returns Array of matching results (limited to top 10)
  */
 export async function searchTicker(
   query: string
@@ -112,14 +145,22 @@ export async function searchTicker(
 
 /**
  * Helper to check if asset type requires price updates
+ *
+ * Determines which asset types support automatic price updates from market data.
+ *
+ * @param assetType - Asset class (equity, bonds, cash, realestate, etc.)
+ * @param subCategory - Asset subcategory (e.g., "Private Equity")
+ * @returns True if asset supports price updates, false otherwise
  */
 export function shouldUpdatePrice(assetType: string, subCategory?: string): boolean {
-  // Real estate and private equity have fixed valuations
+  // Real estate and private equity have fixed/manual valuations (not market-traded)
+  // These assets require manual price updates based on appraisals, not market quotes
   if (assetType === 'realestate' || subCategory === 'Private Equity') {
     return false;
   }
 
-  // Cash always has price = 1
+  // Cash always has price = 1 (no updates needed)
+  // Cash is the base unit of measurement, not a traded asset
   if (assetType === 'cash') {
     return false;
   }

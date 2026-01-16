@@ -1,3 +1,21 @@
+/**
+ * Expense Service
+ *
+ * Manages expense tracking for budgeting and cashflow analysis.
+ *
+ * Features:
+ * - CRUD operations for expenses (create, read, update, delete)
+ * - Recurring expenses (debts with monthly payments)
+ * - Installment expenses (BNPL - Buy Now Pay Later)
+ * - Monthly summaries and statistics with month-over-month comparison
+ * - Category and subcategory management integration
+ *
+ * Amount sign convention:
+ * - Expenses (fixed, variable, debt): stored as negative values
+ * - Income: stored as positive values
+ * This allows simple summing for net cashflow calculations.
+ */
+
 import {
   collection,
   doc,
@@ -26,6 +44,12 @@ const EXPENSES_COLLECTION = 'expenses';
 
 /**
  * Remove undefined fields from an object to prevent Firebase errors
+ *
+ * Firestore rejects documents with undefined values. This helper ensures
+ * only defined fields are included in create/update operations.
+ *
+ * @param obj - Object with potential undefined values
+ * @returns Object with undefined fields removed
  */
 function removeUndefinedFields<T extends Record<string, any>>(obj: T): Partial<T> {
   const cleaned: Partial<T> = {};
@@ -166,8 +190,20 @@ export async function getExpenseById(expenseId: string): Promise<Expense | null>
 }
 
 /**
- * Create a new expense
- * If isRecurring is true and recurringMonths is provided, creates multiple expenses
+ * Create a new expense (single, recurring, or installment)
+ *
+ * Handles three creation modes based on form data:
+ * 1. Installment (BNPL): Creates multiple expenses spread over months with defined amounts
+ * 2. Recurring (debts): Creates multiple expenses with same amount each month
+ * 3. Single: Creates one expense
+ *
+ * Priority: Installment > Recurring > Single (installments checked first)
+ *
+ * @param userId - User ID
+ * @param expenseData - Form data with expense details and mode flags
+ * @param categoryName - Category name for display
+ * @param subCategoryName - Optional subcategory name
+ * @returns Single expense ID or array of IDs (for recurring/installments)
  */
 export async function createExpense(
   userId: string,
@@ -178,20 +214,22 @@ export async function createExpense(
   try {
     const now = Timestamp.now();
 
-    // Check installment first (priority over recurring)
+    // Priority 1: Check installment first (BNPL payments with varying amounts)
+    // Installments have priority over recurring since they're more specific
     if (expenseData.isInstallment && expenseData.installmentCount && expenseData.installmentCount > 1) {
       return await createInstallmentExpenses(userId, expenseData, categoryName, subCategoryName);
     }
 
-    // If it's a recurring expense, create multiple entries
+    // Priority 2: Recurring expenses (debts with fixed monthly payments)
     if (expenseData.isRecurring && expenseData.recurringMonths && expenseData.recurringMonths > 0) {
       return await createRecurringExpenses(userId, expenseData, categoryName, subCategoryName);
     }
 
-    // Create single expense
+    // Priority 3: Create single expense
     const expensesRef = collection(db, EXPENSES_COLLECTION);
 
-    // Ensure amount is negative for expenses (fixed, variable, debt) and positive for income
+    // Apply amount sign convention: expenses negative, income positive
+    // This allows simple sum() for net cashflow without conditional logic
     let amount = Math.abs(expenseData.amount);
     if (expenseData.type !== 'income') {
       amount = -amount;
@@ -295,8 +333,21 @@ async function createRecurringExpenses(
 }
 
 /**
- * Create installment expenses (for BNPL payments)
- * Supports both auto-calculation and manual amounts
+ * Create installment expenses (for BNPL - Buy Now Pay Later payments)
+ *
+ * Supports two modes:
+ * 1. Auto mode: Divides total amount evenly across installments
+ *    - Rounds each installment down to 2 decimals
+ *    - Last installment gets remainder to match exact total (prevents rounding errors)
+ * 2. Manual mode: Uses user-provided amounts for each installment
+ *
+ * All installments are linked via a shared parentId for bulk operations.
+ *
+ * @param userId - User ID
+ * @param expenseData - Form data with installment configuration
+ * @param categoryName - Category name for display
+ * @param subCategoryName - Optional subcategory name
+ * @returns Array of created expense IDs
  */
 async function createInstallmentExpenses(
   userId: string,
@@ -310,7 +361,8 @@ async function createInstallmentExpenses(
     const createdIds: string[] = [];
     const now = Timestamp.now();
 
-    // Generate unique parent ID for linking installments
+    // Generate unique parent ID for linking all installments together
+    // This allows bulk operations like "delete all installments in this series"
     const parentId = `installment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     const installmentCount = expenseData.installmentCount!;
@@ -321,17 +373,19 @@ async function createInstallmentExpenses(
     let totalAmount: number;
 
     if (expenseData.installmentMode === 'auto') {
-      // Auto-calculation: divide total amount
+      // Auto-calculation: divide total amount evenly across installments
       totalAmount = expenseData.installmentTotalAmount!;
       const perInstallment = totalAmount / installmentCount;
       const baseAmount = Math.floor(perInstallment * 100) / 100; // Round down to 2 decimals
       const remainder = totalAmount - (baseAmount * installmentCount);
 
-      // All installments get base amount except last one (gets base + remainder)
+      // All installments get base amount except last one
+      // Last installment gets base + remainder to ensure total matches exactly
+      // (e.g., €100 / 3 = €33.33 + €33.33 + €33.34)
       installmentAmounts = Array(installmentCount - 1).fill(baseAmount);
       installmentAmounts.push(baseAmount + remainder);
     } else {
-      // Manual: use provided amounts
+      // Manual mode: use user-provided amounts (for irregular payment schedules)
       installmentAmounts = expenseData.installmentAmounts!;
       totalAmount = installmentAmounts.reduce((sum, amt) => sum + amt, 0);
     }
@@ -360,8 +414,8 @@ async function createInstallmentExpenses(
         currency: expenseData.currency,
         date: Timestamp.fromDate(installmentDate),
         notes: expenseData.notes
-          ? `${expenseData.notes} (Rata ${i + 1}/${installmentCount})`
-          : `Rata ${i + 1}/${installmentCount}`,
+          ? `${expenseData.notes} (Installment ${i + 1}/${installmentCount})`
+          : `Installment ${i + 1}/${installmentCount}`,
         link: expenseData.link,
 
         // Installment-specific fields
@@ -856,7 +910,7 @@ export async function clearExpensesCategoryAssignment(
     querySnapshot.docs.forEach(docSnapshot => {
       const updates: any = {
         categoryId: 'uncategorized',
-        categoryName: 'Senza categoria',
+        categoryName: 'Uncategorized',
         subCategoryId: null,
         subCategoryName: null,
         updatedAt: Timestamp.now(),

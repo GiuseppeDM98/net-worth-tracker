@@ -195,6 +195,10 @@ export function calculateIRR(
   cfArray.push({ amount: endNW, monthsFromStart: numberOfMonths });
 
   // Newton-Raphson iterative solver
+  // This numerical method finds the rate where NPV = 0 by iteratively refining an initial guess.
+  // Each iteration calculates NPV and its derivative at the current rate, then updates:
+  // new_rate = old_rate - (NPV / derivative)
+  // Convergence is achieved when |NPV| < tolerance
   let rate = 0.1; // Initial guess: 10%
   const maxIterations = 100;
   const tolerance = 1e-6;
@@ -218,7 +222,8 @@ export function calculateIRR(
 
     rate -= npv / derivative; // Newton-Raphson update
 
-    // Prevent negative rates (unrealistic for portfolio returns)
+    // Prevent extremely negative rates (< -99%) which are unrealistic for portfolio returns
+    // and can cause numerical instability in the next iteration
     if (rate < -0.99) rate = -0.99;
   }
 
@@ -278,7 +283,9 @@ export function calculateVolatility(
     // Monthly return = (End NW - Cash Flow) / Start NW - 1
     const monthlyReturn = ((currNW - cashFlow) / prevNW - 1) * 100;
 
-    // Filter extreme values (likely due to large contributions/withdrawals)
+    // Filter extreme values >±50% to exclude spikes from large contributions/withdrawals
+    // These outliers would distort volatility calculations, making them unrepresentative
+    // of actual investment performance
     if (Math.abs(monthlyReturn) < 50) {
       monthlyReturns.push(monthlyReturn);
     }
@@ -603,7 +610,13 @@ export function calculateRecoveryTime(
 
 /**
  * Calculate number of months between two dates (inclusive)
- * Example: Jan 2025 to Dec 2025 = 12 months (not 11)
+ *
+ * @param date1 - End date
+ * @param date2 - Start date
+ * @returns Number of months including both start and end months
+ *
+ * @example
+ * calculateMonthsDifference(new Date(2025, 11), new Date(2025, 0)) // 12 months (Jan to Dec inclusive)
  */
 function calculateMonthsDifference(date1: Date, date2: Date): number {
   const years = date1.getFullYear() - date2.getFullYear();
@@ -613,6 +626,12 @@ function calculateMonthsDifference(date1: Date, date2: Date): number {
 
 /**
  * Get snapshots for a specific time period
+ *
+ * @param allSnapshots - All available snapshots (including dummy data)
+ * @param timePeriod - Time period selector (YTD, 1Y, 3Y, 5Y, ALL, CUSTOM)
+ * @param customStartDate - Start date for CUSTOM period
+ * @param customEndDate - End date for CUSTOM period
+ * @returns Filtered snapshots for the period (excludes dummy data)
  */
 export function getSnapshotsForPeriod(
   allSnapshots: MonthlySnapshot[],
@@ -641,7 +660,7 @@ export function getSnapshotsForPeriod(
       return allSnapshots.filter(s => !s.isDummy); // Return all non-dummy snapshots
     case 'CUSTOM':
       if (!customStartDate || !customEndDate) return [];
-      // Normalizza al primo giorno del mese in timezone locale per allineamento con snapshots
+      // Normalize to first day of month in local timezone to align with snapshot storage format
       startDate = new Date(customStartDate.getFullYear(), customStartDate.getMonth(), 1);
       endDate = customEndDate;
       break;
@@ -660,9 +679,16 @@ export function getSnapshotsForPeriod(
 
 /**
  * Aggregate monthly cash flows from expenses
- * Separates dividend income from other income for accurate performance calculations
+ * Separates dividend income from other income for accurate performance calculations.
  *
+ * Dividend income is excluded from netCashFlow because it represents portfolio returns,
+ * not external contributions. Including it would distort ROI, CAGR, and TWR calculations.
+ *
+ * @param userId - User ID for fetching expenses
+ * @param startDate - Start date for expense range
+ * @param endDate - End date for expense range
  * @param dividendCategoryId - Category ID for dividend income (from user settings)
+ * @returns Array of monthly cash flow data with separated dividend income
  */
 export async function getCashFlowsForPeriod(
   userId: string,
@@ -708,7 +734,7 @@ export async function getCashFlowsForPeriod(
       income: value.income,
       expenses: value.expenses,
       dividendIncome: value.dividendIncome,
-      netCashFlow: value.income - value.expenses, // SENZA dividendi!
+      netCashFlow: value.income - value.expenses, // Excludes dividends (they are portfolio returns, not contributions)
     });
   });
 
@@ -774,7 +800,7 @@ export function getCashFlowsFromExpenses(
       income: value.income,
       expenses: value.expenses,
       dividendIncome: value.dividendIncome,
-      netCashFlow: value.income - value.expenses, // SENZA dividendi!
+      netCashFlow: value.income - value.expenses, // Excludes dividends (they are portfolio returns, not contributions)
     });
   });
 
@@ -954,9 +980,16 @@ export async function calculatePerformanceForPeriod(
 
 /**
  * Get all performance data for the page
+ *
+ * Calculates performance metrics for multiple time periods:
+ * - YTD, 1Y, 3Y, 5Y, ALL time periods
+ * - Rolling 12M and 36M periods
+ *
+ * @param userId - User ID for fetching data
+ * @returns Complete performance data for all periods
  */
 export async function getAllPerformanceData(userId: string): Promise<PerformanceData> {
-  // Fetch all required data
+  // ==== STEP 1: Fetch all required data ====
   const [snapshots, settings] = await Promise.all([
     getUserSnapshots(userId),
     getSettings(userId),
@@ -965,7 +998,9 @@ export async function getAllPerformanceData(userId: string): Promise<Performance
   const riskFreeRate = settings?.riskFreeRate || 2.5; // Default to 2.5%
   const dividendCategoryId = settings?.dividendIncomeCategoryId; // For separating dividend income
 
-  // OPTIMIZATION: Fetch ALL expenses once for the entire history
+  // ==== STEP 2: Pre-fetch optimization ====
+  // Fetch ALL expenses once for the entire history to avoid N Firestore queries
+  // This single query is then filtered in-memory for each period calculation
   const sortedSnapshots = snapshots.filter(s => !s.isDummy).sort((a, b) => {
     if (a.year !== b.year) return a.year - b.year;
     return a.month - b.month;
@@ -980,7 +1015,7 @@ export async function getAllPerformanceData(userId: string): Promise<Performance
     allExpenses = await getExpensesByDateRange(userId, overallStartDate, overallEndDate);
   }
 
-  // Calculate metrics for each period (passing pre-fetched expenses and dividend category ID)
+  // ==== STEP 3: Calculate metrics for all time periods ====
   const [ytd, oneYear, threeYear, fiveYear, allTime] = await Promise.all([
     calculatePerformanceForPeriod(userId, snapshots, 'YTD', riskFreeRate, undefined, undefined, allExpenses, dividendCategoryId),
     calculatePerformanceForPeriod(userId, snapshots, '1Y', riskFreeRate, undefined, undefined, allExpenses, dividendCategoryId),
@@ -989,7 +1024,7 @@ export async function getAllPerformanceData(userId: string): Promise<Performance
     calculatePerformanceForPeriod(userId, snapshots, 'ALL', riskFreeRate, undefined, undefined, allExpenses, dividendCategoryId),
   ]);
 
-  // Calculate rolling periods (with dividend category ID)
+  // ==== STEP 4: Calculate rolling periods ====
   const rolling12M = await calculateRollingPeriods(userId, snapshots, 12, riskFreeRate, dividendCategoryId);
   const rolling36M = await calculateRollingPeriods(userId, snapshots, 36, riskFreeRate, dividendCategoryId);
 
@@ -1010,7 +1045,17 @@ export async function getAllPerformanceData(userId: string): Promise<Performance
 /**
  * Calculate rolling period performance
  *
+ * Calculates performance metrics for sliding windows of fixed length
+ * (e.g., 12-month windows sliding through the entire history).
+ *
+ * Uses in-memory filtering of pre-fetched expenses to avoid N Firestore queries.
+ *
+ * @param userId - User ID for data fetching
+ * @param allSnapshots - All snapshots (will be filtered for non-dummy data)
+ * @param windowMonths - Size of the rolling window in months
+ * @param riskFreeRate - Risk-free rate for Sharpe ratio calculation
  * @param dividendCategoryId - Category ID for dividend income (from user settings)
+ * @returns Array of rolling period performance data
  */
 async function calculateRollingPeriods(
   userId: string,

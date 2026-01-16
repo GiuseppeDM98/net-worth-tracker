@@ -1,3 +1,19 @@
+/**
+ * Expense Category Service
+ *
+ * Manages categories and subcategories for expense classification.
+ *
+ * Features:
+ * - CRUD operations for categories and subcategories
+ * - Filter categories by type (fixed, variable, debt, income)
+ * - Cascading updates: When category/subcategory names change, all associated expenses are updated
+ * - Subcategories stored as nested array within category documents
+ *
+ * Structure:
+ * - Category: Top-level classification (e.g., "Housing", "Food")
+ * - SubCategory: Optional second-level classification (e.g., "Housing" → "Rent", "Utilities")
+ */
+
 import {
   collection,
   doc,
@@ -27,6 +43,12 @@ const CATEGORIES_COLLECTION = 'expenseCategories';
 
 /**
  * Remove undefined fields from an object to prevent Firebase errors
+ *
+ * Firestore rejects documents with undefined values. This helper ensures
+ * only defined fields are included in create/update operations.
+ *
+ * @param obj - Object with potential undefined values
+ * @returns Object with undefined fields removed
  */
 function removeUndefinedFields<T extends Record<string, any>>(obj: T): Partial<T> {
   const cleaned: Partial<T> = {};

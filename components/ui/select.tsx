@@ -1,10 +1,20 @@
 "use client"
 
+/**
+ * Select Components
+ *
+ * Radix UI select primitives with custom Tailwind styling.
+ * Provides dropdown selection with keyboard navigation, scroll buttons for long lists,
+ * and support for both popper and absolute positioning strategies.
+ */
+
 import * as React from "react"
 import * as SelectPrimitive from "@radix-ui/react-select"
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+
+// === Root Components ===
 
 function Select({
   ...props
@@ -24,6 +34,15 @@ function SelectValue({
   return <SelectPrimitive.Value data-slot="select-value" {...props} />
 }
 
+/**
+ * Select trigger button with responsive size variants.
+ *
+ * Supports two size options via the size prop:
+ * - "default": 36px height (h-9)
+ * - "sm": 32px height (h-8)
+ *
+ * Automatically includes a chevron-down icon on the right side.
+ */
 function SelectTrigger({
   className,
   size = "default",
@@ -63,6 +82,8 @@ function SelectContent({
         data-slot="select-content"
         className={cn(
           "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 max-h-(--radix-select-content-available-height) min-w-[8rem] origin-(--radix-select-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md border shadow-md",
+          // Add small offset when using popper positioning to create visual separation
+          // between trigger and content (not needed for absolute positioning)
           position === "popper" &&
             "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
           className
@@ -86,6 +107,8 @@ function SelectContent({
     </SelectPrimitive.Portal>
   )
 }
+
+// === Content Items ===
 
 function SelectLabel({
   className,
@@ -137,6 +160,12 @@ function SelectSeparator({
   )
 }
 
+// === Scroll Buttons ===
+
+/**
+ * Scroll buttons appear automatically when content overflows.
+ * They provide visual indicators and clickable areas to scroll through long option lists.
+ */
 function SelectScrollUpButton({
   className,
   ...props

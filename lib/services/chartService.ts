@@ -1,3 +1,17 @@
+/**
+ * Chart Service
+ *
+ * Transforms portfolio and snapshot data into chart-ready formats for visualization.
+ *
+ * Features:
+ * - Asset distribution charts (by asset class and by individual asset)
+ * - Net worth history charts with proper date formatting
+ * - Currency formatting utilities for compact display (K, M, B suffixes)
+ * - Color mapping for consistent visualization across charts
+ *
+ * Used by: Dashboard overview, assets page, performance charts
+ */
+
 import { Asset, PieChartData, MonthlySnapshot } from '@/types/assets';
 import { calculateAssetValue, calculateTotalValue } from './assetService';
 import { calculateCurrentAllocation } from './assetAllocationService';

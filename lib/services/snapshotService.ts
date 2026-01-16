@@ -1,3 +1,18 @@
+/**
+ * Snapshot Service
+ *
+ * Manages monthly portfolio snapshots for historical tracking and performance analysis.
+ *
+ * Features:
+ * - Create snapshots from current asset state (with optional custom date)
+ * - Fetch snapshots with sorting and filtering by date range
+ * - Calculate month-over-month and year-to-date changes
+ * - Add/update/delete notes for specific snapshots
+ *
+ * Storage format: Firestore document ID is "userId-YYYY-M" (month without padding)
+ * Snapshots are sorted by year (asc), then month (asc) for chronological order.
+ */
+
 import {
   collection,
   doc,
@@ -24,6 +39,15 @@ const SNAPSHOTS_COLLECTION = 'monthly-snapshots';
 
 /**
  * Create a monthly snapshot from current assets
+ *
+ * Calculates total/liquid/illiquid net worth, asset allocation percentages,
+ * and stores a point-in-time record of all assets with their values.
+ *
+ * @param userId - User ID
+ * @param assets - Current asset array (with updated prices)
+ * @param year - Optional year override (defaults to current Italy time)
+ * @param month - Optional month override (defaults to current Italy time)
+ * @returns Snapshot document ID (format: "userId-YYYY-M")
  */
 export async function createSnapshot(
   userId: string,
@@ -41,7 +65,8 @@ export async function createSnapshot(
     const illiquidNetWorth = calculateIlliquidNetWorth(assets);
     const allocation = calculateCurrentAllocation(assets);
 
-    // Convert allocation values to percentages
+    // Convert allocation values (absolute EUR amounts) to percentages
+    // This allows comparing allocation trends over time even as portfolio size changes
     const assetAllocation: { [assetClass: string]: number } = {};
     Object.keys(allocation.byAssetClass).forEach((assetClass) => {
       assetAllocation[assetClass] =
@@ -87,13 +112,21 @@ export async function createSnapshot(
 }
 
 /**
- * Get all snapshots for a user
+ * Get all snapshots for a user, sorted chronologically (oldest first)
+ *
+ * Snapshots are sorted by year (asc), then month (asc) to maintain chronological order
+ * for time-series analysis and charting.
+ *
+ * @param userId - User ID
+ * @returns Array of snapshots sorted chronologically
  */
 export async function getUserSnapshots(
   userId: string
 ): Promise<MonthlySnapshot[]> {
   try {
     const snapshotsRef = collection(db, SNAPSHOTS_COLLECTION);
+    // Sort by year, then month (both ascending) for chronological order
+    // This ensures consistent ordering for time-series calculations and charts
     const q = query(
       snapshotsRef,
       where('userId', '==', userId),
@@ -115,6 +148,15 @@ export async function getUserSnapshots(
 
 /**
  * Get snapshots for a specific time range
+ *
+ * Filters snapshots between start and end dates (inclusive on both sides).
+ *
+ * @param userId - User ID
+ * @param startYear - Start year
+ * @param startMonth - Start month (1-12)
+ * @param endYear - End year
+ * @param endMonth - End month (1-12)
+ * @returns Array of snapshots within the specified range, sorted chronologically
  */
 export async function getSnapshotsInRange(
   userId: string,
@@ -127,6 +169,8 @@ export async function getSnapshotsInRange(
     const allSnapshots = await getUserSnapshots(userId);
 
     return allSnapshots.filter((snapshot) => {
+      // Convert year/month to comparable integer: YYYYMM format (e.g., 2024*100 + 3 = 202403)
+      // This allows simple numeric comparison for date ranges without Date object overhead
       const snapshotDate = snapshot.year * 100 + snapshot.month;
       const startDate = startYear * 100 + startMonth;
       const endDate = endYear * 100 + endMonth;
@@ -141,6 +185,9 @@ export async function getSnapshotsInRange(
 
 /**
  * Get the most recent snapshot for a user
+ *
+ * @param userId - User ID
+ * @returns Latest snapshot, or null if no snapshots exist
  */
 export async function getLatestSnapshot(
   userId: string
@@ -152,7 +199,7 @@ export async function getLatestSnapshot(
       return null;
     }
 
-    // Return the last one (already sorted by date)
+    // Return the last one (already sorted chronologically by getUserSnapshots)
     return snapshots[snapshots.length - 1];
   } catch (error) {
     console.error('Error getting latest snapshot:', error);
@@ -161,7 +208,14 @@ export async function getLatestSnapshot(
 }
 
 /**
- * Calculate month-over-month change
+ * Calculate month-over-month change in net worth
+ *
+ * Compares current net worth with the most recent snapshot to show
+ * portfolio change since last month.
+ *
+ * @param currentNetWorth - Current total net worth
+ * @param previousSnapshot - Most recent snapshot (null if no snapshots exist)
+ * @returns Object with absolute value change and percentage change
  */
 export function calculateMonthlyChange(
   currentNetWorth: number,
@@ -181,8 +235,14 @@ export function calculateMonthlyChange(
 }
 
 /**
- * Calculate year-to-date change
+ * Calculate year-to-date (YTD) change in net worth
+ *
  * Compares current net worth with the first snapshot of the current year
+ * to show portfolio performance since January 1st.
+ *
+ * @param currentNetWorth - Current total net worth
+ * @param snapshots - Array of all snapshots (sorted chronologically)
+ * @returns Object with absolute value change and percentage change, or null if no snapshots for current year
  */
 export function calculateYearlyChange(
   currentNetWorth: number,
@@ -197,7 +257,7 @@ export function calculateYearlyChange(
 
   const currentYear = new Date().getFullYear();
 
-  // Find the first snapshot of the current year
+  // Find the first snapshot of the current year (earliest month in current year)
   const firstSnapshotOfYear = snapshots.find(s => s.year === currentYear);
 
   if (!firstSnapshotOfYear || firstSnapshotOfYear.totalNetWorth === 0) {
@@ -212,11 +272,15 @@ export function calculateYearlyChange(
 
 /**
  * Update or delete a note from a monthly snapshot
+ *
+ * Uses setDoc with merge: true to handle both create and update cases safely.
+ * This allows adding notes even if the snapshot document doesn't exist yet.
+ *
  * @param userId - User ID
  * @param year - Snapshot year
  * @param month - Snapshot month (1-12)
  * @param note - Note text (empty string deletes the note)
- * @throws Error if note exceeds 500 characters or if snapshot doesn't exist
+ * @throws Error if note exceeds 500 characters
  */
 export async function updateSnapshotNote(
   userId: string,
@@ -227,7 +291,7 @@ export async function updateSnapshotNote(
   const trimmedNote = note.trim();
 
   if (trimmedNote.length > 500) {
-    throw new Error('La nota non può superare i 500 caratteri');
+    throw new Error('Note cannot exceed 500 characters');
   }
 
   // Firestore document ID format: userId-YYYY-M (without padding for consistency with existing snapshots)
@@ -235,12 +299,13 @@ export async function updateSnapshotNote(
   const snapshotRef = doc(db, SNAPSHOTS_COLLECTION, snapshotId);
 
   // Use setDoc with merge: true to handle both create and update cases
-  // Include userId to satisfy Firestore security rules for document creation
+  // This prevents overwriting existing snapshot data and satisfies Firestore security rules
+  // Include userId field to allow document creation if snapshot doesn't exist yet
   if (trimmedNote.length === 0) {
     await setDoc(
       snapshotRef,
       {
-        note: deleteField(),
+        note: deleteField(), // Firestore special value to remove field
         userId: userId,
       },
       { merge: true }

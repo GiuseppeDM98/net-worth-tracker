@@ -4,6 +4,11 @@
  * Provides exchange rate conversion using Frankfurter API (free, no API key required).
  * Implements in-memory caching with 24-hour TTL to minimize API calls.
  *
+ * Cache Strategy:
+ * - 24-hour TTL balances data freshness with API usage (exchange rates don't change frequently)
+ * - Frankfurter has no explicit rate limits, but good practice to minimize calls
+ * - Expired cache used as fallback on API failure (graceful degradation)
+ *
  * Supported currencies: EUR, USD, GBP, CHF
  */
 
@@ -34,7 +39,8 @@ export async function getExchangeRateToEur(fromCurrency: string): Promise<number
   const cacheKey = `${fromCurrency.toUpperCase()}_EUR`;
   const now = Date.now();
 
-  // Check cache
+  // Check cache first to minimize API calls
+  // This reduces latency and prevents hitting potential rate limits
   const cached = rateCache.get(cacheKey);
   if (cached && (now - cached.timestamp) < CACHE_TTL_MS) {
     console.log(`[CurrencyConversion] Using cached rate for ${cacheKey}: ${cached.rate}`);
@@ -68,13 +74,15 @@ export async function getExchangeRateToEur(fromCurrency: string): Promise<number
   } catch (error) {
     console.error(`[CurrencyConversion] Error fetching exchange rate for ${fromCurrency}:`, error);
 
-    // If we have an expired cached value, use it as fallback
+    // Graceful degradation: use expired cache as fallback on API failure
+    // A stale exchange rate (e.g., 1-2 days old) is better than failing the entire
+    // dividend creation/conversion process. Exchange rates typically don't change drastically.
     if (cached) {
       console.warn(`[CurrencyConversion] Using expired cache as fallback for ${cacheKey}: ${cached.rate}`);
       return cached.rate;
     }
 
-    // Last resort: throw error
+    // Last resort: throw error if no cache available
     throw new Error(`Failed to fetch exchange rate for ${fromCurrency} -> EUR`);
   }
 }

@@ -1,3 +1,18 @@
+/**
+ * Borsa Italiana Web Scraper
+ *
+ * Scrapes dividend data from borsaitaliana.it by ISIN.
+ *
+ * Table Format Handling:
+ * - ETF table (4 columns): ex-date, amount, currency, payment-date
+ * - Stock table (7+ columns): pattern matching for dates and amounts
+ *
+ * Date Format: All dates are parsed from Italian DD/MM/YY format (e.g., "15/01/25" → Jan 15, 2025)
+ * Number Format: Italian format with period as thousands separator and comma as decimal (e.g., "1.234,56" → 1234.56)
+ *
+ * Error Handling: Returns empty array on failure (graceful degradation - don't block dividend imports).
+ */
+
 import * as cheerio from 'cheerio';
 import { ScrapedDividend, DividendType } from '@/types/dividend';
 import { AssetType } from '@/types/assets';
@@ -17,6 +32,13 @@ function isDateFormat(str: string): boolean {
 
 /**
  * Parse Italian date format (DD/MM/YY or DD/MM/YYYY) to Date object
+ *
+ * Italian date format: day/month/year (e.g., "15/01/25" for Jan 15, 2025)
+ * Handles both 2-digit (YY) and 4-digit (YYYY) year formats.
+ * For 2-digit years, assumes 20XX (e.g., "25" → 2025).
+ *
+ * @param dateString - Date string in Italian format
+ * @returns JavaScript Date object
  */
 function parseItalianDate(dateString: string): Date {
   const parts = dateString.trim().split('/');
@@ -28,9 +50,9 @@ function parseItalianDate(dateString: string): Date {
   const month = parseInt(parts[1], 10) - 1; // Months are 0-indexed in JavaScript
   let year = parseInt(parts[2], 10);
 
-  // Handle 2-digit year (YY format)
+  // Handle 2-digit year (YY format): assume 20XX
+  // This works until year 2100, which is fine for dividend data
   if (year < 100) {
-    // Assume 20XX for years 00-99
     year += 2000;
   }
 
@@ -59,6 +81,17 @@ function parseDividendType(typeText: string): DividendType {
 
 /**
  * Parse decimal number from Italian format (1.234,56 -> 1234.56)
+ *
+ * Italian number format uses:
+ * - Period (.) as thousands separator: "1.234"
+ * - Comma (,) as decimal separator: "0,56"
+ *
+ * Conversion process:
+ * 1. Remove all periods (thousands separators): "1.234,56" → "1234,56"
+ * 2. Replace comma with period (decimal): "1234,56" → "1234.56"
+ *
+ * @param numberString - Number string in Italian format
+ * @returns Parsed number as JavaScript float
  */
 function parseItalianNumber(numberString: string): number {
   // Remove thousands separators (.) and replace decimal comma (,) with period (.)
@@ -144,7 +177,10 @@ export async function scrapeDividendsByIsin(
           });
         }
 
-        // Detect table type: ETF (4 columns) vs Stock (7+ columns)
+        // Detect table type by column count
+        // ETF and stock pages have different HTML table structures on Borsa Italiana:
+        // - ETF table: 4 columns (ex-date, amount, currency, payment-date)
+        // - Stock table: 7+ columns (with additional fields like type, quantity, etc.)
         const isETFTable = cellTexts.length === 4;
         const isStockTable = cellTexts.length >= 7;
 
@@ -190,7 +226,8 @@ export async function scrapeDividendsByIsin(
             currencyText = 'CHF';
           }
 
-          // ETF dividends are always ordinary (no type column in table)
+          // ETF dividends default to 'ordinary' because ETF table doesn't include a type column
+          // Most ETF dividends are ordinary distributions, and the table structure doesn't differentiate
           typeText = 'ordinario';
 
         } else if (isStockTable) {

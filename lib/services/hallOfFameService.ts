@@ -1,3 +1,19 @@
+/**
+ * Hall of Fame Service
+ *
+ * Calculates and stores portfolio performance rankings (best/worst months and years).
+ *
+ * Features:
+ * - Monthly rankings: Net worth growth, income, expenses (top 20)
+ * - Yearly rankings: Annual performance metrics (top 10)
+ * - Current period highlighting: Identifies if current month/year is in top rankings
+ * - Pre-calculated data: Rankings stored in Firestore for fast retrieval
+ *
+ * Calculation logic:
+ * - Monthly: Month-over-month net worth change + income/expense totals for that month
+ * - Yearly: Year-over-year net worth change + annual income/expense totals
+ */
+
 import { db } from '@/lib/firebase/config';
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { HallOfFameData, MonthlyRecord, YearlyRecord } from '@/types/hall-of-fame';

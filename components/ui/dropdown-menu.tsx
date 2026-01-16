@@ -1,10 +1,20 @@
 "use client"
 
+/**
+ * Dropdown Menu Components
+ *
+ * Radix UI dropdown menu primitives with custom Tailwind styling.
+ * Provides a collection of components for building accessible dropdown menus
+ * with support for checkboxes, radio groups, submenus, and keyboard navigation.
+ */
+
 import * as React from "react"
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"
 import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+
+// === Root Components ===
 
 function DropdownMenu({
   ...props
@@ -51,6 +61,8 @@ function DropdownMenuContent({
   )
 }
 
+// === Menu Structure ===
+
 function DropdownMenuGroup({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Group>) {
@@ -82,6 +94,14 @@ function DropdownMenuItem({
   )
 }
 
+// === Interactive Items ===
+
+/**
+ * Checkbox menu item with automatic check indicator.
+ *
+ * Displays a checkmark icon when checked. The indicator is absolutely positioned
+ * on the left side, with content indented via pl-8 to make room for it.
+ */
 function DropdownMenuCheckboxItem({
   className,
   children,
@@ -119,6 +139,12 @@ function DropdownMenuRadioGroup({
   )
 }
 
+/**
+ * Radio menu item with automatic filled circle indicator.
+ *
+ * Displays a filled circle icon when selected within a RadioGroup.
+ * Similar to CheckboxItem, uses absolute positioning for the indicator.
+ */
 function DropdownMenuRadioItem({
   className,
   children,
@@ -142,6 +168,8 @@ function DropdownMenuRadioItem({
     </DropdownMenuPrimitive.RadioItem>
   )
 }
+
+// === Visual Elements ===
 
 function DropdownMenuLabel({
   className,
@@ -192,6 +220,8 @@ function DropdownMenuShortcut({
   )
 }
 
+// === Submenu Components ===
+
 function DropdownMenuSub({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Sub>) {
@@ -217,6 +247,7 @@ function DropdownMenuSubTrigger({
       {...props}
     >
       {children}
+      {/* Automatically append chevron icon to indicate submenu presence */}
       <ChevronRightIcon className="ml-auto size-4" />
     </DropdownMenuPrimitive.SubTrigger>
   )

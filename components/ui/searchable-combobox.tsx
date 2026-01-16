@@ -24,6 +24,23 @@ interface SearchableComboboxProps {
   id?: string;
 }
 
+/**
+ * Searchable combobox with dropdown filtering and optional color badges.
+ *
+ * Provides a text input that filters options as the user types, with dropdown
+ * selection and optional visual badge showing the current selection.
+ *
+ * @param options - Array of selectable options with value, label, and optional color
+ * @param value - Currently selected option value
+ * @param onValueChange - Callback fired when selection changes
+ * @param placeholder - Text shown when no option is selected (default: "Seleziona...")
+ * @param searchPlaceholder - Text shown in input when focused (default: "Cerca...")
+ * @param disabled - Disables the input and prevents interaction
+ * @param emptyMessage - Text shown when no options match search query
+ * @param showBadge - Display selected option as badge below input (default: true)
+ * @param onClear - Optional callback to clear selection (enables clear button in badge)
+ * @param id - HTML id attribute for the input element
+ */
 export function SearchableCombobox({
   options,
   value,
@@ -36,10 +53,14 @@ export function SearchableCombobox({
   onClear,
   id,
 }: SearchableComboboxProps) {
+  // === State Management ===
+
   const [searchQuery, setSearchQuery] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // === Filtering and Display Logic ===
 
   // Filter options based on search query
   const filteredOptions = options.filter((option) =>
@@ -64,6 +85,8 @@ export function SearchableCombobox({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // === Event Handlers ===
+
   const handleSelect = (optionValue: string) => {
     onValueChange(optionValue);
     setIsDropdownOpen(false);
@@ -77,7 +100,10 @@ export function SearchableCombobox({
   };
 
   const handleBlur = () => {
-    // Delay to allow option click to register
+    // Use 200ms delay to allow click events on dropdown items to register
+    // before the blur event closes the dropdown. Without this delay, clicking
+    // an option would trigger blur first, closing the dropdown and preventing
+    // the click handler from firing.
     setTimeout(() => {
       setIsFocused(false);
       setSearchQuery('');
@@ -98,6 +124,8 @@ export function SearchableCombobox({
     }
     setSearchQuery('');
   };
+
+  // === Rendering ===
 
   return (
     <div className="space-y-2">

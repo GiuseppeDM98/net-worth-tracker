@@ -15,6 +15,12 @@ interface CustomTooltipProps {
   label?: string;
 }
 
+/**
+ * Custom tooltip for drawdown chart showing percentage and peak indicator.
+ *
+ * Displays the drawdown percentage with a special message when the portfolio
+ * is at its all-time high (0% drawdown = "Massimo storico").
+ */
 function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   if (!active || !payload || !payload.length) return null;
 
@@ -28,6 +34,7 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
         <span className="text-muted-foreground">Drawdown:</span>
         <span className="font-medium">{formatPercentage(drawdown)}</span>
       </div>
+      {/* Show "Massimo storico" when drawdown is 0% to indicate the portfolio is at peak value */}
       {drawdown === 0 && (
         <p className="text-xs text-muted-foreground mt-1">Massimo storico</p>
       )}
@@ -35,6 +42,21 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   );
 }
 
+/**
+ * Underwater drawdown chart visualizing portfolio decline from peak values.
+ *
+ * Drawdown visualization concept:
+ * - Drawdown measures how far the portfolio has fallen from its all-time high
+ * - 0% = Portfolio is at its peak value (all-time high)
+ * - -20% = Portfolio is 20% below its peak value
+ * - The chart fills the area below zero to emphasize losses
+ *
+ * The Y-axis is inverted (0 at top, negative values below) to visually represent
+ * decline direction, making it easier to see periods of recovery vs. further decline.
+ *
+ * @param data - Array of date/drawdown data points
+ * @param height - Chart height in pixels (default: 400)
+ */
 export function UnderwaterDrawdownChart({ data, height = 400 }: UnderwaterDrawdownChartProps) {
   if (data.length === 0) {
     return (
@@ -55,7 +77,10 @@ export function UnderwaterDrawdownChart({ data, height = 400 }: UnderwaterDrawdo
         />
         <YAxis
           tickFormatter={(value) => `${value.toFixed(1)}%`}
-          domain={['auto', 0]} // Always show 0% at top
+          // Fix 0% at top of chart to anchor the "peak" baseline, with negative
+          // values extending downward. This makes the visual metaphor clearer:
+          // the further down the chart goes, the deeper the drawdown.
+          domain={['auto', 0]}
           tick={{ fontSize: 12 }}
         />
         <Tooltip content={<CustomTooltip />} />

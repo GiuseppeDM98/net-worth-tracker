@@ -1,5 +1,21 @@
-// lib/services/pdfDataService.ts
-// Data aggregation service for PDF generation
+/**
+ * PDF Data Service
+ *
+ * Aggregates and transforms portfolio data for PDF report generation.
+ *
+ * Features:
+ * - Modular data fetching: Only fetch data for selected PDF sections
+ * - Performance optimization: Caches expenses to avoid duplicate fetches
+ * - Time filtering: Support for YTD, 1Y, 3Y, 5Y, All time views
+ * - Section types: Portfolio, allocation, rebalancing, history, cashflow, FIRE metrics
+ *
+ * Architecture:
+ * - Main orchestrator: fetchPDFData() routes to section-specific functions
+ * - Each section function returns typed data matching PDF templates
+ * - Expense caching per user: Reset when userId changes
+ *
+ * Used by: PDF export feature (/api/pdf/generate)
+ */
 
 import type {
   PDFDataContext,

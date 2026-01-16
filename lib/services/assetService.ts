@@ -286,12 +286,19 @@ export async function deleteAsset(assetId: string, userId: string): Promise<void
 
 /**
  * Calculate total value of an asset
- * Per immobili con debito residuo: valore netto = valore lordo - debito
+ *
+ * For real estate with outstanding debt: net value = gross value - debt
+ * This calculates the equity (net ownership) rather than gross property value.
+ *
+ * @param asset - Asset to calculate value for
+ * @returns Total asset value (quantity × price, minus outstanding debt for real estate)
  */
 export function calculateAssetValue(asset: Asset): number {
   const baseValue = asset.quantity * asset.currentPrice;
 
-  // Se è un immobile con debito residuo, sottrai il debito
+  // For real estate with outstanding debt, subtract the debt to get net equity
+  // Use Math.max(0, ...) to prevent negative values for underwater mortgages
+  // (where debt > property value). Negative net worth is tracked at portfolio level.
   if (asset.assetClass === 'realestate' && asset.outstandingDebt) {
     return Math.max(0, baseValue - asset.outstandingDebt);
   }
@@ -307,18 +314,27 @@ export function calculateTotalValue(assets: Asset[]): number {
 }
 
 /**
- * Calculate liquid net worth
- * Se isLiquid è definito, usa quel valore
- * Altrimenti usa la logica legacy (esclude real estate e private equity)
+ * Calculate liquid net worth (assets that can be quickly converted to cash)
+ *
+ * Liquidity determination:
+ * - If isLiquid field is explicitly defined, use that value (allows user override)
+ * - Otherwise use legacy logic: exclude real estate and private equity (for backwards compatibility)
+ *
+ * The isLiquid override takes precedence because users may have unique situations
+ * (e.g., illiquid bonds, liquid real estate like REITs).
+ *
+ * @param assets - All user assets
+ * @returns Total value of liquid assets
  */
 export function calculateLiquidNetWorth(assets: Asset[]): number {
   return assets
     .filter(asset => {
-      // Se isLiquid è definito esplicitamente, usa quel valore
+      // If isLiquid is explicitly defined, use that value (user override)
       if (asset.isLiquid !== undefined) {
         return asset.isLiquid === true;
       }
-      // Altrimenti usa la logica legacy per retrocompatibilità
+      // Otherwise use legacy logic for backwards compatibility
+      // (assets created before isLiquid field was added)
       return (
         asset.assetClass !== 'realestate' &&
         asset.subCategory !== 'Private Equity'
@@ -328,16 +344,21 @@ export function calculateLiquidNetWorth(assets: Asset[]): number {
 }
 
 /**
- * Calculate illiquid net worth
+ * Calculate illiquid net worth (assets that cannot be quickly converted to cash)
+ *
+ * See calculateLiquidNetWorth() for liquidity determination logic.
+ *
+ * @param assets - All user assets
+ * @returns Total value of illiquid assets
  */
 export function calculateIlliquidNetWorth(assets: Asset[]): number {
   return assets
     .filter(asset => {
-      // Se isLiquid è definito esplicitamente, usa quel valore
+      // If isLiquid is explicitly defined, use that value (user override)
       if (asset.isLiquid !== undefined) {
         return asset.isLiquid === false;
       }
-      // Altrimenti usa la logica legacy per retrocompatibilità
+      // Otherwise use legacy logic for backwards compatibility
       return (
         asset.assetClass === 'realestate' ||
         asset.subCategory === 'Private Equity'
@@ -348,9 +369,15 @@ export function calculateIlliquidNetWorth(assets: Asset[]): number {
 
 /**
  * Calculate unrealized gains for a single asset
- * Returns 0 if averageCost is not set
+ *
+ * Returns 0 if averageCost is not set because gains cannot be calculated
+ * without a cost basis (we don't know the purchase price).
+ *
+ * @param asset - Asset to calculate gains for
+ * @returns Unrealized gain/loss (current value - cost basis)
  */
 export function calculateUnrealizedGains(asset: Asset): number {
+  // Cannot calculate gains without cost basis - return 0 as neutral value
   if (!asset.averageCost || asset.averageCost <= 0) {
     return 0;
   }
