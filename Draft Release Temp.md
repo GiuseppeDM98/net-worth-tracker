@@ -161,76 +161,37 @@
   - **Color preservation**: Green for net amounts, red for taxes, consistent across currencies
   - **Exchange rate visibility**: Users can see conversion rate used in dividend details
 
-### Bug Fixes
+### Documentation
 
-- **Drawdown Duration Calculation Mismatch**: Fixed visual inconsistency between displayed period ranges and duration values
-  - **Issue**: Duration showed 6 months but period "01/25 - 07/25" visually suggested 7 months (Jan, Feb, Mar, Apr, May, Jun, Jul)
-  - **Cause**: Durations calculated as interval count (array index difference) but periods displayed as inclusive ranges (month count)
-  - **Impact**: User confusion - "From January to July should be 7 months, not 6"
-  - **Fix**: Changed calculation to inclusive count (both start and end months included), added +1 to all duration formulas
-  - **Result**: "01/25 - 07/25" now correctly shows "7m" duration, matching user's mental model
-  - **Breaking change**: All drawdown duration values increased by 1 month for consistency
-  - **Metrics affected**: Drawdown Duration and Recovery Time (both now use inclusive counting)
-  - **Backward compatibility**: Performance metrics calculated on-the-fly (not cached), next page load shows correct values automatically
+- **CLAUDE.md Updates**: Comprehensive documentation of ETF dividend tracking and currency conversion
+  - Updated Dividend Tracking section (section 6) with ETF support, currency conversion service, dual URL routing
+  - Enhanced key services descriptions with `currencyConversionService.ts` and updated `borsaItalianaScraperService.ts`
+  - Extended `Dividend` data model with EUR conversion fields and exchange rate
+  - Updated Current Status with latest session implementation (2025-12-26)
+  - Added Frankfurter API to Stack & Dependencies (external APIs section)
+  - Enhanced Known Issues with currency conversion and date serialization warnings
+  - Updated key features list with ETF support and automatic currency conversion
+  - Updated Hall of Fame section (section 8) with percentage calculations, data models, and mobile optimizations
+  - Enhanced Portfolio Management section (section 1) with portfolio weight percentage column documentation
+  - Added PDF Export architecture and implementation details
 
-- **Cashflow Section** (#68): Fixed misleading savings text that showed total savings as "per month" amount
-  - Now calculates: Total Net Cashflow ÷ Number of Tracked Months = Average Monthly Savings
-  - Example: €11,998 saved over 12 months → "Risparmi €999.87 al mese (media su 12 mesi)"
+- **AGENTS.md Updates**: Critical patterns and error prevention for future AI agents
+  - **New section**: Date Handling with Firestore - critical `toDate()` helper usage pattern
+  - **New section**: Currency Conversion (Dividends) - Frankfurter API integration patterns and UI display
+  - **New section**: Borsa Italiana Scraper - ETF vs Stock table differences with comparison table
+  - **Common Errors expanded**: Added Date Handling Errors, Currency Conversion Errors, Dividend Scraper Errors
+  - **Key File References updated**: Added `types/dividend.ts`, `dateHelpers.ts`, `currencyConversionService.ts`, `borsaItalianaScraperService.ts`, `dividendService.ts`
+  - **Code examples**: Real implementation patterns from DividendDialog, DividendTable, dividendService
 
-- **FIRE Section** (#68): Fixed hardcoded "25x spese annuali" that was incorrect for non-4% Safe Withdrawal Rates
-  - Dynamic calculation: 100 ÷ SWR = Multiplier
-  - User-configured SWR now properly retrieved from settings (previously always showed 4%)
-  - Trinity Study explanation now conditional (shown only for 4% SWR)
-
-- **Asset Allocation** (#68): Fixed rebalancing actions missing asset classes with zero current value
-  - Previously: Only asset classes in `assetClassData` appeared in rebalancing recommendations
-  - Now: Directly iterates on `comparisonResult.byAssetClass` to ensure completeness
-  - Example: "Materie Prime" with 0€ current value but 4.21% target now correctly shows "COMPRA €10,699.38"
-
-- **Dividend Scraper - ETF URL Routing**: Fixed hardcoded Stock URL causing ETF dividend scraping failures
-  - **Issue**: Scraper used single URL constant (`BORSA_ITALIANA_BASE_URL`) for all asset types
-  - **Impact**: ETF dividend imports failed with wrong URL (`/azioni/listino-a-z.html` instead of `/etf/dividendi.html`)
-  - **Fix**: Implemented dual URL routing with `BORSA_ITALIANA_STOCK_URL` and `BORSA_ITALIANA_ETF_URL` constants
-  - **Solution**: `scrapeDividendsByIsin()` now accepts `assetType` parameter and selects correct URL dynamically
-  - **Integration**: Updated all call sites (`/api/dividends/scrape`, `/api/cron/daily-dividend-processing`) to pass `asset.type`
-  - **Testing**: Verified with VWRL.MI (IE00B3RBWM25) ETF successfully scraping USD dividends
-
-- **DividendDialog - Date Conversion Error**: Fixed crash when editing existing dividends
-  - **Error**: `dividend.exDate.toDate is not a function` when clicking Edit button in dividend table
-  - **Cause**: API responses serialize Firestore Timestamps as ISO strings (JSON format), not Date/Timestamp objects
-  - **Impact**: Manual `instanceof Date` checks and `.toDate()` calls failed on string data
-  - **Fix**: Replaced manual conversion logic with `toDate()` helper from `lib/utils/dateHelpers.ts`
-  - **Solution**: Helper gracefully handles Date objects, Timestamps, ISO strings, and undefined/null values
-  - **Prevention**: Updated AGENTS.md with critical date handling pattern to prevent future occurrences
+- **README.md Updates**: Added comprehensive PDF Export section with usage examples, moved PDF export from roadmap to Current Features (Completed ✅)
 
 
-- **Mobile Optimizations**: Enhanced mobile user experience with compact chart formatting and native-app-like navigation
-  - **Compact chart Y-axis notation**: Applied K/M formatting to 19 monetary charts for improved readability on small screens (€1,500,000 → €1.5 Mln, €850,000 → €850k)
-  - **Bottom navigation bar**: Fixed navigation at bottom of screen for mobile portrait mode with 4 primary actions (Overview, Assets, Cashflow, Menu)
-  - **Secondary menu drawer**: Sheet component sliding from bottom with 5 additional navigation items (Allocation, History, Hall of Fame, FIRE, Settings)
-  - **Intelligent responsive behavior**: Three-tier system across Desktop (sidebar always visible), Mobile Landscape (hamburger toggle), and Mobile Portrait (bottom nav + drawer)
-  - **Native app feel**: Thumb-friendly navigation mimicking iOS/Android Material Design patterns
-  - **Active state highlighting**: Color-coded navigation items (blue for active, gray for inactive)
-  - **Auto-close drawer**: Automatic dismissal after navigation selection for faster workflow
-  - **Zero desktop impact**: All optimizations scoped to mobile screens only, preserving desktop experience
-  - **Preserved backward compatibility**: Mobile landscape mode unchanged (hamburger menu + sidebar toggle)
-  - **Critical bug fix**: Resolved sidebar disappearing on desktop by limiting orientation variants to mobile with `max-lg:` Tailwind prefix
+---
 
-- **Hall of Fame Recalculation**: Fixed server-side service not saving new percentage fields when using "Ricalcola Rankings" button
-  - Issue: `/api/hall-of-fame/recalculate` was using outdated `hallOfFameService.server.ts` without `previousNetWorth` and `startOfYearNetWorth`
-  - Fix: Updated server-side service with identical calculation logic as client-side version
-  - Impact: Percentage columns now populate correctly after manual recalculation
-
-- **Timezone Boundary Bug**: Fixed Hall of Fame entries and snapshots appearing in wrong month when operations executed from production server
-  - **Issue**: December 2023 entries incorrectly displayed as November 2023 after server-side ranking recalculation
-  - **Cause**: JavaScript `Date.getMonth()` and `getFullYear()` are timezone-dependent; server (Vercel/UTC) and browser (Italy/CET) extracted different month values near midnight boundaries
-  - **Impact**: Affected Hall of Fame monthly/yearly rankings, monthly snapshot creation (cron jobs), expense statistics in Cashflow dashboard
-  - **Example**: Entry created December 31 at 23:30 CET was stored correctly but appeared as November when server recalculated at UTC midnight
-  - **Fix**: All date operations now consistently use Italy timezone (Europe/Rome) via new timezone-aware helper functions
-  - **Result**: Rankings, snapshots, and statistics display correctly regardless of server timezone or recalculation location
-  - **Scope**: Ensures consistency across Hall of Fame, monthly snapshots (automatic cron + manual creation), and current month detection in Cashflow stats
-
-### Technical Improvements
+## 🔧 Improvements
+- Improved Hall of Fame rankings by highlighting the current month or year row for quicker scanning
+- Improved Performance charts with rolling 12‑month Sharpe Ratio and smoother 3‑month moving‑average trend lines
+- Improved Cashflow % trend charts with a zero reference line for clearer positive/negative reading
 
 - **PDF Data Service**: Refactored `pdfDataService.ts` for dynamic SWR integration and complete rebalancing logic
 - **Type Safety**: Enhanced `types/pdf.ts` with `numberOfMonthsTracked` and `averageMonthlySavings` fields; updated `types/hall-of-fame.ts` with `previousNetWorth` and `startOfYearNetWorth`
@@ -293,43 +254,75 @@
   - Updated table description to emphasize TTM (Trailing Twelve Months) period
   - Helps users understand the metric is independent from selected period filters
 
-
-### Documentation
-
-- **CLAUDE.md Updates**: Comprehensive documentation of ETF dividend tracking and currency conversion
-  - Updated Dividend Tracking section (section 6) with ETF support, currency conversion service, dual URL routing
-  - Enhanced key services descriptions with `currencyConversionService.ts` and updated `borsaItalianaScraperService.ts`
-  - Extended `Dividend` data model with EUR conversion fields and exchange rate
-  - Updated Current Status with latest session implementation (2025-12-26)
-  - Added Frankfurter API to Stack & Dependencies (external APIs section)
-  - Enhanced Known Issues with currency conversion and date serialization warnings
-  - Updated key features list with ETF support and automatic currency conversion
-  - Updated Hall of Fame section (section 8) with percentage calculations, data models, and mobile optimizations
-  - Enhanced Portfolio Management section (section 1) with portfolio weight percentage column documentation
-  - Added PDF Export architecture and implementation details
-
-- **AGENTS.md Updates**: Critical patterns and error prevention for future AI agents
-  - **New section**: Date Handling with Firestore - critical `toDate()` helper usage pattern
-  - **New section**: Currency Conversion (Dividends) - Frankfurter API integration patterns and UI display
-  - **New section**: Borsa Italiana Scraper - ETF vs Stock table differences with comparison table
-  - **Common Errors expanded**: Added Date Handling Errors, Currency Conversion Errors, Dividend Scraper Errors
-  - **Key File References updated**: Added `types/dividend.ts`, `dateHelpers.ts`, `currencyConversionService.ts`, `borsaItalianaScraperService.ts`, `dividendService.ts`
-  - **Code examples**: Real implementation patterns from DividendDialog, DividendTable, dividendService
-
-- **README.md Updates**: Added comprehensive PDF Export section with usage examples, moved PDF export from roadmap to Current Features (Completed ✅)
-
-
----
-
-## 🔧 Improvements
-- Improved Hall of Fame rankings by highlighting the current month or year row for quicker scanning
-- Improved Performance charts with rolling 12‑month Sharpe Ratio and smoother 3‑month moving‑average trend lines
-
 ## 🐛 Bug Fixes
+
+- **Drawdown Duration Calculation Mismatch**: Fixed visual inconsistency between displayed period ranges and duration values
+  - **Issue**: Duration showed 6 months but period "01/25 - 07/25" visually suggested 7 months (Jan, Feb, Mar, Apr, May, Jun, Jul)
+  - **Cause**: Durations calculated as interval count (array index difference) but periods displayed as inclusive ranges (month count)
+  - **Impact**: User confusion - "From January to July should be 7 months, not 6"
+  - **Fix**: Changed calculation to inclusive count (both start and end months included), added +1 to all duration formulas
+  - **Result**: "01/25 - 07/25" now correctly shows "7m" duration, matching user's mental model
+  - **Breaking change**: All drawdown duration values increased by 1 month for consistency
+  - **Metrics affected**: Drawdown Duration and Recovery Time (both now use inclusive counting)
+  - **Backward compatibility**: Performance metrics calculated on-the-fly (not cached), next page load shows correct values automatically
+
+- **Cashflow Section** (#68): Fixed misleading savings text that showed total savings as "per month" amount
+  - Now calculates: Total Net Cashflow ÷ Number of Tracked Months = Average Monthly Savings
+  - Example: €11,998 saved over 12 months → "Risparmi €999.87 al mese (media su 12 mesi)"
+
+- **FIRE Section** (#68): Fixed hardcoded "25x spese annuali" that was incorrect for non-4% Safe Withdrawal Rates
+  - Dynamic calculation: 100 ÷ SWR = Multiplier
+  - User-configured SWR now properly retrieved from settings (previously always showed 4%)
+  - Trinity Study explanation now conditional (shown only for 4% SWR)
+
+- **Asset Allocation** (#68): Fixed rebalancing actions missing asset classes with zero current value
+  - Previously: Only asset classes in `assetClassData` appeared in rebalancing recommendations
+  - Now: Directly iterates on `comparisonResult.byAssetClass` to ensure completeness
+  - Example: "Materie Prime" with 0€ current value but 4.21% target now correctly shows "COMPRA €10,699.38"
+
+- **Dividend Scraper - ETF URL Routing**: Fixed hardcoded Stock URL causing ETF dividend scraping failures
+  - **Issue**: Scraper used single URL constant (`BORSA_ITALIANA_BASE_URL`) for all asset types
+  - **Impact**: ETF dividend imports failed with wrong URL (`/azioni/listino-a-z.html` instead of `/etf/dividendi.html`)
+  - **Fix**: Implemented dual URL routing with `BORSA_ITALIANA_STOCK_URL` and `BORSA_ITALIANA_ETF_URL` constants
+  - **Solution**: `scrapeDividendsByIsin()` now accepts `assetType` parameter and selects correct URL dynamically
+  - **Integration**: Updated all call sites (`/api/dividends/scrape`, `/api/cron/daily-dividend-processing`) to pass `asset.type`
+  - **Testing**: Verified with VWRL.MI (IE00B3RBWM25) ETF successfully scraping USD dividends
+
+- **DividendDialog - Date Conversion Error**: Fixed crash when editing existing dividends
+  - **Error**: `dividend.exDate.toDate is not a function` when clicking Edit button in dividend table
+  - **Cause**: API responses serialize Firestore Timestamps as ISO strings (JSON format), not Date/Timestamp objects
+  - **Impact**: Manual `instanceof Date` checks and `.toDate()` calls failed on string data
+  - **Fix**: Replaced manual conversion logic with `toDate()` helper from `lib/utils/dateHelpers.ts`
+  - **Solution**: Helper gracefully handles Date objects, Timestamps, ISO strings, and undefined/null values
+  - **Prevention**: Updated AGENTS.md with critical date handling pattern to prevent future occurrences
+
+- **Mobile Optimizations**: Enhanced mobile user experience with compact chart formatting and native-app-like navigation
+  - **Compact chart Y-axis notation**: Applied K/M formatting to 19 monetary charts for improved readability on small screens (€1,500,000 → €1.5 Mln, €850,000 → €850k)
+  - **Bottom navigation bar**: Fixed navigation at bottom of screen for mobile portrait mode with 4 primary actions (Overview, Assets, Cashflow, Menu)
+  - **Secondary menu drawer**: Sheet component sliding from bottom with 5 additional navigation items (Allocation, History, Hall of Fame, FIRE, Settings)
+  - **Intelligent responsive behavior**: Three-tier system across Desktop (sidebar always visible), Mobile Landscape (hamburger toggle), and Mobile Portrait (bottom nav + drawer)
+  - **Native app feel**: Thumb-friendly navigation mimicking iOS/Android Material Design patterns
+  - **Active state highlighting**: Color-coded navigation items (blue for active, gray for inactive)
+  - **Auto-close drawer**: Automatic dismissal after navigation selection for faster workflow
+  - **Zero desktop impact**: All optimizations scoped to mobile screens only, preserving desktop experience
+  - **Preserved backward compatibility**: Mobile landscape mode unchanged (hamburger menu + sidebar toggle)
+  - **Critical bug fix**: Resolved sidebar disappearing on desktop by limiting orientation variants to mobile with `max-lg:` Tailwind prefix
+
+- **Hall of Fame Recalculation**: Fixed server-side service not saving new percentage fields when using "Ricalcola Rankings" button
+  - Issue: `/api/hall-of-fame/recalculate` was using outdated `hallOfFameService.server.ts` without `previousNetWorth` and `startOfYearNetWorth`
+  - Fix: Updated server-side service with identical calculation logic as client-side version
+  - Impact: Percentage columns now populate correctly after manual recalculation
+
+- **Timezone Boundary Bug**: Fixed Hall of Fame entries and snapshots appearing in wrong month when operations executed from production server
+  - **Issue**: December 2023 entries incorrectly displayed as November 2023 after server-side ranking recalculation
+  - **Cause**: JavaScript `Date.getMonth()` and `getFullYear()` are timezone-dependent; server (Vercel/UTC) and browser (Italy/CET) extracted different month values near midnight boundaries
+  - **Impact**: Affected Hall of Fame monthly/yearly rankings, monthly snapshot creation (cron jobs), expense statistics in Cashflow dashboard
+  - **Example**: Entry created December 31 at 23:30 CET was stored correctly but appeared as November when server recalculated at UTC midnight
+  - **Fix**: All date operations now consistently use Italy timezone (Europe/Rome) via new timezone-aware helper functions
+  - **Result**: Rankings, snapshots, and statistics display correctly regardless of server timezone or recalculation location
+  - **Scope**: Ensures consistency across Hall of Fame, monthly snapshots (automatic cron + manual creation), and current month detection in Cashflow stats
+
 - Fixed Hall of Fame "Worst Month: Expenses" and "Worst Year: Expenses" showing positive values and green styling on mobile
 - Fixed Hall of Fame yearly expense rankings missing years that only have expense data (even with fewer than two snapshots)
 - Fixed Sharpe Rolling legend ordering so labels match the visual series order
 - Fixed Cashflow % trend charts showing out-of-scale values when toggling percentage view
-
-## 🔧 Improvements
-- Improved Cashflow % trend charts with a zero reference line for clearer positive/negative reading
