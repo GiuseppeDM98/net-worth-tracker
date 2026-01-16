@@ -2,6 +2,33 @@
 
 ### Features
 
+- **Monthly Calendar View for Dividends**: Visual overview of dividend payment schedules with interactive date exploration
+  - **Calendar grid**: 6 weeks × 7 days grid (Monday start) displaying payment dates with Italian locale (month names, day abbreviations)
+  - **Payment date display**: Each date shows dividend info - single dividend displays ticker + net amount, multiple dividends show badge with count + total sum
+  - **Interactive dialog**: Click any date with dividends to open detailed list showing asset ticker, name, dividend type (color-coded badges), and net amount with EUR conversion
+  - **Month navigation**: Previous/next arrows to browse through months, defaults to current month in Italy timezone
+  - **Visual indicators**: Green background for dates with dividends, blue border for today's date, muted styling for overflow days from adjacent months
+  - **Empty state handling**: Clear message when no dividends scheduled for viewed month
+  - **Responsive design**: Adapts cell size and layout for mobile (60px min-height), tablet (70px), and desktop (80px)
+  - **View toggle**: Switch between "Tabella" and "Calendario" views below filter section
+  - **Filter integration**: Calendar respects existing asset, type, and date range filters from parent component
+  - **Timezone safety**: All date operations use Italy timezone (Europe/Rome) to ensure consistent behavior across client and server
+
+- **Visual Filter Indicator for Dividends**: Clear feedback when viewing filtered dividend data
+  - **Blue banner**: Appears in both table and calendar views when filtering by single date (e.g., "📅 Filtro attivo: 26/11/2025")
+  - **Quick clear action**: "Cancella" button in banner removes filter without scrolling to filter section
+  - **Smart display**: Banner shows only for single-date filters from calendar clicks, not for manual date range selections
+  - **Always visible**: Banner stays visible when switching between table and calendar views to maintain filter awareness
+  - **Color distinction**: Blue theme differentiates filter banner from green dividend theme
+
+- **Totals Row in Filtered Dividend Table**: Summary row showing aggregated values when filters are active
+  - **Automatic display**: Appears at table bottom when any filter is active (asset, dividend type, or date range)
+  - **Three totals**: Displays Total Lordo (gross), Tasse (tax), and Totale Netto (net) with dividend count
+  - **Color coding**: Green for net amount, red for tax, matching table cell styling for visual consistency
+  - **Complete calculation**: Totals computed on all filtered dividends, not just current page (important for pagination)
+  - **Currency handling**: Uses EUR amounts for converted dividends (netAmountEur) for accurate multi-currency totals
+  - **Semantic HTML**: Implemented with TableFooter component for proper table structure and screen reader support
+
 - **Max Drawdown Risk Metric**: New downside risk measurement to track worst portfolio declines
   - **Portfolio risk visibility**: Shows maximum percentage loss from peak to trough before recovery (e.g., -15.5% means portfolio fell 15.5% from its highest point)
   - **Cash flow adjusted**: Automatically excludes contributions and withdrawals to isolate true investment performance
@@ -255,6 +282,13 @@
   - Helps users understand the metric is independent from selected period filters
 
 ## 🐛 Bug Fixes
+
+- **Dividend Date Filtering**: Fixed date range filter using ex-dividend date instead of payment date
+  - **Issue**: Calendar showed dividends by payment date, but filters used ex-date, causing filtered calendar to appear empty after clicking a date
+  - **Impact**: Clicking calendar dates created confusing UX - dividends disappeared despite being visible moments before
+  - **Fix**: Changed filter logic to use `paymentDate` instead of `exDate` for consistency with calendar display
+  - **Rationale**: Users care about when money arrives (payment date), not technical ex-dividend dates
+  - **Result**: Calendar and filters now work coherently - clicking a payment date shows dividends paid on that date
 
 - **Drawdown Duration Calculation Mismatch**: Fixed visual inconsistency between displayed period ranges and duration values
   - **Issue**: Duration showed 6 months but period "01/25 - 07/25" visually suggested 7 months (Jan, Feb, Mar, Apr, May, Jun, Jul)

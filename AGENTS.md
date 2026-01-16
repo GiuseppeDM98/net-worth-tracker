@@ -66,6 +66,28 @@ Use `formatCurrencyCompact()` for Y axis labels on mobile to avoid layout compre
 ### Chart Data Preparation (chartService)
 Functions in `lib/services/chartService.ts` (e.g., `prepareNetWorthHistoryData()`) already include all relevant fields from snapshots (note, month, year). Always check the prepared data structure before implementing additional filtering or matching logic.
 
+### Dividend Calendar Date Filtering
+When implementing calendar views for dividends:
+- Use `paymentDate` for calendar display (when money arrives)
+- Use `paymentDate` for date range filters (not `exDate`)
+- Users care about cash arrival dates, not technical ex-dividend dates
+
+### Table Totals Row Pattern
+For filtered tables showing totals:
+- Use `<TableFooter>` (not `<TableBody>`) for semantic HTML
+- Calculate totals on **all filtered data**, not just current page
+- Use optional props with defaults: `showTotals?: boolean = false`
+- Always use EUR amounts for multi-currency totals (`netAmountEur ?? netAmount`)
+
+---
+
+### Component Unmounting & Dialog State
+When implementing dialogs in conditionally rendered components:
+- Dialog state in a component is lost when the component unmounts
+- Avoid auto-switching parent view modes that unmount the dialog's parent
+- Example: Calendar click should NOT auto-switch to table if dialog is in calendar component
+- Solution: Keep dialog state in parent, or avoid unmounting during interaction
+
 ---
 
 ## Common Errors to Avoid

@@ -19,6 +19,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -44,6 +45,7 @@ interface DividendTableProps {
   dividends: Dividend[];
   onEdit: (dividend: Dividend) => void;
   onRefresh: () => void;
+  showTotals?: boolean; // Show totals row at bottom when filtering
 }
 
 const dividendTypeLabels: Record<DividendType, string> = {
@@ -60,11 +62,30 @@ const dividendTypeBadgeColor: Record<DividendType, string> = {
   final: 'bg-green-100 text-green-800 border-green-200',
 };
 
-export function DividendTable({ dividends, onEdit, onRefresh }: DividendTableProps) {
+export function DividendTable({ dividends, onEdit, onRefresh, showTotals = false }: DividendTableProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortColumn, setSortColumn] = useState<'exDate' | 'paymentDate' | 'totalNet' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  // Calculate totals across all dividends (not just current page)
+  const totals = useMemo(() => {
+    return dividends.reduce(
+      (acc, div) => {
+        // Use EUR amounts if available, otherwise use original currency
+        const grossAmount = div.grossAmountEur ?? div.grossAmount;
+        const taxAmount = div.taxAmountEur ?? div.taxAmount;
+        const netAmount = div.netAmountEur ?? div.netAmount;
+
+        return {
+          gross: acc.gross + grossAmount,
+          tax: acc.tax + taxAmount,
+          net: acc.net + netAmount,
+        };
+      },
+      { gross: 0, tax: 0, net: 0 }
+    );
+  }, [dividends]);
 
   const formatDate = (date: Date | string | Timestamp): string => {
     return format(toDate(date), 'dd/MM/yyyy', { locale: it });
@@ -357,6 +378,27 @@ export function DividendTable({ dividends, onEdit, onRefresh }: DividendTablePro
               </TableRow>
             ))}
           </TableBody>
+
+          {/* Totals Footer Row */}
+          {showTotals && dividends.length > 0 && (
+            <TableFooter>
+              <TableRow>
+                <TableCell colSpan={7} className="text-right font-semibold">
+                  Totale ({dividends.length} {dividends.length === 1 ? 'dividendo' : 'dividendi'}):
+                </TableCell>
+                <TableCell className="text-right font-bold">
+                  {formatCurrency(totals.gross)}
+                </TableCell>
+                <TableCell className="text-right font-bold text-red-600 dark:text-red-400">
+                  {formatCurrency(totals.tax)}
+                </TableCell>
+                <TableCell className="text-right font-bold text-green-600 dark:text-green-400">
+                  {formatCurrency(totals.net)}
+                </TableCell>
+                <TableCell colSpan={2} />
+              </TableRow>
+            </TableFooter>
+          )}
         </Table>
       </div>
 

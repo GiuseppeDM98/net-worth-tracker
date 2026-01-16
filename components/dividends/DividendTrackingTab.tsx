@@ -17,6 +17,7 @@ import { Dividend, DividendType } from '@/types/dividend';
 import { Asset } from '@/types/assets';
 import { DividendDialog } from './DividendDialog';
 import { DividendTable } from './DividendTable';
+import { DividendCalendar } from './DividendCalendar';
 import { DividendStats } from './DividendStats';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -61,6 +62,9 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
 
+  // View mode (table or calendar)
+  const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table');
+
   // Apply filters whenever dividends or filter values change
   useEffect(() => {
     applyFilters();
@@ -79,13 +83,13 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
       filtered = filtered.filter((d) => d.dividendType === typeFilter);
     }
 
-    // Filter by date range
+    // Filter by date range (using paymentDate for better UX - users care when money arrives)
     if (startDate) {
-      filtered = filtered.filter((d) => toDate(d.exDate) >= startDate);
+      filtered = filtered.filter((d) => toDate(d.paymentDate) >= startDate);
     }
 
     if (endDate) {
-      filtered = filtered.filter((d) => toDate(d.exDate) <= endDate);
+      filtered = filtered.filter((d) => toDate(d.paymentDate) <= endDate);
     }
 
     setFilteredDividends(filtered);
@@ -253,6 +257,21 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
     setEndDate(undefined);
   };
 
+  /**
+   * Handle date click from calendar view
+   * Filters dividends to show only those on the selected date.
+   * A visual indicator is shown to make the filter clear to users.
+   */
+  const handleCalendarDateClick = (date: Date) => {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    setStartDate(startOfDay);
+    setEndDate(endOfDay);
+  };
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -395,12 +414,63 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
         )}
       </div>
 
-      {/* Dividend Table */}
-      <DividendTable
-        dividends={filteredDividends}
-        onEdit={handleEdit}
-        onRefresh={onRefresh}
-      />
+      {/* View Mode Toggle */}
+      <div className="flex gap-2 border-b border-border">
+        <Button
+          variant={viewMode === 'table' ? 'default' : 'ghost'}
+          onClick={() => setViewMode('table')}
+          className="rounded-b-none"
+        >
+          Tabella
+        </Button>
+        <Button
+          variant={viewMode === 'calendar' ? 'default' : 'ghost'}
+          onClick={() => setViewMode('calendar')}
+          className="rounded-b-none"
+        >
+          Calendario
+        </Button>
+      </div>
+
+      {/* Active Filter Indicator (shown in both table and calendar views when filtering by single date) */}
+      {startDate && endDate && (
+        startDate.getTime() === endDate.getTime() ||
+        (startDate.getDate() === endDate.getDate() &&
+         startDate.getMonth() === endDate.getMonth() &&
+         startDate.getFullYear() === endDate.getFullYear())
+      ) && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20 p-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-blue-700 dark:text-blue-400">📅</span>
+            <span className="font-medium text-blue-900 dark:text-blue-200">
+              Filtro attivo: {format(startDate, 'dd/MM/yyyy', { locale: it })}
+            </span>
+          </div>
+          <Button
+            onClick={clearFilters}
+            variant="ghost"
+            size="sm"
+            className="h-auto py-1 px-2 text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+          >
+            Cancella
+          </Button>
+        </div>
+      )}
+
+      {/* Conditional Rendering: Table or Calendar */}
+      {viewMode === 'table' ? (
+        <DividendTable
+          dividends={filteredDividends}
+          onEdit={handleEdit}
+          onRefresh={onRefresh}
+          showTotals={assetFilter !== '__all__' || typeFilter !== '__all__' || startDate !== undefined || endDate !== undefined}
+        />
+      ) : (
+        <DividendCalendar
+          dividends={filteredDividends}
+          onDateClick={handleCalendarDateClick}
+        />
+      )}
 
       {/* Dividend Dialog */}
       <DividendDialog

@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz
-- Feature ultimo mese: Visualizzazione note patrimonio netto con tabella dedicata responsive (mobile card layout, desktop table con sticky header)
-- Ultima fix: Corretto bug filtraggio note che impediva visualizzazione nella tabella (2026-01-16)
+- Feature ultimo mese: Vista calendario mensile dividendi con navigazione, filtro per data e dialog dettagli
+- Ultima fix: Filtro data dividendi usa paymentDate invece di exDate per coerenza con calendario (2026-01-16)
 - In corso ora: nessuna attivita attiva
 - Completamento: n/d
 
@@ -30,7 +30,11 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Cashflow con categorie, filtri e statistiche.
 - Snapshot mensili automatici + storico e CSV export.
 - Performance metrics (ROI, CAGR, TWR, IRR, Sharpe, drawdown suite) con heatmap rendimenti mensili, grafico underwater e rolling CAGR/Sharpe con medie mobili.
-- Dividendi multi-currency con conversione EUR, scraping Borsa Italiana, e Yield on Cost (YOC) analysis.
+- Dividendi multi-currency con conversione EUR, scraping Borsa Italiana, Yield on Cost (YOC) analysis, e vista calendario mensile.
+  - Calendar view: griglia 6 settimane × 7 giorni (inizio lunedì, locale italiana) con payment dates
+  - Click su data: dialog con dettagli dividendi + applicazione filtri
+  - Visual filter indicator: banner blu "Filtro attivo" con pulsante cancella rapido
+  - Totals row: riga totali in tabella quando filtri attivi
 - Hall of Fame con ranking mensili/annuali e highlight del periodo corrente.
 - FIRE calculator e Monte Carlo.
 
@@ -45,7 +49,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Conversione valuta dipende da Frankfurter API (fallback su cache, ma possibile failure prolungata).
 
 ## Next Steps (Prossime 1-2 sessioni)
-- Verificare su mobile/tablet i grafici Rolling (CAGR/Sharpe) e la leggibilita delle legende.
+- Verificare responsive design calendario dividendi su mobile/tablet.
+- Testare comportamento filtri con dataset grandi (100+ dividendi).
 - Ottimizzazioni UI/UX basate su feedback utente.
 
 ## Key Files
@@ -55,6 +60,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Performance metrics: `lib/services/performanceService.ts`
 - Performance charts: `components/performance/MonthlyReturnsHeatmap.tsx`, `components/performance/UnderwaterDrawdownChart.tsx`
 - Cashflow charts: `components/cashflow/TotalHistoryTab.tsx`, `components/cashflow/CurrentYearTab.tsx`
+- Dividends UI: `components/dividends/DividendTrackingTab.tsx`, `components/dividends/DividendTable.tsx`, `components/dividends/DividendCalendar.tsx`, `components/dividends/CalendarDayCell.tsx`, `components/dividends/DividendDetailsDialog.tsx`
 - Dividends stats: `app/api/dividends/stats/route.ts`, `components/dividends/DividendStats.tsx`
 - Dividend types: `types/dividend.ts`
 - Hall of Fame UI: `app/dashboard/hall-of-fame/page.tsx`
