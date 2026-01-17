@@ -72,6 +72,14 @@ When implementing calendar views for dividends:
 - Use `paymentDate` for date range filters (not `exDate`)
 - Users care about cash arrival dates, not technical ex-dividend dates
 
+### YOC (Yield on Cost) Calculation Pattern
+When implementing YOC metrics:
+- **Annualization**: < 12 months scale up `(dividends / months) × 12`, >= 12 months average `dividends / (months / 12)`
+- **Cost basis**: Only include assets with `quantity > 0` and `averageCost > 0` (excludes sold assets)
+- **Currency**: Prefer `grossAmountEur ?? grossAmount` for multi-currency portfolios
+- **Filter dividends**: Use `paymentDate` not `exDate` (consistent with calendar)
+- **Architecture**: Use API route pattern due to server-only dividend service constraints
+
 ### Table Totals Row Pattern
 For filtered tables showing totals:
 - Use `<TableFooter>` (not `<TableBody>`) for semantic HTML
@@ -87,6 +95,27 @@ When implementing dialogs in conditionally rendered components:
 - Avoid auto-switching parent view modes that unmount the dialog's parent
 - Example: Calendar click should NOT auto-switch to table if dialog is in calendar component
 - Solution: Keep dialog state in parent, or avoid unmounting during interaction
+
+### Server-Only Module Constraints (Firebase)
+When implementing features requiring Firebase data access:
+- **Pattern**: Client Components cannot import modules with `'server-only'` directive
+- **Symptom**: Build error: "'server-only' cannot be imported from a Client Component module"
+- **Root cause**: `dividendService.ts` and similar files use Firebase Admin SDK (server-only)
+- **Solution**: Create API route for server-side operations
+```typescript
+// ✅ CORRECT - API route with Admin SDK
+// app/api/performance/yoc/route.ts
+import { adminDb } from '@/lib/firebase/admin';
+async function getUserAssetsAdmin(userId: string): Promise<Asset[]> {
+  const querySnapshot = await adminDb
+    .collection('assets')
+    .where('userId', '==', userId)
+    .get();
+  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+```
+- **Client-side**: Fetch from API instead of direct service import
+- **Performance**: Use `Promise.all` to parallelize multiple API calls
 
 ---
 
@@ -144,8 +173,10 @@ const { month, year } = getItalyMonthYear();
 - Formatters: `lib/utils/formatters.ts`
 - Asset history utils: `lib/utils/assetPriceHistoryUtils.ts`
 - Performance service: `lib/services/performanceService.ts`
+- Performance types: `types/performance.ts`
+- YOC API route: `app/api/performance/yoc/route.ts`
 - Currency conversion: `lib/services/currencyConversionService.ts`
 - Query keys: `lib/query/queryKeys.ts`
 - Cashflow charts: `components/cashflow/TotalHistoryTab.tsx`, `components/cashflow/CurrentYearTab.tsx`
 
-**Last updated**: 2026-01-16
+**Last updated**: 2026-01-17

@@ -135,13 +135,18 @@
   - **Educational methodology**: Comprehensive explanation in "Note Metodologiche" covering TWR adjustment, peak tracking, and interpretation
   - **Responsive heights**: Adapts to device (400px desktop, 280px mobile, 300px landscape) for optimal viewing
 
-- Added **Yield on Cost (YOC) analysis** to dividends dashboard
-  - Portfolio-level YOC metric card showing return on original investment cost
-  - Detailed per-asset comparison table with 8 columns: asset details, quantity, average cost, current price, TTM dividends, YOC %, current yield %, and difference
-  - Highlights dividend growth over time by comparing cost-based yield vs market-based yield
-  - Automatic sorting by YOC percentage (highest performers first)
-  - Portfolio totals footer in comparison table
-  - Only displays for assets with configured cost basis and TTM dividends
+- **Yield on Cost (YOC) Metrics in Performance Page**: Comprehensive dividend yield analysis based on original cost basis
+  - **YOC Lordo and YOC Netto cards**: Two dedicated metrics showing gross and net (after-tax) dividend yield on cost
+  - **Annualized calculations**: All time frames (YTD, 1Y, 3Y, 5Y, All Time, Custom) use annualized dividends for cross-period comparability
+  - **Annualization logic**: Periods < 12 months scale up (e.g., 6 months → ×2), periods ≥ 12 months use average annual rate
+  - **Smart cost basis**: Only includes assets currently held (quantity > 0) with known average cost, excluding sold positions
+  - **Detailed insights**: Each card shows total dividends, total cost basis, and number of assets included in calculation
+  - **Educational tooltips**: Comprehensive explanations with practical examples, formula breakdown, and interpretation guidance
+  - **Conditional display**: Row 4 "Metriche Dividendi" appears only when YOC data is available (null when no dividends or no cost basis)
+  - **Note Metodologiche section**: Extended educational content explaining YOC concept, calculation, interpretation, when it's good (>5-7%), and limitations
+  - **Removed from dividends page**: YOC analysis consolidated in Performance page to avoid duplication and improve discoverability
+  - **API architecture**: Server-side `/api/performance/yoc` endpoint using Firebase Admin SDK for optimal data access
+  - **Performance optimized**: 5 parallel API calls for all time periods (YTD, 1Y, 3Y, 5Y, ALL) load in ~500-800ms total
 
 ### User Experience Enhancements
 

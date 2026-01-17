@@ -104,6 +104,66 @@ export default function PerformancePage() {
       setCachedSnapshots(snapshots);
 
       const data = await getAllPerformanceData(user.uid);
+
+      // Fetch YOC metrics for all periods in parallel
+      // YOC requires server-side calculation due to Firebase Admin SDK usage
+      const periods = ['ytd', 'oneYear', 'threeYear', 'fiveYear', 'allTime'] as const;
+      const yocPromises = periods.map(async (periodKey) => {
+        const metrics = data[periodKey];
+        // Only fetch YOC if period has sufficient data
+        if (metrics.hasInsufficientData) {
+          return {
+            yocGross: null,
+            yocNet: null,
+            yocDividendsGross: 0,
+            yocDividendsNet: 0,
+            yocCostBasis: 0,
+            yocAssetCount: 0,
+          };
+        }
+
+        try {
+          const params = new URLSearchParams({
+            userId: user.uid,
+            startDate: metrics.startDate.toISOString(),
+            endDate: metrics.endDate.toISOString(),
+            numberOfMonths: metrics.numberOfMonths.toString(),
+          });
+
+          const response = await fetch(`/api/performance/yoc?${params.toString()}`);
+          if (!response.ok) {
+            console.warn(`Failed to fetch YOC for ${periodKey}:`, response.statusText);
+            return {
+              yocGross: null,
+              yocNet: null,
+              yocDividendsGross: 0,
+              yocDividendsNet: 0,
+              yocCostBasis: 0,
+              yocAssetCount: 0,
+            };
+          }
+
+          return await response.json();
+        } catch (error) {
+          console.error(`Error fetching YOC for ${periodKey}:`, error);
+          return {
+            yocGross: null,
+            yocNet: null,
+            yocDividendsGross: 0,
+            yocDividendsNet: 0,
+            yocCostBasis: 0,
+            yocAssetCount: 0,
+          };
+        }
+      });
+
+      const yocResults = await Promise.all(yocPromises);
+
+      // Merge YOC data into performance data
+      periods.forEach((periodKey, index) => {
+        Object.assign(data[periodKey], yocResults[index]);
+      });
+
       setPerformanceData(data);
     } catch (error) {
       console.error('Error loading performance data:', error);
@@ -138,6 +198,27 @@ export default function PerformancePage() {
         undefined,  // preFetchedExpenses
         performanceData.ytd.dividendCategoryId  // Reuse categoryId from settings
       );
+
+      // Fetch YOC for custom period if sufficient data
+      if (!customMetrics.hasInsufficientData) {
+        try {
+          const params = new URLSearchParams({
+            userId: user.uid,
+            startDate: customMetrics.startDate.toISOString(),
+            endDate: customMetrics.endDate.toISOString(),
+            numberOfMonths: customMetrics.numberOfMonths.toString(),
+          });
+
+          const response = await fetch(`/api/performance/yoc?${params.toString()}`);
+          if (response.ok) {
+            const yocData = await response.json();
+            Object.assign(customMetrics, yocData);
+          }
+        } catch (error) {
+          console.error('Error fetching YOC for custom period:', error);
+          // Continue without YOC data (will show null values)
+        }
+      }
 
       setPerformanceData({
         ...performanceData,
@@ -541,6 +622,27 @@ export default function PerformancePage() {
           />
         </div>
 
+        {/* Metrics Cards - Row 4 - Dividend Metrics (YOC) */}
+        {/* Conditional rendering: only show if at least one YOC value exists */}
+        {(metrics.yocGross !== null || metrics.yocNet !== null) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+            <MetricCard
+              title="YOC Lordo"
+              value={metrics.yocGross}
+              format="percentage"
+              description={`Dividendi: ${formatCurrency(metrics.yocDividendsGross)} | Cost Basis: ${formatCurrency(metrics.yocCostBasis)} | Asset: ${metrics.yocAssetCount}`}
+              tooltip="Yield on Cost (YOC) Lordo misura il rendimento da dividendi lordi rispetto al costo originale di acquisto (cost basis). Formula: (Dividendi Annualizzati / Cost Basis) × 100. Esempio: Se hai comprato 100 azioni a €50 (cost basis €5.000) e ricevi €300/anno di dividendi lordi, YOC = 6%. A differenza del dividend yield corrente (dividendi/prezzo attuale), YOC mostra quanto rende il tuo investimento iniziale. YOC > Yield Corrente indica crescita dei dividendi nel tempo. Valori alti (>5-7%) indicano un buon ritorno sull'investimento originale."
+            />
+            <MetricCard
+              title="YOC Netto"
+              value={metrics.yocNet}
+              format="percentage"
+              description={`Dividendi: ${formatCurrency(metrics.yocDividendsNet)} | Cost Basis: ${formatCurrency(metrics.yocCostBasis)} | Asset: ${metrics.yocAssetCount}`}
+              tooltip="Yield on Cost (YOC) Netto misura il rendimento da dividendi netti (dopo tasse) rispetto al costo originale di acquisto. Formula: (Dividendi Netti Annualizzati / Cost Basis) × 100. Questa metrica mostra quanto effettivamente guadagni (al netto delle ritenute fiscali) rispetto al tuo investimento iniziale. Più realistica dello YOC Lordo perché considera l'impatto fiscale. Utile per valutare il rendimento effettivo del portafoglio nel tempo. La differenza tra YOC Lordo e Netto dipende dalle aliquote fiscali applicate (es. 26% in Italia per dividendi azionari)."
+            />
+          </div>
+        )}
+
         {/* Net Worth Evolution Chart */}
         <Card className="mt-6">
           <CardHeader>
@@ -827,6 +929,55 @@ export default function PerformancePage() {
               <p className="text-muted-foreground">
                 Calcolati come differenza mensile tra entrate e uscite registrate nella sezione Cashflow.
                 Valori positivi sono contributi, negativi sono prelievi.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-1">Yield on Cost (YOC)</h4>
+              <p className="text-muted-foreground">
+                Il Yield on Cost (YOC) misura il rendimento da dividendi basato sul costo originale di acquisto (average cost),
+                non sul prezzo di mercato attuale. Mostra quanto rendono i tuoi investimenti rispetto al capitale iniziale investito.
+                <br /><br />
+                <strong>Formula:</strong> YOC% = (Dividendi Annualizzati / Cost Basis) × 100
+                <br /><br />
+                <strong>Esempio concreto:</strong>
+                <br />
+                • Hai comprato 100 azioni di un ETF a €50/azione nel 2020 (cost basis: €5.000)
+                <br />
+                • Oggi il prezzo è €80/azione (valore attuale: €8.000)
+                <br />
+                • Ricevi €350/anno di dividendi lordi
+                <br />
+                • YOC Lordo = (€350 / €5.000) × 100 = 7%
+                <br />
+                • Current Yield = (€350 / €8.000) × 100 = 4.375%
+                <br /><br />
+                <strong>Come interpretarlo:</strong>
+                <br />
+                • <strong>YOC &gt; Current Yield:</strong> I dividendi sono cresciuti nel tempo (buon segno).
+                Significa che l&apos;azienda/ETF ha aumentato le distribuzioni, premiando chi ha investito presto.
+                <br />
+                • <strong>YOC = Current Yield:</strong> I dividendi sono rimasti stabili rispetto al prezzo.
+                <br />
+                • <strong>YOC &lt; Current Yield:</strong> I dividendi sono cresciuti meno del prezzo dell&apos;asset.
+                Non necessariamente negativo se il capitale totale è comunque aumentato.
+                <br /><br />
+                <strong>Quando è buono?</strong>
+                <br />
+                • YOC &gt; 5-7% è considerato eccellente per un portafoglio diversificato
+                <br />
+                • YOC in crescita anno dopo anno indica dividend growth sostenibile
+                <br />
+                • Confronta YOC tra periodi diversi (1Y, 3Y, 5Y) per vedere l&apos;evoluzione
+                <br /><br />
+                <strong>Limiti:</strong>
+                <br />
+                • Si applica solo ad asset con cost basis noto (average cost)
+                <br />
+                • Asset venduti (quantity = 0) non sono inclusi
+                <br />
+                • YOC non considera capital gains, solo dividendi
+                <br />
+                • I valori sono annualizzati per confrontare periodi diversi
               </p>
             </div>
           </CardContent>

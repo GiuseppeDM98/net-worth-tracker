@@ -64,6 +64,17 @@ export interface PerformanceMetrics {
   totalDividendIncome: number;       // Sum of all dividend income (rendimento portafoglio)
   numberOfMonths: number;            // Number of months in period
 
+  // Yield on Cost (YOC) Metrics
+  // YOC measures annualized dividend yield based on original cost basis (not current market value)
+  // Formula: YOC% = (Annualized Dividends / Cost Basis) × 100
+  // Annualization ensures comparability across different time periods
+  yocGross: number | null;           // YOC based on gross dividends
+  yocNet: number | null;             // YOC based on net dividends (after tax)
+  yocDividendsGross: number;         // Total gross dividends in period (not annualized)
+  yocDividendsNet: number;           // Total net dividends in period (not annualized)
+  yocCostBasis: number;              // Total cost basis of dividend-paying assets
+  yocAssetCount: number;             // Number of assets with dividends + cost basis
+
   // Data availability flags
   hasInsufficientData: boolean;      // Less than 2 snapshots
   errorMessage?: string;             // Error details if calculation failed
