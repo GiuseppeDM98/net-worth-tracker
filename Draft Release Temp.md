@@ -195,6 +195,13 @@
 
 ### Documentation
 
+- **YOC Educational Content**: Enhanced methodology notes explaining annualized dividends concept
+  - **What are Annualized Dividends**: Detailed explanation of conversion to annual rate for period comparability
+  - **Period-specific calculations**: < 12 months (scaling up), ≥ 12 months (average annual)
+  - **Real portfolio example**: Concrete calculation with €174.62 dividends over 5 months → €419/year → 6.76% YOC
+  - **Comparison with Current Yield**: Clarification of cost basis vs current market value
+  - **User benefit**: Better understanding of YOC metric and investment performance
+
 - **CLAUDE.md Updates**: Comprehensive documentation of ETF dividend tracking and currency conversion
   - Updated Dividend Tracking section (section 6) with ETF support, currency conversion service, dual URL routing
   - Enhanced key services descriptions with `currencyConversionService.ts` and updated `borsaItalianaScraperService.ts`
@@ -287,6 +294,13 @@
   - Helps users understand the metric is independent from selected period filters
 
 ## 🐛 Bug Fixes
+
+- **YOC Future Dividends**: Fixed YOC metrics incorrectly including future dividends not yet received
+  - **Issue**: Dividends with payment dates between today and end-of-month were counted as "received", artificially inflating YOC values
+  - **Impact**: YOC metrics showed higher values than actual (e.g., on Jan 17, dividends scheduled for Jan 18-31 were included)
+  - **Fix**: Added separate `dividendEndDate` parameter capped at today for dividend filtering while maintaining original `endDate` for other metrics
+  - **Result**: YOC now accurately reflects only received dividends, excluding scheduled future payments
+  - **User benefit**: More accurate portfolio yield analysis for investment decision-making
 
 - **Dividend Date Filtering**: Fixed date range filter using ex-dividend date instead of payment date
   - **Issue**: Calendar showed dividends by payment date, but filters used ex-date, causing filtered calendar to appear empty after clicking a date

@@ -80,6 +80,14 @@ When implementing YOC metrics:
 - **Filter dividends**: Use `paymentDate` not `exDate` (consistent with calendar)
 - **Architecture**: Use API route pattern due to server-only dividend service constraints
 
+### Time-Sensitive Metrics Pattern
+When implementing metrics requiring "as of today" data filtering:
+- **Separate date parameters**: Use dedicated `*EndDate` field capped at TODAY, don't modify global `endDate`
+- **Example**: YOC uses `dividendEndDate = min(endDate, today)` while other metrics use original `endDate`
+- **Rationale**: Snapshot-based metrics (ROI, CAGR, TWR) need end-of-period dates; dividend metrics need actual received data
+- **Architecture**: Add to type interface, calculate in service, pass through API, document in JSDoc
+- **Zero regression**: Keeps existing metrics unchanged while adding time-aware filtering
+
 ### Table Totals Row Pattern
 For filtered tables showing totals:
 - Use `<TableFooter>` (not `<TableBody>`) for semantic HTML

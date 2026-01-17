@@ -6,7 +6,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz
 - Feature ultimo mese: Metriche Yield on Cost (YOC) nella Performance page con calcolo annualizzato per tutti i time frame
-- Ultima implementazione: YOC Lordo e Netto con sezione educativa, row dedicata e rimozione da pagina dividendi (2026-01-17)
+- Ultima implementazione: Fix YOC future dividends bug - dividendEndDate cappato a TODAY per escludere dividendi non ancora ricevuti (2026-01-17)
 - In corso ora: nessuna attivita attiva
 - Completamento: n/d
 
