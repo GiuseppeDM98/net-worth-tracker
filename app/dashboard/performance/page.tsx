@@ -126,7 +126,7 @@ export default function PerformancePage() {
           const params = new URLSearchParams({
             userId: user.uid,
             startDate: metrics.startDate.toISOString(),
-            endDate: metrics.endDate.toISOString(),
+            dividendEndDate: metrics.dividendEndDate.toISOString(),
             numberOfMonths: metrics.numberOfMonths.toString(),
           });
 
@@ -205,7 +205,7 @@ export default function PerformancePage() {
           const params = new URLSearchParams({
             userId: user.uid,
             startDate: customMetrics.startDate.toISOString(),
-            endDate: customMetrics.endDate.toISOString(),
+            dividendEndDate: customMetrics.dividendEndDate.toISOString(),
             numberOfMonths: customMetrics.numberOfMonths.toString(),
           });
 
@@ -939,17 +939,39 @@ export default function PerformancePage() {
                 <br /><br />
                 <strong>Formula:</strong> YOC% = (Dividendi Annualizzati / Cost Basis) × 100
                 <br /><br />
-                <strong>Esempio concreto:</strong>
+                <strong>Cosa sono i Dividendi Annualizzati?</strong>
                 <br />
-                • Hai comprato 100 azioni di un ETF a €50/azione nel 2020 (cost basis: €5.000)
+                I dividendi totali del periodo vengono convertiti in un <strong>tasso annuale</strong> per rendere confrontabili periodi di durata diversa.
+                <br /><br />
+                • <strong>Periodi &lt; 12 mesi</strong> (es. YTD con 5 mesi): si scala il tasso a un equivalente annuale
                 <br />
-                • Oggi il prezzo è €80/azione (valore attuale: €8.000)
+                &nbsp;&nbsp;Dividendi Annualizzati = (Dividendi Totali / Numero Mesi) × 12
                 <br />
-                • Ricevi €350/anno di dividendi lordi
+                &nbsp;&nbsp;<em>Esempio: €100 in 5 mesi → (€100 / 5) × 12 = €240/anno</em>
+                <br /><br />
+                • <strong>Periodi ≥ 12 mesi</strong> (es. 3Y, 5Y): si calcola la media annuale
                 <br />
-                • YOC Lordo = (€350 / €5.000) × 100 = 7%
+                &nbsp;&nbsp;Dividendi Annualizzati = Dividendi Totali / Numero Anni
                 <br />
-                • Current Yield = (€350 / €8.000) × 100 = 4.375%
+                &nbsp;&nbsp;<em>Esempio: €600 in 3 anni → €600 / 3 = €200/anno</em>
+                <br /><br />
+                <strong>Esempio completo (portafoglio reale):</strong>
+                <br />
+                • Cost basis: €7.100 (5 asset in portafoglio)
+                <br />
+                • Periodo: 5 mesi (set 2025 - gen 2026)
+                <br />
+                • Dividendi lordi ricevuti: €197,52
+                <br />
+                • Dividendi Annualizzati: (€197,52 / 5) × 12 = €474/anno
+                <br />
+                • YOC Lordo: (€474 / €7.100) × 100 = <strong>6,68%</strong>
+                <br /><br />
+                <strong>Confronto con Current Yield:</strong>
+                <br />
+                • YOC si basa sul <strong>costo originale</strong> (€7.100)
+                <br />
+                • Current Yield si baserebbe sul <strong>valore attuale</strong> di mercato
                 <br /><br />
                 <strong>Come interpretarlo:</strong>
                 <br />

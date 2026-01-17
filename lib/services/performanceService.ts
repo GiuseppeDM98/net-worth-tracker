@@ -629,13 +629,14 @@ export function calculateRecoveryTime(
  *
  * FILTERING:
  * - Dividends filtered by payment date (when money actually received)
+ * - endDate is CAPPED AT TODAY to exclude future dividends not yet received
  * - Only assets with quantity > 0 and averageCost > 0 included in cost basis
  * - Multi-currency dividends use EUR conversion if available
  *
  * @param dividends - All user dividends (will be filtered by period internally)
  * @param assets - All user assets (for cost basis calculation)
  * @param startDate - Period start date (inclusive)
- * @param endDate - Period end date (inclusive)
+ * @param endDate - Period end date (inclusive, MUST be capped at today to exclude future dividends)
  * @param numberOfMonths - Duration in months (used for annualization)
  * @returns Object with YOC metrics or null values if insufficient data
  */
@@ -982,6 +983,7 @@ export async function calculatePerformanceForPeriod(
     timePeriod,
     startDate: customStartDate || new Date(),
     endDate: customEndDate || new Date(),
+    dividendEndDate: new Date(),  // Default to now for error cases
     startNetWorth: 0,
     endNetWorth: 0,
     cashFlows: [],
@@ -1031,6 +1033,11 @@ export async function calculatePerformanceForPeriod(
 
   const startDate = new Date(startSnapshot.year, startSnapshot.month - 1, 1);
   const endDate = new Date(endSnapshot.year, endSnapshot.month, 0, 23, 59, 59, 999); // Last day of month
+
+  // For dividend calculations, cap at today to exclude future dividends not yet received
+  const now = new Date();
+  const dividendEndDate = endDate > now ? now : endDate;
+
   const numberOfMonths = calculateMonthsDifference(endDate, startDate);
 
   // Get cash flows for period - use pre-fetched if available, otherwise fetch
@@ -1113,6 +1120,7 @@ export async function calculatePerformanceForPeriod(
     timePeriod,
     startDate,
     endDate,
+    dividendEndDate,
     startNetWorth: startSnapshot.totalNetWorth,
     endNetWorth: endSnapshot.totalNetWorth,
     cashFlows,

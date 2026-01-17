@@ -32,6 +32,7 @@ export interface PerformanceMetrics {
   timePeriod: TimePeriod;
   startDate: Date;
   endDate: Date;
+  dividendEndDate: Date;  // End date capped at today for dividend calculations
   startNetWorth: number;
   endNetWorth: number;
   cashFlows: CashFlowData[];

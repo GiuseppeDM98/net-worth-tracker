@@ -36,7 +36,7 @@ async function getUserAssetsAdmin(userId: string): Promise<Asset[]> {
  * Query params:
  * - userId: User ID (required)
  * - startDate: Period start date ISO string (required)
- * - endDate: Period end date ISO string (required)
+ * - dividendEndDate: Period end date ISO string (required, MUST be capped at today)
  * - numberOfMonths: Duration in months for annualization (required)
  *
  * Returns:
@@ -52,23 +52,23 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const userId = searchParams.get('userId');
     const startDateStr = searchParams.get('startDate');
-    const endDateStr = searchParams.get('endDate');
+    const dividendEndDateStr = searchParams.get('dividendEndDate');
     const numberOfMonthsStr = searchParams.get('numberOfMonths');
 
     // Validate required parameters
-    if (!userId || !startDateStr || !endDateStr || !numberOfMonthsStr) {
+    if (!userId || !startDateStr || !dividendEndDateStr || !numberOfMonthsStr) {
       return NextResponse.json(
-        { error: 'Missing required parameters: userId, startDate, endDate, numberOfMonths' },
+        { error: 'Missing required parameters: userId, startDate, dividendEndDate, numberOfMonths' },
         { status: 400 }
       );
     }
 
     // Parse dates and numberOfMonths
     const startDate = new Date(startDateStr);
-    const endDate = new Date(endDateStr);
+    const dividendEndDate = new Date(dividendEndDateStr);
     const numberOfMonths = parseInt(numberOfMonthsStr, 10);
 
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()) || isNaN(numberOfMonths)) {
+    if (isNaN(startDate.getTime()) || isNaN(dividendEndDate.getTime()) || isNaN(numberOfMonths)) {
       return NextResponse.json(
         { error: 'Invalid date or numberOfMonths format' },
         { status: 400 }
@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
       allDividends,
       allAssets,
       startDate,
-      endDate,
+      dividendEndDate,
       numberOfMonths
     );
 
