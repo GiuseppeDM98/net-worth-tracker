@@ -13,9 +13,11 @@
  */
 
 import { Asset, PieChartData, MonthlySnapshot } from '@/types/assets';
+import { Expense } from '@/types/expenses';
 import { calculateAssetValue, calculateTotalValue } from './assetService';
 import { calculateCurrentAllocation } from './assetAllocationService';
 import { getAssetClassColor, getChartColor } from '@/lib/constants/colors';
+import { getItalyYear } from '@/lib/utils/dateHelpers';
 
 /**
  * Prepare data for asset class distribution pie chart
@@ -301,4 +303,103 @@ export function prepareYoYVariationData(snapshots: MonthlySnapshot[]): {
     });
 
   return yoyData;
+}
+
+/**
+ * Prepare yearly data showing breakdown of net worth growth into savings vs investment returns.
+ *
+ * For each year:
+ * - Net Savings = Income - Expenses (cashflows from user)
+ * - Net Worth Growth = End NW - Start NW (total portfolio change)
+ * - Investment Growth = Net Worth Growth - Net Savings (market performance)
+ *
+ * This separates wealth growth from disciplined saving (user control)
+ * vs market performance (external factors).
+ *
+ * @param snapshots - Monthly snapshots with net worth data
+ * @param expenses - All expense records (income and expenses)
+ * @returns Array of yearly data sorted by year
+ */
+export function prepareSavingsVsInvestmentData(
+  snapshots: MonthlySnapshot[],
+  expenses: Expense[]
+): {
+  year: string;
+  netSavings: number;
+  investmentGrowth: number;
+  netWorthGrowth: number;
+}[] {
+  // Return empty array if missing data
+  if (snapshots.length === 0 || expenses.length === 0) {
+    return [];
+  }
+
+  // Group snapshots by year
+  const snapshotsByYear = new Map<number, MonthlySnapshot[]>();
+  snapshots.forEach((snapshot) => {
+    if (!snapshotsByYear.has(snapshot.year)) {
+      snapshotsByYear.set(snapshot.year, []);
+    }
+    snapshotsByYear.get(snapshot.year)!.push(snapshot);
+  });
+
+  // Group expenses by year using Italy timezone for consistency
+  const expensesByYear = new Map<number, { income: number; expenses: number }>();
+  expenses.forEach((expense) => {
+    const year = getItalyYear(expense.date);
+    const current = expensesByYear.get(year) || { income: 0, expenses: 0 };
+
+    // Income is positive, expenses are stored as negative values
+    if (expense.type === 'income') {
+      current.income += expense.amount;
+    } else {
+      current.expenses += expense.amount; // Already negative
+    }
+
+    expensesByYear.set(year, current);
+  });
+
+  // Calculate yearly breakdown data
+  const yearlyData: {
+    year: string;
+    netSavings: number;
+    investmentGrowth: number;
+    netWorthGrowth: number;
+  }[] = [];
+
+  Array.from(snapshotsByYear.entries())
+    .sort((a, b) => a[0] - b[0]) // Sort by year ascending
+    .forEach(([year, yearSnapshots]) => {
+      // Skip years with less than 2 snapshots (can't calculate YoY growth)
+      if (yearSnapshots.length < 2) return;
+
+      // Skip years with no expense data (can't calculate net savings)
+      if (!expensesByYear.has(year)) return;
+
+      // Sort snapshots by month to get first and last
+      yearSnapshots.sort((a, b) => a.month - b.month);
+
+      const firstSnapshot = yearSnapshots[0];
+      const lastSnapshot = yearSnapshots[yearSnapshots.length - 1];
+      const expenseData = expensesByYear.get(year)!;
+
+      // Calculate Net Worth Growth (end - start)
+      const netWorthGrowth = lastSnapshot.totalNetWorth - firstSnapshot.totalNetWorth;
+
+      // Calculate Net Savings (income + expenses, expenses already negative)
+      const netSavings = expenseData.income + expenseData.expenses;
+
+      // Calculate Investment Growth (total growth - savings)
+      // This isolates market performance from cashflow contributions
+      const investmentGrowth = netWorthGrowth - netSavings;
+
+      yearlyData.push({
+        year: year.toString(),
+        netSavings,
+        investmentGrowth,
+        netWorthGrowth,
+      });
+    });
+
+  return yearlyData;
 }

@@ -609,6 +609,305 @@ export function calculateRecoveryTime(
 }
 
 /**
+ * Calculate Yield on Cost (YOC) metrics for a period
+ *
+ * YOC measures annualized dividend yield based on original cost basis (not current market value).
+ * This metric shows the return on your initial investment, making it useful for evaluating
+ * dividend growth over time.
+ *
+ * ANNUALIZATION STRATEGY:
+ * - Periods < 12 months: Scale up to annual rate (totalDividends / months × 12)
+ * - Periods >= 12 months: Average annual dividends (totalDividends / years)
+ * - This ensures comparability across different time periods
+ *
+ * FORMULA:
+ * YOC% = (Annualized Dividends / Cost Basis) × 100
+ *
+ * Where:
+ * - Annualized Dividends = Dividends adjusted to annual rate based on period length
+ * - Cost Basis = Sum of (quantity × averageCost) for assets that paid dividends
+ *
+ * FILTERING:
+ * - Dividends filtered by payment date (when money actually received)
+ * - endDate is CAPPED AT TODAY to exclude future dividends not yet received
+ * - Only assets with quantity > 0 and averageCost > 0 included in cost basis
+ * - Multi-currency dividends use EUR conversion if available
+ *
+ * @param dividends - All user dividends (will be filtered by period internally)
+ * @param assets - All user assets (for cost basis calculation)
+ * @param startDate - Period start date (inclusive)
+ * @param endDate - Period end date (inclusive, MUST be capped at today to exclude future dividends)
+ * @param numberOfMonths - Duration in months (used for annualization)
+ * @returns Object with YOC metrics or null values if insufficient data
+ */
+export function calculateYocMetrics(
+  dividends: any[],
+  assets: any[],
+  startDate: Date,
+  endDate: Date,
+  numberOfMonths: number
+): {
+  yocGross: number | null;
+  yocNet: number | null;
+  yocDividendsGross: number;
+  yocDividendsNet: number;
+  yocCostBasis: number;
+  yocAssetCount: number;
+} {
+  // STEP 1: Filter dividends by payment date (coerente con calendar view)
+  // Use payment date rather than ex-date because we care about when money was received
+  const periodDividends = dividends.filter(div => {
+    const paymentDate = div.paymentDate instanceof Date
+      ? div.paymentDate
+      : div.paymentDate.toDate();
+    return paymentDate >= startDate && paymentDate <= endDate;
+  });
+
+  // Early return if no dividends in period
+  if (periodDividends.length === 0) {
+    return {
+      yocGross: null,
+      yocNet: null,
+      yocDividendsGross: 0,
+      yocDividendsNet: 0,
+      yocCostBasis: 0,
+      yocAssetCount: 0,
+    };
+  }
+
+  // STEP 2: Calculate total dividends in period
+  // Prefer EUR-converted amounts for multi-currency consistency
+  const totalGross = periodDividends.reduce((sum, div) =>
+    sum + (div.grossAmountEur ?? div.grossAmount), 0
+  );
+  const totalNet = periodDividends.reduce((sum, div) =>
+    sum + (div.netAmountEur ?? div.netAmount), 0
+  );
+
+  // STEP 3: Annualize dividends based on period length
+  // This allows meaningful comparison between different time periods
+  let annualizedGross: number;
+  let annualizedNet: number;
+
+  if (numberOfMonths >= 12) {
+    // For multi-year periods: calculate average annual dividends
+    const years = numberOfMonths / 12;
+    annualizedGross = totalGross / years;
+    annualizedNet = totalNet / years;
+  } else if (numberOfMonths > 0) {
+    // For periods < 1 year: scale up to annual rate
+    annualizedGross = (totalGross / numberOfMonths) * 12;
+    annualizedNet = (totalNet / numberOfMonths) * 12;
+  } else {
+    // Edge case: invalid period (zero months)
+    return {
+      yocGross: null,
+      yocNet: null,
+      yocDividendsGross: totalGross,
+      yocDividendsNet: totalNet,
+      yocCostBasis: 0,
+      yocAssetCount: 0,
+    };
+  }
+
+  // STEP 4: Calculate cost basis for assets that paid dividends in this period
+  // Only include assets currently owned (quantity > 0) with known cost basis
+  const assetIdsWithDividends = new Set(periodDividends.map(d => d.assetId));
+  const assetsMap = new Map(assets.map(a => [a.id, a]));
+
+  let costBasis = 0;
+  let assetCount = 0;
+
+  assetIdsWithDividends.forEach(assetId => {
+    const asset = assetsMap.get(assetId);
+    // Include only assets that:
+    // 1. Still exist in portfolio
+    // 2. Have valid average cost
+    // 3. Have positive quantity (currently owned)
+    if (asset && asset.averageCost && asset.averageCost > 0 && asset.quantity > 0) {
+      costBasis += asset.quantity * asset.averageCost;
+      assetCount++;
+    }
+  });
+
+  // STEP 5: Calculate YOC percentages
+  // Return null if no valid cost basis (prevents division by zero)
+  if (costBasis === 0) {
+    return {
+      yocGross: null,
+      yocNet: null,
+      yocDividendsGross: totalGross,
+      yocDividendsNet: totalNet,
+      yocCostBasis: 0,
+      yocAssetCount: 0,
+    };
+  }
+
+  // Calculate YOC as percentage
+  // YOC = (Annualized Dividends / Cost Basis) × 100
+  return {
+    yocGross: (annualizedGross / costBasis) * 100,
+    yocNet: (annualizedNet / costBasis) * 100,
+    yocDividendsGross: totalGross,
+    yocDividendsNet: totalNet,
+    yocCostBasis: costBasis,
+    yocAssetCount: assetCount,
+  };
+}
+
+/**
+ * Calculate Current Yield metrics for a period
+ *
+ * Current Yield measures annualized dividend yield based on current market value.
+ * Unlike YOC (which uses original cost basis), Current Yield shows the yield
+ * an investor would receive TODAY if purchasing the assets at current prices.
+ *
+ * ANNUALIZATION STRATEGY (same as YOC):
+ * - Periods < 12 months: Scale up to annual rate (totalDividends / months × 12)
+ * - Periods >= 12 months: Average annual dividends (totalDividends / years)
+ * - This ensures comparability across different time periods
+ *
+ * FORMULA:
+ * Current Yield% = (Annualized Dividends / Current Portfolio Value) × 100
+ *
+ * Where:
+ * - Annualized Dividends = Dividends adjusted to annual rate
+ * - Current Portfolio Value = Sum of (quantity × currentPrice) for dividend-paying assets
+ *
+ * FILTERING (consistent with YOC):
+ * - Dividends filtered by payment date (when money actually received)
+ * - endDate CAPPED AT TODAY to exclude future dividends
+ * - Only assets with quantity > 0 that paid dividends in period
+ * - Multi-currency dividends use EUR conversion if available
+ *
+ * COMPARISON WITH YOC:
+ * - Current Yield > YOC: Price increased more than dividend growth
+ * - Current Yield < YOC: Dividends grew or price decreased (good for long-term holders)
+ * - Current Yield = YOC: Proportional growth in both price and dividends
+ *
+ * @param dividends - All user dividends (filtered by period internally)
+ * @param assets - All user assets (for current price calculation)
+ * @param startDate - Period start date (inclusive)
+ * @param endDate - Period end date (inclusive, MUST be capped at today)
+ * @param numberOfMonths - Duration in months (for annualization)
+ * @returns Object with Current Yield metrics or null if insufficient data
+ */
+export function calculateCurrentYieldMetrics(
+  dividends: any[],
+  assets: any[],
+  startDate: Date,
+  endDate: Date,
+  numberOfMonths: number
+): {
+  currentYield: number | null;
+  currentYieldNet: number | null;
+  currentYieldDividends: number;
+  currentYieldDividendsNet: number;
+  currentYieldPortfolioValue: number;
+  currentYieldAssetCount: number;
+} {
+  // STEP 1: Filter dividends by payment date (same as YOC)
+  // Use payment date rather than ex-date because we care about when money was received
+  const periodDividends = dividends.filter(div => {
+    const paymentDate = div.paymentDate instanceof Date
+      ? div.paymentDate
+      : div.paymentDate.toDate();
+    return paymentDate >= startDate && paymentDate <= endDate;
+  });
+
+  // Early return if no dividends in period
+  if (periodDividends.length === 0) {
+    return {
+      currentYield: null,
+      currentYieldNet: null,
+      currentYieldDividends: 0,
+      currentYieldDividendsNet: 0,
+      currentYieldPortfolioValue: 0,
+      currentYieldAssetCount: 0,
+    };
+  }
+
+  // STEP 2: Calculate total dividends in period (both gross and net)
+  // Prefer EUR-converted amounts for multi-currency consistency
+  const totalGross = periodDividends.reduce((sum, div) =>
+    sum + (div.grossAmountEur ?? div.grossAmount), 0
+  );
+  const totalNet = periodDividends.reduce((sum, div) =>
+    sum + (div.netAmountEur ?? div.netAmount), 0
+  );
+
+  // STEP 3: Annualize dividends based on period length (same logic as YOC)
+  // This allows meaningful comparison between different time periods
+  let annualizedGross: number;
+  let annualizedNet: number;
+
+  if (numberOfMonths >= 12) {
+    // For multi-year periods: calculate average annual dividends
+    const years = numberOfMonths / 12;
+    annualizedGross = totalGross / years;
+    annualizedNet = totalNet / years;
+  } else if (numberOfMonths > 0) {
+    // For periods < 1 year: scale up to annual rate
+    annualizedGross = (totalGross / numberOfMonths) * 12;
+    annualizedNet = (totalNet / numberOfMonths) * 12;
+  } else {
+    // Edge case: invalid period (zero months)
+    return {
+      currentYield: null,
+      currentYieldNet: null,
+      currentYieldDividends: totalGross,
+      currentYieldDividendsNet: totalNet,
+      currentYieldPortfolioValue: 0,
+      currentYieldAssetCount: 0,
+    };
+  }
+
+  // STEP 4: Calculate current portfolio value for dividend-paying assets
+  // Only include assets currently owned (quantity > 0) with valid current price
+  const assetIdsWithDividends = new Set(periodDividends.map(d => d.assetId));
+  const assetsMap = new Map(assets.map(a => [a.id, a]));
+
+  let portfolioValue = 0;
+  let assetCount = 0;
+
+  assetIdsWithDividends.forEach(assetId => {
+    const asset = assetsMap.get(assetId);
+    // Include only assets that:
+    // 1. Still exist in portfolio
+    // 2. Have valid current price
+    // 3. Have positive quantity (currently owned)
+    if (asset && asset.currentPrice && asset.currentPrice > 0 && asset.quantity > 0) {
+      portfolioValue += asset.quantity * asset.currentPrice;
+      assetCount++;
+    }
+  });
+
+  // STEP 5: Calculate Current Yield percentages (both gross and net)
+  // Return null if no valid portfolio value (prevents division by zero)
+  if (portfolioValue === 0) {
+    return {
+      currentYield: null,
+      currentYieldNet: null,
+      currentYieldDividends: totalGross,
+      currentYieldDividendsNet: totalNet,
+      currentYieldPortfolioValue: 0,
+      currentYieldAssetCount: 0,
+    };
+  }
+
+  // Calculate Current Yield as percentage
+  // Current Yield = (Annualized Dividends / Current Portfolio Value) × 100
+  return {
+    currentYield: (annualizedGross / portfolioValue) * 100,
+    currentYieldNet: (annualizedNet / portfolioValue) * 100,
+    currentYieldDividends: totalGross,
+    currentYieldDividendsNet: totalNet,
+    currentYieldPortfolioValue: portfolioValue,
+    currentYieldAssetCount: assetCount,
+  };
+}
+
+/**
  * Calculate number of months between two dates (inclusive)
  *
  * @param date1 - End date
@@ -836,6 +1135,7 @@ export async function calculatePerformanceForPeriod(
     timePeriod,
     startDate: customStartDate || new Date(),
     endDate: customEndDate || new Date(),
+    dividendEndDate: new Date(),  // Default to now for error cases
     startNetWorth: 0,
     endNetWorth: 0,
     cashFlows: [],
@@ -860,6 +1160,18 @@ export async function calculatePerformanceForPeriod(
     totalExpenses: 0,
     totalDividendIncome: 0,
     numberOfMonths: 0,
+    yocGross: null,
+    yocNet: null,
+    yocDividendsGross: 0,
+    yocDividendsNet: 0,
+    yocCostBasis: 0,
+    yocAssetCount: 0,
+    currentYield: null,
+    currentYieldNet: null,
+    currentYieldDividends: 0,
+    currentYieldDividendsNet: 0,
+    currentYieldPortfolioValue: 0,
+    currentYieldAssetCount: 0,
     hasInsufficientData: true,
   };
 
@@ -879,6 +1191,11 @@ export async function calculatePerformanceForPeriod(
 
   const startDate = new Date(startSnapshot.year, startSnapshot.month - 1, 1);
   const endDate = new Date(endSnapshot.year, endSnapshot.month, 0, 23, 59, 59, 999); // Last day of month
+
+  // For dividend calculations, cap at today to exclude future dividends not yet received
+  const now = new Date();
+  const dividendEndDate = endDate > now ? now : endDate;
+
   const numberOfMonths = calculateMonthsDifference(endDate, startDate);
 
   // Get cash flows for period - use pre-fetched if available, otherwise fetch
@@ -946,10 +1263,33 @@ export async function calculatePerformanceForPeriod(
     ? calculateSharpeRatio(timeWeightedReturn, riskFreeRate, volatility)
     : null;
 
+  // YOC metrics are calculated server-side via API route
+  // These fields are populated by the client after fetching from /api/performance/yoc
+  const yocMetrics = {
+    yocGross: null as number | null,
+    yocNet: null as number | null,
+    yocDividendsGross: 0,
+    yocDividendsNet: 0,
+    yocCostBasis: 0,
+    yocAssetCount: 0,
+  };
+
+  // Current Yield metrics are calculated server-side via API route
+  // These fields are populated by the client after fetching from /api/performance/current-yield
+  const currentYieldMetrics = {
+    currentYield: null as number | null,
+    currentYieldNet: null as number | null,
+    currentYieldDividends: 0,
+    currentYieldDividendsNet: 0,
+    currentYieldPortfolioValue: 0,
+    currentYieldAssetCount: 0,
+  };
+
   return {
     timePeriod,
     startDate,
     endDate,
+    dividendEndDate,
     startNetWorth: startSnapshot.totalNetWorth,
     endNetWorth: endSnapshot.totalNetWorth,
     cashFlows,
@@ -974,6 +1314,8 @@ export async function calculatePerformanceForPeriod(
     totalExpenses,
     totalDividendIncome,
     numberOfMonths,
+    ...yocMetrics,  // Spread YOC fields (will be populated by client via API)
+    ...currentYieldMetrics,  // Spread Current Yield fields (will be populated by client via API)
     hasInsufficientData: false,
   };
 }

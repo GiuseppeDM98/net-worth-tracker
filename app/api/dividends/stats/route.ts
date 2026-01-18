@@ -133,6 +133,8 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => a.month.localeCompare(b.month));
 
     // Calculate average yield based on TTM (Trailing Twelve Months) dividends
+    // DEPRECATED: Moved to Performance page as Current Yield (uses selected period, not fixed TTM)
+    // Kept for backward compatibility - do not remove until all dependencies are verified
     let averageYield = 0;
 
     // 1. Calculate date 12 months ago

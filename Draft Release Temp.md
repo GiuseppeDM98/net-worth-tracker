@@ -2,6 +2,31 @@
 
 ### Features
 
+- **Current Yield Metrics (Gross & Net)**: Comprehensive dividend yield analysis based on current market value
+  - **Dual metrics**: Current Yield Lordo (gross) and Current Yield Netto (net, after-tax) for complete dividend yield visibility
+  - **Market-based calculation**: Formula uses current portfolio value instead of original cost basis (unlike YOC)
+  - **Period-aware annualization**: All timeframes (YTD, 1Y, 3Y, 5Y, All Time, Custom) use annualized dividends for fair comparison across periods
+  - **Annualization logic**: Periods < 12 months scale up (e.g., 6 months → ×2), periods ≥ 12 months use average annual rate
+  - **Dynamic YOC comparison**: Automatic tooltip comparison between Current Yield and YOC metrics (Gross vs Gross, Net vs Net)
+  - **Performance page integration**: Four-card Row 4 layout - YOC Lordo | YOC Netto | Current Yield Lordo | Current Yield Netto
+  - **Detailed card info**: Each card displays total dividends (gross/net), current portfolio value, and number of assets included
+  - **Educational content**: Comprehensive methodology notes with formulas, real examples (€9,500 portfolio example), and interpretation guidance
+  - **Investment insights**: Shows if dividends grew faster than stock price (CY < YOC = good for early investors) or vice versa (CY > YOC = capital appreciation)
+  - **Removed from Cashflow**: "Yield Medio" card removed from dividend stats (consolidated in Performance page for better discoverability)
+  - **API architecture**: Server-side `/api/performance/current-yield` endpoint using Firebase Admin SDK for optimal data access
+
+- **Savings vs Investment Growth Chart**: New visualization in History page breaking down net worth growth into controllable vs external factors
+  - **Dual component breakdown**: Stacked bars showing Net Savings (green) from your income/expenses + Investment Growth (blue/red) from market performance
+  - **Annual granularity**: Year-by-year comparison for clear long-term trends without monthly noise
+  - **Conditional coloring**: Blue bars for positive market gains, red bars for market losses - immediate visual recognition
+  - **Total visibility**: Stacked bar height always equals total net worth growth, showing exact composition
+  - **Resilience insight**: See how your savings habit protected wealth during market downturns (e.g., +€10k savings offsetting -€2k market loss = +€8k growth)
+  - **Performance attribution**: Understand whether growth came from your discipline (savings) or external luck (markets)
+  - **Smart filtering**: Only displays years with both snapshots and cashflow data for accurate calculations
+  - **Responsive design**: Adapts to mobile (280px), landscape (300px), and desktop (400px) with hidden legends on small screens
+  - **Italian timezone handling**: All calculations use Europe/Rome timezone for consistency across client and server
+  - **Empty state handling**: Clear message when insufficient data (need snapshots + expenses per year)
+
 - **Monthly Calendar View for Dividends**: Visual overview of dividend payment schedules with interactive date exploration
   - **Calendar grid**: 6 weeks × 7 days grid (Monday start) displaying payment dates with Italian locale (month names, day abbreviations)
   - **Payment date display**: Each date shows dividend info - single dividend displays ticker + net amount, multiple dividends show badge with count + total sum
@@ -135,13 +160,18 @@
   - **Educational methodology**: Comprehensive explanation in "Note Metodologiche" covering TWR adjustment, peak tracking, and interpretation
   - **Responsive heights**: Adapts to device (400px desktop, 280px mobile, 300px landscape) for optimal viewing
 
-- Added **Yield on Cost (YOC) analysis** to dividends dashboard
-  - Portfolio-level YOC metric card showing return on original investment cost
-  - Detailed per-asset comparison table with 8 columns: asset details, quantity, average cost, current price, TTM dividends, YOC %, current yield %, and difference
-  - Highlights dividend growth over time by comparing cost-based yield vs market-based yield
-  - Automatic sorting by YOC percentage (highest performers first)
-  - Portfolio totals footer in comparison table
-  - Only displays for assets with configured cost basis and TTM dividends
+- **Yield on Cost (YOC) Metrics in Performance Page**: Comprehensive dividend yield analysis based on original cost basis
+  - **YOC Lordo and YOC Netto cards**: Two dedicated metrics showing gross and net (after-tax) dividend yield on cost
+  - **Annualized calculations**: All time frames (YTD, 1Y, 3Y, 5Y, All Time, Custom) use annualized dividends for cross-period comparability
+  - **Annualization logic**: Periods < 12 months scale up (e.g., 6 months → ×2), periods ≥ 12 months use average annual rate
+  - **Smart cost basis**: Only includes assets currently held (quantity > 0) with known average cost, excluding sold positions
+  - **Detailed insights**: Each card shows total dividends, total cost basis, and number of assets included in calculation
+  - **Educational tooltips**: Comprehensive explanations with practical examples, formula breakdown, and interpretation guidance
+  - **Conditional display**: Row 4 "Metriche Dividendi" appears only when YOC data is available (null when no dividends or no cost basis)
+  - **Note Metodologiche section**: Extended educational content explaining YOC concept, calculation, interpretation, when it's good (>5-7%), and limitations
+  - **Removed from dividends page**: YOC analysis consolidated in Performance page to avoid duplication and improve discoverability
+  - **API architecture**: Server-side `/api/performance/yoc` endpoint using Firebase Admin SDK for optimal data access
+  - **Performance optimized**: 5 parallel API calls for all time periods (YTD, 1Y, 3Y, 5Y, ALL) load in ~500-800ms total
 
 ### User Experience Enhancements
 
@@ -189,6 +219,13 @@
   - **Exchange rate visibility**: Users can see conversion rate used in dividend details
 
 ### Documentation
+
+- **YOC Educational Content**: Enhanced methodology notes explaining annualized dividends concept
+  - **What are Annualized Dividends**: Detailed explanation of conversion to annual rate for period comparability
+  - **Period-specific calculations**: < 12 months (scaling up), ≥ 12 months (average annual)
+  - **Real portfolio example**: Concrete calculation with €174.62 dividends over 5 months → €419/year → 6.76% YOC
+  - **Comparison with Current Yield**: Clarification of cost basis vs current market value
+  - **User benefit**: Better understanding of YOC metric and investment performance
 
 - **CLAUDE.md Updates**: Comprehensive documentation of ETF dividend tracking and currency conversion
   - Updated Dividend Tracking section (section 6) with ETF support, currency conversion service, dual URL routing
@@ -282,6 +319,13 @@
   - Helps users understand the metric is independent from selected period filters
 
 ## 🐛 Bug Fixes
+
+- **YOC Future Dividends**: Fixed YOC metrics incorrectly including future dividends not yet received
+  - **Issue**: Dividends with payment dates between today and end-of-month were counted as "received", artificially inflating YOC values
+  - **Impact**: YOC metrics showed higher values than actual (e.g., on Jan 17, dividends scheduled for Jan 18-31 were included)
+  - **Fix**: Added separate `dividendEndDate` parameter capped at today for dividend filtering while maintaining original `endDate` for other metrics
+  - **Result**: YOC now accurately reflects only received dividends, excluding scheduled future payments
+  - **User benefit**: More accurate portfolio yield analysis for investment decision-making
 
 - **Dividend Date Filtering**: Fixed date range filter using ex-dividend date instead of payment date
   - **Issue**: Calendar showed dividends by payment date, but filters used ex-date, causing filtered calendar to appear empty after clicking a date

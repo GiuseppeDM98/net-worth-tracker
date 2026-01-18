@@ -72,12 +72,38 @@ When implementing calendar views for dividends:
 - Use `paymentDate` for date range filters (not `exDate`)
 - Users care about cash arrival dates, not technical ex-dividend dates
 
+### YOC (Yield on Cost) and Current Yield Calculation Pattern
+When implementing dividend yield metrics (YOC, Current Yield):
+- **Annualization**: < 12 months scale up `(dividends / months) × 12`, >= 12 months average `dividends / (months / 12)`
+- **YOC cost basis**: Only include assets with `quantity > 0` and `averageCost > 0` (excludes sold assets)
+- **Current Yield portfolio value**: Only include assets with `quantity > 0` and `currentPrice > 0` that paid dividends
+- **Currency**: Prefer `grossAmountEur ?? grossAmount` for multi-currency portfolios
+- **Filter dividends**: Use `paymentDate` not `exDate` (consistent with calendar)
+- **Architecture**: Use API route pattern due to server-only dividend service constraints
+- **Difference**: YOC uses `quantity × averageCost` (original cost), Current Yield uses `quantity × currentPrice` (market value)
+
+### Time-Sensitive Metrics Pattern
+When implementing metrics requiring "as of today" data filtering:
+- **Separate date parameters**: Use dedicated `*EndDate` field capped at TODAY, don't modify global `endDate`
+- **Example**: YOC uses `dividendEndDate = min(endDate, today)` while other metrics use original `endDate`
+- **Rationale**: Snapshot-based metrics (ROI, CAGR, TWR) need end-of-period dates; dividend metrics need actual received data
+- **Architecture**: Add to type interface, calculate in service, pass through API, document in JSDoc
+- **Zero regression**: Keeps existing metrics unchanged while adding time-aware filtering
+
 ### Table Totals Row Pattern
 For filtered tables showing totals:
 - Use `<TableFooter>` (not `<TableBody>`) for semantic HTML
 - Calculate totals on **all filtered data**, not just current page
 - Use optional props with defaults: `showTotals?: boolean = false`
 - Always use EUR amounts for multi-currency totals (`netAmountEur ?? netAmount`)
+
+### Expense Amount Sign Convention
+When working with expense data for calculations (cashflow, savings, etc.):
+- **Income**: Stored as POSITIVE values in database
+- **Expenses**: Stored as NEGATIVE values in database
+- **Net Savings formula**: `sum(income) + sum(expenses)` (NOT `income - expenses`)
+- **Why**: Simplifies aggregation, consistent across app (see TotalHistoryTab.tsx)
+- **Example**: Income €1000 + Expense -€400 = Net €600
 
 ---
 
@@ -87,6 +113,27 @@ When implementing dialogs in conditionally rendered components:
 - Avoid auto-switching parent view modes that unmount the dialog's parent
 - Example: Calendar click should NOT auto-switch to table if dialog is in calendar component
 - Solution: Keep dialog state in parent, or avoid unmounting during interaction
+
+### Server-Only Module Constraints (Firebase)
+When implementing features requiring Firebase data access:
+- **Pattern**: Client Components cannot import modules with `'server-only'` directive
+- **Symptom**: Build error: "'server-only' cannot be imported from a Client Component module"
+- **Root cause**: `dividendService.ts` and similar files use Firebase Admin SDK (server-only)
+- **Solution**: Create API route for server-side operations
+```typescript
+// ✅ CORRECT - API route with Admin SDK
+// app/api/performance/yoc/route.ts
+import { adminDb } from '@/lib/firebase/admin';
+async function getUserAssetsAdmin(userId: string): Promise<Asset[]> {
+  const querySnapshot = await adminDb
+    .collection('assets')
+    .where('userId', '==', userId)
+    .get();
+  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+```
+- **Client-side**: Fetch from API instead of direct service import
+- **Performance**: Use `Promise.all` to parallelize multiple API calls
 
 ---
 
@@ -144,8 +191,11 @@ const { month, year } = getItalyMonthYear();
 - Formatters: `lib/utils/formatters.ts`
 - Asset history utils: `lib/utils/assetPriceHistoryUtils.ts`
 - Performance service: `lib/services/performanceService.ts`
+- Performance types: `types/performance.ts`
+- YOC API route: `app/api/performance/yoc/route.ts`
 - Currency conversion: `lib/services/currencyConversionService.ts`
 - Query keys: `lib/query/queryKeys.ts`
 - Cashflow charts: `components/cashflow/TotalHistoryTab.tsx`, `components/cashflow/CurrentYearTab.tsx`
+- History charts: `app/dashboard/history/page.tsx`, `lib/services/chartService.ts`
 
-**Last updated**: 2026-01-16
+**Last updated**: 2026-01-18

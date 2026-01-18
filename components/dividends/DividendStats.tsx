@@ -1,20 +1,21 @@
 /**
- * Dividend statistics dashboard with Yield on Cost (YOC) analysis
+ * Dividend statistics dashboard
  *
  * Features:
- * - Metric cards: Total dividends, average, top payer
+ * - Metric cards: Total dividends, average, top payer, upcoming dividends
  * - Charts: By asset, by type, monthly trend
- * - YOC Table: Per-asset TTM yield on cost calculation
  *
  * Data Source: /api/dividends/stats with optional date range
  * Conditional Rendering: Cards/charts only show when data exists
+ *
+ * Note: YOC (Yield on Cost) metrics have been moved to the Performance page
  */
 'use client';
 
 import { useEffect, useState} from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, TrendingUp, TrendingDown, Percent, Calendar } from 'lucide-react';
+import { DollarSign, TrendingDown, Percent, Calendar } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { formatCurrencyCompact } from '@/lib/services/chartService';
 import {
@@ -147,7 +148,7 @@ export function DividendStats({ startDate, endDate }: DividendStatsProps) {
   return (
     <div className="space-y-6">
       {/* Metric Cards Row 1: Period Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Dividendi Ricevuti (Netto)</CardTitle>
@@ -187,48 +188,6 @@ export function DividendStats({ startDate, endDate }: DividendStatsProps) {
             </p>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Yield Medio</CardTitle>
-            <Percent className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
-              {stats.averageYield > 0 ? `${stats.averageYield.toFixed(2)}%` : 'N/A'}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Yield ponderato del portafoglio
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {stats.period.count} dividendi nel periodo
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* YOC Card - Only show if data exists */}
-        {stats.portfolioYieldOnCost !== undefined && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Yield on Cost</CardTitle>
-              <TrendingUp className="h-4 w-4 text-emerald-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-emerald-600">
-                {stats.portfolioYieldOnCost.toFixed(2)}%
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Rendimento sul costo originale
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Base costi: {formatCurrency(stats.totalCostBasis || 0)}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1 italic">
-                Dividendi lordi TTM (12 mesi)
-              </p>
-            </CardContent>
-          </Card>
-        )}
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -383,114 +342,6 @@ export function DividendStats({ startDate, endDate }: DividendStatsProps) {
                   </div>
                 </div>
               ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Yield on Cost Table - Only show if data exists */}
-      {stats.yieldOnCostAssets && stats.yieldOnCostAssets.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Yield on Cost per Asset</CardTitle>
-            <p className="text-sm text-muted-foreground mt-2">
-              Confronto tra rendimento sul costo originale (YOC) e rendimento corrente,
-              basato su <strong>dividendi lordi TTM (ultimi 12 mesi)</strong>.
-              Una differenza positiva indica crescita dei dividendi.
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-3 font-semibold text-sm">Asset</th>
-                    <th className="text-right p-3 font-semibold text-sm">Quantità</th>
-                    <th className="text-right p-3 font-semibold text-sm">Costo Medio</th>
-                    <th className="text-right p-3 font-semibold text-sm">Prezzo Corrente</th>
-                    <th className="text-right p-3 font-semibold text-sm">Dividendi TTM</th>
-                    <th className="text-right p-3 font-semibold text-sm">YOC %</th>
-                    <th className="text-right p-3 font-semibold text-sm">Yield Corrente %</th>
-                    <th className="text-right p-3 font-semibold text-sm">Differenza</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats.yieldOnCostAssets.map((asset) => (
-                    <tr key={asset.assetId} className="border-b hover:bg-gray-50">
-                      <td className="p-3">
-                        <div>
-                          <p className="font-medium">{asset.assetTicker}</p>
-                          <p className="text-xs text-muted-foreground">{asset.assetName}</p>
-                        </div>
-                      </td>
-                      <td className="text-right p-3">{asset.quantity.toLocaleString('it-IT')}</td>
-                      <td className="text-right p-3">{formatCurrency(asset.averageCost)}</td>
-                      <td className="text-right p-3">{formatCurrency(asset.currentPrice)}</td>
-                      <td className="text-right p-3 font-medium text-green-600">
-                        {formatCurrency(asset.ttmGrossDividends)}
-                      </td>
-                      <td className="text-right p-3">
-                        <span className="font-semibold text-emerald-600">
-                          {asset.yocPercentage.toFixed(2)}%
-                        </span>
-                      </td>
-                      <td className="text-right p-3">
-                        <span className="font-semibold text-blue-600">
-                          {asset.currentYieldPercentage.toFixed(2)}%
-                        </span>
-                      </td>
-                      <td className="text-right p-3">
-                        <span
-                          className={`font-semibold ${
-                            asset.difference > 0
-                              ? 'text-green-600'
-                              : asset.difference < 0
-                              ? 'text-red-600'
-                              : 'text-gray-600'
-                          }`}
-                        >
-                          {asset.difference > 0 ? '+' : ''}
-                          {asset.difference.toFixed(2)}%
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t-2 font-semibold bg-gray-50">
-                    <td className="p-3" colSpan={4}>Portfolio Totale</td>
-                    <td className="text-right p-3 text-green-600">
-                      {formatCurrency(
-                        stats.yieldOnCostAssets.reduce((sum, a) => sum + a.ttmGrossDividends, 0)
-                      )}
-                    </td>
-                    <td className="text-right p-3 text-emerald-600">
-                      {stats.portfolioYieldOnCost?.toFixed(2)}%
-                    </td>
-                    <td className="text-right p-3 text-blue-600">
-                      {stats.averageYield > 0 ? `${stats.averageYield.toFixed(2)}%` : 'N/A'}
-                    </td>
-                    <td className="text-right p-3">
-                      {stats.portfolioYieldOnCost !== undefined && stats.averageYield > 0 ? (
-                        <span
-                          className={`font-semibold ${
-                            stats.portfolioYieldOnCost - stats.averageYield > 0
-                              ? 'text-green-600'
-                              : stats.portfolioYieldOnCost - stats.averageYield < 0
-                              ? 'text-red-600'
-                              : 'text-gray-600'
-                          }`}
-                        >
-                          {stats.portfolioYieldOnCost - stats.averageYield > 0 ? '+' : ''}
-                          {(stats.portfolioYieldOnCost - stats.averageYield).toFixed(2)}%
-                        </span>
-                      ) : (
-                        'N/A'
-                      )}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
             </div>
           </CardContent>
         </Card>

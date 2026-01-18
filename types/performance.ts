@@ -32,6 +32,7 @@ export interface PerformanceMetrics {
   timePeriod: TimePeriod;
   startDate: Date;
   endDate: Date;
+  dividendEndDate: Date;  // End date capped at today for dividend calculations
   startNetWorth: number;
   endNetWorth: number;
   cashFlows: CashFlowData[];
@@ -63,6 +64,28 @@ export interface PerformanceMetrics {
   totalExpenses: number;             // Sum of all expenses in period
   totalDividendIncome: number;       // Sum of all dividend income (rendimento portafoglio)
   numberOfMonths: number;            // Number of months in period
+
+  // Yield on Cost (YOC) Metrics
+  // YOC measures annualized dividend yield based on original cost basis (not current market value)
+  // Formula: YOC% = (Annualized Dividends / Cost Basis) × 100
+  // Annualization ensures comparability across different time periods
+  yocGross: number | null;           // YOC based on gross dividends
+  yocNet: number | null;             // YOC based on net dividends (after tax)
+  yocDividendsGross: number;         // Total gross dividends in period (not annualized)
+  yocDividendsNet: number;           // Total net dividends in period (not annualized)
+  yocCostBasis: number;              // Total cost basis of dividend-paying assets
+  yocAssetCount: number;             // Number of assets with dividends + cost basis
+
+  // Current Yield Metrics
+  // Current Yield measures annualized dividend yield based on current market value
+  // Formula: CY% = (Annualized Dividends / Current Portfolio Value) × 100
+  // Unlike YOC (which uses cost basis), CY uses current market prices
+  currentYield: number | null;              // Current yield percentage (gross)
+  currentYieldNet: number | null;           // Current yield percentage (net, after tax)
+  currentYieldDividends: number;            // Total gross dividends in period (not annualized)
+  currentYieldDividendsNet: number;         // Total net dividends in period (not annualized)
+  currentYieldPortfolioValue: number;       // Current market value of dividend-paying assets
+  currentYieldAssetCount: number;           // Number of assets with dividends
 
   // Data availability flags
   hasInsufficientData: boolean;      // Less than 2 snapshots
