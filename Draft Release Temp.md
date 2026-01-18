@@ -27,6 +27,23 @@
   - **Italian timezone handling**: All calculations use Europe/Rome timezone for consistency across client and server
   - **Empty state handling**: Clear message when insufficient data (need snapshots + expenses per year)
 
+- **Cashflow Sankey Diagram with Expense Types Layer**: Interactive budget flow visualization showing income-to-expense hierarchy with intelligent drill-down
+  - **4-layer structure**: Income Categories → Budget → Expense Types → Expense Categories + Savings
+  - **Expense type grouping**: Three expense types displayed as intermediate layer - Spese Fisse (blue), Variabili (violet), Debiti (amber) - matching pie chart colors
+  - **Interactive drill-down**: Click expense type to view categories for that type, click category to view subcategories
+  - **Dual drill-down modes**: Type-to-categories drill-down shows categories grouped by expense type, category-to-subcategories shows transaction details
+  - **Budget node**: Central node displaying total income with direct flow to expense types and savings
+  - **Savings calculation**: Automatic calculation (income - expenses) shown only when positive, connects directly from Budget
+  - **Color consistency**: Expense type colors match "Spese per Tipo" pie chart for visual recognition across app
+  - **Derived colors**: Category and subcategory colors automatically derived from parent (type or category) using brightness variations
+  - **Mobile optimization**: Aggressive filtering on mobile (top 3 categories per type) prevents overcrowding, labels positioned inside nodes
+  - **Desktop experience**: Full data display with labels outside nodes, gradients enabled, 500px height for comfortable viewing
+  - **Responsive tooltips**: Show amount, percentage of total, and "Click per dettagli" hint for interactive nodes
+  - **Back navigation**: Back button in card header during drill-down returns to budget view
+  - **Separate charts**: "Flusso Cashflow Anno Corrente" and "Flusso Cashflow Storico" with automatic 2025+ filtering for historical view
+  - **Empty state handling**: Chart hidden when no data available with clear message
+  - **Zero horizontal scroll**: Proper margin configuration prevents mobile overflow
+
 - **Monthly Calendar View for Dividends**: Visual overview of dividend payment schedules with interactive date exploration
   - **Calendar grid**: 6 weeks × 7 days grid (Monday start) displaying payment dates with Italian locale (month names, day abbreviations)
   - **Payment date display**: Each date shows dividend info - single dividend displays ticker + net amount, multiple dividends show badge with count + total sum
