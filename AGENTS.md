@@ -105,6 +105,17 @@ When working with expense data for calculations (cashflow, savings, etc.):
 - **Why**: Simplifies aggregation, consistent across app (see TotalHistoryTab.tsx)
 - **Example**: Income €1000 + Expense -€400 = Net €600
 
+### Sankey Diagram Multi-Layer Pattern
+When implementing complex data flow visualizations:
+- **4-layer structure**: Income → Budget → Types → Categories + Savings
+- **Multi-mode drill-down**: Support multiple drill-down modes (type→categories, category→subcategories)
+- **State management**: Use `mode` field in state to distinguish between drill-down types
+- **Color derivation**: Use `deriveSubcategoryColors()` for child node colors from parent
+- **Mobile filtering**: Apply aggressive filtering (top 3-4 per parent) to prevent overcrowding
+- **Type detection**: Check node ID against known type labels for click routing
+- **Empty state**: Always handle empty data gracefully (no nodes/links = don't render)
+- **Example**: CashflowSankeyChart with 3 modes (budget, type drill-down, category drill-down)
+
 ---
 
 ### Component Unmounting & Dialog State
@@ -196,6 +207,7 @@ const { month, year } = getItalyMonthYear();
 - Currency conversion: `lib/services/currencyConversionService.ts`
 - Query keys: `lib/query/queryKeys.ts`
 - Cashflow charts: `components/cashflow/TotalHistoryTab.tsx`, `components/cashflow/CurrentYearTab.tsx`
+- Sankey diagram: `components/cashflow/CashflowSankeyChart.tsx`
 - History charts: `app/dashboard/history/page.tsx`, `lib/services/chartService.ts`
 
 **Last updated**: 2026-01-18

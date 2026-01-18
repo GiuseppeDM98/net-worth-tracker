@@ -34,6 +34,7 @@ import {
 } from 'recharts';
 import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
 import { getItalyMonthYear, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
+import { CashflowSankeyChart } from '@/components/cashflow/CashflowSankeyChart';
 
 const COLORS = [
   '#3b82f6', // blue
@@ -561,10 +562,10 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
       </div>
 
       {/* Charts Grid */}
-      <div className="grid gap-6">
+      <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
         {/* Monthly Trend */}
         {monthlyTrendData.length > 0 && (
-          <Card>
+          <Card className="md:col-span-2">
             <CardHeader>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <CardTitle>Trend Mensile</CardTitle>
@@ -639,7 +640,7 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
 
         {/* Yearly Trend */}
         {yearlyTrendData.length > 0 && (
-          <Card>
+          <Card className="md:col-span-2">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Trend Annuale</CardTitle>
@@ -703,7 +704,7 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
 
         {/* Yearly Income/Expense Ratio */}
         {yearlyIncomeExpenseRatioData.length > 0 && (
-          <Card>
+          <Card className="md:col-span-2">
             <CardHeader>
               <CardTitle>Rapporto Entrate/Spese Annuale</CardTitle>
             </CardHeader>
@@ -766,7 +767,7 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
 
         {/* Monthly Trend - Expenses by Type */}
         {monthlyExpensesByType.length > 0 && (
-          <Card>
+          <Card className="md:col-span-2">
             <CardHeader>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <CardTitle>Trend Mensile Spese per Tipo</CardTitle>
@@ -807,7 +808,7 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
 
         {/* Yearly Trend - Expenses by Type */}
         {yearlyExpensesByType.length > 0 && (
-          <Card>
+          <Card className="md:col-span-2">
             <CardHeader>
               <CardTitle>Trend Annuale Spese per Tipo</CardTitle>
             </CardHeader>
@@ -837,7 +838,7 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
 
         {/* Monthly Trend - Expenses by Category */}
         {monthlyExpensesByCategory.data.length > 0 && (
-          <Card>
+          <Card className="md:col-span-2">
             <CardHeader>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <CardTitle>Trend Mensile Spese per Categoria (Top 5)</CardTitle>
@@ -884,7 +885,7 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
 
         {/* Yearly Trend - Expenses by Category */}
         {yearlyExpensesByCategory.data.length > 0 && (
-          <Card>
+          <Card className="md:col-span-2">
             <CardHeader>
               <CardTitle>Trend Annuale Spese per Categoria (Top 5)</CardTitle>
             </CardHeader>
@@ -920,7 +921,7 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
 
         {/* Monthly Trend - Income by Category */}
         {monthlyIncomeByCategory.data.length > 0 && (
-          <Card>
+          <Card className="md:col-span-2">
             <CardHeader>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <CardTitle>Trend Mensile Entrate per Categoria (Top 5)</CardTitle>
@@ -967,7 +968,7 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
 
         {/* Yearly Trend - Income by Category */}
         {yearlyIncomeByCategory.data.length > 0 && (
-          <Card>
+          <Card className="md:col-span-2">
             <CardHeader>
               <CardTitle>Trend Annuale Entrate per Categoria (Top 5)</CardTitle>
             </CardHeader>
@@ -999,6 +1000,15 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
               </ResponsiveContainer>
             </CardContent>
           </Card>
+        )}
+
+        {/* Sankey Flow Diagram - Budget View */}
+        {expensesFrom2025.length > 0 && (
+          <CashflowSankeyChart
+            expenses={expensesFrom2025}
+            isMobile={isMobile}
+            title="Flusso Cashflow Storico"
+          />
         )}
       </div>
     </div>

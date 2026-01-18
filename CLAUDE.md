@@ -4,9 +4,9 @@
 Net Worth Tracker is a Next.js app for Italian investors to track net worth, assets, cashflow, dividends, performance metrics, and historical snapshots with Firebase.
 
 ## Current Status
-- Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz
-- Feature ultimo mese: Current Yield metrics (Lordo + Netto) in Performance page
-- Ultima implementazione: Current Yield Lordo e Netto con annualizzazione e confronto dinamico YOC (2026-01-18)
+- Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz, @nivo/sankey
+- Feature ultimo mese: Sankey diagram con expense types layer in Cashflow page
+- Ultima implementazione: 4-layer Sankey (Income → Budget → Expense Types → Categories) con drill-down interattivo per tipi e categorie (2026-01-18)
 - In corso ora: nessuna attivita attiva
 - Completamento: n/d
 
@@ -27,7 +27,12 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Key Features (Active)
 - Portfolio multi-asset con aggiornamento prezzi Yahoo Finance.
-- Cashflow con categorie, filtri e statistiche.
+- Cashflow con categorie, filtri, statistiche e Sankey diagram interattivo:
+  - Budget flow visualization: Income Categories → Budget → Expense Types → Expense Categories + Risparmi
+  - Interactive drill-down: click expense type to see categories, click category to see subcategories
+  - Expense types layer: Spese Fisse (blue), Variabili (violet), Debiti (amber) con consistenza colori vs grafici a torta
+  - Mobile optimization: top 3 categories per expense type, responsive labels (inside/outside)
+  - Separate charts per Anno Corrente e Storico Totale (filtro 2025+)
 - Snapshot mensili automatici + storico e CSV export.
 - History page con multiple chart visualizations:
   - Net Worth evolution (total, liquid, illiquid)
@@ -62,7 +67,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Conversione valuta dipende da Frankfurter API (fallback su cache, ma possibile failure prolungata).
 
 ## Next Steps (Prossime 1-2 sessioni)
-- Testing e validazione Current Yield metrics con dati reali utente.
+- Testing e validazione Sankey diagram con dati reali utente.
 - Ottimizzazioni UI/UX basate su feedback utente.
 
 ## Key Files
@@ -74,7 +79,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - YOC API route: `app/api/performance/yoc/route.ts`
 - Current Yield API route: `app/api/performance/current-yield/route.ts`
 - Performance charts: `components/performance/MonthlyReturnsHeatmap.tsx`, `components/performance/UnderwaterDrawdownChart.tsx`
-- Cashflow charts: `components/cashflow/TotalHistoryTab.tsx`, `components/cashflow/CurrentYearTab.tsx`
+- Cashflow charts: `components/cashflow/TotalHistoryTab.tsx`, `components/cashflow/CurrentYearTab.tsx`, `components/cashflow/CashflowSankeyChart.tsx`
 - Dividends UI: `components/dividends/DividendTrackingTab.tsx`, `components/dividends/DividendTable.tsx`, `components/dividends/DividendCalendar.tsx`, `components/dividends/CalendarDayCell.tsx`, `components/dividends/DividendDetailsDialog.tsx`
 - Dividends stats: `app/api/dividends/stats/route.ts`, `components/dividends/DividendStats.tsx`
 - Dividend types: `types/dividend.ts`
