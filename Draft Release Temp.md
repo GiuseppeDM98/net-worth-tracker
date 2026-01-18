@@ -2,6 +2,19 @@
 
 ### Features
 
+- **Current Yield Metrics (Gross & Net)**: Comprehensive dividend yield analysis based on current market value
+  - **Dual metrics**: Current Yield Lordo (gross) and Current Yield Netto (net, after-tax) for complete dividend yield visibility
+  - **Market-based calculation**: Formula uses current portfolio value instead of original cost basis (unlike YOC)
+  - **Period-aware annualization**: All timeframes (YTD, 1Y, 3Y, 5Y, All Time, Custom) use annualized dividends for fair comparison across periods
+  - **Annualization logic**: Periods < 12 months scale up (e.g., 6 months → ×2), periods ≥ 12 months use average annual rate
+  - **Dynamic YOC comparison**: Automatic tooltip comparison between Current Yield and YOC metrics (Gross vs Gross, Net vs Net)
+  - **Performance page integration**: Four-card Row 4 layout - YOC Lordo | YOC Netto | Current Yield Lordo | Current Yield Netto
+  - **Detailed card info**: Each card displays total dividends (gross/net), current portfolio value, and number of assets included
+  - **Educational content**: Comprehensive methodology notes with formulas, real examples (€9,500 portfolio example), and interpretation guidance
+  - **Investment insights**: Shows if dividends grew faster than stock price (CY < YOC = good for early investors) or vice versa (CY > YOC = capital appreciation)
+  - **Removed from Cashflow**: "Yield Medio" card removed from dividend stats (consolidated in Performance page for better discoverability)
+  - **API architecture**: Server-side `/api/performance/current-yield` endpoint using Firebase Admin SDK for optimal data access
+
 - **Savings vs Investment Growth Chart**: New visualization in History page breaking down net worth growth into controllable vs external factors
   - **Dual component breakdown**: Stacked bars showing Net Savings (green) from your income/expenses + Investment Growth (blue/red) from market performance
   - **Annual granularity**: Year-by-year comparison for clear long-term trends without monthly noise

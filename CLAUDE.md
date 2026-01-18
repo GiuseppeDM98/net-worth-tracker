@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz
-- Feature ultimo mese: Savings vs Investment Growth chart in History page per analizzare contributo risparmi vs mercato
-- Ultima implementazione: Stacked bar chart annuale che separa Net Savings (cashflow) da Investment Growth (market performance) (2026-01-18)
+- Feature ultimo mese: Current Yield metrics (Lordo + Netto) in Performance page
+- Ultima implementazione: Current Yield Lordo e Netto con annualizzazione e confronto dinamico YOC (2026-01-18)
 - In corso ora: nessuna attivita attiva
 - Completamento: n/d
 
@@ -38,9 +38,11 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - Current vs Target allocation comparison
 - Performance metrics (ROI, CAGR, TWR, IRR, Sharpe, drawdown suite) con heatmap rendimenti mensili, grafico underwater e rolling CAGR/Sharpe con medie mobili.
   - Yield on Cost (YOC): Metriche YOC Lordo e Netto nella Performance page con annualizzazione per confrontabilità tra periodi (YTD, 1Y, 3Y, 5Y, ALL, CUSTOM)
-  - Row 4 dedicata "Metriche Dividendi" con conditional rendering (visibile solo se dati disponibili)
-  - Dettagli: dividendi totali, cost basis, numero asset inclusi
-  - Sezione educativa nelle Note Metodologiche con formula, esempi concreti e interpretazione
+  - Current Yield: Metriche Current Yield Lordo e Netto basate su valore mercato attuale (vs cost basis di YOC) con stesso pattern annualizzazione
+  - Row 4 dedicata "Metriche Dividendi" con conditional rendering (visibile solo se dati disponibili): YOC Lordo, YOC Netto, Current Yield Lordo, Current Yield Netto
+  - Dettagli card: dividendi totali (gross/net), cost basis (YOC) o valore portafoglio (Current Yield), numero asset inclusi
+  - Confronto automatico in tooltip: CY Lordo vs YOC Lordo, CY Netto vs YOC Netto per analizzare crescita dividendi vs prezzo
+  - Sezione educativa nelle Note Metodologiche con formula, esempi concreti (lordo + netto), confronto YOC vs CY e interpretazione
 - Dividendi multi-currency con conversione EUR, scraping Borsa Italiana, e vista calendario mensile.
   - Calendar view: griglia 6 settimane × 7 giorni (inizio lunedì, locale italiana) con payment dates
   - Click su data: dialog con dettagli dividendi + applicazione filtri
@@ -60,9 +62,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Conversione valuta dipende da Frankfurter API (fallback su cache, ma possibile failure prolungata).
 
 ## Next Steps (Prossime 1-2 sessioni)
-- Testing e validazione Savings vs Investment chart con dati reali utente.
+- Testing e validazione Current Yield metrics con dati reali utente.
 - Ottimizzazioni UI/UX basate su feedback utente.
-- Eventuali enhancement al chart (percentage toggle, drill-down mensile).
 
 ## Key Files
 - History page: `app/dashboard/history/page.tsx`
@@ -71,6 +72,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Performance metrics: `lib/services/performanceService.ts`
 - Performance types: `types/performance.ts`
 - YOC API route: `app/api/performance/yoc/route.ts`
+- Current Yield API route: `app/api/performance/current-yield/route.ts`
 - Performance charts: `components/performance/MonthlyReturnsHeatmap.tsx`, `components/performance/UnderwaterDrawdownChart.tsx`
 - Cashflow charts: `components/cashflow/TotalHistoryTab.tsx`, `components/cashflow/CurrentYearTab.tsx`
 - Dividends UI: `components/dividends/DividendTrackingTab.tsx`, `components/dividends/DividendTable.tsx`, `components/dividends/DividendCalendar.tsx`, `components/dividends/CalendarDayCell.tsx`, `components/dividends/DividendDetailsDialog.tsx`

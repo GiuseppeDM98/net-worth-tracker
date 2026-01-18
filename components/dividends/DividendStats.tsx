@@ -148,7 +148,7 @@ export function DividendStats({ startDate, endDate }: DividendStatsProps) {
   return (
     <div className="space-y-6">
       {/* Metric Cards Row 1: Period Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Dividendi Ricevuti (Netto)</CardTitle>
@@ -185,24 +185,6 @@ export function DividendStats({ startDate, endDate }: DividendStatsProps) {
             </p>
             <p className="text-xs text-muted-foreground mt-1">
               Totale storico: {formatCurrency(stats.allTime.totalTax)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Yield Medio</CardTitle>
-            <Percent className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
-              {stats.averageYield > 0 ? `${stats.averageYield.toFixed(2)}%` : 'N/A'}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Yield ponderato del portafoglio
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {stats.period.count} dividendi nel periodo
             </p>
           </CardContent>
         </Card>

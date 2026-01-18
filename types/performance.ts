@@ -76,6 +76,17 @@ export interface PerformanceMetrics {
   yocCostBasis: number;              // Total cost basis of dividend-paying assets
   yocAssetCount: number;             // Number of assets with dividends + cost basis
 
+  // Current Yield Metrics
+  // Current Yield measures annualized dividend yield based on current market value
+  // Formula: CY% = (Annualized Dividends / Current Portfolio Value) × 100
+  // Unlike YOC (which uses cost basis), CY uses current market prices
+  currentYield: number | null;              // Current yield percentage (gross)
+  currentYieldNet: number | null;           // Current yield percentage (net, after tax)
+  currentYieldDividends: number;            // Total gross dividends in period (not annualized)
+  currentYieldDividendsNet: number;         // Total net dividends in period (not annualized)
+  currentYieldPortfolioValue: number;       // Current market value of dividend-paying assets
+  currentYieldAssetCount: number;           // Number of assets with dividends
+
   // Data availability flags
   hasInsufficientData: boolean;      // Less than 2 snapshots
   errorMessage?: string;             // Error details if calculation failed

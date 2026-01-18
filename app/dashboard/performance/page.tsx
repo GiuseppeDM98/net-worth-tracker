@@ -105,12 +105,12 @@ export default function PerformancePage() {
 
       const data = await getAllPerformanceData(user.uid);
 
-      // Fetch YOC metrics for all periods in parallel
-      // YOC requires server-side calculation due to Firebase Admin SDK usage
+      // Fetch YOC and Current Yield metrics for all periods in parallel
+      // Both require server-side calculation due to Firebase Admin SDK usage
       const periods = ['ytd', 'oneYear', 'threeYear', 'fiveYear', 'allTime'] as const;
-      const yocPromises = periods.map(async (periodKey) => {
+      const metricsPromises = periods.map(async (periodKey) => {
         const metrics = data[periodKey];
-        // Only fetch YOC if period has sufficient data
+        // Only fetch metrics if period has sufficient data
         if (metrics.hasInsufficientData) {
           return {
             yocGross: null,
@@ -119,6 +119,12 @@ export default function PerformancePage() {
             yocDividendsNet: 0,
             yocCostBasis: 0,
             yocAssetCount: 0,
+            currentYield: null,
+            currentYieldNet: null,
+            currentYieldDividends: 0,
+            currentYieldDividendsNet: 0,
+            currentYieldPortfolioValue: 0,
+            currentYieldAssetCount: 0,
           };
         }
 
@@ -130,22 +136,44 @@ export default function PerformancePage() {
             numberOfMonths: metrics.numberOfMonths.toString(),
           });
 
-          const response = await fetch(`/api/performance/yoc?${params.toString()}`);
-          if (!response.ok) {
-            console.warn(`Failed to fetch YOC for ${periodKey}:`, response.statusText);
-            return {
-              yocGross: null,
-              yocNet: null,
-              yocDividendsGross: 0,
-              yocDividendsNet: 0,
-              yocCostBasis: 0,
-              yocAssetCount: 0,
-            };
+          // Fetch YOC and Current Yield in parallel for each period
+          const [yocResponse, currentYieldResponse] = await Promise.all([
+            fetch(`/api/performance/yoc?${params.toString()}`),
+            fetch(`/api/performance/current-yield?${params.toString()}`),
+          ]);
+
+          const yocData = yocResponse.ok
+            ? await yocResponse.json()
+            : {
+                yocGross: null,
+                yocNet: null,
+                yocDividendsGross: 0,
+                yocDividendsNet: 0,
+                yocCostBasis: 0,
+                yocAssetCount: 0,
+              };
+
+          const currentYieldData = currentYieldResponse.ok
+            ? await currentYieldResponse.json()
+            : {
+                currentYield: null,
+                currentYieldNet: null,
+                currentYieldDividends: 0,
+                currentYieldDividendsNet: 0,
+                currentYieldPortfolioValue: 0,
+                currentYieldAssetCount: 0,
+              };
+
+          if (!yocResponse.ok) {
+            console.warn(`Failed to fetch YOC for ${periodKey}:`, yocResponse.statusText);
+          }
+          if (!currentYieldResponse.ok) {
+            console.warn(`Failed to fetch Current Yield for ${periodKey}:`, currentYieldResponse.statusText);
           }
 
-          return await response.json();
+          return { ...yocData, ...currentYieldData };
         } catch (error) {
-          console.error(`Error fetching YOC for ${periodKey}:`, error);
+          console.error(`Error fetching metrics for ${periodKey}:`, error);
           return {
             yocGross: null,
             yocNet: null,
@@ -153,15 +181,21 @@ export default function PerformancePage() {
             yocDividendsNet: 0,
             yocCostBasis: 0,
             yocAssetCount: 0,
+            currentYield: null,
+            currentYieldNet: null,
+            currentYieldDividends: 0,
+            currentYieldDividendsNet: 0,
+            currentYieldPortfolioValue: 0,
+            currentYieldAssetCount: 0,
           };
         }
       });
 
-      const yocResults = await Promise.all(yocPromises);
+      const metricsResults = await Promise.all(metricsPromises);
 
-      // Merge YOC data into performance data
+      // Merge YOC and Current Yield data into performance data
       periods.forEach((periodKey, index) => {
-        Object.assign(data[periodKey], yocResults[index]);
+        Object.assign(data[periodKey], metricsResults[index]);
       });
 
       setPerformanceData(data);
@@ -199,7 +233,7 @@ export default function PerformancePage() {
         performanceData.ytd.dividendCategoryId  // Reuse categoryId from settings
       );
 
-      // Fetch YOC for custom period if sufficient data
+      // Fetch YOC and Current Yield for custom period if sufficient data
       if (!customMetrics.hasInsufficientData) {
         try {
           const params = new URLSearchParams({
@@ -209,14 +243,24 @@ export default function PerformancePage() {
             numberOfMonths: customMetrics.numberOfMonths.toString(),
           });
 
-          const response = await fetch(`/api/performance/yoc?${params.toString()}`);
-          if (response.ok) {
-            const yocData = await response.json();
+          // Fetch YOC and Current Yield in parallel
+          const [yocResponse, currentYieldResponse] = await Promise.all([
+            fetch(`/api/performance/yoc?${params.toString()}`),
+            fetch(`/api/performance/current-yield?${params.toString()}`),
+          ]);
+
+          if (yocResponse.ok) {
+            const yocData = await yocResponse.json();
             Object.assign(customMetrics, yocData);
           }
+
+          if (currentYieldResponse.ok) {
+            const currentYieldData = await currentYieldResponse.json();
+            Object.assign(customMetrics, currentYieldData);
+          }
         } catch (error) {
-          console.error('Error fetching YOC for custom period:', error);
-          // Continue without YOC data (will show null values)
+          console.error('Error fetching metrics for custom period:', error);
+          // Continue without YOC/Current Yield data (will show null values)
         }
       }
 
@@ -622,9 +666,9 @@ export default function PerformancePage() {
           />
         </div>
 
-        {/* Metrics Cards - Row 4 - Dividend Metrics (YOC) */}
-        {/* Conditional rendering: only show if at least one YOC value exists */}
-        {(metrics.yocGross !== null || metrics.yocNet !== null) && (
+        {/* Metrics Cards - Row 4 - Dividend Metrics (YOC + Current Yield) */}
+        {/* Conditional rendering: only show if at least one dividend metric exists */}
+        {(metrics.yocGross !== null || metrics.yocNet !== null || metrics.currentYield !== null || metrics.currentYieldNet !== null) && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
             <MetricCard
               title="YOC Lordo"
@@ -639,6 +683,40 @@ export default function PerformancePage() {
               format="percentage"
               description={`Dividendi: ${formatCurrency(metrics.yocDividendsNet)} | Cost Basis: ${formatCurrency(metrics.yocCostBasis)} | Asset: ${metrics.yocAssetCount}`}
               tooltip="Yield on Cost (YOC) Netto misura il rendimento da dividendi netti (dopo tasse) rispetto al costo originale di acquisto. Formula: (Dividendi Netti Annualizzati / Cost Basis) × 100. Questa metrica mostra quanto effettivamente guadagni (al netto delle ritenute fiscali) rispetto al tuo investimento iniziale. Più realistica dello YOC Lordo perché considera l'impatto fiscale. Utile per valutare il rendimento effettivo del portafoglio nel tempo. La differenza tra YOC Lordo e Netto dipende dalle aliquote fiscali applicate (es. 26% in Italia per dividendi azionari)."
+            />
+            <MetricCard
+              title="Current Yield Lordo"
+              value={metrics.currentYield}
+              format="percentage"
+              description={`Dividendi: ${formatCurrency(metrics.currentYieldDividends)} | Valore Portafoglio: ${formatCurrency(metrics.currentYieldPortfolioValue)} | Asset: ${metrics.currentYieldAssetCount}`}
+              tooltip={`Current Yield Lordo misura il rendimento da dividendi lordi basato sul valore di mercato ATTUALE del portafoglio. Formula: (Dividendi Lordi Annualizzati / Valore Corrente Portafoglio) × 100. A differenza dello YOC (che usa il costo originale), il Current Yield mostra quanto renderebbe il portafoglio se lo acquistassi oggi ai prezzi correnti.${
+                metrics.yocGross !== null
+                  ? `\n\nConfronto con YOC Lordo (${metrics.yocGross.toFixed(2)}%): ${
+                      metrics.currentYield !== null && metrics.currentYield > metrics.yocGross
+                        ? 'Il prezzo è cresciuto più dei dividendi (buon capital gain ma yield diluito)'
+                        : metrics.currentYield !== null && metrics.currentYield < metrics.yocGross
+                        ? 'I dividendi sono cresciuti o il prezzo è sceso (ottimo per chi ha comprato presto!)'
+                        : 'Crescita proporzionale di prezzo e dividendi'
+                    }`
+                  : '\n\nUtile per confrontare il rendimento del portafoglio con altre opportunità di investimento (bond, ETF, depositi) e valutare se il portafoglio genera reddito passivo sufficiente.'
+              }`}
+            />
+            <MetricCard
+              title="Current Yield Netto"
+              value={metrics.currentYieldNet}
+              format="percentage"
+              description={`Dividendi: ${formatCurrency(metrics.currentYieldDividendsNet)} | Valore Portafoglio: ${formatCurrency(metrics.currentYieldPortfolioValue)} | Asset: ${metrics.currentYieldAssetCount}`}
+              tooltip={`Current Yield Netto misura il rendimento da dividendi netti (dopo tasse) basato sul valore di mercato ATTUALE del portafoglio. Formula: (Dividendi Netti Annualizzati / Valore Corrente Portafoglio) × 100. Questa è la metrica più realistica perché considera sia il prezzo corrente che l'impatto fiscale sui dividendi. Mostra quanto effettivamente guadagneresti acquistando il portafoglio oggi ai prezzi correnti.${
+                metrics.yocNet !== null
+                  ? `\n\nConfronto con YOC Netto (${metrics.yocNet.toFixed(2)}%): ${
+                      metrics.currentYieldNet !== null && metrics.currentYieldNet > metrics.yocNet
+                        ? 'Il prezzo è cresciuto più dei dividendi netti (buon capital gain)'
+                        : metrics.currentYieldNet !== null && metrics.currentYieldNet < metrics.yocNet
+                        ? 'I dividendi netti sono cresciuti o il prezzo è sceso (ottimo rendimento effettivo per early investors!)'
+                        : 'Crescita proporzionale di prezzo e dividendi netti'
+                    }`
+                  : '\n\nMetrica più accurata per valutare il reddito passivo effettivo rispetto ad altre opportunità (bond, depositi, altri ETF).'
+              }`}
             />
           </div>
         )}
@@ -925,7 +1003,7 @@ export default function PerformancePage() {
               </p>
             </div>
             <div>
-              <h4 className="font-semibold mb-1">Flussi di Cassa</h4>
+              <h4 className="font-semibold mb-1">Contributi Netti</h4>
               <p className="text-muted-foreground">
                 Calcolati come differenza mensile tra entrate e uscite registrate nella sezione Cashflow.
                 Valori positivi sono contributi, negativi sono prelievi.
@@ -1000,6 +1078,104 @@ export default function PerformancePage() {
                 • YOC non considera capital gains, solo dividendi
                 <br />
                 • I valori sono annualizzati per confrontare periodi diversi
+              </p>
+            </div>
+
+            <div>
+              <h4 className="font-semibold mb-1">Current Yield</h4>
+              <p className="text-muted-foreground">
+                Il Current Yield misura il rendimento da dividendi basato sul valore di mercato attuale del portafoglio,
+                mostrando quanto renderebbe l&apos;investimento se lo acquistassi oggi ai prezzi correnti.
+                <br /><br />
+                <strong>Formula:</strong> Current Yield% = (Dividendi Annualizzati / Valore Corrente Portafoglio) × 100
+                <br /><br />
+                <strong>Cosa sono i Dividendi Annualizzati?</strong>
+                <br />
+                I dividendi del periodo vengono convertiti in un tasso annuale (stessa logica dello YOC):
+                <br /><br />
+                • <strong>Periodi &lt; 12 mesi</strong> (es. YTD con 5 mesi): si scala il tasso
+                <br />
+                &nbsp;&nbsp;Dividendi Annualizzati = (Dividendi Totali / Numero Mesi) × 12
+                <br />
+                &nbsp;&nbsp;<em>Esempio: €100 in 5 mesi → (€100 / 5) × 12 = €240/anno</em>
+                <br /><br />
+                • <strong>Periodi ≥ 12 mesi</strong> (es. 3Y): si calcola la media annuale
+                <br />
+                &nbsp;&nbsp;Dividendi Annualizzati = Dividendi Totali / Numero Anni
+                <br />
+                &nbsp;&nbsp;<em>Esempio: €600 in 3 anni → €600 / 3 = €200/anno</em>
+                <br /><br />
+                <strong>Esempio completo (stesso portafoglio YOC):</strong>
+                <br />
+                • Valore corrente portafoglio: €9.500 (5 asset che pagano dividendi)
+                <br />
+                • Periodo: 5 mesi (set 2025 - gen 2026)
+                <br />
+                • Dividendi lordi ricevuti: €197,52
+                <br />
+                • Dividendi netti ricevuti: €146,17 (dopo tasse 26%)
+                <br />
+                • Dividendi Annualizzati Lordi: (€197,52 / 5) × 12 = €474/anno
+                <br />
+                • Dividendi Annualizzati Netti: (€146,17 / 5) × 12 = €351/anno
+                <br />
+                • <strong>Current Yield Lordo:</strong> (€474 / €9.500) × 100 = <strong>4,99%</strong>
+                <br />
+                • <strong>Current Yield Netto:</strong> (€351 / €9.500) × 100 = <strong>3,69%</strong>
+                <br />
+                • YOC Lordo (dallo stesso esempio): <strong>6,68%</strong>
+                <br />
+                • YOC Netto (dallo stesso esempio): <strong>4,94%</strong>
+                <br /><br />
+                <strong>Confronto Lordo vs Netto:</strong>
+                <br />
+                • <strong>YOC:</strong> Lordo 6,68% vs Netto 4,94% (differenza 1,74 punti percentuali = 26% tasse)
+                <br />
+                • <strong>Current Yield:</strong> Lordo 4,99% vs Netto 3,69% (differenza 1,30 punti percentuali = 26% tasse)
+                <br />
+                • Le metriche Nette sono più realistiche perché mostrano il rendimento effettivo dopo tasse
+                <br /><br />
+                <strong>Confronto YOC vs Current Yield (metriche Nette):</strong>
+                <br />
+                In questo esempio, YOC Netto (4,94%) &gt; Current Yield Netto (3,69%), il che significa:
+                <br />
+                • Il prezzo degli asset è aumentato del 34% rispetto al costo originale (€9.500 / €7.100 = 1.34)
+                <br />
+                • I dividendi netti sono cresciuti, ma il prezzo è cresciuto più velocemente
+                <br />
+                • Chi ha comprato presto gode di un rendimento netto (YOC Netto 4,94%) superiore rispetto a chi compra oggi (CY Netto 3,69%)
+                <br />
+                • Ottimo scenario: capital appreciation + dividendi in crescita
+                <br /><br />
+                <strong>Come interpretarlo:</strong>
+                <br />
+                • <strong>Current Yield &gt; YOC:</strong> I dividendi sono cresciuti più del prezzo (raro, possibile se prezzo sceso). Segnale di potenziale acquisto se il prezzo è sottovalutato.
+                <br />
+                • <strong>Current Yield = YOC:</strong> Crescita proporzionale di prezzo e dividendi. Rendimento stabile.
+                <br />
+                • <strong>Current Yield &lt; YOC:</strong> Il prezzo è cresciuto più dei dividendi (scenario comune in bull market). Buon capital gain ma yield attuale più basso.
+                <br /><br />
+                <strong>Quando è utile?</strong>
+                <br />
+                • Confrontare il rendimento del portafoglio con altre opportunità di investimento (bond, ETF, depositi)
+                <br />
+                • Valutare se il portafoglio genera reddito passivo sufficiente rispetto al capitale investito
+                <br />
+                • Decidere se reinvestire dividendi o cercare alternative con yield più alto
+                <br />
+                • Tracciare l&apos;evoluzione del yield nel tempo (se scende troppo, potrebbe indicare sopravvalutazione)
+                <br /><br />
+                <strong>Limiti:</strong>
+                <br />
+                • Si applica solo ad asset con dividendi (asset growth-only esclusi)
+                <br />
+                • Non considera capital gains (solo dividendi)
+                <br />
+                • Current Yield dipende dalla volatilità del prezzo (può fluttuare)
+                <br />
+                • I valori sono annualizzati per confrontare periodi diversi
+                <br />
+                • Non include asset venduti (quantity = 0)
               </p>
             </div>
           </CardContent>

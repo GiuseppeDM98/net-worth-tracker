@@ -72,13 +72,15 @@ When implementing calendar views for dividends:
 - Use `paymentDate` for date range filters (not `exDate`)
 - Users care about cash arrival dates, not technical ex-dividend dates
 
-### YOC (Yield on Cost) Calculation Pattern
-When implementing YOC metrics:
+### YOC (Yield on Cost) and Current Yield Calculation Pattern
+When implementing dividend yield metrics (YOC, Current Yield):
 - **Annualization**: < 12 months scale up `(dividends / months) × 12`, >= 12 months average `dividends / (months / 12)`
-- **Cost basis**: Only include assets with `quantity > 0` and `averageCost > 0` (excludes sold assets)
+- **YOC cost basis**: Only include assets with `quantity > 0` and `averageCost > 0` (excludes sold assets)
+- **Current Yield portfolio value**: Only include assets with `quantity > 0` and `currentPrice > 0` that paid dividends
 - **Currency**: Prefer `grossAmountEur ?? grossAmount` for multi-currency portfolios
 - **Filter dividends**: Use `paymentDate` not `exDate` (consistent with calendar)
 - **Architecture**: Use API route pattern due to server-only dividend service constraints
+- **Difference**: YOC uses `quantity × averageCost` (original cost), Current Yield uses `quantity × currentPrice` (market value)
 
 ### Time-Sensitive Metrics Pattern
 When implementing metrics requiring "as of today" data filtering:
