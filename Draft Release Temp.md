@@ -2,6 +2,18 @@
 
 ### Features
 
+- **Savings vs Investment Growth Chart**: New visualization in History page breaking down net worth growth into controllable vs external factors
+  - **Dual component breakdown**: Stacked bars showing Net Savings (green) from your income/expenses + Investment Growth (blue/red) from market performance
+  - **Annual granularity**: Year-by-year comparison for clear long-term trends without monthly noise
+  - **Conditional coloring**: Blue bars for positive market gains, red bars for market losses - immediate visual recognition
+  - **Total visibility**: Stacked bar height always equals total net worth growth, showing exact composition
+  - **Resilience insight**: See how your savings habit protected wealth during market downturns (e.g., +€10k savings offsetting -€2k market loss = +€8k growth)
+  - **Performance attribution**: Understand whether growth came from your discipline (savings) or external luck (markets)
+  - **Smart filtering**: Only displays years with both snapshots and cashflow data for accurate calculations
+  - **Responsive design**: Adapts to mobile (280px), landscape (300px), and desktop (400px) with hidden legends on small screens
+  - **Italian timezone handling**: All calculations use Europe/Rome timezone for consistency across client and server
+  - **Empty state handling**: Clear message when insufficient data (need snapshots + expenses per year)
+
 - **Monthly Calendar View for Dividends**: Visual overview of dividend payment schedules with interactive date exploration
   - **Calendar grid**: 6 weeks × 7 days grid (Monday start) displaying payment dates with Italian locale (month names, day abbreviations)
   - **Payment date display**: Each date shows dividend info - single dividend displays ticker + net amount, multiple dividends show badge with count + total sum

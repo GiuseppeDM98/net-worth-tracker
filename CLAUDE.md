@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz
-- Feature ultimo mese: Metriche Yield on Cost (YOC) nella Performance page con calcolo annualizzato per tutti i time frame
-- Ultima implementazione: Fix YOC future dividends bug - dividendEndDate cappato a TODAY per escludere dividendi non ancora ricevuti (2026-01-17)
+- Feature ultimo mese: Savings vs Investment Growth chart in History page per analizzare contributo risparmi vs mercato
+- Ultima implementazione: Stacked bar chart annuale che separa Net Savings (cashflow) da Investment Growth (market performance) (2026-01-18)
 - In corso ora: nessuna attivita attiva
 - Completamento: n/d
 
@@ -29,6 +29,13 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Portfolio multi-asset con aggiornamento prezzi Yahoo Finance.
 - Cashflow con categorie, filtri e statistiche.
 - Snapshot mensili automatici + storico e CSV export.
+- History page con multiple chart visualizations:
+  - Net Worth evolution (total, liquid, illiquid)
+  - Asset Class breakdown (stacked area € or multi-line %)
+  - Liquidity evolution (overlapping areas or separate lines)
+  - YoY variation (bar chart con variazione annuale)
+  - Savings vs Investment Growth: stacked bar chart annuale mostrando Net Savings (green) + Investment Growth (blue/red conditional) = Total NW Growth
+  - Current vs Target allocation comparison
 - Performance metrics (ROI, CAGR, TWR, IRR, Sharpe, drawdown suite) con heatmap rendimenti mensili, grafico underwater e rolling CAGR/Sharpe con medie mobili.
   - Yield on Cost (YOC): Metriche YOC Lordo e Netto nella Performance page con annualizzazione per confrontabilità tra periodi (YTD, 1Y, 3Y, 5Y, ALL, CUSTOM)
   - Row 4 dedicata "Metriche Dividendi" con conditional rendering (visibile solo se dati disponibili)
@@ -53,9 +60,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Conversione valuta dipende da Frankfurter API (fallback su cache, ma possibile failure prolungata).
 
 ## Next Steps (Prossime 1-2 sessioni)
-- Testing manuale YOC con diversi scenari (nessun dividendo, asset venduti, periodi < 1 anno).
-- Verificare performance impact di +5 API calls parallelizzate al caricamento Performance page.
+- Testing e validazione Savings vs Investment chart con dati reali utente.
 - Ottimizzazioni UI/UX basate su feedback utente.
+- Eventuali enhancement al chart (percentage toggle, drill-down mensile).
 
 ## Key Files
 - History page: `app/dashboard/history/page.tsx`
@@ -73,4 +80,4 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Date helpers: `lib/utils/dateHelpers.ts`
 - Formatters: `lib/utils/formatters.ts`
 
-**Last updated**: 2026-01-17
+**Last updated**: 2026-01-18

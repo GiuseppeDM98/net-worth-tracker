@@ -95,6 +95,14 @@ For filtered tables showing totals:
 - Use optional props with defaults: `showTotals?: boolean = false`
 - Always use EUR amounts for multi-currency totals (`netAmountEur ?? netAmount`)
 
+### Expense Amount Sign Convention
+When working with expense data for calculations (cashflow, savings, etc.):
+- **Income**: Stored as POSITIVE values in database
+- **Expenses**: Stored as NEGATIVE values in database
+- **Net Savings formula**: `sum(income) + sum(expenses)` (NOT `income - expenses`)
+- **Why**: Simplifies aggregation, consistent across app (see TotalHistoryTab.tsx)
+- **Example**: Income €1000 + Expense -€400 = Net €600
+
 ---
 
 ### Component Unmounting & Dialog State
@@ -186,5 +194,6 @@ const { month, year } = getItalyMonthYear();
 - Currency conversion: `lib/services/currencyConversionService.ts`
 - Query keys: `lib/query/queryKeys.ts`
 - Cashflow charts: `components/cashflow/TotalHistoryTab.tsx`, `components/cashflow/CurrentYearTab.tsx`
+- History charts: `app/dashboard/history/page.tsx`, `lib/services/chartService.ts`
 
-**Last updated**: 2026-01-17
+**Last updated**: 2026-01-18
