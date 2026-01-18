@@ -10,15 +10,18 @@ import {
   compareAllocations,
   getDefaultTargets,
 } from '@/lib/services/assetAllocationService';
+import { getAllExpenses } from '@/lib/services/expenseService';
 import {
   prepareNetWorthHistoryData,
   prepareAssetClassHistoryData,
   prepareYoYVariationData,
+  prepareSavingsVsInvestmentData,
   formatCurrency,
   formatCurrencyCompact,
   formatPercentage,
 } from '@/lib/services/chartService';
 import { Asset, MonthlySnapshot, AssetAllocationTarget } from '@/types/assets';
+import { Expense } from '@/types/expenses';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Download, Plus, MessageSquare } from 'lucide-react';
@@ -93,6 +96,7 @@ export default function HistoryPage() {
   const [snapshots, setSnapshots] = useState<MonthlySnapshot[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [targets, setTargets] = useState<AssetAllocationTarget | null>(null);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAssetClassPercentage, setShowAssetClassPercentage] = useState(false);
   const [showLiquidityPercentage, setShowLiquidityPercentage] = useState(false);
@@ -132,24 +136,27 @@ export default function HistoryPage() {
    * - Snapshots: Monthly portfolio snapshots used for all historical charts
    * - Assets: Current assets needed for allocation comparison view
    * - Targets: User's allocation targets for comparison (falls back to defaults if not set)
+   * - Expenses: Cashflow data needed for savings vs investment growth chart
    *
    * Snapshots are created automatically at month-end or manually via modal for backfilling.
-   * All three queries run concurrently to minimize loading time.
+   * All four queries run concurrently to minimize loading time.
    */
   const loadData = async () => {
     if (!user) return;
 
     try {
       setLoading(true);
-      const [snapshotsData, assetsData, targetsData] = await Promise.all([
+      const [snapshotsData, assetsData, targetsData, expensesData] = await Promise.all([
         getUserSnapshots(user.uid),
         getAllAssets(user.uid),
         getTargets(user.uid),
+        getAllExpenses(user.uid),
       ]);
 
       setSnapshots(snapshotsData);
       setAssets(assetsData);
       setTargets(targetsData || getDefaultTargets());
+      setExpenses(expensesData);
     } catch (error) {
       console.error('Error loading history data:', error);
       toast.error('Errore nel caricamento dello storico');
@@ -232,6 +239,7 @@ export default function HistoryPage() {
   const netWorthHistory = prepareNetWorthHistoryData(snapshots);
   const assetClassHistory = prepareAssetClassHistoryData(snapshots);
   const yoyVariationData = prepareYoYVariationData(snapshots);
+  const savingsVsInvestmentData = prepareSavingsVsInvestmentData(snapshots, expenses);
 
   // Calculate percentage split of liquid vs illiquid for each snapshot.
   // This enables the chart toggle between € values and % distribution.
@@ -1200,6 +1208,93 @@ export default function HistoryPage() {
                     <Cell
                       key={`cell-${index}`}
                       fill={entry.variation >= 0 ? '#10B981' : '#EF4444'}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Savings vs Investment Growth Chart */}
+      {/* Shows year-by-year breakdown of net worth growth:
+          - Green bar (Net Savings): What user saved from income
+          - Blue/Red bar (Investment Growth): What markets contributed (positive/negative)
+          Stacked bars sum to total Net Worth Growth for the year */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg sm:text-xl">
+            Risparmio vs Crescita Investimenti
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {savingsVsInvestmentData.length === 0 ? (
+            <div className="flex h-64 items-center justify-center text-gray-500">
+              Dati insufficienti per la visualizzazione.
+              Servono snapshot e transazioni cashflow per ogni anno.
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-savings-vs-investment">
+              <BarChart data={savingsVsInvestmentData} margin={getChartMargins()}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="year" />
+                <YAxis
+                  width={getYAxisWidth()}
+                  tickFormatter={(value) => formatCurrencyCompact(value)}
+                />
+                <Tooltip
+                  formatter={(value: number, name: string) => [
+                    formatCurrency(value),
+                    name
+                  ]}
+                  contentStyle={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                    border: '1px solid #ccc',
+                    borderRadius: '8px',
+                    padding: isMobile ? '8px' : '12px',
+                    fontSize: isMobile ? '14px' : '16px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                  }}
+                  labelStyle={{
+                    color: '#000',
+                    fontWeight: 600,
+                    marginBottom: '4px',
+                  }}
+                  itemStyle={{
+                    fontSize: isMobile ? '14px' : '16px',
+                    padding: '2px 0',
+                  }}
+                />
+                <Legend
+                  wrapperStyle={{
+                    display: isMobile ? 'none' : 'block',
+                    paddingTop: isMobile ? '0' : '20px'
+                  }}
+                  iconSize={isMobile ? 8 : 10}
+                  fontSize={isMobile ? 11 : 12}
+                />
+
+                {/* Bar 1: Net Savings (always green) */}
+                <Bar
+                  dataKey="netSavings"
+                  name="Risparmio Netto"
+                  fill="#10B981"
+                  stackId="a"
+                  isAnimationActive={false}
+                />
+
+                {/* Bar 2: Investment Growth (conditional color) */}
+                <Bar
+                  dataKey="investmentGrowth"
+                  name="Crescita Investimenti"
+                  stackId="a"
+                  isAnimationActive={false}
+                >
+                  {savingsVsInvestmentData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={entry.investmentGrowth >= 0 ? '#3B82F6' : '#EF4444'}
                     />
                   ))}
                 </Bar>
