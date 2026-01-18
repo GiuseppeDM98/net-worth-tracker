@@ -42,6 +42,7 @@ import {
 } from 'recharts';
 import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
 import { getItalyMonthYear, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
+import { CashflowSankeyChart } from '@/components/cashflow/CashflowSankeyChart';
 
 interface ChartData {
   name: string;
@@ -1327,6 +1328,15 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
               </ResponsiveContainer>
             </CardContent>
           </Card>
+        )}
+
+        {/* Sankey Flow Diagram - Budget View */}
+        {currentYearExpenses.length > 0 && (
+          <CashflowSankeyChart
+            expenses={currentYearExpenses}
+            isMobile={isMobile}
+            title="Flusso Cashflow Anno Corrente"
+          />
         )}
       </div>
     </div>
