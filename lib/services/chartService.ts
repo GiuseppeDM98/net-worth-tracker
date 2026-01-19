@@ -201,6 +201,22 @@ export function formatCurrency(value: number): string {
 }
 
 /**
+ * Format currency value for Sankey diagrams with fixed decimal places.
+ * Prevents floating-point artifacts by explicitly limiting to 2 decimal places.
+ *
+ * @param value - The numeric value to format
+ * @returns Formatted currency string (e.g., "€1.234,56")
+ */
+export function formatCurrencyForSankey(value: number): string {
+  return new Intl.NumberFormat('it-IT', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+/**
  * Format percentage in Italian format
  */
 export function formatPercentage(value: number, decimals: number = 2): string {

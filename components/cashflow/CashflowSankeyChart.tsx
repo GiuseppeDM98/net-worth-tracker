@@ -24,11 +24,14 @@
 
 import { useState, useMemo } from 'react';
 import { ResponsiveSankey } from '@nivo/sankey';
+import { format } from 'date-fns';
+import { it } from 'date-fns/locale';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
-import { formatCurrency } from '@/lib/services/chartService';
+import { formatCurrency, formatCurrencyForSankey } from '@/lib/services/chartService';
+import { toDate } from '@/lib/utils/dateHelpers';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, ExternalLink } from 'lucide-react';
 
 // Color palette for categories (matches existing COLORS array in CurrentYearTab/TotalHistoryTab)
 const COLORS = [
@@ -452,15 +455,17 @@ export function CashflowSankeyChart({
   title
 }: CashflowSankeyChartProps) {
   // Drill-down state: tracks selected item for drill-down view
-  // mode: 'type' for Type→Categories, 'category' for Category→Subcategories
+  // mode: 'type' for Type→Categories, 'category' for Category→Subcategories, 'transactions' for transaction list
   const [selectedCategory, setSelectedCategory] = useState<{
     name: string;
     color: string;
     isIncome: boolean;
-    mode?: 'type' | 'category';
+    mode?: 'type' | 'category' | 'transactions';
+    parentCategory?: string;         // Category name for transaction filtering
+    selectedSubcategory?: string;    // Subcategory name for transaction filtering
   } | null>(null);
 
-  // Build Sankey data based on current mode (budget view vs drill-down modes)
+  // Build Sankey data based on current mode (budget view vs drill-down modes vs transactions)
   const sankeyData = useMemo(() => {
     if (selectedCategory) {
       if (selectedCategory.mode === 'type') {
@@ -471,7 +476,7 @@ export function CashflowSankeyChart({
           selectedCategory.color,
           isMobile
         );
-      } else {
+      } else if (selectedCategory.mode === 'category') {
         // Category drill-down mode: show category → subcategories
         return buildDrillDownData(
           expenses,
@@ -480,11 +485,13 @@ export function CashflowSankeyChart({
           selectedCategory.isIncome,
           isMobile
         );
+      } else if (selectedCategory.mode === 'transactions') {
+        // Transaction list mode: don't render Sankey, render table instead
+        return { nodes: [], links: [] };
       }
-    } else {
-      // Budget mode: show income → budget → expense types → categories + savings
-      return buildBudgetFlowData(expenses, isMobile);
     }
+    // Budget mode: show income → budget → expense types → categories + savings
+    return buildBudgetFlowData(expenses, isMobile);
   }, [expenses, selectedCategory, isMobile]);
 
   // Calculate total amount for percentage display in tooltips
@@ -525,15 +532,18 @@ export function CashflowSankeyChart({
         labelOffset: 12,
       };
 
-  // Handle node click for drill-down
+  // Check if a category has actual subcategories (not just "Altro")
+  // Used to decide whether to show subcategory drill-down or transaction list
+  const checkIfCategoryHasSubcategories = (categoryName: string): boolean => {
+    const categoryExpenses = expenses.filter(e => e.categoryName === categoryName);
+    // Has subcategories if at least one expense has a non-null subCategoryName
+    return categoryExpenses.some(e => e.subCategoryName);
+  };
+
+  // Handle node click for multi-level drill-down navigation
   const handleNodeClick = (node: any) => {
     // Don't drill down into Budget or Risparmi nodes
     if (node.id === 'Budget' || node.id === 'Risparmi') {
-      return;
-    }
-
-    // If already in drill-down mode, ignore clicks
-    if (selectedCategory) {
       return;
     }
 
@@ -541,34 +551,104 @@ export function CashflowSankeyChart({
     const expenseTypeLabels = Object.values(EXPENSE_TYPE_LABELS).filter(label => label !== 'Entrate');
     const isExpenseType = expenseTypeLabels.includes(node.id);
 
-    if (isExpenseType) {
-      // Expense type drill-down: show type → categories
-      setSelectedCategory({
-        name: node.id,
-        color: node.color,
-        isIncome: false,
-        mode: 'type'
-      });
-    } else {
-      // Category drill-down: show category → subcategories
+    // BUDGET VIEW: drill into type or category
+    if (!selectedCategory) {
+      if (isExpenseType) {
+        // Type drill-down: show expense type → categories
+        setSelectedCategory({
+          name: node.id,
+          color: node.color,
+          isIncome: false,
+          mode: 'type'
+        });
+      } else {
+        // Category drill-down or transactions: depends on whether category has subcategories
+        const hasSubcategories = checkIfCategoryHasSubcategories(node.id);
+        const isIncome = expenses.some(e => e.categoryName === node.id && e.type === 'income');
+
+        setSelectedCategory({
+          name: node.id,
+          color: node.color,
+          isIncome,
+          mode: hasSubcategories ? 'category' : 'transactions',
+          parentCategory: node.id,
+        });
+      }
+    }
+    // TYPE DRILL-DOWN: drill into category
+    else if (selectedCategory.mode === 'type') {
+      // Check if category has subcategories to decide next mode
+      const hasSubcategories = checkIfCategoryHasSubcategories(node.id);
       const isIncome = expenses.some(e => e.categoryName === node.id && e.type === 'income');
 
       setSelectedCategory({
         name: node.id,
         color: node.color,
         isIncome,
-        mode: 'category'
+        mode: hasSubcategories ? 'category' : 'transactions',
+        parentCategory: node.id,
+      });
+    }
+    // CATEGORY DRILL-DOWN: drill into subcategory (show transactions)
+    else if (selectedCategory.mode === 'category') {
+      setSelectedCategory({
+        ...selectedCategory,
+        mode: 'transactions',
+        selectedSubcategory: node.id,
       });
     }
   };
 
-  // Handle back button click
-  const handleBack = () => {
-    setSelectedCategory(null);
+  // Filter expenses for transaction list view
+  // Returns expenses matching the selected category/subcategory
+  const getFilteredExpenses = (): Expense[] => {
+    if (!selectedCategory || selectedCategory.mode !== 'transactions') {
+      return [];
+    }
+
+    return expenses.filter(expense => {
+      // Match category
+      const matchesCategory = expense.categoryName ===
+        (selectedCategory.parentCategory || selectedCategory.name);
+
+      // Match income/expense type
+      const matchesType = selectedCategory.isIncome
+        ? expense.type === 'income'
+        : expense.type !== 'income';
+
+      if (!matchesCategory || !matchesType) return false;
+
+      // If subcategory selected, filter by it
+      if (selectedCategory.selectedSubcategory) {
+        if (selectedCategory.selectedSubcategory === 'Altro') {
+          // "Altro" matches null subcategoryName
+          return !expense.subCategoryName;
+        }
+        return expense.subCategoryName === selectedCategory.selectedSubcategory;
+      }
+
+      return true;
+    });
   };
 
-  // Empty state: no data to visualize
-  if (sankeyData.nodes.length === 0 || sankeyData.links.length === 0) {
+  // Handle back button click for multi-level navigation
+  const handleBack = () => {
+    if (selectedCategory?.mode === 'transactions') {
+      // Return to category drill-down view
+      setSelectedCategory(prev => prev ? {
+        ...prev,
+        mode: 'category',
+        selectedSubcategory: undefined
+      } : null);
+    } else {
+      // Return to budget view
+      setSelectedCategory(null);
+    }
+  };
+
+  // Empty state: no data to visualize (but allow transactions mode to render table)
+  if ((sankeyData.nodes.length === 0 || sankeyData.links.length === 0) &&
+      selectedCategory?.mode !== 'transactions') {
     return (
       <Card className="md:col-span-2">
         <CardHeader>
@@ -606,12 +686,15 @@ export function CashflowSankeyChart({
         </div>
       </CardHeader>
       <CardContent>
-        <div style={{ height: chartConfig.height }}>
-          <ResponsiveSankey
+        {/* Render Sankey chart only when NOT in transactions mode */}
+        {selectedCategory?.mode !== 'transactions' && (
+          <div style={{ height: chartConfig.height }}>
+            <ResponsiveSankey
             data={sankeyData}
             margin={chartConfig.margin}
             align="justify"
             colors={{ datum: 'nodeColor' }}
+            valueFormat={(value) => formatCurrencyForSankey(value)}
             nodeOpacity={1}
             nodeHoverOpacity={0.8}
             nodeThickness={chartConfig.nodeThickness}
@@ -648,7 +731,7 @@ export function CashflowSankeyChart({
                 >
                   <strong>{node.id}</strong>
                   <br />
-                  {formatCurrency(node.value || 0)}
+                  {formatCurrencyForSankey(node.value || 0)}
                   <br />
                   <span style={{ fontSize: '12px', color: '#666' }}>
                     {totalAmount > 0
@@ -675,7 +758,115 @@ export function CashflowSankeyChart({
               },
             }}
           />
-        </div>
+          </div>
+        )}
+
+        {/* Transaction list view: shown when mode='transactions' */}
+        {selectedCategory?.mode === 'transactions' && (() => {
+          const filteredExpenses = getFilteredExpenses();
+
+          return (
+            <div className="mt-6">
+              {/* Transaction count */}
+              <div className="mb-4 text-sm text-muted-foreground">
+                Totale: {filteredExpenses.length} {filteredExpenses.length === 1 ? 'voce' : 'voci'}
+              </div>
+
+              {/* Empty state */}
+              {filteredExpenses.length === 0 && (
+                <div className="py-12 text-center text-muted-foreground">
+                  Nessuna transazione trovata
+                </div>
+              )}
+
+              {/* Desktop table view (sm and above) */}
+              {filteredExpenses.length > 0 && (
+                <>
+                  <div className="hidden rounded-md border sm:block">
+                    <div className="max-h-[500px] overflow-y-auto">
+                      <table className="w-full">
+                        <thead className="sticky top-0 bg-muted/50 border-b">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-sm font-medium">Data</th>
+                            <th className="px-4 py-3 text-right text-sm font-medium">Importo</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium">Note</th>
+                            <th className="px-4 py-3 text-center text-sm font-medium">Link</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredExpenses.map((expense) => (
+                            <tr key={expense.id} className="border-b hover:bg-muted/30 transition-colors">
+                              <td className="px-4 py-3 text-sm">
+                                {format(toDate(expense.date), 'dd/MM/yyyy', { locale: it })}
+                              </td>
+                              <td
+                                className="px-4 py-3 text-right text-sm font-medium"
+                                style={{
+                                  color: expense.type === 'income' ? '#10b981' : '#ef4444'
+                                }}
+                              >
+                                {formatCurrency(expense.amount)}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-muted-foreground">
+                                {expense.notes || '-'}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                {expense.link && (
+                                  <a
+                                    href={expense.link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center text-blue-600 hover:text-blue-800 transition-colors"
+                                  >
+                                    <ExternalLink className="h-4 w-4" />
+                                  </a>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Mobile card view (below sm) */}
+                  <div className="space-y-3 sm:hidden">
+                    {filteredExpenses.map((expense) => (
+                      <div key={expense.id} className="rounded-md border p-3 bg-card">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">
+                            {format(toDate(expense.date), 'dd/MM/yyyy', { locale: it })}
+                          </span>
+                          <span
+                            className="text-sm font-medium"
+                            style={{
+                              color: expense.type === 'income' ? '#10b981' : '#ef4444'
+                            }}
+                          >
+                            {formatCurrency(expense.amount)}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {expense.notes || '-'}
+                        </p>
+                        {expense.link && (
+                          <a
+                            href={expense.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-2 inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 transition-colors"
+                          >
+                            Apri link <ExternalLink className="h-4 w-4" />
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })()}
       </CardContent>
     </Card>
   );
