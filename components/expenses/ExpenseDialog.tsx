@@ -739,9 +739,9 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
             <div className="space-y-4 border rounded-md p-4 bg-muted/50">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="isInstallment">Installment Purchase</Label>
+                  <Label htmlFor="isInstallment">Acquisto rateale</Label>
                   <p className="text-sm text-muted-foreground">
-                    Automatically create monthly installments with customizable amounts
+                    Crea automaticamente rate mensili con importi personalizzabili
                   </p>
                 </div>
                 <Switch

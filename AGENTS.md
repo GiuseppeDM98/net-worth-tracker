@@ -14,11 +14,9 @@ For architecture and status, see [CLAUDE.md](CLAUDE.md).
 - **All code comments in English only**
 
 ### Firebase Date Handling & Timezone
-- Always use `toDate()` from `lib/utils/dateHelpers.ts`
-- API responses serialize Firestore Timestamps as ISO strings
-- Never use manual `instanceof Date` checks on API data
-- **For month/year extraction**: Use `getItalyMonth()`, `getItalyYear()`, `getItalyMonthYear()` (not `Date.getMonth()`)
-- **Ensures consistency**: Server (UTC) and client (browser) produce same results
+- Use `toDate()` from `dateHelpers.ts` (handles Timestamps, ISO strings, null)
+- **Month/year extraction**: Use `getItalyMonth()`, `getItalyYear()`, `getItalyMonthYear()` (NOT `Date.getMonth()`)
+- **Why**: Server (UTC) and client (browser) produce same results
 
 ### Custom Tailwind Breakpoint
 - Use `desktop:` (1025px) instead of `lg:` (1024px)
@@ -29,96 +27,53 @@ For architecture and status, see [CLAUDE.md](CLAUDE.md).
 ## Key Patterns
 
 ### React Query Cache Invalidation
-Invalidate all related caches (direct + indirect) after mutations.
-```typescript
-onSuccess: () => {
-  queryClient.invalidateQueries({ queryKey: queryKeys.snapshots.all(userId) });
-  queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(userId) });
-}
-```
+Invalidate all related caches after mutations (direct + indirect dependencies).
 
-### Lazy-Loading Tabs (mountedTabs)
+### Lazy-Loading Tabs
 Never remove from `mountedTabs` once added to preserve state.
 
 ### Date Range Queries (Firestore)
-End date must include full day:
-```typescript
-const endDate = new Date(year, month, 0, 23, 59, 59, 999);
-```
+End date must include full day: `new Date(year, month, 0, 23, 59, 59, 999)`
 
-### Hall of Fame Annual Rankings
-Include years that have expenses even if they have fewer than 2 snapshots (NW diff stays 0).
-
-### Asset Price History %
-For assets with `price === 1` or `displayMode === 'totalValue'`, compute % using total value.
-
-### Borsa Italiana Scraper
-- ETF and Stock tables have different structures
-- Pass `assetType` to `scrapeDividendsByIsin(asset.isin, asset.type)`
-
-### Currency Conversion (Dividends)
-- Use `currencyConversionService.ts` (Frankfurter API)
-- Cache 24h and store `exchangeRate` for audit
-
-### Chart Y Axis
-Use `formatCurrencyCompact()` for Y axis labels on mobile to avoid layout compression.
-
-### Chart Data Preparation (chartService)
-Functions in `lib/services/chartService.ts` (e.g., `prepareNetWorthHistoryData()`) already include all relevant fields from snapshots (note, month, year). Always check the prepared data structure before implementing additional filtering or matching logic.
-
-### Dividend Calendar Date Filtering
-When implementing calendar views for dividends:
-- Use `paymentDate` for calendar display (when money arrives)
-- Use `paymentDate` for date range filters (not `exDate`)
-- Users care about cash arrival dates, not technical ex-dividend dates
+### Asset & Chart Patterns
+- **Hall of Fame**: Include years with expenses even if <2 snapshots
+- **Asset Price %**: For `price === 1` or `displayMode === 'totalValue'`, use total value
+- **Borsa Italiana**: Pass `assetType` to scraper (ETF vs Stock table structures differ)
+- **Currency**: Use `currencyConversionService.ts` (Frankfurter API, 24h cache)
+- **Chart Y Axis**: Use `formatCurrencyCompact()` on mobile
+- **Chart Data**: Check `chartService.ts` prepared data before adding filters
+- **Dividend Calendar**: Use `paymentDate` (not `exDate`) for display and filters
 
 ### YOC (Yield on Cost) and Current Yield Calculation Pattern
-When implementing dividend yield metrics (YOC, Current Yield):
-- **Annualization**: < 12 months scale up `(dividends / months) × 12`, >= 12 months average `dividends / (months / 12)`
-- **YOC cost basis**: Only include assets with `quantity > 0` and `averageCost > 0` (excludes sold assets)
-- **Current Yield portfolio value**: Only include assets with `quantity > 0` and `currentPrice > 0` that paid dividends
-- **Currency**: Prefer `grossAmountEur ?? grossAmount` for multi-currency portfolios
-- **Filter dividends**: Use `paymentDate` not `exDate` (consistent with calendar)
-- **Architecture**: Use API route pattern due to server-only dividend service constraints
-- **Difference**: YOC uses `quantity × averageCost` (original cost), Current Yield uses `quantity × currentPrice` (market value)
+- **Annualization**: < 12 months scale up, >= 12 months average
+- **YOC**: Only assets with `quantity > 0` and `averageCost > 0`, uses original cost basis
+- **Current Yield**: Uses `currentPrice` (market value) instead of cost
+- **Filter dividends**: Use `paymentDate` not `exDate`
+- **Architecture**: Use API route (server-only dividend service)
 
 ### Time-Sensitive Metrics Pattern
-When implementing metrics requiring "as of today" data filtering:
-- **Separate date parameters**: Use dedicated `*EndDate` field capped at TODAY, don't modify global `endDate`
-- **Example**: YOC uses `dividendEndDate = min(endDate, today)` while other metrics use original `endDate`
-- **Rationale**: Snapshot-based metrics (ROI, CAGR, TWR) need end-of-period dates; dividend metrics need actual received data
-- **Architecture**: Add to type interface, calculate in service, pass through API, document in JSDoc
-- **Zero regression**: Keeps existing metrics unchanged while adding time-aware filtering
+- **Separate date parameters**: Use dedicated `*EndDate` field capped at TODAY
+- **Example**: YOC uses `dividendEndDate = min(endDate, today)` for only received dividends
+- **Rationale**: Snapshot metrics need end-of-period; dividend metrics need actual data
 
 ### Table Totals Row Pattern
-For filtered tables showing totals:
-- Use `<TableFooter>` (not `<TableBody>`) for semantic HTML
-- Calculate totals on **all filtered data**, not just current page
-- Use optional props with defaults: `showTotals?: boolean = false`
-- Always use EUR amounts for multi-currency totals (`netAmountEur ?? netAmount`)
+- Use `<TableFooter>` for semantic HTML
+- Calculate totals on all filtered data (not just current page)
+- Use EUR amounts for multi-currency (`netAmountEur ?? netAmount`)
 
 ### Expense Amount Sign Convention
-When working with expense data for calculations (cashflow, savings, etc.):
-- **Income**: Stored as POSITIVE values in database
-- **Expenses**: Stored as NEGATIVE values in database
-- **Net Savings formula**: `sum(income) + sum(expenses)` (NOT `income - expenses`)
-- **Why**: Simplifies aggregation, consistent across app (see TotalHistoryTab.tsx)
-- **Example**: Income €1000 + Expense -€400 = Net €600
+- **Income**: POSITIVE, **Expenses**: NEGATIVE in database
+- **Net Savings**: `sum(income) + sum(expenses)` (NOT subtraction)
+- **Example**: €1000 + (-€400) = €600
 
 ### Sankey Diagram Multi-Layer Pattern
 When implementing complex data flow visualizations:
 - **4-layer structure**: Income → Budget → Types → Categories + Savings
 - **Multi-mode drill-down**: Support 4 modes (budget, type drill-down, category drill-down, transactions)
-- **State management**: Use `mode` field + `parentType`/`parentCategory` to preserve navigation context
-- **Conditional rendering**: Wrap Nivo components to prevent crashes with empty data
-  - Pattern: `{mode !== 'transactions' && <ResponsiveSankey ... />}`
-  - Never render heavy chart components with empty datasets
-- **Early exit conditions**: Exclude special modes (e.g., transactions) from data validation checks
-- **valueFormat prop**: Use for consistent number formatting in tooltips AND links (Nivo applies globally)
-- **Color derivation**: Use `deriveSubcategoryColors()` for child node colors from parent
-- **Mobile filtering**: Apply aggressive filtering (top 3-4 per parent) to prevent overcrowding
-- **Transaction integration**: Reuse filtering logic from parent components (e.g., CurrentYearTab pattern)
-- **Example**: CashflowSankeyChart with 4 modes + transaction table integration
+- **State management**: Use `mode` field + `parentType`/`parentCategory` for navigation context
+- **Conditional rendering**: `{mode !== 'transactions' && <ResponsiveSankey ... />}` prevents crashes with empty data
+- **Mobile filtering**: Top 3-4 items per parent to prevent overcrowding
+- **Example**: CashflowSankeyChart with 4 modes + transaction table
 
 ### Settings Service Synchronization Pattern
 When adding new fields to settings/configuration types:
@@ -148,34 +103,41 @@ if (settings.includePrimaryResidenceInFIRE !== undefined) {
 - **Why critical**: Omitting service layer updates causes settings to not persist across reloads
 - **Prevention**: Mental checklist when adding any settings field
 
----
+### Firestore Nested Object Deletion Pattern
+**Critical**: Firestore `merge: true` does RECURSIVE merge on nested objects, preventing key deletion.
+- **Problem**: Cannot delete nested keys by omitting them in new object
+  ```typescript
+  // Even if you build completely new object:
+  const newSubTargets = { "All-World": 33, "Momentum": 33 }; // "azioni" omitted
+  await setDoc(ref, { targets: { equity: { subTargets: newSubTargets } } }, { merge: true });
+  // Result: Firestore KEEPS "azioni" key! (recursive merge)
+  ```
+- **Solution**: Use GET + spread + setDoc WITHOUT merge for complete replacement
+  ```typescript
+  // Correct approach:
+  if (settings.targets !== undefined) {
+    const existingDoc = await getDoc(ref);
+    const existingData = existingDoc.exists() ? existingDoc.data() : {};
 
-### Component Unmounting & Dialog State
-When implementing dialogs in conditionally rendered components:
-- Dialog state in a component is lost when the component unmounts
-- Avoid auto-switching parent view modes that unmount the dialog's parent
-- Example: Calendar click should NOT auto-switch to table if dialog is in calendar component
-- Solution: Keep dialog state in parent, or avoid unmounting during interaction
+    const docData = {
+      ...existingData,           // Preserve all other fields
+      targets: settings.targets, // COMPLETELY REPLACE targets
+      updatedAt: Timestamp.now()
+    };
+
+    await setDoc(ref, docData); // NO merge: true!
+  }
+  ```
+- **Rationale**: Read-modify-write pattern with explicit replacement instead of merge
+- **Trade-off**: Extra GET call (~100-200ms overhead) for correctness
+- **Use case**: Deleting subcategories, removing asset allocation keys, any nested object cleanup
+
+---
 
 ### Server-Only Module Constraints (Firebase)
 When implementing features requiring Firebase data access:
 - **Pattern**: Client Components cannot import modules with `'server-only'` directive
-- **Symptom**: Build error: "'server-only' cannot be imported from a Client Component module"
-- **Root cause**: `dividendService.ts` and similar files use Firebase Admin SDK (server-only)
-- **Solution**: Create API route for server-side operations
-```typescript
-// ✅ CORRECT - API route with Admin SDK
-// app/api/performance/yoc/route.ts
-import { adminDb } from '@/lib/firebase/admin';
-async function getUserAssetsAdmin(userId: string): Promise<Asset[]> {
-  const querySnapshot = await adminDb
-    .collection('assets')
-    .where('userId', '==', userId)
-    .get();
-  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-}
-```
-- **Client-side**: Fetch from API instead of direct service import
+- **Solution**: Create API route for server-side operations, fetch from client
 - **Performance**: Use `Promise.all` to parallelize multiple API calls
 
 ---
@@ -183,86 +145,52 @@ async function getUserAssetsAdmin(userId: string): Promise<Asset[]> {
 ## Common Errors to Avoid
 
 ### Date Range Query Errors
-**Sintomo**: Manca l'ultimo giorno nei risultati Firestore
-**Causa**: `new Date(year, month, 0)` taglia dopo mezzanotte
-**Soluzione**:
-```typescript
-const endDate = new Date(year, month, 0, 23, 59, 59, 999);
-```
-**Prevenzione**: Sempre includere `23, 59, 59, 999` per fine periodo
+**Sintomo**: Missing last day in Firestore results
+**Causa**: End date missing time component (cuts at midnight)
+**Soluzione**: `new Date(year, month, 0, 23, 59, 59, 999)`
 
 ### React Query Incomplete Cache Invalidation
-**Sintomo**: UI mostra dati stale dopo una mutation
-**Causa**: Invalidazione solo della cache diretta
-**Soluzione**:
-```typescript
-onSuccess: () => {
-  queryClient.invalidateQueries({ queryKey: queryKeys.snapshots.all(userId) });
-  queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(userId) });
-}
-```
-**Prevenzione**: Traccia API -> Firestore -> cache e invalida tutte le dipendenze
+**Sintomo**: Stale UI after mutation
+**Soluzione**: Invalidate all related caches (direct + indirect dependencies)
 
-### Firestore setDoc Data Loss
-**Sintomo**: Campi scompaiono dopo save parziali
-**Causa**: `setDoc()` senza `{ merge: true }`
+### Firestore Nested Object Deletion Not Persisting
+**Sintomo**: Deleted nested keys reappear after page reload (e.g., removed subcategories come back)
+**Causa**: Firestore `merge: true` does RECURSIVE merge - even new objects get merged with old data
+**Debug time**: >2 hours (tried multiple approaches before discovering root cause)
 **Soluzione**:
 ```typescript
-await setDoc(docRef, payload, { merge: true });
+// For nested object deletions, use GET + setDoc WITHOUT merge:
+const existingDoc = await getDoc(ref);
+const existingData = existingDoc.exists() ? existingDoc.data() : {};
+const docData = { ...existingData, targets: newTargets, updatedAt: Timestamp.now() };
+await setDoc(ref, docData); // NO { merge: true }
 ```
-**Prevenzione**: Usa merge per ogni update parziale
+**Prevenzione**: Use `merge: true` for partial updates, but NOT for nested object key deletions
 
 ### Timezone Boundary Bugs (Server vs Client)
-**Sintomo**: Entries appaiono in mese/anno sbagliato quando operazioni eseguite da server (Vercel/UTC) vs localhost (CET/CEST)
-**Causa**: JavaScript `Date.getMonth()` e `getFullYear()` usano timezone locale. Server (UTC) e client (CET) estraggono valori diversi vicino a mezzanotte
-**Soluzione**:
-```typescript
-// ❌ WRONG - timezone-dependent
-const month = new Date().getMonth() + 1;
-const year = new Date().getFullYear();
-
-// ✅ CORRECT - always uses Italy timezone
-import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
-const { month, year } = getItalyMonthYear();
-```
-**Prevenzione**: Never use `Date.getMonth()` or `getFullYear()` directly. Always use timezone helpers from `dateHelpers.ts`. Test con `TZ=UTC npm run dev` per simulare production.
+**Sintomo**: Entries in wrong month when server (UTC) vs client (CET) near midnight
+**Causa**: `Date.getMonth()` is timezone-dependent
+**Debug time**: ~1 hour to identify timezone mismatch
+**Soluzione**: Use `getItalyMonthYear()` from `dateHelpers.ts` (NOT `Date.getMonth()`)
+**Test**: `TZ=UTC npm run dev` to simulate production
 
 ### Settings Persistence Bugs (Service Layer Incomplete)
 **Sintomo**: UI toggles/inputs save correctly but reset to defaults after page reload
-**Causa**: Type definition includes new field, but service layer functions (`getSettings`, `setSettings`) don't read/write it from Firestore
-**Esempio**: `includePrimaryResidenceInFIRE` defined in type but not handled in `assetAllocationService.ts`
-**Soluzione**: Update BOTH service functions:
-```typescript
-// getSettings() - READ
-includePrimaryResidenceInFIRE: data.includePrimaryResidenceInFIRE,
-
-// setSettings() - WRITE
-if (settings.includePrimaryResidenceInFIRE !== undefined) {
-  docData.includePrimaryResidenceInFIRE = settings.includePrimaryResidenceInFIRE;
-}
-```
+**Causa**: Type definition includes new field, but service layer doesn't read/write it from Firestore
+**Debug time**: ~30min identifying service layer was missing field handling
+**Soluzione**: Update BOTH `getSettings()` (read) and `setSettings()` (write) functions
 **Debug checklist**:
-1. Does field appear in Firestore document? NO → setSettings not writing
+1. Does field appear in Firestore? NO → setSettings not writing
 2. Does UI show saved value after reload? NO → getSettings not reading
-3. Check mutation payload in browser DevTools Network tab
-**Prevenzione**: When adding ANY field to settings types, always grep for service file and update both functions. Use three-place rule pattern.
+**Prevenzione**: Use three-place rule pattern (see Settings Service Synchronization Pattern above)
 
 ---
 
 ## Key Files
-- Date helpers: `lib/utils/dateHelpers.ts`
-- Formatters: `lib/utils/formatters.ts`
-- Asset history utils: `lib/utils/assetPriceHistoryUtils.ts`
-- Performance service: `lib/services/performanceService.ts`
-- Performance types: `types/performance.ts`
-- YOC API route: `app/api/performance/yoc/route.ts`
-- Currency conversion: `lib/services/currencyConversionService.ts`
-- Query keys: `lib/query/queryKeys.ts`
-- Cashflow charts: `components/cashflow/TotalHistoryTab.tsx`, `components/cashflow/CurrentYearTab.tsx`
-- Sankey diagram: `components/cashflow/CashflowSankeyChart.tsx`
-- History charts: `app/dashboard/history/page.tsx`, `lib/services/chartService.ts`
-- Asset allocation service: `lib/services/assetAllocationService.ts`
-- Performance section: `components/performance/MetricSection.tsx`
-- FIRE calculator: `components/fire-simulations/FireCalculatorTab.tsx`
+- **Utils**: `lib/utils/dateHelpers.ts`, `formatters.ts`, `assetPriceHistoryUtils.ts`
+- **Services**: `performanceService.ts`, `assetAllocationService.ts`, `currencyConversionService.ts`, `chartService.ts`
+- **API Routes**: `app/api/performance/yoc/route.ts`
+- **Components**: `CashflowSankeyChart.tsx`, `MetricSection.tsx`, `FireCalculatorTab.tsx`
+- **Pages**: `app/dashboard/settings/page.tsx`, `history/page.tsx`
 
 **Last updated**: 2026-01-19

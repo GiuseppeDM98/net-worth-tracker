@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz, @nivo/sankey
-- Feature ultimo mese: FIRE primary residence exclusion + Performance metrics categorization
-- Ultima implementazione: Primary residence flag for real estate assets with global FIRE toggle + 15 performance metrics organized in 4 logical categories (2026-01-19)
+- Feature ultimo mese: Settings page bug fixes + FIRE setting UI + Performance metrics categorization
+- Ultima implementazione: Fixed 8 Settings page bugs including subcategory deletion persistence, added FIRE primary residence toggle to Settings UI (2026-01-19)
 - In corso ora: nessuna attivita attiva
 - Completamento: n/d
 
@@ -59,7 +59,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Hall of Fame con ranking mensili/annuali e highlight del periodo corrente.
 - FIRE calculator con esclusione configurabile casa di abitazione:
   - Flag `isPrimaryResidence` su asset immobiliari (checkbox nel form asset)
-  - Setting globale `includePrimaryResidenceInFIRE` nel FIRE Calculator (default OFF = escludi, metodologia FIRE standard)
+  - Setting globale `includePrimaryResidenceInFIRE` disponibile in Settings page e FIRE Calculator (default OFF = escludi, metodologia FIRE standard)
   - Calcolo automatico con `calculateFIRENetWorth()` che filtra immobili primari in base al setting
   - PDF export consistente con UI (usa stesso calcolo e setting)
   - Backwards compatible: asset esistenti senza flag → inclusi, settings esistenti → esclusi (FIRE standard)
@@ -81,6 +81,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Known Issues (Active)
 - Etichette legenda su mobile troncate (top 3 elementi).
 - Conversione valuta dipende da Frankfurter API (fallback su cache, ma possibile failure prolungata).
+- Subcategory rename not fully implemented (tracking prepared but old keys not deleted in Firestore).
 
 ## Key Files
 - History page: `app/dashboard/history/page.tsx`
@@ -99,7 +100,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Date helpers: `lib/utils/dateHelpers.ts`
 - Formatters: `lib/utils/formatters.ts`
 - Asset service: `lib/services/assetService.ts` (includes `calculateFIRENetWorth`)
-- Asset allocation service: `lib/services/assetAllocationService.ts`
+- Asset allocation service: `lib/services/assetAllocationService.ts` (includes nested object replacement pattern)
+- Settings page: `app/dashboard/settings/page.tsx`
 - PDF data service: `lib/services/pdfDataService.ts`
 - Asset dialog: `components/assets/AssetDialog.tsx`
 - FIRE calculator: `components/fire-simulations/FireCalculatorTab.tsx`

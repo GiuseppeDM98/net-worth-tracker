@@ -65,38 +65,79 @@ export async function setSettings(
   try {
     const targetRef = doc(db, ALLOCATION_TARGETS_COLLECTION, userId);
 
-    // Build the document object, only including defined fields
-    const docData: any = {
-      userId,
-      targets: settings.targets,
-      updatedAt: Timestamp.now(),
-    };
+    // CRITICAL: If targets is being updated, we need to REPLACE it completely (not merge)
+    // to ensure deleted subcategories are removed from Firestore.
+    // Firestore merge: true does recursive merge, keeping old nested keys.
+    if (settings.targets !== undefined) {
+      // Get existing document to preserve other fields
+      const existingDoc = await getDoc(targetRef);
+      const existingData = existingDoc.exists() ? existingDoc.data() : {};
 
-    // Only add optional fields if they are defined
-    if (settings.userAge !== undefined) {
-      docData.userAge = settings.userAge;
-    }
-    if (settings.riskFreeRate !== undefined) {
-      docData.riskFreeRate = settings.riskFreeRate;
-    }
-    if (settings.withdrawalRate !== undefined) {
-      docData.withdrawalRate = settings.withdrawalRate;
-    }
-    if (settings.plannedAnnualExpenses !== undefined) {
-      docData.plannedAnnualExpenses = settings.plannedAnnualExpenses;
-    }
-    if (settings.includePrimaryResidenceInFIRE !== undefined) {
-      docData.includePrimaryResidenceInFIRE = settings.includePrimaryResidenceInFIRE;
-    }
-    if (settings.dividendIncomeCategoryId !== undefined) {
-      docData.dividendIncomeCategoryId = settings.dividendIncomeCategoryId;
-    }
-    if (settings.dividendIncomeSubCategoryId !== undefined) {
-      docData.dividendIncomeSubCategoryId = settings.dividendIncomeSubCategoryId;
-    }
+      // Build complete document with all fields
+      const docData: any = {
+        ...existingData, // Keep all existing fields
+        userId,
+        targets: settings.targets, // COMPLETELY REPLACE targets (not merge)
+        updatedAt: Timestamp.now(),
+      };
 
-    // Use merge: true to preserve existing fields not included in this update
-    await setDoc(targetRef, docData, { merge: true });
+      // Override with new values for defined fields
+      if (settings.userAge !== undefined) {
+        docData.userAge = settings.userAge;
+      }
+      if (settings.riskFreeRate !== undefined) {
+        docData.riskFreeRate = settings.riskFreeRate;
+      }
+      if (settings.withdrawalRate !== undefined) {
+        docData.withdrawalRate = settings.withdrawalRate;
+      }
+      if (settings.plannedAnnualExpenses !== undefined) {
+        docData.plannedAnnualExpenses = settings.plannedAnnualExpenses;
+      }
+      if (settings.includePrimaryResidenceInFIRE !== undefined) {
+        docData.includePrimaryResidenceInFIRE = settings.includePrimaryResidenceInFIRE;
+      }
+      if (settings.dividendIncomeCategoryId !== undefined) {
+        docData.dividendIncomeCategoryId = settings.dividendIncomeCategoryId;
+      }
+      if (settings.dividendIncomeSubCategoryId !== undefined) {
+        docData.dividendIncomeSubCategoryId = settings.dividendIncomeSubCategoryId;
+      }
+
+      // Use setDoc WITHOUT merge to completely replace targets
+      await setDoc(targetRef, docData);
+    } else {
+      // No targets update, use normal merge behavior
+      const docData: any = {
+        userId,
+        updatedAt: Timestamp.now(),
+      };
+
+      if (settings.userAge !== undefined) {
+        docData.userAge = settings.userAge;
+      }
+      if (settings.riskFreeRate !== undefined) {
+        docData.riskFreeRate = settings.riskFreeRate;
+      }
+      if (settings.withdrawalRate !== undefined) {
+        docData.withdrawalRate = settings.withdrawalRate;
+      }
+      if (settings.plannedAnnualExpenses !== undefined) {
+        docData.plannedAnnualExpenses = settings.plannedAnnualExpenses;
+      }
+      if (settings.includePrimaryResidenceInFIRE !== undefined) {
+        docData.includePrimaryResidenceInFIRE = settings.includePrimaryResidenceInFIRE;
+      }
+      if (settings.dividendIncomeCategoryId !== undefined) {
+        docData.dividendIncomeCategoryId = settings.dividendIncomeCategoryId;
+      }
+      if (settings.dividendIncomeSubCategoryId !== undefined) {
+        docData.dividendIncomeSubCategoryId = settings.dividendIncomeSubCategoryId;
+      }
+
+      // Use merge: true to preserve existing fields
+      await setDoc(targetRef, docData, { merge: true });
+    }
   } catch (error) {
     console.error('Error setting allocation settings:', error);
     throw new Error('Failed to save allocation settings');

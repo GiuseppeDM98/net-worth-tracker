@@ -116,9 +116,15 @@ export default function SettingsPage() {
   const [autoCalculate, setAutoCalculate] = useState(false);
   const [cashUseFixedAmount, setCashUseFixedAmount] = useState(false);
   const [cashFixedAmount, setCashFixedAmount] = useState<number>(0);
+  const [includePrimaryResidenceInFIRE, setIncludePrimaryResidenceInFIRE] = useState<boolean>(false);
   const [assetClassStates, setAssetClassStates] = useState<
     Record<AssetClass, AssetClassState>
   >({} as Record<AssetClass, AssetClassState>);
+
+  // Track original subcategory names to handle renames (Bug #2 fix)
+  const [subcategoryNameMap, setSubcategoryNameMap] = useState<{
+    [assetClass: string]: { [currentName: string]: string }; // currentName -> originalName
+  }>({});
 
   // Expense categories state
   const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
@@ -258,6 +264,8 @@ export default function SettingsPage() {
           settingsData.userAge !== undefined &&
           settingsData.riskFreeRate !== undefined
         );
+        // Load FIRE setting (Bug #1 fix)
+        setIncludePrimaryResidenceInFIRE(settingsData.includePrimaryResidenceInFIRE ?? false);
         // Load dividend settings
         setDividendIncomeCategoryId(settingsData.dividendIncomeCategoryId || '');
         setDividendIncomeSubCategoryId(settingsData.dividendIncomeSubCategoryId || '');
@@ -275,39 +283,54 @@ export default function SettingsPage() {
         AssetClassState
       >;
 
+      // Initialize subcategoryNameMap for rename tracking (Bug #2 fix)
+      const nameMapByAssetClass: {
+        [assetClass: string]: { [currentName: string]: string };
+      } = {};
+
       assetClasses.forEach((assetClass) => {
         const targetData = targets[assetClass];
         const subCategoryConfig = targetData?.subCategoryConfig;
         const subTargets = targetData?.subTargets;
 
+        const subTargetsArray = subTargets
+          ? Object.entries(subTargets).map(([name, value]) => {
+              // Support both old format (number) and new format (SubCategoryTarget)
+              if (typeof value === 'number') {
+                return {
+                  name,
+                  percentage: value,
+                };
+              } else {
+                return {
+                  name,
+                  percentage: value.targetPercentage,
+                  specificAssetsEnabled: value.specificAssetsEnabled || false,
+                  specificAssets: value.specificAssets || [],
+                  expanded: false,
+                };
+              }
+            })
+          : [];
+
+        // Initialize name map: current name -> original name (initially same)
+        const nameMap: { [name: string]: string } = {};
+        subTargetsArray.forEach(st => {
+          nameMap[st.name] = st.name;
+        });
+        nameMapByAssetClass[assetClass] = nameMap;
+
         states[assetClass] = {
           targetPercentage: targetData?.targetPercentage || 0,
           subCategoryEnabled: subCategoryConfig?.enabled || false,
           categories: subCategoryConfig?.categories || [],
-          subTargets: subTargets
-            ? Object.entries(subTargets).map(([name, value]) => {
-                // Support both old format (number) and new format (SubCategoryTarget)
-                if (typeof value === 'number') {
-                  return {
-                    name,
-                    percentage: value,
-                  };
-                } else {
-                  return {
-                    name,
-                    percentage: value.targetPercentage,
-                    specificAssetsEnabled: value.specificAssetsEnabled || false,
-                    specificAssets: value.specificAssets || [],
-                    expanded: false,
-                  };
-                }
-              })
-            : [],
+          subTargets: subTargetsArray,
           expanded: assetClass === 'equity', // Solo equity espanso di default
         };
       });
 
       setAssetClassStates(states);
+      setSubcategoryNameMap(nameMapByAssetClass);
     } catch (error) {
       console.error('Error loading targets:', error);
       toast.error('Errore nel caricamento dei target');
@@ -465,7 +488,8 @@ export default function SettingsPage() {
       await setSettings(user.uid, {
         userAge,
         riskFreeRate,
-        // Preserve FIRE settings
+        // Preserve FIRE settings (Bug #1 & #5 fix)
+        includePrimaryResidenceInFIRE,
         withdrawalRate: settingsData?.withdrawalRate,
         plannedAnnualExpenses: settingsData?.plannedAnnualExpenses,
         targets,
@@ -593,6 +617,20 @@ export default function SettingsPage() {
   const handleSave = async () => {
     if (!user) return;
 
+    // Auto-cleanup empty subcategory rows before validation (Bug #8 fix)
+    assetClasses.forEach(assetClass => {
+      const state = assetClassStates[assetClass];
+      if (state.subCategoryEnabled && state.subTargets.length > 0) {
+        const cleanedSubTargets = state.subTargets.filter(t => t.name.trim() !== '');
+        if (cleanedSubTargets.length !== state.subTargets.length) {
+          updateAssetClassState(assetClass, {
+            subTargets: cleanedSubTargets,
+            categories: cleanedSubTargets.map(t => t.name),
+          });
+        }
+      }
+    });
+
     const total = calculateTotal();
     if (Math.abs(total - 100) > 0.01) {
       toast.error(
@@ -675,14 +713,15 @@ export default function SettingsPage() {
           }),
           subCategoryConfig: {
             enabled: state.subCategoryEnabled,
-            // Sync categories array with actual subcategory names from subTargets
-            categories: state.subCategoryEnabled && state.subTargets.length > 0
-              ? state.subTargets.map(t => t.name)
-              : state.categories,
+            // Always derive categories from subTargets (Bug #4 fix)
+            categories: state.subCategoryEnabled
+              ? state.subTargets.map(t => t.name).filter(n => n !== '')
+              : [],
           },
         };
 
         if (state.subCategoryEnabled && state.subTargets.length > 0) {
+          // Rebuild subTargets from scratch to ensure deleted/renamed entries are removed (Bug #2 & #3 fix)
           targets[assetClass].subTargets = state.subTargets.reduce(
             (acc, target) => {
               if (target.specificAssetsEnabled && target.specificAssets && target.specificAssets.length > 0) {
@@ -709,7 +748,8 @@ export default function SettingsPage() {
       await setSettings(user.uid, {
         userAge,
         riskFreeRate,
-        // Preserve FIRE settings
+        // Preserve FIRE settings (Bug #1 fix)
+        includePrimaryResidenceInFIRE,
         withdrawalRate: settingsData?.withdrawalRate,
         plannedAnnualExpenses: settingsData?.plannedAnnualExpenses,
         targets,
@@ -799,6 +839,7 @@ export default function SettingsPage() {
       updateAssetClassState(assetClass, {
         subCategoryEnabled: enabled,
         subTargets,
+        categories: state.categories, // Explicitly keep in sync (Bug #4 fix)
       });
     } else {
       updateAssetClassState(assetClass, { subCategoryEnabled: enabled });
@@ -807,15 +848,32 @@ export default function SettingsPage() {
 
   const handleAddSubTarget = (assetClass: AssetClass) => {
     const state = assetClassStates[assetClass];
+
+    // Prevent adding if there are existing empty names (Bug #8 fix)
+    const hasEmpty = state.subTargets.some(t => !t.name.trim());
+    if (hasEmpty) {
+      toast.error('Completa le sotto-categorie esistenti prima di aggiungerne altre');
+      return;
+    }
+
+    const newSubTargets = [...state.subTargets, { name: '', percentage: 0 }];
+    // Update categories to stay in sync (Bug #3 fix)
+    const newCategories = newSubTargets.map(t => t.name).filter(n => n !== '');
     updateAssetClassState(assetClass, {
-      subTargets: [...state.subTargets, { name: '', percentage: 0 }],
+      subTargets: newSubTargets,
+      categories: newCategories,
     });
   };
 
   const handleRemoveSubTarget = (assetClass: AssetClass, index: number) => {
     const state = assetClassStates[assetClass];
     const newSubTargets = state.subTargets.filter((_, i) => i !== index);
-    updateAssetClassState(assetClass, { subTargets: newSubTargets });
+    // Update categories to stay in sync (Bug #3 fix)
+    const newCategories = newSubTargets.map(t => t.name);
+    updateAssetClassState(assetClass, {
+      subTargets: newSubTargets,
+      categories: newCategories,
+    });
   };
 
   const handleSubTargetChange = (
@@ -826,12 +884,31 @@ export default function SettingsPage() {
   ) => {
     const state = assetClassStates[assetClass];
     const newSubTargets = [...state.subTargets];
+
     if (field === 'name') {
-      newSubTargets[index].name = value as string;
+      // Track rename mapping (Bug #2 fix)
+      const oldName = newSubTargets[index].name;
+      const newName = value as string;
+      newSubTargets[index].name = newName;
+
+      // Update name map to track rename
+      const nameMap = subcategoryNameMap[assetClass] || {};
+      const originalName = nameMap[oldName] || oldName;
+      const updatedNameMap = { ...nameMap };
+      updatedNameMap[newName] = originalName; // New name -> original name
+      delete updatedNameMap[oldName]; // Remove old mapping
+      setSubcategoryNameMap({ ...subcategoryNameMap, [assetClass]: updatedNameMap });
+
+      // Update categories array to stay in sync (Bug #3 & #4 fix)
+      const newCategories = newSubTargets.map(t => t.name).filter(n => n !== '');
+      updateAssetClassState(assetClass, {
+        subTargets: newSubTargets,
+        categories: newCategories,
+      });
     } else {
       newSubTargets[index].percentage = value as number;
+      updateAssetClassState(assetClass, { subTargets: newSubTargets });
     }
-    updateAssetClassState(assetClass, { subTargets: newSubTargets });
   };
 
   const handleAddCategory = (assetClass: AssetClass, categoryName: string) => {
@@ -1050,6 +1127,23 @@ export default function SettingsPage() {
                 </p>
               </div>
             )}
+
+            {/* FIRE Settings (Bug #1 fix) */}
+            <div className="flex items-center justify-between border-t pt-4">
+              <div>
+                <Label htmlFor="firePrimaryResidence" className="text-sm font-medium">
+                  Includi casa di abitazione nel calcolo FIRE
+                </Label>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Include il valore della casa di abitazione nel net worth FIRE
+                </p>
+              </div>
+              <Switch
+                id="firePrimaryResidence"
+                checked={includePrimaryResidenceInFIRE}
+                onCheckedChange={setIncludePrimaryResidenceInFIRE}
+              />
+            </div>
 
             <p className="text-sm text-gray-600">
               <strong>Nota:</strong> Il tasso risk-free può essere recuperato da{' '}

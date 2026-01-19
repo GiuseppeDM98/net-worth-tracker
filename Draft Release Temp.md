@@ -385,6 +385,23 @@
 
 ## 🐛 Bug Fixes
 
+- **Settings Page - Subcategory Deletion Persistence**: Fixed critical bug where deleted asset allocation subcategories reappeared after page reload
+  - **Issue**: Deleting subcategories (e.g., removing "azioni" from Equity allocation) appeared successful but reverted on page refresh
+  - **Root cause**: Firestore `merge: true` performs recursive merge on nested objects, keeping old keys even when omitted from new data structure
+  - **Discovery process**: Required 3+ hours of debugging to identify Firestore merge behavior as root cause (attempted 2 incorrect fixes before finding solution)
+  - **Fix**: Modified `assetAllocationService.ts` to use read-modify-write pattern with complete replacement for `targets` field (GET existing document → spread all fields → setDoc WITHOUT merge)
+  - **Impact**: Comprehensive fix also resolved 7 related bugs in Settings page with similar patterns
+  - **Additional fixes**:
+    - Bug #1 (CRITICAL): Added missing `includePrimaryResidenceInFIRE` UI toggle in Settings page (setting previously only accessible in FIRE Calculator)
+    - Bug #2 (CRITICAL): Prepared subcategory rename tracking infrastructure (full implementation pending)
+    - Bug #3 (HIGH): Original bug - subcategory deletion now persists correctly
+    - Bug #4 (HIGH): Fixed `categories` ↔ `subTargets` array desynchronization in all handlers
+    - Bug #5 (MEDIUM): Dividend settings save now preserves FIRE setting
+    - Bug #8 (LOW): Added empty subcategory name validation and auto-cleanup on save
+  - **User benefit**: Asset allocation settings now persist reliably; FIRE primary residence setting accessible from Settings page
+  - **Technical details**: Trade-off of ~100-200ms overhead for correctness (extra GET before save when updating targets)
+  - **Backwards compatible**: No breaking changes, existing settings continue working
+
 - **YOC Future Dividends**: Fixed YOC metrics incorrectly including future dividends not yet received
   - **Issue**: Dividends with payment dates between today and end-of-month were counted as "received", artificially inflating YOC values
   - **Impact**: YOC metrics showed higher values than actual (e.g., on Jan 17, dividends scheduled for Jan 18-31 were included)

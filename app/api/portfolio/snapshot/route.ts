@@ -215,8 +215,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: existingSnapshot.exists
-        ? 'Snapshot updated successfully'
-        : 'Snapshot created successfully',
+        ? 'Snapshot aggiornato con successo'
+        : 'Snapshot creato con successo',
       snapshotId,
       data: {
         year: snapshotYear,
