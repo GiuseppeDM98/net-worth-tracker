@@ -192,6 +192,19 @@
 
 ### User Experience Enhancements
 
+- **Sankey Diagram Multi-Level Drill-Down with Transaction Details**: Enhanced cashflow visualization with deep navigation and transaction-level insights
+  - **4-level navigation**: Budget → Expense Type → Category → Subcategory → Individual Transactions
+  - **Smart navigation**: Automatically skips to transaction list when category has no subcategories
+  - **Transaction detail table**: Desktop table with sticky header or mobile card layout showing Date, Amount, Notes, and Links
+  - **Dynamic breadcrumb**: Full navigation path displayed in header (e.g., "Variabili - Cibo - Coop")
+  - **Responsive transaction view**: Scrollable table (max 500px) on desktop, card-based layout on mobile
+  - **Transaction filtering**: Shows only transactions for selected category/subcategory combination
+  - **Color-coded amounts**: Green for income, red for expenses matching app-wide conventions
+  - **External link support**: Opens receipt/order links in new tab from transaction table
+  - **Empty state handling**: Clear message when no transactions match selected filters
+  - **Back button navigation**: Multi-level back support maintaining context through all drill-down levels
+  - **Fixed decimal precision**: All Sankey values display exactly 2 decimal places (€6.709,68)
+
 - **Net Worth History - Notes Table View**: Improved notes visualization with dedicated responsive table replacing truncated chart labels
   - **Dedicated table display**: Notes now appear in a clean, readable table below the chart instead of crowded labels on the graph
   - **Full note visibility**: Complete note text displayed without truncation (previously limited to 50 characters)

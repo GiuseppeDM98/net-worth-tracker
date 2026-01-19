@@ -108,13 +108,17 @@ When working with expense data for calculations (cashflow, savings, etc.):
 ### Sankey Diagram Multi-Layer Pattern
 When implementing complex data flow visualizations:
 - **4-layer structure**: Income → Budget → Types → Categories + Savings
-- **Multi-mode drill-down**: Support multiple drill-down modes (type→categories, category→subcategories)
-- **State management**: Use `mode` field in state to distinguish between drill-down types
+- **Multi-mode drill-down**: Support 4 modes (budget, type drill-down, category drill-down, transactions)
+- **State management**: Use `mode` field + `parentType`/`parentCategory` to preserve navigation context
+- **Conditional rendering**: Wrap Nivo components to prevent crashes with empty data
+  - Pattern: `{mode !== 'transactions' && <ResponsiveSankey ... />}`
+  - Never render heavy chart components with empty datasets
+- **Early exit conditions**: Exclude special modes (e.g., transactions) from data validation checks
+- **valueFormat prop**: Use for consistent number formatting in tooltips AND links (Nivo applies globally)
 - **Color derivation**: Use `deriveSubcategoryColors()` for child node colors from parent
 - **Mobile filtering**: Apply aggressive filtering (top 3-4 per parent) to prevent overcrowding
-- **Type detection**: Check node ID against known type labels for click routing
-- **Empty state**: Always handle empty data gracefully (no nodes/links = don't render)
-- **Example**: CashflowSankeyChart with 3 modes (budget, type drill-down, category drill-down)
+- **Transaction integration**: Reuse filtering logic from parent components (e.g., CurrentYearTab pattern)
+- **Example**: CashflowSankeyChart with 4 modes + transaction table integration
 
 ---
 

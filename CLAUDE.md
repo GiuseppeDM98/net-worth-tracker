@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz, @nivo/sankey
-- Feature ultimo mese: Sankey diagram con expense types layer in Cashflow page
-- Ultima implementazione: 4-layer Sankey (Income → Budget → Expense Types → Categories) con drill-down interattivo per tipi e categorie (2026-01-18)
+- Feature ultimo mese: Sankey diagram multi-level drill-down + transaction details
+- Ultima implementazione: Multi-level navigation (Budget → Type → Category → Subcategory → Transactions) con tabella dettagli transazioni e breadcrumb dinamico (2026-01-19)
 - In corso ora: nessuna attivita attiva
 - Completamento: n/d
 
@@ -29,9 +29,12 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Portfolio multi-asset con aggiornamento prezzi Yahoo Finance.
 - Cashflow con categorie, filtri, statistiche e Sankey diagram interattivo:
   - Budget flow visualization: Income Categories → Budget → Expense Types → Expense Categories + Risparmi
-  - Interactive drill-down: click expense type to see categories, click category to see subcategories
-  - Expense types layer: Spese Fisse (blue), Variabili (violet), Debiti (amber) con consistenza colori vs grafici a torta
-  - Mobile optimization: top 3 categories per expense type, responsive labels (inside/outside)
+  - Multi-level drill-down: Budget → Type → Category → Subcategory → Transaction Details
+  - Transaction details table: desktop (sticky header, scrollable) + mobile (card layout)
+  - Dynamic breadcrumb: shows full navigation path in header (e.g., "Variabili - Cibo - Coop")
+  - Smart navigation: auto-skip to transactions if category has no subcategories
+  - Expense types layer: Spese Fisse (blue), Variabili (violet), Debiti (amber)
+  - Mobile optimization: top 3 categories per expense type, responsive labels
   - Separate charts per Anno Corrente e Storico Totale (filtro 2025+)
 - Snapshot mensili automatici + storico e CSV export.
 - History page con multiple chart visualizations:
@@ -67,8 +70,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Conversione valuta dipende da Frankfurter API (fallback su cache, ma possibile failure prolungata).
 
 ## Next Steps (Prossime 1-2 sessioni)
-- Testing e validazione Sankey diagram con dati reali utente.
-- Ottimizzazioni UI/UX basate su feedback utente.
+- Validazione esperienza utente con navigazione multi-livello Sankey.
+- Eventuali ottimizzazioni performance con dataset grandi.
 
 ## Key Files
 - History page: `app/dashboard/history/page.tsx`

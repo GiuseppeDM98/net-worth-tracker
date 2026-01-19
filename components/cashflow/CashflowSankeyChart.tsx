@@ -461,6 +461,7 @@ export function CashflowSankeyChart({
     color: string;
     isIncome: boolean;
     mode?: 'type' | 'category' | 'transactions';
+    parentType?: string;             // Expense type name for breadcrumb (e.g., "Variabili")
     parentCategory?: string;         // Category name for transaction filtering
     selectedSubcategory?: string;    // Subcategory name for transaction filtering
   } | null>(null);
@@ -586,6 +587,7 @@ export function CashflowSankeyChart({
         color: node.color,
         isIncome,
         mode: hasSubcategories ? 'category' : 'transactions',
+        parentType: selectedCategory.name,  // Track the expense type for breadcrumb
         parentCategory: node.id,
       });
     }
@@ -646,13 +648,62 @@ export function CashflowSankeyChart({
     }
   };
 
+  // Build breadcrumb title based on navigation path
+  const getBreadcrumbTitle = (): string => {
+    const baseTitle = title || 'Flusso Cashflow';
+
+    if (!selectedCategory) {
+      // Budget view
+      return baseTitle;
+    }
+
+    if (selectedCategory.mode === 'type') {
+      // Type drill-down: Base - Type
+      return `${baseTitle} - ${selectedCategory.name}`;
+    }
+
+    if (selectedCategory.mode === 'category') {
+      // Category drill-down
+      if (selectedCategory.parentType) {
+        // From type drill-down: Base - Type - Category
+        return `${baseTitle} - ${selectedCategory.parentType} - ${selectedCategory.name}`;
+      } else {
+        // Direct category drill-down: Base - Category
+        return `${baseTitle} - ${selectedCategory.name}`;
+      }
+    }
+
+    if (selectedCategory.mode === 'transactions') {
+      // Transaction list
+      const categoryName = selectedCategory.parentCategory || selectedCategory.name;
+
+      if (selectedCategory.parentType) {
+        // From type → category → subcategory: Base - Type - Category - Subcategory
+        if (selectedCategory.selectedSubcategory) {
+          return `${baseTitle} - ${selectedCategory.parentType} - ${categoryName} - ${selectedCategory.selectedSubcategory}`;
+        }
+        // From type → category (no subs): Base - Type - Category
+        return `${baseTitle} - ${selectedCategory.parentType} - ${categoryName}`;
+      } else {
+        // Direct category → subcategory: Base - Category - Subcategory
+        if (selectedCategory.selectedSubcategory) {
+          return `${baseTitle} - ${categoryName} - ${selectedCategory.selectedSubcategory}`;
+        }
+        // Direct category (no subs): Base - Category
+        return `${baseTitle} - ${categoryName}`;
+      }
+    }
+
+    return baseTitle;
+  };
+
   // Empty state: no data to visualize (but allow transactions mode to render table)
   if ((sankeyData.nodes.length === 0 || sankeyData.links.length === 0) &&
       selectedCategory?.mode !== 'transactions') {
     return (
       <Card className="md:col-span-2">
         <CardHeader>
-          <CardTitle>{title || 'Flusso Cashflow'}</CardTitle>
+          <CardTitle>{getBreadcrumbTitle()}</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-center text-muted-foreground py-8">
@@ -679,9 +730,7 @@ export function CashflowSankeyChart({
             </Button>
           )}
           <CardTitle>
-            {selectedCategory
-              ? `${title || 'Flusso Cashflow'} - ${selectedCategory.name}`
-              : title || 'Flusso Cashflow'}
+            {getBreadcrumbTitle()}
           </CardTitle>
         </div>
       </CardHeader>
