@@ -109,6 +109,7 @@ const assetSchema = z.object({
   autoUpdatePrice: z.boolean().optional(),
   isComposite: z.boolean().optional(),
   outstandingDebt: z.number().nonnegative('Debt cannot be negative').optional().or(z.nan()),
+  isPrimaryResidence: z.boolean().optional(),
 });
 
 type AssetFormValues = z.infer<typeof assetSchema>;
@@ -167,6 +168,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
       autoUpdatePrice: true,
       isComposite: false,
       outstandingDebt: undefined,
+      isPrimaryResidence: false,
     },
   });
 
@@ -255,6 +257,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         autoUpdatePrice: asset.autoUpdatePrice !== undefined ? asset.autoUpdatePrice : shouldUpdatePrice(asset.type, asset.subCategory),
         isComposite: !!(asset.composition && asset.composition.length > 0),
         outstandingDebt: asset.outstandingDebt || undefined,
+        isPrimaryResidence: asset.isPrimaryResidence || false,
         isin: asset.isin || undefined,
       });
 
@@ -291,6 +294,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         autoUpdatePrice: true,
         isComposite: false,
         outstandingDebt: undefined,
+        isPrimaryResidence: false,
       });
       setComposition([]);
       setIsComposite(false);
@@ -481,6 +485,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         autoUpdatePrice: data.autoUpdatePrice,
         composition: isComposite && composition.length > 0 ? composition : undefined,
         outstandingDebt: data.outstandingDebt && !isNaN(data.outstandingDebt) && data.outstandingDebt > 0 ? data.outstandingDebt : undefined,
+        isPrimaryResidence: data.isPrimaryResidence || false,
       };
 
       if (asset) {
@@ -900,6 +905,26 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                   </p>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Primary Residence - solo per immobili */}
+          {selectedType === 'realestate' && selectedAssetClass === 'realestate' && (
+            <div className="space-y-2 rounded-lg border p-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="isPrimaryResidence">Casa di Abitazione</Label>
+                  <p className="text-xs text-gray-500">
+                    Marca questo immobile come casa di abitazione. Il calcolo FIRE può escludere questi immobili
+                    (configurabile nelle impostazioni FIRE).
+                  </p>
+                </div>
+                <Switch
+                  id="isPrimaryResidence"
+                  checked={watch('isPrimaryResidence')}
+                  onCheckedChange={(checked) => setValue('isPrimaryResidence', checked)}
+                />
+              </div>
             </div>
           )}
 

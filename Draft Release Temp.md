@@ -2,6 +2,41 @@
 
 ### Features
 
+- **FIRE Calculator - Primary Residence Exclusion**: Enhanced FIRE (Financial Independence Retire Early) calculations with configurable primary residence treatment
+  - **Primary residence flag**: Mark real estate assets as "Casa di Abitazione" (primary residence) in the asset form
+  - **Conditional UI**: Checkbox appears only for real estate assets, keeps form clean for other asset types
+  - **Global FIRE setting**: New toggle "Includi Casa di Abitazione nel Calcolo FIRE" in FIRE Calculator settings
+  - **Standard FIRE methodology**: Default behavior excludes primary residences (you need somewhere to live, not liquid for retirement income)
+  - **Flexible inclusion**: Easily include all primary residences with one toggle if planning to downsize or relocate in retirement
+  - **Outstanding debt handling**: Net equity calculation automatically factors in mortgages/loans before applying exclusion
+  - **Smart calculation**: New `calculateFIRENetWorth()` function conditionally filters primary residences based on user preference
+  - **PDF consistency**: Export reports use identical calculation and setting as UI for accurate documentation
+  - **No breaking changes**: Existing assets without flag are included by default; existing settings default to exclusion (FIRE standard)
+  - **Multiple properties**: Support for marking multiple primary residences, all controlled by single global toggle
+  - **Educational help text**: Inline explanations guide users on FIRE methodology and when to include/exclude
+  - **Real-time updates**: FIRE Number, progress percentage, and current allowances recalculate instantly when toggling setting
+  - **Example scenario**: €300k primary residence + €200k investment property + €100k stocks → Setting OFF = €300k FIRE net worth, Setting ON = €600k FIRE net worth
+
+- **Performance Metrics Categorization**: Reorganized 15 performance metrics into 4 logical categories with visual section headers for improved scannability
+  - **Four category sections**: Metriche di Rendimento (4 metrics), Metriche di Rischio (5 metrics), Metriche di Contesto (2 metrics), Metriche Dividendi (4 metrics)
+  - **Visual section headers**: Each category displays title with emoji icon and descriptive subtitle explaining what metrics measure
+  - **Rendimento section**: Groups return metrics (ROI, CAGR, TWR, IRR) showing portfolio growth performance
+  - **Rischio section**: Consolidates risk metrics (Volatilità, Sharpe Ratio, Max Drawdown, Drawdown Duration, Recovery Time) for downside analysis
+  - **Contesto section**: Contextual information (Contributi Netti, Durata) providing period details and capital flow data
+  - **Dividendi section**: Dividend metrics (YOC Gross/Net, Current Yield Gross/Net) with conditional rendering (visible only when data available)
+  - **Better information architecture**: Logical grouping reduces cognitive load when scanning 15+ metrics
+  - **Educational value**: Section descriptions teach users what each category represents and why it matters
+  - **Reusable component**: New `MetricSection` component enables consistent layout across all categories
+  - **Responsive grid**: Mobile (1 column), tablet (2 columns), desktop (4 columns) for optimal viewing on all devices
+  - **No gap in Row 3**: Risk section now displays 5 cards (was 3 with empty space) for balanced visual layout
+  - **Semantic HTML**: h2 headers for section titles improve accessibility and screen reader support
+  - **Dark mode support**: Section headers and descriptions adapt to dark theme with appropriate text colors
+  - **Updated methodology notes**: New "Organizzazione delle Metriche" section explains categorization rationale
+  - **Zero functional changes**: All existing metrics, tooltips, calculations remain identical - purely UX improvement
+  - **Same period switching**: Category headers persist when changing timeframes (YTD, 1Y, 3Y, 5Y, ALL, Custom)
+
+### Features
+
 - **Current Yield Metrics (Gross & Net)**: Comprehensive dividend yield analysis based on current market value
   - **Dual metrics**: Current Yield Lordo (gross) and Current Yield Netto (net, after-tax) for complete dividend yield visibility
   - **Market-based calculation**: Formula uses current portfolio value instead of original cost basis (unlike YOC)

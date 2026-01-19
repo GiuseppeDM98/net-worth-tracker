@@ -27,6 +27,7 @@ import {
 } from 'recharts';
 import { CustomDateRangeDialog } from '@/components/performance/CustomDateRangeDialog';
 import { MetricCard } from '@/components/performance/MetricCard';
+import { MetricSection } from '@/components/performance/MetricSection';
 import { PerformanceTooltip } from '@/components/performance/PerformanceTooltip';
 import { MonthlyReturnsHeatmap } from '@/components/performance/MonthlyReturnsHeatmap';
 import { UnderwaterDrawdownChart } from '@/components/performance/UnderwaterDrawdownChart';
@@ -570,8 +571,11 @@ export default function PerformancePage() {
              - Performance documentation in /docs (if exists)
              Keep explanations consistent across all locations! */}
 
-        {/* Metrics Cards - Row 1 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+        {/* === METRICHE DI RENDIMENTO === */}
+        <MetricSection
+          title="📈 Metriche di Rendimento"
+          description="Misurano quanto il tuo portafoglio è cresciuto nel tempo"
+        >
           <MetricCard
             title="ROI Totale"
             value={metrics.roi}
@@ -596,16 +600,19 @@ export default function PerformancePage() {
             isPrimary
           />
           <MetricCard
-            title="Sharpe Ratio"
-            value={metrics.sharpeRatio}
-            format="number"
-            description="Rendimento aggiustato per il rischio"
-            tooltip={`Misura quanto rendimento extra si ottiene per ogni unità di rischio assunto. Formula: (TWR - Tasso Risk-Free ${formatPercentage(metrics.riskFreeRate)}) / Volatilità. Interpretazione: <1 = scarso, 1-2 = buono, 2-3 = molto buono, >3 = eccellente.`}
+            title="Money-Weighted Return (IRR)"
+            value={metrics.moneyWeightedReturn}
+            format="percentage"
+            description="Tasso interno di rendimento"
+            tooltip="Rendimento personale dell'investitore che tiene conto di QUANDO hai investito o prelevato denaro. Se investi molto prima di una crescita = IRR alto. Se investi prima di un calo = IRR basso. Usa questa metrica per capire quanto hai guadagnato TU con le TUE decisioni di timing."
           />
-        </div>
+        </MetricSection>
 
-        {/* Metrics Cards - Row 2 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+        {/* === METRICHE DI RISCHIO === */}
+        <MetricSection
+          title="⚠️ Metriche di Rischio"
+          description="Valutano la volatilità e i potenziali ribassi del portafoglio"
+        >
           <MetricCard
             title="Volatilità"
             value={metrics.volatility}
@@ -614,12 +621,43 @@ export default function PerformancePage() {
             tooltip="Misura la variabilità dei rendimenti mensili (quanto 'ballano' i risultati). Valori bassi = investimento più stabile e prevedibile. Valori alti = maggiori oscillazioni e rischio. Calcolata sui rendimenti mensili ed espressa in forma annualizzata (× √12)."
           />
           <MetricCard
-            title="Money-Weighted Return (IRR)"
-            value={metrics.moneyWeightedReturn}
-            format="percentage"
-            description="Tasso interno di rendimento"
-            tooltip="Rendimento personale dell'investitore che tiene conto di QUANDO hai investito o prelevato denaro. Se investi molto prima di una crescita = IRR alto. Se investi prima di un calo = IRR basso. Usa questa metrica per capire quanto hai guadagnato TU con le TUE decisioni di timing."
+            title="Sharpe Ratio"
+            value={metrics.sharpeRatio}
+            format="number"
+            description="Rendimento aggiustato per il rischio"
+            tooltip={`Misura quanto rendimento extra si ottiene per ogni unità di rischio assunto. Formula: (TWR - Tasso Risk-Free ${formatPercentage(metrics.riskFreeRate)}) / Volatilità. Interpretazione: <1 = scarso, 1-2 = buono, 2-3 = molto buono, >3 = eccellente.`}
           />
+          <MetricCard
+            title="Max Drawdown"
+            value={metrics.maxDrawdown}
+            subtitle={metrics.maxDrawdownDate}
+            format="percentage"
+            description="Massima perdita percentuale dal picco"
+            tooltip="Misura la peggiore perdita (da picco a valle) che il portafoglio ha subito nel periodo selezionato. Esempio: se il portafoglio valeva €100.000 e scese a €85.000 prima di recuperare, il Max Drawdown è -15%. Calcolo aggiustato per flussi di cassa (sottratte le contribuzioni cumulative) per isolare la performance degli investimenti. Valori vicini allo 0% = portafoglio stabile, valori molto negativi = alta volatilità al ribasso."
+          />
+          <MetricCard
+            title="Durata Drawdown"
+            value={metrics.drawdownDuration}
+            subtitle={metrics.drawdownPeriod}
+            format="months"
+            description="Tempo di recupero dal Max Drawdown"
+            tooltip="Misura il tempo (in mesi) necessario per recuperare completamente dalla perdita più grande (Max Drawdown). Esempio: se il portafoglio perde il 15% a gennaio e recupera a dicembre, la durata è 11 mesi. Questo indicatore misura la resilienza del portafoglio: durate brevi indicano rapido recupero, durate lunghe segnalano lenta ripresa. Calcolo aggiustato per flussi di cassa per isolare la performance degli investimenti. Se il portafoglio è ancora in drawdown, mostra la durata dall'ultimo picco."
+          />
+          <MetricCard
+            title="Recovery Time"
+            value={metrics.recoveryTime}
+            subtitle={metrics.recoveryPeriod}
+            format="months"
+            description="Tempo di risalita dalla valle"
+            tooltip="Misura il tempo (in mesi) necessario per recuperare dal punto più basso (trough) del Max Drawdown fino al completo recupero. A differenza della Durata Drawdown (che parte dal picco iniziale), questa metrica misura SOLO la fase di risalita. Esempio: se il portafoglio scende per 6 mesi e poi risale per 9 mesi, Recovery Time = 9 mesi (Durata Drawdown = 15 mesi). Utile per valutare la velocità di recupero dopo aver toccato il fondo. Calcolo aggiustato per flussi di cassa per isolare la performance degli investimenti."
+          />
+        </MetricSection>
+
+        {/* === METRICHE DI CONTESTO === */}
+        <MetricSection
+          title="📊 Metriche di Contesto"
+          description="Informazioni sul periodo e sui flussi di capitale"
+        >
           <MetricCard
             title="Contributi Netti"
             value={metrics.netCashFlow}
@@ -634,42 +672,14 @@ export default function PerformancePage() {
             description={`Da ${metrics.startDate.toLocaleDateString('it-IT')} a ${metrics.endDate.toLocaleDateString('it-IT')}`}
             tooltip="Periodo di tempo coperto dall'analisi. La data di inizio è il primo giorno del mese del primo snapshot disponibile. La data di fine è l'ultimo giorno del mese dell'ultimo snapshot disponibile. Gli snapshot automatici vengono creati alla fine di ogni mese (28-31) e includono tutti i cash flow fino a quella data."
           />
-        </div>
+        </MetricSection>
 
-        {/* Metrics Cards - Row 3 - Max Drawdown & Drawdown Duration */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
-          <MetricCard
-            title="Max Drawdown"
-            value={metrics.maxDrawdown}
-            subtitle={metrics.maxDrawdownDate}
-            format="percentage"
-            description="Massima perdita percentuale dal picco"
-            tooltip="Misura la peggiore perdita (da picco a valle) che il portafoglio ha subito nel periodo selezionato. Esempio: se il portafoglio valeva €100.000 e scese a €85.000 prima di recuperare, il Max Drawdown è -15%. Calcolo aggiustato per flussi di cassa (sottratte le contribuzioni cumulative) per isolare la performance degli investimenti. Valori vicini allo 0% = portafoglio stabile, valori molto negativi = alta volatilità al ribasso."
-          />
-
-          <MetricCard
-            title="Durata Drawdown"
-            value={metrics.drawdownDuration}
-            subtitle={metrics.drawdownPeriod}
-            format="months"
-            description="Tempo di recupero dal Max Drawdown"
-            tooltip="Misura il tempo (in mesi) necessario per recuperare completamente dalla perdita più grande (Max Drawdown). Esempio: se il portafoglio perde il 15% a gennaio e recupera a dicembre, la durata è 11 mesi. Questo indicatore misura la resilienza del portafoglio: durate brevi indicano rapido recupero, durate lunghe segnalano lenta ripresa. Calcolo aggiustato per flussi di cassa per isolare la performance degli investimenti. Se il portafoglio è ancora in drawdown, mostra la durata dall'ultimo picco."
-          />
-
-          <MetricCard
-            title="Recovery Time"
-            value={metrics.recoveryTime}
-            subtitle={metrics.recoveryPeriod}
-            format="months"
-            description="Tempo di risalita dalla valle"
-            tooltip="Misura il tempo (in mesi) necessario per recuperare dal punto più basso (trough) del Max Drawdown fino al completo recupero. A differenza della Durata Drawdown (che parte dal picco iniziale), questa metrica misura SOLO la fase di risalita. Esempio: se il portafoglio scende per 6 mesi e poi risale per 9 mesi, Recovery Time = 9 mesi (Durata Drawdown = 15 mesi). Utile per valutare la velocità di recupero dopo aver toccato il fondo. Calcolo aggiustato per flussi di cassa per isolare la performance degli investimenti."
-          />
-        </div>
-
-        {/* Metrics Cards - Row 4 - Dividend Metrics (YOC + Current Yield) */}
-        {/* Conditional rendering: only show if at least one dividend metric exists */}
+        {/* === METRICHE DIVIDENDI (conditional) === */}
         {(metrics.yocGross !== null || metrics.yocNet !== null || metrics.currentYield !== null || metrics.currentYieldNet !== null) && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+          <MetricSection
+            title="💰 Metriche Dividendi"
+            description="Rendimento da dividendi rispetto al costo di acquisto e al valore corrente"
+          >
             <MetricCard
               title="YOC Lordo"
               value={metrics.yocGross}
@@ -718,7 +728,7 @@ export default function PerformancePage() {
                   : '\n\nMetrica più accurata per valutare il reddito passivo effettivo rispetto ad altre opportunità (bond, depositi, altri ETF).'
               }`}
             />
-          </div>
+          </MetricSection>
         )}
 
         {/* Net Worth Evolution Chart */}
@@ -893,6 +903,18 @@ export default function PerformancePage() {
             <CardTitle>Note Metodologiche</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
+            <div>
+              <h4 className="font-semibold mb-1">Organizzazione delle Metriche</h4>
+              <p className="text-muted-foreground">
+                Le 15 metriche di performance sono organizzate in 4 categorie logiche per facilitare la comprensione:
+              </p>
+              <ul className="list-disc list-inside mt-2 space-y-1 text-muted-foreground">
+                <li><strong>📈 Rendimento</strong>: Quanto il portafoglio è cresciuto nel tempo (ROI, CAGR, TWR, IRR)</li>
+                <li><strong>⚠️ Rischio</strong>: Volatilità e potenziali ribassi (Volatilità, Sharpe, Max Drawdown, Durata Drawdown, Recovery Time)</li>
+                <li><strong>📊 Contesto</strong>: Informazioni sul periodo e flussi di capitale (Contributi Netti, Durata)</li>
+                <li><strong>💰 Dividendi</strong>: Rendimento da dividendi rispetto al costo di acquisto e al valore corrente (YOC Lordo/Netto, Current Yield Lordo/Netto)</li>
+              </ul>
+            </div>
             <div>
               <h4 className="font-semibold mb-1">Grafico: Evoluzione Patrimonio</h4>
               <p className="text-muted-foreground">

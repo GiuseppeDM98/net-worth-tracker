@@ -120,6 +120,34 @@ When implementing complex data flow visualizations:
 - **Transaction integration**: Reuse filtering logic from parent components (e.g., CurrentYearTab pattern)
 - **Example**: CashflowSankeyChart with 4 modes + transaction table integration
 
+### Settings Service Synchronization Pattern
+When adding new fields to settings/configuration types:
+- **Three-place rule**: ALL fields in settings types must be handled in THREE places
+  1. Type definition (e.g., `AssetAllocationSettings` in `types/assets.ts`)
+  2. `getSettings()` function to read from database
+  3. `setSettings()` function to save to database
+- **Firestore merge mode**: Use `if (field !== undefined)` checks in setSettings to preserve existing fields
+- **Example pattern**:
+```typescript
+// 1. Type definition
+export interface AssetAllocationSettings {
+  includePrimaryResidenceInFIRE?: boolean;
+}
+
+// 2. getSettings()
+return {
+  includePrimaryResidenceInFIRE: data.includePrimaryResidenceInFIRE,
+  // ... other fields
+};
+
+// 3. setSettings()
+if (settings.includePrimaryResidenceInFIRE !== undefined) {
+  docData.includePrimaryResidenceInFIRE = settings.includePrimaryResidenceInFIRE;
+}
+```
+- **Why critical**: Omitting service layer updates causes settings to not persist across reloads
+- **Prevention**: Mental checklist when adding any settings field
+
 ---
 
 ### Component Unmounting & Dialog State
@@ -199,6 +227,26 @@ const { month, year } = getItalyMonthYear();
 ```
 **Prevenzione**: Never use `Date.getMonth()` or `getFullYear()` directly. Always use timezone helpers from `dateHelpers.ts`. Test con `TZ=UTC npm run dev` per simulare production.
 
+### Settings Persistence Bugs (Service Layer Incomplete)
+**Sintomo**: UI toggles/inputs save correctly but reset to defaults after page reload
+**Causa**: Type definition includes new field, but service layer functions (`getSettings`, `setSettings`) don't read/write it from Firestore
+**Esempio**: `includePrimaryResidenceInFIRE` defined in type but not handled in `assetAllocationService.ts`
+**Soluzione**: Update BOTH service functions:
+```typescript
+// getSettings() - READ
+includePrimaryResidenceInFIRE: data.includePrimaryResidenceInFIRE,
+
+// setSettings() - WRITE
+if (settings.includePrimaryResidenceInFIRE !== undefined) {
+  docData.includePrimaryResidenceInFIRE = settings.includePrimaryResidenceInFIRE;
+}
+```
+**Debug checklist**:
+1. Does field appear in Firestore document? NO → setSettings not writing
+2. Does UI show saved value after reload? NO → getSettings not reading
+3. Check mutation payload in browser DevTools Network tab
+**Prevenzione**: When adding ANY field to settings types, always grep for service file and update both functions. Use three-place rule pattern.
+
 ---
 
 ## Key Files
@@ -213,5 +261,8 @@ const { month, year } = getItalyMonthYear();
 - Cashflow charts: `components/cashflow/TotalHistoryTab.tsx`, `components/cashflow/CurrentYearTab.tsx`
 - Sankey diagram: `components/cashflow/CashflowSankeyChart.tsx`
 - History charts: `app/dashboard/history/page.tsx`, `lib/services/chartService.ts`
+- Asset allocation service: `lib/services/assetAllocationService.ts`
+- Performance section: `components/performance/MetricSection.tsx`
+- FIRE calculator: `components/fire-simulations/FireCalculatorTab.tsx`
 
-**Last updated**: 2026-01-18
+**Last updated**: 2026-01-19

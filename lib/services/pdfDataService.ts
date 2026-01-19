@@ -44,6 +44,7 @@ import {
   calculateIlliquidNetWorth,
   calculatePortfolioWeightedTER,
   calculateAnnualPortfolioCost,
+  calculateFIRENetWorth,
 } from './assetService';
 import {
   compareAllocations,
@@ -108,8 +109,11 @@ export async function fetchPDFData(
 
     // FIRE: uses all expenses (not filtered) - FIRE needs complete annual data
     if (sections.fire) {
-      const totalNetWorth = calculateTotalValue(context.assets);
-      data.fire = await prepareFireData(userId, cachedExpenses!, totalNetWorth);
+      // Get user settings to determine if primary residence should be included
+      const settings = await getSettings(userId);
+      const includePrimaryResidence = settings?.includePrimaryResidenceInFIRE ?? false;
+      const fireNetWorth = calculateFIRENetWorth(context.assets, includePrimaryResidence);
+      data.fire = await prepareFireData(userId, cachedExpenses!, fireNetWorth);
     }
 
     // Summary: aggregates all available data

@@ -18,6 +18,12 @@
  * fireData query from running until dependencies are ready, avoiding
  * unnecessary API calls with incomplete data.
  *
+ * FIRE Net Worth Calculation:
+ * - Uses calculateFIRENetWorth() which conditionally excludes primary residences
+ * - User setting includePrimaryResidenceInFIRE controls inclusion/exclusion
+ * - Standard FIRE methodology excludes primary homes (not liquid for retirement income)
+ * - Some users prefer to include home equity if planning to downsize in retirement
+ *
  * Key Metrics Displayed:
  * - Current Metrics:
  *   - FIRE Number: Net worth needed to retire (annual expenses / withdrawal rate)
@@ -44,7 +50,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { getAllAssets, calculateTotalValue } from '@/lib/services/assetService';
+import { getAllAssets, calculateTotalValue, calculateFIRENetWorth } from '@/lib/services/assetService';
 import { getSettings, setSettings, getDefaultTargets } from '@/lib/services/assetAllocationService';
 import { getFIREData, calculatePlannedFIREMetrics } from '@/lib/services/fireService';
 import { formatCurrency, formatCurrencyCompact, formatPercentage } from '@/lib/services/chartService';
@@ -52,6 +58,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { TrendingUp, Calendar, DollarSign, Percent, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -72,6 +79,7 @@ export function FireCalculatorTab() {
 
   const [tempWithdrawalRate, setTempWithdrawalRate] = useState<string>('4.0');
   const [tempPlannedAnnualExpenses, setTempPlannedAnnualExpenses] = useState<string>('');
+  const [includePrimaryResidence, setIncludePrimaryResidence] = useState<boolean>(false);
 
   // Fetch settings data
   const { data: settings, isLoading: isLoadingSettings } = useQuery<Settings | null>({
@@ -91,7 +99,7 @@ export function FireCalculatorTab() {
 
   const withdrawalRate = settings?.withdrawalRate ?? 4.0;
   const plannedAnnualExpenses = settings?.plannedAnnualExpenses ?? null;
-  const currentNetWorth = assets ? calculateTotalValue(assets) : 0;
+  const currentNetWorth = assets ? calculateFIRENetWorth(assets, includePrimaryResidence) : 0;
 
   // Fetch FIRE data, dependent on assets and settings
   const { data: fireData, isLoading: isLoadingFIRE } = useQuery({
@@ -114,11 +122,12 @@ export function FireCalculatorTab() {
     if (settings) {
       setTempWithdrawalRate((settings.withdrawalRate ?? 4.0).toString());
       setTempPlannedAnnualExpenses(settings.plannedAnnualExpenses ? settings.plannedAnnualExpenses.toString() : '');
+      setIncludePrimaryResidence(settings.includePrimaryResidenceInFIRE ?? false);
     }
   }, [settings]);
 
   const mutation = useMutation({
-    mutationFn: (newSettings: { withdrawalRate: number; plannedAnnualExpenses?: number }) => {
+    mutationFn: (newSettings: { withdrawalRate: number; plannedAnnualExpenses?: number; includePrimaryResidenceInFIRE?: boolean }) => {
       return setSettings(user!.uid, {
         ...settings,
         targets: settings?.targets || getDefaultTargets(),
@@ -150,7 +159,11 @@ export function FireCalculatorTab() {
       return;
     }
 
-    mutation.mutate({ withdrawalRate: newWR, plannedAnnualExpenses: newPAE });
+    mutation.mutate({
+      withdrawalRate: newWR,
+      plannedAnnualExpenses: newPAE,
+      includePrimaryResidenceInFIRE: includePrimaryResidence
+    });
   };
 
   if (isLoadingSettings || isLoadingAssets || (currentNetWorth > 0 && isLoadingFIRE)) {
@@ -209,6 +222,27 @@ export function FireCalculatorTab() {
               </p>
             </div>
           </div>
+
+          {/* Include Primary Residence Setting */}
+          <div className="space-y-2 rounded-lg border p-4 mb-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="includePrimaryResidence">
+                  Includi Casa di Abitazione nel Calcolo FIRE
+                </Label>
+                <p className="text-xs text-gray-500">
+                  Se attivo, gli immobili marcati come &quot;casa di abitazione&quot; saranno inclusi nel patrimonio FIRE.
+                  Se disattivo, verranno esclusi (metodologia FIRE standard che considera solo asset generatori di reddito).
+                </p>
+              </div>
+              <Switch
+                id="includePrimaryResidence"
+                checked={includePrimaryResidence}
+                onCheckedChange={setIncludePrimaryResidence}
+              />
+            </div>
+          </div>
+
           <Button
             onClick={handleSaveSettings}
             disabled={mutation.isPending}

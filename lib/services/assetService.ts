@@ -368,6 +368,38 @@ export function calculateIlliquidNetWorth(assets: Asset[]): number {
 }
 
 /**
+ * Calculate FIRE-eligible net worth (conditionally excludes primary residences)
+ *
+ * FIRE calculations MAY exclude primary residences because:
+ * - You need somewhere to live (not available for withdrawal)
+ * - Selling your primary home doesn't contribute to retirement income
+ * - Aligns with standard FIRE methodology (only count assets that generate income/can be liquidated)
+ *
+ * However, some users prefer to include primary residence equity in their FIRE number,
+ * especially if they plan to downsize or relocate in retirement.
+ *
+ * Includes ALL other assets:
+ * - Liquid assets (stocks, bonds, cash)
+ * - Illiquid assets (except optionally primary residence real estate)
+ * - Investment properties (rental income = FIRE-eligible)
+ *
+ * @param assets - All user assets
+ * @param includePrimaryResidence - If true, include primary residences; if false, exclude them (default: false)
+ * @returns Total value of FIRE-eligible assets
+ */
+export function calculateFIRENetWorth(assets: Asset[], includePrimaryResidence: boolean = false): number {
+  return assets
+    .filter(asset => {
+      // Exclude real estate marked as primary residence (if user setting is disabled)
+      if (!includePrimaryResidence && asset.assetClass === 'realestate' && asset.isPrimaryResidence === true) {
+        return false;
+      }
+      return true;
+    })
+    .reduce((total, asset) => total + calculateAssetValue(asset), 0);
+}
+
+/**
  * Calculate unrealized gains for a single asset
  *
  * Returns 0 if averageCost is not set because gains cannot be calculated

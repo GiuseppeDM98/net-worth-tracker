@@ -7,7 +7,10 @@ import { DEFAULT_SUB_CATEGORIES, DEFAULT_EQUITY_SUB_TARGETS } from '@/lib/consta
 const ALLOCATION_TARGETS_COLLECTION = 'assetAllocationTargets';
 
 /**
- * Get allocation settings for a user (includes targets, age, and risk-free rate)
+ * Get allocation settings for a user
+ *
+ * Includes: targets, userAge, riskFreeRate, withdrawalRate, plannedAnnualExpenses,
+ * includePrimaryResidenceInFIRE, dividendIncomeCategoryId, dividendIncomeSubCategoryId
  */
 export async function getSettings(
   userId: string
@@ -28,6 +31,7 @@ export async function getSettings(
       riskFreeRate: data.riskFreeRate,
       withdrawalRate: data.withdrawalRate,
       plannedAnnualExpenses: data.plannedAnnualExpenses,
+      includePrimaryResidenceInFIRE: data.includePrimaryResidenceInFIRE,
       dividendIncomeCategoryId: data.dividendIncomeCategoryId,
       dividendIncomeSubCategoryId: data.dividendIncomeSubCategoryId,
       targets: data.targets as AssetAllocationTarget,
@@ -80,6 +84,9 @@ export async function setSettings(
     }
     if (settings.plannedAnnualExpenses !== undefined) {
       docData.plannedAnnualExpenses = settings.plannedAnnualExpenses;
+    }
+    if (settings.includePrimaryResidenceInFIRE !== undefined) {
+      docData.includePrimaryResidenceInFIRE = settings.includePrimaryResidenceInFIRE;
     }
     if (settings.dividendIncomeCategoryId !== undefined) {
       docData.dividendIncomeCategoryId = settings.dividendIncomeCategoryId;

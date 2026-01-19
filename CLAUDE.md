@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz, @nivo/sankey
-- Feature ultimo mese: Sankey diagram multi-level drill-down + transaction details
-- Ultima implementazione: Multi-level navigation (Budget → Type → Category → Subcategory → Transactions) con tabella dettagli transazioni e breadcrumb dinamico (2026-01-19)
+- Feature ultimo mese: FIRE primary residence exclusion + Performance metrics categorization
+- Ultima implementazione: Primary residence flag for real estate assets with global FIRE toggle + 15 performance metrics organized in 4 logical categories (2026-01-19)
 - In corso ora: nessuna attivita attiva
 - Completamento: n/d
 
@@ -57,7 +57,20 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - Visual filter indicator: banner blu "Filtro attivo" con pulsante cancella rapido
   - Totals row: riga totali in tabella quando filtri attivi
 - Hall of Fame con ranking mensili/annuali e highlight del periodo corrente.
-- FIRE calculator e Monte Carlo.
+- FIRE calculator con esclusione configurabile casa di abitazione:
+  - Flag `isPrimaryResidence` su asset immobiliari (checkbox nel form asset)
+  - Setting globale `includePrimaryResidenceInFIRE` nel FIRE Calculator (default OFF = escludi, metodologia FIRE standard)
+  - Calcolo automatico con `calculateFIRENetWorth()` che filtra immobili primari in base al setting
+  - PDF export consistente con UI (usa stesso calcolo e setting)
+  - Backwards compatible: asset esistenti senza flag → inclusi, settings esistenti → esclusi (FIRE standard)
+- Monte Carlo simulations.
+- Performance metrics organizzate in 4 categorie logiche:
+  - 📈 Rendimento (ROI, CAGR, TWR, IRR)
+  - ⚠️ Rischio (Volatilità, Sharpe, Max Drawdown, Durata Drawdown, Recovery Time)
+  - 📊 Contesto (Contributi Netti, Durata)
+  - 💰 Dividendi (YOC Lordo/Netto, Current Yield Lordo/Netto)
+  - Section headers con descrizioni per ogni categoria
+  - Componente riutilizzabile `MetricSection` per layout responsive
 
 ## Data & Integrations
 - Firestore (client + admin) con merge updates per evitare data loss.
@@ -68,10 +81,6 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Known Issues (Active)
 - Etichette legenda su mobile troncate (top 3 elementi).
 - Conversione valuta dipende da Frankfurter API (fallback su cache, ma possibile failure prolungata).
-
-## Next Steps (Prossime 1-2 sessioni)
-- Validazione esperienza utente con navigazione multi-livello Sankey.
-- Eventuali ottimizzazioni performance con dataset grandi.
 
 ## Key Files
 - History page: `app/dashboard/history/page.tsx`
@@ -89,5 +98,12 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Hall of Fame UI: `app/dashboard/hall-of-fame/page.tsx`
 - Date helpers: `lib/utils/dateHelpers.ts`
 - Formatters: `lib/utils/formatters.ts`
+- Asset service: `lib/services/assetService.ts` (includes `calculateFIRENetWorth`)
+- Asset allocation service: `lib/services/assetAllocationService.ts`
+- PDF data service: `lib/services/pdfDataService.ts`
+- Asset dialog: `components/assets/AssetDialog.tsx`
+- FIRE calculator: `components/fire-simulations/FireCalculatorTab.tsx`
+- Performance metrics section: `components/performance/MetricSection.tsx`
+- Asset types: `types/assets.ts`
 
-**Last updated**: 2026-01-18
+**Last updated**: 2026-01-19
