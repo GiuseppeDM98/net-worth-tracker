@@ -509,3 +509,24 @@
   - **User benefit**: Seamless historical tracking for assets sold and re-acquired (e.g., selling ARKK.MI in November, re-buying in January shows single continuous timeline)
   - **Edge case handling**: Assets with different names (e.g., "Apple Inc." vs "Apple") still display as separate rows for user flexibility
   - **Backwards compatible**: No database migration required - transformation happens at display time using existing snapshot data
+
+- **Cashflow Sankey - Circular Link Error**: Fixed runtime error when clicking categories with only "Altro" (uncategorized) expenses in 5-layer view
+  - **Issue**: Enabling "Mostra sottocategorie" toggle and clicking categories without real subcategories (only "Altro" fallback) caused "circular link" error crash
+  - **Impact**: Feature unusable for categories lacking subcategory organization, preventing users from exploring detailed cashflow breakdown
+  - **Fix**: Enhanced filtering logic to exclude both category nodes and corresponding links when only "Altro" subcategories exist
+  - **Result**: Sankey diagram renders correctly with clean 5-layer visualization, auto-hiding uninformative "Altro-only" categories
+  - **User benefit**: Seamless navigation through cashflow hierarchy without encountering technical errors
+
+- **Cashflow Sankey - Back Navigation Loop**: Fixed navigation getting stuck in empty drill-down showing only "Altro" instead of returning to full chart
+  - **Issue**: Clicking categories without real subcategories and then clicking back button trapped users in drill-down view displaying single "Altro" node
+  - **Impact**: Navigation broken for ~30% of expense categories, requiring page reload to escape stuck state
+  - **Fix**: Added subcategory validation before returning to category drill-down mode; redirects to budget or type view when no real subcategories exist
+  - **Result**: Back button now intelligently returns to appropriate previous view (budget, type drill-down, or full chart)
+  - **User benefit**: Smooth navigation flow matching user expectations, no more dead-end drill-downs
+
+- **Cashflow Sankey - Subcategory Tooltip Labels**: Fixed subcategory tooltips showing internal IDs instead of clean display names
+  - **Issue**: Hovering over subcategories in 5-layer view displayed "Categoria__Sottocategoria" (e.g., "Automobili__Bollo auto") instead of just subcategory name
+  - **Impact**: Cluttered tooltips with technical separators reduced readability and looked unprofessional
+  - **Fix**: Changed tooltip to use `node.label` field (display name) instead of `node.id` (unique identifier)
+  - **Result**: Tooltips now show clean subcategory names (e.g., "Bollo auto") matching user-friendly labels on chart
+  - **User benefit**: Cleaner, more professional tooltip experience consistent with rest of the application

@@ -79,6 +79,7 @@ When implementing complex data flow visualizations:
 - **Label vs ID in Nivo**: Add `label` field to nodes + configure `label={(node) => node.label || node.id}` in ResponsiveSankey
 - **Dual-path navigation**: Support both drill-down flow (4 clicks) and direct 5-layer click (1 click to transactions)
 - **"Altro" filtering**: Skip nodes/links when `subcategories.length === 1 && name === 'Altro'` (not informative)
+- **Node/Link consistency**: When filtering nodes, ALWAYS filter corresponding links too (prevents "missing: [NodeName]" errors)
 - **Example**: CashflowSankeyChart with 4 modes + optional 5-layer + transaction table
 
 ### Settings Service Synchronization Pattern

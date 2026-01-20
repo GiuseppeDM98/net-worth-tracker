@@ -453,12 +453,21 @@ const buildBudgetFlowDataWithSubcategories = (expenses: Expense[], isMobile: boo
         nodeColor: typeColors[type]
       })),
     // Layer 4 (Center-right): Expense categories (grouped by type, with derived colors)
+    // Why: Prevent dangling category nodes in 5-layer view
+    // Categories with only "Altro" subcategories are filtered here to match
+    // the subcategory filtering logic (lines 465-468). This prevents Nivo Sankey
+    // "circular link" errors caused by nodes without incoming/outgoing links.
     ...expenseTypes.flatMap(type => {
       const categories = categoriesPerType.get(type) || [];
-      return categories.map(cat => ({
-        id: cat.name,
-        nodeColor: cat.color
-      }));
+      return categories
+        .filter(cat => {
+          const subcategories = subcategoriesPerCategory.get(cat.name) || [];
+          return !(subcategories.length === 1 && subcategories[0].name === 'Altro');
+        })
+        .map(cat => ({
+          id: cat.name,
+          nodeColor: cat.color
+        }));
     }),
     // Layer 5 (Right): Subcategories (grouped by category, with derived colors)
     ...Array.from(subcategoriesPerCategory.entries()).flatMap(([categoryName, subcategories]) => {
@@ -496,13 +505,19 @@ const buildBudgetFlowDataWithSubcategories = (expenses: Expense[], isMobile: boo
         value: expenseTypeMap.get(type)!
       })),
     // Expense Types → Categories (per type)
+    // Filter links to match filtered category nodes (categories with only "Altro" are excluded)
     ...expenseTypes.flatMap(type => {
       const categories = categoriesPerType.get(type) || [];
-      return categories.map(cat => ({
-        source: EXPENSE_TYPE_LABELS[type],
-        target: cat.name,
-        value: cat.value
-      }));
+      return categories
+        .filter(cat => {
+          const subcategories = subcategoriesPerCategory.get(cat.name) || [];
+          return !(subcategories.length === 1 && subcategories[0].name === 'Altro');
+        })
+        .map(cat => ({
+          source: EXPENSE_TYPE_LABELS[type],
+          target: cat.name,
+          value: cat.value
+        }));
     }),
     // Categories → Subcategories (NEW LAYER)
     ...Array.from(subcategoriesPerCategory.entries()).flatMap(([categoryName, subcategories]) => {
@@ -912,20 +927,42 @@ export function CashflowSankeyChart({
   // Handle back button click for multi-level navigation
   const handleBack = () => {
     if (selectedCategory?.mode === 'transactions') {
-      // Check if we came from 5-layer view (direct subcategory click) or from drill-down
-      // In 5-layer view, we don't have a category drill-down intermediate step
+      // Check if we came from 5-layer view (direct subcategory click)
       const cameFrom5LayerView = !selectedCategory.parentType && selectedCategory.selectedSubcategory;
 
       if (cameFrom5LayerView) {
         // Return directly to budget view (skip category drill-down)
         setSelectedCategory(null);
       } else {
-        // Return to category drill-down view (normal drill-down flow)
-        setSelectedCategory(prev => prev ? {
-          ...prev,
-          mode: 'category',
-          selectedSubcategory: undefined
-        } : null);
+        // Why: Prevent back navigation to empty category drill-down
+        // Before returning to 'category' mode, verify the category has real subcategories.
+        // Without this check, categories with only "Altro" would show a drill-down with
+        // a single "Altro" node instead of returning to budget/type view.
+        const categoryName = selectedCategory.parentCategory || selectedCategory.name;
+        const hasSubcategories = checkIfCategoryHasSubcategories(categoryName);
+
+        if (hasSubcategories) {
+          // Return to category drill-down view
+          setSelectedCategory(prev => prev ? {
+            ...prev,
+            mode: 'category',
+            selectedSubcategory: undefined
+          } : null);
+        } else {
+          // No real subcategories → return to budget or type view
+          if (selectedCategory.parentType) {
+            // Came from type drill-down → return to type view
+            setSelectedCategory(prev => prev ? {
+              name: prev.parentType!,
+              color: prev.color,
+              isIncome: false,
+              mode: 'type'
+            } : null);
+          } else {
+            // Came from budget view → return to budget view
+            setSelectedCategory(null);
+          }
+        }
       }
     } else {
       // Return to budget view
@@ -1075,7 +1112,8 @@ export function CashflowSankeyChart({
                     fontSize: '14px',
                   }}
                 >
-                  <strong>{node.id}</strong>
+                  {/* Display label if available (subcategory nodes use label), fallback to id */}
+                  <strong>{node.label || node.id}</strong>
                   <br />
                   {formatCurrencyForSankey(node.value || 0)}
                   <br />

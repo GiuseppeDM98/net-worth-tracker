@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz, @nivo/sankey
-- Feature ultimo mese: Sankey subcategories toggle + Asset historical aggregation + Settings fixes
-- Ultima implementazione: Added optional 5-layer Sankey view with subcategories toggle for detailed cashflow visualization (2026-01-20)
+- Feature ultimo mese: Sankey bug fixes + Subcategories toggle + Asset historical aggregation + Settings fixes
+- Ultima implementazione: Fixed Sankey diagram bugs (circular link error, back navigation, tooltip labels) (2026-01-20)
 - In corso ora: nessuna attivita attiva
 - Completamento: n/d
 
