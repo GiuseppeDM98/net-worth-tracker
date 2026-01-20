@@ -89,6 +89,7 @@ export function PDFExportDialog({
     allocation: true,
     history: true,
     cashflow: true,
+    performance: true,
     fire: true,
     summary: true,
   });
@@ -129,6 +130,7 @@ export function PDFExportDialog({
         allocation: true,
         history: true,
         cashflow: true,
+        performance: true,
         fire: true,
         summary: true,
       });
@@ -216,6 +218,7 @@ export function PDFExportDialog({
     { key: 'allocation' as const, label: 'Asset Allocation', description: 'Confronto allocazione corrente vs target' },
     { key: 'history' as const, label: 'Storico Patrimonio', description: 'Evoluzione patrimonio e grafici storici' },
     { key: 'cashflow' as const, label: 'Entrate e Uscite', description: 'Analisi cashflow e categorie di spesa' },
+    { key: 'performance' as const, label: 'Performance', description: 'Metriche di rendimento e rischio (ROI, CAGR, TWR, Sharpe, Drawdown, YOC)' },
     { key: 'fire' as const, label: 'FIRE Calculator', description: 'Metriche FIRE e progresso verso indipendenza finanziaria' },
     { key: 'summary' as const, label: 'Riepilogo', description: 'Panoramica key metrics e metadata report' },
   ];
@@ -310,7 +313,7 @@ export function PDFExportDialog({
                   id={key}
                   checked={sections[key]}
                   onCheckedChange={() => toggleSection(key)}
-                  disabled={loading || ((key === 'fire' || key === 'history') && timeFilter === 'monthly')}
+                  disabled={loading || ((key === 'fire' || key === 'history' || key === 'performance') && timeFilter === 'monthly')}
                   className="mt-1"
                 />
                 <label
@@ -334,10 +337,10 @@ export function PDFExportDialog({
               </span>
             </div>
 
-            {/* Warning for FIRE and history sections in monthly filter */}
+            {/* Warning for FIRE, history, and performance sections in monthly filter */}
             {timeFilter === 'monthly' && (
               <div className="text-xs text-amber-600 dark:text-amber-500">
-                Le sezioni Storico Patrimonio e FIRE non sono disponibili per export mensile
+                Le sezioni Storico Patrimonio, Performance e FIRE non sono disponibili per export mensile
               </div>
             )}
 

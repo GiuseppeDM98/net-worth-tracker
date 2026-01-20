@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz, @nivo/sankey
-- Feature ultimo mese: Sankey bug fixes + Subcategories toggle + Asset historical aggregation + Settings fixes
-- Ultima implementazione: Fixed Sankey diagram bugs (circular link error, back navigation, tooltip labels) (2026-01-20)
+- Feature ultimo mese: PDF Performance Export + Sankey bug fixes + Subcategories toggle + Asset historical aggregation
+- Ultima implementazione: Added Performance section to PDF export with all 15 metrics in 4 categories (2026-01-20)
 - In corso ora: nessuna attivita attiva
 - Completamento: n/d
 
@@ -78,6 +78,12 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - 💰 Dividendi (YOC Lordo/Netto, Current Yield Lordo/Netto)
   - Section headers con descrizioni per ogni categoria
   - Componente riutilizzabile `MetricSection` per layout responsive
+- PDF Export con 8 sezioni configurabili (Portfolio, Allocation, History, Cashflow, Performance, FIRE, Summary):
+  - Sezione Performance disponibile solo in export annuali (YTD) e totali, non in mensili
+  - Tutte le 15 metriche performance organizzate in 4 categorie con formatting professionale
+  - Breakdown dettagliato Contributi Netti (Entrate/Dividendi/Uscite) allineato con UI Performance page
+  - Time filter mapping: yearly → YTD, total → ALL, monthly → Performance disabled
+  - Graceful degradation con dati insufficienti (< 2 snapshots)
 
 ## Data & Integrations
 - Firestore (client + admin) con merge updates per evitare data loss.
@@ -111,7 +117,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Asset price history utils: `lib/utils/assetPriceHistoryUtils.ts` (name-based aggregation for re-acquired assets)
 - Asset price history table: `components/assets/AssetPriceHistoryTable.tsx` (historical price/value visualization)
 - Settings page: `app/dashboard/settings/page.tsx`
-- PDF data service: `lib/services/pdfDataService.ts`
+- PDF export: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`, `components/pdf/PDFExportDialog.tsx`, `lib/utils/pdfTimeFilters.ts`
+- PDF sections: `components/pdf/sections/PerformanceSection.tsx` (performance metrics with 4 categories)
 - Asset dialog: `components/assets/AssetDialog.tsx`
 - FIRE calculator: `components/fire-simulations/FireCalculatorTab.tsx`
 - Performance metrics section: `components/performance/MetricSection.tsx`

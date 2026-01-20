@@ -2,6 +2,7 @@
 // TypeScript interfaces for PDF export functionality
 
 import type { Asset, MonthlySnapshot, AssetAllocationTarget } from '@/types/assets';
+import type { PerformanceMetrics } from '@/types/performance';
 
 // ============================================
 // Core PDF Data Types
@@ -22,6 +23,7 @@ export interface SectionSelection {
   allocation: boolean;
   history: boolean;
   cashflow: boolean;
+  performance: boolean;
   fire: boolean;
   summary: boolean;
 }
@@ -49,6 +51,7 @@ export interface PDFSectionData {
   allocation?: AllocationData;
   history?: HistoryData;
   cashflow?: CashflowData;
+  performance?: PerformanceData;
   fire?: FireData;
   summary?: SummaryData;
 }
@@ -207,6 +210,15 @@ export interface SummaryData {
     assetCount: number;
     expenseCount: number;
   };
+}
+
+/**
+ * Performance data for PDF export.
+ * Contains performance metrics and period label for display.
+ */
+export interface PerformanceData {
+  metrics: PerformanceMetrics;
+  periodLabel: string;  // "YTD 2026" or "Storico Totale"
 }
 
 // ============================================

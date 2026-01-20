@@ -7,6 +7,7 @@ import { PortfolioSection } from './sections/PortfolioSection';
 import { AllocationSection } from './sections/AllocationSection';
 import { HistorySection } from './sections/HistorySection';
 import { CashflowSection } from './sections/CashflowSection';
+import { PerformanceSection } from './sections/PerformanceSection';
 import { FireSection } from './sections/FireSection';
 import { SummarySection } from './sections/SummarySection';
 import type { PDFDataContext, PDFSectionData, SectionSelection, ChartImage } from '@/types/pdf';
@@ -27,8 +28,9 @@ interface PDFDocumentProps {
  * 3. Allocation section (asset distribution and rebalancing recommendations)
  * 4. History section (historical performance and year-over-year comparison)
  * 5. Cashflow section (income/expense analysis with financial health indicator)
- * 6. FIRE section (Financial Independence metrics and Trinity Study guidance)
- * 7. Summary section (overview page with all key metrics)
+ * 6. Performance section (portfolio metrics: ROI, CAGR, TWR, Sharpe, Drawdown, YOC)
+ * 7. FIRE section (Financial Independence metrics and Trinity Study guidance)
+ * 8. Summary section (overview page with all key metrics)
  *
  * Section ordering rationale:
  * - Cover first for professional appearance
@@ -92,6 +94,11 @@ export function PDFDocument({
       {/* Cashflow section - Income/expense metrics with financial health indicator */}
       {sections.cashflow && data.cashflow && (
         <CashflowSection data={data.cashflow} />
+      )}
+
+      {/* Performance section - Portfolio performance metrics (ROI, CAGR, TWR, IRR, Sharpe, Drawdown, YOC) */}
+      {sections.performance && data.performance && (
+        <PerformanceSection data={data.performance} />
       )}
 
       {/* FIRE section - Financial Independence metrics with Trinity Study reference */}

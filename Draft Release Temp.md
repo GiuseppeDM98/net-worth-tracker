@@ -49,6 +49,19 @@
   - **Zero functional changes**: All existing metrics, tooltips, calculations remain identical - purely UX improvement
   - **Same period switching**: Category headers persist when changing timeframes (YTD, 1Y, 3Y, 5Y, ALL, Custom)
 
+- **PDF Export - Performance Section**: Comprehensive performance metrics now available in PDF portfolio reports for offline analysis and record-keeping
+  - **8-section PDF reports**: New Performance section joins Portfolio, Allocation, History, Cashflow, FIRE, and Summary for complete portfolio documentation
+  - **All 15 metrics included**: Four category sections (Rendimento, Rischio, Contesto, Dividendi) with professional formatting and color coding
+  - **Smart availability**: Performance section enabled only for annual (YTD) and total (all-time) exports - automatically disabled for monthly reports lacking sufficient data
+  - **Period-aware display**: Section header shows exact timeframe analyzed (e.g., "Performance Portafoglio - YTD 2026" or "Performance Portafoglio - Storico Totale")
+  - **Detailed Contributi Netti**: Net contributions card includes breakdown showing Entrate (income), Dividendi (dividends), and Uscite (expenses) matching Performance page UI
+  - **Professional formatting**: Percentages, currencies, and durations formatted with Italian conventions; color-coded values (green positive, red negative, gray neutral)
+  - **Graceful degradation**: Section automatically omitted when insufficient data (< 2 snapshots) without breaking PDF generation
+  - **Dividend metrics conditional**: YOC and Current Yield section appears only when dividend data available for cleaner reports
+  - **User benefit**: Export complete performance snapshot for tax documentation, financial advisor consultations, or personal record-keeping
+  - **UI consistency**: Checkbox in export dialog matches time filter restrictions (disabled for monthly with explanatory tooltip)
+  - **Zero performance impact**: Reuses existing performance calculation engine with cached snapshots and parallel API fetching
+
 ### Features
 
 - **Current Yield Metrics (Gross & Net)**: Comprehensive dividend yield analysis based on current market value

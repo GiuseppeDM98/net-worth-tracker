@@ -33,8 +33,10 @@ import type {
   CategoryBreakdown,
   FireData,
   SummaryData,
+  PerformanceData,
   TimeFilter,
 } from '@/types/pdf';
+import type { TimePeriod } from '@/types/performance';
 import type { Asset, MonthlySnapshot } from '@/types/assets';
 import {
   calculateAssetValue,
@@ -54,6 +56,7 @@ import { getAllExpenses } from './expenseService';
 import { getAnnualExpenses, getAnnualIncome, calculateFIREMetrics } from './fireService';
 import { formatCurrency, formatPercentage } from './chartService';
 import { filterExpensesByTime } from '@/lib/utils/pdfTimeFilters';
+import { calculatePerformanceForPeriod } from './performanceService';
 
 // Cached expenses to avoid duplicate fetching
 let cachedExpenses: any[] | null = null;
@@ -114,6 +117,16 @@ export async function fetchPDFData(
       const includePrimaryResidence = settings?.includePrimaryResidenceInFIRE ?? false;
       const fireNetWorth = calculateFIRENetWorth(context.assets, includePrimaryResidence);
       data.fire = await prepareFireData(userId, cachedExpenses!, fireNetWorth);
+    }
+
+    // Performance: calculate metrics for selected time period (yearly = YTD, total = ALL)
+    if (sections.performance) {
+      data.performance = await preparePerformanceData(
+        userId,
+        context.snapshots,
+        timeFilter,
+        cachedExpenses ?? undefined
+      ) ?? undefined;
     }
 
     // Summary: aggregates all available data
@@ -469,6 +482,108 @@ export async function prepareFireData(
 }
 
 /**
+ * Prepare performance data with all metrics for the selected time period.
+ *
+ * Fetches performance metrics (ROI, CAGR, TWR, IRR, Sharpe, Drawdown, YOC, Current Yield)
+ * for the specified time filter (yearly = YTD, total = ALL).
+ *
+ * Monthly exports are not supported as performance metrics require multiple time periods.
+ *
+ * @param userId - User ID for fetching settings and dividends
+ * @param snapshots - Monthly snapshots for performance calculation
+ * @param timeFilter - Time filter ('yearly' or 'total', monthly returns null)
+ * @param cachedExpenses - Optional pre-fetched expenses to avoid duplicate queries
+ * @returns PerformanceData with metrics and period label, or null if insufficient data
+ */
+export async function preparePerformanceData(
+  userId: string,
+  snapshots: MonthlySnapshot[],
+  timeFilter: TimeFilter = 'total',
+  cachedExpenses?: any[]
+): Promise<PerformanceData | null> {
+  // Early exit for monthly exports (performance metrics not meaningful for single month)
+  if (timeFilter === 'monthly') {
+    return null;
+  }
+
+  // Determine time period based on filter
+  const timePeriod: TimePeriod = timeFilter === 'yearly' ? 'YTD' : 'ALL';
+
+  try {
+    // Fetch settings for risk-free rate and dividend category
+    const settings = await getSettings(userId);
+    const riskFreeRate = settings?.riskFreeRate ?? 2.5;
+    const dividendCategoryId = settings?.dividendIncomeCategoryId;
+
+    // Calculate base performance metrics
+    const metrics = await calculatePerformanceForPeriod(
+      userId,
+      snapshots,
+      timePeriod,
+      riskFreeRate,
+      undefined,
+      undefined,
+      cachedExpenses,
+      dividendCategoryId
+    );
+
+    // Early exit if insufficient data (< 2 snapshots)
+    if (metrics.hasInsufficientData) {
+      return null;
+    }
+
+    // Fetch YOC and Current Yield metrics via API routes
+    // These require server-side Firebase Admin SDK for asset access
+    const startDate = metrics.startDate.toISOString();
+    const dividendEndDate = metrics.dividendEndDate.toISOString();
+    const numberOfMonths = metrics.numberOfMonths;
+
+    // Parallel fetch for performance optimization
+    const [yocResponse, currentYieldResponse] = await Promise.all([
+      fetch(`/api/performance/yoc?userId=${userId}&startDate=${startDate}&dividendEndDate=${dividendEndDate}&numberOfMonths=${numberOfMonths}`),
+      fetch(`/api/performance/current-yield?userId=${userId}&startDate=${startDate}&dividendEndDate=${dividendEndDate}&numberOfMonths=${numberOfMonths}`)
+    ]);
+
+    // Merge YOC metrics if API call successful
+    if (yocResponse.ok) {
+      const yocData = await yocResponse.json();
+      metrics.yocGross = yocData.yocGross;
+      metrics.yocNet = yocData.yocNet;
+      metrics.yocDividendsGross = yocData.yocDividendsGross;
+      metrics.yocDividendsNet = yocData.yocDividendsNet;
+      metrics.yocCostBasis = yocData.yocCostBasis;
+      metrics.yocAssetCount = yocData.yocAssetCount;
+    }
+
+    // Merge Current Yield metrics if API call successful
+    if (currentYieldResponse.ok) {
+      const currentYieldData = await currentYieldResponse.json();
+      metrics.currentYield = currentYieldData.currentYield;
+      metrics.currentYieldNet = currentYieldData.currentYieldNet;
+      metrics.currentYieldDividends = currentYieldData.currentYieldDividends;
+      metrics.currentYieldDividendsNet = currentYieldData.currentYieldDividendsNet;
+      metrics.currentYieldPortfolioValue = currentYieldData.currentYieldPortfolioValue;
+      metrics.currentYieldAssetCount = currentYieldData.currentYieldAssetCount;
+    }
+
+    // Generate period label for display
+    const currentYear = new Date().getFullYear();
+    const periodLabel = timeFilter === 'yearly'
+      ? `YTD ${currentYear}`
+      : 'Storico Totale';
+
+    return {
+      metrics,
+      periodLabel
+    };
+
+  } catch (error) {
+    console.error('Error preparing performance data for PDF:', error);
+    return null;
+  }
+}
+
+/**
  * Prepare summary data aggregating key metrics
  */
 export function prepareSummaryData(
@@ -507,6 +622,7 @@ export function prepareSummaryData(
   if (sections.allocation) sectionsIncluded.push('Asset Allocation');
   if (sections.history) sectionsIncluded.push('Storico Patrimonio');
   if (sections.cashflow) sectionsIncluded.push('Entrate e Uscite');
+  if (sections.performance) sectionsIncluded.push('Performance Portafoglio');
   if (sections.fire) sectionsIncluded.push('FIRE Calculator');
   if (sections.summary) sectionsIncluded.push('Riepilogo');
 

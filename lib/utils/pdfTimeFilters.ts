@@ -104,7 +104,7 @@ export function validateTimeFilterData(
 }
 
 /**
- * Adjust sections for time filter (disable FIRE for monthly)
+ * Adjust sections for time filter (disable FIRE, history, and performance for monthly)
  *
  * @param timeFilter - Selected time filter
  * @param currentSections - Current section selection
@@ -115,11 +115,13 @@ export function adjustSectionsForTimeFilter(
   currentSections: SectionSelection
 ): SectionSelection {
   if (timeFilter === 'monthly') {
-    // Monthly: disable FIRE and history sections
+    // Monthly: disable FIRE, history, and performance sections
+    // Rationale: These sections require multiple time periods for meaningful metrics
     return {
       ...currentSections,
       fire: false,
       history: false,
+      performance: false,
     };
   }
 
