@@ -1,6 +1,5 @@
 # 💰 Portfolio Tracker
 
-gg
 A comprehensive web application for tracking and managing investment portfolios across multiple asset classes, with integrated expense tracking, FIRE (Financial Independence, Retire Early) calculator, and personal financial rankings.
 
 Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-based portfolio management with a modern, automated solution.
