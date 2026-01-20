@@ -70,11 +70,16 @@ End date must include full day: `new Date(year, month, 0, 23, 59, 59, 999)`
 ### Sankey Diagram Multi-Layer Pattern
 When implementing complex data flow visualizations:
 - **4-layer structure**: Income → Budget → Types → Categories + Savings
+- **5-layer optional**: Toggle to add Subcategories layer (Categories → Subcategories)
 - **Multi-mode drill-down**: Support 4 modes (budget, type drill-down, category drill-down, transactions)
 - **State management**: Use `mode` field + `parentType`/`parentCategory` for navigation context
 - **Conditional rendering**: `{mode !== 'transactions' && <ResponsiveSankey ... />}` prevents crashes with empty data
-- **Mobile filtering**: Top 3-4 items per parent to prevent overcrowding
-- **Example**: CashflowSankeyChart with 4 modes + transaction table
+- **Mobile filtering**: Top 3-4 items per parent to prevent overcrowding (top 4 for subcategories)
+- **Unique IDs with separator**: Use `"Category__Subcategory"` format (double underscore) for collision-free IDs
+- **Label vs ID in Nivo**: Add `label` field to nodes + configure `label={(node) => node.label || node.id}` in ResponsiveSankey
+- **Dual-path navigation**: Support both drill-down flow (4 clicks) and direct 5-layer click (1 click to transactions)
+- **"Altro" filtering**: Skip nodes/links when `subcategories.length === 1 && name === 'Altro'` (not informative)
+- **Example**: CashflowSankeyChart with 4 modes + optional 5-layer + transaction table
 
 ### Settings Service Synchronization Pattern
 When adding new fields to settings/configuration types:

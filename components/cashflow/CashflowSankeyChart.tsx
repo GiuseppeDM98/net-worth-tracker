@@ -56,6 +56,7 @@ interface CashflowSankeyChartProps {
 interface SankeyNode {
   id: string;
   nodeColor: string;
+  label?: string; // Optional display label (if different from id)
 }
 
 interface SankeyLink {
@@ -277,6 +278,256 @@ const buildBudgetFlowData = (expenses: Expense[], isMobile: boolean): SankeyData
 };
 
 /**
+ * Build 5-layer Budget Flow Sankey with subcategories layer
+ *
+ * Extends buildBudgetFlowData by adding granular subcategory breakdown.
+ * Architecture: Income → Budget → Types → Categories → Subcategories + Savings
+ *
+ * Algorithm:
+ * 1. Aggregate expenses in triple-nested Map (Type → Category → Subcategory → Amount)
+ * 2. Build 5-layer node structure with color derivation chain:
+ *    - Type colors (fixed)
+ *    - Category colors (derived from type, -15% brightness per item)
+ *    - Subcategory colors (derived from category, -15% brightness per item)
+ * 3. Apply mobile filtering (top 4 subcategories per category)
+ * 4. Map expenses without subCategoryName to "Altro" fallback
+ *
+ * Why 5 layers? Provides granular expense breakdown while maintaining visual hierarchy.
+ * Trade-off: More nodes (~40-50 typical) but within Nivo Sankey capacity.
+ *
+ * @param expenses - All expenses for period
+ * @param isMobile - Apply mobile optimizations (top N filtering)
+ * @returns Nivo Sankey data structure { nodes, links }
+ */
+const buildBudgetFlowDataWithSubcategories = (expenses: Expense[], isMobile: boolean): SankeyData => {
+  // Step 1: Aggregate income by category
+  const incomeMap = new Map<string, number>();
+
+  // Step 2: Aggregate expenses by TYPE
+  const expenseTypeMap = new Map<ExpenseType, number>();
+
+  // Step 3: Aggregate expenses by TYPE+CATEGORY+SUBCATEGORY (triple-nested Map)
+  const typeAndCategoryAndSubcategoryMap = new Map<ExpenseType, Map<string, Map<string, number>>>();
+
+  let totalIncome = 0;
+  let totalExpenses = 0;
+
+  expenses.forEach(expense => {
+    const amount = Math.abs(expense.amount);
+    const category = expense.categoryName;
+    const type = expense.type;
+
+    if (type === 'income') {
+      incomeMap.set(category, (incomeMap.get(category) || 0) + amount);
+      totalIncome += amount;
+    } else {
+      // Aggregate by expense type
+      expenseTypeMap.set(type, (expenseTypeMap.get(type) || 0) + amount);
+      totalExpenses += amount;
+
+      // Aggregate by type+category+subcategory (triple-nested)
+      const subcategory = expense.subCategoryName || 'Altro'; // Fallback for expenses without subcategory
+
+      if (!typeAndCategoryAndSubcategoryMap.has(type)) {
+        typeAndCategoryAndSubcategoryMap.set(type, new Map<string, Map<string, number>>());
+      }
+      const categoryMap = typeAndCategoryAndSubcategoryMap.get(type)!;
+
+      if (!categoryMap.has(category)) {
+        categoryMap.set(category, new Map<string, number>());
+      }
+      const subcategoryMap = categoryMap.get(category)!;
+
+      subcategoryMap.set(subcategory, (subcategoryMap.get(subcategory) || 0) + amount);
+    }
+  });
+
+  // Step 4: Calculate savings
+  const savings = totalIncome - totalExpenses;
+
+  // Step 5: Mobile filtering - income categories
+  let incomeCategories = Array.from(incomeMap.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, value]) => ({ name, value }));
+
+  if (isMobile) {
+    incomeCategories = incomeCategories.slice(0, 5);
+  }
+
+  // Step 6: Extract expense types
+  const expenseTypes: ExpenseType[] = ['fixed', 'variable', 'debt'];
+  const typeColors: Record<ExpenseType, string> = {
+    fixed: '#3b82f6',     // blue
+    variable: '#8b5cf6',  // violet
+    debt: '#f59e0b',      // amber
+    income: '#10b981',    // green (not used in expense flow)
+  };
+
+  // Step 7: Build category and subcategory lists per type with mobile filtering
+  const categoriesPerType = new Map<ExpenseType, Array<{ name: string; value: number; color: string }>>();
+  const subcategoriesPerCategory = new Map<string, Array<{ name: string; value: number; color: string }>>();
+
+  expenseTypes.forEach(type => {
+    const categoryMap = typeAndCategoryAndSubcategoryMap.get(type);
+    if (!categoryMap) {
+      categoriesPerType.set(type, []);
+      return;
+    }
+
+    // Calculate category totals (sum of all subcategories)
+    let categories = Array.from(categoryMap.entries())
+      .map(([categoryName, subcategoryMap]) => {
+        const total = Array.from(subcategoryMap.values()).reduce((sum, val) => sum + val, 0);
+        return { name: categoryName, value: total };
+      })
+      .sort((a, b) => b.value - a.value);
+
+    // Mobile filtering for categories
+    if (isMobile) {
+      categories = categories.slice(0, 3);
+    }
+
+    // Derive colors for categories from type color
+    const typeColor = typeColors[type];
+    const categoryColors = deriveSubcategoryColors(typeColor, categories.length);
+
+    // Assign colors to categories and build subcategory lists
+    const categoriesWithColors = categories.map((cat, catIndex) => {
+      const categoryColor = categoryColors[catIndex];
+
+      // Get subcategories for this category
+      const subcategoryMap = categoryMap.get(cat.name)!;
+      let subcategories = Array.from(subcategoryMap.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([name, value]) => ({ name, value }));
+
+      // Mobile filtering for subcategories
+      if (isMobile) {
+        subcategories = subcategories.slice(0, 4);
+      }
+
+      // Derive colors for subcategories from category color
+      const subcategoryColors = deriveSubcategoryColors(categoryColor, subcategories.length);
+      const subcategoriesWithColors = subcategories.map((subcat, subcatIndex) => ({
+        name: subcat.name,
+        value: subcat.value,
+        color: subcategoryColors[subcatIndex]
+      }));
+
+      // Store subcategories for later link building
+      subcategoriesPerCategory.set(cat.name, subcategoriesWithColors);
+
+      return {
+        name: cat.name,
+        value: cat.value,
+        color: categoryColor
+      };
+    });
+
+    categoriesPerType.set(type, categoriesWithColors);
+  });
+
+  // Step 8: Assign colors to income categories
+  const incomeColorMap = new Map<string, string>();
+  incomeCategories.forEach((cat, index) => {
+    incomeColorMap.set(cat.name, COLORS[index % COLORS.length]);
+  });
+
+  // Step 9: Build nodes (5 layers)
+  const nodes: SankeyNode[] = [
+    // Layer 1 (Left): Income categories
+    ...incomeCategories.map(cat => ({
+      id: cat.name,
+      nodeColor: incomeColorMap.get(cat.name)!
+    })),
+    // Layer 2 (Center-left): Budget node
+    {
+      id: 'Budget',
+      nodeColor: '#10b981' // green
+    },
+    // Layer 3 (Center): Expense type nodes
+    ...expenseTypes
+      .filter(type => expenseTypeMap.has(type) && expenseTypeMap.get(type)! > 0)
+      .map(type => ({
+        id: EXPENSE_TYPE_LABELS[type],
+        nodeColor: typeColors[type]
+      })),
+    // Layer 4 (Center-right): Expense categories (grouped by type, with derived colors)
+    ...expenseTypes.flatMap(type => {
+      const categories = categoriesPerType.get(type) || [];
+      return categories.map(cat => ({
+        id: cat.name,
+        nodeColor: cat.color
+      }));
+    }),
+    // Layer 5 (Right): Subcategories (grouped by category, with derived colors)
+    ...Array.from(subcategoriesPerCategory.entries()).flatMap(([categoryName, subcategories]) => {
+      // Skip subcategories if only "Altro" exists (no real subcategories)
+      if (subcategories.length === 1 && subcategories[0].name === 'Altro') {
+        return [];
+      }
+      return subcategories.map(subcat => ({
+        id: `${categoryName}__${subcat.name}`, // Unique ID to prevent collisions
+        label: subcat.name, // Display only subcategory name, not "Category_Subcategory"
+        nodeColor: subcat.color
+      }));
+    }),
+    // Layer 5 (Right): Savings (only if positive)
+    ...(savings > 0 ? [{
+      id: 'Risparmi',
+      nodeColor: '#3b82f6' // blue
+    }] : [])
+  ];
+
+  // Step 10: Build links (5-layer flow)
+  const links: SankeyLink[] = [
+    // Income → Budget
+    ...incomeCategories.map(cat => ({
+      source: cat.name,
+      target: 'Budget',
+      value: cat.value
+    })),
+    // Budget → Expense Types
+    ...expenseTypes
+      .filter(type => expenseTypeMap.has(type) && expenseTypeMap.get(type)! > 0)
+      .map(type => ({
+        source: 'Budget',
+        target: EXPENSE_TYPE_LABELS[type],
+        value: expenseTypeMap.get(type)!
+      })),
+    // Expense Types → Categories (per type)
+    ...expenseTypes.flatMap(type => {
+      const categories = categoriesPerType.get(type) || [];
+      return categories.map(cat => ({
+        source: EXPENSE_TYPE_LABELS[type],
+        target: cat.name,
+        value: cat.value
+      }));
+    }),
+    // Categories → Subcategories (NEW LAYER)
+    ...Array.from(subcategoriesPerCategory.entries()).flatMap(([categoryName, subcategories]) => {
+      // Skip link if only "Altro" exists (no real subcategories)
+      if (subcategories.length === 1 && subcategories[0].name === 'Altro') {
+        return [];
+      }
+      return subcategories.map(subcat => ({
+        source: categoryName,
+        target: `${categoryName}__${subcat.name}`, // Match unique ID from nodes
+        value: subcat.value
+      }));
+    }),
+    // Budget → Savings (only if positive)
+    ...(savings > 0 ? [{
+      source: 'Budget',
+      target: 'Risparmi',
+      value: savings
+    }] : [])
+  ];
+
+  return { nodes, links };
+};
+
+/**
  * Build Type Drill-down Sankey: Expense Type → Categories
  *
  * Algorithm:
@@ -466,6 +717,9 @@ export function CashflowSankeyChart({
     selectedSubcategory?: string;    // Subcategory name for transaction filtering
   } | null>(null);
 
+  // Toggle for showing subcategories in budget view (5-layer vs 4-layer)
+  const [showSubcategories, setShowSubcategories] = useState(false);
+
   // Build Sankey data based on current mode (budget view vs drill-down modes vs transactions)
   const sankeyData = useMemo(() => {
     if (selectedCategory) {
@@ -491,9 +745,14 @@ export function CashflowSankeyChart({
         return { nodes: [], links: [] };
       }
     }
-    // Budget mode: show income → budget → expense types → categories + savings
+    // Budget mode: conditional invocation based on subcategories toggle
+    if (showSubcategories) {
+      // 5-layer mode: show income → budget → types → categories → subcategories + savings
+      return buildBudgetFlowDataWithSubcategories(expenses, isMobile);
+    }
+    // 4-layer mode: show income → budget → types → categories + savings
     return buildBudgetFlowData(expenses, isMobile);
-  }, [expenses, selectedCategory, isMobile]);
+  }, [expenses, selectedCategory, isMobile, showSubcategories]);
 
   // Calculate total amount for percentage display in tooltips
   const totalAmount = useMemo(() => {
@@ -545,6 +804,23 @@ export function CashflowSankeyChart({
   const handleNodeClick = (node: any) => {
     // Don't drill down into Budget or Risparmi nodes
     if (node.id === 'Budget' || node.id === 'Risparmi') {
+      return;
+    }
+
+    // Handle subcategory click in 5-layer view (when showSubcategories is ON)
+    // Subcategory IDs are in format "CategoryName__SubcategoryName"
+    if (node.id.includes('__')) {
+      const [categoryName, subcategoryName] = node.id.split('__');
+      const isIncome = expenses.some(e => e.categoryName === categoryName && e.type === 'income');
+
+      setSelectedCategory({
+        name: categoryName,
+        color: node.color,
+        isIncome,
+        mode: 'transactions',
+        parentCategory: categoryName,
+        selectedSubcategory: subcategoryName,
+      });
       return;
     }
 
@@ -636,12 +912,21 @@ export function CashflowSankeyChart({
   // Handle back button click for multi-level navigation
   const handleBack = () => {
     if (selectedCategory?.mode === 'transactions') {
-      // Return to category drill-down view
-      setSelectedCategory(prev => prev ? {
-        ...prev,
-        mode: 'category',
-        selectedSubcategory: undefined
-      } : null);
+      // Check if we came from 5-layer view (direct subcategory click) or from drill-down
+      // In 5-layer view, we don't have a category drill-down intermediate step
+      const cameFrom5LayerView = !selectedCategory.parentType && selectedCategory.selectedSubcategory;
+
+      if (cameFrom5LayerView) {
+        // Return directly to budget view (skip category drill-down)
+        setSelectedCategory(null);
+      } else {
+        // Return to category drill-down view (normal drill-down flow)
+        setSelectedCategory(prev => prev ? {
+          ...prev,
+          mode: 'category',
+          selectedSubcategory: undefined
+        } : null);
+      }
     } else {
       // Return to budget view
       setSelectedCategory(null);
@@ -717,21 +1002,32 @@ export function CashflowSankeyChart({
   return (
     <Card className="md:col-span-2">
       <CardHeader>
-        <div className="flex items-center gap-2">
-          {selectedCategory && (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            {selectedCategory && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleBack}
+                className="gap-1"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Indietro
+              </Button>
+            )}
+            <CardTitle>
+              {getBreadcrumbTitle()}
+            </CardTitle>
+          </div>
+          {!selectedCategory && (
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              onClick={handleBack}
-              className="gap-1"
+              onClick={() => setShowSubcategories(!showSubcategories)}
             >
-              <ChevronLeft className="h-4 w-4" />
-              Indietro
+              {showSubcategories ? 'Nascondi sottocategorie' : 'Mostra sottocategorie'}
             </Button>
           )}
-          <CardTitle>
-            {getBreadcrumbTitle()}
-          </CardTitle>
         </div>
       </CardHeader>
       <CardContent>
@@ -755,6 +1051,7 @@ export function CashflowSankeyChart({
             linkHoverOpacity={0.6}
             linkContract={3}
             enableLinkGradient={chartConfig.enableLinkGradient}
+            label={(node: any) => node.label || node.id}
             labelPosition={chartConfig.labelPosition}
             labelPadding={chartConfig.labelOffset}
             labelOrientation="horizontal"

@@ -2,6 +2,20 @@
 
 ### Features
 
+- **Cashflow Sankey - Subcategories Toggle**: Optional detailed view showing subcategory breakdown directly in main flow chart
+  - **Toggle control**: "Mostra sottocategorie" button in top-right corner switches between 4-layer and 5-layer visualization
+  - **5-layer structure**: Income → Budget → Types → Categories → **Subcategories** + Savings for granular expense visibility
+  - **One-click navigation**: Direct click on any subcategory opens transaction details (vs 3 clicks in drill-down)
+  - **Smart filtering**: Categories without real subcategories (only "Altro") remain at 4-layer for cleaner view
+  - **Clean labels**: Subcategories display name only (e.g., "Coop" instead of "Cibo_Coop") for better readability
+  - **Mobile optimized**: Top 4 subcategories per category on mobile prevents overcrowding (~50 nodes total)
+  - **Color hierarchy**: Subcategory colors automatically derived from parent category with brightness variations
+  - **Dual navigation paths**: Use either traditional drill-down (Type → Category → Subcategory) or direct 5-layer click
+  - **Backward compatible**: Default OFF preserves existing UX, toggle state preserved during navigation
+  - **Responsive positioning**: Toggle button stacks vertically on mobile, aligned right on desktop (matches "% Percentuali" pattern)
+
+### Features
+
 - **FIRE Calculator - Primary Residence Exclusion**: Enhanced FIRE (Financial Independence Retire Early) calculations with configurable primary residence treatment
   - **Primary residence flag**: Mark real estate assets as "Casa di Abitazione" (primary residence) in the asset form
   - **Conditional UI**: Checkbox appears only for real estate assets, keeps form clean for other asset types

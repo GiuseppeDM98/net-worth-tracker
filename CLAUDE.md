@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz, @nivo/sankey
-- Feature ultimo mese: Asset historical data aggregation by name + Settings page fixes
-- Ultima implementazione: Fixed asset re-acquisition showing duplicate rows in historical tables by aggregating on name instead of ID (2026-01-20)
+- Feature ultimo mese: Sankey subcategories toggle + Asset historical aggregation + Settings fixes
+- Ultima implementazione: Added optional 5-layer Sankey view with subcategories toggle for detailed cashflow visualization (2026-01-20)
 - In corso ora: nessuna attivita attiva
 - Completamento: n/d
 
@@ -29,12 +29,15 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Portfolio multi-asset con aggiornamento prezzi Yahoo Finance.
 - Cashflow con categorie, filtri, statistiche e Sankey diagram interattivo:
   - Budget flow visualization: Income Categories → Budget → Expense Types → Expense Categories + Risparmi
+  - **Optional 5-layer view**: Toggle "Mostra sottocategorie" aggiunge layer Subcategories (Categories → Subcategories)
+  - **Dual-path navigation**: Drill-down classico (4 click) o click diretto su subcategory nel 5-layer (1 click)
   - Multi-level drill-down: Budget → Type → Category → Subcategory → Transaction Details
   - Transaction details table: desktop (sticky header, scrollable) + mobile (card layout)
   - Dynamic breadcrumb: shows full navigation path in header (e.g., "Variabili - Cibo - Coop")
   - Smart navigation: auto-skip to transactions if category has no subcategories
   - Expense types layer: Spese Fisse (blue), Variabili (violet), Debiti (amber)
-  - Mobile optimization: top 3 categories per expense type, responsive labels
+  - Mobile optimization: top 3 categories per expense type, top 4 subcategories per category, responsive labels
+  - Smart filtering: "Altro" singolo escluso quando categoria non ha subcategories reali
   - Separate charts per Anno Corrente e Storico Totale (filtro 2025+)
 - Snapshot mensili automatici + storico e CSV export.
 - Asset price/value history tables (Prezzi Storici / Valori Storici):
