@@ -23,9 +23,8 @@ export interface MonthDataCell {
  * Asset row in the price history table
  */
 export interface AssetPriceHistoryRow {
-  assetId: string;
+  name: string; // Primary key for aggregation (replaces assetId to unify re-acquired assets)
   ticker: string;
-  name: string;
   isDeleted: boolean; // True if asset not in current portfolio
   months: {
     [monthKey: string]: MonthDataCell; // monthKey: "2025-1", "2025-2", etc.
@@ -161,42 +160,51 @@ export function transformPriceHistoryData(
     month: s.month,
   }));
 
-  // Step 3: Collect all unique assets (current + deleted from snapshots)
-  const allAssetIds = new Set<string>();
+  // Step 3: Collect all unique assets by name (aggregate re-acquired assets)
+  // Use name as key to unify assets that were sold and re-purchased
   const assetMetadata = new Map<
     string,
     { ticker: string; name: string; isDeleted: boolean }
   >();
 
-  // Add current assets
+  // Add current assets (group by name)
   currentAssets.forEach((asset) => {
-    allAssetIds.add(asset.id);
-    assetMetadata.set(asset.id, {
+    // Use name as key - if multiple assets with same name exist, use latest ticker
+    assetMetadata.set(asset.name, {
       ticker: asset.ticker,
       name: asset.name,
       isDeleted: false,
     });
   });
 
-  // Add historical assets (deleted from portfolio but in snapshots)
+  // Add historical assets from snapshots (only if not already in current portfolio)
   filteredSnapshots.forEach((snapshot) => {
     snapshot.byAsset.forEach((snapshotAsset) => {
-      if (!allAssetIds.has(snapshotAsset.assetId)) {
-        allAssetIds.add(snapshotAsset.assetId);
-        assetMetadata.set(snapshotAsset.assetId, {
+      // Check if asset with this name is already tracked
+      const existingMetadata = assetMetadata.get(snapshotAsset.name);
+
+      if (!existingMetadata) {
+        // New asset name not in current portfolio - add as deleted
+        assetMetadata.set(snapshotAsset.name, {
           ticker: snapshotAsset.ticker,
           name: snapshotAsset.name,
           isDeleted: true, // Not in current portfolio
         });
+      } else if (existingMetadata.isDeleted) {
+        // If we already marked it as deleted but find it in a snapshot,
+        // keep it deleted (prefer current portfolio status)
+        // But update ticker if current one is missing
+        if (!existingMetadata.ticker && snapshotAsset.ticker) {
+          existingMetadata.ticker = snapshotAsset.ticker;
+        }
       }
     });
   });
 
-  // Step 4: Build price/value history rows
+  // Step 4: Build price/value history rows (grouped by asset name)
   const assetRows: AssetPriceHistoryRow[] = [];
 
-  allAssetIds.forEach((assetId) => {
-    const metadata = assetMetadata.get(assetId)!;
+  assetMetadata.forEach((metadata, assetName) => {
     const months: { [monthKey: string]: MonthDataCell } = {};
     let previousPrice: number | null = null; // Track for color coding
     let previousTotalValue: number | null = null; // Track for color coding
@@ -207,9 +215,9 @@ export function transformPriceHistoryData(
         (s) => s.year === monthCol.year && s.month === monthCol.month
       );
 
-      // Find asset in snapshot.byAsset
+      // Find asset in snapshot.byAsset by name (aggregate all instances with same name)
       const snapshotAsset = snapshot?.byAsset.find(
-        (a) => a.assetId === assetId
+        (a) => a.name === assetName
       );
 
       if (!snapshotAsset) {
@@ -305,9 +313,8 @@ export function transformPriceHistoryData(
     }
 
     assetRows.push({
-      assetId,
+      name: metadata.name, // Use name as primary key (aggregates re-acquired assets)
       ticker: metadata.ticker,
-      name: metadata.name,
       isDeleted: metadata.isDeleted,
       months,
       ytd,

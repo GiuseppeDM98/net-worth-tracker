@@ -38,6 +38,7 @@ End date must include full day: `new Date(year, month, 0, 23, 59, 59, 999)`
 ### Asset & Chart Patterns
 - **Hall of Fame**: Include years with expenses even if <2 snapshots
 - **Asset Price %**: For `price === 1` or `displayMode === 'totalValue'`, use total value
+- **Asset Historical Aggregation**: Use `name` (not `assetId`) as aggregation key in price history tables to unify data when asset sold and re-purchased
 - **Borsa Italiana**: Pass `assetType` to scraper (ETF vs Stock table structures differ)
 - **Currency**: Use `currencyConversionService.ts` (Frankfurter API, 24h cache)
 - **Chart Y Axis**: Use `formatCurrencyCompact()` on mobile
@@ -134,6 +135,17 @@ if (settings.includePrimaryResidenceInFIRE !== undefined) {
 
 ---
 
+### Asset Re-acquisition Aggregation Pattern
+When displaying historical asset data across time periods:
+- **Aggregation key**: Use `asset.name` instead of `assetId` to unify re-purchased assets
+- **Rationale**: When user sells asset (deletes document) and re-buys later, new Firestore doc gets new ID
+- **Display logic**: `Map<name, metadata>` groups all instances with same name into single row
+- **Badge "Venduto"**: Shows only if name NOT found in current portfolio (`isDeleted: true`)
+- **React keys**: Use `asset.name` for stable keys across re-acquisitions
+- **Edge case**: Different names (e.g., "Apple Inc." vs "Apple") → separate rows (user controlled)
+- **Files**: `assetPriceHistoryUtils.ts` (aggregation), `AssetPriceHistoryTable.tsx` (display)
+- **No DB migration**: Snapshots still save `assetId`, transformation happens at render time
+
 ### Server-Only Module Constraints (Firebase)
 When implementing features requiring Firebase data access:
 - **Pattern**: Client Components cannot import modules with `'server-only'` directive
@@ -193,4 +205,4 @@ await setDoc(ref, docData); // NO { merge: true }
 - **Components**: `CashflowSankeyChart.tsx`, `MetricSection.tsx`, `FireCalculatorTab.tsx`
 - **Pages**: `app/dashboard/settings/page.tsx`, `history/page.tsx`
 
-**Last updated**: 2026-01-19
+**Last updated**: 2026-01-20

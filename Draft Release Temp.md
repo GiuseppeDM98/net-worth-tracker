@@ -486,3 +486,12 @@
 - Fixed Hall of Fame yearly expense rankings missing years that only have expense data (even with fewer than two snapshots)
 - Fixed Sharpe Rolling legend ordering so labels match the visual series order
 - Fixed Cashflow % trend charts showing out-of-scale values when toggling percentage view
+
+- **Asset Re-acquisition Duplicate Rows**: Fixed historical price and value tables showing duplicate rows when selling and re-purchasing the same asset
+  - **Issue**: When selling an asset and later re-buying it with the same name, the "Prezzi Storici" and "Valori Storici" tables displayed two separate rows - one marked "Venduto" (sold) with old data, and a new one without historical continuity
+  - **Impact**: Fragmented historical view prevented users from seeing complete asset performance over time, making it harder to track long-term investments
+  - **Fix**: Changed aggregation logic from unique asset ID to asset name - assets with identical names now automatically merge into single row
+  - **Result**: Re-purchased assets display unified row with complete historical data (pre-sale + post-purchase), "Venduto" badge removed when asset back in portfolio
+  - **User benefit**: Seamless historical tracking for assets sold and re-acquired (e.g., selling ARKK.MI in November, re-buying in January shows single continuous timeline)
+  - **Edge case handling**: Assets with different names (e.g., "Apple Inc." vs "Apple") still display as separate rows for user flexibility
+  - **Backwards compatible**: No database migration required - transformation happens at display time using existing snapshot data

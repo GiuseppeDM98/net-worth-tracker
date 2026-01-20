@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz, @nivo/sankey
-- Feature ultimo mese: Settings page bug fixes + FIRE setting UI + Performance metrics categorization
-- Ultima implementazione: Fixed 8 Settings page bugs including subcategory deletion persistence, added FIRE primary residence toggle to Settings UI (2026-01-19)
+- Feature ultimo mese: Asset historical data aggregation by name + Settings page fixes
+- Ultima implementazione: Fixed asset re-acquisition showing duplicate rows in historical tables by aggregating on name instead of ID (2026-01-20)
 - In corso ora: nessuna attivita attiva
 - Completamento: n/d
 
@@ -37,6 +37,10 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - Mobile optimization: top 3 categories per expense type, responsive labels
   - Separate charts per Anno Corrente e Storico Totale (filtro 2025+)
 - Snapshot mensili automatici + storico e CSV export.
+- Asset price/value history tables (Prezzi Storici / Valori Storici):
+  - Aggregazione per nome asset invece di ID univoco
+  - Asset venduti e ricomprati mostrano riga unificata con continuità dati storici
+  - Badge "Venduto" solo per asset non più nel portfolio corrente
 - History page con multiple chart visualizations:
   - Net Worth evolution (total, liquid, illiquid)
   - Asset Class breakdown (stacked area € or multi-line %)
@@ -101,6 +105,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Formatters: `lib/utils/formatters.ts`
 - Asset service: `lib/services/assetService.ts` (includes `calculateFIRENetWorth`)
 - Asset allocation service: `lib/services/assetAllocationService.ts` (includes nested object replacement pattern)
+- Asset price history utils: `lib/utils/assetPriceHistoryUtils.ts` (name-based aggregation for re-acquired assets)
+- Asset price history table: `components/assets/AssetPriceHistoryTable.tsx` (historical price/value visualization)
 - Settings page: `app/dashboard/settings/page.tsx`
 - PDF data service: `lib/services/pdfDataService.ts`
 - Asset dialog: `components/assets/AssetDialog.tsx`
@@ -108,4 +114,4 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Performance metrics section: `components/performance/MetricSection.tsx`
 - Asset types: `types/assets.ts`
 
-**Last updated**: 2026-01-19
+**Last updated**: 2026-01-20

@@ -144,7 +144,7 @@ export function AssetPriceHistoryTable({
             </TableHeader>
             <TableBody>
               {assetRows.map((asset) => (
-                <TableRow key={asset.assetId}>
+                <TableRow key={asset.name}>
                   {/* Sticky first column: asset ticker + name + "Venduto" badge */}
                   <TableCell className="sticky left-0 bg-white z-10 border-r">
                     <div className="flex items-center gap-2">
