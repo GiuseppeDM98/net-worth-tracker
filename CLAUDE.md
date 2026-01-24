@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz, @nivo/sankey
-- Feature ultimo mese: Doubling Time Analysis + PDF Performance Export + Sankey bug fixes + Subcategories toggle
-- Ultima implementazione: Added Doubling Time metric to History page with dual-mode visualization (geometric + threshold) (2026-01-24)
+- Feature ultimo mese: Month filter for Sankey chart in CurrentYearTab + Doubling Time Analysis + PDF Performance Export
+- Ultima implementazione: Added month filter to Sankey chart in CurrentYearTab with timezone-aware filtering (2026-01-24)
 - In corso ora: nessuna attivita attiva
 - Completamento: 100%
 
@@ -29,6 +29,12 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Portfolio multi-asset con aggiornamento prezzi Yahoo Finance.
 - Cashflow con categorie, filtri, statistiche e Sankey diagram interattivo:
   - Budget flow visualization: Income Categories → Budget → Expense Types → Expense Categories + Risparmi
+  - **Month filter in CurrentYearTab**: Dropdown selector to filter Sankey chart by specific month (Jan-Dec) or show full year
+    - Timezone-aware filtering using `getItalyMonth()` for consistency between server (UTC) and client (CET)
+    - Visual filter indicator: blue banner with "Filtro attivo" + quick "Cancella" button
+    - Dynamic title: updates to show selected month (e.g., "Flusso Cashflow Gennaio 2026")
+    - Empty state: message when selected month has no expenses
+    - Only affects Sankey chart, other charts remain unaffected
   - **Optional 5-layer view**: Toggle "Mostra sottocategorie" aggiunge layer Subcategories (Categories → Subcategories)
   - **Dual-path navigation**: Drill-down classico (4 click) o click diretto su subcategory nel 5-layer (1 click)
   - Multi-level drill-down: Budget → Type → Category → Subcategory → Transaction Details

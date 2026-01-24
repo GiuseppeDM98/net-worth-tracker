@@ -22,6 +22,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RefreshCw, ChevronLeft, ExternalLink, Info, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import {
@@ -41,7 +43,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
-import { getItalyMonthYear, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
+import { getItalyMonth, getItalyMonthYear, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
 import { CashflowSankeyChart } from '@/components/cashflow/CashflowSankeyChart';
 
 interface ChartData {
@@ -62,6 +64,12 @@ const COLORS = [
   '#f97316', // orange
   '#6366f1', // indigo
   '#14b8a6', // teal
+];
+
+// Italian month names for filter dropdown
+const ITALIAN_MONTHS = [
+  'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+  'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
 ];
 
 type DrillDownLevel = 'category' | 'subcategory' | 'expenseList';
@@ -96,6 +104,9 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
 
   // Info alert dismissal state
   const [showDrillDownInfo, setShowDrillDownInfo] = useState(true);
+
+  // Month filter for Sankey chart (null = all year, 1-12 = specific month)
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
 
   // Responsive state for mobile-specific chart rendering
   const [isMobile, setIsMobile] = useState(false);
@@ -143,6 +154,23 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
   const currentYearExpenses = useMemo(() => {
     return allExpenses.filter(expense => getItalyYear(toDate(expense.date)) === currentYear);
   }, [allExpenses, currentYear]);
+
+  // Filter expenses for Sankey chart based on selected month
+  // Uses timezone-aware helpers to ensure consistent filtering (server UTC vs client CET)
+  const sankeyFilteredExpenses = useMemo(() => {
+    if (selectedMonth === null) {
+      // No month filter: return all current year expenses
+      return currentYearExpenses;
+    }
+
+    // Filter by specific month using Italy timezone
+    // getItalyMonth ensures consistent results between server (Vercel UTC) and client
+    return currentYearExpenses.filter(expense => {
+      const expenseDate = toDate(expense.date);
+      const expenseMonth = getItalyMonth(expenseDate);
+      return expenseMonth === selectedMonth;
+    });
+  }, [currentYearExpenses, selectedMonth]);
 
   /**
    * Aggregate expenses by category name with percentage calculation
@@ -1330,13 +1358,75 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
           </Card>
         )}
 
-        {/* Sankey Flow Diagram - Budget View */}
+        {/* Month filter for Sankey chart */}
         {currentYearExpenses.length > 0 && (
-          <CashflowSankeyChart
-            expenses={currentYearExpenses}
-            isMobile={isMobile}
-            title="Flusso Cashflow Anno Corrente"
-          />
+          <div className="flex flex-col gap-4 md:col-span-2">
+            {/* Month selector */}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <Label htmlFor="sankeyMonthFilter" className="text-sm font-medium">
+                Filtro Mese Sankey
+              </Label>
+              <Select
+                value={selectedMonth?.toString() || '__all__'}
+                onValueChange={(value) => setSelectedMonth(value === '__all__' ? null : parseInt(value))}
+              >
+                <SelectTrigger id="sankeyMonthFilter" className="w-full sm:w-[200px]">
+                  <SelectValue placeholder="Tutto l'anno" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Tutto l&apos;anno</SelectItem>
+                  {ITALIAN_MONTHS.map((month, index) => (
+                    <SelectItem key={index + 1} value={(index + 1).toString()}>
+                      {month}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Active filter indicator - shows when month is selected */}
+            {selectedMonth !== null && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20 p-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-blue-700 dark:text-blue-400">📅</span>
+                  <span className="font-medium text-blue-900 dark:text-blue-200">
+                    Filtro attivo: {ITALIAN_MONTHS[selectedMonth - 1]} {currentYear}
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedMonth(null)}
+                  className="h-7 text-xs text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-200"
+                >
+                  Cancella
+                </Button>
+              </div>
+            )}
+
+            {/* Empty state when filtered month has no expenses */}
+            {selectedMonth !== null && sankeyFilteredExpenses.length === 0 && (
+              <Card>
+                <CardContent className="py-12">
+                  <p className="text-center text-muted-foreground">
+                    Nessuna spesa trovata per {ITALIAN_MONTHS[selectedMonth - 1]} {currentYear}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Sankey Flow Diagram - Budget View */}
+            {sankeyFilteredExpenses.length > 0 && (
+              <CashflowSankeyChart
+                expenses={sankeyFilteredExpenses}
+                isMobile={isMobile}
+                title={selectedMonth
+                  ? `Flusso Cashflow ${ITALIAN_MONTHS[selectedMonth - 1]} ${currentYear}`
+                  : "Flusso Cashflow Anno Corrente"
+                }
+              />
+            )}
+          </div>
         )}
       </div>
     </div>

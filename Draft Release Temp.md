@@ -2,6 +2,15 @@
 
 ## ✨ New Features
 
+### Month Filter for Sankey Chart
+- Added month filter to Sankey flow diagram in Current Year cashflow tab
+- Filter dropdown with all 12 months in Italian + "All year" option to easily analyze specific months
+- Visual indicator banner showing active filter with quick clear button
+- Dynamic chart title updates to reflect selected month (e.g., "Cashflow January 2026")
+- Helpful empty state message when selected month has no transactions
+- Filter affects only the Sankey chart, leaving other charts (trends, pie charts) unaffected for full year comparison
+- Timezone-aware filtering ensures consistent results regardless of server location
+
 ### Doubling Time Analysis
 - Added Doubling Time Analysis section to History page to track how long your net worth takes to double over time
 - Dual-mode visualization:
