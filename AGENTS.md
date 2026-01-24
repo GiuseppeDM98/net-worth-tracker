@@ -141,6 +141,15 @@ if (settings.includePrimaryResidenceInFIRE !== undefined) {
 
 ---
 
+### Doubling Time Milestone Pattern
+When calculating time-based milestones from historical data:
+- **Skip pre-existing milestones**: If first snapshot already exceeds a threshold, skip it to avoid 0-month duration
+- **Example**: Portfolio starts at €164k → skip €100k threshold (would show 0m duration)
+- **Why critical**: 0-month milestones falsely inflate "fastest doubling" metric
+- **Implementation**: `if (threshold <= firstPositive.totalNetWorth) continue;`
+- **Geometric mode exception**: NOT affected because baseline is always first snapshot (2x, 4x of actual start)
+- **Files**: `chartService.ts` (`calculateThresholdMilestones`)
+
 ### Asset Re-acquisition Aggregation Pattern
 When displaying historical asset data across time periods:
 - **Aggregation key**: Use `asset.name` instead of `assetId` to unify re-purchased assets

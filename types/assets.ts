@@ -302,3 +302,42 @@ export interface AssetHistoryTotalRow {
   ytd?: number;       // Year-to-date % (undefined if <2 months in current year)
   fromStart?: number; // From start % (undefined if <2 months total)
 }
+
+// Doubling Time Metric Types
+// Used by History page to visualize wealth accumulation velocity
+// Tracks when net worth doubles over time (2x, 4x, 8x... or €100k, €200k, €500k...)
+
+export type DoublingMode = 'geometric' | 'threshold';
+
+// Doubling Time Milestone represents a period where net worth doubled.
+// Each milestone tracks either geometric progression (2x, 4x, 8x...)
+// or fixed thresholds (€100k, €200k, €500k, €1M...).
+export interface DoublingMilestone {
+  milestoneNumber: number;           // 1st, 2nd, 3rd... milestone
+  startValue: number;                 // Starting net worth (e.g., €50,000)
+  endValue: number;                   // Ending net worth (e.g., €100,000)
+  startDate: {
+    year: number;
+    month: number;
+  };
+  endDate: {
+    year: number;
+    month: number;
+  };
+  durationMonths: number;             // Time taken in months
+  periodLabel: string;                // "01/20 - 06/22" (MM/YY format)
+  isComplete: boolean;                // true if milestone reached, false if in progress
+  progressPercentage?: number;        // 0-100 for incomplete milestones
+  milestoneType: 'geometric' | 'threshold';  // Type of milestone
+  thresholdValue?: number;            // e.g., 100000 for €100k threshold (only for threshold type)
+}
+
+// Summary of all doubling time milestones with aggregate statistics.
+// Used to display fastest doubling, average time, and current progress.
+export interface DoublingTimeSummary {
+  milestones: DoublingMilestone[];
+  fastestDoubling: DoublingMilestone | null;
+  averageMonths: number | null;
+  totalDoublings: number;
+  currentDoublingInProgress: DoublingMilestone | null;
+}

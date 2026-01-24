@@ -16,11 +16,14 @@ import {
   prepareAssetClassHistoryData,
   prepareYoYVariationData,
   prepareSavingsVsInvestmentData,
+  prepareDoublingTimeData,
   formatCurrency,
   formatCurrencyCompact,
   formatPercentage,
 } from '@/lib/services/chartService';
-import { Asset, MonthlySnapshot, AssetAllocationTarget } from '@/types/assets';
+import { Asset, MonthlySnapshot, AssetAllocationTarget, DoublingMode } from '@/types/assets';
+import { DoublingTimeSummaryCards } from '@/components/history/DoublingTimeSummaryCards';
+import { DoublingMilestoneTimeline } from '@/components/history/DoublingMilestoneTimeline';
 import { Expense } from '@/types/expenses';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -104,6 +107,7 @@ export default function HistoryPage() {
   const [showManualSnapshotModal, setShowManualSnapshotModal] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   const [snapshotSearchDialogOpen, setSnapshotSearchDialogOpen] = useState(false);
+  const [doublingMode, setDoublingMode] = useState<DoublingMode>('geometric');
 
   // Responsive breakpoints
   const isMobile = useMediaQuery('(max-width: 767px)');
@@ -240,6 +244,7 @@ export default function HistoryPage() {
   const assetClassHistory = prepareAssetClassHistoryData(snapshots);
   const yoyVariationData = prepareYoYVariationData(snapshots);
   const savingsVsInvestmentData = prepareSavingsVsInvestmentData(snapshots, expenses);
+  const doublingTimeSummary = prepareDoublingTimeData(snapshots, doublingMode);
 
   // Calculate percentage split of liquid vs illiquid for each snapshot.
   // This enables the chart toggle between € values and % distribution.
@@ -1300,6 +1305,63 @@ export default function HistoryPage() {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Doubling Time Analysis */}
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <CardTitle className="text-lg sm:text-xl">Tempo di Raddoppio Patrimonio</CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                Mostra quanto tempo ha impiegato il tuo patrimonio per raddoppiare nei diversi periodi.
+                Ogni milestone rappresenta un traguardo significativo nella crescita del tuo portafoglio.
+              </p>
+            </div>
+            {/* Toggle button for switching between geometric and threshold modes */}
+            <div className="flex gap-2 shrink-0">
+              <Button
+                variant={doublingMode === 'geometric' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setDoublingMode('geometric')}
+                className="text-xs sm:text-sm"
+              >
+                Raddoppi (2x, 4x...)
+              </Button>
+              <Button
+                variant={doublingMode === 'threshold' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setDoublingMode('threshold')}
+                className="text-xs sm:text-sm"
+              >
+                Traguardi (€100k...)
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {doublingTimeSummary.totalDoublings === 0 && !doublingTimeSummary.currentDoublingInProgress ? (
+            <div className="flex h-32 items-center justify-center text-gray-500">
+              Nessuna milestone ancora completata. Continua a costruire il tuo patrimonio!
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Summary Metrics */}
+              <DoublingTimeSummaryCards summary={doublingTimeSummary} />
+
+              {/* Milestone Timeline */}
+              <div>
+                <h3 className="text-md font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                  Storico {doublingMode === 'geometric' ? 'Raddoppi' : 'Traguardi'}
+                </h3>
+                <DoublingMilestoneTimeline
+                  milestones={doublingTimeSummary.milestones}
+                  currentInProgress={doublingTimeSummary.currentDoublingInProgress}
+                />
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

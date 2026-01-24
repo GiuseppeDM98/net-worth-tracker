@@ -5,10 +5,10 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz, @nivo/sankey
-- Feature ultimo mese: PDF Performance Export + Sankey bug fixes + Subcategories toggle + Asset historical aggregation
-- Ultima implementazione: Added Performance section to PDF export with all 15 metrics in 4 categories (2026-01-20)
+- Feature ultimo mese: Doubling Time Analysis + PDF Performance Export + Sankey bug fixes + Subcategories toggle
+- Ultima implementazione: Added Doubling Time metric to History page with dual-mode visualization (geometric + threshold) (2026-01-24)
 - In corso ora: nessuna attivita attiva
-- Completamento: n/d
+- Completamento: 100%
 
 ## Architecture Snapshot
 - App Router con pagine protette sotto `app/dashboard/*`.
@@ -50,6 +50,13 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - Liquidity evolution (overlapping areas or separate lines)
   - YoY variation (bar chart con variazione annuale)
   - Savings vs Investment Growth: stacked bar chart annuale mostrando Net Savings (green) + Investment Growth (blue/red conditional) = Total NW Growth
+  - **Doubling Time Analysis**: traccia tempo impiegato dal patrimonio per raddoppiare
+    - **Dual mode**: Geometrico (2x, 4x, 8x, 16x...) vs Soglie Fisse (€100k, €200k, €500k, €1M, €2M)
+    - Toggle button per alternare tra modalità
+    - 3 summary metrics: Raddoppio Più Rapido, Tempo Medio, Milestone Completate
+    - Timeline milestone cards con badge colorati (green complete, blue in-progress)
+    - Progress bar per milestone in corso con percentuale completamento
+    - Edge case handling: negative periods skipped, insufficient data message, in-progress tracking
   - Current vs Target allocation comparison
 - Performance metrics (ROI, CAGR, TWR, IRR, Sharpe, drawdown suite) con heatmap rendimenti mensili, grafico underwater e rolling CAGR/Sharpe con medie mobili.
   - Yield on Cost (YOC): Metriche YOC Lordo e Netto nella Performance page con annualizzazione per confrontabilità tra periodi (YTD, 1Y, 3Y, 5Y, ALL, CUSTOM)
@@ -97,8 +104,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Subcategory rename not fully implemented (tracking prepared but old keys not deleted in Firestore).
 
 ## Key Files
-- History page: `app/dashboard/history/page.tsx`
-- Chart service: `lib/services/chartService.ts`
+- History page: `app/dashboard/history/page.tsx` (includes Doubling Time section)
+- Chart service: `lib/services/chartService.ts` (includes `prepareDoublingTimeData()`)
+- Doubling Time UI: `components/history/DoublingTimeSummaryCards.tsx`, `components/history/DoublingMilestoneTimeline.tsx`
 - Performance page: `app/dashboard/performance/page.tsx`
 - Performance metrics: `lib/services/performanceService.ts`
 - Performance types: `types/performance.ts`
@@ -122,6 +130,6 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Asset dialog: `components/assets/AssetDialog.tsx`
 - FIRE calculator: `components/fire-simulations/FireCalculatorTab.tsx`
 - Performance metrics section: `components/performance/MetricSection.tsx`
-- Asset types: `types/assets.ts`
+- Asset types: `types/assets.ts` (includes DoublingMilestone, DoublingTimeSummary, DoublingMode)
 
-**Last updated**: 2026-01-20
+**Last updated**: 2026-01-24
