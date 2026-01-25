@@ -25,6 +25,22 @@
 - Progress tracking for current milestone in progress with percentage completion and progress bar
 - Smart handling of edge cases (negative net worth periods, insufficient data, portfolios starting above thresholds)
 
+### AI Performance Analysis
+- Added AI-powered portfolio analysis button on Performance page powered by Claude Sonnet 4.5
+- Click "Analizza con AI" button (with sparkles icon) to get instant AI-generated insights on your portfolio metrics
+- Real-time streaming analysis appears progressively as it's generated (ChatGPT-style experience)
+- AI analyzes all your performance metrics (returns, risk, dividends) for the selected time period
+- Get actionable insights including:
+  - Interpretation of key metrics and what they mean for your portfolio
+  - Strengths highlighted in your performance
+  - Areas for improvement or risks to consider
+  - Concrete suggestions when appropriate
+- Beautiful dialog interface with markdown formatting (bold text, bullet points) for easy reading
+- Regenerate button to get fresh analysis if needed
+- Works across all time periods (YTD, 1Y, 3Y, 5Y, ALL, CUSTOM)
+- Analysis in Italian language matching the rest of the app
+- Disclaimer footer reminding users that AI analysis is not financial advice
+
 ## 🐛 Bug Fixes
 
 - Fixed threshold milestones incorrectly showing 0-month duration when portfolio tracking started with net worth already above threshold value (e.g., starting at €164k would show €100k milestone as "reached in 0 months")

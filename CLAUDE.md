@@ -4,9 +4,9 @@
 Net Worth Tracker is a Next.js app for Italian investors to track net worth, assets, cashflow, dividends, performance metrics, and historical snapshots with Firebase.
 
 ## Current Status
-- Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz, @nivo/sankey
-- Feature ultimo mese: Month filter for Sankey chart in CurrentYearTab + Doubling Time Analysis + PDF Performance Export
-- Ultima implementazione: Added month filter to Sankey chart in CurrentYearTab with timezone-aware filtering (2026-01-24)
+- Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk
+- Feature ultimo mese: AI Performance Analysis + Month filter for Sankey chart + Doubling Time Analysis + PDF Performance Export
+- Ultima implementazione: Added AI-powered performance analysis with Claude Sonnet 4.5 integration (real-time streaming, markdown formatting) (2026-01-25)
 - In corso ora: nessuna attivita attiva
 - Completamento: 100%
 
@@ -97,6 +97,15 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - Breakdown dettagliato Contributi Netti (Entrate/Dividendi/Uscite) allineato con UI Performance page
   - Time filter mapping: yearly → YTD, total → ALL, monthly → Performance disabled
   - Graceful degradation con dati insufficienti (< 2 snapshots)
+- **AI Performance Analysis**: On-demand portfolio analysis powered by Claude Sonnet 4.5 (Anthropic API)
+  - Button in Performance page header: "Analizza con AI" con icona Sparkles
+  - Real-time streaming response with Server-Sent Events (SSE) for progressive text display
+  - Base-level analysis: metrics interpretation, strengths identification, weaknesses, actionable insights
+  - Italian language output aligned with app localization
+  - Dialog UI with markdown formatting (bold, bullet points), scrollable content
+  - Regenerate button for new analysis if unsatisfied with first result
+  - Graceful error handling with fallback messages and toast notifications
+  - Auto-fetch on dialog open, disclaimer footer (not financial advice)
 
 ## Data & Integrations
 - Firestore (client + admin) con merge updates per evitare data loss.
@@ -137,5 +146,6 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - FIRE calculator: `components/fire-simulations/FireCalculatorTab.tsx`
 - Performance metrics section: `components/performance/MetricSection.tsx`
 - Asset types: `types/assets.ts` (includes DoublingMilestone, DoublingTimeSummary, DoublingMode)
+- AI Analysis: `app/api/ai/analyze-performance/route.ts` (Anthropic API integration with SSE streaming), `components/performance/AIAnalysisDialog.tsx` (dialog with markdown rendering)
 
-**Last updated**: 2026-01-24
+**Last updated**: 2026-01-25

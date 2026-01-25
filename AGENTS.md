@@ -211,6 +211,92 @@ await setDoc(ref, docData); // NO { merge: true }
 2. Does UI show saved value after reload? NO → getSettings not reading
 **Prevenzione**: Use three-place rule pattern (see Settings Service Synchronization Pattern above)
 
+### Radix UI Dialog with Conditional Mounting Auto-Trigger Bug
+**Sintomo**: Dialog opens but callback functions don't fire (e.g., auto-fetch on open doesn't trigger)
+**Causa**: When component is rendered conditionally with `open={true}` from start, `onOpenChange` callback never fires (no state transition from `false` to `true`)
+**Debug time**: ~1 hour (checked API, checked network, added extensive logging before discovering root cause)
+**Soluzione**: Use `useEffect` with `open` dependency instead of relying on `onOpenChange` callback
+```typescript
+// ❌ WRONG: Callback won't fire if component mounted with open={true}
+const handleOpenChange = (newOpen: boolean) => {
+  onOpenChange(newOpen);
+  if (newOpen && !data) {
+    fetchData();  // Never runs if mounted with open={true}
+  }
+};
+
+// ✅ CORRECT: useEffect detects when dialog is open
+useEffect(() => {
+  if (open && !data && !loading) {
+    fetchData();
+  }
+}, [open]);
+```
+**Prevenzione**: For side effects on dialog open (fetch, logging, analytics), always use `useEffect(() => { ... }, [open])` instead of `onOpenChange` callbacks
+**Note**: This is a common Radix UI pattern - when conditionally rendering dialogs with `{condition && <Dialog open={true} ...>}`, the open prop is already true on mount
+
+### Anthropic API Streaming SSE Pattern
+**Pattern**: Server-Sent Events for progressive text generation
+**Use case**: AI-powered analysis with real-time streaming (Performance page)
+**Implementation**:
+```typescript
+// Server (API route): Return ReadableStream with 'text/event-stream' content type
+const encoder = new TextEncoder();
+const readableStream = new ReadableStream({
+  async start(controller) {
+    for await (const chunk of anthropicStream) {
+      if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: chunk.delta.text })}\n\n`));
+      }
+    }
+    controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+    controller.close();
+  },
+});
+
+return new NextResponse(readableStream, {
+  headers: {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+  },
+});
+
+// Client: Use fetch + ReadableStream reader to parse chunks
+const reader = response.body?.getReader();
+const decoder = new TextDecoder();
+let buffer = '';
+
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+
+  buffer += decoder.decode(value, { stream: true });
+
+  // Process complete SSE messages (delimited by \n\n)
+  const lines = buffer.split('\n\n');
+  buffer = lines.pop() || '';  // Keep incomplete line in buffer
+
+  for (const line of lines) {
+    if (line.startsWith('data: ')) {
+      const data = line.slice(6);
+      if (data === '[DONE]') {
+        setLoading(false);
+        return;
+      }
+      const parsed = JSON.parse(data);
+      if (parsed.text) {
+        setAnalysis((prev) => prev + parsed.text);  // Progressive rendering
+      }
+    }
+  }
+}
+```
+**Why critical**: Allows real-time UI updates without waiting for full response (~5-10s), improves perceived performance
+**Buffer handling**: Split by `\n\n`, keep incomplete lines in buffer to prevent parse errors on partial chunks
+**Error handling**: Stream errors don't crash API route (try-catch in start()), client shows error banner on failure
+**Files**: `app/api/ai/analyze-performance/route.ts`, `components/performance/AIAnalysisDialog.tsx`
+
 ---
 
 ## Key Files
@@ -220,4 +306,4 @@ await setDoc(ref, docData); // NO { merge: true }
 - **Components**: `CashflowSankeyChart.tsx`, `MetricSection.tsx`, `FireCalculatorTab.tsx`
 - **Pages**: `app/dashboard/settings/page.tsx`, `history/page.tsx`
 
-**Last updated**: 2026-01-20
+**Last updated**: 2026-01-25

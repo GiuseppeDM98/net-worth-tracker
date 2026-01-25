@@ -10,7 +10,7 @@ import { MonthlySnapshot } from '@/types/assets';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, TrendingUp, Info } from 'lucide-react';
+import { RefreshCw, TrendingUp, Info, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency, formatPercentage, formatCurrencyCompact } from '@/lib/services/chartService';
 import {
@@ -26,6 +26,7 @@ import {
   ResponsiveContainer
 } from 'recharts';
 import { CustomDateRangeDialog } from '@/components/performance/CustomDateRangeDialog';
+import { AIAnalysisDialog } from '@/components/performance/AIAnalysisDialog';
 import { MetricCard } from '@/components/performance/MetricCard';
 import { MetricSection } from '@/components/performance/MetricSection';
 import { PerformanceTooltip } from '@/components/performance/PerformanceTooltip';
@@ -69,6 +70,7 @@ export default function PerformancePage() {
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('YTD');
   const [showCustomDateDialog, setShowCustomDateDialog] = useState(false);
+  const [showAIAnalysisDialog, setShowAIAnalysisDialog] = useState(false);
   const [cachedSnapshots, setCachedSnapshots] = useState<MonthlySnapshot[]>([]);
 
   // Responsive breakpoints
@@ -544,6 +546,15 @@ export default function PerformancePage() {
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setShowCustomDateDialog(true)}>
             Periodo Personalizzato
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setShowAIAnalysisDialog(true)}
+            disabled={!metrics || metrics.hasInsufficientData}
+            className="gap-2"
+          >
+            <Sparkles className="h-4 w-4" />
+            Analizza con AI
           </Button>
           <Button onClick={loadPerformanceData}>
             <RefreshCw className="mr-2 h-4 w-4" />
@@ -1210,6 +1221,17 @@ export default function PerformancePage() {
         onOpenChange={setShowCustomDateDialog}
         onConfirm={handleCustomDateRange}
       />
+
+      {/* AI Analysis Dialog */}
+      {user && metrics && !metrics.hasInsufficientData && (
+        <AIAnalysisDialog
+          open={showAIAnalysisDialog}
+          onOpenChange={setShowAIAnalysisDialog}
+          metrics={metrics}
+          timePeriod={selectedPeriod}
+          userId={user.uid}
+        />
+      )}
     </div>
   );
 }
