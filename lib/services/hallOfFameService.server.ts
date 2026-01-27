@@ -111,7 +111,6 @@ function calculateMonthlyRecords(
       previousNetWorth,
       totalIncome,
       totalExpenses,
-      ...(current.note && { note: current.note }),
     });
   }
 
@@ -239,8 +238,18 @@ export async function updateHallOfFame(userId: string): Promise<void> {
       updatedAt: Timestamp.now(),
     };
 
-    // Salva su Firebase usando Admin SDK
-    await adminDb.collection(COLLECTION_NAME).doc(userId).set(hallOfFameData);
+    // Preserve existing notes when recalculating rankings
+    // Critical: Notes must not be lost during ranking updates (which happen after every new snapshot)
+    // Pattern: GET existing → merge notes → SET complete doc
+    const existingDocRef = adminDb.collection(COLLECTION_NAME).doc(userId);
+    const existingDoc = await existingDocRef.get();
+    const existingNotes = existingDoc.exists ? existingDoc.data()?.notes || [] : [];
+
+    // Salva su Firebase usando Admin SDK, preserving notes
+    await existingDocRef.set({
+      ...hallOfFameData,
+      notes: existingNotes, // Preserve user notes during recalculation
+    });
 
     console.log(`Hall of Fame updated for user ${userId} (server-side)`);
   } catch (error) {

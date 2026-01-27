@@ -278,6 +278,7 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
 - **Best/Worst years** by annual performance (Top 10)
 - **Automatic ranking updates** with each new snapshot
 - **Motivation tracking** to compare current performance with historical bests
+- **Dedicated notes system**: Add contextual notes to specific periods across multiple ranking sections with visual indicators
 
 ### 🎨 **Streamlined Navigation & UI**
 - **Simplified sidebar** from 11 to 8 navigation items for cleaner UX

@@ -29,15 +29,27 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { HallOfFameData, MonthlyRecord, YearlyRecord } from '@/types/hall-of-fame';
-import { getHallOfFameData } from '@/lib/services/hallOfFameService';
+import {
+  HallOfFameData,
+  MonthlyRecord,
+  YearlyRecord,
+  HallOfFameNote,
+  HallOfFameSectionKey,
+} from '@/types/hall-of-fame';
+import {
+  getHallOfFameData,
+  addHallOfFameNote,
+  updateHallOfFameNote,
+  deleteHallOfFameNote,
+} from '@/lib/services/hallOfFameService';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Trophy, TrendingUp, TrendingDown, DollarSign, Loader2, RefreshCw } from 'lucide-react';
+import { Trophy, TrendingUp, TrendingDown, DollarSign, Loader2, RefreshCw, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { NoteIconCell } from '@/components/hall-of-fame/NoteIconCell';
+import { HallOfFameNoteDialog } from '@/components/hall-of-fame/HallOfFameNoteDialog';
 import { getItalyMonthYear, getItalyYear } from '@/lib/utils/dateHelpers';
 
 export default function HallOfFamePage() {
@@ -45,6 +57,8 @@ export default function HallOfFamePage() {
   const [data, setData] = useState<HallOfFameData | null>(null);
   const [loading, setLoading] = useState(true);
   const [recalculating, setRecalculating] = useState(false);
+  const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+  const [editingNote, setEditingNote] = useState<HallOfFameNote | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -102,6 +116,97 @@ export default function HallOfFamePage() {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(amount);
+  };
+
+  /**
+   * Extract available years from Hall of Fame data
+   *
+   * Collects all unique years from monthly and yearly rankings,
+   * sorted in descending order (newest first) for year selector in note dialog.
+   */
+  const getAvailableYears = (data: HallOfFameData): number[] => {
+    const years = new Set<number>();
+
+    // Collect from monthly records
+    data.bestMonthsByNetWorthGrowth.forEach((r) => years.add(r.year));
+    data.bestMonthsByIncome.forEach((r) => years.add(r.year));
+    data.worstMonthsByNetWorthDecline.forEach((r) => years.add(r.year));
+    data.worstMonthsByExpenses.forEach((r) => years.add(r.year));
+
+    // Collect from yearly records
+    data.bestYearsByNetWorthGrowth.forEach((r) => years.add(r.year));
+    data.bestYearsByIncome.forEach((r) => years.add(r.year));
+    data.worstYearsByNetWorthDecline.forEach((r) => years.add(r.year));
+    data.worstYearsByExpenses.forEach((r) => years.add(r.year));
+
+    return Array.from(years).sort((a, b) => b - a); // Descending order
+  };
+
+  /**
+   * Handle note save (create or update)
+   *
+   * Determines whether to create new note or update existing based on presence of ID.
+   * Reloads data after save to refresh UI with new/updated note.
+   */
+  const handleNoteSave = async (noteData: {
+    id?: string;
+    text: string;
+    sections: HallOfFameSectionKey[];
+    year: number;
+    month?: number;
+  }) => {
+    if (!user) return;
+
+    try {
+      if (noteData.id) {
+        // Update existing note
+        await updateHallOfFameNote(user.uid, noteData.id, {
+          text: noteData.text,
+          sections: noteData.sections,
+        });
+      } else {
+        // Create new note
+        await addHallOfFameNote(user.uid, {
+          text: noteData.text,
+          sections: noteData.sections,
+          year: noteData.year,
+          month: noteData.month,
+        });
+      }
+
+      // Reload data to show updated notes
+      await loadData();
+    } catch (error) {
+      console.error('Error saving note:', error);
+      throw error; // Re-throw to let dialog show error toast
+    }
+  };
+
+  /**
+   * Handle note deletion
+   *
+   * Deletes note by ID and reloads data to refresh UI.
+   */
+  const handleNoteDelete = async (noteId: string) => {
+    if (!user) return;
+
+    try {
+      await deleteHallOfFameNote(user.uid, noteId);
+      await loadData();
+    } catch (error) {
+      console.error('Error deleting note:', error);
+      throw error;
+    }
+  };
+
+  /**
+   * Handle note icon click
+   *
+   * Opens note dialog in edit mode with selected note.
+   */
+  const handleNoteIconClick = (note: HallOfFameNote) => {
+    setEditingNote(note);
+    setNoteDialogOpen(true);
   };
 
   if (loading) {
@@ -173,24 +278,37 @@ export default function HallOfFamePage() {
             I tuoi migliori e peggiori record finanziari
           </p>
         </div>
-        <Button
-          onClick={handleRecalculate}
-          disabled={recalculating}
-          variant="outline"
-          className="gap-2 w-full sm:w-auto"
-        >
-          {recalculating ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Ricalcolo in corso...
-            </>
-          ) : (
-            <>
-              <RefreshCw className="h-4 w-4" />
-              Ricalcola Rankings
-            </>
-          )}
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Button
+            onClick={() => {
+              setEditingNote(null);
+              setNoteDialogOpen(true);
+            }}
+            variant="default"
+            className="gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Aggiungi Nota
+          </Button>
+          <Button
+            onClick={handleRecalculate}
+            disabled={recalculating}
+            variant="outline"
+            className="gap-2"
+          >
+            {recalculating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Ricalcolo in corso...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4" />
+                Ricalcola Rankings
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Ranking Mensili */}
@@ -219,6 +337,9 @@ export default function HallOfFamePage() {
                       rank={idx + 1}
                       valueKey="netWorthDiff"
                       formatCurrency={formatCurrency}
+                      sectionKey="bestMonthsByNetWorthGrowth"
+                      notes={data.notes || []}
+                      onNoteClick={handleNoteIconClick}
                     />
                   ))
                 ) : (
@@ -230,7 +351,14 @@ export default function HallOfFamePage() {
 
               {/* Desktop: Table */}
               <div className="hidden md:block">
-                <MonthlyTable records={data.bestMonthsByNetWorthGrowth} valueKey="netWorthDiff" formatCurrency={formatCurrency} />
+                <MonthlyTable
+                  records={data.bestMonthsByNetWorthGrowth}
+                  valueKey="netWorthDiff"
+                  formatCurrency={formatCurrency}
+                  sectionKey="bestMonthsByNetWorthGrowth"
+                  notes={data.notes || []}
+                  onNoteClick={handleNoteIconClick}
+                />
               </div>
             </CardContent>
           </Card>
@@ -257,6 +385,9 @@ export default function HallOfFamePage() {
                       rank={idx + 1}
                       valueKey="totalIncome"
                       formatCurrency={formatCurrency}
+                      sectionKey="bestMonthsByIncome"
+                      notes={data.notes || []}
+                      onNoteClick={handleNoteIconClick}
                     />
                   ))
                 ) : (
@@ -268,7 +399,14 @@ export default function HallOfFamePage() {
 
               {/* Desktop: Table */}
               <div className="hidden md:block">
-                <MonthlyTable records={data.bestMonthsByIncome} valueKey="totalIncome" formatCurrency={formatCurrency} />
+                <MonthlyTable
+                  records={data.bestMonthsByIncome}
+                  valueKey="totalIncome"
+                  formatCurrency={formatCurrency}
+                  sectionKey="bestMonthsByIncome"
+                  notes={data.notes || []}
+                  onNoteClick={handleNoteIconClick}
+                />
               </div>
             </CardContent>
           </Card>
@@ -295,6 +433,9 @@ export default function HallOfFamePage() {
                       rank={idx + 1}
                       valueKey="netWorthDiff"
                       formatCurrency={formatCurrency}
+                      sectionKey="worstMonthsByNetWorthDecline"
+                      notes={data.notes || []}
+                      onNoteClick={handleNoteIconClick}
                     />
                   ))
                 ) : (
@@ -306,7 +447,14 @@ export default function HallOfFamePage() {
 
               {/* Desktop: Table */}
               <div className="hidden md:block">
-                <MonthlyTable records={data.worstMonthsByNetWorthDecline} valueKey="netWorthDiff" formatCurrency={formatCurrency} />
+                <MonthlyTable
+                  records={data.worstMonthsByNetWorthDecline}
+                  valueKey="netWorthDiff"
+                  formatCurrency={formatCurrency}
+                  sectionKey="worstMonthsByNetWorthDecline"
+                  notes={data.notes || []}
+                  onNoteClick={handleNoteIconClick}
+                />
               </div>
             </CardContent>
           </Card>
@@ -333,6 +481,9 @@ export default function HallOfFamePage() {
                       rank={idx + 1}
                       valueKey="totalExpenses"
                       formatCurrency={formatCurrency}
+                      sectionKey="worstMonthsByExpenses"
+                      notes={data.notes || []}
+                      onNoteClick={handleNoteIconClick}
                     />
                   ))
                 ) : (
@@ -344,7 +495,14 @@ export default function HallOfFamePage() {
 
               {/* Desktop: Table */}
               <div className="hidden md:block">
-                <MonthlyTable records={data.worstMonthsByExpenses} valueKey="totalExpenses" formatCurrency={formatCurrency} />
+                <MonthlyTable
+                  records={data.worstMonthsByExpenses}
+                  valueKey="totalExpenses"
+                  formatCurrency={formatCurrency}
+                  sectionKey="worstMonthsByExpenses"
+                  notes={data.notes || []}
+                  onNoteClick={handleNoteIconClick}
+                />
               </div>
             </CardContent>
           </Card>
@@ -377,6 +535,9 @@ export default function HallOfFamePage() {
                       rank={idx + 1}
                       valueKey="netWorthDiff"
                       formatCurrency={formatCurrency}
+                      sectionKey="bestYearsByNetWorthGrowth"
+                      notes={data.notes || []}
+                      onNoteClick={handleNoteIconClick}
                     />
                   ))
                 ) : (
@@ -388,7 +549,14 @@ export default function HallOfFamePage() {
 
               {/* Desktop: Table */}
               <div className="hidden md:block">
-                <YearlyTable records={data.bestYearsByNetWorthGrowth} valueKey="netWorthDiff" formatCurrency={formatCurrency} />
+                <YearlyTable
+                  records={data.bestYearsByNetWorthGrowth}
+                  valueKey="netWorthDiff"
+                  formatCurrency={formatCurrency}
+                  sectionKey="bestYearsByNetWorthGrowth"
+                  notes={data.notes || []}
+                  onNoteClick={handleNoteIconClick}
+                />
               </div>
             </CardContent>
           </Card>
@@ -415,6 +583,9 @@ export default function HallOfFamePage() {
                       rank={idx + 1}
                       valueKey="totalIncome"
                       formatCurrency={formatCurrency}
+                      sectionKey="bestYearsByIncome"
+                      notes={data.notes || []}
+                      onNoteClick={handleNoteIconClick}
                     />
                   ))
                 ) : (
@@ -426,7 +597,14 @@ export default function HallOfFamePage() {
 
               {/* Desktop: Table */}
               <div className="hidden md:block">
-                <YearlyTable records={data.bestYearsByIncome} valueKey="totalIncome" formatCurrency={formatCurrency} />
+                <YearlyTable
+                  records={data.bestYearsByIncome}
+                  valueKey="totalIncome"
+                  formatCurrency={formatCurrency}
+                  sectionKey="bestYearsByIncome"
+                  notes={data.notes || []}
+                  onNoteClick={handleNoteIconClick}
+                />
               </div>
             </CardContent>
           </Card>
@@ -453,6 +631,9 @@ export default function HallOfFamePage() {
                       rank={idx + 1}
                       valueKey="netWorthDiff"
                       formatCurrency={formatCurrency}
+                      sectionKey="worstYearsByNetWorthDecline"
+                      notes={data.notes || []}
+                      onNoteClick={handleNoteIconClick}
                     />
                   ))
                 ) : (
@@ -464,7 +645,14 @@ export default function HallOfFamePage() {
 
               {/* Desktop: Table */}
               <div className="hidden md:block">
-                <YearlyTable records={data.worstYearsByNetWorthDecline} valueKey="netWorthDiff" formatCurrency={formatCurrency} />
+                <YearlyTable
+                  records={data.worstYearsByNetWorthDecline}
+                  valueKey="netWorthDiff"
+                  formatCurrency={formatCurrency}
+                  sectionKey="worstYearsByNetWorthDecline"
+                  notes={data.notes || []}
+                  onNoteClick={handleNoteIconClick}
+                />
               </div>
             </CardContent>
           </Card>
@@ -491,6 +679,9 @@ export default function HallOfFamePage() {
                       rank={idx + 1}
                       valueKey="totalExpenses"
                       formatCurrency={formatCurrency}
+                      sectionKey="worstYearsByExpenses"
+                      notes={data.notes || []}
+                      onNoteClick={handleNoteIconClick}
                     />
                   ))
                 ) : (
@@ -502,12 +693,32 @@ export default function HallOfFamePage() {
 
               {/* Desktop: Table */}
               <div className="hidden md:block">
-                <YearlyTable records={data.worstYearsByExpenses} valueKey="totalExpenses" formatCurrency={formatCurrency} />
+                <YearlyTable
+                  records={data.worstYearsByExpenses}
+                  valueKey="totalExpenses"
+                  formatCurrency={formatCurrency}
+                  sectionKey="worstYearsByExpenses"
+                  notes={data.notes || []}
+                  onNoteClick={handleNoteIconClick}
+                />
               </div>
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* Note Dialog */}
+      {data && (
+        <HallOfFameNoteDialog
+          open={noteDialogOpen}
+          onOpenChange={setNoteDialogOpen}
+          userId={user!.uid}
+          editNote={editingNote}
+          availableYears={getAvailableYears(data)}
+          onSave={handleNoteSave}
+          onDelete={handleNoteDelete}
+        />
+      )}
     </div>
   );
 }
@@ -518,11 +729,17 @@ function MonthlyRecordCard({
   rank,
   valueKey,
   formatCurrency,
+  sectionKey,
+  notes,
+  onNoteClick,
 }: {
   record: MonthlyRecord;
   rank: number;
   valueKey: keyof MonthlyRecord;
   formatCurrency: (amount: number) => string;
+  sectionKey: HallOfFameSectionKey;
+  notes: HallOfFameNote[];
+  onNoteClick: (note: HallOfFameNote) => void;
 }) {
   const { month: currentMonth, year: currentYear } = getItalyMonthYear();
   const isCurrentMonth = record.year === currentYear && record.month === currentMonth;
@@ -557,7 +774,13 @@ function MonthlyRecordCard({
           </Badge>
           <span className="text-sm font-medium">{record.monthYear}</span>
         </div>
-        {record.note && <NoteIconCell note={record.note} monthYear={record.monthYear} />}
+        <NoteIconCell
+          notes={notes}
+          section={sectionKey}
+          year={record.year}
+          month={record.month}
+          onNoteClick={onNoteClick}
+        />
       </div>
 
       {/* Row 2: Value + Percentage (highlighted) */}
@@ -585,11 +808,17 @@ function YearlyRecordCard({
   rank,
   valueKey,
   formatCurrency,
+  sectionKey,
+  notes,
+  onNoteClick,
 }: {
   record: YearlyRecord;
   rank: number;
   valueKey: keyof YearlyRecord;
   formatCurrency: (amount: number) => string;
+  sectionKey: HallOfFameSectionKey;
+  notes: HallOfFameNote[];
+  onNoteClick: (note: HallOfFameNote) => void;
 }) {
   const currentYear = getItalyYear();
   const isCurrentYear = record.year === currentYear;
@@ -648,10 +877,16 @@ function MonthlyTable({
   records,
   valueKey,
   formatCurrency,
+  sectionKey,
+  notes,
+  onNoteClick,
 }: {
   records: MonthlyRecord[];
   valueKey: keyof MonthlyRecord;
   formatCurrency: (amount: number) => string;
+  sectionKey: HallOfFameSectionKey;
+  notes: HallOfFameNote[];
+  onNoteClick: (note: HallOfFameNote) => void;
 }) {
   if (records.length === 0) {
     return (
@@ -706,7 +941,13 @@ function MonthlyTable({
                   </TableCell>
                 )}
                 <TableCell className="text-center">
-                  <NoteIconCell note={record.note} monthYear={record.monthYear} />
+                  <NoteIconCell
+                    notes={notes}
+                    section={sectionKey}
+                    year={record.year}
+                    month={record.month}
+                    onNoteClick={onNoteClick}
+                  />
                 </TableCell>
               </TableRow>
             );
@@ -722,10 +963,16 @@ function YearlyTable({
   records,
   valueKey,
   formatCurrency,
+  sectionKey,
+  notes,
+  onNoteClick,
 }: {
   records: YearlyRecord[];
   valueKey: keyof YearlyRecord;
   formatCurrency: (amount: number) => string;
+  sectionKey: HallOfFameSectionKey;
+  notes: HallOfFameNote[];
+  onNoteClick: (note: HallOfFameNote) => void;
 }) {
   if (records.length === 0) {
     return (
