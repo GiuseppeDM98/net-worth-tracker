@@ -47,7 +47,7 @@ export function NoteIconCell({ notes, section, year, month, onNoteClick }: NoteI
     <button
       onClick={() => onNoteClick(noteToDisplay)}
       className="flex items-center justify-center w-8 h-8 rounded hover:bg-amber-100 dark:hover:bg-amber-950 transition-colors"
-      aria-label="Visualizza e modifica nota"
+      aria-label="Visualizza nota"
     >
       <MessageSquare className="h-4 w-4 text-amber-500" />
     </button>

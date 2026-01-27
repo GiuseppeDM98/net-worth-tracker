@@ -46,9 +46,12 @@
 - Create and edit notes associated with specific time periods (year and optional month)
 - **Multi-section support**: Associate a single note with multiple ranking tables using checkboxes
   - Example: "Bought car €22,000" can appear in both "Worst Month: Expenses" and "Worst Month: Net Worth Change"
+- **Improved UX with dual-dialog pattern**: Click amber icon to view note first (read-only), then optionally edit
+  - View dialog shows note content with period and associated sections in clean, organized layout
+  - "Modifica Nota" button in view dialog footer transitions to edit mode when needed
+  - Separates casual viewing from intentional editing for better user experience
 - Smart month field: Automatically hides when only yearly sections selected, becomes required for monthly sections
 - Visual note indicators: Amber message icon buttons displayed in relevant ranking tables
-- Click amber icon to view and edit existing notes
 - "Aggiungi Nota" button in page header for creating new notes
 - Note preservation: User notes automatically preserved during ranking recalculations (triggered after new snapshots)
 - 500 character limit with real-time counter and color-coded warnings (green/orange/red)
@@ -59,6 +62,9 @@
 ## 🐛 Bug Fixes
 
 - Fixed threshold milestones incorrectly showing 0-month duration when portfolio tracking started with net worth already above threshold value (e.g., starting at €164k would show €100k milestone as "reached in 0 months")
+- **CRITICAL**: Fixed data loss bug where Hall of Fame notes were deleted every time a new snapshot was created from the Dashboard
+  - Notes are now properly preserved during automatic ranking recalculations
+  - Affects only Dashboard snapshot creation; monthly automated snapshots were not affected
 
 ## 🔧 Improvements
 

@@ -6,7 +6,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk
 - Feature ultimo mese: AI Performance Analysis + Month filter for Sankey chart + Doubling Time Analysis + PDF Performance Export
-- Ultima implementazione: Hall of Fame dedicated notes system with multi-section support (2026-01-27)
+- Ultima implementazione: Hall of Fame notes view/edit separation + critical data loss bug fix (2026-01-27)
 - In corso ora: nessuna attivita attiva
 - Completamento: 100%
 
@@ -78,9 +78,11 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - Totals row: riga totali in tabella quando filtri attivi
 - Hall of Fame con ranking mensili/annuali e highlight del periodo corrente.
   - Sistema note dedicato con supporto multi-sezione: associa note a mesi/anni specifici
-  - Dialog create/edit con checkboxes per 8 sezioni ranking (4 mensili + 4 annuali)
+  - **Dual-dialog UX**: Click icona → view dialog (read-only) → "Modifica Nota" button → edit dialog
+  - View dialog: period display, sections grouped (Monthly/Yearly), scrollable text
+  - Edit dialog: create/edit con checkboxes per 8 sezioni ranking (4 mensili + 4 annuali)
   - Icone amber per note presenti, filtrate automaticamente per sezione e periodo
-  - Note separate da History, preservate durante ricalcolo rankings
+  - Note separate da History, preservate durante ricalcolo rankings (pattern GET existing → merge → SET)
 - FIRE calculator con esclusione configurabile casa di abitazione:
   - Flag `isPrimaryResidence` su asset immobiliari (checkbox nel form asset)
   - Setting globale `includePrimaryResidenceInFIRE` disponibile in Settings page e FIRE Calculator (default OFF = escludi, metodologia FIRE standard)
@@ -137,8 +139,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Dividends stats: `app/api/dividends/stats/route.ts`, `components/dividends/DividendStats.tsx`
 - Dividend types: `types/dividend.ts`
 - Hall of Fame UI: `app/dashboard/hall-of-fame/page.tsx`
-- Hall of Fame notes: `components/hall-of-fame/HallOfFameNoteDialog.tsx` (create/edit with multi-section), `components/hall-of-fame/NoteIconCell.tsx` (filtered icons)
-- Hall of Fame service: `lib/services/hallOfFameService.ts` (CRUD + getNotesForPeriod), `lib/services/hallOfFameService.server.ts` (note preservation)
+- Hall of Fame notes: `components/hall-of-fame/HallOfFameNoteViewDialog.tsx` (read-only view), `components/hall-of-fame/HallOfFameNoteDialog.tsx` (create/edit with multi-section), `components/hall-of-fame/NoteIconCell.tsx` (filtered icons)
+- Hall of Fame service: `lib/services/hallOfFameService.ts` (CRUD + getNotesForPeriod + note preservation), `lib/services/hallOfFameService.server.ts` (note preservation)
 - Date helpers: `lib/utils/dateHelpers.ts`
 - Formatters: `lib/utils/formatters.ts`
 - Asset service: `lib/services/assetService.ts` (includes `calculateFIRENetWorth`)

@@ -50,6 +50,7 @@ import { Trophy, TrendingUp, TrendingDown, DollarSign, Loader2, RefreshCw, Plus 
 import { toast } from 'sonner';
 import { NoteIconCell } from '@/components/hall-of-fame/NoteIconCell';
 import { HallOfFameNoteDialog } from '@/components/hall-of-fame/HallOfFameNoteDialog';
+import { HallOfFameNoteViewDialog } from '@/components/hall-of-fame/HallOfFameNoteViewDialog';
 import { getItalyMonthYear, getItalyYear } from '@/lib/utils/dateHelpers';
 
 export default function HallOfFamePage() {
@@ -57,7 +58,13 @@ export default function HallOfFamePage() {
   const [data, setData] = useState<HallOfFameData | null>(null);
   const [loading, setLoading] = useState(true);
   const [recalculating, setRecalculating] = useState(false);
-  const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+
+  // View dialog state (read-only note display)
+  const [noteViewDialogOpen, setNoteViewDialogOpen] = useState(false);
+  const [viewingNote, setViewingNote] = useState<HallOfFameNote | null>(null);
+
+  // Edit dialog state (create/edit note)
+  const [noteEditDialogOpen, setNoteEditDialogOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<HallOfFameNote | null>(null);
 
   useEffect(() => {
@@ -202,11 +209,34 @@ export default function HallOfFamePage() {
   /**
    * Handle note icon click
    *
-   * Opens note dialog in edit mode with selected note.
+   * Opens view dialog (read-only) to display note content.
+   * User can then transition to edit mode via "Modifica Nota" button.
    */
   const handleNoteIconClick = (note: HallOfFameNote) => {
-    setEditingNote(note);
-    setNoteDialogOpen(true);
+    setViewingNote(note);
+    setNoteViewDialogOpen(true);
+  };
+
+  /**
+   * Handle transition from view to edit mode
+   *
+   * Transfers note from viewing state to editing state and switches dialogs.
+   * Called when user clicks "Modifica Nota" button in view dialog footer.
+   */
+  const handleEditFromView = () => {
+    setEditingNote(viewingNote); // Transfer note to edit state
+    setNoteViewDialogOpen(false); // Close view dialog
+    setNoteEditDialogOpen(true); // Open edit dialog
+  };
+
+  /**
+   * Handle "Aggiungi Nota" button click
+   *
+   * Opens edit dialog in create mode (empty form).
+   */
+  const handleAddNoteClick = () => {
+    setEditingNote(null); // Clear for create mode
+    setNoteEditDialogOpen(true); // Open edit dialog
   };
 
   if (loading) {
@@ -280,10 +310,7 @@ export default function HallOfFamePage() {
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <Button
-            onClick={() => {
-              setEditingNote(null);
-              setNoteDialogOpen(true);
-            }}
+            onClick={handleAddNoteClick}
             variant="default"
             className="gap-2"
           >
@@ -707,11 +734,21 @@ export default function HallOfFamePage() {
         </div>
       </div>
 
-      {/* Note Dialog */}
+      {/* View Dialog (Read-only note display) */}
+      {data && (
+        <HallOfFameNoteViewDialog
+          open={noteViewDialogOpen}
+          onOpenChange={setNoteViewDialogOpen}
+          note={viewingNote}
+          onEditClick={handleEditFromView}
+        />
+      )}
+
+      {/* Edit/Create Dialog (Note management) */}
       {data && (
         <HallOfFameNoteDialog
-          open={noteDialogOpen}
-          onOpenChange={setNoteDialogOpen}
+          open={noteEditDialogOpen}
+          onOpenChange={setNoteEditDialogOpen}
           userId={user!.uid}
           editNote={editingNote}
           availableYears={getAvailableYears(data)}

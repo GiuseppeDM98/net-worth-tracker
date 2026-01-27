@@ -208,9 +208,9 @@ export async function updateHallOfFame(userId: string): Promise<void> {
     const yearlyRecords = calculateYearlyRecords(snapshots, expenses);
 
     // Create rankings by sorting records across different dimensions
-    const hallOfFameData: HallOfFameData = {
+    const hallOfFameData = {
       userId,
-      notes: [], // Initialize empty notes array (notes managed separately via CRUD operations)
+      // notes: [],  ← REMOVED: Notes are preserved from existing document (see below)
 
       // Best months by net worth growth (sorted descending by netWorthDiff)
       bestMonthsByNetWorthGrowth: [...monthlyRecords]
@@ -259,9 +259,20 @@ export async function updateHallOfFame(userId: string): Promise<void> {
       updatedAt: Timestamp.now(),
     };
 
-    // Salva su Firebase
+    // GET existing document to preserve notes
+    // Critical: User notes must be preserved during ranking updates
+    // Pattern copied from server-side hallOfFameService.server.ts
     const docRef = doc(db, COLLECTION_NAME, userId);
-    await setDoc(docRef, hallOfFameData);
+    const existingDoc = await getDoc(docRef);
+    const existingNotes = existingDoc.exists()
+      ? (existingDoc.data()?.notes || [])
+      : [];
+
+    // SET with notes preservation
+    await setDoc(docRef, {
+      ...hallOfFameData,
+      notes: existingNotes,  // Preserve user notes during ranking update
+    });
 
     console.log(`Hall of Fame updated for user ${userId}`);
   } catch (error) {

@@ -139,6 +139,46 @@ if (settings.includePrimaryResidenceInFIRE !== undefined) {
 - **Trade-off**: Extra GET call (~100-200ms overhead) for correctness
 - **Use case**: Deleting subcategories, removing asset allocation keys, any nested object cleanup
 
+### Firestore User-Managed Data Preservation Pattern
+**Critical**: When updating Firestore documents, user-managed data MUST be preserved.
+- **Problem**: Function overwrites entire document, losing user-managed fields
+  ```typescript
+  // ❌ WRONG: Initializes empty array, loses existing notes
+  const docData = {
+    userId,
+    notes: [],  // Overwrites user notes!
+    ...calculatedRankings,
+  };
+  await setDoc(docRef, docData);
+  ```
+- **Solution**: GET existing document BEFORE writing, preserve user fields
+  ```typescript
+  // ✅ CORRECT: Read-modify-write pattern
+  const docData = {
+    userId,
+    // notes: [],  ← DO NOT initialize user-managed fields
+    ...calculatedRankings,
+  };
+
+  // GET existing to preserve user data
+  const docRef = doc(db, COLLECTION_NAME, userId);
+  const existingDoc = await getDoc(docRef);
+  const existingNotes = existingDoc.exists()
+    ? (existingDoc.data()?.notes || [])
+    : [];
+
+  // SET with preserved user data
+  await setDoc(docRef, {
+    ...docData,
+    notes: existingNotes,  // Critical: preserve user notes!
+  });
+  ```
+- **Why critical**: Prevents data loss when calculated data (rankings, statistics) is updated
+- **When to use**: Any document mixing calculated fields + user-managed fields
+- **Client/Server divergence risk**: If duplicating functions client/server, ensure BOTH preserve user data
+- **Edge cases**: First write (no existing doc) → use empty array fallback
+- **Files**: `hallOfFameService.ts` (client), `hallOfFameService.server.ts` (server)
+
 ---
 
 ### Doubling Time Milestone Pattern
@@ -193,6 +233,30 @@ const docData = { ...existingData, targets: newTargets, updatedAt: Timestamp.now
 await setDoc(ref, docData); // NO { merge: true }
 ```
 **Prevenzione**: Use `merge: true` for partial updates, but NOT for nested object key deletions
+
+### Firestore User Data Loss During Updates
+**Sintomo**: User-managed data (notes, configurations) disappears after calculated data updates (rankings, statistics)
+**Causa**: Document update initializes user fields with empty values, causing overwrite
+**Debug time**: Immediate recognition if familiar with pattern, but critical data loss if missed
+**Soluzione**:
+```typescript
+// GET existing document BEFORE writing
+const existingDoc = await getDoc(docRef);
+const existingUserData = existingDoc.exists()
+  ? (existingDoc.data()?.userManagedField || [])
+  : [];
+
+// SET with preserved user data
+await setDoc(docRef, {
+  ...calculatedData,
+  userManagedField: existingUserData,
+});
+```
+**Prevenzione**:
+- NEVER initialize user-managed fields in calculated data objects
+- Always GET before SET when document mixes calculated + user-managed data
+- Test "update calculated data → verify user data still exists" end-to-end
+- Watch for client/server function duplications with divergent implementations
 
 ### Timezone Boundary Bugs (Server vs Client)
 **Sintomo**: Entries in wrong month when server (UTC) vs client (CET) near midnight
