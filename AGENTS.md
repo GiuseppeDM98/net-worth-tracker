@@ -297,6 +297,58 @@ while (true) {
 **Error handling**: Stream errors don't crash API route (try-catch in start()), client shows error banner on failure
 **Files**: `app/api/ai/analyze-performance/route.ts`, `components/performance/AIAnalysisDialog.tsx`
 
+### Radix UI Select Empty String Value Error
+**Sintomo**: Runtime error "Select.Item must have a value prop that is not an empty string"
+**Causa**: Radix UI Select doesn't allow `value=""` (empty string) as valid SelectItem value
+**Soluzione**:
+```typescript
+// ❌ WRONG: Empty string not allowed
+<SelectItem value="">Nessuno</SelectItem>
+
+// ✅ CORRECT: Use undefined for unselected state, rely on placeholder
+<Select
+  value={selectedMonth?.toString() || undefined}
+  onValueChange={(value) => setSelectedMonth(value ? Number(value) : null)}
+>
+  <SelectTrigger>
+    <SelectValue placeholder="Seleziona mese" />
+  </SelectTrigger>
+  <SelectContent>
+    {ITALIAN_MONTHS.map((month, idx) => (
+      <SelectItem key={idx + 1} value={(idx + 1).toString()}>
+        {month}
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
+```
+**Prevenzione**: For optional fields in Radix Select, use `undefined` instead of empty string and rely on placeholder
+**Why**: Radix enforces this to avoid ambiguity between "no value selected" vs "empty value selected"
+
+### Local Scripts with tsx/dotenv Environment Variables
+**Sintomo**: Script fails with "Could not load default credentials" despite `.env.local` existing
+**Causa**: `tsx` doesn't automatically load `.env.local` files, Firebase Admin SDK initializes before env vars are loaded
+**Soluzione**: For one-time local scripts, use service account JSON file directly instead of env vars
+```typescript
+// ❌ WRONG: Relying on .env.local with tsx
+import { adminDb } from '../lib/firebase/admin'; // Initializes before env vars loaded
+
+// ✅ CORRECT: Load service account JSON directly
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+
+const serviceAccount = JSON.parse(
+  readFileSync(join(process.cwd(), 'firebase-admin-key.json'), 'utf8')
+);
+initializeApp({ credential: cert(serviceAccount) });
+const adminDb = getFirestore();
+```
+**Why**: Simpler and more reliable for one-time migration/maintenance scripts
+**Security**: Add `firebase-admin-key.json` to `.gitignore`, delete after use, or revoke key from Firebase Console
+**Alternative**: If env vars needed, use `dotenv.config()` BEFORE importing Firebase modules, but JSON approach is cleaner
+
 ---
 
 ## Key Files
@@ -306,4 +358,4 @@ while (true) {
 - **Components**: `CashflowSankeyChart.tsx`, `MetricSection.tsx`, `FireCalculatorTab.tsx`
 - **Pages**: `app/dashboard/settings/page.tsx`, `history/page.tsx`
 
-**Last updated**: 2026-01-25
+**Last updated**: 2026-01-27

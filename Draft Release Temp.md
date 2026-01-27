@@ -41,6 +41,21 @@
 - Analysis in Italian language matching the rest of the app
 - Disclaimer footer reminding users that AI analysis is not financial advice
 
+### Hall of Fame Dedicated Notes System
+- Added dedicated notes system for Hall of Fame rankings, completely separate from History page notes
+- Create and edit notes associated with specific time periods (year and optional month)
+- **Multi-section support**: Associate a single note with multiple ranking tables using checkboxes
+  - Example: "Bought car €22,000" can appear in both "Worst Month: Expenses" and "Worst Month: Net Worth Change"
+- Smart month field: Automatically hides when only yearly sections selected, becomes required for monthly sections
+- Visual note indicators: Amber message icon buttons displayed in relevant ranking tables
+- Click amber icon to view and edit existing notes
+- "Aggiungi Nota" button in page header for creating new notes
+- Note preservation: User notes automatically preserved during ranking recalculations (triggered after new snapshots)
+- 500 character limit with real-time counter and color-coded warnings (green/orange/red)
+- Full CRUD operations: Create, view, edit, and delete notes with instant UI updates
+- Period-specific filtering: Notes only appear in tables matching their year/month and selected sections
+- Available for all 8 ranking tables: 4 monthly (Best/Worst by Net Worth/Income/Expenses) + 4 yearly
+
 ## 🐛 Bug Fixes
 
 - Fixed threshold milestones incorrectly showing 0-month duration when portfolio tracking started with net worth already above threshold value (e.g., starting at €164k would show €100k milestone as "reached in 0 months")
@@ -50,3 +65,8 @@
 - Improved milestone calculation accuracy by skipping pre-existing thresholds
 - Added responsive design support for doubling time cards (mobile/tablet/desktop layouts)
 - Dark mode support for all doubling time components
+
+## 🏗️ Technical
+
+- Fixed snapshot ID format inconsistency in database to use standardized format without zero-padding
+- Added migration tooling for database maintenance scripts

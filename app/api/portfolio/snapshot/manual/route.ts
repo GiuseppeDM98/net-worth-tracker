@@ -140,18 +140,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Snapshot document ID format: "{userId}-{year}-{MM}"
+    // Snapshot document ID format: "{userId}-{year}-{M}"
     //
     // Examples:
-    //   user123-2024-01
+    //   user123-2024-1
     //   user123-2024-12
     //
     // Design considerations:
     //   - Composite key enables:
     //     - One snapshot per user per month (automatic upsert)
     //     - Efficient queries by userId prefix
-    //     - Sortable by month (lexicographic ordering)
-    //   - Month zero-padded: "2024-01" sorts before "2024-12"
+    //   - Month NOT zero-padded: format is "2024-1" not "2024-01"
+    //   - Sorting uses year/month fields, not lexicographic ID comparison
     //   - Alternative considered: Auto-generated IDs
     //     Rejected: Would allow duplicate snapshots per month
     const snapshotId = `${userId}-${year}-${month}`;

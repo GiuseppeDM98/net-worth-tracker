@@ -34,7 +34,7 @@ const SNAPSHOTS_COLLECTION = 'monthly-snapshots';
  *
  * Snapshot Structure:
  *   - One document per user per month
- *   - Document ID: "{userId}-{year}-{MM}"
+ *   - Document ID: "{userId}-{year}-{M}"
  *   - Contains: net worth, allocations, per-asset breakdown
  *
  * Idempotency:
@@ -166,9 +166,7 @@ export async function POST(request: NextRequest) {
       totalValue: calculateAssetValue(asset),
     }));
 
-    const snapshotId = `${userId}-${snapshotYear}-${String(
-      snapshotMonth
-    ).padStart(2, '0')}`;
+    const snapshotId = `${userId}-${snapshotYear}-${snapshotMonth}`;
 
     // Check if snapshot already exists
     const existingSnapshotRef = adminDb
