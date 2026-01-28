@@ -299,6 +299,23 @@ useEffect(() => {
 **Prevenzione**: For side effects on dialog open (fetch, logging, analytics), always use `useEffect(() => { ... }, [open])` instead of `onOpenChange` callbacks
 **Note**: This is a common Radix UI pattern - when conditionally rendering dialogs with `{condition && <Dialog open={true} ...>}`, the open prop is already true on mount
 
+### Anthropic Claude Knowledge Cutoff Pattern
+**Pattern**: Provide current date in prompt for time-sensitive analysis
+**Use case**: When Claude needs to analyze historical periods beyond its knowledge cutoff (January 2025)
+**Implementation**:
+```typescript
+// Server (API route): Include current date at start of prompt
+function buildAnalysisPrompt(metrics: any, timePeriod: string): string {
+  const today = format(new Date(), 'dd/MM/yyyy', { locale: it });
+
+  return `Oggi è il ${today}. Sei un esperto analista finanziario italiano.
+  Analizza le seguenti metriche di performance del portafoglio per il periodo ${periodLabel}...`;
+}
+```
+**Why critical**: Without explicit date context, Claude treats dates beyond January 2025 as "future" and cannot analyze market events or provide historical context
+**Result**: Claude correctly interprets analysis periods (e.g., "feb 25 - gen 26") as past and provides relevant market event context
+**Files**: `app/api/ai/analyze-performance/route.ts`
+
 ### Anthropic API Streaming SSE Pattern
 **Pattern**: Server-Sent Events for progressive text generation
 **Use case**: AI-powered analysis with real-time streaming (Performance page)
@@ -422,4 +439,4 @@ const adminDb = getFirestore();
 - **Components**: `CashflowSankeyChart.tsx`, `MetricSection.tsx`, `FireCalculatorTab.tsx`
 - **Pages**: `app/dashboard/settings/page.tsx`, `history/page.tsx`
 
-**Last updated**: 2026-01-27
+**Last updated**: 2026-01-28

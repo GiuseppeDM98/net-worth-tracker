@@ -1,5 +1,6 @@
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
+import { TimePeriod } from '@/types/performance';
 
 /**
  * Format a number as currency (Italian format)
@@ -49,4 +50,50 @@ export function formatDateTime(date: Date): string {
  */
 export function formatNumber(value: number): string {
   return new Intl.NumberFormat('it-IT').format(value);
+}
+
+/**
+ * Format time period label in Italian for display
+ *
+ * Shows exact date range for all periods using Italian date formatting.
+ * Always returns "MMM yy - MMM yy" format when metrics are available.
+ *
+ * CONVENTIONS:
+ * - All periods: "gen 25 - apr 25" (abbreviated month + 2-digit year)
+ * - Format matches existing conventions in charts (lowercase month abbreviations)
+ * - Requires metrics with startDate and endDate for proper formatting
+ *
+ * @param timePeriod - TimePeriod enum value
+ * @param metrics - PerformanceMetrics with startDate and endDate for date extraction
+ * @returns Formatted Italian date range label
+ */
+export function formatTimePeriodLabel(
+  timePeriod: TimePeriod,
+  metrics?: { startDate: Date; endDate: Date }
+): string {
+  // Return generic label if no metrics provided
+  if (!metrics) {
+    switch (timePeriod) {
+      case 'YTD':
+        return `Anno Corrente ${new Date().getFullYear()}`;
+      case '1Y':
+        return 'Ultimo Anno';
+      case '3Y':
+        return 'Ultimi 3 Anni';
+      case '5Y':
+        return 'Ultimi 5 Anni';
+      case 'ALL':
+        return 'Storico Completo';
+      case 'CUSTOM':
+        return 'Periodo Personalizzato';
+      default:
+        return timePeriod;
+    }
+  }
+
+  // Format date range for all period types (YTD, 1Y, 3Y, 5Y, ALL, CUSTOM)
+  // Format: "gen 25 - apr 25" (abbreviated month + 2-digit year)
+  const start = format(metrics.startDate, 'MMM yy', { locale: it });
+  const end = format(metrics.endDate, 'MMM yy', { locale: it });
+  return `${start} - ${end}`;
 }

@@ -6,7 +6,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk
 - Feature ultimo mese: AI Performance Analysis + Month filter for Sankey chart + Doubling Time Analysis + PDF Performance Export
-- Ultima implementazione: Hall of Fame notes view/edit separation + critical data loss bug fix (2026-01-27)
+- Ultima implementazione: AI Performance Analysis UX improvements (2026-01-28)
 - In corso ora: nessuna attivita attiva
 - Completamento: 100%
 
@@ -106,9 +106,17 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - **AI Performance Analysis**: On-demand portfolio analysis powered by Claude Sonnet 4.5 (Anthropic API)
   - Button in Performance page header: "Analizza con AI" con icona Sparkles
   - Real-time streaming response with Server-Sent Events (SSE) for progressive text display
-  - Base-level analysis: metrics interpretation, strengths identification, weaknesses, actionable insights
+  - **Extended Thinking enabled**: 10k token budget for deeper internal reasoning before responding
+  - Analysis features:
+    - Metrics interpretation con 4 categorie (Rendimento, Rischio, Contesto, Dividendi)
+    - Financial market events context: identifica eventi chiave del periodo (crisi, rally, shock geopolitici, decisioni banche centrali)
+    - Strengths identification, weaknesses, actionable insights (max 350 parole)
+  - Enhanced prompt: include periodo esatto con date range + current date for knowledge cutoff handling
   - Italian language output aligned with app localization
-  - Dialog UI with markdown formatting (bold, bullet points), scrollable content
+  - Dialog UI (max-w-4xl) with markdown formatting (bold, bullet points), scrollable content
+  - Summary metrics header: ROI, CAGR, TWR con color-coding verde/rosso
+  - Copy-to-clipboard button con feedback visivo (toast + icon transition)
+  - Generation timestamp footer in Italian format (DD/MM/YYYY HH:mm)
   - Regenerate button for new analysis if unsatisfied with first result
   - Graceful error handling with fallback messages and toast notifications
   - Auto-fetch on dialog open, disclaimer footer (not financial advice)
@@ -156,4 +164,4 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Asset types: `types/assets.ts` (includes DoublingMilestone, DoublingTimeSummary, DoublingMode)
 - AI Analysis: `app/api/ai/analyze-performance/route.ts` (Anthropic API integration with SSE streaming), `components/performance/AIAnalysisDialog.tsx` (dialog with markdown rendering)
 
-**Last updated**: 2026-01-27
+**Last updated**: 2026-01-28

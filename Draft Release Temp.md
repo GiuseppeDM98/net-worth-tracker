@@ -68,6 +68,18 @@
 
 ## 🔧 Improvements
 
+### AI Performance Analysis Enhancements
+- Enhanced dialog with exact date range display for all time periods instead of generic labels (e.g., "feb 25 - gen 26" instead of "Last Year")
+- Wider dialog layout (896px) for better text readability and structure with longer AI analysis
+- Added financial market events context to AI analysis - identifies key events (crises, rallies, geopolitical shocks, central bank decisions) that may have impacted your portfolio performance during the analyzed period
+- AI now correctly analyzes historical periods beyond January 2025 by providing current date context
+- Added summary metrics header showing ROI, CAGR, and TWR at a glance with color-coded positive/negative indicators (green/red)
+- Added copy-to-clipboard button with visual feedback to easily save analysis text
+- Added generation timestamp showing when analysis was created in Italian format
+- Extended Thinking enabled for deeper AI reasoning (10k token budget) resulting in more insightful analysis
+- Increased analysis length from 300 to 350 words to accommodate market events context
+
+### Other Improvements
 - Improved milestone calculation accuracy by skipping pre-existing thresholds
 - Added responsive design support for doubling time cards (mobile/tablet/desktop layouts)
 - Dark mode support for all doubling time components

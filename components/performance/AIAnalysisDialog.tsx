@@ -10,9 +10,15 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader2, Sparkles, Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { format } from 'date-fns';
+import { it } from 'date-fns/locale';
+import { formatTimePeriodLabel } from '@/lib/utils/formatters';
+import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { TimePeriod } from '@/types/performance';
 
 /**
  * AI Analysis Dialog Component
@@ -42,7 +48,7 @@ interface AIAnalysisDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   metrics: any; // PerformanceMetrics
-  timePeriod: string;
+  timePeriod: TimePeriod;
   userId: string;
 }
 
@@ -56,6 +62,8 @@ export function AIAnalysisDialog({
   const [analysis, setAnalysis] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [generatedAt, setGeneratedAt] = useState<Date | null>(null);
 
   /**
    * Fetch AI analysis with streaming support
@@ -140,6 +148,7 @@ export function AIAnalysisDialog({
             if (data === '[DONE]') {
               console.log('[AIAnalysisDialog] Stream completed (DONE signal received)');
               setLoading(false);
+              setGeneratedAt(new Date());
               return;
             }
 
@@ -195,18 +204,76 @@ export function AIAnalysisDialog({
     }
   }, [open]); // Re-run when dialog open state changes
 
+  /**
+   * Copy analysis text to clipboard
+   * Shows success/error toast and temporary checkmark icon
+   */
+  const handleCopyAnalysis = async () => {
+    if (!analysis) return;
+
+    try {
+      await navigator.clipboard.writeText(analysis);
+      setCopied(true);
+      toast.success('Analisi copiata negli appunti');
+
+      // Reset icon after 2 seconds
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('[AIAnalysisDialog] Failed to copy:', err);
+      toast.error('Impossibile copiare il testo');
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-purple-600" />
             Analisi AI del Portafoglio
           </DialogTitle>
           <DialogDescription>
-            Periodo: {timePeriod} • Generato da Claude Sonnet 4.5
+            Periodo: {formatTimePeriodLabel(timePeriod, metrics)} • Generato da Claude Sonnet 4.5
           </DialogDescription>
         </DialogHeader>
+
+        {/* Summary Metrics - Quick Reference */}
+        {metrics && (
+          <div className="grid grid-cols-3 gap-3 py-3 px-1 border-b">
+            <div className="text-center">
+              <div className="text-xs text-muted-foreground mb-1">ROI</div>
+              <div className={cn(
+                "text-lg font-semibold",
+                metrics.roi !== null && metrics.roi > 0 ? "text-green-600" :
+                metrics.roi !== null && metrics.roi < 0 ? "text-red-600" : ""
+              )}>
+                {metrics.roi !== null ? `${metrics.roi.toFixed(2)}%` : 'N/D'}
+              </div>
+            </div>
+
+            <div className="text-center border-x">
+              <div className="text-xs text-muted-foreground mb-1">CAGR</div>
+              <div className={cn(
+                "text-lg font-semibold",
+                metrics.cagr !== null && metrics.cagr > 0 ? "text-green-600" :
+                metrics.cagr !== null && metrics.cagr < 0 ? "text-red-600" : ""
+              )}>
+                {metrics.cagr !== null ? `${metrics.cagr.toFixed(2)}%` : 'N/D'}
+              </div>
+            </div>
+
+            <div className="text-center">
+              <div className="text-xs text-muted-foreground mb-1">TWR</div>
+              <div className={cn(
+                "text-lg font-semibold",
+                metrics.timeWeightedReturn !== null && metrics.timeWeightedReturn > 0 ? "text-green-600" :
+                metrics.timeWeightedReturn !== null && metrics.timeWeightedReturn < 0 ? "text-red-600" : ""
+              )}>
+                {metrics.timeWeightedReturn !== null ? `${metrics.timeWeightedReturn.toFixed(2)}%` : 'N/D'}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Scrollable content area */}
         <div className="flex-1 overflow-y-auto">
@@ -269,15 +336,39 @@ export function AIAnalysisDialog({
         {/* Footer with disclaimer and action buttons */}
         <DialogFooter className="flex-row justify-between items-center">
           <p className="text-xs text-muted-foreground">
+            {generatedAt && (
+              <span className="inline-block mr-2">
+                Generato il {format(generatedAt, 'dd/MM/yyyy HH:mm', { locale: it })} •
+              </span>
+            )}
             L&apos;analisi AI è generata automaticamente e non costituisce
             consulenza finanziaria.
           </p>
           <div className="flex gap-2">
-            {/* Regenerate button (only show when analysis complete) */}
+            {/* Copy and Regenerate buttons (only show when analysis complete) */}
             {analysis && !loading && (
-              <Button variant="outline" onClick={fetchAnalysis}>
-                Rigenera
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  onClick={handleCopyAnalysis}
+                  className="gap-2"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-4 w-4" />
+                      Copiato
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4" />
+                      Copia Analisi
+                    </>
+                  )}
+                </Button>
+                <Button variant="outline" onClick={fetchAnalysis}>
+                  Rigenera
+                </Button>
+              </>
             )}
             <Button variant="default" onClick={() => onOpenChange(false)}>
               Chiudi

@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { format } from 'date-fns';
+import { it } from 'date-fns/locale';
+import { formatTimePeriodLabel } from '@/lib/utils/formatters';
+import { TimePeriod } from '@/types/performance';
 
 /**
  * API Route for AI-powered performance analysis using Anthropic Claude
@@ -58,11 +62,16 @@ export async function POST(request: NextRequest) {
 
     // Call Anthropic API with streaming enabled
     // Uses claude-sonnet-4-5-20250929 (latest Sonnet model with optimal cost/quality balance)
+    // Extended Thinking enabled for deeper analysis (10k token budget)
     let stream;
     try {
       stream = await anthropic.messages.create({
         model: 'claude-sonnet-4-5-20250929',
-        max_tokens: 1024,
+        max_tokens: 16000, // Total tokens (thinking 10k + output ~6k max)
+        thinking: {
+          type: 'enabled',
+          budget_tokens: 10000, // Budget for internal reasoning (~10k tokens for deep analysis)
+        },
         messages: [
           {
             role: 'user',
@@ -171,13 +180,21 @@ export async function POST(request: NextRequest) {
  * - Structured metrics presentation (4 categories: Rendimento, Rischio, Contesto, Dividendi)
  * - Clear instructions for concise, actionable analysis (max 300 words)
  * - Markdown formatting requested (bold, bullet points) for better readability
+ * - Includes translated period label + date range for better context
  *
  * @param metrics - PerformanceMetrics object with all calculated metrics
  * @param timePeriod - TimePeriod string (YTD, 1Y, 3Y, 5Y, ALL, CUSTOM)
  * @returns Formatted Italian prompt string
  */
 function buildAnalysisPrompt(metrics: any, timePeriod: string): string {
-  return `Sei un esperto analista finanziario italiano. Analizza le seguenti metriche di performance del portafoglio per il periodo ${timePeriod}:
+  // Format period label in Italian with date range for context
+  const periodLabel = formatTimePeriodLabel(timePeriod as TimePeriod, metrics);
+  const dateRange = `(${format(metrics.startDate, 'dd/MM/yyyy', { locale: it })} - ${format(metrics.endDate, 'dd/MM/yyyy', { locale: it })})`;
+
+  // Include current date to help Claude contextualize the analysis period
+  const today = format(new Date(), 'dd/MM/yyyy', { locale: it });
+
+  return `Oggi è il ${today}. Sei un esperto analista finanziario italiano. Analizza le seguenti metriche di performance del portafoglio per il periodo ${periodLabel} ${dateRange}:
 
 **Metriche di Rendimento:**
 - ROI Totale: ${formatMetric(metrics.roi)}
@@ -202,11 +219,12 @@ ${metrics.yocGross !== null ? `**Metriche Dividendi:**
 - Current Yield Lordo: ${formatMetric(metrics.currentYield)}
 - Current Yield Netto: ${formatMetric(metrics.currentYieldNet)}` : ''}
 
-Fornisci un'analisi concisa e actionable (massimo 300 parole) che:
+Fornisci un'analisi concisa e actionable (massimo 350 parole) che:
 1. Interpreta le metriche chiave e cosa significano per questo portafoglio
-2. Evidenzia i punti di forza della performance
-3. Identifica aree di miglioramento o rischi da considerare
-4. Se appropriato, offri 1-2 suggerimenti concreti
+2. Identifica gli eventi chiave dei mercati finanziari nel periodo analizzato (crisi, rally, shock geopolitici, decisioni banche centrali) e spiega come potrebbero aver influenzato la performance del portafoglio
+3. Evidenzia i punti di forza della performance
+4. Identifica aree di miglioramento o rischi da considerare
+5. Se appropriato, offri 1-2 suggerimenti concreti
 
 Usa un tono professionale ma accessibile. Rispondi in italiano con formattazione markdown (grassetto per concetti chiave, bullet points per elenchi).`;
 }
