@@ -333,15 +333,17 @@ export function transformPriceHistoryData(
     let previousMonthTotal: number | null = null;
 
     // First pass: Calculate monthly totals
+    // Calculate monthly totals by summing all assets with data in that month.
+    // Sold assets (isDeleted: true) have values for months when held and null
+    // for months after sale, so they naturally contribute to historical totals
+    // and are excluded from future months without needing explicit filtering.
     monthColumns.forEach((monthCol) => {
       let monthTotal = 0;
 
       assetRows.forEach((assetRow) => {
-        if (!assetRow.isDeleted) {  // Exclude deleted assets from total
-          const cell = assetRow.months[monthCol.key];
-          if (cell?.totalValue !== null && cell?.totalValue !== undefined) {
-            monthTotal += cell.totalValue;
-          }
+        const cell = assetRow.months[monthCol.key];
+        if (cell?.totalValue !== null && cell?.totalValue !== undefined) {
+          monthTotal += cell.totalValue;
         }
       });
 

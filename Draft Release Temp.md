@@ -65,6 +65,11 @@
 - **CRITICAL**: Fixed data loss bug where Hall of Fame notes were deleted every time a new snapshot was created from the Dashboard
   - Notes are now properly preserved during automatic ranking recalculations
   - Affects only Dashboard snapshot creation; monthly automated snapshots were not affected
+- **CRITICAL**: Fixed historical asset values total calculation incorrectly excluding sold assets from monthly totals
+  - Assets that were in the portfolio during historical snapshot months are now correctly included in the total row
+  - Affects both "Valori Storici" (Historical Values) and "Valori Anno Corrente" (Current Year Values) tabs
+  - Total row now matches manual sum of displayed asset values for each month
+  - Month-over-month percentage changes recalculate correctly based on accurate totals
 
 ## 🔧 Improvements
 

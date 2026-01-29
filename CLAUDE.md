@@ -6,7 +6,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk
 - Feature ultimo mese: AI Performance Analysis with Web Search + Month filter for Sankey chart + Doubling Time Analysis
-- Ultima implementazione: Web Search integration per AI Analysis (2026-01-29)
+- Ultima implementazione: Asset Historical Values Total Bug Fix (2026-01-29)
 - In corso ora: nessuna attivita attiva
 - Completamento: 100%
 
