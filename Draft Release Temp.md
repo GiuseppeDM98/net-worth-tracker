@@ -69,6 +69,13 @@
 ## 🔧 Improvements
 
 ### AI Performance Analysis Enhancements
+- **Real-time web search integration**: AI now fetches actual financial news from the analyzed period to provide context
+  - Powered by Tavily API with multi-query approach (3 parallel searches for comprehensive coverage)
+  - Searches 3 event categories: Central Banks (Fed/ECB decisions), Geopolitical Events (tariffs, elections, policy changes), and Market Events (crashes, rallies, volatility)
+  - Displays top 6 most relevant news articles from trusted sources (WSJ, Bloomberg, Financial Times, Reuters)
+  - Captures important events beyond AI's knowledge cutoff (e.g., Liberation Day 2025, recent Fed meetings, market volatility)
+  - Results are balanced across categories to prevent any single topic from dominating
+  - Gracefully continues analysis even if web search fails (no crashes or errors)
 - Enhanced dialog with exact date range display for all time periods instead of generic labels (e.g., "feb 25 - gen 26" instead of "Last Year")
 - Wider dialog layout (896px) for better text readability and structure with longer AI analysis
 - Added financial market events context to AI analysis - identifies key events (crises, rallies, geopolitical shocks, central bank decisions) that may have impacted your portfolio performance during the analyzed period

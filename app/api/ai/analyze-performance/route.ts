@@ -4,6 +4,8 @@ import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { formatTimePeriodLabel } from '@/lib/utils/formatters';
 import { TimePeriod } from '@/types/performance';
+import { searchFinancialNews, formatSearchResultsForPrompt } from '@/lib/services/tavilySearchService';
+import type { TavilySearchResult } from '@/types/tavily';
 
 /**
  * API Route for AI-powered performance analysis using Anthropic Claude
@@ -57,8 +59,23 @@ export async function POST(request: NextRequest) {
 
     console.log('[API /ai/analyze-performance] Request received for user:', userId, 'period:', timePeriod);
 
-    // Build Italian prompt with performance metrics context
-    const prompt = buildAnalysisPrompt(metrics, timePeriod);
+    // Search for financial market events in the analysis period
+    // Preprocessing pattern: executed BEFORE calling Claude to enrich context
+    let marketContext: TavilySearchResult[] = [];
+    try {
+      marketContext = await searchFinancialNews(
+        new Date(metrics.startDate),
+        new Date(metrics.endDate)
+      );
+      console.log('[API /ai/analyze-performance] Market context fetched:', marketContext.length, 'results');
+    } catch (error) {
+      // Graceful degradation: continue without market context if search fails
+      // Claude will analyze based on knowledge cutoff (Jan 2025) only
+      console.warn('[API /ai/analyze-performance] Tavily search failed, continuing without market context:', error);
+    }
+
+    // Build Italian prompt with performance metrics + market events context
+    const prompt = buildAnalysisPrompt(metrics, timePeriod, marketContext);
 
     // Call Anthropic API with streaming enabled
     // Uses claude-sonnet-4-5-20250929 (latest Sonnet model with optimal cost/quality balance)
@@ -177,16 +194,22 @@ export async function POST(request: NextRequest) {
  *
  * PROMPT DESIGN:
  * - Professional analyst persona (Italian financial expert)
+ * - Market events context section (NEW - from Tavily web search)
  * - Structured metrics presentation (4 categories: Rendimento, Rischio, Contesto, Dividendi)
- * - Clear instructions for concise, actionable analysis (max 300 words)
+ * - Clear instructions for concise, actionable analysis (max 350 words)
  * - Markdown formatting requested (bold, bullet points) for better readability
  * - Includes translated period label + date range for better context
  *
  * @param metrics - PerformanceMetrics object with all calculated metrics
  * @param timePeriod - TimePeriod string (YTD, 1Y, 3Y, 5Y, ALL, CUSTOM)
+ * @param marketContext - Search results from Tavily (financial news for period)
  * @returns Formatted Italian prompt string
  */
-function buildAnalysisPrompt(metrics: any, timePeriod: string): string {
+function buildAnalysisPrompt(
+  metrics: any,
+  timePeriod: string,
+  marketContext: TavilySearchResult[]
+): string {
   // Format period label in Italian with date range for context
   const periodLabel = formatTimePeriodLabel(timePeriod as TimePeriod, metrics);
   const dateRange = `(${format(metrics.startDate, 'dd/MM/yyyy', { locale: it })} - ${format(metrics.endDate, 'dd/MM/yyyy', { locale: it })})`;
@@ -194,7 +217,12 @@ function buildAnalysisPrompt(metrics: any, timePeriod: string): string {
   // Include current date to help Claude contextualize the analysis period
   const today = format(new Date(), 'dd/MM/yyyy', { locale: it });
 
-  return `Oggi è il ${today}. Sei un esperto analista finanziario italiano. Analizza le seguenti metriche di performance del portafoglio per il periodo ${periodLabel} ${dateRange}:
+  // Build market events section if context available from Tavily
+  const marketEventsSection = formatMarketEventsSection(marketContext, dateRange);
+
+  return `Oggi è il ${today}. Sei un esperto analista finanziario italiano.
+${marketEventsSection}
+Analizza le seguenti metriche di performance del portafoglio per il periodo ${periodLabel} ${dateRange}:
 
 **Metriche di Rendimento:**
 - ROI Totale: ${formatMetric(metrics.roi)}
@@ -227,6 +255,40 @@ Fornisci un'analisi concisa e actionable (massimo 350 parole) che:
 5. Se appropriato, offri 1-2 suggerimenti concreti
 
 Usa un tono professionale ma accessibile. Rispondi in italiano con formattazione markdown (grassetto per concetti chiave, bullet points per elenchi).`;
+}
+
+/**
+ * Format market events section for prompt inclusion
+ *
+ * Provides Claude with real-time financial news context to analyze portfolio
+ * performance against actual market events (vs knowledge cutoff Jan 2025).
+ *
+ * Format: Compact markdown list with source, title, date
+ * Returns empty string if no results (graceful degradation)
+ *
+ * @param results - Tavily search results
+ * @param dateRange - Formatted date range string for section title
+ * @returns Formatted markdown section or empty string
+ */
+function formatMarketEventsSection(
+  results: TavilySearchResult[],
+  dateRange: string
+): string {
+  // No results: return empty (Claude will analyze without market context)
+  if (!results || results.length === 0) {
+    return '';
+  }
+
+  const formattedResults = formatSearchResultsForPrompt(results);
+
+  return `
+**Contesto Eventi di Mercato ${dateRange}:**
+${formattedResults}
+
+Utilizza questi eventi reali per contestualizzare la performance del portafoglio nel periodo analizzato. Considera come questi eventi potrebbero aver influenzato i rendimenti, la volatilità e il comportamento del mercato.
+
+---
+`;
 }
 
 /**

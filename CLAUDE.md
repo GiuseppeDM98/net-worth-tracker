@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk
-- Feature ultimo mese: AI Performance Analysis + Month filter for Sankey chart + Doubling Time Analysis + PDF Performance Export
-- Ultima implementazione: AI Performance Analysis UX improvements (2026-01-28)
+- Feature ultimo mese: AI Performance Analysis with Web Search + Month filter for Sankey chart + Doubling Time Analysis
+- Ultima implementazione: Web Search integration per AI Analysis (2026-01-29)
 - In corso ora: nessuna attivita attiva
 - Completamento: 100%
 
@@ -107,11 +107,16 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - Button in Performance page header: "Analizza con AI" con icona Sparkles
   - Real-time streaming response with Server-Sent Events (SSE) for progressive text display
   - **Extended Thinking enabled**: 10k token budget for deeper internal reasoning before responding
+  - **Web Search Integration** (Tavily API): Real-time financial news context
+    - Multi-query approach: 3 parallel searches (Central Banks, Geopolitical Events, Market Events)
+    - Top 2 results per category for balanced coverage (6 total)
+    - Captures events post-January 2025 (e.g., Liberation Day, Fed meetings, market volatility)
+    - Graceful degradation: continues without web search if API fails
   - Analysis features:
     - Metrics interpretation con 4 categorie (Rendimento, Rischio, Contesto, Dividendi)
-    - Financial market events context: identifica eventi chiave del periodo (crisi, rally, shock geopolitici, decisioni banche centrali)
+    - Financial market events context: real-time news from WSJ, Bloomberg, FT, Reuters
     - Strengths identification, weaknesses, actionable insights (max 350 parole)
-  - Enhanced prompt: include periodo esatto con date range + current date for knowledge cutoff handling
+  - Enhanced prompt: include periodo esatto con date range + current date + market context
   - Italian language output aligned with app localization
   - Dialog UI (max-w-4xl) with markdown formatting (bold, bullet points), scrollable content
   - Summary metrics header: ROI, CAGR, TWR con color-coding verde/rosso
@@ -126,6 +131,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Yahoo Finance per prezzi.
 - Frankfurter API per conversione valute (cache 24h con fallback).
 - Borsa Italiana scraping (ETF vs Stock table structure).
+- Tavily API per web search (AI performance analysis context, free tier 1,000 credits/mese).
 
 ## Known Issues (Active)
 - Etichette legenda su mobile troncate (top 3 elementi).
@@ -162,6 +168,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - FIRE calculator: `components/fire-simulations/FireCalculatorTab.tsx`
 - Performance metrics section: `components/performance/MetricSection.tsx`
 - Asset types: `types/assets.ts` (includes DoublingMilestone, DoublingTimeSummary, DoublingMode)
-- AI Analysis: `app/api/ai/analyze-performance/route.ts` (Anthropic API integration with SSE streaming), `components/performance/AIAnalysisDialog.tsx` (dialog with markdown rendering)
+- AI Analysis: `app/api/ai/analyze-performance/route.ts` (Anthropic API integration with SSE streaming + web search preprocessing), `components/performance/AIAnalysisDialog.tsx` (dialog with markdown rendering)
+- Web Search: `lib/services/tavilySearchService.ts` (multi-query approach with 3 categories), `types/tavily.ts` (API types)
 
-**Last updated**: 2026-01-28
+**Last updated**: 2026-01-29

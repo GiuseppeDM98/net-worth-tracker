@@ -134,6 +134,17 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
 - **Mobile-responsive design**: Optimized grid layout with clean chart formatting
 - **Methodology section**: Includes "Periodi Temporali e Snapshot" with concrete examples explaining YTD vs 1Y difference
 - **Insufficient data handling**: Clear messaging when period has <2 snapshots or limited data
+- **AI-Powered Analysis** (powered by Claude Sonnet 4.5):
+  - On-demand portfolio analysis with "Analizza con AI" button
+  - Real-time streaming response (ChatGPT-style progressive text)
+  - **Web Search Integration**: Fetches actual financial news from analyzed period via Tavily API
+    - Multi-query search across 3 categories: Central Banks (Fed/ECB), Geopolitical Events, Market Events
+    - Top 6 relevant articles from WSJ, Bloomberg, FT, Reuters
+    - Captures events beyond AI's knowledge cutoff (e.g., recent Fed meetings, market volatility)
+  - Extended Thinking enabled (10k token budget) for deeper reasoning
+  - Analyzes returns, risk, dividends with market context
+  - Actionable insights: strengths, weaknesses, concrete suggestions
+  - Copy-to-clipboard, regenerate option, Italian language output
 
 ### 📄 **PDF Export & Reporting**
 - **Comprehensive portfolio reports** with professional PDF generation

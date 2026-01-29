@@ -430,13 +430,41 @@ const adminDb = getFirestore();
 **Security**: Add `firebase-admin-key.json` to `.gitignore`, delete after use, or revoke key from Firebase Console
 **Alternative**: If env vars needed, use `dotenv.config()` BEFORE importing Firebase modules, but JSON approach is cleaner
 
+### Multi-Query API Pattern (Web Search)
+When integrating external search APIs for comprehensive data coverage:
+- **Categorized queries**: Split search into domain-specific queries (e.g., monetary policy, geopolitics, market events)
+- **Parallel execution**: Use `Promise.allSettled` for independent queries to minimize latency
+- **Graceful degradation**: If one category fails, others continue (resilience)
+- **Deduplication**: Merge results by unique identifier (e.g., URL) to prevent duplicates across categories
+- **Top-N per category**: Limit results per query for balanced coverage (e.g., top 2 per category)
+- **Example**: Tavily web search with 3 parallel queries → 6 balanced results
+- **Pattern**:
+```typescript
+const queries = buildCategorizedQueries(); // 3 queries: monetary, geopolitical, market
+const searchPromises = queries.map(q => executeSearch(q.query, q.category));
+const results = await Promise.allSettled(searchPromises);
+
+// Collect successful results
+const allResults = [];
+results.forEach((result, index) => {
+  if (result.status === 'fulfilled') {
+    allResults.push(...result.value.slice(0, 2)); // Top 2 per category
+  }
+});
+
+// Deduplicate by URL
+const uniqueResults = deduplicateByUrl(allResults);
+```
+- **Cost consideration**: Multiple queries = multiple API credits (3 queries = 6 credits with advanced search)
+- **Files**: `lib/services/tavilySearchService.ts` (web search), `app/api/ai/analyze-performance/route.ts` (preprocessing)
+
 ---
 
 ## Key Files
 - **Utils**: `lib/utils/dateHelpers.ts`, `formatters.ts`, `assetPriceHistoryUtils.ts`
-- **Services**: `performanceService.ts`, `assetAllocationService.ts`, `currencyConversionService.ts`, `chartService.ts`
-- **API Routes**: `app/api/performance/yoc/route.ts`
+- **Services**: `performanceService.ts`, `assetAllocationService.ts`, `currencyConversionService.ts`, `chartService.ts`, `tavilySearchService.ts`
+- **API Routes**: `app/api/performance/yoc/route.ts`, `app/api/ai/analyze-performance/route.ts`
 - **Components**: `CashflowSankeyChart.tsx`, `MetricSection.tsx`, `FireCalculatorTab.tsx`
 - **Pages**: `app/dashboard/settings/page.tsx`, `history/page.tsx`
 
-**Last updated**: 2026-01-28
+**Last updated**: 2026-01-29
