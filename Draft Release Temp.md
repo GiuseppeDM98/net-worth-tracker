@@ -2,14 +2,17 @@
 
 ## ✨ New Features
 
-### Month Filter for Sankey Chart
-- Added month filter to Sankey flow diagram in Current Year cashflow tab
+### Unified Month Filter for Cashflow Charts
+- Added unified month filter for 3 main cashflow charts in Current Year tab: Sankey diagram, Expenses by Category, and Income by Category
 - Filter dropdown with all 12 months in Italian + "All year" option to easily analyze specific months
+- Charts reordered with filtered section at the top for better visibility (Sankey → Expenses → Income → other charts)
+- Visual grouping with blue-bordered container clearly showing which charts are affected by the filter
 - Visual indicator banner showing active filter with quick clear button
-- Dynamic chart title updates to reflect selected month (e.g., "Cashflow January 2026")
+- Dynamic chart titles update to reflect selected month (e.g., "Expenses by Category - March 2026")
+- Drill-down navigation preserved when changing month filter - explore subcategories in filtered data without losing your place
 - Helpful empty state message when selected month has no transactions
-- Filter affects only the Sankey chart, leaving other charts (trends, pie charts) unaffected for full year comparison
 - Timezone-aware filtering ensures consistent results regardless of server location
+- Filter does not affect other charts (trends, expense types) for full year comparison
 
 ### Doubling Time Analysis
 - Added Doubling Time Analysis section to History page to track how long your net worth takes to double over time

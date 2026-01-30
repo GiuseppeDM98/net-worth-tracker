@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk
-- Feature ultimo mese: AI Performance Analysis with Web Search + Month filter for Sankey chart + Doubling Time Analysis
-- Ultima implementazione: Asset Historical Values Total Bug Fix (2026-01-29)
+- Feature ultimo mese: Unified Month Filter for Cashflow Charts + AI Performance Analysis with Web Search + Doubling Time Analysis
+- Ultima implementazione: Unified Month Filter Extension (2026-01-30)
 - In corso ora: nessuna attivita attiva
 - Completamento: 100%
 
@@ -29,12 +29,16 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Portfolio multi-asset con aggiornamento prezzi Yahoo Finance.
 - Cashflow con categorie, filtri, statistiche e Sankey diagram interattivo:
   - Budget flow visualization: Income Categories → Budget → Expense Types → Expense Categories + Risparmi
-  - **Month filter in CurrentYearTab**: Dropdown selector to filter Sankey chart by specific month (Jan-Dec) or show full year
+  - **Unified Month Filter**: Dropdown selector to filter 3 main charts by specific month (Jan-Dec) or show full year
+    - Applies to: Sankey diagram, Spese per Categoria, Entrate per Categoria
+    - Charts reordered: filtered section at top (Sankey → Spese → Entrate), then other charts
+    - Visual grouping: blue-bordered container shows which charts share the filter
     - Timezone-aware filtering using `getItalyMonth()` for consistency between server (UTC) and client (CET)
     - Visual filter indicator: blue banner with "Filtro attivo" + quick "Cancella" button
-    - Dynamic title: updates to show selected month (e.g., "Flusso Cashflow Gennaio 2026")
-    - Empty state: message when selected month has no expenses
-    - Only affects Sankey chart, other charts remain unaffected
+    - Dynamic titles: update to show selected month (e.g., "Spese per Categoria - Marzo 2026")
+    - Drill-down preserved: navigate subcategories in filtered data without losing context
+    - Empty state: single message when selected month has no transactions
+    - Other charts (trends, expense types) remain unaffected for full year comparison
   - **Optional 5-layer view**: Toggle "Mostra sottocategorie" aggiunge layer Subcategories (Categories → Subcategories)
   - **Dual-path navigation**: Drill-down classico (4 click) o click diretto su subcategory nel 5-layer (1 click)
   - Multi-level drill-down: Budget → Type → Category → Subcategory → Transaction Details

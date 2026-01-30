@@ -157,7 +157,7 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
 
   // Filter expenses for Sankey chart based on selected month
   // Uses timezone-aware helpers to ensure consistent filtering (server UTC vs client CET)
-  const sankeyFilteredExpenses = useMemo(() => {
+  const monthFilteredExpenses = useMemo(() => {
     if (selectedMonth === null) {
       // No month filter: return all current year expenses
       return currentYearExpenses;
@@ -183,10 +183,12 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
    * 5. Sort by value descending
    *
    * Why Map? O(1) lookups, preserves insertion order for debugging
+   *
+   * @param expenses - Expense array to aggregate (can be filtered by month)
    */
-  const getExpensesByCategory = (): ChartData[] => {
-    const expenseItems = currentYearExpenses.filter(e => e.type !== 'income');
-    const total = calculateTotalExpenses(currentYearExpenses);
+  const getExpensesByCategory = (expenses: Expense[]): ChartData[] => {
+    const expenseItems = expenses.filter(e => e.type !== 'income');
+    const total = calculateTotalExpenses(expenses);
 
     if (total === 0) return [];
 
@@ -210,10 +212,14 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
     return data.sort((a, b) => b.value - a.value);
   };
 
-  // Prepare data for income by category
-  const getIncomeByCategory = (): ChartData[] => {
-    const incomeItems = currentYearExpenses.filter(e => e.type === 'income');
-    const total = calculateTotalIncome(currentYearExpenses);
+  /**
+   * Aggregate income by category name with percentage calculation
+   *
+   * @param expenses - Expense array to aggregate (can be filtered by month)
+   */
+  const getIncomeByCategory = (expenses: Expense[]): ChartData[] => {
+    const incomeItems = expenses.filter(e => e.type === 'income');
+    const total = calculateTotalIncome(expenses);
 
     if (total === 0) return [];
 
@@ -480,9 +486,15 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
     return colors;
   };
 
-  // Get subcategories data for a selected category
-  const getSubcategoriesData = (categoryName: string, chartType: ChartType): ChartData[] => {
-    const filteredExpenses = currentYearExpenses.filter(e =>
+  /**
+   * Get subcategories data for a selected category
+   *
+   * @param expenses - Expense array to filter (can be filtered by month)
+   * @param categoryName - Category to drill into
+   * @param chartType - Chart type (income or expenses)
+   */
+  const getSubcategoriesData = (expenses: Expense[], categoryName: string, chartType: ChartType): ChartData[] => {
+    const filteredExpenses = expenses.filter(e =>
       e.categoryName === categoryName &&
       (chartType === 'income' ? e.type === 'income' : e.type !== 'income')
     );
@@ -517,11 +529,14 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
     return data.sort((a, b) => b.value - a.value);
   };
 
-  // Get expenses for a specific category and subcategory
+  /**
+   * Get expenses for a specific category and subcategory
+   * Uses monthFilteredExpenses to respect month filter when drilling down
+   */
   const getFilteredExpenses = (): Expense[] => {
     if (!drillDown.selectedCategory) return [];
 
-    return currentYearExpenses.filter(expense => {
+    return monthFilteredExpenses.filter(expense => {
       const matchesCategory = expense.categoryName === drillDown.selectedCategory;
       const matchesType = drillDown.chartType === 'income'
         ? expense.type === 'income'
@@ -622,8 +637,6 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
     );
   };
 
-  const expensesByCategoryData = getExpensesByCategory();
-  const incomeByCategoryData = getIncomeByCategory();
   const expensesByTypeData = getExpensesByType();
   const monthlyTrendData = getMonthlyTrend();
   const monthlyTrendPercentData = monthlyTrendData.map((item) => ({
@@ -636,9 +649,9 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
   const monthlyExpensesByCategory = getMonthlyExpensesByCategory();
   const monthlyIncomeByCategory = getMonthlyIncomeByCategory();
 
-  // Get current drill-down data
+  // Get current drill-down data (uses monthFilteredExpenses to respect month filter)
   const currentSubcategoriesData = drillDown.level === 'subcategory' && drillDown.selectedCategory && drillDown.chartType
-    ? getSubcategoriesData(drillDown.selectedCategory, drillDown.chartType)
+    ? getSubcategoriesData(monthFilteredExpenses, drillDown.selectedCategory, drillDown.chartType)
     : [];
 
   const currentFilteredExpenses = drillDown.level === 'expenseList'
@@ -687,12 +700,12 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
       </div>
 
       {/* Info Alert for Drill-Down Functionality */}
-      {showDrillDownInfo && drillDown.level === 'category' && (expensesByCategoryData.length > 0 || incomeByCategoryData.length > 0) && (
+      {showDrillDownInfo && drillDown.level === 'category' && currentYearExpenses.length > 0 && (
         <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800">
           <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
           <AlertDescription className="flex items-start justify-between gap-4">
             <span className="text-blue-900 dark:text-blue-100">
-              💡 <strong>Suggerimento:</strong> Clicca sulle fette dei grafici &quot;Spese per Categoria&quot; e &quot;Entrate per Categoria&quot; per visualizzare i dettagli delle sottocategorie.
+              💡 <strong>Suggerimento:</strong> Usa il filtro mese per analizzare Sankey, Spese e Entrate di un periodo specifico. Clicca sulle fette dei grafici &quot;Spese per Categoria&quot; e &quot;Entrate per Categoria&quot; per esplorare le sottocategorie nel dettaglio.
             </span>
             <Button
               variant="ghost"
@@ -707,443 +720,549 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
         </Alert>
       )}
 
+      {/* ==============================================
+          SECTION 1: MONTH-FILTERED CHARTS
+          (Sankey + Spese per Categoria + Entrate per Categoria)
+          ============================================== */}
+      {currentYearExpenses.length > 0 && (
+        <div className="rounded-lg border-2 border-blue-200 bg-blue-50/50 dark:bg-blue-950/10 dark:border-blue-800 p-4 sm:p-6">
+          {/* Filter Controls */}
+          <div className="flex flex-col gap-4 mb-6">
+            {/* Month filter dropdown */}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <Label htmlFor="monthFilter" className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                📊 Vista Mensile
+              </Label>
+              <Select
+                value={selectedMonth?.toString() || '__all__'}
+                onValueChange={(value) => setSelectedMonth(value === '__all__' ? null : parseInt(value))}
+              >
+                <SelectTrigger id="monthFilter" className="w-full sm:w-[200px]">
+                  <SelectValue placeholder="Tutto l'anno" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Tutto l&apos;anno</SelectItem>
+                  {ITALIAN_MONTHS.map((month, index) => (
+                    <SelectItem key={index + 1} value={(index + 1).toString()}>
+                      {month}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Active filter indicator */}
+            {selectedMonth !== null && (
+              <div className="rounded-md border border-blue-300 bg-blue-100 dark:bg-blue-900/30 dark:border-blue-700 p-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-blue-700 dark:text-blue-400">📅</span>
+                  <span className="font-medium text-blue-900 dark:text-blue-200">
+                    Filtro attivo: {ITALIAN_MONTHS[selectedMonth - 1]} {currentYear}
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedMonth(null)}
+                  className="h-7 text-xs text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-200"
+                >
+                  Cancella
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Charts Container - renders only when data exists */}
+          <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
+            {/* Empty state: single message for all 3 charts */}
+            {selectedMonth !== null && monthFilteredExpenses.length === 0 && (
+              <Card className="md:col-span-2">
+                <CardContent className="py-12">
+                  <p className="text-center text-muted-foreground">
+                    Nessuna transazione trovata per {ITALIAN_MONTHS[selectedMonth - 1]} {currentYear}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Only render charts when filtered data exists */}
+            {monthFilteredExpenses.length > 0 && (() => {
+              // Prepare chart data with filtered expenses using useMemo pattern
+              // This ensures data is computed only when monthFilteredExpenses changes
+              const expensesByCategoryData = useMemo(
+                () => getExpensesByCategory(monthFilteredExpenses),
+                [monthFilteredExpenses]
+              );
+
+              const incomeByCategoryData = useMemo(
+                () => getIncomeByCategory(monthFilteredExpenses),
+                [monthFilteredExpenses]
+              );
+
+              return (
+                <>
+                  {/* CHART 1: Sankey Flow Diagram */}
+                  <div className="md:col-span-2">
+                    <CashflowSankeyChart
+                      expenses={monthFilteredExpenses}
+                      isMobile={isMobile}
+                      title={selectedMonth
+                        ? `Flusso Cashflow ${ITALIAN_MONTHS[selectedMonth - 1]} ${currentYear}`
+                        : "Flusso Cashflow Anno Corrente"
+                      }
+                    />
+                  </div>
+
+                  {/* CHART 2: Spese per Categoria - Interactive Drill-Down */}
+                  {(expensesByCategoryData.length > 0 || (drillDown.chartType === 'expenses' && drillDown.level !== 'category')) && (
+                    <Card ref={expensesChartRef} className="md:col-span-2">
+                      <CardHeader>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
+                            {drillDown.chartType === 'expenses' && drillDown.level !== 'category' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleBack}
+                                className="w-full justify-start gap-1 sm:w-auto"
+                              >
+                                <ChevronLeft className="h-4 w-4" />
+                                Indietro
+                              </Button>
+                            )}
+                            <CardTitle>
+                              {drillDown.chartType === 'expenses' && drillDown.level === 'subcategory'
+                                ? `Spese - ${drillDown.selectedCategory}${selectedMonth ? ` - ${ITALIAN_MONTHS[selectedMonth - 1]}` : ''}`
+                                : drillDown.chartType === 'expenses' && drillDown.level === 'expenseList'
+                                ? `Spese - ${drillDown.selectedCategory} - ${drillDown.selectedSubCategory}${selectedMonth ? ` - ${ITALIAN_MONTHS[selectedMonth - 1]}` : ''}`
+                                : selectedMonth
+                                  ? `Spese per Categoria - ${ITALIAN_MONTHS[selectedMonth - 1]} ${currentYear}`
+                                  : 'Spese per Categoria'}
+                            </CardTitle>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        {/* Level 1: Category Pie Chart */}
+                        {drillDown.level === 'category' && expensesByCategoryData.length > 0 && (
+                          <ResponsiveContainer width="100%" height={pieChartHeight}>
+                            <RechartsPC>
+                              <Pie
+                                data={expensesByCategoryData as any}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                label={!isMobile
+                                  ? (entry: any) =>
+                                    entry.percentage >= 5
+                                      ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
+                                      : ''
+                                  : false}
+                                outerRadius={pieOuterRadius}
+                                fill="#8884d8"
+                                dataKey="value"
+                                onClick={(data: any) => handleCategoryClick(data, 'expenses')}
+                                cursor="pointer"
+                              >
+                                {expensesByCategoryData.map((entry, index) => (
+                                  <Cell
+                                    key={`cell-${index}`}
+                                    fill={entry.color}
+                                    style={{ cursor: 'pointer' }}
+                                  />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                formatter={(value: number) => formatCurrency(value)}
+                                contentStyle={{
+                                  backgroundColor: 'white',
+                                  border: '1px solid #ccc',
+                                  borderRadius: '4px',
+                                }}
+                              />
+                              <Legend
+                                layout={isMobile ? 'horizontal' : 'vertical'}
+                                align={isMobile ? 'center' : 'right'}
+                                verticalAlign={isMobile ? 'bottom' : 'middle'}
+                                content={() => renderLegendItems(
+                                  expensesByCategoryData,
+                                  entry => handleCategoryClick(entry, 'expenses'),
+                                  undefined,
+                                  isMobile ? 3 : undefined
+                                )}
+                              />
+                            </RechartsPC>
+                          </ResponsiveContainer>
+                        )}
+
+                        {/* Level 2: Subcategory Pie Chart */}
+                        {drillDown.level === 'subcategory' && drillDown.chartType === 'expenses' && currentSubcategoriesData.length > 0 && (
+                          <ResponsiveContainer width="100%" height={pieChartHeight}>
+                            <RechartsPC>
+                              <Pie
+                                data={currentSubcategoriesData as any}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                label={!isMobile
+                                  ? (entry: any) =>
+                                    entry.percentage >= 5
+                                      ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
+                                      : ''
+                                  : false}
+                                outerRadius={pieOuterRadius}
+                                fill="#8884d8"
+                                dataKey="value"
+                                onClick={(data: any) => handleSubcategoryClick(data)}
+                                cursor="pointer"
+                              >
+                                {currentSubcategoriesData.map((entry, index) => (
+                                  <Cell
+                                    key={`cell-${index}`}
+                                    fill={entry.color}
+                                    style={{ cursor: 'pointer' }}
+                                  />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                formatter={(value: number) => formatCurrency(value)}
+                                contentStyle={{
+                                  backgroundColor: 'white',
+                                  border: '1px solid #ccc',
+                                  borderRadius: '4px',
+                                }}
+                              />
+                              <Legend
+                                layout={isMobile ? 'horizontal' : 'vertical'}
+                                align={isMobile ? 'center' : 'right'}
+                                verticalAlign={isMobile ? 'bottom' : 'middle'}
+                                content={() => renderLegendItems(currentSubcategoriesData, entry => handleSubcategoryClick(entry))}
+                              />
+                            </RechartsPC>
+                          </ResponsiveContainer>
+                        )}
+
+                        {/* Level 3: Expense List */}
+                        {drillDown.level === 'expenseList' && drillDown.chartType === 'expenses' && currentFilteredExpenses.length > 0 && (
+                          <div className="space-y-4">
+                            <div className="space-y-3 sm:hidden">
+                              {currentFilteredExpenses.map((expense) => {
+                                const date = toDate(expense.date);
+                                return (
+                                  <div key={expense.id} className="rounded-md border p-3">
+                                    <div className="flex items-center justify-between text-sm">
+                                      <span className="text-muted-foreground">
+                                        {format(date, 'dd/MM/yyyy', { locale: it })}
+                                      </span>
+                                      <span className="font-medium text-red-600">
+                                        {formatCurrency(expense.amount)}
+                                      </span>
+                                    </div>
+                                    <p className="mt-2 text-sm text-muted-foreground">
+                                      {expense.notes || '-'}
+                                    </p>
+                                    {expense.link && (
+                                      <a
+                                        href={expense.link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="mt-2 inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+                                      >
+                                        Apri link
+                                        <ExternalLink className="h-4 w-4" />
+                                      </a>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div className="hidden rounded-md border sm:block">
+                              <div className="max-h-[500px] overflow-y-auto">
+                                <table className="w-full">
+                                  <thead className="sticky top-0 bg-muted/50 border-b">
+                                    <tr>
+                                      <th className="px-4 py-3 text-left text-sm font-medium">Data</th>
+                                      <th className="px-4 py-3 text-right text-sm font-medium">Importo</th>
+                                      <th className="px-4 py-3 text-left text-sm font-medium">Note</th>
+                                      <th className="px-4 py-3 text-center text-sm font-medium">Link</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {currentFilteredExpenses.map((expense) => {
+                                      const date = toDate(expense.date);
+                                      return (
+                                        <tr key={expense.id} className="border-b hover:bg-muted/30">
+                                          <td className="px-4 py-3 text-sm">
+                                            {format(date, 'dd/MM/yyyy', { locale: it })}
+                                          </td>
+                                          <td className="px-4 py-3 text-sm text-right font-medium text-red-600">
+                                            {formatCurrency(expense.amount)}
+                                          </td>
+                                          <td className="px-4 py-3 text-sm text-muted-foreground">
+                                            {expense.notes || '-'}
+                                          </td>
+                                          <td className="px-4 py-3 text-center">
+                                            {expense.link && (
+                                              <a
+                                                href={expense.link}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex text-blue-600 hover:text-blue-800"
+                                              >
+                                                <ExternalLink className="h-4 w-4" />
+                                              </a>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              Totale: {currentFilteredExpenses.length} {currentFilteredExpenses.length === 1 ? 'voce' : 'voci'}
+                            </div>
+                          </div>
+                        )}
+
+                        {drillDown.level === 'expenseList' && drillDown.chartType === 'expenses' && currentFilteredExpenses.length === 0 && (
+                          <div className="text-center py-8 text-muted-foreground">
+                            Nessuna spesa trovata
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* CHART 3: Entrate per Categoria - Interactive Drill-Down */}
+                  {(incomeByCategoryData.length > 0 || (drillDown.chartType === 'income' && drillDown.level !== 'category')) && (
+                    <Card ref={incomeChartRef} className="md:col-span-2">
+                      <CardHeader>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
+                            {drillDown.chartType === 'income' && drillDown.level !== 'category' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleBack}
+                                className="w-full justify-start gap-1 sm:w-auto"
+                              >
+                                <ChevronLeft className="h-4 w-4" />
+                                Indietro
+                              </Button>
+                            )}
+                            <CardTitle>
+                              {drillDown.chartType === 'income' && drillDown.level === 'subcategory'
+                                ? `Entrate - ${drillDown.selectedCategory}${selectedMonth ? ` - ${ITALIAN_MONTHS[selectedMonth - 1]}` : ''}`
+                                : drillDown.chartType === 'income' && drillDown.level === 'expenseList'
+                                ? `Entrate - ${drillDown.selectedCategory} - ${drillDown.selectedSubCategory}${selectedMonth ? ` - ${ITALIAN_MONTHS[selectedMonth - 1]}` : ''}`
+                                : selectedMonth
+                                  ? `Entrate per Categoria - ${ITALIAN_MONTHS[selectedMonth - 1]} ${currentYear}`
+                                  : 'Entrate per Categoria'}
+                            </CardTitle>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        {/* Level 1: Category Pie Chart */}
+                        {drillDown.level === 'category' && incomeByCategoryData.length > 0 && (
+                          <ResponsiveContainer width="100%" height={pieChartHeight}>
+                            <RechartsPC>
+                              <Pie
+                                data={incomeByCategoryData as any}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                label={!isMobile
+                                  ? (entry: any) =>
+                                    entry.percentage >= 5
+                                      ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
+                                      : ''
+                                  : false}
+                                outerRadius={pieOuterRadius}
+                                fill="#8884d8"
+                                dataKey="value"
+                                onClick={(data: any) => handleCategoryClick(data, 'income')}
+                                cursor="pointer"
+                              >
+                                {incomeByCategoryData.map((entry, index) => (
+                                  <Cell
+                                    key={`cell-${index}`}
+                                    fill={entry.color}
+                                    style={{ cursor: 'pointer' }}
+                                  />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                formatter={(value: number) => formatCurrency(value)}
+                                contentStyle={{
+                                  backgroundColor: 'white',
+                                  border: '1px solid #ccc',
+                                  borderRadius: '4px',
+                                }}
+                              />
+                              <Legend
+                                layout={isMobile ? 'horizontal' : 'vertical'}
+                                align={isMobile ? 'center' : 'right'}
+                                verticalAlign={isMobile ? 'bottom' : 'middle'}
+                                content={() => renderLegendItems(incomeByCategoryData, entry => handleCategoryClick(entry, 'income'))}
+                              />
+                            </RechartsPC>
+                          </ResponsiveContainer>
+                        )}
+
+                        {/* Level 2: Subcategory Pie Chart */}
+                        {drillDown.level === 'subcategory' && drillDown.chartType === 'income' && currentSubcategoriesData.length > 0 && (
+                          <ResponsiveContainer width="100%" height={pieChartHeight}>
+                            <RechartsPC>
+                              <Pie
+                                data={currentSubcategoriesData as any}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                label={!isMobile
+                                  ? (entry: any) =>
+                                    entry.percentage >= 5
+                                      ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
+                                      : ''
+                                  : false}
+                                outerRadius={pieOuterRadius}
+                                fill="#8884d8"
+                                dataKey="value"
+                                onClick={(data: any) => handleSubcategoryClick(data)}
+                                cursor="pointer"
+                              >
+                                {currentSubcategoriesData.map((entry, index) => (
+                                  <Cell
+                                    key={`cell-${index}`}
+                                    fill={entry.color}
+                                    style={{ cursor: 'pointer' }}
+                                  />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                formatter={(value: number) => formatCurrency(value)}
+                                contentStyle={{
+                                  backgroundColor: 'white',
+                                  border: '1px solid #ccc',
+                                  borderRadius: '4px',
+                                }}
+                              />
+                              <Legend
+                                layout={isMobile ? 'horizontal' : 'vertical'}
+                                align={isMobile ? 'center' : 'right'}
+                                verticalAlign={isMobile ? 'bottom' : 'middle'}
+                                content={() => renderLegendItems(currentSubcategoriesData, entry => handleSubcategoryClick(entry))}
+                              />
+                            </RechartsPC>
+                          </ResponsiveContainer>
+                        )}
+
+                        {/* Level 3: Expense List */}
+                        {drillDown.level === 'expenseList' && drillDown.chartType === 'income' && currentFilteredExpenses.length > 0 && (
+                          <div className="space-y-4">
+                            <div className="space-y-3 sm:hidden">
+                              {currentFilteredExpenses.map((expense) => {
+                                const date = toDate(expense.date);
+                                return (
+                                  <div key={expense.id} className="rounded-md border p-3">
+                                    <div className="flex items-center justify-between text-sm">
+                                      <span className="text-muted-foreground">
+                                        {format(date, 'dd/MM/yyyy', { locale: it })}
+                                      </span>
+                                      <span className="font-medium text-green-600">
+                                        {formatCurrency(expense.amount)}
+                                      </span>
+                                    </div>
+                                    <p className="mt-2 text-sm text-muted-foreground">
+                                      {expense.notes || '-'}
+                                    </p>
+                                    {expense.link && (
+                                      <a
+                                        href={expense.link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="mt-2 inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+                                      >
+                                        Apri link
+                                        <ExternalLink className="h-4 w-4" />
+                                      </a>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div className="hidden rounded-md border sm:block">
+                              <div className="max-h-[500px] overflow-y-auto">
+                                <table className="w-full">
+                                  <thead className="sticky top-0 bg-muted/50 border-b">
+                                    <tr>
+                                      <th className="px-4 py-3 text-left text-sm font-medium">Data</th>
+                                      <th className="px-4 py-3 text-right text-sm font-medium">Importo</th>
+                                      <th className="px-4 py-3 text-left text-sm font-medium">Note</th>
+                                      <th className="px-4 py-3 text-center text-sm font-medium">Link</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {currentFilteredExpenses.map((expense) => {
+                                      const date = toDate(expense.date);
+                                      return (
+                                        <tr key={expense.id} className="border-b hover:bg-muted/30">
+                                          <td className="px-4 py-3 text-sm">
+                                            {format(date, 'dd/MM/yyyy', { locale: it })}
+                                          </td>
+                                          <td className="px-4 py-3 text-sm text-right font-medium text-green-600">
+                                            {formatCurrency(expense.amount)}
+                                          </td>
+                                          <td className="px-4 py-3 text-sm text-muted-foreground">
+                                            {expense.notes || '-'}
+                                          </td>
+                                          <td className="px-4 py-3 text-center">
+                                            {expense.link && (
+                                              <a
+                                                href={expense.link}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex text-blue-600 hover:text-blue-800"
+                                              >
+                                                <ExternalLink className="h-4 w-4" />
+                                              </a>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              Totale: {currentFilteredExpenses.length} {currentFilteredExpenses.length === 1 ? 'voce' : 'voci'}
+                            </div>
+                          </div>
+                        )}
+
+                        {drillDown.level === 'expenseList' && drillDown.chartType === 'income' && currentFilteredExpenses.length === 0 && (
+                          <div className="text-center py-8 text-muted-foreground">
+                            Nessuna entrata trovata
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* ==============================================
+          SECTION 2: OTHER CHARTS (Full Year - No Filter)
+          ============================================== */}
       {/* Charts Grid */}
       <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
-        {/* Expenses by Category - Interactive Drill-Down */}
-        {(expensesByCategoryData.length > 0 || (drillDown.chartType === 'expenses' && drillDown.level !== 'category')) && (
-          <Card ref={expensesChartRef} className="md:col-span-2">
-            <CardHeader>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
-                  {drillDown.chartType === 'expenses' && drillDown.level !== 'category' && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleBack}
-                      className="w-full justify-start gap-1 sm:w-auto"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                      Indietro
-                    </Button>
-                  )}
-                  <CardTitle>
-                    {drillDown.chartType === 'expenses' && drillDown.level === 'subcategory'
-                      ? `Spese - ${drillDown.selectedCategory}`
-                      : drillDown.chartType === 'expenses' && drillDown.level === 'expenseList'
-                      ? `Spese - ${drillDown.selectedCategory} - ${drillDown.selectedSubCategory}`
-                      : 'Spese per Categoria'}
-                  </CardTitle>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {/* Level 1: Category Pie Chart */}
-              {drillDown.level === 'category' && expensesByCategoryData.length > 0 && (
-                <ResponsiveContainer width="100%" height={pieChartHeight}>
-                  <RechartsPC>
-                    <Pie
-                      data={expensesByCategoryData as any}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={!isMobile
-                        ? (entry: any) =>
-                          entry.percentage >= 5
-                            ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
-                            : ''
-                        : false}
-                      outerRadius={pieOuterRadius}
-                      fill="#8884d8"
-                      dataKey="value"
-                      onClick={(data: any) => handleCategoryClick(data, 'expenses')}
-                      cursor="pointer"
-                    >
-                      {expensesByCategoryData.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={entry.color}
-                          style={{ cursor: 'pointer' }}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value: number) => formatCurrency(value)}
-                      contentStyle={{
-                        backgroundColor: 'white',
-                        border: '1px solid #ccc',
-                        borderRadius: '4px',
-                      }}
-                    />
-                    <Legend
-                      layout={isMobile ? 'horizontal' : 'vertical'}
-                      align={isMobile ? 'center' : 'right'}
-                      verticalAlign={isMobile ? 'bottom' : 'middle'}
-                      content={() => renderLegendItems(
-                        expensesByCategoryData,
-                        entry => handleCategoryClick(entry, 'expenses'),
-                        undefined,
-                        isMobile ? 3 : undefined
-                      )}
-                    />
-                  </RechartsPC>
-                </ResponsiveContainer>
-              )}
-
-              {/* Level 2: Subcategory Pie Chart */}
-              {drillDown.level === 'subcategory' && drillDown.chartType === 'expenses' && currentSubcategoriesData.length > 0 && (
-                <ResponsiveContainer width="100%" height={pieChartHeight}>
-                  <RechartsPC>
-                    <Pie
-                      data={currentSubcategoriesData as any}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={!isMobile
-                        ? (entry: any) =>
-                          entry.percentage >= 5
-                            ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
-                            : ''
-                        : false}
-                      outerRadius={pieOuterRadius}
-                      fill="#8884d8"
-                      dataKey="value"
-                      onClick={(data: any) => handleSubcategoryClick(data)}
-                      cursor="pointer"
-                    >
-                      {currentSubcategoriesData.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={entry.color}
-                          style={{ cursor: 'pointer' }}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value: number) => formatCurrency(value)}
-                      contentStyle={{
-                        backgroundColor: 'white',
-                        border: '1px solid #ccc',
-                        borderRadius: '4px',
-                      }}
-                    />
-                    <Legend
-                      layout={isMobile ? 'horizontal' : 'vertical'}
-                      align={isMobile ? 'center' : 'right'}
-                      verticalAlign={isMobile ? 'bottom' : 'middle'}
-                      content={() => renderLegendItems(currentSubcategoriesData, entry => handleSubcategoryClick(entry))}
-                    />
-                  </RechartsPC>
-                </ResponsiveContainer>
-              )}
-
-              {/* Level 3: Expense List */}
-              {drillDown.level === 'expenseList' && drillDown.chartType === 'expenses' && currentFilteredExpenses.length > 0 && (
-                <div className="space-y-4">
-                  <div className="space-y-3 sm:hidden">
-                    {currentFilteredExpenses.map((expense) => {
-                      const date = toDate(expense.date);
-                      return (
-                        <div key={expense.id} className="rounded-md border p-3">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">
-                              {format(date, 'dd/MM/yyyy', { locale: it })}
-                            </span>
-                            <span className="font-medium text-red-600">
-                              {formatCurrency(expense.amount)}
-                            </span>
-                          </div>
-                          <p className="mt-2 text-sm text-muted-foreground">
-                            {expense.notes || '-'}
-                          </p>
-                          {expense.link && (
-                            <a
-                              href={expense.link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="mt-2 inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
-                            >
-                              Apri link
-                              <ExternalLink className="h-4 w-4" />
-                            </a>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="hidden rounded-md border sm:block">
-                    <div className="max-h-[500px] overflow-y-auto">
-                      <table className="w-full">
-                        <thead className="sticky top-0 bg-muted/50 border-b">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-sm font-medium">Data</th>
-                            <th className="px-4 py-3 text-right text-sm font-medium">Importo</th>
-                            <th className="px-4 py-3 text-left text-sm font-medium">Note</th>
-                            <th className="px-4 py-3 text-center text-sm font-medium">Link</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {currentFilteredExpenses.map((expense) => {
-                            const date = toDate(expense.date);
-                            return (
-                              <tr key={expense.id} className="border-b hover:bg-muted/30">
-                                <td className="px-4 py-3 text-sm">
-                                  {format(date, 'dd/MM/yyyy', { locale: it })}
-                                </td>
-                                <td className="px-4 py-3 text-sm text-right font-medium text-red-600">
-                                  {formatCurrency(expense.amount)}
-                                </td>
-                                <td className="px-4 py-3 text-sm text-muted-foreground">
-                                  {expense.notes || '-'}
-                                </td>
-                                <td className="px-4 py-3 text-center">
-                                  {expense.link && (
-                                    <a
-                                      href={expense.link}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex text-blue-600 hover:text-blue-800"
-                                    >
-                                      <ExternalLink className="h-4 w-4" />
-                                    </a>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Totale: {currentFilteredExpenses.length} {currentFilteredExpenses.length === 1 ? 'voce' : 'voci'}
-                  </div>
-                </div>
-              )}
-
-              {drillDown.level === 'expenseList' && drillDown.chartType === 'expenses' && currentFilteredExpenses.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  Nessuna spesa trovata
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Income by Category - Interactive Drill-Down */}
-        {(incomeByCategoryData.length > 0 || (drillDown.chartType === 'income' && drillDown.level !== 'category')) && (
-          <Card ref={incomeChartRef} className="md:col-span-2">
-            <CardHeader>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
-                  {drillDown.chartType === 'income' && drillDown.level !== 'category' && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleBack}
-                      className="w-full justify-start gap-1 sm:w-auto"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                      Indietro
-                    </Button>
-                  )}
-                  <CardTitle>
-                    {drillDown.chartType === 'income' && drillDown.level === 'subcategory'
-                      ? `Entrate - ${drillDown.selectedCategory}`
-                      : drillDown.chartType === 'income' && drillDown.level === 'expenseList'
-                      ? `Entrate - ${drillDown.selectedCategory} - ${drillDown.selectedSubCategory}`
-                      : 'Entrate per Categoria'}
-                  </CardTitle>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {/* Level 1: Category Pie Chart */}
-              {drillDown.level === 'category' && incomeByCategoryData.length > 0 && (
-                <ResponsiveContainer width="100%" height={pieChartHeight}>
-                  <RechartsPC>
-                    <Pie
-                      data={incomeByCategoryData as any}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={!isMobile
-                        ? (entry: any) =>
-                          entry.percentage >= 5
-                            ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
-                            : ''
-                        : false}
-                      outerRadius={pieOuterRadius}
-                      fill="#8884d8"
-                      dataKey="value"
-                      onClick={(data: any) => handleCategoryClick(data, 'income')}
-                      cursor="pointer"
-                    >
-                      {incomeByCategoryData.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={entry.color}
-                          style={{ cursor: 'pointer' }}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value: number) => formatCurrency(value)}
-                      contentStyle={{
-                        backgroundColor: 'white',
-                        border: '1px solid #ccc',
-                        borderRadius: '4px',
-                      }}
-                    />
-                    <Legend
-                      layout={isMobile ? 'horizontal' : 'vertical'}
-                      align={isMobile ? 'center' : 'right'}
-                      verticalAlign={isMobile ? 'bottom' : 'middle'}
-                      content={() => renderLegendItems(incomeByCategoryData, entry => handleCategoryClick(entry, 'income'))}
-                    />
-                  </RechartsPC>
-                </ResponsiveContainer>
-              )}
-
-              {/* Level 2: Subcategory Pie Chart */}
-              {drillDown.level === 'subcategory' && drillDown.chartType === 'income' && currentSubcategoriesData.length > 0 && (
-                <ResponsiveContainer width="100%" height={pieChartHeight}>
-                  <RechartsPC>
-                    <Pie
-                      data={currentSubcategoriesData as any}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={!isMobile
-                        ? (entry: any) =>
-                          entry.percentage >= 5
-                            ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
-                            : ''
-                        : false}
-                      outerRadius={pieOuterRadius}
-                      fill="#8884d8"
-                      dataKey="value"
-                      onClick={(data: any) => handleSubcategoryClick(data)}
-                      cursor="pointer"
-                    >
-                      {currentSubcategoriesData.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={entry.color}
-                          style={{ cursor: 'pointer' }}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value: number) => formatCurrency(value)}
-                      contentStyle={{
-                        backgroundColor: 'white',
-                        border: '1px solid #ccc',
-                        borderRadius: '4px',
-                      }}
-                    />
-                    <Legend
-                      layout={isMobile ? 'horizontal' : 'vertical'}
-                      align={isMobile ? 'center' : 'right'}
-                      verticalAlign={isMobile ? 'bottom' : 'middle'}
-                      content={() => renderLegendItems(currentSubcategoriesData, entry => handleSubcategoryClick(entry))}
-                    />
-                  </RechartsPC>
-                </ResponsiveContainer>
-              )}
-
-              {/* Level 3: Expense List */}
-              {drillDown.level === 'expenseList' && drillDown.chartType === 'income' && currentFilteredExpenses.length > 0 && (
-                <div className="space-y-4">
-                  <div className="space-y-3 sm:hidden">
-                    {currentFilteredExpenses.map((expense) => {
-                      const date = toDate(expense.date);
-                      return (
-                        <div key={expense.id} className="rounded-md border p-3">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">
-                              {format(date, 'dd/MM/yyyy', { locale: it })}
-                            </span>
-                            <span className="font-medium text-green-600">
-                              {formatCurrency(expense.amount)}
-                            </span>
-                          </div>
-                          <p className="mt-2 text-sm text-muted-foreground">
-                            {expense.notes || '-'}
-                          </p>
-                          {expense.link && (
-                            <a
-                              href={expense.link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="mt-2 inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
-                            >
-                              Apri link
-                              <ExternalLink className="h-4 w-4" />
-                            </a>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="hidden rounded-md border sm:block">
-                    <div className="max-h-[500px] overflow-y-auto">
-                      <table className="w-full">
-                        <thead className="sticky top-0 bg-muted/50 border-b">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-sm font-medium">Data</th>
-                            <th className="px-4 py-3 text-right text-sm font-medium">Importo</th>
-                            <th className="px-4 py-3 text-left text-sm font-medium">Note</th>
-                            <th className="px-4 py-3 text-center text-sm font-medium">Link</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {currentFilteredExpenses.map((expense) => {
-                            const date = toDate(expense.date);
-                            return (
-                              <tr key={expense.id} className="border-b hover:bg-muted/30">
-                                <td className="px-4 py-3 text-sm">
-                                  {format(date, 'dd/MM/yyyy', { locale: it })}
-                                </td>
-                                <td className="px-4 py-3 text-sm text-right font-medium text-green-600">
-                                  {formatCurrency(expense.amount)}
-                                </td>
-                                <td className="px-4 py-3 text-sm text-muted-foreground">
-                                  {expense.notes || '-'}
-                                </td>
-                                <td className="px-4 py-3 text-center">
-                                  {expense.link && (
-                                    <a
-                                      href={expense.link}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex text-blue-600 hover:text-blue-800"
-                                    >
-                                      <ExternalLink className="h-4 w-4" />
-                                    </a>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Totale: {currentFilteredExpenses.length} {currentFilteredExpenses.length === 1 ? 'voce' : 'voci'}
-                  </div>
-                </div>
-              )}
-
-              {drillDown.level === 'expenseList' && drillDown.chartType === 'income' && currentFilteredExpenses.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  Nessuna entrata trovata
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
         {/* Expenses by Type */}
         {expensesByTypeData.length > 0 && (
           <Card className="md:col-span-2">
@@ -1356,77 +1475,6 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
               </ResponsiveContainer>
             </CardContent>
           </Card>
-        )}
-
-        {/* Month filter for Sankey chart */}
-        {currentYearExpenses.length > 0 && (
-          <div className="flex flex-col gap-4 md:col-span-2">
-            {/* Month selector */}
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <Label htmlFor="sankeyMonthFilter" className="text-sm font-medium">
-                Filtro Mese Sankey
-              </Label>
-              <Select
-                value={selectedMonth?.toString() || '__all__'}
-                onValueChange={(value) => setSelectedMonth(value === '__all__' ? null : parseInt(value))}
-              >
-                <SelectTrigger id="sankeyMonthFilter" className="w-full sm:w-[200px]">
-                  <SelectValue placeholder="Tutto l'anno" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">Tutto l&apos;anno</SelectItem>
-                  {ITALIAN_MONTHS.map((month, index) => (
-                    <SelectItem key={index + 1} value={(index + 1).toString()}>
-                      {month}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Active filter indicator - shows when month is selected */}
-            {selectedMonth !== null && (
-              <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20 p-3 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-blue-700 dark:text-blue-400">📅</span>
-                  <span className="font-medium text-blue-900 dark:text-blue-200">
-                    Filtro attivo: {ITALIAN_MONTHS[selectedMonth - 1]} {currentYear}
-                  </span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSelectedMonth(null)}
-                  className="h-7 text-xs text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-200"
-                >
-                  Cancella
-                </Button>
-              </div>
-            )}
-
-            {/* Empty state when filtered month has no expenses */}
-            {selectedMonth !== null && sankeyFilteredExpenses.length === 0 && (
-              <Card>
-                <CardContent className="py-12">
-                  <p className="text-center text-muted-foreground">
-                    Nessuna spesa trovata per {ITALIAN_MONTHS[selectedMonth - 1]} {currentYear}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Sankey Flow Diagram - Budget View */}
-            {sankeyFilteredExpenses.length > 0 && (
-              <CashflowSankeyChart
-                expenses={sankeyFilteredExpenses}
-                isMobile={isMobile}
-                title={selectedMonth
-                  ? `Flusso Cashflow ${ITALIAN_MONTHS[selectedMonth - 1]} ${currentYear}`
-                  : "Flusso Cashflow Anno Corrente"
-                }
-              />
-            )}
-          </div>
         )}
       </div>
     </div>
