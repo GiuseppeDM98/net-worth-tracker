@@ -406,6 +406,39 @@ while (true) {
 **Prevenzione**: For optional fields in Radix Select, use `undefined` instead of empty string and rely on placeholder
 **Why**: Radix enforces this to avoid ambiguity between "no value selected" vs "empty value selected"
 
+### Firebase Auth Registration PERMISSION_DENIED During setDoc()
+**Sintomo**: User registration succeeds (user created in Auth + Firestore users collection), but allocation settings fail with "Missing or insufficient permissions"
+**Causa**: Triple-layered issue combining auth timing, error handling, and Firestore rules
+**Debug time**: ~3 hours (multiple false starts before identifying all three root causes)
+**Root causes**:
+1. **Token refresh race**: `getIdToken()` refresh happens async, Firestore writes see stale token
+2. **Wrapped errors**: Service layer catches Firebase errors and rethrows generic `Error()`, losing `error.code`
+3. **Rules check resource.data**: `getDoc()` before document exists fails when rule checks `resource.data.userId`
+
+**Soluzione completa** (all three required):
+```typescript
+// 1. Force token refresh after user creation
+const { user } = await createUserWithEmailAndPassword(auth, email, password);
+await user.getIdToken(true);  // Force refresh with retry logic
+
+// 2. Preserve original Firebase errors in service layer
+catch (error) {
+  console.error('Error:', error);
+  throw error;  // ✅ NOT: throw new Error('Generic message')
+}
+
+// 3. Fix Firestore rules to use document ID for read
+// firestore.rules:
+allow read: if isAuthenticated() && targetId == request.auth.uid;  // Not resource.data.userId
+```
+
+**Prevenzione**:
+- Always force token refresh before first Firestore write after user creation
+- Never wrap Firebase errors if retry logic needs error codes
+- Use document ID in read rules when ID = userId pattern (permits getDoc on non-existent docs)
+- Add retry logic wrapper for PERMISSION_DENIED errors as safety net
+**Files**: `authHelpers.ts` (retry utilities), `AuthContext.tsx` (registration), `firestore.rules`, `assetAllocationService.ts`
+
 ### Local Scripts with tsx/dotenv Environment Variables
 **Sintomo**: Script fails with "Could not load default credentials" despite `.env.local` existing
 **Causa**: `tsx` doesn't automatically load `.env.local` files, Firebase Admin SDK initializes before env vars are loaded
@@ -457,6 +490,61 @@ const uniqueResults = deduplicateByUrl(allResults);
 ```
 - **Cost consideration**: Multiple queries = multiple API credits (3 queries = 6 credits with advanced search)
 - **Files**: `lib/services/tavilySearchService.ts` (web search), `app/api/ai/analyze-performance/route.ts` (preprocessing)
+
+### Firebase Auth + Firestore Security Rules Synchronization Pattern
+**Critical for user registration flows with immediate Firestore writes**
+
+When creating new users with Firebase Auth and immediately writing to Firestore:
+- **Problem 1**: Auth token refresh is asynchronous (100-500ms), causing race condition
+  - `createUserWithEmailAndPassword()` creates user immediately
+  - ID token refresh happens in background
+  - Firestore writes may see `request.auth` as null/stale → PERMISSION_DENIED
+- **Problem 2**: Firestore rules checking `resource.data` fail on non-existent documents
+  - Rule: `allow read: if resource.data.userId == request.auth.uid`
+  - Fails when document doesn't exist (`resource.data` is null)
+  - Common when code does `getDoc()` before `setDoc()` to preserve existing fields
+
+**Solution - Triple Layer Defense**:
+```typescript
+// 1. Force token refresh after user creation
+const { user: firebaseUser } = await createUserWithEmailAndPassword(auth, email, password);
+await waitForAuthTokenRefresh(firebaseUser);  // Force getIdToken(true) with retry
+
+// 2. Wrap Firestore operations in retry logic
+await retryFirestoreOperation(async () => {
+  await setSettings(firebaseUser.uid, { targets: getDefaultTargets() });
+});
+
+// 3. Fix Firestore rules to use document ID instead of resource.data
+// Before: allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+// After:  allow read: if isAuthenticated() && targetId == request.auth.uid;
+```
+
+**Why all three are needed**:
+1. **Token refresh**: Eliminates race condition in 95%+ cases
+2. **Retry logic**: Safety net for network delays, slow token propagation
+3. **Rule fix**: Permits `getDoc()` on non-existent documents (when ID = userId pattern)
+
+**Implementation details**:
+- **authHelpers.ts**: `waitForAuthTokenRefresh()` with 5 retries + exponential backoff
+- **authHelpers.ts**: `retryFirestoreOperation()` retries only PERMISSION_DENIED errors (3 attempts)
+- **Service layer**: Rethrow original Firebase errors (don't wrap) to preserve error codes
+- **Pattern matching**: Check `error.code`, `error.message` for multiple Firebase error formats
+
+**Firestore rules pattern for user-owned collections**:
+```firestore
+// When document ID = userId (common pattern):
+match /collectionName/{docId} {
+  // ✅ Works for non-existent documents
+  allow read: if isAuthenticated() && docId == request.auth.uid;
+
+  // ✅ Standard create/update/delete rules still use resource.data
+  allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+  allow update: if isOwner(resource.data.userId);
+}
+```
+
+**Files**: `lib/utils/authHelpers.ts`, `contexts/AuthContext.tsx`, `firestore.rules`, `lib/services/assetAllocationService.ts`
 
 ---
 

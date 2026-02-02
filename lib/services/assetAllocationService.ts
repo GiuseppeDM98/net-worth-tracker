@@ -140,7 +140,9 @@ export async function setSettings(
     }
   } catch (error) {
     console.error('Error setting allocation settings:', error);
-    throw new Error('Failed to save allocation settings');
+    // Re-throw original error to preserve Firebase error codes (e.g., permission-denied)
+    // This allows retry logic in AuthContext to detect and handle permission errors
+    throw error;
   }
 }
 

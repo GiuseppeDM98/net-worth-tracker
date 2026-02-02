@@ -64,6 +64,12 @@
 
 ## 🐛 Bug Fixes
 
+- **CRITICAL**: Fixed user registration failing with permission error when creating default asset allocation settings
+  - New users can now successfully complete registration without "Missing or insufficient permissions" errors
+  - Registration process is now more reliable with automatic retry logic for edge cases
+  - Affected both email/password and Google OAuth registration flows
+  - Root cause was a race condition between Firebase Auth token refresh and Firestore security rules evaluation
+  - Solution includes forced token refresh after user creation + retry mechanism + improved Firestore security rules
 - Fixed threshold milestones incorrectly showing 0-month duration when portfolio tracking started with net worth already above threshold value (e.g., starting at €164k would show €100k milestone as "reached in 0 months")
 - **CRITICAL**: Fixed data loss bug where Hall of Fame notes were deleted every time a new snapshot was created from the Dashboard
   - Notes are now properly preserved during automatic ranking recalculations

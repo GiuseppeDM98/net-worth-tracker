@@ -41,6 +41,7 @@ import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase/config';
 import { User } from '@/types/assets';
 import { getDefaultTargets, setSettings } from '@/lib/services/assetAllocationService';
+import { waitForAuthTokenRefresh, retryFirestoreOperation } from '@/lib/utils/authHelpers';
 
 /**
  * Authentication context interface
@@ -162,23 +163,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Step 2: Create Firebase Auth user
     const { user: firebaseUser } = await createUserWithEmailAndPassword(auth, email, password);
 
-    // Step 3: Update Firebase Auth profile with displayName if provided
+    // Step 3: Wait for Auth token refresh to ensure Firestore permissions are synchronized
+    // This prevents PERMISSION_DENIED errors when creating user documents
+    console.log('[AuthContext] Waiting for authentication token refresh...');
+    await waitForAuthTokenRefresh(firebaseUser);
+
+    // Step 4: Update Firebase Auth profile with displayName if provided
     if (displayName) {
       await updateProfile(firebaseUser, {
         displayName: displayName,
       });
     }
 
-    // Step 4: Create Firestore user document with metadata
+    // Step 5: Create Firestore user document with metadata
     await setDoc(doc(db, 'users', firebaseUser.uid), {
       email: firebaseUser.email,
       displayName: displayName || '',
       createdAt: new Date(),
     });
 
-    // Step 5: Set default asset allocation (60% equity, 40% bonds)
-    await setSettings(firebaseUser.uid, {
-      targets: getDefaultTargets(),
+    // Step 6: Set default asset allocation (60% equity, 40% bonds)
+    // Wrapped in retry logic as additional safety net for permission synchronization
+    await retryFirestoreOperation(async () => {
+      await setSettings(firebaseUser.uid, {
+        targets: getDefaultTargets(),
+      });
     });
   };
 
@@ -241,7 +250,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           throw new Error(error.message || 'Registrations are currently closed.');
         }
 
-        // Registration is allowed - create Firestore document
+        // Registration is allowed - wait for token refresh first
+        console.log('[AuthContext] Google OAuth: Waiting for authentication token refresh...');
+        await waitForAuthTokenRefresh(result.user);
+
+        // Create Firestore document
         await setDoc(userRef, {
           email: result.user.email,
           displayName: result.user.displayName || '',
@@ -249,8 +262,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
 
         // Set default asset allocation (60% equity, 40% bonds)
-        await setSettings(result.user.uid, {
-          targets: getDefaultTargets(),
+        // Wrapped in retry logic as additional safety net for permission synchronization
+        await retryFirestoreOperation(async () => {
+          await setSettings(result.user.uid, {
+            targets: getDefaultTargets(),
+          });
         });
       } catch (error: any) {
         // Re-throw the error to be caught by the component

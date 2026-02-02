@@ -6,7 +6,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk
 - Feature ultimo mese: Unified Month Filter for Cashflow Charts + AI Performance Analysis with Web Search + Doubling Time Analysis
-- Ultima implementazione: Unified Month Filter Extension (2026-01-30)
+- Ultima implementazione: Registration Permission Error Fix (2026-02-02)
 - In corso ora: nessuna attivita attiva
 - Completamento: 100%
 
@@ -174,5 +174,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Asset types: `types/assets.ts` (includes DoublingMilestone, DoublingTimeSummary, DoublingMode)
 - AI Analysis: `app/api/ai/analyze-performance/route.ts` (Anthropic API integration with SSE streaming + web search preprocessing), `components/performance/AIAnalysisDialog.tsx` (dialog with markdown rendering)
 - Web Search: `lib/services/tavilySearchService.ts` (multi-query approach with 3 categories), `types/tavily.ts` (API types)
+- Auth helpers: `lib/utils/authHelpers.ts` (token refresh + retry logic for Firebase Auth + Firestore synchronization)
+- Auth context: `contexts/AuthContext.tsx` (user registration with token refresh pattern)
 
-**Last updated**: 2026-01-29
+**Last updated**: 2026-02-02

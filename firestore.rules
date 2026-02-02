@@ -72,7 +72,9 @@ service cloud.firestore {
 
     // Collezione assetAllocationTargets - target di allocazione asset
     match /assetAllocationTargets/{targetId} {
-      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // Read: use targetId instead of resource.data.userId to allow reading non-existent documents
+      // This is needed during registration when getDoc() is called before the document exists
+      allow read: if isAuthenticated() && targetId == request.auth.uid;
       allow create: if isAuthenticated() && hasValidUserId();
       allow update: if isOwner(resource.data.userId) &&
                        (!('userId' in request.resource.data) ||
