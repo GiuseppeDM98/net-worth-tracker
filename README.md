@@ -298,7 +298,7 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
   - **Cashflow**: Unified section with 3 tabs:
     - **Tracciamento**: Full expense/income tracking with filters
     - **Anno Corrente**: Current year analytics with drill-down charts
-    - **Storico Totale**: All-time cashflow trends and visualizations
+    - **Storico Totale**: All-time cashflow trends with "Analisi Periodo" section (Sankey + drill-down pie charts with year/month filtering)
 - **Contextual navigation**: Switch between related views without leaving the page
 - **Backward compatible**: Original URLs still work for existing bookmarks and links
 - **Reduced cognitive load**: Logical grouping makes features easier to discover

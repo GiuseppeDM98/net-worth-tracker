@@ -1,9 +1,9 @@
 /**
  * Historical trend analysis across all years
  *
- * Dual Aggregation: Monthly and Yearly views
- * - Monthly: All months across all years
- * - Yearly: One data point per year
+ * Two main sections:
+ * 1. Analisi Periodo: Year+month filtered view with Sankey, pie charts, drill-down
+ * 2. Trend Charts: Monthly and Yearly aggregations across all time
  *
  * Pattern Duplication: getMonthlyX and getYearlyX functions share logic
  * but operate on different time granularities (month vs year key).
@@ -12,13 +12,20 @@
  */
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
-import { calculateIncomeExpenseRatio } from '@/lib/services/expenseService';
+import { calculateIncomeExpenseRatio, calculateTotalExpenses, calculateTotalIncome } from '@/lib/services/expenseService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { RefreshCw } from 'lucide-react';
+import { ChevronLeft, ExternalLink, RefreshCw } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { format } from 'date-fns';
+import { it } from 'date-fns/locale';
 import {
+  PieChart as RechartsPC,
+  Pie,
+  Cell,
   ResponsiveContainer,
   Tooltip,
   Legend,
@@ -33,8 +40,15 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
-import { getItalyMonthYear, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
+import { getItalyMonth, getItalyMonthYear, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
 import { CashflowSankeyChart } from '@/components/cashflow/CashflowSankeyChart';
+
+interface ChartData {
+  name: string;
+  value: number;
+  percentage: number;
+  color: string;
+}
 
 const COLORS = [
   '#3b82f6', // blue
@@ -49,6 +63,22 @@ const COLORS = [
   '#14b8a6', // teal
 ];
 
+const ITALIAN_MONTHS = [
+  'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+  'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
+];
+
+type DrillDownLevel = 'category' | 'subcategory' | 'expenseList';
+type ChartType = 'expenses' | 'income';
+
+interface DrillDownState {
+  level: DrillDownLevel;
+  chartType: ChartType | null;
+  selectedCategory: string | null;
+  selectedCategoryColor: string | null;
+  selectedSubCategory: string | null;
+}
+
 interface TotalHistoryTabProps {
   allExpenses: Expense[];
   loading: boolean;
@@ -62,6 +92,23 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
   const [showFullMonthlyHistory, setShowFullMonthlyHistory] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
+  // Analisi Periodo: year+month filter state
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+
+  // Drill-down state for pie charts in Analisi Periodo
+  const [drillDown, setDrillDown] = useState<DrillDownState>({
+    level: 'category',
+    chartType: null,
+    selectedCategory: null,
+    selectedCategoryColor: null,
+    selectedSubCategory: null,
+  });
+
+  // Refs for auto-scroll on drill-down
+  const expensesChartRef = useRef<HTMLDivElement>(null);
+  const incomeChartRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const media = window.matchMedia('(max-width: 639px)');
     const handleChange = () => setIsMobile(media.matches);
@@ -69,6 +116,75 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
     media.addEventListener('change', handleChange);
     return () => media.removeEventListener('change', handleChange);
   }, []);
+
+  // Auto-scroll to the appropriate chart when drill-down changes
+  useEffect(() => {
+    if (drillDown.level !== 'category' && drillDown.chartType) {
+      const targetRef = drillDown.chartType === 'expenses' ? expensesChartRef : incomeChartRef;
+      if (targetRef.current) {
+        setTimeout(() => {
+          targetRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+      }
+    }
+  }, [drillDown.level, drillDown.chartType]);
+
+  // Excludes pre-2025 bulk imports (same filter used by trend charts)
+  const expensesFrom2025ForAnalysis = useMemo(() => {
+    return allExpenses.filter(expense => getItalyYear(toDate(expense.date)) >= 2025);
+  }, [allExpenses]);
+
+  // Extract available years from expenses (2025+), sorted newest first
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    expensesFrom2025ForAnalysis.forEach(expense => {
+      years.add(getItalyYear(toDate(expense.date)));
+    });
+    return Array.from(years).sort((a, b) => b - a);
+  }, [expensesFrom2025ForAnalysis]);
+
+  // Filter expenses by selected year and optional month
+  // Default (no year selected): show all expenses from 2025+
+  const periodFilteredExpenses = useMemo(() => {
+    if (selectedYear === null) return expensesFrom2025ForAnalysis;
+
+    return expensesFrom2025ForAnalysis.filter(expense => {
+      const date = toDate(expense.date);
+      if (getItalyYear(date) !== selectedYear) return false;
+      if (selectedMonth !== null && getItalyMonth(date) !== selectedMonth) return false;
+      return true;
+    });
+  }, [expensesFrom2025ForAnalysis, selectedYear, selectedMonth]);
+
+  /**
+   * Reset drill-down state to initial category level
+   * Called when year or month filter changes to prevent stale drill-down
+   */
+  const resetDrillDown = () => {
+    setDrillDown({
+      level: 'category',
+      chartType: null,
+      selectedCategory: null,
+      selectedCategoryColor: null,
+      selectedSubCategory: null,
+    });
+  };
+
+  const handleYearChange = (value: string) => {
+    if (value === '__all_years__') {
+      setSelectedYear(null);
+      setSelectedMonth(null);
+    } else {
+      setSelectedYear(parseInt(value));
+      setSelectedMonth(null);
+    }
+    resetDrillDown();
+  };
+
+  const handleMonthChange = (value: string) => {
+    setSelectedMonth(value === '__all__' ? null : parseInt(value));
+    resetDrillDown();
+  };
 
   /**
    * Clamp percentage to valid chart domain
@@ -421,6 +537,234 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
     return { data, categories: [...top5Categories, 'Altro'] };
   };
 
+  // ============================================
+  // ANALISI PERIODO: Pie chart helpers
+  // ============================================
+
+  /**
+   * Aggregate expenses by category name with percentage calculation
+   * @param expenses - Expense array to aggregate (filtered by year+month)
+   */
+  const getExpensesByCategory = (expenses: Expense[]): ChartData[] => {
+    const expenseItems = expenses.filter(e => e.type !== 'income');
+    const total = calculateTotalExpenses(expenses);
+
+    if (total === 0) return [];
+
+    const categoryMap = new Map<string, number>();
+
+    expenseItems.forEach(expense => {
+      const current = categoryMap.get(expense.categoryName) || 0;
+      categoryMap.set(expense.categoryName, current + Math.abs(expense.amount));
+    });
+
+    const data: ChartData[] = [];
+    categoryMap.forEach((value, name) => {
+      data.push({
+        name,
+        value,
+        percentage: (value / total) * 100,
+        color: COLORS[data.length % COLORS.length],
+      });
+    });
+
+    return data.sort((a, b) => b.value - a.value);
+  };
+
+  /**
+   * Aggregate income by category name with percentage calculation
+   * @param expenses - Expense array to aggregate (filtered by year+month)
+   */
+  const getIncomeByCategory = (expenses: Expense[]): ChartData[] => {
+    const incomeItems = expenses.filter(e => e.type === 'income');
+    const total = calculateTotalIncome(expenses);
+
+    if (total === 0) return [];
+
+    const categoryMap = new Map<string, number>();
+
+    incomeItems.forEach(expense => {
+      const current = categoryMap.get(expense.categoryName) || 0;
+      categoryMap.set(expense.categoryName, current + expense.amount);
+    });
+
+    const data: ChartData[] = [];
+    categoryMap.forEach((value, name) => {
+      data.push({
+        name,
+        value,
+        percentage: (value / total) * 100,
+        color: COLORS[data.length % COLORS.length],
+      });
+    });
+
+    return data.sort((a, b) => b.value - a.value);
+  };
+
+  /**
+   * Color derivation for subcategory visualization
+   * Gradually darkens parent color so subcategories are visually related but distinct
+   */
+  const deriveSubcategoryColors = (baseColor: string, count: number): string[] => {
+    const hex = baseColor.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+
+    const colors: string[] = [];
+    for (let i = 0; i < count; i++) {
+      const factor = 1 - (i * 0.15);
+      const newR = Math.round(Math.max(0, Math.min(255, r * factor)));
+      const newG = Math.round(Math.max(0, Math.min(255, g * factor)));
+      const newB = Math.round(Math.max(0, Math.min(255, b * factor)));
+      colors.push(`#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`);
+    }
+    return colors;
+  };
+
+  /**
+   * Get subcategories data for a selected category drill-down
+   */
+  const getSubcategoriesData = (expenses: Expense[], categoryName: string, chartType: ChartType): ChartData[] => {
+    const filteredExpenses = expenses.filter(e =>
+      e.categoryName === categoryName &&
+      (chartType === 'income' ? e.type === 'income' : e.type !== 'income')
+    );
+
+    const total = filteredExpenses.reduce((sum, e) => sum + Math.abs(e.amount), 0);
+    if (total === 0) return [];
+
+    const subcategoryMap = new Map<string, number>();
+
+    filteredExpenses.forEach(expense => {
+      const subCatName = expense.subCategoryName || 'Altro';
+      const current = subcategoryMap.get(subCatName) || 0;
+      subcategoryMap.set(subCatName, current + Math.abs(expense.amount));
+    });
+
+    const baseColor = drillDown.selectedCategoryColor || COLORS[0];
+    const subcatCount = subcategoryMap.size;
+    const colors = deriveSubcategoryColors(baseColor, subcatCount);
+
+    const data: ChartData[] = [];
+    let colorIndex = 0;
+    subcategoryMap.forEach((value, name) => {
+      data.push({
+        name,
+        value,
+        percentage: (value / total) * 100,
+        color: colors[colorIndex % colors.length],
+      });
+      colorIndex++;
+    });
+
+    return data.sort((a, b) => b.value - a.value);
+  };
+
+  /**
+   * Get filtered expenses for drill-down expense list view
+   * Uses periodFilteredExpenses to respect year+month filter
+   */
+  const getFilteredExpenses = (): Expense[] => {
+    if (!drillDown.selectedCategory) return [];
+
+    return periodFilteredExpenses.filter(expense => {
+      const matchesCategory = expense.categoryName === drillDown.selectedCategory;
+      const matchesType = drillDown.chartType === 'income'
+        ? expense.type === 'income'
+        : expense.type !== 'income';
+
+      if (!matchesCategory || !matchesType) return false;
+
+      if (drillDown.selectedSubCategory) {
+        if (drillDown.selectedSubCategory === 'Altro') {
+          return !expense.subCategoryName;
+        }
+        return expense.subCategoryName === drillDown.selectedSubCategory;
+      }
+
+      return true;
+    });
+  };
+
+  const handleCategoryClick = (data: ChartData, chartType: ChartType) => {
+    setDrillDown({
+      level: 'subcategory',
+      chartType,
+      selectedCategory: data.name,
+      selectedCategoryColor: data.color,
+      selectedSubCategory: null,
+    });
+  };
+
+  const handleSubcategoryClick = (data: ChartData) => {
+    setDrillDown(prev => ({
+      ...prev,
+      level: 'expenseList',
+      selectedSubCategory: data.name,
+    }));
+  };
+
+  const handleBack = () => {
+    if (drillDown.level === 'expenseList') {
+      setDrillDown(prev => ({
+        ...prev,
+        level: 'subcategory',
+        selectedSubCategory: null,
+      }));
+    } else if (drillDown.level === 'subcategory') {
+      resetDrillDown();
+    }
+  };
+
+  const pieChartHeight = isMobile ? 320 : 500;
+  const pieOuterRadius = isMobile ? 110 : 140;
+
+  const renderLegendItems = (
+    items: ChartData[],
+    onItemClick?: (item: ChartData) => void,
+    className?: string,
+    maxItems?: number
+  ) => {
+    const filteredItems = items
+      .filter(item => item.percentage >= 5)
+      .sort((a, b) => b.value - a.value);
+    const visibleItems = maxItems ? filteredItems.slice(0, maxItems) : filteredItems;
+    const baseClassName = isMobile ? 'mt-4 flex flex-wrap gap-3' : 'pl-5';
+    return (
+      <div className={`${baseClassName} ${className || ''}`.trim()}>
+        {visibleItems.map((item, index) => (
+          <div
+            key={`legend-item-${index}`}
+            className={`flex items-center gap-2 text-sm ${onItemClick ? 'cursor-pointer' : ''}`}
+            onClick={onItemClick ? () => onItemClick(item) : undefined}
+          >
+            <div className="h-3.5 w-3.5 flex-shrink-0 rounded-sm" style={{ backgroundColor: item.color }} />
+            <span className="text-muted-foreground">
+              {item.name} ({item.percentage.toFixed(1)}%)
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // Drill-down data computed from filtered expenses
+  const currentSubcategoriesData = drillDown.level === 'subcategory' && drillDown.selectedCategory && drillDown.chartType
+    ? getSubcategoriesData(periodFilteredExpenses, drillDown.selectedCategory, drillDown.chartType)
+    : [];
+
+  const currentFilteredExpenses = drillDown.level === 'expenseList'
+    ? getFilteredExpenses()
+    : [];
+
+  // Period label for dynamic titles
+  const periodLabel = selectedYear === null
+    ? 'Storico Completo'
+    : selectedMonth
+      ? `${ITALIAN_MONTHS[selectedMonth - 1]} ${selectedYear}`
+      : `${selectedYear}`;
+
   // Prepare yearly income/expense ratio data
   const getYearlyIncomeExpenseRatio = () => {
     const yearlyMap = new Map<number, Expense[]>();
@@ -559,6 +903,541 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
         <p className="text-muted-foreground mt-1">
           Visualizza l'andamento delle tue finanze nel tempo (tutti gli anni)
         </p>
+      </div>
+
+      {/* ==============================================
+          ANALISI PERIODO: Year+month filtered charts
+          (Sankey + Spese per Categoria + Entrate per Categoria)
+          ============================================== */}
+      <div className="rounded-lg border-2 border-blue-200 bg-blue-50/50 dark:bg-blue-950/10 dark:border-blue-800 p-4 sm:p-6">
+        {/* Filter Controls */}
+        <div className="flex flex-col gap-4 mb-6">
+          {/* Year + Month filter dropdowns */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <Label className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+              📊 Analisi Periodo
+            </Label>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              {/* Year dropdown */}
+              <Select
+                value={selectedYear?.toString() || '__all_years__'}
+                onValueChange={handleYearChange}
+              >
+                <SelectTrigger className="w-full sm:w-[160px]">
+                  <SelectValue placeholder="Tutti gli anni" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all_years__">Tutti gli anni</SelectItem>
+                  {availableYears.map(year => (
+                    <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Month dropdown - enabled only when year is selected */}
+              <Select
+                value={selectedMonth?.toString() || '__all__'}
+                onValueChange={handleMonthChange}
+                disabled={selectedYear === null}
+              >
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="Tutto l'anno" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Tutto l&apos;anno</SelectItem>
+                  {ITALIAN_MONTHS.map((month, index) => (
+                    <SelectItem key={index + 1} value={(index + 1).toString()}>
+                      {month}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Active filter indicator - shown only when filtering by specific year */}
+          {(selectedYear !== null || selectedMonth !== null) && (
+            <div className="rounded-md border border-blue-300 bg-blue-100 dark:bg-blue-900/30 dark:border-blue-700 p-3 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-blue-700 dark:text-blue-400">📅</span>
+                <span className="font-medium text-blue-900 dark:text-blue-200">
+                  Filtro attivo: {periodLabel}
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setSelectedYear(null); setSelectedMonth(null); resetDrillDown(); }}
+                className="h-7 text-xs text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-200"
+              >
+                Cancella
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Charts or empty state */}
+        {periodFilteredExpenses.length === 0 ? (
+          <div className="py-12 text-center text-muted-foreground">
+            Nessuna transazione trovata per {periodLabel}
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
+            {/* CHART 1: Sankey Flow Diagram */}
+            <div className="md:col-span-2">
+              <CashflowSankeyChart
+                expenses={periodFilteredExpenses}
+                isMobile={isMobile}
+                title={`Flusso Cashflow ${periodLabel}`}
+              />
+            </div>
+
+            {/* Pie charts rendered via IIFE to use useMemo inside conditional */}
+            {(() => {
+              const expensesByCategoryData = getExpensesByCategory(periodFilteredExpenses);
+              const incomeByCategoryData = getIncomeByCategory(periodFilteredExpenses);
+
+              return (
+                <>
+                  {/* CHART 2: Spese per Categoria - Interactive Drill-Down */}
+                  {(expensesByCategoryData.length > 0 || (drillDown.chartType === 'expenses' && drillDown.level !== 'category')) && (
+                    <Card ref={expensesChartRef} className="md:col-span-2">
+                      <CardHeader>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
+                            {drillDown.chartType === 'expenses' && drillDown.level !== 'category' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleBack}
+                                className="w-full justify-start gap-1 sm:w-auto"
+                              >
+                                <ChevronLeft className="h-4 w-4" />
+                                Indietro
+                              </Button>
+                            )}
+                            <CardTitle>
+                              {drillDown.chartType === 'expenses' && drillDown.level === 'subcategory'
+                                ? `Spese - ${drillDown.selectedCategory} - ${periodLabel}`
+                                : drillDown.chartType === 'expenses' && drillDown.level === 'expenseList'
+                                ? `Spese - ${drillDown.selectedCategory} - ${drillDown.selectedSubCategory} - ${periodLabel}`
+                                : `Spese per Categoria - ${periodLabel}`}
+                            </CardTitle>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        {/* Level 1: Category Pie Chart */}
+                        {drillDown.level === 'category' && expensesByCategoryData.length > 0 && (
+                          <ResponsiveContainer width="100%" height={pieChartHeight}>
+                            <RechartsPC>
+                              <Pie
+                                data={expensesByCategoryData as any}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                label={!isMobile
+                                  ? (entry: any) =>
+                                    entry.percentage >= 5
+                                      ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
+                                      : ''
+                                  : false}
+                                outerRadius={pieOuterRadius}
+                                fill="#8884d8"
+                                dataKey="value"
+                                onClick={(data: any) => handleCategoryClick(data, 'expenses')}
+                                cursor="pointer"
+                              >
+                                {expensesByCategoryData.map((entry, index) => (
+                                  <Cell
+                                    key={`cell-${index}`}
+                                    fill={entry.color}
+                                    style={{ cursor: 'pointer' }}
+                                  />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                formatter={(value: number) => formatCurrency(value)}
+                                contentStyle={{
+                                  backgroundColor: 'white',
+                                  border: '1px solid #ccc',
+                                  borderRadius: '4px',
+                                }}
+                              />
+                              <Legend
+                                layout={isMobile ? 'horizontal' : 'vertical'}
+                                align={isMobile ? 'center' : 'right'}
+                                verticalAlign={isMobile ? 'bottom' : 'middle'}
+                                content={() => renderLegendItems(
+                                  expensesByCategoryData,
+                                  entry => handleCategoryClick(entry, 'expenses'),
+                                  undefined,
+                                  isMobile ? 3 : undefined
+                                )}
+                              />
+                            </RechartsPC>
+                          </ResponsiveContainer>
+                        )}
+
+                        {/* Level 2: Subcategory Pie Chart */}
+                        {drillDown.level === 'subcategory' && drillDown.chartType === 'expenses' && currentSubcategoriesData.length > 0 && (
+                          <ResponsiveContainer width="100%" height={pieChartHeight}>
+                            <RechartsPC>
+                              <Pie
+                                data={currentSubcategoriesData as any}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                label={!isMobile
+                                  ? (entry: any) =>
+                                    entry.percentage >= 5
+                                      ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
+                                      : ''
+                                  : false}
+                                outerRadius={pieOuterRadius}
+                                fill="#8884d8"
+                                dataKey="value"
+                                onClick={(data: any) => handleSubcategoryClick(data)}
+                                cursor="pointer"
+                              >
+                                {currentSubcategoriesData.map((entry, index) => (
+                                  <Cell
+                                    key={`cell-${index}`}
+                                    fill={entry.color}
+                                    style={{ cursor: 'pointer' }}
+                                  />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                formatter={(value: number) => formatCurrency(value)}
+                                contentStyle={{
+                                  backgroundColor: 'white',
+                                  border: '1px solid #ccc',
+                                  borderRadius: '4px',
+                                }}
+                              />
+                              <Legend
+                                layout={isMobile ? 'horizontal' : 'vertical'}
+                                align={isMobile ? 'center' : 'right'}
+                                verticalAlign={isMobile ? 'bottom' : 'middle'}
+                                content={() => renderLegendItems(currentSubcategoriesData, entry => handleSubcategoryClick(entry))}
+                              />
+                            </RechartsPC>
+                          </ResponsiveContainer>
+                        )}
+
+                        {/* Level 3: Expense List */}
+                        {drillDown.level === 'expenseList' && drillDown.chartType === 'expenses' && currentFilteredExpenses.length > 0 && (
+                          <div className="space-y-4">
+                            <div className="space-y-3 sm:hidden">
+                              {currentFilteredExpenses.map((expense) => {
+                                const date = toDate(expense.date);
+                                return (
+                                  <div key={expense.id} className="rounded-md border p-3">
+                                    <div className="flex items-center justify-between text-sm">
+                                      <span className="text-muted-foreground">
+                                        {format(date, 'dd/MM/yyyy', { locale: it })}
+                                      </span>
+                                      <span className="font-medium text-red-600">
+                                        {formatCurrency(expense.amount)}
+                                      </span>
+                                    </div>
+                                    <p className="mt-2 text-sm text-muted-foreground">
+                                      {expense.notes || '-'}
+                                    </p>
+                                    {expense.link && (
+                                      <a
+                                        href={expense.link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="mt-2 inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+                                      >
+                                        Apri link
+                                        <ExternalLink className="h-4 w-4" />
+                                      </a>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div className="hidden rounded-md border sm:block">
+                              <div className="max-h-[500px] overflow-y-auto">
+                                <table className="w-full">
+                                  <thead className="sticky top-0 bg-muted/50 border-b">
+                                    <tr>
+                                      <th className="px-4 py-3 text-left text-sm font-medium">Data</th>
+                                      <th className="px-4 py-3 text-right text-sm font-medium">Importo</th>
+                                      <th className="px-4 py-3 text-left text-sm font-medium">Note</th>
+                                      <th className="px-4 py-3 text-center text-sm font-medium">Link</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {currentFilteredExpenses.map((expense) => {
+                                      const date = toDate(expense.date);
+                                      return (
+                                        <tr key={expense.id} className="border-b hover:bg-muted/30">
+                                          <td className="px-4 py-3 text-sm">
+                                            {format(date, 'dd/MM/yyyy', { locale: it })}
+                                          </td>
+                                          <td className="px-4 py-3 text-sm text-right font-medium text-red-600">
+                                            {formatCurrency(expense.amount)}
+                                          </td>
+                                          <td className="px-4 py-3 text-sm text-muted-foreground">
+                                            {expense.notes || '-'}
+                                          </td>
+                                          <td className="px-4 py-3 text-center">
+                                            {expense.link && (
+                                              <a
+                                                href={expense.link}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex text-blue-600 hover:text-blue-800"
+                                              >
+                                                <ExternalLink className="h-4 w-4" />
+                                              </a>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              Totale: {currentFilteredExpenses.length} {currentFilteredExpenses.length === 1 ? 'voce' : 'voci'}
+                            </div>
+                          </div>
+                        )}
+
+                        {drillDown.level === 'expenseList' && drillDown.chartType === 'expenses' && currentFilteredExpenses.length === 0 && (
+                          <div className="text-center py-8 text-muted-foreground">
+                            Nessuna spesa trovata
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* CHART 3: Entrate per Categoria - Interactive Drill-Down */}
+                  {(incomeByCategoryData.length > 0 || (drillDown.chartType === 'income' && drillDown.level !== 'category')) && (
+                    <Card ref={incomeChartRef} className="md:col-span-2">
+                      <CardHeader>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
+                            {drillDown.chartType === 'income' && drillDown.level !== 'category' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleBack}
+                                className="w-full justify-start gap-1 sm:w-auto"
+                              >
+                                <ChevronLeft className="h-4 w-4" />
+                                Indietro
+                              </Button>
+                            )}
+                            <CardTitle>
+                              {drillDown.chartType === 'income' && drillDown.level === 'subcategory'
+                                ? `Entrate - ${drillDown.selectedCategory} - ${periodLabel}`
+                                : drillDown.chartType === 'income' && drillDown.level === 'expenseList'
+                                ? `Entrate - ${drillDown.selectedCategory} - ${drillDown.selectedSubCategory} - ${periodLabel}`
+                                : `Entrate per Categoria - ${periodLabel}`}
+                            </CardTitle>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        {/* Level 1: Category Pie Chart */}
+                        {drillDown.level === 'category' && incomeByCategoryData.length > 0 && (
+                          <ResponsiveContainer width="100%" height={pieChartHeight}>
+                            <RechartsPC>
+                              <Pie
+                                data={incomeByCategoryData as any}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                label={!isMobile
+                                  ? (entry: any) =>
+                                    entry.percentage >= 5
+                                      ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
+                                      : ''
+                                  : false}
+                                outerRadius={pieOuterRadius}
+                                fill="#8884d8"
+                                dataKey="value"
+                                onClick={(data: any) => handleCategoryClick(data, 'income')}
+                                cursor="pointer"
+                              >
+                                {incomeByCategoryData.map((entry, index) => (
+                                  <Cell
+                                    key={`cell-${index}`}
+                                    fill={entry.color}
+                                    style={{ cursor: 'pointer' }}
+                                  />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                formatter={(value: number) => formatCurrency(value)}
+                                contentStyle={{
+                                  backgroundColor: 'white',
+                                  border: '1px solid #ccc',
+                                  borderRadius: '4px',
+                                }}
+                              />
+                              <Legend
+                                layout={isMobile ? 'horizontal' : 'vertical'}
+                                align={isMobile ? 'center' : 'right'}
+                                verticalAlign={isMobile ? 'bottom' : 'middle'}
+                                content={() => renderLegendItems(incomeByCategoryData, entry => handleCategoryClick(entry, 'income'))}
+                              />
+                            </RechartsPC>
+                          </ResponsiveContainer>
+                        )}
+
+                        {/* Level 2: Subcategory Pie Chart */}
+                        {drillDown.level === 'subcategory' && drillDown.chartType === 'income' && currentSubcategoriesData.length > 0 && (
+                          <ResponsiveContainer width="100%" height={pieChartHeight}>
+                            <RechartsPC>
+                              <Pie
+                                data={currentSubcategoriesData as any}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                label={!isMobile
+                                  ? (entry: any) =>
+                                    entry.percentage >= 5
+                                      ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
+                                      : ''
+                                  : false}
+                                outerRadius={pieOuterRadius}
+                                fill="#8884d8"
+                                dataKey="value"
+                                onClick={(data: any) => handleSubcategoryClick(data)}
+                                cursor="pointer"
+                              >
+                                {currentSubcategoriesData.map((entry, index) => (
+                                  <Cell
+                                    key={`cell-${index}`}
+                                    fill={entry.color}
+                                    style={{ cursor: 'pointer' }}
+                                  />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                formatter={(value: number) => formatCurrency(value)}
+                                contentStyle={{
+                                  backgroundColor: 'white',
+                                  border: '1px solid #ccc',
+                                  borderRadius: '4px',
+                                }}
+                              />
+                              <Legend
+                                layout={isMobile ? 'horizontal' : 'vertical'}
+                                align={isMobile ? 'center' : 'right'}
+                                verticalAlign={isMobile ? 'bottom' : 'middle'}
+                                content={() => renderLegendItems(currentSubcategoriesData, entry => handleSubcategoryClick(entry))}
+                              />
+                            </RechartsPC>
+                          </ResponsiveContainer>
+                        )}
+
+                        {/* Level 3: Income List */}
+                        {drillDown.level === 'expenseList' && drillDown.chartType === 'income' && currentFilteredExpenses.length > 0 && (
+                          <div className="space-y-4">
+                            <div className="space-y-3 sm:hidden">
+                              {currentFilteredExpenses.map((expense) => {
+                                const date = toDate(expense.date);
+                                return (
+                                  <div key={expense.id} className="rounded-md border p-3">
+                                    <div className="flex items-center justify-between text-sm">
+                                      <span className="text-muted-foreground">
+                                        {format(date, 'dd/MM/yyyy', { locale: it })}
+                                      </span>
+                                      <span className="font-medium text-green-600">
+                                        {formatCurrency(expense.amount)}
+                                      </span>
+                                    </div>
+                                    <p className="mt-2 text-sm text-muted-foreground">
+                                      {expense.notes || '-'}
+                                    </p>
+                                    {expense.link && (
+                                      <a
+                                        href={expense.link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="mt-2 inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+                                      >
+                                        Apri link
+                                        <ExternalLink className="h-4 w-4" />
+                                      </a>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div className="hidden rounded-md border sm:block">
+                              <div className="max-h-[500px] overflow-y-auto">
+                                <table className="w-full">
+                                  <thead className="sticky top-0 bg-muted/50 border-b">
+                                    <tr>
+                                      <th className="px-4 py-3 text-left text-sm font-medium">Data</th>
+                                      <th className="px-4 py-3 text-right text-sm font-medium">Importo</th>
+                                      <th className="px-4 py-3 text-left text-sm font-medium">Note</th>
+                                      <th className="px-4 py-3 text-center text-sm font-medium">Link</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {currentFilteredExpenses.map((expense) => {
+                                      const date = toDate(expense.date);
+                                      return (
+                                        <tr key={expense.id} className="border-b hover:bg-muted/30">
+                                          <td className="px-4 py-3 text-sm">
+                                            {format(date, 'dd/MM/yyyy', { locale: it })}
+                                          </td>
+                                          <td className="px-4 py-3 text-sm text-right font-medium text-green-600">
+                                            {formatCurrency(expense.amount)}
+                                          </td>
+                                          <td className="px-4 py-3 text-sm text-muted-foreground">
+                                            {expense.notes || '-'}
+                                          </td>
+                                          <td className="px-4 py-3 text-center">
+                                            {expense.link && (
+                                              <a
+                                                href={expense.link}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex text-blue-600 hover:text-blue-800"
+                                              >
+                                                <ExternalLink className="h-4 w-4" />
+                                              </a>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              Totale: {currentFilteredExpenses.length} {currentFilteredExpenses.length === 1 ? 'voce' : 'voci'}
+                            </div>
+                          </div>
+                        )}
+
+                        {drillDown.level === 'expenseList' && drillDown.chartType === 'income' && currentFilteredExpenses.length === 0 && (
+                          <div className="text-center py-8 text-muted-foreground">
+                            Nessuna entrata trovata
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        )}
       </div>
 
       {/* Charts Grid */}
@@ -1002,14 +1881,6 @@ export function TotalHistoryTab({ allExpenses, loading }: TotalHistoryTabProps) 
           </Card>
         )}
 
-        {/* Sankey Flow Diagram - Budget View */}
-        {expensesFrom2025.length > 0 && (
-          <CashflowSankeyChart
-            expenses={expensesFrom2025}
-            isMobile={isMobile}
-            title="Flusso Cashflow Storico"
-          />
-        )}
       </div>
     </div>
   );

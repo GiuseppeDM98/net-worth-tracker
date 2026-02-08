@@ -44,6 +44,17 @@
 - Analysis in Italian language matching the rest of the app
 - Disclaimer footer reminding users that AI analysis is not financial advice
 
+### Period Analysis in Total History (Cashflow)
+- Added "Analisi Periodo" section to the Total History (Storico Totale) tab in Cashflow page
+- Three interactive charts: Sankey flow diagram, Expenses by Category pie chart, Income by Category pie chart
+- Year + Month filtering: optionally filter by year first, then refine by month
+- Shows all historical data (2025+) by default — filters are optional refinements, not prerequisites
+- Three-level drill-down on pie charts: Category → Subcategory → Individual transactions with dates, amounts, notes, and links
+- Blue-bordered container with filter badge showing active filters and quick clear button
+- Dynamic chart titles update to reflect selected period (e.g., "Flusso Finanziario - Gennaio 2026")
+- Drill-down state resets automatically when filters change to prevent stale data
+- Removed redundant standalone Sankey chart (now integrated in the Analisi Periodo section with filtering support)
+
 ### Hall of Fame Dedicated Notes System
 - Added dedicated notes system for Hall of Fame rankings, completely separate from History page notes
 - Create and edit notes associated with specific time periods (year and optional month)

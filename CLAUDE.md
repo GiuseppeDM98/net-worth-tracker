@@ -6,7 +6,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk
 - Feature ultimo mese: AI Performance Analysis with Web Search + Doubling Time Analysis
-- Ultima implementazione: Remove Monte Carlo Historical Returns Feature (2026-02-08)
+- Ultima implementazione: Analisi Periodo in Storico Totale (2026-02-08)
 - In corso ora: nessuna attivita attiva
 - Completamento: 100%
 
@@ -31,6 +31,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - Budget flow visualization con unified month filter, 5-layer optional view, dual-path navigation
   - Multi-level drill-down: Budget → Type → Category → Subcategory → Transaction Details
   - Separate charts per Anno Corrente e Storico Totale
+  - **Analisi Periodo** in Storico Totale: sezione con filtri anno+mese, Sankey + 2 pie charts (spese/entrate per categoria) con drill-down 3 livelli. Default tutti i dati dal 2025+, filtri opzionali.
 - Snapshot mensili automatici + storico e CSV export.
 - Asset price/value history tables (Prezzi Storici / Valori Storici):
   - Aggregazione per nome asset invece di ID univoco
