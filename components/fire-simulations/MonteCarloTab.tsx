@@ -5,30 +5,14 @@
  *
  * Monte Carlo simulation interface for retirement planning and portfolio analysis.
  *
- * Design Approach - Three Parameter Sources (Teacher Comment):
- *
- * The simulation can use return/volatility parameters from three different sources:
- *
- * 1. Market Defaults ('market'):
- *    - Industry-standard historical averages (e.g., 7% equity return, 15% equity volatility)
- *    - Suitable for users without historical data or who want conservative estimates
- *    - Based on long-term market performance (S&P 500, bond indices)
- *
- * 2. Historical Data ('historical'):
- *    - Calculated from user's own snapshot history
- *    - Uses calculateHistoricalReturns() to derive actual portfolio returns and volatility
- *    - Only available if user has sufficient snapshot history (6+ months recommended)
- *    - Most accurate for users with long tracking history
- *
- * 3. Custom ('custom'):
- *    - User manually enters their own assumptions
- *    - Allows testing optimistic/pessimistic scenarios
- *    - Useful for sensitivity analysis
- *
  * Monte Carlo Method:
  * Runs N simulations (default 10,000) of portfolio performance over retirement years.
  * Each simulation uses random sampling from normal distributions defined by return/volatility params.
  * Success rate = % of simulations where portfolio doesn't run out before retirement ends.
+ *
+ * Market parameters use long-term historical averages (equity 7%/18%, bonds 3%/6%)
+ * which are the standard for FIRE Monte Carlo simulations. Users can manually adjust
+ * these values to test different scenarios.
  *
  * Key Features:
  * - Auto-prefill portfolio value from user's current net worth
@@ -45,10 +29,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAllAssets, calculateTotalValue, calculateLiquidNetWorth } from '@/lib/services/assetService';
 import { getSettings } from '@/lib/services/assetAllocationService';
-import { getUserSnapshots } from '@/lib/services/snapshotService';
 import {
   runMonteCarloSimulation,
-  calculateHistoricalReturns,
   getDefaultMarketParameters,
 } from '@/lib/services/monteCarloService';
 import { formatCurrencyCompact } from '@/lib/services/chartService';
@@ -69,7 +51,7 @@ export function MonteCarloTab() {
   const [isRunning, setIsRunning] = useState(false);
 
   /**
-   * React Query Integration: All three queries run in parallel and are cached for 5 minutes.
+   * React Query Integration: Both queries run in parallel and are cached for 5 minutes.
    * This prevents redundant API calls when switching between tabs or re-rendering.
    */
 
@@ -89,19 +71,9 @@ export function MonteCarloTab() {
     staleTime: 300000, // 5 minutes
   });
 
-  // Fetch snapshots data for historical returns calculation
-  const { data: snapshots, isLoading: isLoadingSnapshots } = useQuery({
-    queryKey: ['snapshots', user?.uid],
-    queryFn: () => getUserSnapshots(user!.uid),
-    enabled: !!user,
-    staleTime: 300000, // 5 minutes
-  });
-
   // Derived data calculations
   const totalNetWorth = assets ? calculateTotalValue(assets) : 0;
   const liquidNetWorth = assets ? calculateLiquidNetWorth(assets) : 0;
-  const availableSnapshotCount = snapshots ? snapshots.filter((s) => !s.isDummy).length : 0;
-  const historicalReturns = snapshots ? calculateHistoricalReturns(snapshots) : null;
 
   // ========== Parameter Initialization ==========
 
@@ -116,7 +88,6 @@ export function MonteCarloTab() {
    * - retirementYears: 30 (common planning horizon)
    * - equity/bonds: 60/40 (classic balanced portfolio allocation)
    * - annualWithdrawal: 30000 (placeholder, will be auto-filled from settings)
-   * - parameterSource: 'market' (default to conservative market averages)
    * - numberOfSimulations: 10000 (good balance of accuracy vs performance)
    *
    * Why initialize with 0 for initialPortfolio?
@@ -131,7 +102,6 @@ export function MonteCarloTab() {
     bondsPercentage: 40,
     annualWithdrawal: 30000,
     withdrawalAdjustment: 'inflation',
-    parameterSource: 'market',
     equityReturn: defaultMarketParams.equityReturn,
     equityVolatility: defaultMarketParams.equityVolatility,
     bondsReturn: defaultMarketParams.bondsReturn,
@@ -229,7 +199,7 @@ export function MonteCarloTab() {
 
   // ========== Render ==========
 
-  if (isLoadingAssets || isLoadingSettings || isLoadingSnapshots) {
+  if (isLoadingAssets || isLoadingSettings) {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="text-gray-500">Caricamento...</div>
@@ -249,12 +219,12 @@ export function MonteCarloTab() {
             <p className="font-semibold mb-1">📊 Parametri di Mercato</p>
             <ul className="list-disc list-inside space-y-1 text-gray-700 ml-2">
               <li>
-                <strong>Standard:</strong> Usa rendimenti e volatilità tipici del mercato
-                (es. Equity 7%/18%, Bonds 3%/6%)
+                <strong>Default:</strong> Rendimenti e volatilità basati su medie storiche
+                di lungo periodo (Equity 7%/18%, Bonds 3%/6%)
               </li>
               <li>
-                <strong>Storici Personali:</strong> Calcola dai TUOI snapshot mensili
-                (richiede ≥24 mesi di dati)
+                <strong>Personalizzabili:</strong> Puoi modificare manualmente tutti i
+                parametri per testare scenari diversi
               </li>
             </ul>
           </div>
@@ -298,8 +268,6 @@ export function MonteCarloTab() {
         onRunSimulation={handleRunSimulation}
         totalNetWorth={totalNetWorth}
         liquidNetWorth={liquidNetWorth}
-        historicalReturns={historicalReturns}
-        availableSnapshotCount={availableSnapshotCount}
         isRunning={isRunning}
       />
 

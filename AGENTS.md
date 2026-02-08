@@ -555,4 +555,4 @@ match /collectionName/{docId} {
 - **Components**: `CashflowSankeyChart.tsx`, `MetricSection.tsx`, `FireCalculatorTab.tsx`
 - **Pages**: `app/dashboard/settings/page.tsx`, `history/page.tsx`
 
-**Last updated**: 2026-01-29
+**Last updated**: 2026-02-08

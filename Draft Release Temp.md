@@ -82,6 +82,12 @@
 
 ## 🔧 Improvements
 
+### Monte Carlo Simulation Simplification
+- Removed unreliable "Use personal historical data" toggle that produced inflated return estimates (e.g., 69% equity returns instead of realistic 7%)
+- Monte Carlo simulation now uses editable market defaults (Equity 7%/18%, Bonds 3%/6%) as the standard for FIRE planning
+- All market parameters remain fully customizable to test different scenarios
+- Cleaner, simpler interface with descriptive guidance text under market parameters section
+
 ### AI Performance Analysis Enhancements
 - **Real-time web search integration**: AI now fetches actual financial news from the analyzed period to provide context
   - Powered by Tavily API with multi-query approach (3 parallel searches for comprehensive coverage)

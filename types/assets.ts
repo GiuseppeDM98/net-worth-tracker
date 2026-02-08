@@ -196,8 +196,6 @@ export interface PriceHistory {
 // Monte Carlo Simulation Types
 export type PortfolioSource = 'total' | 'liquid' | 'custom';
 export type WithdrawalAdjustment = 'inflation' | 'fixed' | 'percentage';
-export type ParameterSource = 'market' | 'historical';
-
 export interface MonteCarloParams {
   // Portfolio settings
   portfolioSource: PortfolioSource;
@@ -215,7 +213,6 @@ export interface MonteCarloParams {
   withdrawalAdjustment: WithdrawalAdjustment;
 
   // Market parameters
-  parameterSource: ParameterSource;
   equityReturn: number;
   equityVolatility: number;
   bondsReturn: number;
@@ -264,22 +261,6 @@ export interface MonteCarloResults {
     percentage: number;
   }[];
   simulations: SingleSimulationResult[];
-}
-
-export interface HistoricalReturnsData {
-  equity: {
-    mean: number;
-    volatility: number;
-    monthlyReturns: number[];
-  };
-  bonds: {
-    mean: number;
-    volatility: number;
-    monthlyReturns: number[];
-  };
-  availableMonths: number;
-  startDate: string;
-  endDate: string;
 }
 
 // Asset Price History Types

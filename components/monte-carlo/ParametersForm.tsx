@@ -2,9 +2,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
-import { AlertCircle, Settings, Info, ChevronDown, ChevronUp } from 'lucide-react';
-import { MonteCarloParams, HistoricalReturnsData } from '@/types/assets';
+import { AlertCircle, Settings, Info } from 'lucide-react';
+import { MonteCarloParams } from '@/types/assets';
 import { formatCurrency } from '@/lib/services/chartService';
 import { useState, useEffect } from 'react';
 
@@ -14,8 +13,6 @@ interface ParametersFormProps {
   onRunSimulation: () => void;
   totalNetWorth: number;
   liquidNetWorth: number;
-  historicalReturns: HistoricalReturnsData | null;
-  availableSnapshotCount: number;
   isRunning: boolean;
 }
 
@@ -25,37 +22,23 @@ interface ParametersFormProps {
  * Key features:
  * - Portfolio settings (initial amount, retirement years, annual withdrawal)
  * - Asset allocation (equity/bonds percentages with auto-complement validation)
- * - Parameter source toggle (historical data vs market defaults)
- * - Market parameters (equity/bonds return/volatility, inflation rate)
+ * - Market parameters (equity/bonds return/volatility, inflation rate) - all editable
  * - Simulation count selector (1,000-50,000)
  * - Quick-select buttons for net worth values
- * - Collapsible technical details section
  *
  * State management pattern:
- * This component uses 12 separate useState calls for local input tracking.
+ * This component uses separate useState calls for local input tracking.
  * Why? To provide smooth UX during user input:
  * 1. Allow partial/invalid input while typing (e.g., "7." before completing "7.5")
  * 2. Only validate and sync with parent on blur (handleBlur handlers)
  * 3. Format display values after validation (Italian locale for currency)
  * 4. Prevent input field "jumping" during typing due to premature formatting
  *
- * Without local state, formatting on every keystroke would cause:
- * - Cursor position issues (typing "100" might format to "1.00" mid-input)
- * - Inability to type decimal points or negative signs
- * - Poor user experience with constant validation interruptions
- *
- * Historical vs Market Parameters:
- * - Historical mode: Uses user's actual portfolio performance (requires ≥24 snapshots)
- * - Market mode: Uses industry-standard defaults (equity 7%/18%, bonds 3%/6%)
- * - Toggle auto-populates all return/volatility fields and disables manual editing
- *
  * @param params - Current simulation parameters (controlled by parent)
  * @param onParamsChange - Callback to update parameters in parent
  * @param onRunSimulation - Callback to trigger simulation execution
  * @param totalNetWorth - User's total net worth for quick-select
  * @param liquidNetWorth - User's liquid net worth for quick-select
- * @param historicalReturns - Calculated returns from user snapshots (null if insufficient data)
- * @param availableSnapshotCount - Number of snapshots available (min 24 for historical mode)
  * @param isRunning - Whether simulation is currently executing
  */
 export function ParametersForm({
@@ -64,8 +47,6 @@ export function ParametersForm({
   onRunSimulation,
   totalNetWorth,
   liquidNetWorth,
-  historicalReturns,
-  availableSnapshotCount,
   isRunning,
 }: ParametersFormProps) {
   // ===== Input State Management =====
@@ -87,19 +68,6 @@ export function ParametersForm({
   const [bondsReturnInput, setBondsReturnInput] = useState<string>(params.bondsReturn.toFixed(1));
   const [bondsVolatilityInput, setBondsVolatilityInput] = useState<string>(params.bondsVolatility.toFixed(1));
   const [inflationRateInput, setInflationRateInput] = useState<string>(params.inflationRate.toFixed(1));
-
-  // UI state for collapsible technical details section
-  const [showTechnicalDetails, setShowTechnicalDetails] = useState<boolean>(false);
-
-  // Local toggle state for instant visual feedback before parent update
-  const [isHistoricalMode, setIsHistoricalMode] = useState<boolean>(params.parameterSource === 'historical');
-
-  const isHistoricalAvailable = historicalReturns !== null;
-
-  // Sync local toggle state with parent params
-  useEffect(() => {
-    setIsHistoricalMode(params.parameterSource === 'historical');
-  }, [params.parameterSource]);
 
   // Sync initialPortfolio input when params change (e.g., from buttons)
   useEffect(() => {
@@ -239,60 +207,6 @@ export function ParametersForm({
     } else {
       // Reset to fallback if invalid
       setInputState(fallbackValue.toFixed(1));
-    }
-  };
-
-  /**
-   * Toggles between historical and market parameter sources.
-   *
-   * Historical mode (requires ≥24 monthly snapshots):
-   * - Auto-populates equity/bonds return and volatility from user's actual portfolio performance
-   * - Calculated by monteCarloService.calculateHistoricalReturns() from snapshot data
-   * - Input fields become disabled (read-only) to prevent manual editing
-   * - More personalized simulation based on user's actual experience
-   *
-   * Market mode (default):
-   * - Uses industry-standard default parameters:
-   *   * Equity: 7% return, 18% volatility (typical US stock market)
-   *   * Bonds: 3% return, 6% volatility (typical bond market)
-   * - Input fields remain editable for custom parameter tuning
-   * - Inflation rate remains editable in both modes (not derived from historical data)
-   *
-   * Why disable fields in historical mode?
-   * If we calculated parameters from user's data but allowed editing, it's unclear
-   * whether we're using "historical" or "custom" parameters. Forcing read-only
-   * makes it explicit that these values come from actual performance data.
-   *
-   * @param useHistorical - true for historical mode, false for market mode
-   */
-  const handleParameterSourceToggle = (useHistorical: boolean) => {
-    // Update local toggle state immediately for instant visual feedback
-    setIsHistoricalMode(useHistorical);
-
-    if (useHistorical && historicalReturns) {
-      // Switch to historical mode: populate from user's calculated returns
-      updateParam('parameterSource', 'historical');
-      updateParam('equityReturn', historicalReturns.equity.mean);
-      updateParam('equityVolatility', historicalReturns.equity.volatility);
-      updateParam('bondsReturn', historicalReturns.bonds.mean);
-      updateParam('bondsVolatility', historicalReturns.bonds.volatility);
-      // Sync local input state for display
-      setEquityReturnInput(historicalReturns.equity.mean.toFixed(1));
-      setEquityVolatilityInput(historicalReturns.equity.volatility.toFixed(1));
-      setBondsReturnInput(historicalReturns.bonds.mean.toFixed(1));
-      setBondsVolatilityInput(historicalReturns.bonds.volatility.toFixed(1));
-    } else {
-      // Switch to market mode: reset to industry-standard defaults
-      updateParam('parameterSource', 'market');
-      updateParam('equityReturn', 7.0);
-      updateParam('equityVolatility', 18.0);
-      updateParam('bondsReturn', 3.0);
-      updateParam('bondsVolatility', 6.0);
-      // Sync local input state for display
-      setEquityReturnInput('7.0');
-      setEquityVolatilityInput('18.0');
-      setBondsReturnInput('3.0');
-      setBondsVolatilityInput('6.0');
     }
   };
 
@@ -438,131 +352,13 @@ export function ParametersForm({
           )}
         </div>
 
-        {/* Market vs Historical Parameters Explanation */}
-        <div className="space-y-2">
-          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex gap-2">
-              <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-blue-900">
-                <p className="font-semibold mb-2">Parametri di Mercato vs Storici</p>
-                <ul className="list-disc list-inside space-y-1">
-                  <li>
-                    <strong>Parametri di Mercato</strong>: Valori medi storici generali
-                    (Equity: 7% rendimento / 18% volatilità, Bonds: 3% / 6%)
-                  </li>
-                  <li>
-                    <strong>Parametri Storici</strong>: Calcolati dai tuoi snapshot mensili reali
-                    analizzando i rendimenti passati dei tuoi investimenti in equity e bonds
-                  </li>
-                  <li>
-                    I parametri storici riflettono il <strong>tuo comportamento</strong> di investimento
-                    reale e le tue allocazioni specifiche
-                  </li>
-                  <li>
-                    Requisito minimo: <strong>24 snapshot mensili</strong> per avere dati statisticamente significativi
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          {/* Technical Details Collapsible */}
-          <div className="border border-blue-200 rounded-lg overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
-              className="w-full p-3 bg-blue-100 hover:bg-blue-150 transition-colors flex items-center justify-between text-left"
-            >
-              <span className="text-sm font-semibold text-blue-900">Dettagli Tecnici del Calcolo</span>
-              {showTechnicalDetails ? (
-                <ChevronUp className="h-4 w-4 text-blue-600" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-blue-600" />
-              )}
-            </button>
-
-            {showTechnicalDetails && (
-              <div className="p-4 bg-blue-50 text-sm text-blue-900 space-y-3">
-                <div>
-                  <p className="font-semibold mb-1">Come vengono calcolati i parametri storici:</p>
-                  <ol className="list-decimal list-inside space-y-2 ml-2">
-                    <li>
-                      <strong>Calcolo dei rendimenti mensili</strong>: Per ogni mese viene calcolato
-                      il rendimento percentuale degli asset equity e bonds separatamente
-                    </li>
-                    <li>
-                      <strong>Filtraggio degli outlier</strong>: I rendimenti mensili superiori a +50%
-                      o inferiori a -50% vengono scartati, in quanto probabilmente dovuti a depositi
-                      o prelievi piuttosto che a performance di mercato
-                    </li>
-                    <li>
-                      <strong>Annualizzazione dei rendimenti</strong>: La media dei rendimenti mensili
-                      viene annualizzata usando la formula composta: ((1 + rendimento_mensile)<sup>12</sup> - 1) × 100
-                    </li>
-                    <li>
-                      <strong>Calcolo della volatilità</strong>: La deviazione standard dei rendimenti
-                      mensili viene calcolata e poi annualizzata moltiplicandola per √12
-                    </li>
-                    <li>
-                      <strong>Requisiti minimi</strong>: Servono almeno 24 snapshot mensili e 12 rendimenti
-                      mensili validi (dopo il filtraggio) per ogni asset class
-                    </li>
-                  </ol>
-                </div>
-                <div className="pt-2 border-t border-blue-200">
-                  <p className="text-xs italic">
-                    Questo approccio statistico garantisce che i parametri riflettano accuratamente
-                    la tua esperienza di investimento personale, escludendo anomalie dovute a movimenti
-                    di capitale.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Historical vs Market Parameters Toggle */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className="text-base font-semibold">Parametri di Mercato</Label>
-              <p className="text-xs text-muted-foreground">
-                {isHistoricalAvailable
-                  ? `Usa dati storici personali (${availableSnapshotCount} mesi disponibili)`
-                  : 'Servono almeno 24 snapshot mensili per parametri storici'}
-              </p>
-            </div>
-            <Switch
-              checked={isHistoricalMode}
-              onCheckedChange={handleParameterSourceToggle}
-              disabled={!isHistoricalAvailable}
-            />
-          </div>
-
-          {!isHistoricalAvailable && (
-            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <div className="flex gap-2">
-                <AlertCircle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-yellow-900">
-                  Per utilizzare parametri storici personali servono almeno 24 snapshot
-                  mensili. Attualmente ne hai {availableSnapshotCount}.
-                  Continua a tracciare il tuo patrimonio!
-                </p>
-              </div>
-            </div>
-          )}
-
-          {params.parameterSource === 'historical' && historicalReturns && (
-            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-xs text-green-900">
-                Parametri calcolati dai tuoi snapshot dal {historicalReturns.startDate} al{' '}
-                {historicalReturns.endDate}
-              </p>
-            </div>
-          )}
-        </div>
-
         {/* Market Parameters */}
+        <div className="space-y-3">
+          <Label className="text-base font-semibold">Parametri di Mercato</Label>
+          <p className="text-xs text-muted-foreground">
+            Valori default basati su medie storiche di lungo periodo. Modifica per testare scenari diversi.
+          </p>
+        </div>
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
@@ -575,7 +371,6 @@ export function ParametersForm({
                 onBlur={() => handleMarketParamBlur('equityReturn', equityReturnInput, setEquityReturnInput, params.equityReturn)}
                 onWheel={(e) => e.currentTarget.blur()}
                 step="0.1"
-                disabled={params.parameterSource === 'historical'}
                 className="mt-1"
               />
             </div>
@@ -589,7 +384,6 @@ export function ParametersForm({
                 onBlur={() => handleMarketParamBlur('equityVolatility', equityVolatilityInput, setEquityVolatilityInput, params.equityVolatility)}
                 onWheel={(e) => e.currentTarget.blur()}
                 step="0.1"
-                disabled={params.parameterSource === 'historical'}
                 className="mt-1"
               />
             </div>
@@ -605,7 +399,6 @@ export function ParametersForm({
                 onBlur={() => handleMarketParamBlur('bondsReturn', bondsReturnInput, setBondsReturnInput, params.bondsReturn)}
                 onWheel={(e) => e.currentTarget.blur()}
                 step="0.1"
-                disabled={params.parameterSource === 'historical'}
                 className="mt-1"
               />
             </div>
@@ -619,7 +412,6 @@ export function ParametersForm({
                 onBlur={() => handleMarketParamBlur('bondsVolatility', bondsVolatilityInput, setBondsVolatilityInput, params.bondsVolatility)}
                 onWheel={(e) => e.currentTarget.blur()}
                 step="0.1"
-                disabled={params.parameterSource === 'historical'}
                 className="mt-1"
               />
             </div>

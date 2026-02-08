@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk
-- Feature ultimo mese: Unified Month Filter for Cashflow Charts + AI Performance Analysis with Web Search + Doubling Time Analysis
-- Ultima implementazione: Registration Permission Error Fix (2026-02-02)
+- Feature ultimo mese: AI Performance Analysis with Web Search + Doubling Time Analysis
+- Ultima implementazione: Remove Monte Carlo Historical Returns Feature (2026-02-08)
 - In corso ora: nessuna attivita attiva
 - Completamento: 100%
 
@@ -28,27 +28,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Key Features (Active)
 - Portfolio multi-asset con aggiornamento prezzi Yahoo Finance.
 - Cashflow con categorie, filtri, statistiche e Sankey diagram interattivo:
-  - Budget flow visualization: Income Categories → Budget → Expense Types → Expense Categories + Risparmi
-  - **Unified Month Filter**: Dropdown selector to filter 3 main charts by specific month (Jan-Dec) or show full year
-    - Applies to: Sankey diagram, Spese per Categoria, Entrate per Categoria
-    - Charts reordered: filtered section at top (Sankey → Spese → Entrate), then other charts
-    - Visual grouping: blue-bordered container shows which charts share the filter
-    - Timezone-aware filtering using `getItalyMonth()` for consistency between server (UTC) and client (CET)
-    - Visual filter indicator: blue banner with "Filtro attivo" + quick "Cancella" button
-    - Dynamic titles: update to show selected month (e.g., "Spese per Categoria - Marzo 2026")
-    - Drill-down preserved: navigate subcategories in filtered data without losing context
-    - Empty state: single message when selected month has no transactions
-    - Other charts (trends, expense types) remain unaffected for full year comparison
-  - **Optional 5-layer view**: Toggle "Mostra sottocategorie" aggiunge layer Subcategories (Categories → Subcategories)
-  - **Dual-path navigation**: Drill-down classico (4 click) o click diretto su subcategory nel 5-layer (1 click)
+  - Budget flow visualization con unified month filter, 5-layer optional view, dual-path navigation
   - Multi-level drill-down: Budget → Type → Category → Subcategory → Transaction Details
-  - Transaction details table: desktop (sticky header, scrollable) + mobile (card layout)
-  - Dynamic breadcrumb: shows full navigation path in header (e.g., "Variabili - Cibo - Coop")
-  - Smart navigation: auto-skip to transactions if category has no subcategories
-  - Expense types layer: Spese Fisse (blue), Variabili (violet), Debiti (amber)
-  - Mobile optimization: top 3 categories per expense type, top 4 subcategories per category, responsive labels
-  - Smart filtering: "Altro" singolo escluso quando categoria non ha subcategories reali
-  - Separate charts per Anno Corrente e Storico Totale (filtro 2025+)
+  - Separate charts per Anno Corrente e Storico Totale
 - Snapshot mensili automatici + storico e CSV export.
 - Asset price/value history tables (Prezzi Storici / Valori Storici):
   - Aggregazione per nome asset invece di ID univoco
@@ -80,20 +62,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - Click su data: dialog con dettagli dividendi + applicazione filtri
   - Visual filter indicator: banner blu "Filtro attivo" con pulsante cancella rapido
   - Totals row: riga totali in tabella quando filtri attivi
-- Hall of Fame con ranking mensili/annuali e highlight del periodo corrente.
-  - Sistema note dedicato con supporto multi-sezione: associa note a mesi/anni specifici
-  - **Dual-dialog UX**: Click icona → view dialog (read-only) → "Modifica Nota" button → edit dialog
-  - View dialog: period display, sections grouped (Monthly/Yearly), scrollable text
-  - Edit dialog: create/edit con checkboxes per 8 sezioni ranking (4 mensili + 4 annuali)
-  - Icone amber per note presenti, filtrate automaticamente per sezione e periodo
-  - Note separate da History, preservate durante ricalcolo rankings (pattern GET existing → merge → SET)
-- FIRE calculator con esclusione configurabile casa di abitazione:
-  - Flag `isPrimaryResidence` su asset immobiliari (checkbox nel form asset)
-  - Setting globale `includePrimaryResidenceInFIRE` disponibile in Settings page e FIRE Calculator (default OFF = escludi, metodologia FIRE standard)
-  - Calcolo automatico con `calculateFIRENetWorth()` che filtra immobili primari in base al setting
-  - PDF export consistente con UI (usa stesso calcolo e setting)
-  - Backwards compatible: asset esistenti senza flag → inclusi, settings esistenti → esclusi (FIRE standard)
-- Monte Carlo simulations.
+- Hall of Fame con ranking mensili/annuali, highlight periodo corrente, e sistema note dedicato multi-sezione.
+- FIRE calculator con esclusione configurabile casa di abitazione (flag `isPrimaryResidence`, setting globale, PDF export consistente).
+- Monte Carlo simulations con parametri di mercato editabili (equity 7%/18%, bonds 3%/6%).
 - Performance metrics organizzate in 4 categorie logiche:
   - 📈 Rendimento (ROI, CAGR, TWR, IRR)
   - ⚠️ Rischio (Volatilità, Sharpe, Max Drawdown, Durata Drawdown, Recovery Time)
@@ -177,4 +148,4 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Auth helpers: `lib/utils/authHelpers.ts` (token refresh + retry logic for Firebase Auth + Firestore synchronization)
 - Auth context: `contexts/AuthContext.tsx` (user registration with token refresh pattern)
 
-**Last updated**: 2026-02-02
+**Last updated**: 2026-02-08

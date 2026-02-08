@@ -274,7 +274,7 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
 ### 🎲 **Monte Carlo Retirement Simulations**
 - **Probabilistic retirement planning** with thousands of simulations
 - **Success rate calculation** to assess plan sustainability
-- **Market vs Historical parameters**: Use standard market assumptions or your own historical returns
+- **Editable market parameters**: Customize equity/bonds returns and volatility (defaults based on long-term historical averages)
 - **Flexible portfolio selection**: Total net worth, liquid assets only, or custom amount
 - **Interactive visualizations**:
   - Fan chart showing percentile distributions (10th, 25th, 50th, 75th, 90th)
@@ -1554,7 +1554,6 @@ See the [LICENSE](./LICENSE) file for the full license text.
   - Country-specific tax rates for international portfolios
   - Note: Manual dividend entry already allows tax rate editing; this enhancement would extend configurability to automatic scraping
 - 🔜 Monte Carlo: Expand asset allocation to include all asset classes (Equity, Bonds, Commodities, Cryptocurrencies, Real Estate, Cash) with configurable percentages
-- 🔜 Monte Carlo: Calculate historical returns and volatility from user snapshots when sufficient data is available (minimum 24 monthly data points per asset class). Display warning message when data is insufficient for specific asset classes (e.g., "⚠️ Asset X: Limited historical data. Using market averages")
 - 🔜 Dummy snapshot generator: Add Commodity asset class generation (currently set to 0%) to match all available asset classes
 
 ### Long-term Vision (Future 🚀)
