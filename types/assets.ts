@@ -374,8 +374,12 @@ export interface FIREProjectionYearData {
   bearNetWorth: number;
   baseNetWorth: number;
   bullNetWorth: number;
+  bearExpenses: number;    // Annual expenses inflated with bear scenario inflation
   baseExpenses: number;    // Annual expenses inflated with base scenario inflation
-  baseFireNumber: number;  // FIRE Number = expenses / (withdrawalRate / 100)
+  bullExpenses: number;    // Annual expenses inflated with bull scenario inflation
+  bearFireNumber: number;  // FIRE Number using bear expenses
+  baseFireNumber: number;  // FIRE Number using base expenses
+  bullFireNumber: number;  // FIRE Number using bull expenses
   bearFireReached: boolean;
   baseFireReached: boolean;
   bullFireReached: boolean;

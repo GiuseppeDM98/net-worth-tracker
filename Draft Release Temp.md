@@ -125,9 +125,11 @@
   - **Bull**: 10% growth, 1.5% inflation (Goldilocks economy)
 - Annual expenses increase with inflation year-over-year, making the FIRE Number a moving target
 - Annual savings auto-calculated from your real cashflow data (income - expenses from last complete year)
-- Interactive line chart showing 3 projected net worth paths + dashed FIRE Number reference line
+- Interactive line chart with 3 projected net worth paths + 3 dashed FIRE Number lines (one per scenario, color-matched)
+- Vertical reference lines marking the exact year FIRE is reached for each scenario
 - Summary cards showing "Years to FIRE" for each scenario with projected year
-- Collapsible year-by-year table with detailed projections per scenario
+- Collapsible year-by-year table grouped by scenario, showing both portfolio value and FIRE Number side-by-side
+- Annual savings automatically stop for a scenario once FIRE is reached (simulates retirement — no more work income)
 - All scenario parameters are fully customizable and can be saved for future sessions
 - "Reset to Default" button to restore original scenario values
 - Respects the "Include Primary Residence" toggle for net worth calculation

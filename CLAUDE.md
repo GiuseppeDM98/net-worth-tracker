@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk
-- Ultima implementazione: Monte Carlo 4 Asset Classes + Bear/Base/Bull Scenario Comparison (2026-02-09)
+- Ultima implementazione: FIRE Projection per-scenario FIRE Numbers + stop savings on FIRE (2026-02-09)
 - In corso ora: nessuna attivita attiva
 
 ## Architecture Snapshot
@@ -24,7 +24,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Performance metrics (ROI, CAGR, TWR, IRR, Sharpe, drawdown suite, YOC, Current Yield) con heatmap, underwater chart, rolling charts. Organizzate in 4 categorie (Rendimento, Rischio, Contesto, Dividendi).
 - Dividendi multi-currency con conversione EUR, scraping Borsa Italiana, calendario mensile con drill-down.
 - Hall of Fame con ranking mensili/annuali e sistema note dedicato multi-sezione.
-- FIRE calculator con esclusione casa abitazione, Proiezione Scenari Bear/Base/Bull con inflazione.
+- FIRE calculator con esclusione casa abitazione, Proiezione Scenari Bear/Base/Bull con inflazione, FIRE Number per-scenario, stop risparmi al raggiungimento FIRE.
 - Monte Carlo simulations con 4 asset class (Equity, Bonds, Immobili, Materie Prime) e parametri editabili.
   - **Confronto Scenari**: modalità Bear/Base/Bull con parametri per-scenario (rendimenti, volatilità, inflazione)
   - Toggle "Simulazione Singola" / "Confronto Scenari", overlay chart, 3 distribution charts, tabella comparativa
@@ -51,7 +51,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Cashflow: `components/cashflow/TotalHistoryTab.tsx`, `CurrentYearTab.tsx`, `CashflowSankeyChart.tsx`
 - Dividends: `components/dividends/DividendTrackingTab.tsx`, `DividendTable.tsx`, `DividendCalendar.tsx`
 - Hall of Fame: `app/dashboard/hall-of-fame/page.tsx`, `lib/services/hallOfFameService.ts`
-- FIRE: `components/fire-simulations/FireCalculatorTab.tsx`, `FIREProjectionSection.tsx`, `lib/services/fireService.ts`
+- FIRE: `components/fire-simulations/FireCalculatorTab.tsx`, `FIREProjectionSection.tsx`, `FIREProjectionChart.tsx`, `FIREProjectionTable.tsx`, `lib/services/fireService.ts`
 - Monte Carlo: `components/fire-simulations/MonteCarloTab.tsx`, `lib/services/monteCarloService.ts`
 - Monte Carlo UI: `components/monte-carlo/ParametersForm.tsx`, `SimulationChart.tsx`, `DistributionChart.tsx`, `SuccessRateCard.tsx`
 - Monte Carlo scenarios: `components/monte-carlo/ScenarioParameterCards.tsx`, `ScenarioComparisonResults.tsx`

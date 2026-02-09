@@ -336,7 +336,8 @@ export function getDefaultScenarios(): FIREProjectionScenarios {
  *   4. FIRE Number:     expenses / (withdrawalRate / 100)
  *   5. Check:           portfolio >= FIRE Number → FIRE reached
  *
- * The chart shows base scenario's FIRE Number as single reference line.
+ * All 3 scenarios' FIRE Numbers are tracked and displayed in chart/table.
+ * Savings stop for a scenario once it reaches FIRE (retirement = no more income).
  */
 export function calculateFIREProjection(
   initialNetWorth: number,
@@ -368,10 +369,10 @@ export function calculateFIREProjection(
     baseNW *= (1 + scenarios.base.growthRate / 100);
     bullNW *= (1 + scenarios.bull.growthRate / 100);
 
-    // Step 2: Add annual savings
-    bearNW += annualSavings;
-    baseNW += annualSavings;
-    bullNW += annualSavings;
+    // Step 2: Add annual savings (only if FIRE not yet reached — retirement stops income)
+    if (bearYearsToFIRE === null) bearNW += annualSavings;
+    if (baseYearsToFIRE === null) baseNW += annualSavings;
+    if (bullYearsToFIRE === null) bullNW += annualSavings;
 
     // Step 3: Inflate expenses per scenario
     bearExpenses *= (1 + scenarios.bear.inflationRate / 100);
@@ -398,8 +399,12 @@ export function calculateFIREProjection(
       bearNetWorth: Math.round(bearNW),
       baseNetWorth: Math.round(baseNW),
       bullNetWorth: Math.round(bullNW),
+      bearExpenses: Math.round(bearExpenses),
       baseExpenses: Math.round(baseExpenses),
+      bullExpenses: Math.round(bullExpenses),
+      bearFireNumber: Math.round(bearFireNumber),
       baseFireNumber: Math.round(baseFireNumber),
+      bullFireNumber: Math.round(bullFireNumber),
       bearFireReached: bearReached,
       baseFireReached: baseReached,
       bullFireReached: bullReached,

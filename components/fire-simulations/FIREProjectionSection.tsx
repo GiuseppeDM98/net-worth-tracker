@@ -271,11 +271,16 @@ export function FIREProjectionSection({
             <CardHeader>
               <CardTitle>Proiezione Patrimonio</CardTitle>
               <CardDescription>
-                Crescita stimata del patrimonio netto nei 3 scenari. La linea tratteggiata ambra è il FIRE Number (scenario base).
+                Crescita stimata del patrimonio netto nei 3 scenari. Le linee tratteggiate rappresentano il FIRE Number di ciascuno scenario, che cresce con l&apos;inflazione specifica.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <FIREProjectionChart yearlyData={projection.yearlyData} />
+              <FIREProjectionChart
+                yearlyData={projection.yearlyData}
+                bearYearsToFIRE={projection.bearYearsToFIRE}
+                baseYearsToFIRE={projection.baseYearsToFIRE}
+                bullYearsToFIRE={projection.bullYearsToFIRE}
+              />
             </CardContent>
           </Card>
 
@@ -292,8 +297,9 @@ export function FIREProjectionSection({
             <div className="text-sm text-blue-800 space-y-2">
               <p>
                 <strong>Come funziona la proiezione:</strong> Ogni anno il patrimonio cresce con il rendimento di mercato
-                dello scenario, poi si aggiungono i risparmi annuali. Le spese aumentano con l&apos;inflazione, facendo
-                crescere il FIRE Number nel tempo.
+                dello scenario, poi si aggiungono i risparmi annuali (fino al raggiungimento del FIRE). Le spese aumentano
+                con l&apos;inflazione dello scenario, facendo crescere il FIRE Number nel tempo. Quando uno scenario raggiunge
+                il FIRE, i risparmi annuali non vengono più aggiunti (simulando il pensionamento).
               </p>
               <p>
                 <strong>Risparmi annuali:</strong> Calcolati automaticamente dalle tue entrate e uscite dell&apos;ultimo

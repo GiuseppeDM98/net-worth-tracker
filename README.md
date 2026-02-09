@@ -273,10 +273,12 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
 - **Projection Scenarios (Bear / Base / Bull)**: Deterministic portfolio projections under 3 market scenarios
   - Customizable growth rates and inflation rates per scenario
   - Inflation-adjusted expenses make the FIRE Number a moving target over time
-  - Annual savings auto-calculated from real cashflow data
-  - Interactive line chart with 3 projected paths + FIRE Number reference line
+  - Per-scenario FIRE Numbers: see how different inflation rates impact the target across Bear, Base, and Bull
+  - Annual savings auto-calculated from real cashflow data, automatically stop when FIRE is reached (simulates retirement)
+  - Interactive line chart with 3 projected paths + 3 dashed FIRE Number lines (color-matched per scenario)
+  - Vertical reference lines marking the exact year each scenario reaches FIRE
   - Summary cards showing "Years to FIRE" per scenario
-  - Collapsible year-by-year detail table
+  - Collapsible year-by-year table grouped by scenario with portfolio value and FIRE Number side-by-side
   - Parameters saveable to user settings
 
 ### 🎲 **Monte Carlo Retirement Simulations**
