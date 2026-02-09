@@ -145,6 +145,22 @@
 - Added responsive design support for doubling time cards (mobile/tablet/desktop layouts)
 - Dark mode support for all doubling time components
 
+### Monte Carlo 4 Asset Classes + Scenario Comparison
+- Expanded Monte Carlo simulation from 2 to 4 asset classes: Equity, Bonds, Real Estate, and Commodities
+  - Each asset class has independent return and volatility parameters
+  - Default allocation 60/40/0/0 for backward compatibility — new classes weight 0% until activated
+- Added **Bear/Base/Bull Scenario Comparison** mode with toggle to switch between single simulation and scenario comparison
+  - Three editable parameter cards (one per scenario) with per-scenario returns, volatilities, and inflation rates
+  - Overlay chart showing 3 median lines with semi-transparent p10-p90 bands per scenario
+  - Three success rate cards showing simulation outcomes per scenario
+  - Three side-by-side distribution histograms colored by scenario (red/indigo/green)
+  - Comparison table with median portfolio values at 5-year intervals
+  - All scenario parameters persist to Firestore for future sessions
+  - "Reset to Default" button to restore standard scenario values
+- Bear defaults: equity 4%/20%, bonds 2%/7%, real estate 2%/14%, commodities 1%/22%, inflation 3.5%
+- Base defaults: equity 7%/18%, bonds 3%/6%, real estate 5%/12%, commodities 3.5%/20%, inflation 2.5%
+- Bull defaults: equity 10%/16%, bonds 4%/5%, real estate 8%/10%, commodities 6%/18%, inflation 1.5%
+
 ## 🏗️ Technical
 
 - Fixed snapshot ID format inconsistency in database to use standardized format without zero-padding

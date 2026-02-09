@@ -10,45 +10,52 @@
  * Each simulation uses random sampling from normal distributions defined by return/volatility params.
  * Success rate = % of simulations where portfolio doesn't run out before retirement ends.
  *
- * Market parameters use long-term historical averages (equity 7%/18%, bonds 3%/6%)
- * which are the standard for FIRE Monte Carlo simulations. Users can manually adjust
- * these values to test different scenarios.
- *
- * Key Features:
- * - Auto-prefill portfolio value from user's current net worth
- * - Auto-prefill annual withdrawal from planned expenses (if set)
- * - Portfolio allocation validation (equity + bonds must equal 100%)
- * - Withdrawal adjustment modes: inflation-adjusted or fixed
- * - Rich visualization: percentile chart, distribution chart, success rate card
+ * Supports 4 asset classes (equity, bonds, real estate, commodities) and two modes:
+ * - Single Simulation: one set of market parameters, full results
+ * - Scenario Comparison: Bear/Base/Bull scenarios run in parallel for side-by-side comparison
  *
  * @returns Tab component with parameter form, simulation button, and results visualization
  */
 
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAllAssets, calculateTotalValue, calculateLiquidNetWorth } from '@/lib/services/assetService';
-import { getSettings } from '@/lib/services/assetAllocationService';
+import { getSettings, setSettings, getDefaultTargets } from '@/lib/services/assetAllocationService';
 import {
   runMonteCarloSimulation,
   getDefaultMarketParameters,
+  getDefaultMonteCarloScenarios,
+  buildParamsFromScenario,
 } from '@/lib/services/monteCarloService';
 import { formatCurrencyCompact } from '@/lib/services/chartService';
-import { MonteCarloParams, MonteCarloResults } from '@/types/assets';
+import { MonteCarloParams, MonteCarloResults, MonteCarloScenarios } from '@/types/assets';
 import { toast } from 'sonner';
 import { Dices } from 'lucide-react';
 import { SimulationChart } from '@/components/monte-carlo/SimulationChart';
 import { SuccessRateCard } from '@/components/monte-carlo/SuccessRateCard';
 import { ParametersForm } from '@/components/monte-carlo/ParametersForm';
 import { DistributionChart } from '@/components/monte-carlo/DistributionChart';
+import { ScenarioParameterCards } from '@/components/monte-carlo/ScenarioParameterCards';
+import { ScenarioComparisonResults } from '@/components/monte-carlo/ScenarioComparisonResults';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export function MonteCarloTab() {
   // ========== State and Data Fetching ==========
 
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [results, setResults] = useState<MonteCarloResults | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+
+  // Scenario mode state
+  const [scenarioMode, setScenarioMode] = useState(false);
+  const [scenarios, setScenarios] = useState<MonteCarloScenarios>(getDefaultMonteCarloScenarios());
+  const [scenarioResults, setScenarioResults] = useState<{
+    bear: MonteCarloResults;
+    base: MonteCarloResults;
+    bull: MonteCarloResults;
+  } | null>(null);
 
   /**
    * React Query Integration: Both queries run in parallel and are cached for 5 minutes.
@@ -80,19 +87,9 @@ export function MonteCarloTab() {
   const defaultMarketParams = getDefaultMarketParameters();
 
   /**
-   * Teacher Comment: Smart Parameter Initialization
-   *
    * Initial params use sensible defaults:
-   * - portfolioSource: 'total' (use total net worth, not just liquid)
-   * - initialPortfolio: 0 (will be auto-filled from totalNetWorth in useEffect)
-   * - retirementYears: 30 (common planning horizon)
-   * - equity/bonds: 60/40 (classic balanced portfolio allocation)
-   * - annualWithdrawal: 30000 (placeholder, will be auto-filled from settings)
-   * - numberOfSimulations: 10000 (good balance of accuracy vs performance)
-   *
-   * Why initialize with 0 for initialPortfolio?
-   * Assets query might not be loaded yet. The useEffect below will populate it
-   * once data arrives, avoiding premature simulation runs with incomplete data.
+   * - equity/bonds/realEstate/commodities: 60/40/0/0 (classic balanced, backward compatible)
+   * - New asset classes default to 0% so existing behavior is unchanged until user opts in
    */
   const [params, setParams] = useState<MonteCarloParams>({
     portfolioSource: 'total',
@@ -100,23 +97,25 @@ export function MonteCarloTab() {
     retirementYears: 30,
     equityPercentage: 60,
     bondsPercentage: 40,
+    realEstatePercentage: 0,
+    commoditiesPercentage: 0,
     annualWithdrawal: 30000,
     withdrawalAdjustment: 'inflation',
     equityReturn: defaultMarketParams.equityReturn,
     equityVolatility: defaultMarketParams.equityVolatility,
     bondsReturn: defaultMarketParams.bondsReturn,
     bondsVolatility: defaultMarketParams.bondsVolatility,
+    realEstateReturn: defaultMarketParams.realEstateReturn,
+    realEstateVolatility: defaultMarketParams.realEstateVolatility,
+    commoditiesReturn: defaultMarketParams.commoditiesReturn,
+    commoditiesVolatility: defaultMarketParams.commoditiesVolatility,
     inflationRate: defaultMarketParams.inflationRate,
     numberOfSimulations: 10000,
   });
 
   /**
    * Auto-fill portfolio value and withdrawal from user data.
-   *
-   * Why this effect depends on totalNetWorth and settings?
-   * - Both values come from async queries that may not be loaded on mount
-   * - We want to update params once data arrives, but not on every render
-   * - Dependency array ensures we only update when these specific values change
+   * Both values come from async queries that may not be loaded on mount.
    */
   useEffect(() => {
     if (totalNetWorth > 0 && settings) {
@@ -133,68 +132,109 @@ export function MonteCarloTab() {
     }
   }, [totalNetWorth, settings]);
 
-  // ========== Simulation Logic ==========
+  // Sync scenario params from Firestore when settings load
+  useEffect(() => {
+    if (settings?.monteCarloScenarios) {
+      setScenarios(settings.monteCarloScenarios);
+    }
+  }, [settings?.monteCarloScenarios]);
 
-  const handleRunSimulation = () => {
-    // Validation: Ensure all required parameters are valid before running
+  // ========== Scenario Persistence ==========
+
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      if (!user) throw new Error('User not authenticated');
+      return setSettings(user.uid, {
+        ...settings,
+        targets: settings?.targets || getDefaultTargets(),
+        monteCarloScenarios: scenarios,
+      });
+    },
+    onSuccess: () => {
+      toast.success('Parametri scenari salvati');
+      queryClient.invalidateQueries({ queryKey: ['settings', user?.uid] });
+    },
+    onError: () => toast.error('Errore nel salvataggio dei parametri'),
+  });
+
+  // ========== Validation ==========
+
+  const validateParams = (): boolean => {
     if (params.initialPortfolio <= 0) {
       toast.error('Inserisci un patrimonio iniziale valido');
-      return;
+      return false;
     }
     if (params.annualWithdrawal <= 0) {
       toast.error('Inserisci un prelievo annuale valido');
-      return;
+      return false;
     }
 
-    /**
-     * Why Math.abs() with 0.01 tolerance instead of strict === 100?
-     *
-     * Floating point arithmetic can cause small precision errors. For example,
-     * 60 + 40 might actually be 99.99999999999999 due to JavaScript's number
-     * representation. Using absolute difference with small tolerance (0.01%)
-     * accounts for these precision issues while still validating the sum is 100%.
-     */
-    if (Math.abs(params.equityPercentage + params.bondsPercentage - 100) > 0.01) {
-      toast.error('La somma di Equity e Bonds deve essere 100%');
-      return;
+    // All 4 asset classes must sum to 100%
+    const allocationSum = params.equityPercentage + params.bondsPercentage +
+      params.realEstatePercentage + params.commoditiesPercentage;
+    if (Math.abs(allocationSum - 100) > 0.01) {
+      toast.error('La somma delle allocazioni deve essere 100%');
+      return false;
     }
     if (params.retirementYears < 1 || params.retirementYears > 60) {
       toast.error('Gli anni di pensionamento devono essere tra 1 e 60');
-      return;
+      return false;
     }
+    return true;
+  };
 
-    try {
-      setIsRunning(true);
-      toast.info('Esecuzione simulazione in corso...');
+  // ========== Simulation Logic ==========
 
-      /**
-       * Why setTimeout with 100ms delay?
-       *
-       * Monte Carlo simulation with 10,000 runs is CPU-intensive and can block
-       * the main thread for 1-2 seconds, freezing the UI. By wrapping in setTimeout,
-       * we give the browser a chance to render the "running" state (spinner, disabled
-       * button) before the heavy computation starts. This provides visual feedback
-       * that something is happening, improving perceived performance.
-       *
-       * Alternative would be to use Web Workers, but that adds significant complexity.
-       */
-      setTimeout(() => {
-        try {
-          const simulationResults = runMonteCarloSimulation(params);
-          setResults(simulationResults);
-          toast.success(`Simulazione completata! Tasso di successo: ${simulationResults.successRate.toFixed(1)}%`);
-        } catch (error) {
-          console.error('Error running simulation:', error);
-          toast.error('Errore durante la simulazione');
-        } finally {
-          setIsRunning(false);
-        }
-      }, 100);
-    } catch (error) {
-      console.error('Error starting simulation:', error);
-      toast.error("Errore durante l'avvio della simulazione");
-      setIsRunning(false);
-    }
+  const handleRunSimulation = () => {
+    if (!validateParams()) return;
+
+    setIsRunning(true);
+    toast.info('Esecuzione simulazione in corso...');
+
+    /**
+     * Why setTimeout with 100ms delay?
+     * Monte Carlo simulation is CPU-intensive and blocks the main thread.
+     * The delay lets the browser render the "running" state before computation starts.
+     */
+    setTimeout(() => {
+      try {
+        const simulationResults = runMonteCarloSimulation(params);
+        setResults(simulationResults);
+        toast.success(`Simulazione completata! Tasso di successo: ${simulationResults.successRate.toFixed(1)}%`);
+      } catch (error) {
+        console.error('Error running simulation:', error);
+        toast.error('Errore durante la simulazione');
+      } finally {
+        setIsRunning(false);
+      }
+    }, 100);
+  };
+
+  const handleRunScenarioSimulation = () => {
+    if (!validateParams()) return;
+
+    setIsRunning(true);
+    toast.info('Esecuzione 3 scenari in corso...');
+
+    setTimeout(() => {
+      try {
+        const bearParams = buildParamsFromScenario(params, scenarios.bear);
+        const baseParams = buildParamsFromScenario(params, scenarios.base);
+        const bullParams = buildParamsFromScenario(params, scenarios.bull);
+
+        const bearResults = runMonteCarloSimulation(bearParams);
+        const baseResults = runMonteCarloSimulation(baseParams);
+        const bullResults = runMonteCarloSimulation(bullParams);
+
+        setScenarioResults({ bear: bearResults, base: baseResults, bull: bullResults });
+        toast.success('Simulazione scenari completata!');
+      } catch (error) {
+        console.error('Error running scenario simulation:', error);
+        toast.error('Errore durante la simulazione scenari');
+      } finally {
+        setIsRunning(false);
+      }
+    }, 100);
   };
 
   // ========== Render ==========
@@ -212,67 +252,87 @@ export function MonteCarloTab() {
       {/* ========== Information Card ========== */}
       <Card className="bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200">
         <CardHeader>
-          <CardTitle className="text-lg">ℹ️ Come Funzionano le Simulazioni</CardTitle>
+          <CardTitle className="text-lg">Come Funzionano le Simulazioni</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <div>
-            <p className="font-semibold mb-1">📊 Parametri di Mercato</p>
+            <p className="font-semibold mb-1">Parametri di Mercato</p>
             <ul className="list-disc list-inside space-y-1 text-gray-700 ml-2">
               <li>
-                <strong>Default:</strong> Rendimenti e volatilità basati su medie storiche
-                di lungo periodo (Equity 7%/18%, Bonds 3%/6%)
+                <strong>4 Asset Class:</strong> Equity, Bonds, Immobili e Materie Prime con
+                rendimenti e volatilità personalizzabili
               </li>
               <li>
-                <strong>Personalizzabili:</strong> Puoi modificare manualmente tutti i
-                parametri per testare scenari diversi
+                <strong>Scenari:</strong> Confronta scenari Orso/Base/Toro con parametri
+                diversi per ogni asset class
               </li>
             </ul>
           </div>
           <div>
-            <p className="font-semibold mb-1">🎯 Interpretazione Risultati</p>
+            <p className="font-semibold mb-1">Interpretazione Risultati</p>
             <ul className="list-disc list-inside space-y-1 text-gray-700 ml-2">
               <li>
                 <strong>Tasso di Successo:</strong> % di simulazioni dove il patrimonio
                 dura almeno N anni
               </li>
               <li>
-                <strong>&gt;90%:</strong> Piano molto sicuro e sostenibile
+                <strong>&gt;90%:</strong> Piano molto sicuro | <strong>80-90%:</strong> Rischio moderato | <strong>&lt;80%:</strong> Considera aggiustamenti
               </li>
-              <li>
-                <strong>80-90%:</strong> Piano buono con rischio moderato
-              </li>
-              <li>
-                <strong>&lt;80%:</strong> Considera di ridurre prelievi o aumentare
-                patrimonio
-              </li>
-            </ul>
-          </div>
-          <div>
-            <p className="font-semibold mb-1">📈 Grafico Fan Chart</p>
-            <ul className="list-disc list-inside space-y-1 text-gray-700 ml-2">
-              <li>
-                Mostra i percentili (10°, 25°, 50°, 75°, 90°) dell'evoluzione del
-                patrimonio
-              </li>
-              <li>La linea blu rappresenta il valore mediano (50° percentile)</li>
-              <li>Le aree colorate mostrano il range di possibili risultati</li>
             </ul>
           </div>
         </CardContent>
       </Card>
 
-      {/* Parameters Form */}
+      {/* ========== Mode Toggle ========== */}
+      <div className="flex items-center justify-center">
+        <div className="inline-flex rounded-lg border bg-muted p-1">
+          <button
+            onClick={() => setScenarioMode(false)}
+            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+              !scenarioMode
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Simulazione Singola
+          </button>
+          <button
+            onClick={() => setScenarioMode(true)}
+            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+              scenarioMode
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Confronto Scenari
+          </button>
+        </div>
+      </div>
+
+      {/* Parameters Form — hides market params in scenario mode */}
       <ParametersForm
         params={params}
         onParamsChange={setParams}
-        onRunSimulation={handleRunSimulation}
+        onRunSimulation={scenarioMode ? handleRunScenarioSimulation : handleRunSimulation}
         totalNetWorth={totalNetWorth}
         liquidNetWorth={liquidNetWorth}
         isRunning={isRunning}
+        hideMarketParams={scenarioMode}
       />
 
-      {/* Results */}
-      {results && (
+      {/* ========== Scenario Parameter Cards (only in scenario mode) ========== */}
+      {scenarioMode && (
+        <ScenarioParameterCards
+          scenarios={scenarios}
+          onScenariosChange={setScenarios}
+          onSave={() => saveMutation.mutate()}
+          onReset={() => setScenarios(getDefaultMonteCarloScenarios())}
+          isSaving={saveMutation.isPending}
+        />
+      )}
+
+      {/* ========== Single Mode Results ========== */}
+      {!scenarioMode && results && (
         <>
           {/* Success Rate Card */}
           <SuccessRateCard
@@ -360,8 +420,19 @@ export function MonteCarloTab() {
         </>
       )}
 
+      {/* ========== Scenario Mode Results ========== */}
+      {scenarioMode && scenarioResults && (
+        <ScenarioComparisonResults
+          bear={scenarioResults.bear}
+          base={scenarioResults.base}
+          bull={scenarioResults.bull}
+          retirementYears={params.retirementYears}
+          numberOfSimulations={params.numberOfSimulations}
+        />
+      )}
+
       {/* Empty State */}
-      {!results && !isRunning && (
+      {((!scenarioMode && !results) || (scenarioMode && !scenarioResults)) && !isRunning && (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Dices className="h-16 w-16 text-gray-400 mb-4" />

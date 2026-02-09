@@ -121,6 +121,7 @@ export interface AssetAllocationSettings {
   dividendIncomeCategoryId?: string; // Category ID for automatic dividend income entries
   dividendIncomeSubCategoryId?: string; // Subcategory ID for automatic dividend income entries
   fireProjectionScenarios?: FIREProjectionScenarios; // Custom scenario parameters for FIRE projections (Bear/Base/Bull)
+  monteCarloScenarios?: MonteCarloScenarios; // Custom scenario parameters for Monte Carlo simulations (Bear/Base/Bull)
   targets: AssetAllocationTarget;
 }
 
@@ -205,9 +206,11 @@ export interface MonteCarloParams {
   // Retirement duration
   retirementYears: number;
 
-  // Asset allocation
+  // Asset allocation (all 4 must sum to 100%)
   equityPercentage: number;
   bondsPercentage: number;
+  realEstatePercentage: number;
+  commoditiesPercentage: number;
 
   // Withdrawal settings
   annualWithdrawal: number;
@@ -218,6 +221,10 @@ export interface MonteCarloParams {
   equityVolatility: number;
   bondsReturn: number;
   bondsVolatility: number;
+  realEstateReturn: number;
+  realEstateVolatility: number;
+  commoditiesReturn: number;
+  commoditiesVolatility: number;
   inflationRate: number;
 
   // Simulation settings
@@ -262,6 +269,27 @@ export interface MonteCarloResults {
     percentage: number;
   }[];
   simulations: SingleSimulationResult[];
+}
+
+// Monte Carlo Scenario Types
+// Each scenario defines per-asset-class returns/volatilities plus inflation,
+// enabling Bear/Base/Bull comparison of retirement outcomes.
+export interface MonteCarloScenarioParams {
+  equityReturn: number;
+  equityVolatility: number;
+  bondsReturn: number;
+  bondsVolatility: number;
+  realEstateReturn: number;
+  realEstateVolatility: number;
+  commoditiesReturn: number;
+  commoditiesVolatility: number;
+  inflationRate: number;
+}
+
+export interface MonteCarloScenarios {
+  bear: MonteCarloScenarioParams;
+  base: MonteCarloScenarioParams;
+  bull: MonteCarloScenarioParams;
 }
 
 // Asset Price History Types

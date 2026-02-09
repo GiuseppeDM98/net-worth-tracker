@@ -35,6 +35,7 @@ export async function getSettings(
       dividendIncomeCategoryId: data.dividendIncomeCategoryId,
       dividendIncomeSubCategoryId: data.dividendIncomeSubCategoryId,
       fireProjectionScenarios: data.fireProjectionScenarios,
+      monteCarloScenarios: data.monteCarloScenarios,
       targets: data.targets as AssetAllocationTarget,
     };
   } catch (error) {
@@ -107,6 +108,9 @@ export async function setSettings(
       if (settings.fireProjectionScenarios !== undefined) {
         docData.fireProjectionScenarios = settings.fireProjectionScenarios;
       }
+      if (settings.monteCarloScenarios !== undefined) {
+        docData.monteCarloScenarios = settings.monteCarloScenarios;
+      }
 
       // Use setDoc WITHOUT merge to completely replace targets
       await setDoc(targetRef, docData);
@@ -140,6 +144,9 @@ export async function setSettings(
       }
       if (settings.fireProjectionScenarios !== undefined) {
         docData.fireProjectionScenarios = settings.fireProjectionScenarios;
+      }
+      if (settings.monteCarloScenarios !== undefined) {
+        docData.monteCarloScenarios = settings.monteCarloScenarios;
       }
 
       // Use merge: true to preserve existing fields

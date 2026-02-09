@@ -14,6 +14,7 @@ interface ParametersFormProps {
   totalNetWorth: number;
   liquidNetWorth: number;
   isRunning: boolean;
+  hideMarketParams?: boolean; // Hide market params section when scenario mode handles them
 }
 
 /**
@@ -21,8 +22,8 @@ interface ParametersFormProps {
  *
  * Key features:
  * - Portfolio settings (initial amount, retirement years, annual withdrawal)
- * - Asset allocation (equity/bonds percentages with auto-complement validation)
- * - Market parameters (equity/bonds return/volatility, inflation rate) - all editable
+ * - Asset allocation (equity/bonds/real estate/commodities with sum-to-100 validation)
+ * - Market parameters (return/volatility per asset class, inflation) - all editable
  * - Simulation count selector (1,000-50,000)
  * - Quick-select buttons for net worth values
  *
@@ -40,6 +41,7 @@ interface ParametersFormProps {
  * @param totalNetWorth - User's total net worth for quick-select
  * @param liquidNetWorth - User's liquid net worth for quick-select
  * @param isRunning - Whether simulation is currently executing
+ * @param hideMarketParams - When true, hides market params section (scenario mode manages them)
  */
 export function ParametersForm({
   params,
@@ -48,25 +50,32 @@ export function ParametersForm({
   totalNetWorth,
   liquidNetWorth,
   isRunning,
+  hideMarketParams = false,
 }: ParametersFormProps) {
   // ===== Input State Management =====
   // All numeric input fields maintain local string state to allow partial input during typing.
   // Values sync with parent params only on blur after validation.
 
-  // Asset allocation inputs (must sum to 100%)
+  // Asset allocation inputs (all 4 must sum to 100%)
   const [equityInput, setEquityInput] = useState<string>(params.equityPercentage.toString());
   const [bondsInput, setBondsInput] = useState<string>(params.bondsPercentage.toString());
+  const [realEstateInput, setRealEstateInput] = useState<string>(params.realEstatePercentage.toString());
+  const [commoditiesInput, setCommoditiesInput] = useState<string>(params.commoditiesPercentage.toString());
 
   // Initial portfolio (formatted in Italian locale with decimal places)
   const [initialPortfolioInput, setInitialPortfolioInput] = useState<string>(
     params.initialPortfolio.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   );
 
-  // Market parameters (return and volatility for equity and bonds, plus inflation rate)
+  // Market parameters (return and volatility for each asset class, plus inflation rate)
   const [equityReturnInput, setEquityReturnInput] = useState<string>(params.equityReturn.toFixed(1));
   const [equityVolatilityInput, setEquityVolatilityInput] = useState<string>(params.equityVolatility.toFixed(1));
   const [bondsReturnInput, setBondsReturnInput] = useState<string>(params.bondsReturn.toFixed(1));
   const [bondsVolatilityInput, setBondsVolatilityInput] = useState<string>(params.bondsVolatility.toFixed(1));
+  const [realEstateReturnInput, setRealEstateReturnInput] = useState<string>(params.realEstateReturn.toFixed(1));
+  const [realEstateVolatilityInput, setRealEstateVolatilityInput] = useState<string>(params.realEstateVolatility.toFixed(1));
+  const [commoditiesReturnInput, setCommoditiesReturnInput] = useState<string>(params.commoditiesReturn.toFixed(1));
+  const [commoditiesVolatilityInput, setCommoditiesVolatilityInput] = useState<string>(params.commoditiesVolatility.toFixed(1));
   const [inflationRateInput, setInflationRateInput] = useState<string>(params.inflationRate.toFixed(1));
 
   // Sync initialPortfolio input when params change (e.g., from buttons)
@@ -100,47 +109,29 @@ export function ParametersForm({
   };
 
   // ===== Asset Allocation Handlers =====
-  // Equity and bonds percentages must sum to exactly 100%.
-  // Auto-complement pattern: When user changes equity, bonds automatically adjusts (and vice versa).
+  // With 4 asset classes, auto-complement is ambiguous, so each field is independent.
+  // Validation shows current sum and error when not 100%.
 
-  const handleEquityChange = (value: string) => {
-    setEquityInput(value);
-  };
-
-  const handleBondsChange = (value: string) => {
-    setBondsInput(value);
-  };
+  const allocationSum = params.equityPercentage + params.bondsPercentage +
+    params.realEstatePercentage + params.commoditiesPercentage;
+  const allocationRemaining = 100 - allocationSum;
 
   /**
-   * Validates equity percentage and auto-complements bonds to sum to 100%.
-   * On blur, if input is valid (0-100), update both percentages.
-   * If invalid, reset input to current param value.
+   * Generic blur handler for allocation fields.
+   * Validates 0-100 range and syncs with parent. No auto-complement with 4 classes.
    */
-  const handleEquityBlur = () => {
-    const value = parseFloat(equityInput);
+  const handleAllocationBlur = (
+    key: 'equityPercentage' | 'bondsPercentage' | 'realEstatePercentage' | 'commoditiesPercentage',
+    inputValue: string,
+    setInputState: (v: string) => void,
+    fallbackValue: number
+  ) => {
+    const value = parseFloat(inputValue);
     if (!isNaN(value) && value >= 0 && value <= 100) {
-      updateParam('equityPercentage', value);
-      updateParam('bondsPercentage', 100 - value);
-      setBondsInput((100 - value).toString());
+      updateParam(key, value);
+      setInputState(value.toString());
     } else {
-      // Reset to current value if invalid input
-      setEquityInput(params.equityPercentage.toString());
-    }
-  };
-
-  /**
-   * Validates bonds percentage and auto-complements equity to sum to 100%.
-   * Mirror of handleEquityBlur for bonds input.
-   */
-  const handleBondsBlur = () => {
-    const value = parseFloat(bondsInput);
-    if (!isNaN(value) && value >= 0 && value <= 100) {
-      updateParam('bondsPercentage', value);
-      updateParam('equityPercentage', 100 - value);
-      setEquityInput((100 - value).toString());
-    } else {
-      // Reset to current value if invalid input
-      setBondsInput(params.bondsPercentage.toString());
+      setInputState(fallbackValue.toString());
     }
   };
 
@@ -164,7 +155,7 @@ export function ParametersForm({
    * 4. Round to integer (fractional currency not needed for portfolio totals)
    * 5. Format back to Italian locale for display
    *
-   * Example: User types "50.000,00" → parses as 50000.00 → displays as "50.000,00"
+   * Example: User types "50.000,00" -> parses as 50000.00 -> displays as "50.000,00"
    */
   const handleInitialPortfolioBlur = () => {
     // Strip all non-numeric characters except comma (decimal) and dot (thousands) and minus
@@ -190,12 +181,13 @@ export function ParametersForm({
   // ===== Market Parameter Handlers =====
 
   /**
-   * Generic blur handler for all market parameters (equity/bonds return/volatility, inflation).
+   * Generic blur handler for all market parameters (return/volatility per asset class, inflation).
    * Validates input is within reasonable range (-100% to +100%) before updating.
    * Formats to 1 decimal place for consistency.
    */
   const handleMarketParamBlur = (
-    paramKey: 'equityReturn' | 'equityVolatility' | 'bondsReturn' | 'bondsVolatility' | 'inflationRate',
+    paramKey: 'equityReturn' | 'equityVolatility' | 'bondsReturn' | 'bondsVolatility' |
+      'realEstateReturn' | 'realEstateVolatility' | 'commoditiesReturn' | 'commoditiesVolatility' | 'inflationRate',
     inputValue: string,
     setInputState: (value: string) => void,
     fallbackValue: number
@@ -309,18 +301,30 @@ export function ParametersForm({
           </div>
         </div>
 
-        {/* Asset Allocation */}
+        {/* Asset Allocation — 4 classes */}
         <div className="space-y-3">
-          <Label className="text-base font-semibold">Asset Allocation</Label>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-base font-semibold">Asset Allocation</Label>
+            {/* Show remaining allocation to help user balance to 100% */}
+            <span className={`text-xs font-medium ${
+              Math.abs(allocationRemaining) < 0.01 ? 'text-green-600' :
+              allocationRemaining > 0 ? 'text-amber-600' : 'text-red-600'
+            }`}>
+              {Math.abs(allocationRemaining) < 0.01
+                ? 'Totale: 100%'
+                : `Rimanente: ${allocationRemaining > 0 ? '+' : ''}${allocationRemaining.toFixed(1)}%`
+              }
+            </span>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <div>
               <Label htmlFor="equityPercentage">Equity (%)</Label>
               <Input
                 id="equityPercentage"
                 type="number"
                 value={equityInput}
-                onChange={(e) => handleEquityChange(e.target.value)}
-                onBlur={handleEquityBlur}
+                onChange={(e) => setEquityInput(e.target.value)}
+                onBlur={() => handleAllocationBlur('equityPercentage', equityInput, setEquityInput, params.equityPercentage)}
                 onWheel={(e) => e.currentTarget.blur()}
                 min="0"
                 max="100"
@@ -334,8 +338,38 @@ export function ParametersForm({
                 id="bondsPercentage"
                 type="number"
                 value={bondsInput}
-                onChange={(e) => handleBondsChange(e.target.value)}
-                onBlur={handleBondsBlur}
+                onChange={(e) => setBondsInput(e.target.value)}
+                onBlur={() => handleAllocationBlur('bondsPercentage', bondsInput, setBondsInput, params.bondsPercentage)}
+                onWheel={(e) => e.currentTarget.blur()}
+                min="0"
+                max="100"
+                step="5"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="realEstatePercentage">Immobili (%)</Label>
+              <Input
+                id="realEstatePercentage"
+                type="number"
+                value={realEstateInput}
+                onChange={(e) => setRealEstateInput(e.target.value)}
+                onBlur={() => handleAllocationBlur('realEstatePercentage', realEstateInput, setRealEstateInput, params.realEstatePercentage)}
+                onWheel={(e) => e.currentTarget.blur()}
+                min="0"
+                max="100"
+                step="5"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="commoditiesPercentage">Materie Prime (%)</Label>
+              <Input
+                id="commoditiesPercentage"
+                type="number"
+                value={commoditiesInput}
+                onChange={(e) => setCommoditiesInput(e.target.value)}
+                onBlur={() => handleAllocationBlur('commoditiesPercentage', commoditiesInput, setCommoditiesInput, params.commoditiesPercentage)}
                 onWheel={(e) => e.currentTarget.blur()}
                 min="0"
                 max="100"
@@ -344,92 +378,157 @@ export function ParametersForm({
               />
             </div>
           </div>
-          {Math.abs(params.equityPercentage + params.bondsPercentage - 100) > 0.01 && (
+          {Math.abs(allocationSum - 100) > 0.01 && (
             <p className="text-xs text-red-600 flex items-center gap-1">
               <AlertCircle className="h-3 w-3" />
-              La somma deve essere 100%
+              La somma delle allocazioni deve essere 100% (attuale: {allocationSum.toFixed(1)}%)
             </p>
           )}
         </div>
 
-        {/* Market Parameters */}
-        <div className="space-y-3">
-          <Label className="text-base font-semibold">Parametri di Mercato</Label>
-          <p className="text-xs text-muted-foreground">
-            Valori default basati su medie storiche di lungo periodo. Modifica per testare scenari diversi.
-          </p>
-        </div>
-        <div className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <Label htmlFor="equityReturn">Rendimento Equity (%/anno)</Label>
-              <Input
-                id="equityReturn"
-                type="number"
-                value={equityReturnInput}
-                onChange={(e) => setEquityReturnInput(e.target.value)}
-                onBlur={() => handleMarketParamBlur('equityReturn', equityReturnInput, setEquityReturnInput, params.equityReturn)}
-                onWheel={(e) => e.currentTarget.blur()}
-                step="0.1"
-                className="mt-1"
-              />
+        {/* Market Parameters — hidden in scenario mode */}
+        {!hideMarketParams && (
+          <>
+            <div className="space-y-3">
+              <Label className="text-base font-semibold">Parametri di Mercato</Label>
+              <p className="text-xs text-muted-foreground">
+                Valori default basati su medie storiche di lungo periodo. Modifica per testare scenari diversi.
+              </p>
             </div>
-            <div>
-              <Label htmlFor="equityVolatility">Volatilità Equity (%)</Label>
-              <Input
-                id="equityVolatility"
-                type="number"
-                value={equityVolatilityInput}
-                onChange={(e) => setEquityVolatilityInput(e.target.value)}
-                onBlur={() => handleMarketParamBlur('equityVolatility', equityVolatilityInput, setEquityVolatilityInput, params.equityVolatility)}
-                onWheel={(e) => e.currentTarget.blur()}
-                step="0.1"
-                className="mt-1"
-              />
+            <div className="space-y-4">
+              {/* Equity */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="equityReturn">Rendimento Equity (%/anno)</Label>
+                  <Input
+                    id="equityReturn"
+                    type="number"
+                    value={equityReturnInput}
+                    onChange={(e) => setEquityReturnInput(e.target.value)}
+                    onBlur={() => handleMarketParamBlur('equityReturn', equityReturnInput, setEquityReturnInput, params.equityReturn)}
+                    onWheel={(e) => e.currentTarget.blur()}
+                    step="0.1"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="equityVolatility">Volatilità Equity (%)</Label>
+                  <Input
+                    id="equityVolatility"
+                    type="number"
+                    value={equityVolatilityInput}
+                    onChange={(e) => setEquityVolatilityInput(e.target.value)}
+                    onBlur={() => handleMarketParamBlur('equityVolatility', equityVolatilityInput, setEquityVolatilityInput, params.equityVolatility)}
+                    onWheel={(e) => e.currentTarget.blur()}
+                    step="0.1"
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+              {/* Bonds */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="bondsReturn">Rendimento Bonds (%/anno)</Label>
+                  <Input
+                    id="bondsReturn"
+                    type="number"
+                    value={bondsReturnInput}
+                    onChange={(e) => setBondsReturnInput(e.target.value)}
+                    onBlur={() => handleMarketParamBlur('bondsReturn', bondsReturnInput, setBondsReturnInput, params.bondsReturn)}
+                    onWheel={(e) => e.currentTarget.blur()}
+                    step="0.1"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="bondsVolatility">Volatilità Bonds (%)</Label>
+                  <Input
+                    id="bondsVolatility"
+                    type="number"
+                    value={bondsVolatilityInput}
+                    onChange={(e) => setBondsVolatilityInput(e.target.value)}
+                    onBlur={() => handleMarketParamBlur('bondsVolatility', bondsVolatilityInput, setBondsVolatilityInput, params.bondsVolatility)}
+                    onWheel={(e) => e.currentTarget.blur()}
+                    step="0.1"
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+              {/* Real Estate */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="realEstateReturn">Rendimento Immobili (%/anno)</Label>
+                  <Input
+                    id="realEstateReturn"
+                    type="number"
+                    value={realEstateReturnInput}
+                    onChange={(e) => setRealEstateReturnInput(e.target.value)}
+                    onBlur={() => handleMarketParamBlur('realEstateReturn', realEstateReturnInput, setRealEstateReturnInput, params.realEstateReturn)}
+                    onWheel={(e) => e.currentTarget.blur()}
+                    step="0.1"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="realEstateVolatility">Volatilità Immobili (%)</Label>
+                  <Input
+                    id="realEstateVolatility"
+                    type="number"
+                    value={realEstateVolatilityInput}
+                    onChange={(e) => setRealEstateVolatilityInput(e.target.value)}
+                    onBlur={() => handleMarketParamBlur('realEstateVolatility', realEstateVolatilityInput, setRealEstateVolatilityInput, params.realEstateVolatility)}
+                    onWheel={(e) => e.currentTarget.blur()}
+                    step="0.1"
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+              {/* Commodities */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="commoditiesReturn">Rendimento Materie Prime (%/anno)</Label>
+                  <Input
+                    id="commoditiesReturn"
+                    type="number"
+                    value={commoditiesReturnInput}
+                    onChange={(e) => setCommoditiesReturnInput(e.target.value)}
+                    onBlur={() => handleMarketParamBlur('commoditiesReturn', commoditiesReturnInput, setCommoditiesReturnInput, params.commoditiesReturn)}
+                    onWheel={(e) => e.currentTarget.blur()}
+                    step="0.1"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="commoditiesVolatility">Volatilità Materie Prime (%)</Label>
+                  <Input
+                    id="commoditiesVolatility"
+                    type="number"
+                    value={commoditiesVolatilityInput}
+                    onChange={(e) => setCommoditiesVolatilityInput(e.target.value)}
+                    onBlur={() => handleMarketParamBlur('commoditiesVolatility', commoditiesVolatilityInput, setCommoditiesVolatilityInput, params.commoditiesVolatility)}
+                    onWheel={(e) => e.currentTarget.blur()}
+                    step="0.1"
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+              {/* Inflation */}
+              <div>
+                <Label htmlFor="inflationRate">Inflazione (%/anno)</Label>
+                <Input
+                  id="inflationRate"
+                  type="number"
+                  value={inflationRateInput}
+                  onChange={(e) => setInflationRateInput(e.target.value)}
+                  onBlur={() => handleMarketParamBlur('inflationRate', inflationRateInput, setInflationRateInput, params.inflationRate)}
+                  onWheel={(e) => e.currentTarget.blur()}
+                  step="0.1"
+                  className="mt-1"
+                />
+              </div>
             </div>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <Label htmlFor="bondsReturn">Rendimento Bonds (%/anno)</Label>
-              <Input
-                id="bondsReturn"
-                type="number"
-                value={bondsReturnInput}
-                onChange={(e) => setBondsReturnInput(e.target.value)}
-                onBlur={() => handleMarketParamBlur('bondsReturn', bondsReturnInput, setBondsReturnInput, params.bondsReturn)}
-                onWheel={(e) => e.currentTarget.blur()}
-                step="0.1"
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label htmlFor="bondsVolatility">Volatilità Bonds (%)</Label>
-              <Input
-                id="bondsVolatility"
-                type="number"
-                value={bondsVolatilityInput}
-                onChange={(e) => setBondsVolatilityInput(e.target.value)}
-                onBlur={() => handleMarketParamBlur('bondsVolatility', bondsVolatilityInput, setBondsVolatilityInput, params.bondsVolatility)}
-                onWheel={(e) => e.currentTarget.blur()}
-                step="0.1"
-                className="mt-1"
-              />
-            </div>
-          </div>
-          <div>
-            <Label htmlFor="inflationRate">Inflazione (%/anno)</Label>
-            <Input
-              id="inflationRate"
-              type="number"
-              value={inflationRateInput}
-              onChange={(e) => setInflationRateInput(e.target.value)}
-              onBlur={() => handleMarketParamBlur('inflationRate', inflationRateInput, setInflationRateInput, params.inflationRate)}
-              onWheel={(e) => e.currentTarget.blur()}
-              step="0.1"
-              className="mt-1"
-            />
-          </div>
-        </div>
+          </>
+        )}
 
         {/* Number of Simulations */}
         <div>

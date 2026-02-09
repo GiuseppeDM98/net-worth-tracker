@@ -108,6 +108,22 @@ ALL fields in settings types must be handled in THREE places:
 - **Solution**: When modifying formatters, update BOTH functions to keep signatures aligned
 - **Future**: Prefer importing from `formatters.ts` in new components to gradually reduce chartService dependency
 
+### Multi-Class Allocation Validation
+- With 2 classes: auto-complement (change one, adjust the other) works well
+- With 3+ classes: auto-complement is ambiguous — which class absorbs the difference?
+- **Solution**: Independent fields + "Rimanente: X%" badge with error if sum ≠ 100%
+- **Files**: `components/monte-carlo/ParametersForm.tsx`
+
+### Scenario Mode hideMarketParams Pattern
+- When a form has fields also present in per-scenario cards, add `hideMarketParams?: boolean` prop
+- In scenario mode, market params are edited in scenario cards → hide them from the base form to avoid duplicated/conflicting inputs
+- **Files**: `components/monte-carlo/ParametersForm.tsx`, `MonteCarloTab.tsx`
+
+### Scenario Params Builder Pattern
+- When shared params (portfolio, allocation, withdrawal) must be combined with scenario-specific params (returns, volatility, inflation), use a builder function
+- `buildParamsFromScenario(baseParams, scenario)` spreads base + overrides market fields from scenario
+- **Files**: `lib/services/monteCarloService.ts`
+
 ---
 
 ## Common Errors to Avoid
@@ -132,6 +148,10 @@ ALL fields in settings types must be handled in THREE places:
 ### Firestore Nested Object Deletion Not Persisting
 **Symptom**: Deleted nested keys reappear after reload
 **Fix**: GET + setDoc WITHOUT `merge: true` (see pattern above)
+
+### Wrong Import Source for Service Functions
+**Symptom**: Build error when importing settings helpers from constants modules
+**Fix**: `getDefaultTargets`, `getSettings`, `setSettings` all live in `assetAllocationService.ts` — do NOT import from `defaultSubCategories` or other constant files
 
 ---
 
