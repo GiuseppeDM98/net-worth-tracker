@@ -387,7 +387,7 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
                           <TableCell className="text-right">{formatCurrency(asset.currentPrice)}</TableCell>
                           <TableCell className="text-right">
                             {asset.averageCost ? (
-                              formatCurrency(asset.averageCost)
+                              formatCurrency(asset.averageCost, asset.currency, 4)
                             ) : (
                               <span className="text-muted-foreground">-</span>
                             )}

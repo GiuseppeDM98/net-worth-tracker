@@ -214,7 +214,7 @@ export function AssetCard({
             <div>
               <span className="text-gray-500">PMC:</span>{' '}
               <span className="font-medium">
-                {formatCurrency(asset.averageCost)}
+                {formatCurrency(asset.averageCost, asset.currency, 4)}
               </span>
             </div>
           )}

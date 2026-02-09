@@ -117,6 +117,13 @@
 - Extended Thinking enabled for deeper AI reasoning (10k token budget) resulting in more insightful analysis
 - Increased analysis length from 300 to 350 words to accommodate market events context
 
+### Average Cost Precision
+- Increased average cost per share precision from 2 to 4 decimal places (e.g., €100.1119 instead of €100.11)
+- More accurate gain/loss calculations, especially for assets with low prices or large quantities
+- Input field now accepts up to 4 decimals to match broker precision
+- All displays updated: asset cards, management table, and tax calculator
+- Backward compatible: existing assets with 2 decimals display correctly with trailing zeros
+
 ### Other Improvements
 - Improved milestone calculation accuracy by skipping pre-existing thresholds
 - Added responsive design support for doubling time cards (mobile/tablet/desktop layouts)

@@ -96,6 +96,12 @@ ALL fields in settings types must be handled in THREE places:
 - **Extended Thinking**: 10k token budget for deeper reasoning
 - **Web Search**: Multi-query with `Promise.allSettled`, top 2 per category, deduplicate by URL
 
+### Formatter Utility Duplication
+- **Gotcha**: `formatCurrency` exists in BOTH `lib/utils/formatters.ts` AND `lib/services/chartService.ts`
+- **Why**: Historical reasons - chartService is self-contained, 34 files import from it
+- **Solution**: When modifying formatters, update BOTH functions to keep signatures aligned
+- **Future**: Prefer importing from `formatters.ts` in new components to gradually reduce chartService dependency
+
 ---
 
 ## Common Errors to Avoid
@@ -130,4 +136,4 @@ ALL fields in settings types must be handled in THREE places:
 - **Components**: `CashflowSankeyChart.tsx`, `TotalHistoryTab.tsx`, `CurrentYearTab.tsx`, `MetricSection.tsx`
 - **Pages**: `app/dashboard/settings/page.tsx`, `history/page.tsx`
 
-**Last updated**: 2026-02-08
+**Last updated**: 2026-02-09

@@ -958,10 +958,10 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                     <Input
                       id="averageCost"
                       type="number"
-                      step="0.01"
+                      step="0.0001"
                       min="0"
                       {...register('averageCost', { valueAsNumber: true })}
-                      placeholder="es. 85.50"
+                      placeholder="es. 85.1234"
                     />
                     {errors.averageCost && (
                       <p className="text-sm text-red-500">{errors.averageCost.message}</p>

@@ -173,7 +173,7 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
               </div>
               <div>
                 <span className="text-gray-600">PMC:</span>{' '}
-                <span className="font-medium">{formatCurrency(asset.averageCost || 0)}</span>
+                <span className="font-medium">{formatCurrency(asset.averageCost || 0, asset.currency, 4)}</span>
               </div>
               <div>
                 <span className="text-gray-600">Aliquota fiscale:</span>{' '}
@@ -268,7 +268,7 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
                 <div className="space-y-1">
                   <p className="text-sm text-gray-600">Prezzo medio di carico (PMC)</p>
                   <p className="text-lg font-semibold">
-                    {formatCurrency(results.averageCost)}
+                    {formatCurrency(results.averageCost, asset.currency, 4)}
                   </p>
                 </div>
 

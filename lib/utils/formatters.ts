@@ -6,12 +6,21 @@ import { TimePeriod } from '@/types/performance';
  * Format a number as currency (Italian format)
  * @param amount - The amount to format
  * @param currency - The currency code (default: EUR)
+ * @param decimals - Optional number of decimal places (default: currency default, typically 2)
  * @returns Formatted currency string
  */
-export function formatCurrency(amount: number, currency: string = 'EUR'): string {
+export function formatCurrency(
+  amount: number,
+  currency: string = 'EUR',
+  decimals?: number
+): string {
   return new Intl.NumberFormat('it-IT', {
     style: 'currency',
     currency: currency,
+    ...(decimals !== undefined && {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    }),
   }).format(amount);
 }
 

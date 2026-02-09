@@ -6,7 +6,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk
 - Feature ultimo mese: AI Performance Analysis with Web Search + Doubling Time Analysis
-- Ultima implementazione: Analisi Periodo in Storico Totale (2026-02-08)
+- Ultima implementazione: Estensione precisione Costo Medio per Azione a 4 decimali (2026-02-09)
 - In corso ora: nessuna attivita attiva
 - Completamento: 100%
 
@@ -27,6 +27,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Key Features (Active)
 - Portfolio multi-asset con aggiornamento prezzi Yahoo Finance.
+  - **Average Cost Precision**: Campo "Costo Medio per Azione" supporta 4 decimali (es. €100,1119) per allinearsi con precisione broker e migliorare accuratezza calcoli gain/loss.
 - Cashflow con categorie, filtri, statistiche e Sankey diagram interattivo:
   - Budget flow visualization con unified month filter, 5-layer optional view, dual-path navigation
   - Multi-level drill-down: Budget → Type → Category → Subcategory → Transaction Details
@@ -149,4 +150,4 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Auth helpers: `lib/utils/authHelpers.ts` (token refresh + retry logic for Firebase Auth + Firestore synchronization)
 - Auth context: `contexts/AuthContext.tsx` (user registration with token refresh pattern)
 
-**Last updated**: 2026-02-08
+**Last updated**: 2026-02-09

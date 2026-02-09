@@ -199,11 +199,23 @@ function getAssetClassName(assetClass: string): string {
 
 /**
  * Format currency value in Italian format
+ * @param value - The amount to format
+ * @param currency - The currency code (default: EUR)
+ * @param decimals - Optional number of decimal places (default: currency default, typically 2)
+ * @returns Formatted currency string
  */
-export function formatCurrency(value: number): string {
+export function formatCurrency(
+  value: number,
+  currency: string = 'EUR',
+  decimals?: number
+): string {
   return new Intl.NumberFormat('it-IT', {
     style: 'currency',
-    currency: 'EUR',
+    currency: currency,
+    ...(decimals !== undefined && {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    }),
   }).format(value);
 }
 
