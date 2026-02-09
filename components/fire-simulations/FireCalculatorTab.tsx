@@ -72,6 +72,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { Settings } from '@/types/settings';
+import { FIREProjectionSection } from './FIREProjectionSection';
 
 export function FireCalculatorTab() {
   const { user } = useAuth();
@@ -537,6 +538,16 @@ export function FireCalculatorTab() {
           )}
         </CardContent>
       </Card>
+
+      {/* FIRE Projection Scenarios */}
+      {fireMetrics && currentNetWorth > 0 && (
+        <FIREProjectionSection
+          userId={user!.uid}
+          currentNetWorth={currentNetWorth}
+          withdrawalRate={withdrawalRate}
+          settings={settings}
+        />
+      )}
 
       {/* Info Box */}
       <Card className="border-blue-200 bg-blue-50">

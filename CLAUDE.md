@@ -6,7 +6,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk
 - Feature ultimo mese: AI Performance Analysis with Web Search + Doubling Time Analysis
-- Ultima implementazione: Estensione precisione Costo Medio per Azione a 4 decimali (2026-02-09)
+- Ultima implementazione: FIRE Projection Scenarios (Bear/Base/Bull) con inflazione (2026-02-09)
 - In corso ora: nessuna attivita attiva
 - Completamento: 100%
 
@@ -66,6 +66,13 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - Totals row: riga totali in tabella quando filtri attivi
 - Hall of Fame con ranking mensili/annuali, highlight periodo corrente, e sistema note dedicato multi-sezione.
 - FIRE calculator con esclusione configurabile casa di abitazione (flag `isPrimaryResidence`, setting globale, PDF export consistente).
+  - **Proiezione Scenari**: proiezione deterministica patrimonio sotto 3 scenari di mercato (Bear/Base/Bull)
+    - Parametri editabili per scenario: crescita mercati + inflazione (con default preimpostati)
+    - Inflazione applicata alle spese anno per anno → FIRE Number è un target mobile
+    - Risparmio annuale auto-calcolato dal cashflow reale (entrate - uscite ultimo anno)
+    - Default: Bear (4%/3.5%), Base (7%/2.5%), Bull (10%/1.5%)
+    - Output: chart 3 linee + FIRE Number tratteggiato, card "Anni al FIRE", tabella anno per anno collassabile
+    - Parametri salvabili in Firestore settings
 - Monte Carlo simulations con parametri di mercato editabili (equity 7%/18%, bonds 3%/6%).
 - Performance metrics organizzate in 4 categorie logiche:
   - 📈 Rendimento (ROI, CAGR, TWR, IRR)
@@ -81,27 +88,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - Time filter mapping: yearly → YTD, total → ALL, monthly → Performance disabled
   - Graceful degradation con dati insufficienti (< 2 snapshots)
 - **AI Performance Analysis**: On-demand portfolio analysis powered by Claude Sonnet 4.5 (Anthropic API)
-  - Button in Performance page header: "Analizza con AI" con icona Sparkles
-  - Real-time streaming response with Server-Sent Events (SSE) for progressive text display
-  - **Extended Thinking enabled**: 10k token budget for deeper internal reasoning before responding
-  - **Web Search Integration** (Tavily API): Real-time financial news context
-    - Multi-query approach: 3 parallel searches (Central Banks, Geopolitical Events, Market Events)
-    - Top 2 results per category for balanced coverage (6 total)
-    - Captures events post-January 2025 (e.g., Liberation Day, Fed meetings, market volatility)
-    - Graceful degradation: continues without web search if API fails
-  - Analysis features:
-    - Metrics interpretation con 4 categorie (Rendimento, Rischio, Contesto, Dividendi)
-    - Financial market events context: real-time news from WSJ, Bloomberg, FT, Reuters
-    - Strengths identification, weaknesses, actionable insights (max 350 parole)
-  - Enhanced prompt: include periodo esatto con date range + current date + market context
-  - Italian language output aligned with app localization
-  - Dialog UI (max-w-4xl) with markdown formatting (bold, bullet points), scrollable content
-  - Summary metrics header: ROI, CAGR, TWR con color-coding verde/rosso
-  - Copy-to-clipboard button con feedback visivo (toast + icon transition)
-  - Generation timestamp footer in Italian format (DD/MM/YYYY HH:mm)
-  - Regenerate button for new analysis if unsatisfied with first result
-  - Graceful error handling with fallback messages and toast notifications
-  - Auto-fetch on dialog open, disclaimer footer (not financial advice)
+  - SSE streaming, Extended Thinking (10k tokens), Web Search (Tavily API, 3 parallel queries)
+  - Metrics interpretation, market context, strengths/weaknesses, actionable insights (max 350 parole)
+  - Dialog UI con markdown, copy-to-clipboard, regenerate, timestamp, disclaimer
 
 ## Data & Integrations
 - Firestore (client + admin) con merge updates per evitare data loss.
@@ -143,6 +132,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - PDF sections: `components/pdf/sections/PerformanceSection.tsx` (performance metrics with 4 categories)
 - Asset dialog: `components/assets/AssetDialog.tsx`
 - FIRE calculator: `components/fire-simulations/FireCalculatorTab.tsx`
+- FIRE projection scenarios: `components/fire-simulations/FIREProjectionSection.tsx`, `components/fire-simulations/FIREProjectionChart.tsx`, `components/fire-simulations/FIREProjectionTable.tsx`
+- FIRE service: `lib/services/fireService.ts` (includes `getAnnualCashflowData`, `calculateFIREProjection`)
 - Performance metrics section: `components/performance/MetricSection.tsx`
 - Asset types: `types/assets.ts` (includes DoublingMilestone, DoublingTimeSummary, DoublingMode)
 - AI Analysis: `app/api/ai/analyze-performance/route.ts` (Anthropic API integration with SSE streaming + web search preprocessing), `components/performance/AIAnalysisDialog.tsx` (dialog with markdown rendering)

@@ -1,5 +1,5 @@
 import { Expense } from '@/types/expenses';
-import { MonthlySnapshot } from '@/types/assets';
+import { MonthlySnapshot, FIREProjectionScenarios, FIREProjectionYearData, FIREProjectionResult } from '@/types/assets';
 import { getExpensesByDateRange, calculateTotalExpenses, calculateTotalIncome } from './expenseService';
 import { getUserSnapshots } from './snapshotService';
 
@@ -239,4 +239,187 @@ export async function getFIREData(
     console.error('Error getting FIRE data:', error);
     throw new Error('Failed to get FIRE data');
   }
+}
+
+/**
+ * Calculate annual cashflow data for FIRE projections.
+ *
+ * Returns both annual savings and annual expenses from the same data source
+ * for consistency. Uses the most recent complete calendar year (e.g., 2025
+ * if current year is 2026). Falls back to current year annualized if no
+ * prior year data exists.
+ *
+ * Why both from the same source: savings and expenses must come from the same
+ * period to avoid inconsistencies (e.g., current year expenses with last year savings).
+ */
+export interface AnnualCashflowData {
+  annualSavings: number;  // Net savings (income - expenses), clamped to 0 minimum
+  annualExpensesFromCashflow: number; // Total expenses from the reference year
+  referenceYear: number;  // Which year the data comes from
+  isAnnualized: boolean;  // True if current year data was scaled to full year
+}
+
+export async function getAnnualCashflowData(userId: string): Promise<AnnualCashflowData> {
+  try {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const lastYear = currentYear - 1;
+
+    // Try last complete calendar year first
+    const lastYearStart = new Date(lastYear, 0, 1);
+    const lastYearEnd = new Date(lastYear, 11, 31, 23, 59, 59, 999);
+    const lastYearExpenses = await getExpensesByDateRange(userId, lastYearStart, lastYearEnd);
+
+    if (lastYearExpenses.length > 0) {
+      const income = calculateTotalIncome(lastYearExpenses);
+      const expenses = calculateTotalExpenses(lastYearExpenses);
+      return {
+        annualSavings: Math.max(income - expenses, 0),
+        annualExpensesFromCashflow: expenses,
+        referenceYear: lastYear,
+        isAnnualized: false,
+      };
+    }
+
+    // Fallback: annualize current year data
+    const currentYearStart = new Date(currentYear, 0, 1);
+    const currentYearExpenses = await getExpensesByDateRange(userId, currentYearStart, now);
+
+    if (currentYearExpenses.length === 0) {
+      return { annualSavings: 0, annualExpensesFromCashflow: 0, referenceYear: currentYear, isAnnualized: true };
+    }
+
+    const income = calculateTotalIncome(currentYearExpenses);
+    const expenses = calculateTotalExpenses(currentYearExpenses);
+    const savings = income - expenses;
+
+    // Annualize: scale partial year to full year
+    const monthsElapsed = now.getMonth() + 1;
+    return {
+      annualSavings: Math.max((savings / monthsElapsed) * 12, 0),
+      annualExpensesFromCashflow: (expenses / monthsElapsed) * 12,
+      referenceYear: currentYear,
+      isAnnualized: true,
+    };
+  } catch (error) {
+    console.error('Error calculating annual cashflow data:', error);
+    return { annualSavings: 0, annualExpensesFromCashflow: 0, referenceYear: new Date().getFullYear(), isAnnualized: true };
+  }
+}
+
+/**
+ * Default scenario parameters for FIRE projections.
+ * Bear: conservative growth with higher inflation (stagflation-like).
+ * Base: historical average returns with moderate inflation.
+ * Bull: strong growth with low inflation (Goldilocks economy).
+ */
+export function getDefaultScenarios(): FIREProjectionScenarios {
+  return {
+    bear: { growthRate: 4.0, inflationRate: 3.5 },
+    base: { growthRate: 7.0, inflationRate: 2.5 },
+    bull: { growthRate: 10.0, inflationRate: 1.5 },
+  };
+}
+
+/**
+ * Project portfolio growth under three market scenarios (Bear/Base/Bull).
+ *
+ * Each scenario applies its own growth rate and inflation rate yearly.
+ * Expenses grow with each scenario's inflation, making the FIRE Number
+ * a moving target. Annual savings are added nominally (not inflation-adjusted)
+ * as a conservative assumption.
+ *
+ * Algorithm per year per scenario:
+ *   1. Apply growth:    portfolio *= (1 + growthRate)
+ *   2. Add savings:     portfolio += annualSavings
+ *   3. Inflate expenses: expenses *= (1 + inflationRate)
+ *   4. FIRE Number:     expenses / (withdrawalRate / 100)
+ *   5. Check:           portfolio >= FIRE Number → FIRE reached
+ *
+ * The chart shows base scenario's FIRE Number as single reference line.
+ */
+export function calculateFIREProjection(
+  initialNetWorth: number,
+  annualExpenses: number,
+  annualSavings: number,
+  withdrawalRate: number,
+  scenarios: FIREProjectionScenarios,
+  maxYears: number = 50
+): FIREProjectionResult {
+  const wrDecimal = withdrawalRate / 100;
+  const currentYear = new Date().getFullYear();
+
+  const yearlyData: FIREProjectionYearData[] = [];
+  let bearYearsToFIRE: number | null = null;
+  let baseYearsToFIRE: number | null = null;
+  let bullYearsToFIRE: number | null = null;
+
+  // Track portfolio and expenses per scenario independently
+  let bearNW = initialNetWorth;
+  let baseNW = initialNetWorth;
+  let bullNW = initialNetWorth;
+  let bearExpenses = annualExpenses;
+  let baseExpenses = annualExpenses;
+  let bullExpenses = annualExpenses;
+
+  for (let year = 1; year <= maxYears; year++) {
+    // Step 1: Apply market growth
+    bearNW *= (1 + scenarios.bear.growthRate / 100);
+    baseNW *= (1 + scenarios.base.growthRate / 100);
+    bullNW *= (1 + scenarios.bull.growthRate / 100);
+
+    // Step 2: Add annual savings
+    bearNW += annualSavings;
+    baseNW += annualSavings;
+    bullNW += annualSavings;
+
+    // Step 3: Inflate expenses per scenario
+    bearExpenses *= (1 + scenarios.bear.inflationRate / 100);
+    baseExpenses *= (1 + scenarios.base.inflationRate / 100);
+    bullExpenses *= (1 + scenarios.bull.inflationRate / 100);
+
+    // Step 4: Calculate FIRE Number per scenario
+    const bearFireNumber = wrDecimal > 0 ? bearExpenses / wrDecimal : 0;
+    const baseFireNumber = wrDecimal > 0 ? baseExpenses / wrDecimal : 0;
+    const bullFireNumber = wrDecimal > 0 ? bullExpenses / wrDecimal : 0;
+
+    // Step 5: Check FIRE reached
+    const bearReached = bearNW >= bearFireNumber;
+    const baseReached = baseNW >= baseFireNumber;
+    const bullReached = bullNW >= bullFireNumber;
+
+    if (bearReached && bearYearsToFIRE === null) bearYearsToFIRE = year;
+    if (baseReached && baseYearsToFIRE === null) baseYearsToFIRE = year;
+    if (bullReached && bullYearsToFIRE === null) bullYearsToFIRE = year;
+
+    yearlyData.push({
+      year,
+      calendarYear: currentYear + year,
+      bearNetWorth: Math.round(bearNW),
+      baseNetWorth: Math.round(baseNW),
+      bullNetWorth: Math.round(bullNW),
+      baseExpenses: Math.round(baseExpenses),
+      baseFireNumber: Math.round(baseFireNumber),
+      bearFireReached: bearReached,
+      baseFireReached: baseReached,
+      bullFireReached: bullReached,
+    });
+
+    // Stop early if all scenarios reached FIRE
+    if (bearYearsToFIRE !== null && baseYearsToFIRE !== null && bullYearsToFIRE !== null) {
+      // Add a few more years to show post-FIRE growth in chart
+      if (year >= Math.max(bearYearsToFIRE, baseYearsToFIRE, bullYearsToFIRE) + 5) break;
+    }
+  }
+
+  return {
+    yearlyData,
+    bearYearsToFIRE,
+    baseYearsToFIRE,
+    bullYearsToFIRE,
+    annualSavings,
+    initialNetWorth,
+    initialExpenses: annualExpenses,
+    scenarios,
+  };
 }

@@ -96,6 +96,12 @@ ALL fields in settings types must be handled in THREE places:
 - **Extended Thinking**: 10k token budget for deeper reasoning
 - **Web Search**: Multi-query with `Promise.allSettled`, top 2 per category, deduplicate by URL
 
+### Consistent Data Source Pattern
+- When multiple values must be consistent (e.g., annual savings + annual expenses for projections), fetch them from the **same data source in a single function**
+- Avoids mismatches like "expenses from current year + savings from last year"
+- **Example**: `getAnnualCashflowData()` returns both `annualSavings` and `annualExpensesFromCashflow` from the same reference year
+- **Files**: `lib/services/fireService.ts`
+
 ### Formatter Utility Duplication
 - **Gotcha**: `formatCurrency` exists in BOTH `lib/utils/formatters.ts` AND `lib/services/chartService.ts`
 - **Why**: Historical reasons - chartService is self-contained, 34 files import from it
@@ -131,7 +137,7 @@ ALL fields in settings types must be handled in THREE places:
 
 ## Key Files
 - **Utils**: `lib/utils/dateHelpers.ts`, `formatters.ts`, `assetPriceHistoryUtils.ts`
-- **Services**: `performanceService.ts`, `assetAllocationService.ts`, `currencyConversionService.ts`, `chartService.ts`, `tavilySearchService.ts`
+- **Services**: `performanceService.ts`, `assetAllocationService.ts`, `fireService.ts`, `currencyConversionService.ts`, `chartService.ts`, `tavilySearchService.ts`
 - **API Routes**: `app/api/performance/yoc/route.ts`, `app/api/ai/analyze-performance/route.ts`
 - **Components**: `CashflowSankeyChart.tsx`, `TotalHistoryTab.tsx`, `CurrentYearTab.tsx`, `MetricSection.tsx`
 - **Pages**: `app/dashboard/settings/page.tsx`, `history/page.tsx`

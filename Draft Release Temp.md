@@ -117,6 +117,22 @@
 - Extended Thinking enabled for deeper AI reasoning (10k token budget) resulting in more insightful analysis
 - Increased analysis length from 300 to 350 words to accommodate market events context
 
+### FIRE Projection Scenarios (Bear / Base / Bull)
+- Added deterministic portfolio projection under 3 market scenarios to the FIRE Calculator tab
+- Each scenario models different market growth rates and inflation rates:
+  - **Bear**: 4% growth, 3.5% inflation (stagflation-like)
+  - **Base**: 7% growth, 2.5% inflation (historical average)
+  - **Bull**: 10% growth, 1.5% inflation (Goldilocks economy)
+- Annual expenses increase with inflation year-over-year, making the FIRE Number a moving target
+- Annual savings auto-calculated from your real cashflow data (income - expenses from last complete year)
+- Interactive line chart showing 3 projected net worth paths + dashed FIRE Number reference line
+- Summary cards showing "Years to FIRE" for each scenario with projected year
+- Collapsible year-by-year table with detailed projections per scenario
+- All scenario parameters are fully customizable and can be saved for future sessions
+- "Reset to Default" button to restore original scenario values
+- Respects the "Include Primary Residence" toggle for net worth calculation
+- Complementary to Monte Carlo (stochastic): projections are deterministic for quick planning
+
 ### Average Cost Precision
 - Increased average cost per share precision from 2 to 4 decimal places (e.g., €100.1119 instead of €100.11)
 - More accurate gain/loss calculations, especially for assets with low prices or large quantities

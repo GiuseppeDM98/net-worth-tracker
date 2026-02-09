@@ -120,6 +120,7 @@ export interface AssetAllocationSettings {
   includePrimaryResidenceInFIRE?: boolean; // If true, include primary residences in FIRE calculations; if false, exclude them (FIRE standard)
   dividendIncomeCategoryId?: string; // Category ID for automatic dividend income entries
   dividendIncomeSubCategoryId?: string; // Subcategory ID for automatic dividend income entries
+  fireProjectionScenarios?: FIREProjectionScenarios; // Custom scenario parameters for FIRE projections (Bear/Base/Bull)
   targets: AssetAllocationTarget;
 }
 
@@ -321,4 +322,44 @@ export interface DoublingTimeSummary {
   averageMonths: number | null;
   totalDoublings: number;
   currentDoublingInProgress: DoublingMilestone | null;
+}
+
+// FIRE Projection Scenario Types
+// Used by the FIRE Calculator tab to project portfolio growth under different
+// market conditions (Bear/Base/Bull) with inflation-adjusted expenses.
+// Complementary to Monte Carlo (stochastic) — these are deterministic projections.
+
+export interface FIREScenarioParams {
+  growthRate: number;    // Annual market growth rate as percentage (e.g., 7.0 for 7%)
+  inflationRate: number; // Annual inflation rate as percentage (e.g., 2.5 for 2.5%)
+}
+
+export interface FIREProjectionScenarios {
+  bear: FIREScenarioParams;
+  base: FIREScenarioParams;
+  bull: FIREScenarioParams;
+}
+
+export interface FIREProjectionYearData {
+  year: number;            // Projection year number (1, 2, 3...)
+  calendarYear: number;    // Actual calendar year (2026, 2027...)
+  bearNetWorth: number;
+  baseNetWorth: number;
+  bullNetWorth: number;
+  baseExpenses: number;    // Annual expenses inflated with base scenario inflation
+  baseFireNumber: number;  // FIRE Number = expenses / (withdrawalRate / 100)
+  bearFireReached: boolean;
+  baseFireReached: boolean;
+  bullFireReached: boolean;
+}
+
+export interface FIREProjectionResult {
+  yearlyData: FIREProjectionYearData[];
+  bearYearsToFIRE: number | null;  // null = not reached within projection horizon
+  baseYearsToFIRE: number | null;
+  bullYearsToFIRE: number | null;
+  annualSavings: number;
+  initialNetWorth: number;
+  initialExpenses: number;
+  scenarios: FIREProjectionScenarios;
 }

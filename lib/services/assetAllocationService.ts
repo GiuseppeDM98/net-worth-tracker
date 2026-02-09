@@ -34,6 +34,7 @@ export async function getSettings(
       includePrimaryResidenceInFIRE: data.includePrimaryResidenceInFIRE,
       dividendIncomeCategoryId: data.dividendIncomeCategoryId,
       dividendIncomeSubCategoryId: data.dividendIncomeSubCategoryId,
+      fireProjectionScenarios: data.fireProjectionScenarios,
       targets: data.targets as AssetAllocationTarget,
     };
   } catch (error) {
@@ -103,6 +104,9 @@ export async function setSettings(
       if (settings.dividendIncomeSubCategoryId !== undefined) {
         docData.dividendIncomeSubCategoryId = settings.dividendIncomeSubCategoryId;
       }
+      if (settings.fireProjectionScenarios !== undefined) {
+        docData.fireProjectionScenarios = settings.fireProjectionScenarios;
+      }
 
       // Use setDoc WITHOUT merge to completely replace targets
       await setDoc(targetRef, docData);
@@ -133,6 +137,9 @@ export async function setSettings(
       }
       if (settings.dividendIncomeSubCategoryId !== undefined) {
         docData.dividendIncomeSubCategoryId = settings.dividendIncomeSubCategoryId;
+      }
+      if (settings.fireProjectionScenarios !== undefined) {
+        docData.fireProjectionScenarios = settings.fireProjectionScenarios;
       }
 
       // Use merge: true to preserve existing fields

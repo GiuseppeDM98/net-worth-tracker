@@ -270,6 +270,14 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
 - **Monthly/Annual/Daily allowance** calculations
 - **Years of expenses** coverage tracker
 - **Historical evolution** charts of income, expenses, and sustainable withdrawal
+- **Projection Scenarios (Bear / Base / Bull)**: Deterministic portfolio projections under 3 market scenarios
+  - Customizable growth rates and inflation rates per scenario
+  - Inflation-adjusted expenses make the FIRE Number a moving target over time
+  - Annual savings auto-calculated from real cashflow data
+  - Interactive line chart with 3 projected paths + FIRE Number reference line
+  - Summary cards showing "Years to FIRE" per scenario
+  - Collapsible year-by-year detail table
+  - Parameters saveable to user settings
 
 ### 🎲 **Monte Carlo Retirement Simulations**
 - **Probabilistic retirement planning** with thousands of simulations
@@ -1184,6 +1192,8 @@ Click **"ROLLING_12M"** to see performance consistency:
    - Years of Expenses remaining
 5. Compare current vs planned scenarios
 6. Track progress month-over-month with historical chart
+7. Scroll down to **"Proiezione Scenari"** to see projected years to FIRE under Bear/Base/Bull scenarios
+8. Customize scenario parameters (growth rate, inflation) and save
 
 ### Tracking Cost Basis and Taxes
 
