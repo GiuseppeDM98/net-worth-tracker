@@ -131,6 +131,18 @@ ALL fields in settings types must be handled in THREE places:
 - `buildParamsFromScenario(baseParams, scenario)` spreads base + overrides market fields from scenario
 - **Files**: `lib/services/monteCarloService.ts`
 
+### Unit Testing with Vitest
+- **Config**: `vitest.config.ts` with `@/` path alias, tests in `__tests__/*.test.ts`
+- **Run**: `npm test` (single run), `npm run test:watch` (watch mode)
+- **Firebase mock**: Services import Firebase transitively → mock dependent modules before importing:
+  ```ts
+  vi.mock('@/lib/services/expenseService', () => ({}))
+  vi.mock('@/lib/services/snapshotService', () => ({}))
+  vi.mock('@/lib/services/assetAllocationService', () => ({}))
+  ```
+- **Scope**: Only test pure functions (no Firebase/API calls). Async functions that hit Firestore are NOT unit-tested.
+- **Intl locale**: Node.js small ICU may not format Italian locale correctly → use regex assertions for `Intl.NumberFormat` output (e.g., `/1[.,]?234/` instead of exact `'1.234'`)
+
 ---
 
 ## Common Errors to Avoid
