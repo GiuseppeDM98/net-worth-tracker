@@ -5,6 +5,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss)
 ![Firebase](https://img.shields.io/badge/Firebase-12-FFCA28?logo=firebase)
+![Vitest](https://img.shields.io/badge/Vitest-4-6E9F18?logo=vitest)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue)
 
 ## Description
@@ -151,16 +152,19 @@ See [`.env.local.example`](.env.local.example) for detailed comments on each var
 | Forms | react-hook-form, zod | Form handling and validation |
 | Dates | date-fns, date-fns-tz | Timezone-aware date operations |
 | Scraping | cheerio | Borsa Italiana dividend data |
+| Testing | Vitest | Unit testing (117 tests) |
 
 ## Development
 
 ### Commands
 
 ```bash
-npm run dev      # Start dev server with hot-reload
-npm run build    # Production build
-npm run start    # Start production server
-npm run lint     # Run ESLint
+npm run dev        # Start dev server with hot-reload
+npm run build      # Production build
+npm run start      # Start production server
+npm run lint       # Run ESLint
+npm test           # Run unit tests (single run)
+npm run test:watch # Run tests in watch mode
 ```
 
 ### Conventions

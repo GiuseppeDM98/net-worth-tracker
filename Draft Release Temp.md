@@ -174,3 +174,4 @@
 
 - Fixed snapshot ID format inconsistency in database to use standardized format without zero-padding
 - Added migration tooling for database maintenance scripts
+- Added unit testing infrastructure with Vitest (117 tests covering formatters, date helpers, FIRE calculations, and performance metrics)

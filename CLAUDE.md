@@ -4,8 +4,8 @@
 Net Worth Tracker is a Next.js app for Italian investors to track net worth, assets, cashflow, dividends, performance metrics, and historical snapshots with Firebase.
 
 ## Current Status
-- Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk
-- Ultima implementazione: Monte Carlo auto-fill allocazione da portafoglio reale (2026-02-10)
+- Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk
+- Ultima implementazione: Unit testing infrastructure con Vitest (2026-02-10)
 - In corso ora: nessuna attivita attiva
 
 ## Architecture Snapshot
@@ -31,6 +31,12 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - **Auto-fill allocazione** da portafoglio reale: le 4 classi MC vengono estratte dall'allocazione corrente e normalizzate a 100% (crypto e cash escluse). Fallback 60/40/0/0 se nessuna delle 4 classi presente.
 - PDF Export con 8 sezioni configurabili (Performance solo in export annuali/totali).
 - **AI Performance Analysis**: Claude Sonnet 4.5 con SSE streaming, Extended Thinking, Web Search (Tavily).
+
+## Testing
+- **Framework**: Vitest (`npm test`, `npm run test:watch`)
+- **117 unit test** across 5 files in `__tests__/` covering formatters, dateHelpers, fireService, performanceService
+- **Scope**: Pure functions only (no Firebase mocking). Services need `vi.mock()` on Firebase-dependent imports.
+- **Config**: `vitest.config.ts` with `@/` path alias
 
 ## Data & Integrations
 - Firestore (client + admin) con merge updates.
@@ -62,5 +68,6 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Utils: `lib/utils/dateHelpers.ts`, `formatters.ts`, `assetPriceHistoryUtils.ts`
 - Auth: `lib/utils/authHelpers.ts`, `contexts/AuthContext.tsx`
 - PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`
+- Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`
 
 **Last updated**: 2026-02-10
