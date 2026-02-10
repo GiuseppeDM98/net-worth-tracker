@@ -11,14 +11,13 @@
 
 Net Worth Tracker is a full-featured personal finance application built for Italian investors. It provides comprehensive portfolio tracking, performance analytics, cashflow management, dividend monitoring, and long-term financial planning tools — all in a single dashboard.
 
-The app integrates with Yahoo Finance for real-time price updates, supports multi-currency portfolios with automatic EUR conversion, and includes advanced features like Monte Carlo simulations, FIRE (Financial Independence, Retire Early) projections, and AI-powered performance analysis via Claude. The UI is in Italian while the codebase follows English conventions.
+The app integrates with Yahoo Finance for real-time price updates and includes advanced features like Monte Carlo simulations, FIRE (Financial Independence, Retire Early) projections, and AI-powered performance analysis via Claude. The UI is in Italian while the codebase follows English conventions.
 
 ## Key Features
 
 ### Portfolio Management
 - Multi-asset tracking across stocks, ETFs, bonds, crypto, real estate, commodities, and cash
 - Automatic price updates via Yahoo Finance
-- Multi-currency support with automatic EUR conversion (Frankfurter API)
 - Average cost tracking with 4-decimal precision
 - Current vs target asset allocation visualization
 
@@ -68,7 +67,7 @@ The app integrates with Yahoo Finance for real-time price updates, supports mult
 
 ```bash
 # Clone the repository
-git clone https://github.com/GianmarcoDIAG/net-worth-tracker.git
+git clone https://github.com/GiuseppeDM98/net-worth-tracker.git
 cd net-worth-tracker
 
 # Install dependencies
