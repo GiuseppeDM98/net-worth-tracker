@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk
-- Ultima implementazione: FIRE Projection per-scenario FIRE Numbers + stop savings on FIRE (2026-02-09)
+- Ultima implementazione: Monte Carlo auto-fill allocazione da portafoglio reale (2026-02-10)
 - In corso ora: nessuna attivita attiva
 
 ## Architecture Snapshot
@@ -28,7 +28,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Monte Carlo simulations con 4 asset class (Equity, Bonds, Immobili, Materie Prime) e parametri editabili.
   - **Confronto Scenari**: modalità Bear/Base/Bull con parametri per-scenario (rendimenti, volatilità, inflazione)
   - Toggle "Simulazione Singola" / "Confronto Scenari", overlay chart, 3 distribution charts, tabella comparativa
-  - Default allocazione 60/40/0/0 per backward compatibility
+  - **Auto-fill allocazione** da portafoglio reale: le 4 classi MC vengono estratte dall'allocazione corrente e normalizzate a 100% (crypto e cash escluse). Fallback 60/40/0/0 se nessuna delle 4 classi presente.
 - PDF Export con 8 sezioni configurabili (Performance solo in export annuali/totali).
 - **AI Performance Analysis**: Claude Sonnet 4.5 con SSE streaming, Extended Thinking, Web Search (Tavily).
 
@@ -63,4 +63,4 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Auth: `lib/utils/authHelpers.ts`, `contexts/AuthContext.tsx`
 - PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`
 
-**Last updated**: 2026-02-09
+**Last updated**: 2026-02-10

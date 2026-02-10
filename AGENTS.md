@@ -114,6 +114,13 @@ ALL fields in settings types must be handled in THREE places:
 - **Solution**: Independent fields + "Rimanente: X%" badge with error if sum ≠ 100%
 - **Files**: `components/monte-carlo/ParametersForm.tsx`
 
+### ParametersForm Local State Sync
+- `ParametersForm` uses local `useState<string>` for each input to allow partial typing (e.g., "7." before "7.5")
+- Local state initializes from `params` at mount but does NOT auto-sync on prop changes
+- **Any field that can be updated asynchronously by the parent** (e.g., auto-fill from portfolio) needs a `useEffect` to sync local state
+- Pattern already exists for `initialPortfolio` (riga 82-86) — replicate for any new auto-filled field
+- **Files**: `components/monte-carlo/ParametersForm.tsx`
+
 ### Scenario Mode hideMarketParams Pattern
 - When a form has fields also present in per-scenario cards, add `hideMarketParams?: boolean` prop
 - In scenario mode, market params are edited in scenario cards → hide them from the base form to avoid duplicated/conflicting inputs
@@ -162,4 +169,4 @@ ALL fields in settings types must be handled in THREE places:
 - **Components**: `CashflowSankeyChart.tsx`, `TotalHistoryTab.tsx`, `CurrentYearTab.tsx`, `MetricSection.tsx`
 - **Pages**: `app/dashboard/settings/page.tsx`, `history/page.tsx`
 
-**Last updated**: 2026-02-09
+**Last updated**: 2026-02-10

@@ -85,6 +85,14 @@ export function ParametersForm({
     );
   }, [params.initialPortfolio]);
 
+  // Sync allocation inputs when params change (e.g., auto-filled from real portfolio)
+  useEffect(() => {
+    setEquityInput(params.equityPercentage.toString());
+    setBondsInput(params.bondsPercentage.toString());
+    setRealEstateInput(params.realEstatePercentage.toString());
+    setCommoditiesInput(params.commoditiesPercentage.toString());
+  }, [params.equityPercentage, params.bondsPercentage, params.realEstatePercentage, params.commoditiesPercentage]);
+
   /**
    * Generic helper to update a single parameter and trigger parent callback.
    * Uses TypeScript generics to ensure type safety for all parameter keys.

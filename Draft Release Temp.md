@@ -93,6 +93,13 @@
 
 ## 🔧 Improvements
 
+### Monte Carlo Smart Asset Allocation
+- Monte Carlo simulation now auto-populates asset allocation from your real portfolio instead of defaulting to 60/40/0/0
+- Allocation is derived from actual portfolio holdings across the 4 simulation asset classes (Equity, Bonds, Real Estate, Commodities)
+- Crypto and cash holdings are excluded and the remaining classes are normalized to 100%
+- Falls back to the classic 60/40/0/0 if none of the 4 classes are in your portfolio
+- You can still manually adjust the percentages after auto-fill
+
 ### Monte Carlo Simulation Simplification
 - Removed unreliable "Use personal historical data" toggle that produced inflated return estimates (e.g., 69% equity returns instead of realistic 7%)
 - Monte Carlo simulation now uses editable market defaults (Equity 7%/18%, Bonds 3%/6%) as the standard for FIRE planning

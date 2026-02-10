@@ -21,7 +21,7 @@ import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAllAssets, calculateTotalValue, calculateLiquidNetWorth } from '@/lib/services/assetService';
-import { getSettings, setSettings, getDefaultTargets } from '@/lib/services/assetAllocationService';
+import { getSettings, setSettings, getDefaultTargets, calculateCurrentAllocation } from '@/lib/services/assetAllocationService';
 import {
   runMonteCarloSimulation,
   getDefaultMarketParameters,
@@ -114,23 +114,54 @@ export function MonteCarloTab() {
   });
 
   /**
-   * Auto-fill portfolio value and withdrawal from user data.
-   * Both values come from async queries that may not be loaded on mount.
+   * Auto-fill portfolio value, withdrawal, and asset allocation from user data.
+   * Allocation is derived from real portfolio proportions, normalized to 100%
+   * across the 4 MC asset classes (excluding crypto and cash).
    */
   useEffect(() => {
-    if (totalNetWorth > 0 && settings) {
-      setParams((prev) => ({
-        ...prev,
-        initialPortfolio: totalNetWorth,
-        annualWithdrawal: settings.plannedAnnualExpenses || 30000,
-      }));
-    } else if (totalNetWorth > 0) {
-      setParams((prev) => ({
-        ...prev,
-        initialPortfolio: totalNetWorth,
-      }));
+    if (totalNetWorth > 0) {
+      setParams((prev) => {
+        const updates: Partial<MonteCarloParams> = {
+          initialPortfolio: totalNetWorth,
+        };
+
+        if (settings) {
+          updates.annualWithdrawal = settings.plannedAnnualExpenses || 30000;
+        }
+
+        // Derive allocation from real portfolio, filtering to the 4 MC classes
+        if (assets && assets.length > 0) {
+          const { byAssetClass } = calculateCurrentAllocation(assets);
+          const equity = byAssetClass['equity'] || 0;
+          const bonds = byAssetClass['bonds'] || 0;
+          const realEstate = byAssetClass['realestate'] || 0;
+          const commodities = byAssetClass['commodity'] || 0;
+          const total = equity + bonds + realEstate + commodities;
+
+          if (total > 0) {
+            // Sort by value descending so rounding residual goes to smallest class
+            const classes = [
+              { key: 'equityPercentage' as const, value: equity },
+              { key: 'bondsPercentage' as const, value: bonds },
+              { key: 'realEstatePercentage' as const, value: realEstate },
+              { key: 'commoditiesPercentage' as const, value: commodities },
+            ].sort((a, b) => b.value - a.value);
+
+            // Round first 3, compute last as remainder to guarantee sum = 100
+            let allocated = 0;
+            for (let i = 0; i < classes.length - 1; i++) {
+              const pct = Math.round((classes[i].value / total) * 100);
+              updates[classes[i].key] = pct;
+              allocated += pct;
+            }
+            updates[classes[classes.length - 1].key] = 100 - allocated;
+          }
+        }
+
+        return { ...prev, ...updates };
+      });
     }
-  }, [totalNetWorth, settings]);
+  }, [totalNetWorth, settings, assets]);
 
   // Sync scenario params from Firestore when settings load
   useEffect(() => {

@@ -291,6 +291,7 @@ Built with Next.js, Firebase, and TypeScript. Designed to replace spreadsheet-ba
   - Distribution histogram of final portfolio values
   - Failure analysis with median and average depletion years
 - **Configurable parameters**: Retirement duration, asset allocation, withdrawal rates, inflation
+- **Smart asset allocation**: Auto-populates allocation from your real portfolio (Equity, Bonds, Real Estate, Commodities), normalized to 100% excluding crypto and cash
 - **Automatic data integration**: Pre-populates with your current portfolio and expense data
 
 ### 🏆 **Hall of Fame Rankings**
@@ -1565,7 +1566,7 @@ See the [LICENSE](./LICENSE) file for the full license text.
   - Distinction between "regime amministrato" (broker-managed) vs "regime dichiarativo" (self-reported) tax regimes
   - Country-specific tax rates for international portfolios
   - Note: Manual dividend entry already allows tax rate editing; this enhancement would extend configurability to automatic scraping
-- 🔜 Monte Carlo: Expand asset allocation to include all asset classes (Equity, Bonds, Commodities, Cryptocurrencies, Real Estate, Cash) with configurable percentages
+- 🔜 Monte Carlo: Expand simulation to include all 6 asset classes (currently 4: Equity, Bonds, Real Estate, Commodities; missing: Crypto, Cash)
 - 🔜 Dummy snapshot generator: Add Commodity asset class generation (currently set to 0%) to match all available asset classes
 
 ### Long-term Vision (Future 🚀)
