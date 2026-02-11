@@ -981,3 +981,155 @@ export async function reassignExpensesSubCategory(
     throw new Error('Failed to reassign expenses subcategory');
   }
 }
+
+/**
+ * Check if a cross-type move requires flipping the amount sign.
+ *
+ * Sign convention: income = positive, expenses (fixed/variable/debt) = negative.
+ * When moving between income ↔ expense types, the amount must be flipped.
+ */
+function needsSignFlip(oldType: ExpenseType, newType: ExpenseType): boolean {
+  const isOldIncome = oldType === 'income';
+  const isNewIncome = newType === 'income';
+  return isOldIncome !== isNewIncome;
+}
+
+/**
+ * Move all expenses from one category to another, updating type for cross-type moves.
+ *
+ * Unlike reassignExpensesCategory (used during deletion), this preserves the source
+ * category and also updates the expense `type` field to match the destination category.
+ * When moving between income ↔ expense types, flips the amount sign to maintain
+ * the sign convention (income = positive, expenses = negative).
+ */
+export async function moveExpensesToCategory(
+  oldCategoryId: string,
+  oldType: ExpenseType,
+  newCategoryId: string,
+  newCategoryName: string,
+  newType: ExpenseType,
+  userId: string,
+  newSubCategoryId?: string,
+  newSubCategoryName?: string
+): Promise<number> {
+  try {
+    const expensesRef = collection(db, EXPENSES_COLLECTION);
+    const q = query(
+      expensesRef,
+      where('userId', '==', userId),
+      where('categoryId', '==', oldCategoryId)
+    );
+
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+      return 0;
+    }
+
+    const flipSign = needsSignFlip(oldType, newType);
+    const batch = writeBatch(db);
+    let count = 0;
+
+    querySnapshot.docs.forEach(docSnapshot => {
+      const updates: any = {
+        categoryId: newCategoryId,
+        categoryName: newCategoryName,
+        type: newType,
+        updatedAt: Timestamp.now(),
+      };
+
+      // Flip amount sign when crossing income ↔ expense boundary
+      if (flipSign) {
+        const currentAmount = docSnapshot.data().amount;
+        updates.amount = -currentAmount;
+      }
+
+      if (newSubCategoryId && newSubCategoryName) {
+        updates.subCategoryId = newSubCategoryId;
+        updates.subCategoryName = newSubCategoryName;
+      } else {
+        updates.subCategoryId = null;
+        updates.subCategoryName = null;
+      }
+
+      batch.update(docSnapshot.ref, removeUndefinedFields(updates));
+      count++;
+    });
+
+    await batch.commit();
+    return count;
+  } catch (error) {
+    console.error('Error moving expenses to category:', error);
+    throw new Error('Failed to move expenses to category');
+  }
+}
+
+/**
+ * Move all expenses from a specific subcategory to another category/subcategory.
+ *
+ * Supports cross-category and cross-type moves. Source subcategory is preserved.
+ * When moving between income ↔ expense types, flips the amount sign.
+ */
+export async function moveExpensesFromSubCategory(
+  oldCategoryId: string,
+  oldSubCategoryId: string,
+  oldType: ExpenseType,
+  newCategoryId: string,
+  newCategoryName: string,
+  newType: ExpenseType,
+  userId: string,
+  newSubCategoryId?: string,
+  newSubCategoryName?: string
+): Promise<number> {
+  try {
+    const expensesRef = collection(db, EXPENSES_COLLECTION);
+    const q = query(
+      expensesRef,
+      where('userId', '==', userId),
+      where('categoryId', '==', oldCategoryId),
+      where('subCategoryId', '==', oldSubCategoryId)
+    );
+
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+      return 0;
+    }
+
+    const flipSign = needsSignFlip(oldType, newType);
+    const batch = writeBatch(db);
+    let count = 0;
+
+    querySnapshot.docs.forEach(docSnapshot => {
+      const updates: any = {
+        categoryId: newCategoryId,
+        categoryName: newCategoryName,
+        type: newType,
+        updatedAt: Timestamp.now(),
+      };
+
+      // Flip amount sign when crossing income ↔ expense boundary
+      if (flipSign) {
+        const currentAmount = docSnapshot.data().amount;
+        updates.amount = -currentAmount;
+      }
+
+      if (newSubCategoryId && newSubCategoryName) {
+        updates.subCategoryId = newSubCategoryId;
+        updates.subCategoryName = newSubCategoryName;
+      } else {
+        updates.subCategoryId = null;
+        updates.subCategoryName = null;
+      }
+
+      batch.update(docSnapshot.ref, removeUndefinedFields(updates));
+      count++;
+    });
+
+    await batch.commit();
+    return count;
+  } catch (error) {
+    console.error('Error moving expenses from subcategory:', error);
+    throw new Error('Failed to move expenses from subcategory');
+  }
+}

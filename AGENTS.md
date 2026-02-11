@@ -33,6 +33,7 @@ End date must include full day: `new Date(year, month, 0, 23, 59, 59, 999)`
 ### Expense Amount Sign Convention
 - **Income**: POSITIVE, **Expenses**: NEGATIVE in database
 - **Net Savings**: `sum(income) + sum(expenses)` (NOT subtraction)
+- **Cross-type move**: When moving expenses between income ↔ expense types, flip the amount sign. Helper `needsSignFlip()` in `expenseService.ts`
 
 ### Cashflow Tab Pattern (Parallel Siblings)
 - CurrentYearTab and TotalHistoryTab are parallel siblings with independent state
@@ -131,6 +132,18 @@ ALL fields in settings types must be handled in THREE places:
 - `buildParamsFromScenario(baseParams, scenario)` spreads base + overrides market fields from scenario
 - **Files**: `lib/services/monteCarloService.ts`
 
+### Category/Expense Move vs Reassign
+- **`reassignExpenses*`**: Used during category **deletion** — does NOT update `type` field
+- **`moveExpenses*`**: Used for standalone **move** — updates `type` field + flips amount sign on cross-type
+- Both use `writeBatch` for atomic updates. Keep them separate (different use cases, different guarantees)
+- **Files**: `lib/services/expenseService.ts`, `components/expenses/CategoryMoveDialog.tsx`
+
+### Dialog useEffect Reset Pattern
+- When a dialog fetches data that updates a memoized list (e.g., inline category creation → `localCategories` → `availableCategories`), do NOT include that list in the reset `useEffect` deps
+- Split into two effects: one resets on `[open]`, another auto-selects only if no current selection (`!selectedId`)
+- **Why**: Otherwise the reset effect fires after data changes and wipes user selections
+- **Files**: `components/expenses/CategoryMoveDialog.tsx`, `CategoryDeleteConfirmDialog.tsx`
+
 ### Unit Testing with Vitest
 - **Config**: `vitest.config.ts` with `@/` path alias, tests in `__tests__/*.test.ts`
 - **Run**: `npm test` (single run), `npm run test:watch` (watch mode)
@@ -179,6 +192,7 @@ ALL fields in settings types must be handled in THREE places:
 - **Services**: `performanceService.ts`, `assetAllocationService.ts`, `fireService.ts`, `currencyConversionService.ts`, `chartService.ts`, `tavilySearchService.ts`
 - **API Routes**: `app/api/performance/yoc/route.ts`, `app/api/ai/analyze-performance/route.ts`
 - **Components**: `CashflowSankeyChart.tsx`, `TotalHistoryTab.tsx`, `CurrentYearTab.tsx`, `MetricSection.tsx`
+- **Expenses**: `CategoryMoveDialog.tsx`, `CategoryDeleteConfirmDialog.tsx`, `CategoryManagementDialog.tsx`
 - **Pages**: `app/dashboard/settings/page.tsx`, `history/page.tsx`
 
-**Last updated**: 2026-02-10
+**Last updated**: 2026-02-11

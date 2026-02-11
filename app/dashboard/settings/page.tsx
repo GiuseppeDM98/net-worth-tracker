@@ -51,14 +51,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Save, RotateCcw, Plus, Trash2, ChevronDown, ChevronUp, Edit, Receipt, FlaskConical, Coins } from 'lucide-react';
+import { Save, RotateCcw, Plus, Trash2, ChevronDown, ChevronUp, Edit, Receipt, FlaskConical, Coins, ArrowRightLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { ExpenseCategory, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { getAllCategories, deleteCategory, getCategoryById } from '@/lib/services/expenseCategoryService';
-import { getExpenseCountByCategoryId, reassignExpensesCategory, clearExpensesCategoryAssignment } from '@/lib/services/expenseService';
+import { getExpenseCountByCategoryId, reassignExpensesCategory, clearExpensesCategoryAssignment, moveExpensesToCategory } from '@/lib/services/expenseService';
 import { CategoryManagementDialog } from '@/components/expenses/CategoryManagementDialog';
 import { CategoryDeleteConfirmDialog } from '@/components/expenses/CategoryDeleteConfirmDialog';
+import { CategoryMoveDialog } from '@/components/expenses/CategoryMoveDialog';
 import { CreateDummySnapshotModal } from '@/components/CreateDummySnapshotModal';
 import { DeleteDummyDataDialog } from '@/components/DeleteDummyDataDialog';
 
@@ -136,6 +137,11 @@ export default function SettingsPage() {
   const [deleteConfirmDialogOpen, setDeleteConfirmDialogOpen] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<ExpenseCategory | null>(null);
   const [expenseCountToReassign, setExpenseCountToReassign] = useState(0);
+
+  // Move dialog state
+  const [moveCategoryDialogOpen, setMoveCategoryDialogOpen] = useState(false);
+  const [categoryToMove, setCategoryToMove] = useState<ExpenseCategory | null>(null);
+  const [expenseCountToMove, setExpenseCountToMove] = useState(0);
 
   // Dividend settings state
   const [dividendIncomeCategoryId, setDividendIncomeCategoryId] = useState<string>('');
@@ -464,6 +470,81 @@ export default function SettingsPage() {
     } catch (error) {
       console.error('Error during reassignment and deletion:', error);
       toast.error('Errore durante la riassegnazione delle spese');
+    }
+  };
+
+  // ========== Move Category Handlers ==========
+
+  const handleMoveExpenseCategory = async (categoryId: string, categoryName: string) => {
+    if (!user) return;
+
+    try {
+      const expenseCount = await getExpenseCountByCategoryId(categoryId, user.uid);
+
+      if (expenseCount === 0) {
+        toast.warning(`La categoria "${categoryName}" non ha transazioni da spostare`);
+        return;
+      }
+
+      const category = await getCategoryById(categoryId);
+      if (category) {
+        setCategoryToMove(category);
+        setExpenseCountToMove(expenseCount);
+        setMoveCategoryDialogOpen(true);
+      }
+    } catch (error) {
+      console.error('Error checking category expenses:', error);
+      toast.error('Errore nel controllo delle transazioni');
+    }
+  };
+
+  const handleConfirmMoveCategory = async (
+    newCategoryId: string,
+    newSubCategoryId?: string
+  ) => {
+    if (!categoryToMove || !user) return;
+
+    try {
+      const newCategory = await getCategoryById(newCategoryId);
+      if (!newCategory) {
+        toast.error('Categoria di destinazione non trovata');
+        return;
+      }
+
+      // Resolve subcategory name if provided
+      let newSubCategoryName: string | undefined;
+      if (newSubCategoryId && newSubCategoryId !== '__none__') {
+        const newSubCategory = newCategory.subCategories.find(
+          sub => sub.id === newSubCategoryId
+        );
+        newSubCategoryName = newSubCategory?.name;
+      } else {
+        // Sentinel value or no subcategory selected
+        newSubCategoryId = undefined;
+      }
+
+      const movedCount = await moveExpensesToCategory(
+        categoryToMove.id,
+        categoryToMove.type,
+        newCategoryId,
+        newCategory.name,
+        newCategory.type,
+        user.uid,
+        newSubCategoryId,
+        newSubCategoryName
+      );
+
+      toast.success(
+        `${movedCount} ${movedCount === 1 ? 'transazione spostata' : 'transazioni spostate'} da "${categoryToMove.name}" a "${newCategory.name}"`
+      );
+
+      // Reset state — source category is NOT deleted
+      setMoveCategoryDialogOpen(false);
+      setCategoryToMove(null);
+      setExpenseCountToMove(0);
+    } catch (error) {
+      console.error('Error during category move:', error);
+      toast.error('Errore nello spostamento delle transazioni');
     }
   };
 
@@ -1592,6 +1673,14 @@ export default function SettingsPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                onClick={() => handleMoveExpenseCategory(category.id, category.name)}
+                                title="Sposta tutte le transazioni"
+                              >
+                                <ArrowRightLeft className="h-4 w-4 text-blue-500" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => handleDeleteExpenseCategory(category.id, category.name)}
                               >
                                 <Trash2 className="h-4 w-4 text-red-500" />
@@ -1805,6 +1894,22 @@ export default function SettingsPage() {
           onConfirm={handleConfirmDeleteWithReassignment}
           categoryToDelete={categoryToDelete}
           expenseCount={expenseCountToReassign}
+          allCategories={expenseCategories}
+        />
+      )}
+
+      {/* Category Move Dialog */}
+      {categoryToMove && (
+        <CategoryMoveDialog
+          open={moveCategoryDialogOpen}
+          onClose={() => {
+            setMoveCategoryDialogOpen(false);
+            setCategoryToMove(null);
+            setExpenseCountToMove(0);
+          }}
+          onConfirm={handleConfirmMoveCategory}
+          sourceCategory={categoryToMove}
+          expenseCount={expenseCountToMove}
           allCategories={expenseCategories}
         />
       )}

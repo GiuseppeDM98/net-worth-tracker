@@ -46,6 +46,7 @@ import {
 import {
   createCategory,
   updateCategory,
+  getAllCategories,
 } from '@/lib/services/expenseCategoryService';
 import {
   getExpenseCountBySubCategoryId,
@@ -69,7 +70,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, ArrowRightLeft } from 'lucide-react';
+import { CategoryMoveDialog } from './CategoryMoveDialog';
+import { moveExpensesFromSubCategory } from '@/lib/services/expenseService';
 
 /**
  * Teacher Comment: Zod Schema with Custom Refinement
@@ -135,6 +138,12 @@ export function CategoryManagementDialog({
   const [deleteSubCategoryDialogOpen, setDeleteSubCategoryDialogOpen] = useState(false);
   const [subCategoryToDelete, setSubCategoryToDelete] = useState<ExpenseSubCategory | null>(null);
   const [subCategoryExpenseCount, setSubCategoryExpenseCount] = useState(0);
+
+  // Subcategory move state
+  const [moveSubCategoryDialogOpen, setMoveSubCategoryDialogOpen] = useState(false);
+  const [subCategoryToMove, setSubCategoryToMove] = useState<ExpenseSubCategory | null>(null);
+  const [subCategoryMoveExpenseCount, setSubCategoryMoveExpenseCount] = useState(0);
+  const [allCategoriesForMove, setAllCategoriesForMove] = useState<ExpenseCategory[]>([]);
 
   const {
     register,
@@ -276,6 +285,88 @@ export function CategoryManagementDialog({
     }
   };
 
+  // ========== Subcategory Move Handlers ==========
+
+  const handleMoveSubCategory = async (subCategoryId: string) => {
+    if (!category || !user) return;
+
+    try {
+      const expenseCount = await getExpenseCountBySubCategoryId(category.id, subCategoryId, user.uid);
+
+      if (expenseCount === 0) {
+        const subCat = subCategories.find(sub => sub.id === subCategoryId);
+        toast.warning(`La sotto-categoria "${subCat?.name}" non ha transazioni da spostare`);
+        return;
+      }
+
+      // Fetch all categories for the move dialog destination options
+      const categories = await getAllCategories(user.uid);
+
+      const subCat = subCategories.find(sub => sub.id === subCategoryId);
+      if (subCat) {
+        setSubCategoryToMove(subCat);
+        setSubCategoryMoveExpenseCount(expenseCount);
+        setAllCategoriesForMove(categories);
+        setMoveSubCategoryDialogOpen(true);
+      }
+    } catch (error) {
+      console.error('Error checking subcategory expenses:', error);
+      toast.error('Errore nel controllo delle transazioni');
+    }
+  };
+
+  const handleConfirmMoveSubCategory = async (
+    newCategoryId: string,
+    newSubCategoryId?: string
+  ) => {
+    if (!category || !subCategoryToMove || !user) return;
+
+    try {
+      const newCategory = allCategoriesForMove.find(cat => cat.id === newCategoryId);
+      if (!newCategory) {
+        toast.error('Categoria di destinazione non trovata');
+        return;
+      }
+
+      // Resolve subcategory name
+      let newSubCategoryName: string | undefined;
+      if (newSubCategoryId && newSubCategoryId !== '__none__') {
+        const newSubCat = newCategory.subCategories.find(sub => sub.id === newSubCategoryId);
+        newSubCategoryName = newSubCat?.name;
+      } else {
+        newSubCategoryId = undefined;
+      }
+
+      const movedCount = await moveExpensesFromSubCategory(
+        category.id,
+        subCategoryToMove.id,
+        category.type,
+        newCategoryId,
+        newCategory.name,
+        newCategory.type,
+        user.uid,
+        newSubCategoryId,
+        newSubCategoryName
+      );
+
+      const destLabel = newSubCategoryName
+        ? `${newCategory.name} → ${newSubCategoryName}`
+        : newCategory.name;
+
+      toast.success(
+        `${movedCount} ${movedCount === 1 ? 'transazione spostata' : 'transazioni spostate'} da "${category.name} → ${subCategoryToMove.name}" a "${destLabel}"`
+      );
+
+      // Reset state — source subcategory is NOT deleted
+      setMoveSubCategoryDialogOpen(false);
+      setSubCategoryToMove(null);
+      setSubCategoryMoveExpenseCount(0);
+    } catch (error) {
+      console.error('Error moving subcategory expenses:', error);
+      toast.error('Errore nello spostamento delle transazioni');
+    }
+  };
+
   const onSubmit = async (data: CategoryFormValues) => {
     if (!user) {
       toast.error('Devi essere autenticato');
@@ -408,14 +499,28 @@ export function CategoryManagementDialog({
                       className="flex items-center justify-between p-2 bg-muted rounded-md"
                     >
                       <span className="text-sm">{subCategory.name}</span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveSubCategory(subCategory.id)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        {/* Only show move button when editing an existing category */}
+                        {category && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleMoveSubCategory(subCategory.id)}
+                            title="Sposta transazioni"
+                          >
+                            <ArrowRightLeft className="h-3.5 w-3.5 text-blue-500" />
+                          </Button>
+                        )}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveSubCategory(subCategory.id)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -484,6 +589,23 @@ export function CategoryManagementDialog({
           expenseCount={subCategoryExpenseCount}
           allCategories={[category]} // Only allow reassignment within same category for subcategories
           subCategoryToDelete={subCategoryToDelete}
+        />
+      )}
+
+      {/* Subcategory Move Dialog */}
+      {category && subCategoryToMove && (
+        <CategoryMoveDialog
+          open={moveSubCategoryDialogOpen}
+          onClose={() => {
+            setMoveSubCategoryDialogOpen(false);
+            setSubCategoryToMove(null);
+            setSubCategoryMoveExpenseCount(0);
+          }}
+          onConfirm={handleConfirmMoveSubCategory}
+          sourceCategory={category}
+          sourceSubCategory={subCategoryToMove}
+          expenseCount={subCategoryMoveExpenseCount}
+          allCategories={allCategoriesForMove}
         />
       )}
     </Dialog>

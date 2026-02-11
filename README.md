@@ -31,6 +31,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 
 ### Cashflow
 - Income and expense tracking with custom categories and subcategories
+- Bulk move transactions between categories/subcategories (cross-type supported)
 - 5-layer Sankey diagram visualization
 - 4-level drill-down for detailed expense analysis
 - Period analysis with year and month filters
@@ -240,7 +241,6 @@ Contributions are welcome! When contributing:
 
 - Legend labels may be truncated on mobile (shows top 3 elements only)
 - Currency conversion depends on the Frankfurter API (falls back to cached rates)
-- Subcategory rename does not fully clean up old keys in Firestore
 
 ## License
 

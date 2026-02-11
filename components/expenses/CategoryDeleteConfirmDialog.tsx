@@ -240,7 +240,11 @@ export function CategoryDeleteConfirmDialog({
 
     setIsSubmitting(true);
     try {
-      await onConfirm(selectedCategoryId, selectedSubCategoryId || undefined);
+      // Convert sentinel value to undefined (Radix Select doesn't allow empty string)
+      const subCategoryId = selectedSubCategoryId && selectedSubCategoryId !== '__none__'
+        ? selectedSubCategoryId
+        : undefined;
+      await onConfirm(selectedCategoryId, subCategoryId);
       onClose();
     } catch (error) {
       console.error('Error during reassignment:', error);
@@ -391,7 +395,7 @@ export function CategoryDeleteConfirmDialog({
                   <SelectValue placeholder="Nessuna sotto-categoria" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nessuna sotto-categoria</SelectItem>
+                  <SelectItem value="__none__">Nessuna sotto-categoria</SelectItem>
                   {filteredSubCategories.map((subCategory) => (
                     <SelectItem key={subCategory.id} value={subCategory.id}>
                       {subCategory.name}

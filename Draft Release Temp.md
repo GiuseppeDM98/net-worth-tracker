@@ -170,6 +170,21 @@
 - Base defaults: equity 7%/18%, bonds 3%/6%, real estate 5%/12%, commodities 3.5%/20%, inflation 2.5%
 - Bull defaults: equity 10%/16%, bonds 4%/5%, real estate 8%/10%, commodities 6%/18%, inflation 1.5%
 
+## ✨ New Features (continued)
+
+### Bulk Move Transactions Between Categories
+- Move all transactions from one category or subcategory to another without deleting the source
+- Cross-type support: move transactions between different expense types (e.g., from Fixed Expenses to Variable Expenses or Income)
+- Available from Settings page: blue arrow icon on each category row, and inside category edit dialog for subcategories
+- Searchable destination picker with inline category creation
+- Automatic amount sign correction when moving between income and expense types
+- Warning banner when moving across different expense types so you know what will change
+- Source category/subcategory is preserved after the move
+
+## 🐛 Bug Fixes (continued)
+
+- Fixed Radix Select crash when choosing "No subcategory" option during category reassignment (empty string value not allowed by Radix UI)
+
 ## 🏗️ Technical
 
 - Fixed snapshot ID format inconsistency in database to use standardized format without zero-padding

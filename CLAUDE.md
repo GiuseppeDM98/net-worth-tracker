@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk
-- Ultima implementazione: Unit testing infrastructure con Vitest (2026-02-10)
+- Ultima implementazione: Bulk move transazioni tra categorie/sottocategorie con cross-type support (2026-02-11)
 - In corso ora: nessuna attivita attiva
 
 ## Architecture Snapshot
@@ -17,7 +17,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Key Features (Active)
 - Portfolio multi-asset con aggiornamento prezzi Yahoo Finance (average cost 4 decimali).
-- Cashflow con categorie, filtri, Sankey 5-layer, drill-down 4 livelli, Analisi Periodo con filtri anno+mese.
+- Cashflow con categorie, filtri, Sankey 5-layer, drill-down 4 livelli, Analisi Periodo con filtri anno+mese. Bulk move transazioni tra categorie (cross-type, da Settings).
 - Snapshot mensili automatici + storico e CSV export.
 - Asset price/value history tables con aggregazione per nome e badge "Venduto".
 - History page: Net Worth evolution, Asset Class breakdown, Liquidity, YoY variation, Savings vs Investment Growth, Doubling Time Analysis (geometrico + soglie fisse), Current vs Target allocation.
@@ -46,7 +46,6 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Known Issues (Active)
 - Etichette legenda su mobile troncate (top 3 elementi).
 - Conversione valuta dipende da Frankfurter API (fallback su cache).
-- Subcategory rename not fully implemented (old keys not deleted in Firestore).
 
 ## Key Files
 - History: `app/dashboard/history/page.tsx`, `components/history/DoublingTimeSummaryCards.tsx`, `DoublingMilestoneTimeline.tsx`
@@ -63,6 +62,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Monte Carlo scenarios: `components/monte-carlo/ScenarioParameterCards.tsx`, `ScenarioComparisonResults.tsx`
 - Asset types: `types/assets.ts` (MonteCarloParams, MonteCarloScenarios, DoublingMilestone, etc.)
 - Settings: `lib/services/assetAllocationService.ts`, `app/dashboard/settings/page.tsx`
+- Category Move: `components/expenses/CategoryMoveDialog.tsx`, `CategoryManagementDialog.tsx`, `CategoryDeleteConfirmDialog.tsx`
 - AI Analysis: `app/api/ai/analyze-performance/route.ts`, `components/performance/AIAnalysisDialog.tsx`
 - Web Search: `lib/services/tavilySearchService.ts`, `types/tavily.ts`
 - Utils: `lib/utils/dateHelpers.ts`, `formatters.ts`, `assetPriceHistoryUtils.ts`
@@ -70,4 +70,4 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`
 - Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`
 
-**Last updated**: 2026-02-10
+**Last updated**: 2026-02-11
