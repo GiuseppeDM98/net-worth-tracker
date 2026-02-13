@@ -85,7 +85,14 @@ ALL fields in settings types must be handled in THREE places:
 
 ### Asset Patterns
 - **Historical Aggregation**: Use `name` (not `assetId`) as key to unify re-purchased assets
-- **Borsa Italiana**: Pass `assetType` to scraper (ETF vs Stock table structures differ)
+- **Borsa Italiana Dividends**: Pass `assetType` to scraper (ETF vs Stock table structures differ)
+- **Borsa Italiana Bond Scraping**:
+  - **Timeout**: 30s minimum (Borsa Italiana can be slow during market hours)
+  - **JavaScript HTML**: Main price displayed on page is client-side rendered → NOT in `fetch()` HTML. Use "Prezzo ufficiale" (official reference price) instead
+  - **Cheerio robustness**: Iterate elements + `className.includes('formatPrice')` instead of CSS selectors (leading dash classes fail)
+  - **Multi-level fallback**: 5 priorities (main → ultimo contratto → prezzo ufficiale → apertura → table)
+  - **Label matching**: Use full labels ("ultimo contratto", not "ultimo") to avoid false positives
+  - **Files**: `borsaItalianaBondScraperService.ts`, `priceUpdater.ts`, `AssetDialog.tsx`
 - **Currency**: Use `currencyConversionService.ts` (Frankfurter API, 24h cache)
 - **Chart Y Axis**: Use `formatCurrencyCompact()` on mobile
 - **Doubling Time**: Skip pre-existing milestones (`threshold <= firstPositive.totalNetWorth`)
@@ -195,4 +202,4 @@ ALL fields in settings types must be handled in THREE places:
 - **Expenses**: `CategoryMoveDialog.tsx`, `CategoryDeleteConfirmDialog.tsx`, `CategoryManagementDialog.tsx`
 - **Pages**: `app/dashboard/settings/page.tsx`, `history/page.tsx`
 
-**Last updated**: 2026-02-11
+**Last updated**: 2026-02-13

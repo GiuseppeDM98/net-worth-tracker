@@ -18,7 +18,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 
 ### Portfolio Management
 - Multi-asset tracking across stocks, ETFs, bonds, crypto, real estate, commodities, and cash
-- Automatic price updates via Yahoo Finance
+- Automatic price updates via Yahoo Finance (all assets) and Borsa Italiana (Italian bonds with ISIN)
 - Average cost tracking with 4-decimal precision
 - Current vs target asset allocation visualization
 
@@ -39,7 +39,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 
 ### Dividends
 - Multi-currency dividend recording with automatic EUR conversion
-- Borsa Italiana scraping for Italian market data
+- Borsa Italiana scraping for Italian market data (dividends and bond prices)
 - Monthly calendar view with drill-down
 - Dividend statistics and yield calculations
 
@@ -152,8 +152,8 @@ See [`.env.local.example`](.env.local.example) for detailed comments on each var
 | PDF | @react-pdf/renderer | Export reports |
 | Forms | react-hook-form, zod | Form handling and validation |
 | Dates | date-fns, date-fns-tz | Timezone-aware date operations |
-| Scraping | cheerio | Borsa Italiana dividend data |
-| Testing | Vitest | Unit testing (117 tests) |
+| Scraping | cheerio | Borsa Italiana dividend and bond price data |
+| Testing | Vitest | Unit testing (123 tests) |
 
 ## Development
 

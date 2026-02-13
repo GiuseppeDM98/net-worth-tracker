@@ -1,8 +1,10 @@
 import { adminDb } from '@/lib/firebase/admin';
 import {
   getMultipleQuotes,
+  getQuote,
   shouldUpdatePrice,
 } from '@/lib/services/yahooFinanceService';
+import { getBondPriceByIsin } from '@/lib/services/borsaItalianaBondScraperService';
 
 export interface PriceUpdateResult {
   updated: number;
@@ -67,19 +69,78 @@ export async function updateUserAssetPrices(
       };
     }
 
-    // Extract unique tickers
+    // Separate bonds with ISIN for Borsa Italiana scraping
+    const bondsWithIsin = updatableAssets.filter((asset: any) =>
+      asset.type === 'bond' &&
+      asset.assetClass === 'bonds' &&
+      asset.isin &&
+      asset.isin.trim().length > 0
+    );
+
+    const otherAssets = updatableAssets.filter((asset: any) =>
+      !(asset.type === 'bond' && asset.assetClass === 'bonds' && asset.isin)
+    );
+
+    console.log(`[Price Update] Bonds with ISIN: ${bondsWithIsin.length}`);
+    console.log(`[Price Update] Other assets: ${otherAssets.length}`);
+
+    // Track results
+    const updated: string[] = [];
+    const failed: string[] = [];
+
+    // Process bonds via Borsa Italiana scraper (with Yahoo Finance fallback)
+    for (const bond of bondsWithIsin) {
+      try {
+        console.log(`[Bond Update] Processing ${(bond as any).ticker} (ISIN: ${(bond as any).isin})`);
+
+        // Try Borsa Italiana scraper first
+        const bondPrice = await getBondPriceByIsin((bond as any).isin);
+
+        if (bondPrice && bondPrice.price && bondPrice.price > 0) {
+          // Success: update with Borsa Italiana price
+          const assetRef = adminDb.collection('assets').doc((bond as any).id);
+          await assetRef.update({
+            currentPrice: bondPrice.price,
+            lastPriceUpdate: new Date(),
+            updatedAt: new Date(),
+          });
+          updated.push(`${(bond as any).ticker} (BI-${bondPrice.priceType})`);
+          console.log(`[Bond Update] ${(bond as any).ticker}: Updated from Borsa Italiana (${bondPrice.priceType}): ${bondPrice.price}`);
+        } else {
+          // Fallback to Yahoo Finance
+          console.log(`[Bond Update] ${(bond as any).ticker}: Borsa Italiana returned null, falling back to Yahoo Finance`);
+          const quote = await getQuote((bond as any).ticker);
+
+          if (quote && quote.price !== null && quote.price > 0) {
+            const assetRef = adminDb.collection('assets').doc((bond as any).id);
+            await assetRef.update({
+              currentPrice: quote.price,
+              lastPriceUpdate: new Date(),
+              updatedAt: new Date(),
+            });
+            updated.push(`${(bond as any).ticker} (YF-fallback)`);
+            console.log(`[Bond Update] ${(bond as any).ticker}: Updated from Yahoo Finance fallback: ${quote.price}`);
+          } else {
+            failed.push((bond as any).ticker);
+            console.warn(`[Bond Update] ${(bond as any).ticker}: Both Borsa Italiana and Yahoo Finance failed`);
+          }
+        }
+      } catch (error) {
+        console.error(`[Bond Update] Error updating ${(bond as any).ticker}:`, error);
+        failed.push((bond as any).ticker);
+      }
+    }
+
+    // Extract unique tickers for other assets
     const tickers = [
-      ...new Set(updatableAssets.map((asset: any) => asset.ticker)),
+      ...new Set(otherAssets.map((asset: any) => asset.ticker)),
     ];
 
     // Fetch quotes from Yahoo Finance
     const quotes = await getMultipleQuotes(tickers);
 
-    // Update asset prices using Admin SDK
-    const updated: string[] = [];
-    const failed: string[] = [];
-
-    for (const asset of updatableAssets) {
+    // Update asset prices using Admin SDK (for non-bond assets)
+    for (const asset of otherAssets) {
       const quote = quotes.get((asset as any).ticker);
 
       if (quote && quote.price !== null && quote.price > 0) {

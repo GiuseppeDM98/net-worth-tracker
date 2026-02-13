@@ -4,8 +4,8 @@
 Net Worth Tracker is a Next.js app for Italian investors to track net worth, assets, cashflow, dividends, performance metrics, and historical snapshots with Firebase.
 
 ## Current Status
-- Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk
-- Ultima implementazione: Bulk move transazioni tra categorie/sottocategorie con cross-type support (2026-02-11)
+- Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio
+- Ultima implementazione: Bond price tracking via Borsa Italiana scraping con fallback Yahoo Finance (2026-02-13)
 - In corso ora: nessuna attivita attiva
 
 ## Architecture Snapshot
@@ -16,7 +16,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Timezone: Europe/Rome via `lib/utils/dateHelpers.ts` helpers (`getItalyDate`, `getItalyMonth`, `getItalyYear`, `getItalyMonthYear`)
 
 ## Key Features (Active)
-- Portfolio multi-asset con aggiornamento prezzi Yahoo Finance (average cost 4 decimali).
+- Portfolio multi-asset con aggiornamento prezzi Yahoo Finance (average cost 4 decimali). Bond con ISIN: scraping automatico prezzi da Borsa Italiana con fallback Yahoo Finance.
 - Cashflow con categorie, filtri, Sankey 5-layer, drill-down 4 livelli, Analisi Periodo con filtri anno+mese. Bulk move transazioni tra categorie (cross-type, da Settings).
 - Snapshot mensili automatici + storico e CSV export.
 - Asset price/value history tables con aggregazione per nome e badge "Venduto".
@@ -34,13 +34,13 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Testing
 - **Framework**: Vitest (`npm test`, `npm run test:watch`)
-- **117 unit test** across 5 files in `__tests__/` covering formatters, dateHelpers, fireService, performanceService
+- **123 unit test** across 6 files in `__tests__/` covering formatters, dateHelpers, fireService, performanceService, borsaItalianaBondScraper
 - **Scope**: Pure functions only (no Firebase mocking). Services need `vi.mock()` on Firebase-dependent imports.
 - **Config**: `vitest.config.ts` with `@/` path alias
 
 ## Data & Integrations
 - Firestore (client + admin) con merge updates.
-- Yahoo Finance per prezzi. Frankfurter API per valute (cache 24h). Borsa Italiana scraping.
+- Yahoo Finance per prezzi. Borsa Italiana scraping per dividendi e bond MOT. Frankfurter API per valute (cache 24h).
 - Tavily API per web search (AI analysis context).
 
 ## Known Issues (Active)
@@ -65,9 +65,10 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Category Move: `components/expenses/CategoryMoveDialog.tsx`, `CategoryManagementDialog.tsx`, `CategoryDeleteConfirmDialog.tsx`
 - AI Analysis: `app/api/ai/analyze-performance/route.ts`, `components/performance/AIAnalysisDialog.tsx`
 - Web Search: `lib/services/tavilySearchService.ts`, `types/tavily.ts`
+- Bond Scraping: `lib/services/borsaItalianaBondScraperService.ts`, `lib/helpers/priceUpdater.ts`, `app/api/prices/bond-quote/route.ts`
 - Utils: `lib/utils/dateHelpers.ts`, `formatters.ts`, `assetPriceHistoryUtils.ts`
 - Auth: `lib/utils/authHelpers.ts`, `contexts/AuthContext.tsx`
 - PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`
-- Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`
+- Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`, `borsaItalianaBondScraper.test.ts`
 
-**Last updated**: 2026-02-11
+**Last updated**: 2026-02-13

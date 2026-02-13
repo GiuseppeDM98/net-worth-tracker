@@ -73,6 +73,28 @@
 - Period-specific filtering: Notes only appear in tables matching their year/month and selected sections
 - Available for all 8 ranking tables: 4 monthly (Best/Worst by Net Worth/Income/Expenses) + 4 yearly
 
+### Bond Price Tracking from Borsa Italiana
+- Added automatic bond price updates from Borsa Italiana for Italian MOT bonds with ISIN codes
+- ISIN field now editable for bonds in asset form (previously only available for stocks/ETFs for dividend tracking)
+- Dual-source price fetching: Borsa Italiana as primary source for bonds, Yahoo Finance as fallback
+- Integrated in 3 price update flows: monthly automatic snapshots, manual "Update Prices" button, and "Create Snapshot" button
+- Dynamic UI labels show correct price source ("Borsa Italiana" for bonds with ISIN, "Yahoo Finance" for other assets)
+- Graceful error handling with automatic fallback to Yahoo Finance if Borsa Italiana scraping fails
+- Multi-level fallback strategy within Borsa Italiana scraper (ultimo contratto → prezzo ufficiale → apertura → table structure)
+- Test API endpoint `/api/prices/bond-quote?isin={ISIN}` for manual price validation
+- 6 new unit tests covering ISIN validation logic for Italian bonds
+- Timeout optimized for Borsa Italiana's response times (30 seconds)
+- Backward compatible: bonds without ISIN continue using Yahoo Finance exclusively
+
+### Bulk Move Transactions Between Categories
+- Move all transactions from one category or subcategory to another without deleting the source
+- Cross-type support: move transactions between different expense types (e.g., from Fixed Expenses to Variable Expenses or Income)
+- Available from Settings page: blue arrow icon on each category row, and inside category edit dialog for subcategories
+- Searchable destination picker with inline category creation
+- Automatic amount sign correction when moving between income and expense types
+- Warning banner when moving across different expense types so you know what will change
+- Source category/subcategory is preserved after the move
+
 ## 🐛 Bug Fixes
 
 - **CRITICAL**: Fixed user registration failing with permission error when creating default asset allocation settings
@@ -90,6 +112,7 @@
   - Affects both "Valori Storici" (Historical Values) and "Valori Anno Corrente" (Current Year Values) tabs
   - Total row now matches manual sum of displayed asset values for each month
   - Month-over-month percentage changes recalculate correctly based on accurate totals
+- Fixed Radix Select crash when choosing "No subcategory" option during category reassignment (empty string value not allowed by Radix UI)
 
 ## 🔧 Improvements
 
@@ -170,23 +193,8 @@
 - Base defaults: equity 7%/18%, bonds 3%/6%, real estate 5%/12%, commodities 3.5%/20%, inflation 2.5%
 - Bull defaults: equity 10%/16%, bonds 4%/5%, real estate 8%/10%, commodities 6%/18%, inflation 1.5%
 
-## ✨ New Features (continued)
-
-### Bulk Move Transactions Between Categories
-- Move all transactions from one category or subcategory to another without deleting the source
-- Cross-type support: move transactions between different expense types (e.g., from Fixed Expenses to Variable Expenses or Income)
-- Available from Settings page: blue arrow icon on each category row, and inside category edit dialog for subcategories
-- Searchable destination picker with inline category creation
-- Automatic amount sign correction when moving between income and expense types
-- Warning banner when moving across different expense types so you know what will change
-- Source category/subcategory is preserved after the move
-
-## 🐛 Bug Fixes (continued)
-
-- Fixed Radix Select crash when choosing "No subcategory" option during category reassignment (empty string value not allowed by Radix UI)
-
 ## 🏗️ Technical
 
 - Fixed snapshot ID format inconsistency in database to use standardized format without zero-padding
 - Added migration tooling for database maintenance scripts
-- Added unit testing infrastructure with Vitest (117 tests covering formatters, date helpers, FIRE calculations, and performance metrics)
+- Added unit testing infrastructure with Vitest (123 tests covering formatters, date helpers, FIRE calculations, performance metrics, and bond ISIN validation)

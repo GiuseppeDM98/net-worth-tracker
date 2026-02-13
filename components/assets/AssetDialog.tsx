@@ -177,6 +177,11 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
   const selectedSubCategory = watch('subCategory');
   const watchIsLiquid = watch('isLiquid');
   const watchAutoUpdatePrice = watch('autoUpdatePrice');
+
+  // Determine price source based on asset type
+  const priceSource = selectedType === 'bond' && selectedAssetClass === 'bonds'
+    ? 'Borsa Italiana'
+    : 'Yahoo Finance';
   const watchIsComposite = watch('isComposite');
 
   // Set intelligent defaults for isLiquid and autoUpdatePrice based on asset class
@@ -435,23 +440,44 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         currentPrice = data.manualPrice;
         toast.success(`Prezzo manuale impostato: ${currentPrice.toFixed(2)} ${data.currency}`);
       }
-      // Path 2: Check if we need to fetch price from Yahoo Finance
-      // This applies to stocks, ETFs, bonds, crypto, and commodities
+      // Path 2: Check if we need to fetch price from market data sources
+      // Bonds with ISIN: Borsa Italiana
+      // Other assets (stocks, ETFs, crypto, commodities): Yahoo Finance
       else if (shouldUpdatePrice(data.type, data.subCategory)) {
         try {
-          const response = await fetch(
-            `/api/prices/quote?ticker=${encodeURIComponent(data.ticker)}`
-          );
+          // Check if this is a bond with ISIN -> use Borsa Italiana scraper
+          const isBondWithIsin =
+            data.type === 'bond' &&
+            data.assetClass === 'bonds' &&
+            data.isin &&
+            data.isin.trim().length > 0;
+
+          let response;
+          let source = 'Yahoo Finance';
+
+          if (isBondWithIsin) {
+            // Use Borsa Italiana scraper for bonds with ISIN
+            response = await fetch(
+              `/api/prices/bond-quote?isin=${encodeURIComponent(data.isin!.trim())}`
+            );
+            source = 'Borsa Italiana';
+          } else {
+            // Use Yahoo Finance for other assets
+            response = await fetch(
+              `/api/prices/quote?ticker=${encodeURIComponent(data.ticker)}`
+            );
+          }
+
           const quote = await response.json();
 
           if (quote.price && quote.price > 0) {
             currentPrice = quote.price;
             toast.success(
-              `Prezzo recuperato: ${currentPrice.toFixed(2)} ${quote.currency}`
+              `Prezzo recuperato da ${source}: ${currentPrice.toFixed(2)} ${quote.currency}`
             );
           } else {
             toast.error(
-              `Impossibile recuperare il prezzo per ${data.ticker}. Puoi inserire manualmente il prezzo nel campo apposito.`
+              `Impossibile recuperare il prezzo ${isBondWithIsin ? `per ISIN ${data.isin}` : `per ${data.ticker}`}. Puoi inserire manualmente il prezzo nel campo apposito.`
             );
             // Set price to 0 as indicator that manual update is needed
             // This allows saving the asset while flagging price as missing
@@ -460,7 +486,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         } catch (error) {
           console.error('Error fetching quote:', error);
           toast.error(
-            `Errore nel recupero del prezzo per ${data.ticker}. Puoi inserire manualmente il prezzo nel campo apposito.`
+            `Errore nel recupero del prezzo. Puoi inserire manualmente il prezzo nel campo apposito.`
           );
           currentPrice = 0;
         }
@@ -553,15 +579,17 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
               {...register('isin')}
               placeholder="IE00B3RBWM25"
               disabled={
-                (selectedType !== 'stock' && selectedType !== 'etf') ||
-                selectedAssetClass !== 'equity'
+                // Enable for stocks/ETFs in equity class (dividends)
+                !((selectedType === 'stock' || selectedType === 'etf') && selectedAssetClass === 'equity') &&
+                // Enable for bonds in bonds class (price scraping)
+                !(selectedType === 'bond' && selectedAssetClass === 'bonds')
               }
             />
             {errors.isin && (
               <p className="text-sm text-red-500">{errors.isin.message}</p>
             )}
             <p className="text-xs text-muted-foreground">
-              Necessario per azioni ed ETF quotati su Borsa Italiana con dividendi
+              Necessario per dividendi automatici (azioni/ETF) e aggiornamento prezzi obbligazioni MOT
             </p>
           </div>
 
@@ -736,7 +764,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
               <div className="space-y-0.5">
                 <Label htmlFor="autoUpdatePrice">Aggiornamento Automatico Prezzo</Label>
                 <p className="text-xs text-gray-500">
-                  Indica se il prezzo deve essere aggiornato automaticamente da Yahoo Finance
+                  Indica se il prezzo deve essere aggiornato automaticamente da {priceSource}
                 </p>
               </div>
               <Switch
@@ -1044,13 +1072,13 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                 type="number"
                 step="0.01"
                 {...register('manualPrice', { valueAsNumber: true })}
-                placeholder="Lascia vuoto per recupero automatico da Yahoo Finance"
+                placeholder={`Lascia vuoto per recupero automatico da ${priceSource}`}
               />
               {errors.manualPrice && (
                 <p className="text-sm text-red-500">{errors.manualPrice.message}</p>
               )}
               <p className="text-xs text-gray-500">
-                Se inserisci un prezzo manuale, questo verrà utilizzato al posto del recupero automatico da Yahoo Finance.
+                Se inserisci un prezzo manuale, questo verrà utilizzato al posto del recupero automatico da {priceSource}.
               </p>
             </div>
           )}
@@ -1061,7 +1089,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
               {selectedType === 'cash' && ' Per asset di tipo liquidità, il prezzo sarà impostato a 1.'}
               {selectedType === 'realestate' && ' Per immobili, il prezzo deve essere aggiornato manualmente.'}
               {selectedSubCategory === 'Private Equity' && ' Per Private Equity, il prezzo deve essere aggiornato manualmente.'}
-              {shouldUpdatePrice(selectedType, selectedSubCategory) && ' Puoi inserire un prezzo manuale nel campo apposito, oppure il prezzo verrà recuperato automaticamente da Yahoo Finance. In caso di errore nel recupero automatico, potrai sempre impostare il prezzo manualmente.'}
+              {shouldUpdatePrice(selectedType, selectedSubCategory) && ` Puoi inserire un prezzo manuale nel campo apposito, oppure il prezzo verrà recuperato automaticamente da ${priceSource}. In caso di errore nel recupero automatico, potrai sempre impostare il prezzo manualmente.`}
             </p>
           </div>
 
