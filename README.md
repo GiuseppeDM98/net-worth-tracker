@@ -54,6 +54,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - FIRE calculator with primary residence exclusion
 - Multi-scenario projections (Bear / Base / Bull) with inflation adjustment
 - Per-scenario FIRE numbers with automatic savings stop at FIRE reached
+- **Goal-Based Investing**: allocate portfolio portions to financial goals (house, retirement, emergency fund, etc.) with progress tracking, recommended allocation comparison, and open-ended goal support
 
 ### Monte Carlo Simulations
 - 4 asset classes: Equity, Bonds, Real Estate, Commodities
@@ -153,7 +154,7 @@ See [`.env.local.example`](.env.local.example) for detailed comments on each var
 | Forms | react-hook-form, zod | Form handling and validation |
 | Dates | date-fns, date-fns-tz | Timezone-aware date operations |
 | Scraping | cheerio | Borsa Italiana dividend and bond price data |
-| Testing | Vitest | Unit testing (123 tests) |
+| Testing | Vitest | Unit testing (144 tests) |
 
 ## Development
 
@@ -207,18 +208,19 @@ net-worth-tracker/
 │   ├── cashflow/           # Income/expense tracking
 │   ├── dividends/          # Dividend calendar and tables
 │   ├── fire-simulations/   # FIRE calculator
+│   ├── goals/              # Goal-based investing
 │   ├── monte-carlo/        # Monte Carlo UI
 │   ├── history/            # Historical analysis
 │   ├── hall-of-fame/       # Rankings
 │   └── pdf/                # PDF export (sections + primitives)
 ├── lib/
-│   ├── services/           # Business logic (21 services)
+│   ├── services/           # Business logic (22 services)
 │   ├── utils/              # Helpers (formatters, dates, auth)
 │   ├── hooks/              # Custom React hooks
 │   ├── constants/          # App config, colors, defaults
 │   ├── firebase/           # Firebase client + admin setup
 │   └── query/              # React Query key factory
-├── types/                  # TypeScript definitions (8 files)
+├── types/                  # TypeScript definitions (9 files)
 ├── contexts/               # React contexts (AuthContext)
 └── public/                 # Static assets
 ```

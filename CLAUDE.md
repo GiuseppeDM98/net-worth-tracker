@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio
-- Ultima implementazione: Bond price tracking via Borsa Italiana scraping con fallback Yahoo Finance (2026-02-13)
+- Ultima implementazione: Goal-Based Investing con assegnazione asset percentuale e confronto allocazione (2026-02-14)
 - In corso ora: nessuna attivita attiva
 
 ## Architecture Snapshot
@@ -29,12 +29,13 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - **Confronto Scenari**: modalità Bear/Base/Bull con parametri per-scenario (rendimenti, volatilità, inflazione)
   - Toggle "Simulazione Singola" / "Confronto Scenari", overlay chart, 3 distribution charts, tabella comparativa
   - **Auto-fill allocazione** da portafoglio reale: le 4 classi MC vengono estratte dall'allocazione corrente e normalizzate a 100% (crypto e cash escluse). Fallback 60/40/0/0 se nessuna delle 4 classi presente.
+- **Goal-Based Investing**: allocazione mentale di porzioni del portafoglio a obiettivi finanziari (casa, pensione, auto, fondo emergenza). Toggle in Settings. Assegnazione asset per percentuale (memorizzata come %, mostrata in EUR). Confronto allocazione effettiva vs consigliata per obiettivo. Obiettivi open-ended (senza importo target) supportati. 3° tab in FIRE e Simulazioni.
 - PDF Export con 8 sezioni configurabili (Performance solo in export annuali/totali).
 - **AI Performance Analysis**: Claude Sonnet 4.5 con SSE streaming, Extended Thinking, Web Search (Tavily).
 
 ## Testing
 - **Framework**: Vitest (`npm test`, `npm run test:watch`)
-- **123 unit test** across 6 files in `__tests__/` covering formatters, dateHelpers, fireService, performanceService, borsaItalianaBondScraper
+- **144 unit test** across 7 files in `__tests__/` covering formatters, dateHelpers, fireService, performanceService, borsaItalianaBondScraper, goalService
 - **Scope**: Pure functions only (no Firebase mocking). Services need `vi.mock()` on Firebase-dependent imports.
 - **Config**: `vitest.config.ts` with `@/` path alias
 
@@ -60,6 +61,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Monte Carlo: `components/fire-simulations/MonteCarloTab.tsx`, `lib/services/monteCarloService.ts`
 - Monte Carlo UI: `components/monte-carlo/ParametersForm.tsx`, `SimulationChart.tsx`, `DistributionChart.tsx`, `SuccessRateCard.tsx`
 - Monte Carlo scenarios: `components/monte-carlo/ScenarioParameterCards.tsx`, `ScenarioComparisonResults.tsx`
+- Goals: `types/goals.ts`, `lib/services/goalService.ts`, `components/fire-simulations/GoalBasedInvestingTab.tsx`, `components/goals/*`
 - Asset types: `types/assets.ts` (MonteCarloParams, MonteCarloScenarios, DoublingMilestone, etc.)
 - Settings: `lib/services/assetAllocationService.ts`, `app/dashboard/settings/page.tsx`
 - Category Move: `components/expenses/CategoryMoveDialog.tsx`, `CategoryManagementDialog.tsx`, `CategoryDeleteConfirmDialog.tsx`
@@ -69,6 +71,6 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Utils: `lib/utils/dateHelpers.ts`, `formatters.ts`, `assetPriceHistoryUtils.ts`
 - Auth: `lib/utils/authHelpers.ts`, `contexts/AuthContext.tsx`
 - PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`
-- Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`, `borsaItalianaBondScraper.test.ts`
+- Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`, `borsaItalianaBondScraper.test.ts`, `goalService.test.ts`
 
-**Last updated**: 2026-02-13
+**Last updated**: 2026-02-14

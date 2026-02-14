@@ -122,6 +122,7 @@ export interface AssetAllocationSettings {
   dividendIncomeSubCategoryId?: string; // Subcategory ID for automatic dividend income entries
   fireProjectionScenarios?: FIREProjectionScenarios; // Custom scenario parameters for FIRE projections (Bear/Base/Bull)
   monteCarloScenarios?: MonteCarloScenarios; // Custom scenario parameters for Monte Carlo simulations (Bear/Base/Bull)
+  goalBasedInvestingEnabled?: boolean; // Toggle to enable goal-based investing feature (mental allocation of portfolio to financial goals)
   targets: AssetAllocationTarget;
 }
 

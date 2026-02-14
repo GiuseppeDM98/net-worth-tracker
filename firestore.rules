@@ -148,6 +148,19 @@ service cloud.firestore {
       allow delete: if isOwner(userId);
     }
 
+    // Collezione goalBasedInvesting - obiettivi di investimento
+    match /goalBasedInvesting/{userId} {
+      // Read: use userId (doc ID) to allow reading non-existent documents (returns null)
+      allow read: if isOwner(userId);
+
+      // Write: only the owner can create/update/delete their goals
+      allow create, update: if isOwner(userId) &&
+                               request.resource.data.userId == userId;
+
+      // Delete: only the owner
+      allow delete: if isOwner(userId);
+    }
+
     // Blocca tutto il resto per sicurezza
     match /{document=**} {
       allow read, write: if false;

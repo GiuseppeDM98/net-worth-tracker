@@ -6,16 +6,18 @@
  * TAB STRUCTURE:
  * - FIRE Calculator: Calculate retirement readiness
  * - Monte Carlo: Probabilistic portfolio simulations
+ * - Obiettivi: Goal-based investing (mental allocation of portfolio to financial goals)
  *
  * No lazy loading needed - components load quickly.
  */
 
 'use client';
 
-import { Flame, Dices } from 'lucide-react';
+import { Flame, Dices, Target } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FireCalculatorTab } from '@/components/fire-simulations/FireCalculatorTab';
 import { MonteCarloTab } from '@/components/fire-simulations/MonteCarloTab';
+import { GoalBasedInvestingTab } from '@/components/fire-simulations/GoalBasedInvestingTab';
 
 export default function FireSimulationsPage() {
   return (
@@ -33,7 +35,7 @@ export default function FireSimulationsPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="fire" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full max-w-lg grid-cols-3">
           <TabsTrigger value="fire" className="flex items-center gap-2">
             <Flame className="h-4 w-4" />
             FIRE Calculator
@@ -41,6 +43,10 @@ export default function FireSimulationsPage() {
           <TabsTrigger value="montecarlo" className="flex items-center gap-2">
             <Dices className="h-4 w-4" />
             Monte Carlo
+          </TabsTrigger>
+          <TabsTrigger value="goals" className="flex items-center gap-2">
+            <Target className="h-4 w-4" />
+            Obiettivi
           </TabsTrigger>
         </TabsList>
 
@@ -50,6 +56,10 @@ export default function FireSimulationsPage() {
 
         <TabsContent value="montecarlo" className="mt-6">
           <MonteCarloTab />
+        </TabsContent>
+
+        <TabsContent value="goals" className="mt-6">
+          <GoalBasedInvestingTab />
         </TabsContent>
       </Tabs>
     </div>

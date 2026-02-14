@@ -118,6 +118,7 @@ export default function SettingsPage() {
   const [cashUseFixedAmount, setCashUseFixedAmount] = useState(false);
   const [cashFixedAmount, setCashFixedAmount] = useState<number>(0);
   const [includePrimaryResidenceInFIRE, setIncludePrimaryResidenceInFIRE] = useState<boolean>(false);
+  const [goalBasedInvestingEnabled, setGoalBasedInvestingEnabled] = useState<boolean>(false);
   const [assetClassStates, setAssetClassStates] = useState<
     Record<AssetClass, AssetClassState>
   >({} as Record<AssetClass, AssetClassState>);
@@ -272,6 +273,7 @@ export default function SettingsPage() {
         );
         // Load FIRE setting (Bug #1 fix)
         setIncludePrimaryResidenceInFIRE(settingsData.includePrimaryResidenceInFIRE ?? false);
+        setGoalBasedInvestingEnabled(settingsData.goalBasedInvestingEnabled ?? false);
         // Load dividend settings
         setDividendIncomeCategoryId(settingsData.dividendIncomeCategoryId || '');
         setDividendIncomeSubCategoryId(settingsData.dividendIncomeSubCategoryId || '');
@@ -831,6 +833,7 @@ export default function SettingsPage() {
         riskFreeRate,
         // Preserve FIRE settings (Bug #1 fix)
         includePrimaryResidenceInFIRE,
+        goalBasedInvestingEnabled,
         withdrawalRate: settingsData?.withdrawalRate,
         plannedAnnualExpenses: settingsData?.plannedAnnualExpenses,
         targets,
@@ -1223,6 +1226,23 @@ export default function SettingsPage() {
                 id="firePrimaryResidence"
                 checked={includePrimaryResidenceInFIRE}
                 onCheckedChange={setIncludePrimaryResidenceInFIRE}
+              />
+            </div>
+
+            {/* Goal-Based Investing toggle */}
+            <div className="flex items-center justify-between border-t pt-4">
+              <div>
+                <Label htmlFor="goalBasedInvesting" className="text-sm font-medium">
+                  Obiettivi di Investimento
+                </Label>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Assegna porzioni del portafoglio a obiettivi finanziari specifici
+                </p>
+              </div>
+              <Switch
+                id="goalBasedInvesting"
+                checked={goalBasedInvestingEnabled}
+                onCheckedChange={setGoalBasedInvestingEnabled}
               />
             </div>
 

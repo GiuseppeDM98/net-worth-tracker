@@ -95,6 +95,22 @@
 - Warning banner when moving across different expense types so you know what will change
 - Source category/subcategory is preserved after the move
 
+### Goal-Based Investing
+- Mentally allocate portions of your portfolio to different financial goals (house purchase, retirement, car, emergency fund, children's savings, etc.)
+- Enable/disable from Settings with a dedicated toggle
+- Create goals with optional target amount, target date, priority level, color, and notes
+- Quick-start templates for common goals: House Purchase, Retirement, Car, Emergency Fund
+- Assign assets to goals by percentage — stored as %, displayed as EUR equivalent (scales automatically with price changes)
+- Optional recommended allocation per goal (e.g., 70% bonds / 30% equity for house purchase)
+- Visual comparison of actual vs recommended asset class allocation for each goal
+- Summary cards showing progress toward each goal with progress bar (or accumulated value for open-ended goals)
+- Portfolio allocation pie chart showing how your total portfolio is distributed across goals
+- Expandable detail cards with assigned assets table, allocation comparison, and remaining amount
+- Validation warnings when any asset is over-assigned (>100% across all goals)
+- Open-ended goals supported: skip the target amount for goals like "save for children" with no fixed target
+- Located in FIRE & Simulations page as the 3rd tab "Obiettivi"
+- 21 unit tests covering all calculation logic
+
 ## 🐛 Bug Fixes
 
 - **CRITICAL**: Fixed user registration failing with permission error when creating default asset allocation settings

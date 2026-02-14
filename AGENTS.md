@@ -64,6 +64,12 @@ ALL fields in settings types must be handled in THREE places:
 - `merge: true` does RECURSIVE merge — cannot delete nested keys by omitting them
 - **Solution**: GET existing doc → spread + replace target field → `setDoc()` WITHOUT `merge: true`
 
+### Firestore Rejects `undefined` Values
+- `setDoc()` throws `FirebaseError: Unsupported field value: undefined` if any field is `undefined`
+- TypeScript optional fields (`field?: T`) spread as `undefined` into Firestore documents
+- **Solution**: Build the document object manually, only including fields that have a value
+- **Files**: `goalService.ts` (`saveGoalData`)
+
 ### Firestore User-Managed Data Preservation
 - When updating documents mixing calculated + user-managed fields: GET existing → preserve user fields
 - NEVER initialize user-managed fields (notes, configs) in calculated data objects
@@ -196,10 +202,10 @@ ALL fields in settings types must be handled in THREE places:
 
 ## Key Files
 - **Utils**: `lib/utils/dateHelpers.ts`, `formatters.ts`, `assetPriceHistoryUtils.ts`
-- **Services**: `performanceService.ts`, `assetAllocationService.ts`, `fireService.ts`, `currencyConversionService.ts`, `chartService.ts`, `tavilySearchService.ts`
+- **Services**: `performanceService.ts`, `assetAllocationService.ts`, `fireService.ts`, `currencyConversionService.ts`, `chartService.ts`, `tavilySearchService.ts`, `goalService.ts`
 - **API Routes**: `app/api/performance/yoc/route.ts`, `app/api/ai/analyze-performance/route.ts`
 - **Components**: `CashflowSankeyChart.tsx`, `TotalHistoryTab.tsx`, `CurrentYearTab.tsx`, `MetricSection.tsx`
 - **Expenses**: `CategoryMoveDialog.tsx`, `CategoryDeleteConfirmDialog.tsx`, `CategoryManagementDialog.tsx`
 - **Pages**: `app/dashboard/settings/page.tsx`, `history/page.tsx`
 
-**Last updated**: 2026-02-13
+**Last updated**: 2026-02-14
