@@ -111,6 +111,16 @@
 - Located in FIRE & Simulations page as the 3rd tab "Obiettivi"
 - 21 unit tests covering all calculation logic
 
+### Goal-Driven Asset Allocation
+- Added option to automatically derive portfolio allocation targets from your financial goals
+- New "Allocazione da Obiettivi" toggle in Settings (appears only when Goal-Based Investing is enabled)
+- When enabled, the Allocation page calculates target percentages as a weighted average of each goal's recommended allocation
+- Goals with a target amount use that amount as weight; open-ended goals use their current assigned value
+- Sub-category drill-down preserved: only asset class targets are overridden, sub-category structure from Settings remains intact
+- Green banner indicator on Allocation page shows when targets are derived from goals
+- Automatic fallback to manual Settings targets when goal data is insufficient (no goals with recommended allocation)
+- Disabling Goal-Based Investing automatically disables goal-driven allocation
+
 ## 🐛 Bug Fixes
 
 - **CRITICAL**: Fixed user registration failing with permission error when creating default asset allocation settings

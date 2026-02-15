@@ -1,6 +1,6 @@
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
-import { Asset, AssetAllocationTarget, AssetAllocationSettings, AllocationResult, SubCategoryTarget, SpecificAssetAllocation, AllocationData } from '@/types/assets';
+import { Asset, AssetClass, AssetAllocationTarget, AssetAllocationSettings, AllocationResult, SubCategoryTarget, SpecificAssetAllocation, AllocationData } from '@/types/assets';
 import { calculateAssetValue, calculateTotalValue } from './assetService';
 import { DEFAULT_SUB_CATEGORIES, DEFAULT_EQUITY_SUB_TARGETS } from '@/lib/constants/defaultSubCategories';
 
@@ -37,6 +37,7 @@ export async function getSettings(
       fireProjectionScenarios: data.fireProjectionScenarios,
       monteCarloScenarios: data.monteCarloScenarios,
       goalBasedInvestingEnabled: data.goalBasedInvestingEnabled,
+      goalDrivenAllocationEnabled: data.goalDrivenAllocationEnabled,
       targets: data.targets as AssetAllocationTarget,
     };
   } catch (error) {
@@ -115,6 +116,9 @@ export async function setSettings(
       if (settings.goalBasedInvestingEnabled !== undefined) {
         docData.goalBasedInvestingEnabled = settings.goalBasedInvestingEnabled;
       }
+      if (settings.goalDrivenAllocationEnabled !== undefined) {
+        docData.goalDrivenAllocationEnabled = settings.goalDrivenAllocationEnabled;
+      }
 
       // Use setDoc WITHOUT merge to completely replace targets
       await setDoc(targetRef, docData);
@@ -154,6 +158,9 @@ export async function setSettings(
       }
       if (settings.goalBasedInvestingEnabled !== undefined) {
         docData.goalBasedInvestingEnabled = settings.goalBasedInvestingEnabled;
+      }
+      if (settings.goalDrivenAllocationEnabled !== undefined) {
+        docData.goalDrivenAllocationEnabled = settings.goalDrivenAllocationEnabled;
       }
 
       // Use merge: true to preserve existing fields
@@ -604,6 +611,41 @@ export async function addSubCategory(
     console.error('Error adding subcategory:', error);
     throw error;
   }
+}
+
+/**
+ * Build an AssetAllocationTarget from goal-derived allocation percentages.
+ *
+ * Overrides targetPercentage at the asset class level with goal-derived values
+ * while preserving sub-category structure (subCategoryConfig, subTargets) from
+ * existing user targets. This keeps the drill-down experience intact.
+ *
+ * Asset classes not present in the derived allocation get 0% target.
+ */
+export function buildTargetsFromGoalAllocation(
+  derived: Partial<Record<AssetClass, number>>,
+  existingTargets?: AssetAllocationTarget | null
+): AssetAllocationTarget {
+  const allClasses: AssetClass[] = [
+    'equity', 'bonds', 'crypto', 'realestate', 'cash', 'commodity',
+  ];
+
+  const targets: AssetAllocationTarget = {};
+
+  for (const cls of allClasses) {
+    const existing = existingTargets?.[cls];
+    targets[cls] = {
+      // Override asset class percentage with goal-derived value
+      targetPercentage: derived[cls] ?? 0,
+      // Preserve sub-category structure from user Settings
+      ...(existing?.useFixedAmount != null && { useFixedAmount: existing.useFixedAmount }),
+      ...(existing?.fixedAmount != null && { fixedAmount: existing.fixedAmount }),
+      ...(existing?.subCategoryConfig && { subCategoryConfig: existing.subCategoryConfig }),
+      ...(existing?.subTargets && { subTargets: existing.subTargets }),
+    };
+  }
+
+  return targets;
 }
 
 /**

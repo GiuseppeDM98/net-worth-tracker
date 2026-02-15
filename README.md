@@ -55,6 +55,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Multi-scenario projections (Bear / Base / Bull) with inflation adjustment
 - Per-scenario FIRE numbers with automatic savings stop at FIRE reached
 - **Goal-Based Investing**: allocate portfolio portions to financial goals (house, retirement, emergency fund, etc.) with progress tracking, recommended allocation comparison, and open-ended goal support
+- **Goal-Driven Allocation**: optionally derive portfolio allocation targets as a weighted average of goal recommended allocations, with automatic fallback to manual targets
 
 ### Monte Carlo Simulations
 - 4 asset classes: Equity, Bonds, Real Estate, Commodities

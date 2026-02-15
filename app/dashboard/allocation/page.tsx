@@ -38,10 +38,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { getAllAssets, ASSET_CLASS_ORDER } from '@/lib/services/assetService';
 import {
-  getTargets,
+  getSettings,
   compareAllocations,
   getDefaultTargets,
+  buildTargetsFromGoalAllocation,
 } from '@/lib/services/assetAllocationService';
+import { getGoalData, deriveTargetAllocationFromGoals } from '@/lib/services/goalService';
 import { Asset, AllocationResult, AssetAllocationTarget } from '@/types/assets';
 import { formatCurrency, formatPercentage } from '@/lib/services/chartService';
 import { Button } from '@/components/ui/button';
@@ -81,6 +83,7 @@ export default function AllocationPage() {
   const [targets, setTargets] = useState<AssetAllocationTarget | null>(null);
   const [allocation, setAllocation] = useState<AllocationResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [usingGoalTargets, setUsingGoalTargets] = useState(false);
 
   // TWO NAVIGATION STATE SYSTEMS:
   //
@@ -125,18 +128,44 @@ export default function AllocationPage() {
 
     try {
       setLoading(true);
-      const [assetsData, targetsData] = await Promise.all([
+      const [assetsData, settings, goalData] = await Promise.all([
         getAllAssets(user.uid),
-        getTargets(user.uid),
+        getSettings(user.uid),
+        getGoalData(user.uid),
       ]);
 
       setAssets(assetsData);
-      setTargets(targetsData || getDefaultTargets());
 
-      const allocationResult = compareAllocations(
-        assetsData,
-        targetsData || getDefaultTargets()
-      );
+      // Derive targets from goals when goal-based investing is enabled
+      let effectiveTargets: AssetAllocationTarget;
+      let fromGoals = false;
+
+      if (
+        settings?.goalBasedInvestingEnabled &&
+        settings?.goalDrivenAllocationEnabled &&
+        goalData &&
+        goalData.goals.length > 0
+      ) {
+        const derived = deriveTargetAllocationFromGoals(
+          goalData.goals,
+          goalData.assignments,
+          assetsData
+        );
+        if (derived) {
+          // Preserve sub-category structure from Settings while overriding asset class targets
+          effectiveTargets = buildTargetsFromGoalAllocation(derived, settings?.targets);
+          fromGoals = true;
+        } else {
+          effectiveTargets = settings?.targets || getDefaultTargets();
+        }
+      } else {
+        effectiveTargets = settings?.targets || getDefaultTargets();
+      }
+
+      setTargets(effectiveTargets);
+      setUsingGoalTargets(fromGoals);
+
+      const allocationResult = compareAllocations(assetsData, effectiveTargets);
       setAllocation(allocationResult);
     } catch (error) {
       console.error('Error loading allocation data:', error);
@@ -567,13 +596,24 @@ export default function AllocationPage() {
             Confronta l'allocazione corrente con i tuoi obiettivi
           </p>
         </div>
-        <Link href="/dashboard/settings">
-          <Button variant="outline">
-            <Settings className="mr-2 h-4 w-4" />
-            Modifica Target
-          </Button>
-        </Link>
+        {!usingGoalTargets && (
+          <Link href="/dashboard/settings">
+            <Button variant="outline">
+              <Settings className="mr-2 h-4 w-4" />
+              Modifica Target
+            </Button>
+          </Link>
+        )}
       </div>
+
+      {/* Goal-derived targets indicator */}
+      {usingGoalTargets && (
+        <div className="rounded-lg border border-green-200 bg-green-50/50 p-4 dark:border-green-800 dark:bg-green-950/10">
+          <p className="text-sm text-green-800 dark:text-green-200">
+            <strong>Target calcolati dagli obiettivi</strong> — I target di allocazione sono derivati come media pesata delle allocazioni raccomandate dei tuoi obiettivi finanziari.
+          </p>
+        </div>
+      )}
 
       {/* Legend (shared for both mobile and desktop) */}
       <div className="rounded-lg bg-blue-50 p-4">

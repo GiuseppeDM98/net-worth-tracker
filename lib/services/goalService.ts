@@ -222,6 +222,86 @@ export function cleanOrphanedAssignments(
 }
 
 /**
+ * Derive portfolio-level target allocation from goal recommended allocations.
+ *
+ * Computes a weighted average of each goal's recommendedAllocation, where the
+ * weight is targetAmount (if set) or currentValue (for open-ended goals).
+ * Goals without recommendedAllocation are excluded from the calculation.
+ *
+ * Returns null when no usable data is available (no goals with recommended
+ * allocation, or total weight is zero).
+ */
+export function deriveTargetAllocationFromGoals(
+  goals: InvestmentGoal[],
+  assignments: GoalAssetAssignment[],
+  assets: Asset[]
+): Partial<Record<AssetClass, number>> | null {
+  // Filter to goals that have a non-empty recommended allocation
+  const goalsWithAllocation = goals.filter(
+    (g) =>
+      g.recommendedAllocation &&
+      Object.keys(g.recommendedAllocation).length > 0
+  );
+
+  if (goalsWithAllocation.length === 0) return null;
+
+  // Determine weight for each goal
+  const weighted: { allocation: Partial<Record<AssetClass, number>>; weight: number }[] = [];
+  let totalWeight = 0;
+
+  for (const goal of goalsWithAllocation) {
+    let weight: number;
+
+    if (goal.targetAmount != null && goal.targetAmount > 0) {
+      weight = goal.targetAmount;
+    } else {
+      // Open-ended goal: use current assigned value as weight
+      const progress = calculateGoalProgress(goal, assignments, assets);
+      weight = progress.currentValue;
+    }
+
+    if (weight <= 0) continue;
+
+    weighted.push({ allocation: goal.recommendedAllocation!, weight });
+    totalWeight += weight;
+  }
+
+  if (totalWeight === 0) return null;
+
+  // Compute weighted average per asset class
+  const result: Partial<Record<AssetClass, number>> = {};
+
+  for (const { allocation, weight } of weighted) {
+    for (const [cls, pct] of Object.entries(allocation)) {
+      const current = result[cls as AssetClass] || 0;
+      result[cls as AssetClass] = current + ((pct as number) * weight) / totalWeight;
+    }
+  }
+
+  // Round to 1 decimal, ensure sum = 100% using remainder strategy
+  const entries = Object.entries(result) as [AssetClass, number][];
+  if (entries.length === 0) return null;
+
+  // Sort by value descending so the smallest class absorbs rounding error
+  entries.sort((a, b) => b[1] - a[1]);
+
+  const rounded: Partial<Record<AssetClass, number>> = {};
+  let allocated = 0;
+
+  for (let i = 0; i < entries.length - 1; i++) {
+    const pct = Math.round(entries[i][1] * 10) / 10;
+    rounded[entries[i][0]] = pct;
+    allocated += pct;
+  }
+
+  // Last class gets the remainder to guarantee sum = 100%
+  rounded[entries[entries.length - 1][0]] =
+    Math.round((100 - allocated) * 10) / 10;
+
+  return rounded;
+}
+
+/**
  * Get the available (unassigned) percentage for an asset.
  * Takes into account all existing assignments except those for a specific goal
  * (useful when editing an existing assignment).

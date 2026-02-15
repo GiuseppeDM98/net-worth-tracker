@@ -60,6 +60,8 @@ ALL fields in settings types must be handled in THREE places:
 2. `getSettings()` function (read from Firestore)
 3. `setSettings()` function (write to Firestore, with `if (field !== undefined)` check)
 
+**Gotcha**: `setSettings()` has TWO write branches (with targets → `setDoc` without merge, without targets → `setDoc` with merge). New fields must be added to BOTH branches or they won't persist.
+
 ### Firestore Nested Object Deletion
 - `merge: true` does RECURSIVE merge — cannot delete nested keys by omitting them
 - **Solution**: GET existing doc → spread + replace target field → `setDoc()` WITHOUT `merge: true`
@@ -145,6 +147,11 @@ ALL fields in settings types must be handled in THREE places:
 - `buildParamsFromScenario(baseParams, scenario)` spreads base + overrides market fields from scenario
 - **Files**: `lib/services/monteCarloService.ts`
 
+### Goal-Driven Allocation Override Pattern
+- When building `AssetAllocationTarget` from goal-derived data, always pass existing Settings targets to preserve sub-category structure
+- `buildTargetsFromGoalAllocation(derived, existingTargets)` overrides only `targetPercentage` at asset class level
+- **Files**: `assetAllocationService.ts`, `allocation/page.tsx`
+
 ### Category/Expense Move vs Reassign
 - **`reassignExpenses*`**: Used during category **deletion** — does NOT update `type` field
 - **`moveExpenses*`**: Used for standalone **move** — updates `type` field + flips amount sign on cross-type
@@ -208,4 +215,4 @@ ALL fields in settings types must be handled in THREE places:
 - **Expenses**: `CategoryMoveDialog.tsx`, `CategoryDeleteConfirmDialog.tsx`, `CategoryManagementDialog.tsx`
 - **Pages**: `app/dashboard/settings/page.tsx`, `history/page.tsx`
 
-**Last updated**: 2026-02-14
+**Last updated**: 2026-02-15

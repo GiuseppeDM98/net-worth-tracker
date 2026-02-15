@@ -119,6 +119,7 @@ export default function SettingsPage() {
   const [cashFixedAmount, setCashFixedAmount] = useState<number>(0);
   const [includePrimaryResidenceInFIRE, setIncludePrimaryResidenceInFIRE] = useState<boolean>(false);
   const [goalBasedInvestingEnabled, setGoalBasedInvestingEnabled] = useState<boolean>(false);
+  const [goalDrivenAllocationEnabled, setGoalDrivenAllocationEnabled] = useState<boolean>(false);
   const [assetClassStates, setAssetClassStates] = useState<
     Record<AssetClass, AssetClassState>
   >({} as Record<AssetClass, AssetClassState>);
@@ -274,6 +275,7 @@ export default function SettingsPage() {
         // Load FIRE setting (Bug #1 fix)
         setIncludePrimaryResidenceInFIRE(settingsData.includePrimaryResidenceInFIRE ?? false);
         setGoalBasedInvestingEnabled(settingsData.goalBasedInvestingEnabled ?? false);
+        setGoalDrivenAllocationEnabled(settingsData.goalDrivenAllocationEnabled ?? false);
         // Load dividend settings
         setDividendIncomeCategoryId(settingsData.dividendIncomeCategoryId || '');
         setDividendIncomeSubCategoryId(settingsData.dividendIncomeSubCategoryId || '');
@@ -834,6 +836,7 @@ export default function SettingsPage() {
         // Preserve FIRE settings (Bug #1 fix)
         includePrimaryResidenceInFIRE,
         goalBasedInvestingEnabled,
+        goalDrivenAllocationEnabled,
         withdrawalRate: settingsData?.withdrawalRate,
         plannedAnnualExpenses: settingsData?.plannedAnnualExpenses,
         targets,
@@ -1242,9 +1245,32 @@ export default function SettingsPage() {
               <Switch
                 id="goalBasedInvesting"
                 checked={goalBasedInvestingEnabled}
-                onCheckedChange={setGoalBasedInvestingEnabled}
+                onCheckedChange={(checked) => {
+                  setGoalBasedInvestingEnabled(checked);
+                  // Disable goal-driven allocation when goals are disabled
+                  if (!checked) setGoalDrivenAllocationEnabled(false);
+                }}
               />
             </div>
+
+            {/* Goal-Driven Allocation toggle — only visible when goals are enabled */}
+            {goalBasedInvestingEnabled && (
+              <div className="flex items-center justify-between border-t pt-4">
+                <div>
+                  <Label htmlFor="goalDrivenAllocation" className="text-sm font-medium">
+                    Allocazione da Obiettivi
+                  </Label>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Calcola i target di allocazione come media pesata delle allocazioni raccomandate degli obiettivi
+                  </p>
+                </div>
+                <Switch
+                  id="goalDrivenAllocation"
+                  checked={goalDrivenAllocationEnabled}
+                  onCheckedChange={setGoalDrivenAllocationEnabled}
+                />
+              </div>
+            )}
 
             <p className="text-sm text-gray-600">
               <strong>Nota:</strong> Il tasso risk-free può essere recuperato da{' '}
