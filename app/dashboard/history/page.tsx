@@ -1349,7 +1349,7 @@ export default function HistoryPage() {
           ) : (
             <div className="space-y-6">
               {/* Summary Metrics */}
-              <DoublingTimeSummaryCards summary={doublingTimeSummary} />
+              <DoublingTimeSummaryCards summary={doublingTimeSummary} doublingMode={doublingMode} />
 
               {/* Milestone Timeline */}
               <div>

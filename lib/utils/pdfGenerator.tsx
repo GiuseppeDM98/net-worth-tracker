@@ -64,6 +64,8 @@ export async function generatePDF(options: PDFGenerateOptions): Promise<void> {
       assets: options.assets,
       allocationTargets: options.allocationTargets,
       timeFilter: options.timeFilter,
+      selectedYear: options.selectedYear,
+      selectedMonth: options.selectedMonth,
     };
 
     // Step 3: Fetch and prepare section data
@@ -72,7 +74,9 @@ export async function generatePDF(options: PDFGenerateOptions): Promise<void> {
       options.userId,
       context,
       options.sections,
-      options.timeFilter
+      options.timeFilter,
+      options.selectedYear,
+      options.selectedMonth
     );
 
     console.log('Data fetched successfully');

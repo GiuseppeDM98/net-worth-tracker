@@ -5,33 +5,38 @@ import type { MonthlySnapshot } from '@/types/assets';
 import type { SectionSelection, TimeFilter, TimeFilterValidation } from '@/types/pdf';
 
 /**
- * Filter snapshots by time filter
+ * Filter snapshots by time filter.
+ *
+ * Optional year/month allow exporting past periods (not just current).
+ * Falls back to current date when not specified, preserving backwards compatibility.
  *
  * @param snapshots - Array of all snapshots
  * @param timeFilter - Filter type: 'total' | 'yearly' | 'monthly'
+ * @param year - Target year (defaults to current year)
+ * @param month - Target month 1-12 (defaults to current month)
  * @returns Filtered snapshots array
  */
 export function filterSnapshotsByTime(
   snapshots: MonthlySnapshot[],
-  timeFilter: TimeFilter = 'total'
+  timeFilter: TimeFilter = 'total',
+  year?: number,
+  month?: number
 ): MonthlySnapshot[] {
   if (timeFilter === 'total') {
     return snapshots;
   }
 
   const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1; // JavaScript 0-11 → 1-12
+  const targetYear = year ?? now.getFullYear();
+  const targetMonth = month ?? (now.getMonth() + 1);
 
   if (timeFilter === 'yearly') {
-    // From January 1st of current year to today
-    return snapshots.filter(s => s.year === currentYear);
+    return snapshots.filter(s => s.year === targetYear);
   }
 
   if (timeFilter === 'monthly') {
-    // Only snapshots from current month
     return snapshots.filter(s =>
-      s.year === currentYear && s.month === currentMonth
+      s.year === targetYear && s.month === targetMonth
     );
   }
 
@@ -39,23 +44,30 @@ export function filterSnapshotsByTime(
 }
 
 /**
- * Filter expenses by time filter
+ * Filter expenses by time filter.
+ *
+ * Optional year/month allow exporting past periods.
+ * Falls back to current date when not specified.
  *
  * @param expenses - Array of all expenses
  * @param timeFilter - Filter type: 'total' | 'yearly' | 'monthly'
+ * @param year - Target year (defaults to current year)
+ * @param month - Target month 1-12 (defaults to current month)
  * @returns Filtered expenses array
  */
 export function filterExpensesByTime(
   expenses: any[],
-  timeFilter: TimeFilter = 'total'
+  timeFilter: TimeFilter = 'total',
+  year?: number,
+  month?: number
 ): any[] {
   if (timeFilter === 'total') {
     return expenses;
   }
 
   const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1; // JavaScript 0-11 → 1-12
+  const targetYear = year ?? now.getFullYear();
+  const targetMonth = month ?? (now.getMonth() + 1);
 
   return expenses.filter(expense => {
     // Handle both Date and Firestore Timestamp
@@ -67,11 +79,11 @@ export function filterExpensesByTime(
     const expenseMonth = date.getMonth() + 1;
 
     if (timeFilter === 'yearly') {
-      return expenseYear === currentYear;
+      return expenseYear === targetYear;
     }
 
     if (timeFilter === 'monthly') {
-      return expenseYear === currentYear && expenseMonth === currentMonth;
+      return expenseYear === targetYear && expenseMonth === targetMonth;
     }
 
     return true;
@@ -79,7 +91,10 @@ export function filterExpensesByTime(
 }
 
 /**
- * Validate available data for each time filter option
+ * Validate available data for each time filter option.
+ *
+ * Checks ALL available years/months (not just current) so users can export
+ * past periods even if the current period has no data yet.
  *
  * @param snapshots - Array of all snapshots
  * @returns Validation object with availability flags
@@ -91,12 +106,16 @@ export function validateTimeFilterData(
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
 
-  const monthlySnapshots = filterSnapshotsByTime(snapshots, 'monthly');
-  const yearlySnapshots = filterSnapshotsByTime(snapshots, 'yearly');
+  // Check if any year has enough data for yearly export (>=2 snapshots)
+  const snapshotsByYear = new Map<number, number>();
+  for (const s of snapshots) {
+    snapshotsByYear.set(s.year, (snapshotsByYear.get(s.year) ?? 0) + 1);
+  }
+  const hasYearlyData = Array.from(snapshotsByYear.values()).some(count => count >= 2);
 
   return {
-    hasMonthlyData: monthlySnapshots.length >= 1,
-    hasYearlyData: yearlySnapshots.length >= 2,
+    hasMonthlyData: snapshots.length >= 1,
+    hasYearlyData,
     hasTotalData: snapshots.length >= 2,
     currentMonth,
     currentYear,
@@ -104,28 +123,50 @@ export function validateTimeFilterData(
 }
 
 /**
- * Adjust sections for time filter (disable FIRE, history, and performance for monthly)
+ * Adjust sections for time filter and period selection.
+ *
+ * Disabling rules:
+ * - Monthly: only Cashflow available (all others disabled)
+ * - Past yearly: Portfolio/Allocation/Summary disabled (no historical asset-level data)
+ * - Current yearly / Total: all sections available
  *
  * @param timeFilter - Selected time filter
  * @param currentSections - Current section selection
+ * @param isPastPeriod - True when exporting a past year or any monthly period
  * @returns Adjusted section selection
  */
 export function adjustSectionsForTimeFilter(
   timeFilter: TimeFilter,
-  currentSections: SectionSelection
+  currentSections: SectionSelection,
+  isPastPeriod?: boolean
 ): SectionSelection {
   if (timeFilter === 'monthly') {
-    // Monthly: disable FIRE, history, and performance sections
-    // Rationale: These sections require multiple time periods for meaningful metrics
+    // Monthly: only Cashflow is meaningful for a single month
     return {
       ...currentSections,
       fire: false,
       history: false,
       performance: false,
+      portfolio: false,
+      allocation: false,
+      summary: false,
     };
   }
 
-  // Yearly and Total: all sections available
+  // Past yearly: disable sections that need current asset-level data.
+  // FIRE also disabled: it uses current net worth and unfiltered expenses,
+  // so it would show identical data regardless of selected year.
+  if (isPastPeriod) {
+    return {
+      ...currentSections,
+      portfolio: false,
+      allocation: false,
+      summary: false,
+      fire: false,
+    };
+  }
+
+  // Current yearly and Total: all sections available
   return currentSections;
 }
 
@@ -181,34 +222,44 @@ export function getTimeFilterTooltip(
   validation: TimeFilterValidation
 ): string | undefined {
   if (timeFilter === 'monthly' && !validation.hasMonthlyData) {
-    return `Nessuno snapshot disponibile per ${validation.currentMonth}/${validation.currentYear}`;
+    return 'Nessuno snapshot disponibile per export mensile';
   }
 
   if (timeFilter === 'yearly' && !validation.hasYearlyData) {
-    return `Dati insufficienti per l'anno ${validation.currentYear} (minimo 2 snapshot)`;
+    return 'Dati insufficienti per export annuale (minimo 2 snapshot in un anno)';
   }
 
   return undefined;
 }
 
 /**
- * Get formatted label for time filter option
+ * Get formatted label for time filter option.
+ *
+ * Accepts optional selectedYear/selectedMonth to display the user's chosen
+ * period instead of the current date.
  *
  * @param timeFilter - Time filter type
  * @param validation - Validation results for dynamic year/month
+ * @param selectedYear - User-selected year (defaults to current)
+ * @param selectedMonth - User-selected month (defaults to current)
  * @returns Formatted label
  */
 export function getTimeFilterLabel(
   timeFilter: TimeFilter,
-  validation: TimeFilterValidation
+  validation: TimeFilterValidation,
+  selectedYear?: number,
+  selectedMonth?: number
 ): string {
   switch (timeFilter) {
     case 'total':
       return 'Export Totale';
     case 'yearly':
-      return `Export Annuale (${validation.currentYear})`;
-    case 'monthly':
-      return `Export Mensile (${validation.currentMonth}/${validation.currentYear})`;
+      return `Export Annuale (${selectedYear ?? validation.currentYear})`;
+    case 'monthly': {
+      const m = selectedMonth ?? validation.currentMonth;
+      const y = selectedYear ?? validation.currentYear;
+      return `Export Mensile (${m}/${y})`;
+    }
     default:
       return 'Export Totale';
   }

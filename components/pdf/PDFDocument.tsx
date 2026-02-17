@@ -74,6 +74,8 @@ export function PDFDocument({
         generatedAt={context.generatedAt}
         userName={context.userName}
         timeFilter={context.timeFilter}
+        selectedYear={context.selectedYear}
+        selectedMonth={context.selectedMonth}
       />
 
       {/* Portfolio section - Asset details with pagination (25 assets per page) */}

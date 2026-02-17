@@ -10,10 +10,15 @@ interface CoverSectionProps {
   generatedAt: Date;
   userName: string;
   timeFilter?: TimeFilter;
+  selectedYear?: number;
+  selectedMonth?: number;
 }
 
 /**
- * Derives report type label from time filter with current date context.
+ * Derives report type label from time filter and user-selected period.
+ *
+ * Uses selectedYear/selectedMonth when provided (custom period export),
+ * falls back to current date for backwards compatibility.
  *
  * Capitalization logic:
  * Italian month names from toLocaleString() are lowercase ("gennaio", "febbraio").
@@ -24,18 +29,24 @@ interface CoverSectionProps {
  * - Yearly: "Report Annuale - 2024"
  * - Total: "Report Totale"
  */
-function getReportTypeLabel(timeFilter?: TimeFilter): string {
+function getReportTypeLabel(
+  timeFilter?: TimeFilter,
+  selectedYear?: number,
+  selectedMonth?: number
+): string {
   const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.toLocaleString('it-IT', { month: 'long' });
-  // Capitalize first letter: "gennaio" → "Gennaio"
-  const capitalizedMonth = currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1);
+  const year = selectedYear ?? now.getFullYear();
 
   switch (timeFilter) {
-    case 'monthly':
-      return `Report Mensile - ${capitalizedMonth} ${currentYear}`;
+    case 'monthly': {
+      // Build a Date from the selected month to get Italian locale name
+      const monthIndex = (selectedMonth ?? (now.getMonth() + 1)) - 1;
+      const monthName = new Date(2024, monthIndex).toLocaleString('it-IT', { month: 'long' });
+      const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+      return `Report Mensile - ${capitalizedMonth} ${year}`;
+    }
     case 'yearly':
-      return `Report Annuale - ${currentYear}`;
+      return `Report Annuale - ${year}`;
     case 'total':
     default:
       return 'Report Totale';
@@ -58,7 +69,7 @@ function getReportTypeLabel(timeFilter?: TimeFilter): string {
  * @param userName - User's display name
  * @param timeFilter - Report period (total/yearly/monthly)
  */
-export function CoverSection({ generatedAt, userName, timeFilter }: CoverSectionProps) {
+export function CoverSection({ generatedAt, userName, timeFilter, selectedYear, selectedMonth }: CoverSectionProps) {
   const formattedDate = format(generatedAt, 'dd/MM/yyyy', { locale: it });
 
   return (
@@ -70,7 +81,7 @@ export function CoverSection({ generatedAt, userName, timeFilter }: CoverSection
         {/* Report Type Badge */}
         {timeFilter && (
           <View style={styles.badge}>
-            <Text style={styles.badgeText}>{getReportTypeLabel(timeFilter)}</Text>
+            <Text style={styles.badgeText}>{getReportTypeLabel(timeFilter, selectedYear, selectedMonth)}</Text>
           </View>
         )}
 

@@ -65,7 +65,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 
 ### Other
 - **Hall of Fame** — Monthly and annual performance rankings with multi-section note system
-- **PDF Export** — 8 configurable sections (performance metrics only in annual/total exports)
+- **PDF Export** — 8 configurable sections with custom year/month period selection; sections auto-disabled for past periods when historical data is unavailable
 
 ## Quick Start
 

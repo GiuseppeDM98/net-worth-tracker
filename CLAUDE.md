@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio
-- Ultima implementazione: Asset a quantità zero + prezzo a 4 decimali (2026-02-17)
+- Ultima implementazione: PDF custom period export + doubling cards dynamic text (2026-02-17)
 - In corso ora: nessuna attivita attiva
 
 ## Architecture Snapshot
@@ -20,7 +20,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Cashflow con categorie, filtri, Sankey 5-layer, drill-down 4 livelli, Analisi Periodo con filtri anno+mese. Bulk move transazioni tra categorie (cross-type, da Settings).
 - Snapshot mensili automatici + storico e CSV export.
 - Asset price/value history tables con aggregazione per nome e badge "Venduto".
-- History page: Net Worth evolution, Asset Class breakdown, Liquidity, YoY variation, Savings vs Investment Growth, Doubling Time Analysis (geometrico + soglie fisse), Current vs Target allocation.
+- History page: Net Worth evolution, Asset Class breakdown, Liquidity, YoY variation, Savings vs Investment Growth, Doubling Time Analysis (geometrico + soglie fisse, summary cards adattivi alla modalità), Current vs Target allocation.
 - Performance metrics (ROI, CAGR, TWR, IRR, Sharpe, drawdown suite, YOC, Current Yield) con heatmap, underwater chart, rolling charts. Organizzate in 4 categorie (Rendimento, Rischio, Contesto, Dividendi).
 - Dividendi multi-currency con conversione EUR, scraping Borsa Italiana, calendario mensile con drill-down.
 - Hall of Fame con ranking mensili/annuali e sistema note dedicato multi-sezione.
@@ -31,7 +31,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - **Auto-fill allocazione** da portafoglio reale: le 4 classi MC vengono estratte dall'allocazione corrente e normalizzate a 100% (crypto e cash escluse). Fallback 60/40/0/0 se nessuna delle 4 classi presente.
 - **Goal-Based Investing**: allocazione mentale di porzioni del portafoglio a obiettivi finanziari (casa, pensione, auto, fondo emergenza). Toggle in Settings. Assegnazione asset per percentuale (memorizzata come %, mostrata in EUR). Confronto allocazione effettiva vs consigliata per obiettivo. Obiettivi open-ended (senza importo target) supportati. 3° tab in FIRE e Simulazioni.
   - **Goal-Driven Allocation**: toggle separato in Settings. Quando attivo, la pagina Allocation deriva i target come media pesata delle `recommendedAllocation` degli obiettivi (peso = `targetAmount` o `currentValue` per open-ended). Sub-categories preservate dai Settings manuali. Fallback ai target manuali se dati insufficienti.
-- PDF Export con 8 sezioni configurabili (Performance solo in export annuali/totali).
+- PDF Export con 8 sezioni configurabili, selezione anno/mese custom per export annuali e mensili. Sezioni auto-disabilitate per periodi passati (Portfolio/Allocation/Summary/FIRE usano dati live). Monthly: solo Cashflow.
 - **AI Performance Analysis**: Claude Sonnet 4.5 con SSE streaming, Extended Thinking, Web Search (Tavily).
 
 ## Testing
@@ -72,7 +72,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Bond Scraping: `lib/services/borsaItalianaBondScraperService.ts`, `lib/helpers/priceUpdater.ts`, `app/api/prices/bond-quote/route.ts`
 - Utils: `lib/utils/dateHelpers.ts`, `formatters.ts`, `assetPriceHistoryUtils.ts`
 - Auth: `lib/utils/authHelpers.ts`, `contexts/AuthContext.tsx`
-- PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`
+- PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`, `components/pdf/PDFExportDialog.tsx`, `lib/utils/pdfTimeFilters.ts`, `lib/utils/pdfGenerator.tsx`
 - Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`, `borsaItalianaBondScraper.test.ts`, `goalService.test.ts`
 
 **Last updated**: 2026-02-17

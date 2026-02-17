@@ -148,6 +148,13 @@ ALL fields in settings types must be handled in THREE places:
 - `buildParamsFromScenario(baseParams, scenario)` spreads base + overrides market fields from scenario
 - **Files**: `lib/services/monteCarloService.ts`
 
+### PDF Past Period Export Pattern
+- `context.assets` in the PDF pipeline is **live current data**, not historical → sections that depend on it (Portfolio, Allocation, Summary, FIRE) must be disabled for past periods
+- `adjustSectionsForTimeFilter(timeFilter, sections, isPastPeriod)` handles the matrix: monthly → only Cashflow; past yearly → Cashflow + History + Performance; current yearly / total → all sections
+- `filterSnapshotsByTime` / `filterExpensesByTime` accept optional `year?`/`month?` with fallback to `new Date()` (backwards compatible)
+- For past-year performance: use `timePeriod = 'ALL'` (not `'YTD'`) because snapshots are already pre-filtered to the selected year
+- **Files**: `pdfTimeFilters.ts`, `PDFExportDialog.tsx`, `pdfDataService.ts`
+
 ### Goal-Driven Allocation Override Pattern
 - When building `AssetAllocationTarget` from goal-derived data, always pass existing Settings targets to preserve sub-category structure
 - `buildTargetsFromGoalAllocation(derived, existingTargets)` overrides only `targetPercentage` at asset class level

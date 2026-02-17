@@ -69,7 +69,9 @@ export async function fetchPDFData(
   userId: string,
   context: PDFDataContext,
   sections: SectionSelection,
-  timeFilter?: TimeFilter
+  timeFilter?: TimeFilter,
+  selectedYear?: number,
+  selectedMonth?: number
 ): Promise<PDFSectionData> {
   const data: PDFSectionData = {};
 
@@ -103,9 +105,9 @@ export async function fetchPDFData(
     }
 
     if (sections.cashflow) {
-      // Filter expenses for cashflow section based on timeFilter
+      // Filter expenses for cashflow section based on timeFilter and user-selected period
       const filteredExpenses = timeFilter
-        ? filterExpensesByTime(cachedExpenses!, timeFilter)
+        ? filterExpensesByTime(cachedExpenses!, timeFilter, selectedYear, selectedMonth)
         : cachedExpenses!;
       data.cashflow = prepareCashflowData(filteredExpenses);
     }
@@ -125,7 +127,8 @@ export async function fetchPDFData(
         userId,
         context.snapshots,
         timeFilter,
-        cachedExpenses ?? undefined
+        cachedExpenses ?? undefined,
+        selectedYear
       ) ?? undefined;
     }
 
@@ -490,24 +493,29 @@ export async function prepareFireData(
  * Monthly exports are not supported as performance metrics require multiple time periods.
  *
  * @param userId - User ID for fetching settings and dividends
- * @param snapshots - Monthly snapshots for performance calculation
+ * @param snapshots - Monthly snapshots for performance calculation (already pre-filtered)
  * @param timeFilter - Time filter ('yearly' or 'total', monthly returns null)
  * @param cachedExpenses - Optional pre-fetched expenses to avoid duplicate queries
+ * @param selectedYear - User-selected year for yearly exports (affects period label)
  * @returns PerformanceData with metrics and period label, or null if insufficient data
  */
 export async function preparePerformanceData(
   userId: string,
   snapshots: MonthlySnapshot[],
   timeFilter: TimeFilter = 'total',
-  cachedExpenses?: any[]
+  cachedExpenses?: any[],
+  selectedYear?: number
 ): Promise<PerformanceData | null> {
   // Early exit for monthly exports (performance metrics not meaningful for single month)
   if (timeFilter === 'monthly') {
     return null;
   }
 
-  // Determine time period based on filter
-  const timePeriod: TimePeriod = timeFilter === 'yearly' ? 'YTD' : 'ALL';
+  // Snapshots arrive pre-filtered from the dialog, so use 'ALL' to avoid
+  // double-filtering (YTD would filter to current year, breaking past-year exports)
+  const currentYear = new Date().getFullYear();
+  const isPastYear = selectedYear != null && selectedYear < currentYear;
+  const timePeriod: TimePeriod = (timeFilter === 'yearly' && !isPastYear) ? 'YTD' : 'ALL';
 
   try {
     // Fetch settings for risk-free rate and dividend category
@@ -567,9 +575,9 @@ export async function preparePerformanceData(
     }
 
     // Generate period label for display
-    const currentYear = new Date().getFullYear();
+    const displayYear = selectedYear ?? new Date().getFullYear();
     const periodLabel = timeFilter === 'yearly'
-      ? `YTD ${currentYear}`
+      ? (isPastYear ? `Anno ${displayYear}` : `YTD ${displayYear}`)
       : 'Storico Totale';
 
     return {

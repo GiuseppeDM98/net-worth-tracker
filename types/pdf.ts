@@ -16,6 +16,8 @@ export interface PDFDataContext {
   assets: Asset[];
   allocationTargets: AssetAllocationTarget;
   timeFilter?: TimeFilter;
+  selectedYear?: number;
+  selectedMonth?: number;
 }
 
 export interface SectionSelection {
@@ -260,6 +262,8 @@ export interface PDFGenerateOptions {
   assets: Asset[];
   allocationTargets: AssetAllocationTarget;
   timeFilter?: TimeFilter;     // Optional: default 'total'
+  selectedYear?: number;
+  selectedMonth?: number;
 }
 
 export interface PDFGenerationResult {

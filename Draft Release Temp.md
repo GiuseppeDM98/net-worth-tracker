@@ -140,6 +140,25 @@
   - Month-over-month percentage changes recalculate correctly based on accurate totals
 - Fixed Radix Select crash when choosing "No subcategory" option during category reassignment (empty string value not allowed by Radix UI)
 
+### PDF Export Custom Period Selection
+- Annual and monthly PDF exports can now target any past year or month — no longer locked to the current date
+- Year dropdown populated from available snapshot data (most recent first)
+- Month dropdown for monthly exports, dynamically filtered by available months in the selected year
+- Intelligent section disabling for past periods:
+  - **Past yearly export**: Portfolio, Allocation, Summary, and FIRE sections are automatically disabled (they use live portfolio data, not historical)
+  - **Monthly export**: Only Cashflow section is available (single-month data lacks context for trends and projections)
+  - **Current year / Total export**: All 8 sections remain available
+- Disabled sections show explanatory warning messages in the export dialog
+- Cover page and report labels correctly reflect the selected period (e.g., "Report Annuale - 2024")
+- Performance data for past years uses correct period label ("Anno 2024" instead of "YTD 2024")
+
+### Dynamic Doubling Time Summary Cards
+- Summary cards in the Doubling Time Analysis section now adapt their text to the selected calculation mode
+- **Geometric mode**: "Raddoppio Più Rapido", "Tempo Medio di Raddoppio", doubling-focused tooltips
+- **Threshold mode**: "Traguardo Più Rapido", "Tempo Medio per Traguardo", milestone-focused tooltips
+- Subtitle text ("raddoppio/i" vs "traguardo/i") and tooltip explanations update accordingly
+- Previously, cards always showed doubling-related text regardless of mode selection
+
 ## 🔧 Improvements
 
 ### Monte Carlo Smart Asset Allocation
