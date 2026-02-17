@@ -198,6 +198,17 @@
 - All displays updated: asset cards, management table, and tax calculator
 - Backward compatible: existing assets with 2 decimals display correctly with trailing zeros
 
+### Asset Price Display at 4 Decimal Places
+- Asset prices now display with 4 decimal places throughout the app (asset table, cards, tax calculator), matching the existing precision of average cost (PMC)
+- More accurate price display for bonds, low-priced stocks, and cryptocurrencies
+- Manual price input field now accepts up to 4 decimal places
+
+### Zero-Quantity Asset Support
+- Assets with a quantity of 0 can now be saved to the portfolio — useful for tracking fully sold positions without losing history
+- Zero-quantity assets show an "Azzerato" badge in the asset table and mobile cards for quick identification
+- Zero-quantity assets appear with a "Venduto" badge in price history — historical data is preserved and the badge disappears automatically when quantity is restored
+- Dashboard asset counter excludes zero-quantity assets from the total count
+
 ### Other Improvements
 - Improved milestone calculation accuracy by skipping pre-existing thresholds
 - Added responsive design support for doubling time cards (mobile/tablet/desktop layouts)

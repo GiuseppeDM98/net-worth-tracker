@@ -368,7 +368,16 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
 
                       return (
                         <TableRow key={asset.id} className={isManualPrice ? 'bg-amber-50' : ''}>
-                          <TableCell className="font-medium">{asset.name}</TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              {asset.name}
+                              {asset.quantity === 0 && (
+                                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-500 border border-gray-300">
+                                  Azzerato
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell>{asset.ticker}</TableCell>
                           <TableCell>{formatAssetName(asset.type)}</TableCell>
                           <TableCell>
@@ -384,7 +393,7 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
                             </span>
                           </TableCell>
                           <TableCell className="text-right">{formatNumber(asset.quantity, 2)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(asset.currentPrice)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(asset.currentPrice, asset.currency, 4)}</TableCell>
                           <TableCell className="text-right">
                             {asset.averageCost ? (
                               formatCurrency(asset.averageCost, asset.currency, 4)

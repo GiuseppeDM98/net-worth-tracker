@@ -121,7 +121,7 @@ export default function DashboardPage() {
     totalValue: calculateTotalValue(assets),
     liquidNetWorth: calculateLiquidNetWorth(assets),
     illiquidNetWorth: calculateIlliquidNetWorth(assets),
-    assetCount: assets.length,
+    assetCount: assets.filter(a => a.quantity > 0).length,
     unrealizedGains: calculateTotalUnrealizedGains(assets),
     estimatedTaxes: calculateTotalEstimatedTaxes(assets),
     liquidEstimatedTaxes: calculateLiquidEstimatedTaxes(assets),

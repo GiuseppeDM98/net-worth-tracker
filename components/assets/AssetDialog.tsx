@@ -100,7 +100,7 @@ const assetSchema = z.object({
   assetClass: z.enum(['equity', 'bonds', 'crypto', 'realestate', 'cash', 'commodity']),
   subCategory: z.string().optional(),
   currency: z.string().min(1, 'Currency is required'),
-  quantity: z.number().positive('Quantity must be positive'),
+  quantity: z.number().min(0, 'La quantità non può essere negativa'),
   manualPrice: z.number().positive('Price must be positive').optional().or(z.nan()),
   averageCost: z.number().positive('Average cost must be positive').optional().or(z.nan()),
   taxRate: z.number().min(0, 'Tax rate must be at least 0').max(100, 'Tax rate must be at most 100').optional().or(z.nan()),
@@ -1070,7 +1070,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
               <Input
                 id="manualPrice"
                 type="number"
-                step="0.01"
+                step="0.0001"
                 {...register('manualPrice', { valueAsNumber: true })}
                 placeholder={`Lascia vuoto per recupero automatico da ${priceSource}`}
               />

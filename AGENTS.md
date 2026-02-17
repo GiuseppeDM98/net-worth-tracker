@@ -92,6 +92,7 @@ ALL fields in settings types must be handled in THREE places:
 - Calculate totals on all filtered data (not just current page), use EUR amounts for multi-currency
 
 ### Asset Patterns
+- **Zero-Quantity Assets**: `quantity = 0` is valid and saved to Firestore (Zod uses `.min(0)`, not `.positive()`). In `assetPriceHistoryUtils.ts`, set `isDeleted: asset.quantity === 0` in the `currentAssets.forEach` loop so the "Venduto" badge appears in price history. Dashboard counter filters `quantity > 0`. No backend validation — client-side only by design.
 - **Historical Aggregation**: Use `name` (not `assetId`) as key to unify re-purchased assets
 - **Borsa Italiana Dividends**: Pass `assetType` to scraper (ETF vs Stock table structures differ)
 - **Borsa Italiana Bond Scraping**:
@@ -215,4 +216,4 @@ ALL fields in settings types must be handled in THREE places:
 - **Expenses**: `CategoryMoveDialog.tsx`, `CategoryDeleteConfirmDialog.tsx`, `CategoryManagementDialog.tsx`
 - **Pages**: `app/dashboard/settings/page.tsx`, `history/page.tsx`
 
-**Last updated**: 2026-02-15
+**Last updated**: 2026-02-17

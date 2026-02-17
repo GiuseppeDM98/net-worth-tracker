@@ -192,7 +192,7 @@ export function PerformanceSection({ data }: PerformanceSectionProps) {
         {/* Category 4: Dividend Metrics (conditional) */}
         {hasDividendData && (
           <View style={styles.categorySection}>
-            <Text style={styles.categoryTitle}>💰 Metriche Dividendi</Text>
+            <Text style={styles.categoryTitle}>Metriche Dividendi</Text>
             <Text style={styles.categoryDescription}>
               Rendimento da dividendi (annualizzato)
             </Text>

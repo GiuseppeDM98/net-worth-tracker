@@ -113,6 +113,11 @@ export function AssetCard({
             {asset.ticker && (
               <p className="text-sm text-gray-500 mt-0.5">{asset.ticker}</p>
             )}
+            {asset.quantity === 0 && (
+              <Badge variant="outline" className="mt-1 text-xs text-gray-500 bg-gray-100">
+                Azzerato
+              </Badge>
+            )}
           </div>
           <Badge
             className="ml-2"
@@ -207,7 +212,7 @@ export function AssetCard({
           <div>
             <span className="text-gray-500">Prezzo:</span>{' '}
             <span className="font-medium">
-              {formatCurrency(asset.currentPrice)}
+              {formatCurrency(asset.currentPrice, asset.currency, 4)}
             </span>
           </div>
           {asset.averageCost && (

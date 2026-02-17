@@ -169,7 +169,7 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
               </div>
               <div>
                 <span className="text-gray-600">Prezzo corrente:</span>{' '}
-                <span className="font-medium">{formatCurrency(asset.currentPrice)}</span>
+                <span className="font-medium">{formatCurrency(asset.currentPrice, asset.currency, 4)}</span>
               </div>
               <div>
                 <span className="text-gray-600">PMC:</span>{' '}

@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio
-- Ultima implementazione: Goal-Driven Allocation — target allocazione derivati da obiettivi finanziari (2026-02-15)
+- Ultima implementazione: Asset a quantità zero + prezzo a 4 decimali (2026-02-17)
 - In corso ora: nessuna attivita attiva
 
 ## Architecture Snapshot
@@ -16,7 +16,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Timezone: Europe/Rome via `lib/utils/dateHelpers.ts` helpers (`getItalyDate`, `getItalyMonth`, `getItalyYear`, `getItalyMonthYear`)
 
 ## Key Features (Active)
-- Portfolio multi-asset con aggiornamento prezzi Yahoo Finance (average cost 4 decimali). Bond con ISIN: scraping automatico prezzi da Borsa Italiana con fallback Yahoo Finance.
+- Portfolio multi-asset con aggiornamento prezzi Yahoo Finance (prezzo e average cost a 4 decimali). Asset con quantità zero supportati: badge "Azzerato" in tabella, esclusi dal conteggio overview, marcati "Venduto" nello storico. Bond con ISIN: scraping automatico prezzi da Borsa Italiana con fallback Yahoo Finance.
 - Cashflow con categorie, filtri, Sankey 5-layer, drill-down 4 livelli, Analisi Periodo con filtri anno+mese. Bulk move transazioni tra categorie (cross-type, da Settings).
 - Snapshot mensili automatici + storico e CSV export.
 - Asset price/value history tables con aggregazione per nome e badge "Venduto".
@@ -75,4 +75,4 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`
 - Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`, `borsaItalianaBondScraper.test.ts`, `goalService.test.ts`
 
-**Last updated**: 2026-02-15
+**Last updated**: 2026-02-17

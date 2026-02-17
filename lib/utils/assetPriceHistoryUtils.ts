@@ -170,10 +170,11 @@ export function transformPriceHistoryData(
   // Add current assets (group by name)
   currentAssets.forEach((asset) => {
     // Use name as key - if multiple assets with same name exist, use latest ticker
+    // qty=0 behaves like sold in price history — show Venduto badge, preserve historical data
     assetMetadata.set(asset.name, {
       ticker: asset.ticker,
       name: asset.name,
-      isDeleted: false,
+      isDeleted: asset.quantity === 0,
     });
   });
 
