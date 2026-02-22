@@ -18,8 +18,19 @@
 'use client';
 
 import { useEffect, useState, useMemo, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
 import { Expense, ExpenseCategory, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
-import { calculateTotalIncome, calculateTotalExpenses, calculateNetBalance, calculateIncomeExpenseRatio } from '@/lib/services/expenseService';
+import {
+  calculateTotalIncome,
+  calculateTotalExpenses,
+  calculateNetBalance,
+  calculateIncomeExpenseRatio,
+  getExpensesByRecurringParentId,
+  getExpensesByInstallmentParentId,
+} from '@/lib/services/expenseService';
+import { updateCashAssetBalance } from '@/lib/services/assetService';
+import { queryKeys } from '@/lib/query/queryKeys';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -63,6 +74,8 @@ interface ExpenseTrackingTabProps {
  * 4. Add type validation in ExpenseDialog schema
  */
 export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh }: ExpenseTrackingTabProps) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const currentYear = new Date().getFullYear();
   const currentMonth = String(new Date().getMonth() + 1); // 1-based month (1-12)
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -294,7 +307,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
       const deleteSingle = window.confirm(confirmMessage);
 
       if (deleteSingle) {
-        await deleteSingleExpense(expense.id);
+        await deleteSingleExpense(expense);
       } else {
         const deleteAll = window.confirm(`Vuoi eliminare TUTTE le ${expense.installmentTotal} rate?`);
         if (deleteAll) {
@@ -313,7 +326,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
       const deleteSingle = window.confirm(confirmMessage);
 
       if (deleteSingle) {
-        await deleteSingleExpense(expense.id);
+        await deleteSingleExpense(expense);
       } else {
         const deleteAll = window.confirm('Vuoi eliminare TUTTE le voci ricorrenti correlate?');
         if (deleteAll) {
@@ -326,15 +339,20 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
         `Sei sicuro di voler eliminare questa voce?${expense.notes ? `\n\n"${expense.notes}"` : ''}`
       );
       if (confirmDelete) {
-        await deleteSingleExpense(expense.id);
+        await deleteSingleExpense(expense);
       }
     }
   };
 
-  const deleteSingleExpense = async (expenseId: string) => {
+  const deleteSingleExpense = async (expense: Expense) => {
     try {
+      // Reverse the balance effect on the linked cash asset before deleting
+      if (expense.linkedCashAssetId) {
+        await updateCashAssetBalance(expense.linkedCashAssetId, -expense.amount);
+        if (user) queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
+      }
       const { deleteExpense } = await import('@/lib/services/expenseService');
-      await deleteExpense(expenseId);
+      await deleteExpense(expense.id);
       toast.success('Voce eliminata con successo');
       await onRefresh();
     } catch (error) {
@@ -345,6 +363,16 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
 
   const deleteAllRecurringExpenses = async (recurringParentId: string) => {
     try {
+      // Reverse balance effects before bulk-deleting (only the first entry stores linkedCashAssetId)
+      const seriesExpenses = await getExpensesByRecurringParentId(recurringParentId);
+      for (const exp of seriesExpenses) {
+        if (exp.linkedCashAssetId) {
+          await updateCashAssetBalance(exp.linkedCashAssetId, -exp.amount);
+        }
+      }
+      if (user && seriesExpenses.some(e => e.linkedCashAssetId)) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
+      }
       const { deleteRecurringExpenses } = await import('@/lib/services/expenseService');
       await deleteRecurringExpenses(recurringParentId);
       toast.success('Tutte le voci ricorrenti sono state eliminate');
@@ -357,6 +385,16 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
 
   const deleteAllInstallmentExpenses = async (installmentParentId: string) => {
     try {
+      // Reverse balance effects before bulk-deleting (only the first installment stores linkedCashAssetId)
+      const seriesExpenses = await getExpensesByInstallmentParentId(installmentParentId);
+      for (const exp of seriesExpenses) {
+        if (exp.linkedCashAssetId) {
+          await updateCashAssetBalance(exp.linkedCashAssetId, -exp.amount);
+        }
+      }
+      if (user && seriesExpenses.some(e => e.linkedCashAssetId)) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
+      }
       const { deleteInstallmentExpenses } = await import('@/lib/services/expenseService');
       await deleteInstallmentExpenses(installmentParentId);
       toast.success('Tutte le rate sono state eliminate');

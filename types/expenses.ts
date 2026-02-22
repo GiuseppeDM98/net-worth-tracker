@@ -73,6 +73,9 @@ export interface Expense {
   installmentNumber?: number; // Current installment number (1, 2, 3...)
   installmentTotal?: number; // Total number of installments in series
   installmentTotalAmount?: number; // Total amount of the purchase (for analytics)
+  // Optional link to a cash-class asset whose balance is updated when this expense is saved.
+  // Only stored on single expenses or the first entry of a recurring/installment series.
+  linkedCashAssetId?: string;
   createdAt: Date | Timestamp;
   updatedAt: Date | Timestamp;
 }
@@ -95,6 +98,7 @@ export interface ExpenseFormData {
   installmentTotalAmount?: number; // Total amount to divide (auto mode only)
   installmentAmounts?: number[]; // Individual amounts for each installment (manual mode)
   installmentStartDate?: Date; // Date of first installment
+  linkedCashAssetId?: string; // ID of cash asset whose balance is updated on save
 }
 
 export interface MonthlyExpenseSummary {

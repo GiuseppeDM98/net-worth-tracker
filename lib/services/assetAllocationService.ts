@@ -38,6 +38,8 @@ export async function getSettings(
       monteCarloScenarios: data.monteCarloScenarios,
       goalBasedInvestingEnabled: data.goalBasedInvestingEnabled,
       goalDrivenAllocationEnabled: data.goalDrivenAllocationEnabled,
+      defaultDebitCashAssetId: data.defaultDebitCashAssetId,
+      defaultCreditCashAssetId: data.defaultCreditCashAssetId,
       targets: data.targets as AssetAllocationTarget,
     };
   } catch (error) {
@@ -119,6 +121,12 @@ export async function setSettings(
       if (settings.goalDrivenAllocationEnabled !== undefined) {
         docData.goalDrivenAllocationEnabled = settings.goalDrivenAllocationEnabled;
       }
+      if (settings.defaultDebitCashAssetId !== undefined) {
+        docData.defaultDebitCashAssetId = settings.defaultDebitCashAssetId;
+      }
+      if (settings.defaultCreditCashAssetId !== undefined) {
+        docData.defaultCreditCashAssetId = settings.defaultCreditCashAssetId;
+      }
 
       // Use setDoc WITHOUT merge to completely replace targets
       await setDoc(targetRef, docData);
@@ -161,6 +169,12 @@ export async function setSettings(
       }
       if (settings.goalDrivenAllocationEnabled !== undefined) {
         docData.goalDrivenAllocationEnabled = settings.goalDrivenAllocationEnabled;
+      }
+      if (settings.defaultDebitCashAssetId !== undefined) {
+        docData.defaultDebitCashAssetId = settings.defaultDebitCashAssetId;
+      }
+      if (settings.defaultCreditCashAssetId !== undefined) {
+        docData.defaultCreditCashAssetId = settings.defaultCreditCashAssetId;
       }
 
       // Use merge: true to preserve existing fields

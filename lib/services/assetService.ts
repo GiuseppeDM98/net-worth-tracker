@@ -257,6 +257,41 @@ export async function updateAssetPrice(
 }
 
 /**
+ * Update a cash asset's balance by applying a signed delta.
+ *
+ * Used when a cashflow transaction is created, edited, or deleted to keep
+ * the linked cash asset's balance in sync.
+ *
+ * Formula: newPrice = (currentPrice * quantity + signedDelta) / quantity
+ * Works correctly for any quantity (typically 1 for simple bank accounts).
+ * No clamping: allows negative values (overdraft scenario).
+ *
+ * @param assetId - ID of the cash asset to update
+ * @param signedDelta - Amount to add (positive = increase, negative = decrease)
+ */
+export async function updateCashAssetBalance(assetId: string, signedDelta: number): Promise<void> {
+  try {
+    const asset = await getAssetById(assetId);
+    if (!asset) {
+      // Asset may have been deleted — silently skip to avoid blocking the expense operation
+      console.warn(`updateCashAssetBalance: asset ${assetId} not found, skipping balance update`);
+      return;
+    }
+
+    // For cash assets, treat quantity as the direct balance (e.g., €8000 balance = quantity 8000)
+    const newQuantity = asset.quantity + signedDelta;
+    const assetRef = doc(db, ASSETS_COLLECTION, assetId);
+    await updateDoc(assetRef, {
+      quantity: newQuantity,
+      updatedAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error('Error updating cash asset balance:', error);
+    throw new Error('Failed to update cash asset balance');
+  }
+}
+
+/**
  * Delete an asset and its future dividends
  * Only deletes dividends with ex-date > today to preserve historical data
  * Uses API endpoint to leverage Admin SDK and bypass Firestore Security Rules

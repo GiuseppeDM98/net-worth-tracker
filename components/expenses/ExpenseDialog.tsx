@@ -33,6 +33,7 @@ import { useEffect, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Expense,
@@ -41,8 +42,12 @@ import {
   EXPENSE_TYPE_LABELS,
   ExpenseCategory
 } from '@/types/expenses';
+import { Asset } from '@/types/assets';
 import { createExpense, updateExpense } from '@/lib/services/expenseService';
+import { getAllAssets, updateCashAssetBalance } from '@/lib/services/assetService';
+import { getSettings } from '@/lib/services/assetAllocationService';
 import { getAllCategories, addSubCategory } from '@/lib/services/expenseCategoryService';
+import { queryKeys } from '@/lib/query/queryKeys';
 import { Timestamp } from 'firebase/firestore';
 import { CategoryManagementDialog } from '@/components/expenses/CategoryManagementDialog';
 import {
@@ -107,6 +112,7 @@ const expenseSchema = z.object({
   installmentTotalAmount: z.number().positive().optional(),
   installmentAmounts: z.array(z.number()).optional(),
   installmentStartDate: z.date().optional(),
+  linkedCashAssetId: z.string().optional(),
 }).refine((data) => {
   // Custom validation: when isInstallment is true, validate mode-specific required fields
   if (data.isInstallment) {
@@ -147,8 +153,12 @@ const expenseTypes: { value: ExpenseType; label: string }[] = [
 
 export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDialogProps) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
+  const [cashAssets, setCashAssets] = useState<Asset[]>([]);
+  const [defaultDebitCashAssetId, setDefaultDebitCashAssetId] = useState<string>('__none__');
+  const [defaultCreditCashAssetId, setDefaultCreditCashAssetId] = useState<string>('__none__');
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [newSubCategoryName, setNewSubCategoryName] = useState('');
   const [addingSubCategory, setAddingSubCategory] = useState(false);
@@ -160,6 +170,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
     reset,
     setValue,
     watch,
+    getValues,
     control,
     formState: { errors, isSubmitting },
   } = useForm<ExpenseFormValues>({
@@ -174,6 +185,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
       installmentMode: 'auto',
       installmentCount: 2,
       installmentAmounts: [],
+      linkedCashAssetId: '__none__',
     },
   });
 
@@ -182,10 +194,11 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
   const selectedIsRecurring = watch('isRecurring');
   const selectedDate = watch('date');
 
-  // Load categories when dialog opens
+  // Load categories and cash assets when dialog opens
   useEffect(() => {
     if (open && user) {
       loadCategories();
+      loadCashAssets();
     }
   }, [open, user]);
 
@@ -214,6 +227,35 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
     }
   };
 
+  const loadCashAssets = async () => {
+    if (!user) return;
+    try {
+      const [allAssets, settings] = await Promise.all([
+        getAllAssets(user.uid),
+        getSettings(user.uid),
+      ]);
+      setCashAssets(allAssets.filter(a => a.assetClass === 'cash'));
+      const debitId = settings?.defaultDebitCashAssetId || '__none__';
+      const creditId = settings?.defaultCreditCashAssetId || '__none__';
+      setDefaultDebitCashAssetId(debitId);
+      setDefaultCreditCashAssetId(creditId);
+
+      // Apply default immediately for new expenses using the current form type.
+      // This handles the initial open case where selectedType hasn't changed
+      // (so the separate useEffect wouldn't fire for the initial 'variable' type).
+      if (!expense) {
+        const currentType = getValues('type');
+        const defaultId = currentType === 'income' ? creditId : debitId;
+        if (defaultId !== '__none__') {
+          setValue('linkedCashAssetId', defaultId);
+        }
+      }
+    } catch (error) {
+      // Non-blocking: cash assets are optional, don't show a toast
+      console.error('Error loading cash assets:', error);
+    }
+  };
+
   useEffect(() => {
     if (expense) {
       reset({
@@ -228,6 +270,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
         isRecurring: expense.isRecurring || false,
         recurringDay: expense.recurringDay,
         recurringMonths: 1,
+        linkedCashAssetId: expense.linkedCashAssetId || '__none__',
       });
     } else {
       reset({
@@ -242,9 +285,22 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
         isRecurring: false,
         recurringDay: new Date().getDate(),
         recurringMonths: 12,
+        linkedCashAssetId: '__none__',
       });
     }
   }, [expense, reset, open]);
+
+  // Apply default cash account for new expenses once settings are loaded.
+  // Runs when defaults change (i.e., after loadCashAssets resolves) and when type changes.
+  // Only for new expenses — edits keep the account already saved on the expense.
+  useEffect(() => {
+    if (!expense && open) {
+      const defaultId = selectedType === 'income' ? defaultCreditCashAssetId : defaultDebitCashAssetId;
+      if (defaultId !== '__none__') {
+        setValue('linkedCashAssetId', defaultId);
+      }
+    }
+  }, [defaultDebitCashAssetId, defaultCreditCashAssetId, selectedType, expense, open, setValue]);
 
   // Auto-set recurring day when date changes
   // Why: When user enables recurring expenses and selects a date, we automatically
@@ -334,6 +390,9 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
       subCategoryName = subCategory?.name;
     }
 
+    // Resolve sentinel '__none__' to undefined — no linked account selected
+    const linkedCashAssetId = data.linkedCashAssetId !== '__none__' ? data.linkedCashAssetId : undefined;
+
     try {
       const expenseData: ExpenseFormData = {
         type: data.type,
@@ -359,19 +418,60 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
           ? data.installmentAmounts
           : undefined,
         installmentStartDate: data.isInstallment ? data.installmentStartDate : undefined,
+
+        // Linked cash account for automatic balance updates
+        linkedCashAssetId,
       };
 
       if (expense) {
-        // Update existing expense
+        // === EDIT: Update existing expense ===
+        // For edit, pass null explicitly to clear the linked asset if user deselected it.
+        // null persists to Firestore (removing the field), whereas undefined would be stripped.
+        const updatesWithLink = {
+          ...expenseData,
+          linkedCashAssetId: linkedCashAssetId ?? null,
+        };
         await updateExpense(
           expense.id,
-          expenseData,
+          updatesWithLink as ExpenseFormData,
           selectedCategory.name,
           subCategoryName
         );
         toast.success('Spesa aggiornata con successo');
+
+        // Update linked cash asset balances to reflect the change.
+        // Compute signed amounts using the same sign convention as the DB.
+        const oldLinkedAssetId = expense.linkedCashAssetId;
+        const newLinkedAssetId = linkedCashAssetId;
+        const oldSignedAmount = expense.amount; // already signed from DB
+        const newSignedAmount = data.type !== 'income' ? -Math.abs(data.amount) : Math.abs(data.amount);
+
+        let assetUpdated = false;
+        if (oldLinkedAssetId && newLinkedAssetId && oldLinkedAssetId === newLinkedAssetId) {
+          // Same asset: apply delta only to avoid double-reads
+          const delta = newSignedAmount - oldSignedAmount;
+          if (Math.abs(delta) > 0.001) {
+            await updateCashAssetBalance(oldLinkedAssetId, delta);
+            assetUpdated = true;
+          }
+        } else {
+          // Different assets (or one side is missing): reverse old, apply new
+          if (oldLinkedAssetId) {
+            await updateCashAssetBalance(oldLinkedAssetId, -oldSignedAmount);
+            assetUpdated = true;
+          }
+          if (newLinkedAssetId) {
+            await updateCashAssetBalance(newLinkedAssetId, newSignedAmount);
+            assetUpdated = true;
+          }
+        }
+
+        if (assetUpdated) {
+          queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
+        }
+
       } else {
-        // Create new expense
+        // === CREATE: New expense ===
         const result = await createExpense(
           user.uid,
           expenseData,
@@ -390,6 +490,33 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
           }
         } else {
           toast.success('Spesa creata con successo');
+        }
+
+        // Update the linked cash asset balance for the first (immediate) payment.
+        // For recurring/installment series, only the first entry has linkedCashAssetId stored.
+        if (linkedCashAssetId) {
+          let firstSignedAmount: number;
+
+          if (expenseData.isInstallment && expenseData.installmentCount && expenseData.installmentCount > 1) {
+            // Compute signed amount of the first installment
+            let firstAmt: number;
+            if (expenseData.installmentMode === 'auto') {
+              // Mirrors the splitting logic in createInstallmentExpenses
+              firstAmt = Math.floor((expenseData.installmentTotalAmount! / expenseData.installmentCount) * 100) / 100;
+            } else {
+              firstAmt = expenseData.installmentAmounts![0];
+            }
+            firstSignedAmount = data.type !== 'income' ? -Math.abs(firstAmt) : Math.abs(firstAmt);
+          } else if (expenseData.isRecurring && expenseData.recurringMonths && expenseData.recurringMonths > 0) {
+            // Recurring is always debt — amount is negative
+            firstSignedAmount = -Math.abs(data.amount);
+          } else {
+            // Single expense
+            firstSignedAmount = data.type !== 'income' ? -Math.abs(data.amount) : Math.abs(data.amount);
+          }
+
+          await updateCashAssetBalance(linkedCashAssetId, firstSignedAmount);
+          queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
         }
       }
 
@@ -731,6 +858,37 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
               Aggiungi un link per tenere traccia di ordini, ricevute, ecc.
             </p>
           </div>
+
+          {/* ========== Linked Cash Account Section ========== */}
+
+          {/* Linked cash account — only shown when user has at least one cash asset */}
+          {cashAssets.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="linkedCashAssetId">
+                {selectedType === 'income' ? 'Conto di Accredito' : 'Conto di Prelievo'}
+                <span className="text-muted-foreground font-normal ml-1">(opzionale)</span>
+              </Label>
+              <Select
+                value={watch('linkedCashAssetId') || '__none__'}
+                onValueChange={(value) => setValue('linkedCashAssetId', value)}
+              >
+                <SelectTrigger id="linkedCashAssetId">
+                  <SelectValue placeholder="Nessun conto" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Nessun conto</SelectItem>
+                  {cashAssets.map((asset) => (
+                    <SelectItem key={asset.id} value={asset.id}>
+                      {asset.name} ({asset.currency})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Il saldo del conto selezionato viene aggiornato automaticamente al salvataggio.
+              </p>
+            </div>
+          )}
 
           {/* ========== Advanced Features Section ========== */}
 

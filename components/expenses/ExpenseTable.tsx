@@ -25,8 +25,18 @@
  */
 
 import { useState, useMemo, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
-import { deleteExpense, deleteRecurringExpenses, deleteInstallmentExpenses } from '@/lib/services/expenseService';
+import {
+  deleteExpense,
+  deleteRecurringExpenses,
+  deleteInstallmentExpenses,
+  getExpensesByRecurringParentId,
+  getExpensesByInstallmentParentId,
+} from '@/lib/services/expenseService';
+import { updateCashAssetBalance } from '@/lib/services/assetService';
+import { queryKeys } from '@/lib/query/queryKeys';
 import { Timestamp } from 'firebase/firestore';
 import {
   Table,
@@ -52,6 +62,9 @@ interface ExpenseTableProps {
 }
 
 export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
   // ========== State Management ==========
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -110,7 +123,7 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
       const deleteSingle = window.confirm(confirmMessage);
 
       if (deleteSingle) {
-        await deleteSingleExpense(expense.id, expense.notes || 'questa voce');
+        await deleteSingleExpense(expense);
       } else {
         const deleteAll = window.confirm(
           `Vuoi eliminare TUTTE le ${expense.installmentTotal} rate?`
@@ -130,7 +143,7 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
       const deleteSingle = window.confirm(confirmMessage);
 
       if (deleteSingle) {
-        await deleteSingleExpense(expense.id, expense.notes || 'questa voce');
+        await deleteSingleExpense(expense);
       } else {
         const deleteAll = window.confirm(
           'Vuoi eliminare TUTTE le voci ricorrenti correlate?'
@@ -145,15 +158,20 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
         `Sei sicuro di voler eliminare questa voce?${expense.notes ? `\n\n"${expense.notes}"` : ''}`
       );
       if (confirmDelete) {
-        await deleteSingleExpense(expense.id, expense.notes || 'questa voce');
+        await deleteSingleExpense(expense);
       }
     }
   };
 
-  const deleteSingleExpense = async (expenseId: string, description: string) => {
+  const deleteSingleExpense = async (expense: Expense) => {
     try {
-      setDeletingId(expenseId);
-      await deleteExpense(expenseId);
+      setDeletingId(expense.id);
+      // Reverse the balance effect on the linked cash asset before deleting
+      if (expense.linkedCashAssetId) {
+        await updateCashAssetBalance(expense.linkedCashAssetId, -expense.amount);
+        if (user) queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
+      }
+      await deleteExpense(expense.id);
       toast.success('Voce eliminata con successo');
       onRefresh();
     } catch (error) {
@@ -167,6 +185,16 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
   const deleteAllRecurringExpenses = async (recurringParentId: string) => {
     try {
       setDeletingId(recurringParentId);
+      // Reverse balance effects before bulk-deleting (only the first entry stores linkedCashAssetId)
+      const seriesExpenses = await getExpensesByRecurringParentId(recurringParentId);
+      for (const exp of seriesExpenses) {
+        if (exp.linkedCashAssetId) {
+          await updateCashAssetBalance(exp.linkedCashAssetId, -exp.amount);
+        }
+      }
+      if (user && seriesExpenses.some(e => e.linkedCashAssetId)) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
+      }
       await deleteRecurringExpenses(recurringParentId);
       toast.success('Tutte le voci ricorrenti sono state eliminate');
       onRefresh();
@@ -181,6 +209,16 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
   const deleteAllInstallmentExpenses = async (installmentParentId: string) => {
     try {
       setDeletingId(installmentParentId);
+      // Reverse balance effects before bulk-deleting (only the first installment stores linkedCashAssetId)
+      const seriesExpenses = await getExpensesByInstallmentParentId(installmentParentId);
+      for (const exp of seriesExpenses) {
+        if (exp.linkedCashAssetId) {
+          await updateCashAssetBalance(exp.linkedCashAssetId, -exp.amount);
+        }
+      }
+      if (user && seriesExpenses.some(e => e.linkedCashAssetId)) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
+      }
       await deleteInstallmentExpenses(installmentParentId);
       toast.success('Tutte le rate sono state eliminate');
       onRefresh();

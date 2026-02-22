@@ -248,6 +248,7 @@ export async function createExpense(
       notes: expenseData.notes,
       link: expenseData.link,
       isRecurring: false,
+      linkedCashAssetId: expenseData.linkedCashAssetId,
       createdAt: now,
       updatedAt: now,
     });
@@ -315,6 +316,9 @@ async function createRecurringExpenses(
         isRecurring: true,
         recurringDay,
         recurringParentId: parentId,
+        // Only store on the first entry — balance update applies to current payment only,
+        // not to future-dated recurring instances.
+        linkedCashAssetId: i === 0 ? expenseData.linkedCashAssetId : undefined,
         createdAt: now,
         updatedAt: now,
       });
@@ -425,6 +429,10 @@ async function createInstallmentExpenses(
         installmentTotal: installmentCount,
         installmentTotalAmount: totalAmount,
 
+        // Only store on the first installment — balance update applies to the immediate
+        // payment only, not to future-dated installments.
+        linkedCashAssetId: i === 0 ? expenseData.linkedCashAssetId : undefined,
+
         createdAt: now,
         updatedAt: now,
       });
@@ -497,6 +505,7 @@ export async function updateExpense(
       categoryName,
       subCategoryName,
       date: updates.date ? Timestamp.fromDate(updates.date) : undefined,
+      linkedCashAssetId: updates.linkedCashAssetId,
       updatedAt: Timestamp.now(),
     });
 
@@ -1131,5 +1140,59 @@ export async function moveExpensesFromSubCategory(
   } catch (error) {
     console.error('Error moving expenses from subcategory:', error);
     throw new Error('Failed to move expenses from subcategory');
+  }
+}
+
+/**
+ * Fetch all expenses in a recurring series by parent ID.
+ *
+ * Used before deleting a series to identify which entries had a linked cash asset
+ * so the asset balance can be reversed before deletion.
+ *
+ * @param recurringParentId - The shared parent ID of the recurring series
+ */
+export async function getExpensesByRecurringParentId(recurringParentId: string): Promise<Expense[]> {
+  try {
+    const expensesRef = collection(db, EXPENSES_COLLECTION);
+    const q = query(expensesRef, where('recurringParentId', '==', recurringParentId));
+    const snapshot = await getDocs(q);
+
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      date: doc.data().date?.toDate() || new Date(),
+      createdAt: doc.data().createdAt?.toDate() || new Date(),
+      updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+    })) as Expense[];
+  } catch (error) {
+    console.error('Error fetching recurring series expenses:', error);
+    throw new Error('Failed to fetch recurring series expenses');
+  }
+}
+
+/**
+ * Fetch all expenses in an installment series by parent ID.
+ *
+ * Used before deleting a series to identify which entries had a linked cash asset
+ * so the asset balance can be reversed before deletion.
+ *
+ * @param installmentParentId - The shared parent ID of the installment series
+ */
+export async function getExpensesByInstallmentParentId(installmentParentId: string): Promise<Expense[]> {
+  try {
+    const expensesRef = collection(db, EXPENSES_COLLECTION);
+    const q = query(expensesRef, where('installmentParentId', '==', installmentParentId));
+    const snapshot = await getDocs(q);
+
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      date: doc.data().date?.toDate() || new Date(),
+      createdAt: doc.data().createdAt?.toDate() || new Date(),
+      updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+    })) as Expense[];
+  } catch (error) {
+    console.error('Error fetching installment series expenses:', error);
+    throw new Error('Failed to fetch installment series expenses');
   }
 }

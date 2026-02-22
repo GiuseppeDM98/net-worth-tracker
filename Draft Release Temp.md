@@ -2,6 +2,19 @@
 
 ## ✨ New Features
 
+### Linked Cash Account for Transactions
+- Link any expense or income entry to a cash account (bank account, current account) directly from the transaction dialog
+- Account balance updates automatically when a transaction is saved — no manual adjustment needed
+- Bidirectional: editing a transaction adjusts the balance by the delta; deleting reverses the effect
+- For recurring and installment series, only the first entry updates the account balance
+- Optional field: fully backwards-compatible with existing transactions
+
+### Default Cash Accounts in Settings
+- Set a default withdrawal account for expenses and a separate default credit account for income in Settings
+- Pre-selected automatically when creating new transactions — override anytime in the dialog
+- Label in the dialog adapts dynamically: "Withdrawal Account" for expenses, "Credit Account" for income
+- Dropdowns only appear in Settings if you have at least one cash-class asset
+
 ### Unified Month Filter for Cashflow Charts
 - Added unified month filter for 3 main cashflow charts in Current Year tab: Sankey diagram, Expenses by Category, and Income by Category
 - Filter dropdown with all 12 months in Italian + "All year" option to easily analyze specific months

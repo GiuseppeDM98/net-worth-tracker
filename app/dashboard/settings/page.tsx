@@ -55,6 +55,8 @@ import { Save, RotateCcw, Plus, Trash2, ChevronDown, ChevronUp, Edit, Receipt, F
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { ExpenseCategory, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
+import { Asset } from '@/types/assets';
+import { getAllAssets } from '@/lib/services/assetService';
 import { getAllCategories, deleteCategory, getCategoryById } from '@/lib/services/expenseCategoryService';
 import { getExpenseCountByCategoryId, reassignExpensesCategory, clearExpensesCategoryAssignment, moveExpensesToCategory } from '@/lib/services/expenseService';
 import { CategoryManagementDialog } from '@/components/expenses/CategoryManagementDialog';
@@ -145,6 +147,11 @@ export default function SettingsPage() {
   const [categoryToMove, setCategoryToMove] = useState<ExpenseCategory | null>(null);
   const [expenseCountToMove, setExpenseCountToMove] = useState(0);
 
+  // Default cash account settings
+  const [cashAssets, setCashAssets] = useState<Asset[]>([]);
+  const [defaultDebitCashAssetId, setDefaultDebitCashAssetId] = useState<string>('__none__');
+  const [defaultCreditCashAssetId, setDefaultCreditCashAssetId] = useState<string>('__none__');
+
   // Dividend settings state
   const [dividendIncomeCategoryId, setDividendIncomeCategoryId] = useState<string>('');
   const [dividendIncomeSubCategoryId, setDividendIncomeSubCategoryId] = useState<string>('');
@@ -159,6 +166,9 @@ export default function SettingsPage() {
     if (user) {
       loadTargets();
       loadExpenseCategories();
+      getAllAssets(user.uid).then((assets) =>
+        setCashAssets(assets.filter((a) => a.assetClass === 'cash'))
+      );
     }
   }, [user]);
 
@@ -276,6 +286,9 @@ export default function SettingsPage() {
         setIncludePrimaryResidenceInFIRE(settingsData.includePrimaryResidenceInFIRE ?? false);
         setGoalBasedInvestingEnabled(settingsData.goalBasedInvestingEnabled ?? false);
         setGoalDrivenAllocationEnabled(settingsData.goalDrivenAllocationEnabled ?? false);
+        // Load default cash account settings
+        setDefaultDebitCashAssetId(settingsData.defaultDebitCashAssetId || '__none__');
+        setDefaultCreditCashAssetId(settingsData.defaultCreditCashAssetId || '__none__');
         // Load dividend settings
         setDividendIncomeCategoryId(settingsData.dividendIncomeCategoryId || '');
         setDividendIncomeSubCategoryId(settingsData.dividendIncomeSubCategoryId || '');
@@ -842,6 +855,8 @@ export default function SettingsPage() {
         targets,
         dividendIncomeCategoryId: dividendIncomeCategoryId || undefined,
         dividendIncomeSubCategoryId: dividendIncomeSubCategoryId || undefined,
+        defaultDebitCashAssetId: defaultDebitCashAssetId !== '__none__' ? defaultDebitCashAssetId : undefined,
+        defaultCreditCashAssetId: defaultCreditCashAssetId !== '__none__' ? defaultCreditCashAssetId : undefined,
       });
       toast.success('Impostazioni salvate con successo');
     } catch (error) {
@@ -1269,6 +1284,56 @@ export default function SettingsPage() {
                   checked={goalDrivenAllocationEnabled}
                   onCheckedChange={setGoalDrivenAllocationEnabled}
                 />
+              </div>
+            )}
+
+            {/* Default cash accounts for cashflow */}
+            {cashAssets.length > 0 && (
+              <div className="border-t pt-4 space-y-4">
+                <div>
+                  <Label className="text-sm font-medium">Conti di Default (Cashflow)</Label>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Pre-selezionati nel dialog delle spese/entrate per nuove transazioni
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label htmlFor="defaultDebitAccount" className="text-sm">
+                      Conto di Prelievo (spese)
+                    </Label>
+                    <Select value={defaultDebitCashAssetId} onValueChange={setDefaultDebitCashAssetId}>
+                      <SelectTrigger id="defaultDebitAccount">
+                        <SelectValue placeholder="Nessun default" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Nessun default</SelectItem>
+                        {cashAssets.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            {a.name} ({a.currency})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="defaultCreditAccount" className="text-sm">
+                      Conto di Accredito (entrate)
+                    </Label>
+                    <Select value={defaultCreditCashAssetId} onValueChange={setDefaultCreditCashAssetId}>
+                      <SelectTrigger id="defaultCreditAccount">
+                        <SelectValue placeholder="Nessun default" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Nessun default</SelectItem>
+                        {cashAssets.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            {a.name} ({a.currency})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
             )}
 

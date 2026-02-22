@@ -93,6 +93,7 @@ ALL fields in settings types must be handled in THREE places:
 
 ### Asset Patterns
 - **Zero-Quantity Assets**: `quantity = 0` is valid and saved to Firestore (Zod uses `.min(0)`, not `.positive()`). In `assetPriceHistoryUtils.ts`, set `isDeleted: asset.quantity === 0` in the `currentAssets.forEach` loop so the "Venduto" badge appears in price history. Dashboard counter filters `quantity > 0`. No backend validation — client-side only by design.
+- **Cash Asset Balance**: For `assetClass === 'cash'` assets, `quantity` IS the balance (e.g., €8000 = quantity 8000, price stays fixed). Update balance via `updateDoc({ quantity: newQuantity })`, NOT via `updateAssetPrice`/`currentPrice`. See `updateCashAssetBalance()` in `assetService.ts`.
 - **Historical Aggregation**: Use `name` (not `assetId`) as key to unify re-purchased assets
 - **Borsa Italiana Dividends**: Pass `assetType` to scraper (ETF vs Stock table structures differ)
 - **Borsa Italiana Bond Scraping**:
@@ -172,6 +173,12 @@ ALL fields in settings types must be handled in THREE places:
 - **Why**: Otherwise the reset effect fires after data changes and wipes user selections
 - **Files**: `components/expenses/CategoryMoveDialog.tsx`, `CategoryDeleteConfirmDialog.tsx`
 
+### Dialog Async Pre-fill Pattern
+- A `useEffect` watching async state won't fire on dialog open if the dep already had that value (e.g., `selectedType` was already `'variable'` before open, so it doesn't re-trigger)
+- **Fix**: Call `setValue()` directly inside the async loader using `getValues('field')` to read current form state synchronously after the await
+- Keep the `useEffect` only for subsequent user-triggered changes (e.g., type change after open)
+- **Files**: `components/expenses/ExpenseDialog.tsx` (`loadCashAssets`)
+
 ### Unit Testing with Vitest
 - **Config**: `vitest.config.ts` with `@/` path alias, tests in `__tests__/*.test.ts`
 - **Run**: `npm test` (single run), `npm run test:watch` (watch mode)
@@ -223,4 +230,4 @@ ALL fields in settings types must be handled in THREE places:
 - **Expenses**: `CategoryMoveDialog.tsx`, `CategoryDeleteConfirmDialog.tsx`, `CategoryManagementDialog.tsx`
 - **Pages**: `app/dashboard/settings/page.tsx`, `history/page.tsx`
 
-**Last updated**: 2026-02-17
+**Last updated**: 2026-02-22
