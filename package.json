@@ -51,6 +51,9 @@
     "yahoo-finance2": "^3.11.2",
     "zod": "^4.1.12"
   },
+  "overrides": {
+    "minimatch": ">=10.2.1"
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
