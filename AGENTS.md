@@ -114,10 +114,17 @@ ALL fields in settings types must be handled in THREE places:
   - **Phase 3 must use `getFollowingCouponDate(paidDate, frequency, maturityDate)`** — advances exactly one period from the PAID coupon's date, no "today" comparison
   - `getApplicableCouponRate(paymentDate, issueDate, baseRate, schedule?)` — for step-up bonds; computes bond-year as `Math.ceil(elapsedMonths / 12)` (min 1), finds matching `CouponRateTier`, falls back to `baseRate`
   - `nominalValue × quantity` = total face value; both coupon math and price conversion use this product
+- **Auto-generated dividend cleanup — never create zero-amount entries**: when `quantity === 0` (asset sold), `POST /api/dividends` still runs cleanup (`deleteUpcomingCouponsForAsset`) but returns early before creating the record. Check `if (quantity === 0)` server-side after cleanup, return 200 without insertion. Same pattern for `finalPremium`.
 - **Currency**: Use `currencyConversionService.ts` (Frankfurter API, 24h cache)
 - **Chart Y Axis**: Use `formatCurrencyCompact()` on mobile
 - **Doubling Time**: Skip pre-existing milestones (`threshold <= firstPositive.totalNetWorth`)
 - **Dividend Calendar**: Use `paymentDate` (not `exDate`) for display and filters
+
+### DividendStats Filter Coupling
+- `DividendStats` makes an **independent** API fetch to `/api/dividends/stats` — it does NOT read from parent filtered state
+- Any filter added to `DividendTrackingTab` (asset, date range, type) **must be explicitly passed** as a prop to `DividendStats` and forwarded to the API, otherwise charts and table will be out of sync
+- Asset dropdown scope: only `equity` + `bonds` (not crypto/cash/realestate/commodity) — bonds included because coupons are tracked as dividend entries
+- `calculateDividendStats` in `dividendService.ts` accepts optional `assetId?` and filters after the Firestore fetch (no composite index needed; volume per user is manageable)
 
 ### Anthropic API Patterns
 - **Current date in prompt**: Provide `Oggi è il ${today}` for time-sensitive analysis (knowledge cutoff)

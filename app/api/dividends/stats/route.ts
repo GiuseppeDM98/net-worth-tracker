@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get('userId');
     const startDateStr = searchParams.get('startDate');
     const endDateStr = searchParams.get('endDate');
+    const assetId = searchParams.get('assetId') || undefined;
 
     if (!userId) {
       return NextResponse.json(
@@ -43,11 +44,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Calculate period statistics (filtered or all-time)
-    const periodStats = await calculateDividendStats(userId, startDate, endDate);
+    // Calculate period statistics (filtered by date range and optionally by asset)
+    const periodStats = await calculateDividendStats(userId, startDate, endDate, assetId);
 
-    // Calculate all-time statistics
-    const allTimeStats = await calculateDividendStats(userId);
+    // Calculate all-time statistics (also filtered by asset if provided)
+    const allTimeStats = await calculateDividendStats(userId, undefined, undefined, assetId);
 
     // Get upcoming dividends and filter by asset ownership
     const upcomingDividends = await getUpcomingDividends(userId);

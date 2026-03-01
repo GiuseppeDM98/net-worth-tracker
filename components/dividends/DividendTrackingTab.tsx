@@ -320,10 +320,7 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
         </p>
       </div>
 
-      {/* Stats Component */}
-      <DividendStats startDate={startDate} endDate={endDate} />
-
-      {/* Filters Row */}
+      {/* Filters Row — positioned at top so they affect both charts and table */}
       <div className="rounded-md border p-4 bg-muted/50">
         <h3 className="font-semibold mb-4">Filtri</h3>
         <div className="grid gap-4 md:grid-cols-4">
@@ -415,6 +412,13 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
           </div>
         )}
       </div>
+
+      {/* Stats Component — receives active filters so charts reflect current selection */}
+      <DividendStats
+        startDate={startDate}
+        endDate={endDate}
+        assetId={assetFilter !== '__all__' ? assetFilter : undefined}
+      />
 
       {/* View Mode Toggle */}
       <div className="flex gap-2 border-b border-border">

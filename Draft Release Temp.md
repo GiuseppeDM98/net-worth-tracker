@@ -144,6 +144,10 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed dividend page asset filter not showing bond assets — bonds are now listed alongside stocks and ETFs in the filter dropdown so you can filter coupon entries by bond
+- Fixed dividend charts (by asset, by year, monthly trend) not updating when filtering by a specific asset — selecting an asset now refreshes both the table and all stats charts together
+- Fixed a zero-value coupon entry being created when a bond's quantity was set to 0 (sold position) — coupons are now correctly cleaned up and no €0 record is inserted
+
 - Fixed bond total value showing 10× lower than expected when using Borsa Italiana prices — bond prices are quoted as a percentage of par value (e.g. 104.2%) and are now correctly converted to EUR per unit using the nominal value before being saved (e.g. 104.2% × €1,000 nominal = €1,042 per bond)
 
 - Fixed Time-Weighted Return (TWR) showing inflated values for short time periods — on a YTD period with only 1–2 months of data, TWR could show values approximately 2× higher than CAGR for the same period. TWR and CAGR now use the same period duration calculation and produce consistent annualized results.
@@ -189,6 +193,12 @@
 - Previously, cards always showed doubling-related text regardless of mode selection
 
 ## 🔧 Improvements
+
+### Dividend Page Filter Repositioned to Top
+- Filters (asset, type, date range) are now displayed above the statistics charts instead of below them
+- Since filters affect both the charts and the transaction table, placing them at the top makes it immediately clear that they control the entire page
+
+
 
 ### Monte Carlo Smart Asset Allocation
 - Monte Carlo simulation now auto-populates asset allocation from your real portfolio instead of defaulting to 60/40/0/0

@@ -38,6 +38,8 @@ import { toast } from 'sonner';
 interface DividendStatsProps {
   startDate?: Date;
   endDate?: Date;
+  // When set, stats are filtered to a single asset (affects charts + metric cards)
+  assetId?: string;
 }
 
 interface DividendStatsData {
@@ -90,7 +92,7 @@ interface DividendStatsData {
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF6B9D'];
 
-export function DividendStats({ startDate, endDate }: DividendStatsProps) {
+export function DividendStats({ startDate, endDate, assetId }: DividendStatsProps) {
   const { user } = useAuth();
   const [stats, setStats] = useState<DividendStatsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -99,7 +101,7 @@ export function DividendStats({ startDate, endDate }: DividendStatsProps) {
     if (user) {
       loadStats();
     }
-  }, [user, startDate, endDate]);
+  }, [user, startDate, endDate, assetId]);
 
   const loadStats = async () => {
     if (!user) return;
@@ -111,6 +113,7 @@ export function DividendStats({ startDate, endDate }: DividendStatsProps) {
       params.append('userId', user.uid);
       if (startDate) params.append('startDate', startDate.toISOString());
       if (endDate) params.append('endDate', endDate.toISOString());
+      if (assetId) params.append('assetId', assetId);
 
       const response = await fetch(`/api/dividends/stats?${params.toString()}`);
 

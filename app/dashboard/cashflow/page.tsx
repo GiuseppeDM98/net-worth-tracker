@@ -72,7 +72,8 @@ export default function CashflowPage() {
       ]);
 
       setDividends(dividendsData);
-      setAssets(assetsData.filter(a => a.assetClass === 'equity')); // Only equity for dividends
+      // Include equity and bonds: bonds have coupons tracked as dividend entries
+      setAssets(assetsData.filter(a => a.assetClass === 'equity' || a.assetClass === 'bonds'));
       setOtherDataLoaded(true);
     } catch (error) {
       console.error('Error loading dividend/asset data:', error);

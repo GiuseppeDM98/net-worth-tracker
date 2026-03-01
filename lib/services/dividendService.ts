@@ -375,7 +375,8 @@ export async function deleteDividend(dividendId: string): Promise<void> {
 export async function calculateDividendStats(
   userId: string,
   startDate?: Date,
-  endDate?: Date
+  endDate?: Date,
+  assetId?: string
 ): Promise<DividendStats> {
   try {
     let dividends: Dividend[];
@@ -384,6 +385,11 @@ export async function calculateDividendStats(
       dividends = await getDividendsByDateRange(userId, startDate, endDate);
     } else {
       dividends = await getAllDividends(userId);
+    }
+
+    // Filter by asset when a specific asset is selected
+    if (assetId) {
+      dividends = dividends.filter(d => d.assetId === assetId);
     }
 
     // Filter out future dividends - only calculate stats for paid/realized dividends
