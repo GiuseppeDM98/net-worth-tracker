@@ -52,7 +52,7 @@ const dividendSchema = z.object({
   sharesHeld: z.number().positive('Il numero di azioni deve essere positivo'),
   exDate: z.date(),
   paymentDate: z.date(),
-  dividendType: z.enum(['ordinary', 'extraordinary', 'interim', 'final']),
+  dividendType: z.enum(['ordinary', 'extraordinary', 'interim', 'final', 'coupon', 'finalPremium']),
   currency: z.string().min(1, 'Valuta è obbligatoria'),
   notes: z.string().optional(),
   sourceUrl: z.string().url('Inserisci un URL valido').optional().or(z.literal('')),
@@ -84,6 +84,8 @@ const dividendTypeLabels: Record<DividendType, string> = {
   extraordinary: 'Straordinario',
   interim: 'Interim',
   final: 'Finale',
+  coupon: 'Cedola',
+  finalPremium: 'Premio Finale',
 };
 
 export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendDialogProps) {

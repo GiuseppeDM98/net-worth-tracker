@@ -103,10 +103,28 @@ ALL fields in settings types must be handled in THREE places:
   - **Multi-level fallback**: 5 priorities (main → ultimo contratto → prezzo ufficiale → apertura → table)
   - **Label matching**: Use full labels ("ultimo contratto", not "ultimo") to avoid false positives
   - **Files**: `borsaItalianaBondScraperService.ts`, `priceUpdater.ts`, `AssetDialog.tsx`
+- **Bond Price Convention (% of par → EUR)**:
+  - Borsa Italiana and Yahoo Finance return bond prices as **% of par** (e.g. 104.2 = 104.2%, not €104.2)
+  - Stored `currentPrice` must be EUR per unit: `storedPrice = rawPercent × (nominalValue / 100)`
+  - Apply conversion in **two places**: `priceUpdater.ts` (cron/batch) AND `AssetDialog.onSubmit` Path 2 (on save)
+  - Without this: `totalValue = 104.2 × 30 = €3,126` instead of `€31,260` for 30 bonds at €1,000 nominal
+  - Convention: `nominalValue = 1000` (face value per bond), `quantity = number of bonds owned`
+- **Bond Coupon Scheduling (Cron Phase 3 Timezone)**:
+  - `getNextCouponDate` uses `new Date()` with `setHours(0,0,0,0)` in LOCAL time → unsafe in Phase 3 where the comparison is against UTC Firestore Timestamps
+  - **Phase 3 must use `getFollowingCouponDate(paidDate, frequency, maturityDate)`** — advances exactly one period from the PAID coupon's date, no "today" comparison
+  - `getApplicableCouponRate(paymentDate, issueDate, baseRate, schedule?)` — for step-up bonds; computes bond-year as `Math.ceil(elapsedMonths / 12)` (min 1), finds matching `CouponRateTier`, falls back to `baseRate`
+  - `nominalValue × quantity` = total face value; both coupon math and price conversion use this product
+- **Auto-generated dividend cleanup — never create zero-amount entries**: when `quantity === 0` (asset sold), `POST /api/dividends` still runs cleanup (`deleteUpcomingCouponsForAsset`) but returns early before creating the record. Check `if (quantity === 0)` server-side after cleanup, return 200 without insertion. Same pattern for `finalPremium`.
 - **Currency**: Use `currencyConversionService.ts` (Frankfurter API, 24h cache)
 - **Chart Y Axis**: Use `formatCurrencyCompact()` on mobile
 - **Doubling Time**: Skip pre-existing milestones (`threshold <= firstPositive.totalNetWorth`)
 - **Dividend Calendar**: Use `paymentDate` (not `exDate`) for display and filters
+
+### DividendStats Filter Coupling
+- `DividendStats` makes an **independent** API fetch to `/api/dividends/stats` — it does NOT read from parent filtered state
+- Any filter added to `DividendTrackingTab` (asset, date range, type) **must be explicitly passed** as a prop to `DividendStats` and forwarded to the API, otherwise charts and table will be out of sync
+- Asset dropdown scope: only `equity` + `bonds` (not crypto/cash/realestate/commodity) — bonds included because coupons are tracked as dividend entries
+- `calculateDividendStats` in `dividendService.ts` accepts optional `assetId?` and filters after the Firestore fetch (no composite index needed; volume per user is manageable)
 
 ### Anthropic API Patterns
 - **Current date in prompt**: Provide `Oggi è il ${today}` for time-sensitive analysis (knowledge cutoff)
@@ -179,6 +197,12 @@ ALL fields in settings types must be handled in THREE places:
 - Keep the `useEffect` only for subsequent user-triggered changes (e.g., type change after open)
 - **Files**: `components/expenses/ExpenseDialog.tsx` (`loadCashAssets`)
 
+### useFieldArray Edit-Mode Repopulation
+- `setValue('fieldArrayName', someArray)` does **NOT** reliably update rendered `fields` managed by `useFieldArray`
+- **Fix**: destructure `replace` from `useFieldArray` and call `replace(newArray)` in edit-mode prefill
+- `setValue` works fine for scalar fields; only field arrays need `replace`
+- **Files**: `AssetDialog.tsx` (`replaceTiers()` for `bondCouponRateSchedule`)
+
 ### Unit Testing with Vitest
 - **Config**: `vitest.config.ts` with `@/` path alias, tests in `__tests__/*.test.ts`
 - **Run**: `npm test` (single run), `npm run test:watch` (watch mode)
@@ -238,4 +262,4 @@ ALL fields in settings types must be handled in THREE places:
 - **Expenses**: `CategoryMoveDialog.tsx`, `CategoryDeleteConfirmDialog.tsx`, `CategoryManagementDialog.tsx`
 - **Pages**: `app/dashboard/settings/page.tsx`, `history/page.tsx`
 
-**Last updated**: 2026-02-27
+**Last updated**: 2026-02-28

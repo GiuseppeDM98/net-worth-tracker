@@ -32,6 +32,8 @@ const dividendTypeLabels: Record<DividendType, string> = {
   extraordinary: 'Straordinario',
   interim: 'Interim',
   final: 'Finale',
+  coupon: 'Cedola',
+  finalPremium: 'Premio Finale',
 };
 
 // Badge colors for dividend types (consistent with DividendTable)
@@ -40,6 +42,8 @@ const dividendTypeBadgeColor: Record<DividendType, string> = {
   extraordinary: 'bg-purple-100 text-purple-800 border-purple-200',
   interim: 'bg-yellow-100 text-yellow-800 border-yellow-200',
   final: 'bg-green-100 text-green-800 border-green-200',
+  coupon: 'bg-amber-100 text-amber-800 border-amber-200',
+  finalPremium: 'bg-emerald-100 text-emerald-800 border-emerald-200',
 };
 
 interface DividendDetailsDialogProps {

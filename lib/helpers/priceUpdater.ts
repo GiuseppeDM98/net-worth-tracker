@@ -97,29 +97,43 @@ export async function updateUserAssetPrices(
         const bondPrice = await getBondPriceByIsin((bond as any).isin);
 
         if (bondPrice && bondPrice.price && bondPrice.price > 0) {
-          // Success: update with Borsa Italiana price
+          // Bond prices from Borsa Italiana are quoted as % of par (e.g. 104.2 = 104.2%).
+          // If nominalValue is set, convert to actual EUR per unit so that
+          // totalValue = currentPrice × quantity is correct.
+          // Example: 104.2% × €1,000 nominalValue = €1,042 per lot
+          const nominalValue = (bond as any).bondDetails?.nominalValue;
+          const adjustedPrice = nominalValue && nominalValue > 1
+            ? bondPrice.price * (nominalValue / 100)
+            : bondPrice.price;
+
           const assetRef = adminDb.collection('assets').doc((bond as any).id);
           await assetRef.update({
-            currentPrice: bondPrice.price,
+            currentPrice: adjustedPrice,
             lastPriceUpdate: new Date(),
             updatedAt: new Date(),
           });
           updated.push(`${(bond as any).ticker} (BI-${bondPrice.priceType})`);
-          console.log(`[Bond Update] ${(bond as any).ticker}: Updated from Borsa Italiana (${bondPrice.priceType}): ${bondPrice.price}`);
+          console.log(`[Bond Update] ${(bond as any).ticker}: Updated from Borsa Italiana (${bondPrice.priceType}): ${bondPrice.price}% → €${adjustedPrice}`);
         } else {
           // Fallback to Yahoo Finance
           console.log(`[Bond Update] ${(bond as any).ticker}: Borsa Italiana returned null, falling back to Yahoo Finance`);
           const quote = await getQuote((bond as any).ticker);
 
           if (quote && quote.price !== null && quote.price > 0) {
+            // Same % → EUR conversion for Yahoo Finance fallback
+            const nominalValue = (bond as any).bondDetails?.nominalValue;
+            const adjustedPrice = nominalValue && nominalValue > 1
+              ? quote.price * (nominalValue / 100)
+              : quote.price;
+
             const assetRef = adminDb.collection('assets').doc((bond as any).id);
             await assetRef.update({
-              currentPrice: quote.price,
+              currentPrice: adjustedPrice,
               lastPriceUpdate: new Date(),
               updatedAt: new Date(),
             });
             updated.push(`${(bond as any).ticker} (YF-fallback)`);
-            console.log(`[Bond Update] ${(bond as any).ticker}: Updated from Yahoo Finance fallback: ${quote.price}`);
+            console.log(`[Bond Update] ${(bond as any).ticker}: Updated from Yahoo Finance fallback: ${quote.price}% → €${adjustedPrice}`);
           } else {
             failed.push((bond as any).ticker);
             console.warn(`[Bond Update] ${(bond as any).ticker}: Both Borsa Italiana and Yahoo Finance failed`);

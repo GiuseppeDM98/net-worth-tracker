@@ -1,6 +1,14 @@
 import { Timestamp } from 'firebase/firestore';
 
-export type DividendType = 'ordinary' | 'extraordinary' | 'interim' | 'final';
+// WARNING: If you add a type here, also update:
+// - DividendTable.tsx (type badge map)
+// - DividendDetailsDialog.tsx (type labels + badge map)
+// - DividendTrackingTab.tsx (type labels)
+// - DividendDialog.tsx (select options + Zod enum)
+// - dividendService.ts (byType initializer in calculateDividendStats)
+export type DividendType = 'ordinary' | 'extraordinary' | 'interim' | 'final' | 'coupon' | 'finalPremium';
+// coupon: bond coupon payment, auto-generated from BondDetails on asset save
+// finalPremium: one-time bonus paid at maturity (e.g. BTP Valore 0.8%)
 
 // Dividend payment record for a specific asset.
 // Supports manual entry and automatic scraping from Borsa Italiana (via ISIN).

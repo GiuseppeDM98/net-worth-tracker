@@ -13,6 +13,39 @@ import { Timestamp } from 'firebase/firestore';
 export type AssetType = 'stock' | 'etf' | 'bond' | 'crypto' | 'commodity' | 'cash' | 'realestate';
 export type AssetClass = 'equity' | 'bonds' | 'crypto' | 'realestate' | 'cash' | 'commodity';
 
+// Coupon payment frequency for bonds.
+// Determines how many times per year the coupon is paid.
+export type CouponFrequency = 'monthly' | 'quarterly' | 'semiannual' | 'annual';
+
+// One tier of a step-up coupon schedule.
+// yearFrom/yearTo are 1-based years from issueDate (inclusive).
+// Example: BTP Valore → [{ yearFrom:1, yearTo:2, rate:2.50 }, { yearFrom:3, yearTo:4, rate:2.80 }, ...]
+export interface CouponRateTier {
+  yearFrom: number; // Inclusive, 1-based (year 1 = first full year after issue)
+  yearTo: number;   // Inclusive
+  rate: number;     // Annual coupon rate % for this period
+}
+
+// Bond-specific details stored alongside the asset.
+// Used to auto-generate the next coupon as a dividend entry.
+//
+// Teacher Note - Coupon Calculation:
+// Gross coupon per payment = (couponRate / 100 / periodsPerYear) * nominalValue * quantity
+// Example: 4% annual rate, quarterly, nominalValue=1000, quantity=5
+//   → (4/100/4) * 1000 * 5 = €50 per quarter
+//
+// For step-up bonds: couponRateSchedule overrides couponRate when present.
+// couponRate is used as fallback if no tier matches.
+export interface BondDetails {
+  couponRate: number;          // Annual coupon rate as percentage (e.g. 4.0 for 4%). Fallback when no schedule.
+  couponFrequency: CouponFrequency;
+  issueDate: Date | Timestamp; // Reference date for coupon schedule (first coupon = issueDate + 1 period)
+  maturityDate: Date | Timestamp; // Bond redemption date (no coupons generated after this)
+  nominalValue?: number;       // Face value per unit in currency (e.g. 1000 for a €1000 bond). Default: 1
+  couponRateSchedule?: CouponRateTier[]; // Step-up tiers; overrides couponRate when present
+  finalPremiumRate?: number;   // Bonus % of nominalValue paid at maturity (e.g. 0.8 for BTP Valore 0.8%)
+}
+
 export interface AssetComposition {
   assetClass: AssetClass;
   percentage: number;
@@ -42,6 +75,7 @@ export interface Asset {
   outstandingDebt?: number; // Outstanding mortgage/loan for real estate. Net value calculation: value - outstandingDebt
   isPrimaryResidence?: boolean; // Indicates if this real estate is the primary residence (excluded from FIRE calculations based on user setting)
   isin?: string; // ISIN code for dividend scraping (optional)
+  bondDetails?: BondDetails; // Optional bond-specific details for coupon scheduling
   lastPriceUpdate: Date | Timestamp;
   createdAt: Date | Timestamp;
   updatedAt: Date | Timestamp;
@@ -65,6 +99,7 @@ export interface AssetFormData {
   outstandingDebt?: number;
   isPrimaryResidence?: boolean;
   isin?: string; // ISIN code for dividend scraping (optional)
+  bondDetails?: BondDetails; // Optional bond-specific details for coupon scheduling
 }
 
 export interface SubCategoryConfig {

@@ -48,11 +48,15 @@ interface DividendTableProps {
   showTotals?: boolean; // Show totals row at bottom when filtering
 }
 
+// WARNING: If you add a DividendType, update both maps below.
+// Also update types/dividend.ts and DividendDialog.tsx.
 const dividendTypeLabels: Record<DividendType, string> = {
   ordinary: 'Ordinario',
   extraordinary: 'Straordinario',
   interim: 'Interim',
   final: 'Finale',
+  coupon: 'Cedola',
+  finalPremium: 'Premio Finale',
 };
 
 const dividendTypeBadgeColor: Record<DividendType, string> = {
@@ -60,6 +64,8 @@ const dividendTypeBadgeColor: Record<DividendType, string> = {
   extraordinary: 'bg-purple-100 text-purple-800 border-purple-200',
   interim: 'bg-yellow-100 text-yellow-800 border-yellow-200',
   final: 'bg-green-100 text-green-800 border-green-200',
+  coupon: 'bg-amber-100 text-amber-800 border-amber-200',
+  finalPremium: 'bg-emerald-100 text-emerald-800 border-emerald-200',
 };
 
 export function DividendTable({ dividends, onEdit, onRefresh, showTotals = false }: DividendTableProps) {

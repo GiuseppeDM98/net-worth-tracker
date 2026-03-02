@@ -34,12 +34,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
-import { Asset, AssetFormData, AssetType, AssetClass, AssetAllocationTarget, AssetComposition } from '@/types/assets';
+import { Asset, AssetFormData, AssetType, AssetClass, AssetAllocationTarget, AssetComposition, CouponFrequency, BondDetails, CouponRateTier } from '@/types/assets';
 import { createAsset, updateAsset } from '@/lib/services/assetService';
+import { getNextCouponDate, calculateCouponPerShare, getApplicableCouponRate } from '@/lib/utils/couponUtils';
 import { getTargets, addSubCategory } from '@/lib/services/assetAllocationService';
 import {
   Dialog,
@@ -110,6 +111,20 @@ const assetSchema = z.object({
   isComposite: z.boolean().optional(),
   outstandingDebt: z.number().nonnegative('Debt cannot be negative').optional().or(z.nan()),
   isPrimaryResidence: z.boolean().optional(),
+  // Bond coupon details (optional, only shown for type=bond + assetClass=bonds)
+  bondCouponRate: z.number().min(0).max(100).optional().or(z.nan()),
+  bondCouponFrequency: z.enum(['monthly', 'quarterly', 'semiannual', 'annual']).optional(),
+  bondIssueDate: z.string().optional(),
+  bondMaturityDate: z.string().optional(),
+  bondNominalValue: z.number().positive('Il valore nominale deve essere positivo').optional().or(z.nan()),
+  // Step-up coupon rate tiers (optional, up to 5)
+  bondCouponRateSchedule: z.array(z.object({
+    yearFrom: z.number().int().min(1, 'Anno minimo 1'),
+    yearTo: z.number().int().min(1, 'Anno minimo 1'),
+    rate: z.number().min(0).max(100),
+  })).optional(),
+  // Final premium at maturity (optional, e.g. BTP Valore 0.8%)
+  bondFinalPremiumRate: z.number().min(0).max(100).optional().or(z.nan()),
 });
 
 type AssetFormValues = z.infer<typeof assetSchema>;
@@ -152,12 +167,15 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
   const [hasOutstandingDebt, setHasOutstandingDebt] = useState(false);
   const [showCostBasis, setShowCostBasis] = useState(false);
   const [showTER, setShowTER] = useState(false);
+  const [showBondDetails, setShowBondDetails] = useState(false);
+  const [showStepUp, setShowStepUp] = useState(false);
   const {
     register,
     handleSubmit,
     reset,
     setValue,
     watch,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<AssetFormValues>({
     resolver: zodResolver(assetSchema),
@@ -170,6 +188,11 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
       outstandingDebt: undefined,
       isPrimaryResidence: false,
     },
+  });
+
+  const { fields: tierFields, append: appendTier, remove: removeTier, replace: replaceTiers } = useFieldArray({
+    control,
+    name: 'bondCouponRateSchedule',
   });
 
   const selectedType = watch('type');
@@ -209,6 +232,17 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
       }
     }
   }, [selectedAssetClass, selectedSubCategory, selectedType, watchIsLiquid, watchAutoUpdatePrice, setValue]);
+
+  // Auto-activate bond detail toggles for new bond assets
+  // When type=bond and assetClass=bonds, automatically open the bond details and cost basis sections
+  // so the user sees the available fields without needing to manually toggle them.
+  // Only applies to new assets (!asset) to avoid overriding the user's existing saved state.
+  useEffect(() => {
+    if (!asset && selectedType === 'bond' && selectedAssetClass === 'bonds') {
+      setShowBondDetails(true);
+      setShowCostBasis(true);
+    }
+  }, [selectedType, selectedAssetClass, asset]);
 
   // Gestisci il toggle della composizione
   useEffect(() => {
@@ -282,6 +316,30 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
 
       // Set showTER state based on asset data
       setShowTER(!!(asset.totalExpenseRatio && asset.totalExpenseRatio > 0));
+
+      // Set bond details state and pre-fill form fields
+      setShowBondDetails(!!asset.bondDetails);
+      if (asset.bondDetails) {
+        const bd = asset.bondDetails;
+        // Convert Timestamp or Date to ISO date string for <input type="date">
+        const toDateStr = (d: Date | any): string => {
+          const date = d instanceof Date ? d : d.toDate();
+          return date.toISOString().split('T')[0];
+        };
+        setValue('bondCouponRate', bd.couponRate);
+        setValue('bondCouponFrequency', bd.couponFrequency);
+        setValue('bondIssueDate', toDateStr(bd.issueDate));
+        setValue('bondMaturityDate', toDateStr(bd.maturityDate));
+        setValue('bondNominalValue', bd.nominalValue);
+        setValue('bondFinalPremiumRate', bd.finalPremiumRate);
+        if (bd.couponRateSchedule && bd.couponRateSchedule.length > 0) {
+          setShowStepUp(true);
+          replaceTiers(bd.couponRateSchedule);
+        } else {
+          setShowStepUp(false);
+          replaceTiers([]);
+        }
+      }
     } else {
       reset({
         ticker: '',
@@ -306,6 +364,8 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
       setHasOutstandingDebt(false);
       setShowCostBasis(false);
       setShowTER(false);
+      setShowBondDetails(false);
+      setShowStepUp(false);
     }
   }, [asset, reset]);
 
@@ -472,6 +532,12 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
 
           if (quote.price && quote.price > 0) {
             currentPrice = quote.price;
+            // Bonds from Borsa Italiana are quoted as % of par (e.g. 104.2 = 104.2%).
+            // Convert to actual EUR per unit: price% × (nominalValue / 100)
+            // This mirrors the same conversion in priceUpdater.ts.
+            if (isBondWithIsin && data.bondNominalValue && !isNaN(data.bondNominalValue) && data.bondNominalValue > 1) {
+              currentPrice = currentPrice * (data.bondNominalValue / 100);
+            }
             toast.success(
               `Prezzo recuperato da ${source}: ${currentPrice.toFixed(2)} ${quote.currency}`
             );
@@ -494,6 +560,33 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
       // Path 3: Use default price of 1 for assets that don't need market prices
       // (cash, real estate, private equity)
 
+      // Build optional bond details object (only when toggle is on and required fields filled)
+      let bondDetailsValue: BondDetails | undefined;
+      if (
+        showBondDetails &&
+        data.bondCouponRate && !isNaN(data.bondCouponRate) &&
+        data.bondCouponFrequency &&
+        data.bondIssueDate &&
+        data.bondMaturityDate
+      ) {
+        bondDetailsValue = {
+          couponRate: data.bondCouponRate,
+          couponFrequency: data.bondCouponFrequency,
+          issueDate: new Date(data.bondIssueDate),
+          maturityDate: new Date(data.bondMaturityDate),
+          // Include nominalValue only if provided (avoids undefined in Firestore nested object)
+          ...(data.bondNominalValue && !isNaN(data.bondNominalValue) ? { nominalValue: data.bondNominalValue } : {}),
+          // Include step-up schedule only if active and non-empty
+          ...(showStepUp && data.bondCouponRateSchedule && data.bondCouponRateSchedule.length > 0
+            ? { couponRateSchedule: data.bondCouponRateSchedule as CouponRateTier[] }
+            : {}),
+          // Include final premium only if provided
+          ...(data.bondFinalPremiumRate && !isNaN(data.bondFinalPremiumRate)
+            ? { finalPremiumRate: data.bondFinalPremiumRate }
+            : {}),
+        };
+      }
+
       const formData: AssetFormData = {
         ticker: data.ticker,
         name: data.name,
@@ -512,7 +605,10 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         composition: isComposite && composition.length > 0 ? composition : undefined,
         outstandingDebt: data.outstandingDebt && !isNaN(data.outstandingDebt) && data.outstandingDebt > 0 ? data.outstandingDebt : undefined,
         isPrimaryResidence: data.isPrimaryResidence || false,
+        bondDetails: bondDetailsValue,
       };
+
+      let savedAssetId: string;
 
       if (asset) {
         // When editing, keep the existing price if we're not fetching a new one
@@ -520,10 +616,98 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
           formData.currentPrice = asset.currentPrice;
         }
         await updateAsset(asset.id, formData);
+        savedAssetId = asset.id;
         toast.success('Asset aggiornato con successo');
       } else {
-        await createAsset(user.uid, formData);
+        savedAssetId = await createAsset(user.uid, formData);
         toast.success('Asset creato con successo');
+      }
+
+      // Generate next coupon dividend if bond details are configured
+      if (bondDetailsValue) {
+        try {
+          const issueDate = bondDetailsValue.issueDate as Date;
+          const maturityDate = bondDetailsValue.maturityDate as Date;
+          const nominalValue = bondDetailsValue.nominalValue ?? 1;
+          // Use asset tax rate if set (e.g. 12.5% for BTPs), otherwise default 26%
+          const taxRate = data.taxRate && !isNaN(data.taxRate) && data.taxRate > 0 ? data.taxRate : 26;
+
+          const nextDate = getNextCouponDate(issueDate, bondDetailsValue.couponFrequency, maturityDate);
+
+          if (nextDate) {
+            // For step-up bonds: pick the rate applicable to the payment date
+            const effectiveRate = getApplicableCouponRate(
+              nextDate,
+              issueDate,
+              bondDetailsValue.couponRate,
+              bondDetailsValue.couponRateSchedule
+            );
+            const perShare = calculateCouponPerShare(effectiveRate, nominalValue, bondDetailsValue.couponFrequency);
+            const gross = perShare * data.quantity;
+            const tax = gross * (taxRate / 100);
+
+            const couponResponse = await fetch('/api/dividends', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: user.uid,
+                dividendData: {
+                  assetId: savedAssetId,
+                  exDate: nextDate,
+                  paymentDate: nextDate,
+                  dividendPerShare: perShare,
+                  quantity: data.quantity,
+                  grossAmount: gross,
+                  taxAmount: tax,
+                  netAmount: gross - tax,
+                  currency: data.currency,
+                  dividendType: 'coupon',
+                  isAutoGenerated: true,
+                  notes: `Cedola ${data.bondCouponFrequency} — tasso annuo ${effectiveRate}%`,
+                },
+              }),
+            });
+
+            if (couponResponse.ok) {
+              const formattedDate = nextDate.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+              toast.success(`Prossima cedola programmata: ${formattedDate}`);
+            }
+          }
+
+          // Generate final premium dividend if configured and maturity is in the future.
+          // Cleanup of existing finalPremium entries happens server-side in POST /api/dividends.
+          if (bondDetailsValue.finalPremiumRate && maturityDate > new Date()) {
+            const premiumPerShare = (bondDetailsValue.finalPremiumRate / 100) * nominalValue;
+            const premiumGross = premiumPerShare * data.quantity;
+            const premiumTax = premiumGross * (taxRate / 100);
+
+            await fetch('/api/dividends', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: user.uid,
+                dividendData: {
+                  assetId: savedAssetId,
+                  exDate: maturityDate,
+                  paymentDate: maturityDate,
+                  dividendPerShare: premiumPerShare,
+                  quantity: data.quantity,
+                  grossAmount: premiumGross,
+                  taxAmount: premiumTax,
+                  netAmount: premiumGross - premiumTax,
+                  currency: data.currency,
+                  dividendType: 'finalPremium',
+                  isAutoGenerated: true,
+                  notes: `Premio finale a scadenza — ${bondDetailsValue.finalPremiumRate}%`,
+                },
+              }),
+            });
+          }
+        } catch (couponError) {
+          // Non-critical: asset was saved successfully, coupon generation failed
+          console.error('Error generating coupon dividend:', couponError);
+          toast.error('Asset salvato, ma errore nella generazione della cedola automatica');
+        }
       }
 
       onClose();
@@ -956,6 +1140,268 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
             </div>
           )}
 
+          {/* Dettagli Cedole - only for bond assets in bonds class */}
+          {selectedType === 'bond' && selectedAssetClass === 'bonds' && (
+            <div className="space-y-2 rounded-lg border p-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="showBondDetails">Dettagli Cedole</Label>
+                  <p className="text-xs text-gray-500">
+                    Configura il piano cedolare per generare automaticamente la prossima cedola
+                  </p>
+                </div>
+                <Switch
+                  id="showBondDetails"
+                  checked={showBondDetails}
+                  onCheckedChange={(checked) => {
+                    setShowBondDetails(checked);
+                    if (!checked) {
+                      setValue('bondCouponRate', undefined);
+                      setValue('bondCouponFrequency', undefined);
+                      setValue('bondIssueDate', undefined);
+                      setValue('bondMaturityDate', undefined);
+                      setValue('bondNominalValue', undefined);
+                      setValue('bondCouponRateSchedule', []);
+                      setValue('bondFinalPremiumRate', undefined);
+                      setShowStepUp(false);
+                    }
+                  }}
+                />
+              </div>
+
+              {showBondDetails && (
+                <div className="mt-4 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="bondCouponRate">Tasso Cedolare Annuo (%)</Label>
+                      <Input
+                        id="bondCouponRate"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        {...register('bondCouponRate', { valueAsNumber: true })}
+                        placeholder="es. 4.00"
+                      />
+                      {errors.bondCouponRate && (
+                        <p className="text-sm text-red-500">{errors.bondCouponRate.message}</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="bondCouponFrequency">Periodicità Cedole</Label>
+                      <Select
+                        value={watch('bondCouponFrequency') || ''}
+                        onValueChange={(value) => setValue('bondCouponFrequency', value as CouponFrequency)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleziona periodicità" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="monthly">Mensile (12/anno)</SelectItem>
+                          <SelectItem value="quarterly">Trimestrale (4/anno)</SelectItem>
+                          <SelectItem value="semiannual">Semestrale (2/anno)</SelectItem>
+                          <SelectItem value="annual">Annuale (1/anno)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="bondIssueDate">Data di Emissione</Label>
+                      <Input
+                        id="bondIssueDate"
+                        type="date"
+                        {...register('bondIssueDate')}
+                      />
+                      {errors.bondIssueDate && (
+                        <p className="text-sm text-red-500">{errors.bondIssueDate.message}</p>
+                      )}
+                      <p className="text-xs text-gray-500">Ancora del calendario cedolare</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="bondMaturityDate">Data di Rimborso</Label>
+                      <Input
+                        id="bondMaturityDate"
+                        type="date"
+                        {...register('bondMaturityDate')}
+                      />
+                      {errors.bondMaturityDate && (
+                        <p className="text-sm text-red-500">{errors.bondMaturityDate.message}</p>
+                      )}
+                      <p className="text-xs text-gray-500">Nessuna cedola oltre questa data</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="bondNominalValue">
+                      Valore Nominale per Unità ({watch('currency')}){' '}
+                      <span className="text-gray-400 font-normal">(opzionale)</span>
+                    </Label>
+                    <Input
+                      id="bondNominalValue"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      {...register('bondNominalValue', { valueAsNumber: true })}
+                      placeholder="es. 1000"
+                    />
+                    {errors.bondNominalValue && (
+                      <p className="text-sm text-red-500">{errors.bondNominalValue.message}</p>
+                    )}
+                    {/* Dynamic coupon preview based on current form values */}
+                    {(() => {
+                      const rate = watch('bondCouponRate');
+                      const freq = watch('bondCouponFrequency');
+                      const nominal = watch('bondNominalValue');
+                      const qty = watch('quantity');
+                      const periodsMap: Record<string, number> = { monthly: 12, quarterly: 4, semiannual: 2, annual: 1 };
+                      const periods = freq ? periodsMap[freq] : null;
+                      if (rate && !isNaN(rate) && periods && nominal && !isNaN(nominal) && nominal > 0 && qty > 0) {
+                        const perShare = (rate / 100 / periods) * nominal;
+                        const total = perShare * qty;
+                        return (
+                          <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                            → Cedola stimata: {perShare.toFixed(2)} {watch('currency')}/unità × {qty} = {total.toFixed(2)} {watch('currency')} per pagamento
+                          </p>
+                        );
+                      }
+                      return (
+                        <div className="text-xs text-gray-500 space-y-1">
+                          <p>Valore faccia per singola unità nella tua valuta.</p>
+                          <p>• Hai 5 lotti da €1000 (qty=5) → inserisci <strong>1000</strong></p>
+                          <p>• Hai qty=5000 e ogni unità vale €1 → inserisci <strong>1</strong></p>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Step-Up Coupon Rate Schedule */}
+                  <div className="space-y-3 rounded-md border border-dashed p-3">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="showStepUp"
+                        checked={showStepUp}
+                        onChange={(e) => {
+                          setShowStepUp(e.target.checked);
+                          if (!e.target.checked) {
+                            setValue('bondCouponRateSchedule', []);
+                          }
+                        }}
+                        className="h-4 w-4 rounded"
+                      />
+                      <Label htmlFor="showStepUp" className="cursor-pointer font-normal">
+                        Tasso variabile (step-up)
+                      </Label>
+                    </div>
+                    {showStepUp && (
+                      <div className="space-y-2">
+                        <p className="text-xs text-gray-500">
+                          Il tasso base sopra è usato come fallback se nessuna fascia corrisponde.
+                        </p>
+                        {tierFields.map((field, index) => (
+                          <div key={field.id} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end">
+                            <div className="space-y-1">
+                              {index === 0 && <Label className="text-xs">Anno da</Label>}
+                              <Input
+                                type="number"
+                                min="1"
+                                step="1"
+                                placeholder="1"
+                                {...register(`bondCouponRateSchedule.${index}.yearFrom`, { valueAsNumber: true })}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              {index === 0 && <Label className="text-xs">Anno a</Label>}
+                              <Input
+                                type="number"
+                                min="1"
+                                step="1"
+                                placeholder="2"
+                                {...register(`bondCouponRateSchedule.${index}.yearTo`, { valueAsNumber: true })}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              {index === 0 && <Label className="text-xs">Tasso (%)</Label>}
+                              <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                placeholder="2.50"
+                                {...register(`bondCouponRateSchedule.${index}.rate`, { valueAsNumber: true })}
+                              />
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeTier(index)}
+                              className={index === 0 ? 'mt-5' : ''}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => appendTier({ yearFrom: 1, yearTo: 2, rate: 0 })}
+                          disabled={tierFields.length >= 5}
+                          className="w-full"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Aggiungi fascia {tierFields.length >= 5 && '(max 5)'}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Premio Finale */}
+                  <div className="space-y-2">
+                    <Label htmlFor="bondFinalPremiumRate">
+                      Premio Finale a Scadenza (%){' '}
+                      <span className="text-gray-400 font-normal">(opzionale)</span>
+                    </Label>
+                    <Input
+                      id="bondFinalPremiumRate"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      {...register('bondFinalPremiumRate', { valueAsNumber: true })}
+                      placeholder="es. 0.80"
+                    />
+                    {errors.bondFinalPremiumRate && (
+                      <p className="text-sm text-red-500">{errors.bondFinalPremiumRate.message}</p>
+                    )}
+                    {(() => {
+                      const premRate = watch('bondFinalPremiumRate');
+                      const nominal = watch('bondNominalValue');
+                      const qty = watch('quantity');
+                      if (premRate && !isNaN(premRate) && nominal && !isNaN(nominal) && nominal > 0 && qty > 0) {
+                        const perShare = (premRate / 100) * nominal;
+                        const total = perShare * qty;
+                        return (
+                          <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                            → Premio stimato: {perShare.toFixed(2)} {watch('currency')}/unità × {qty} = {total.toFixed(2)} {watch('currency')} alla scadenza
+                          </p>
+                        );
+                      }
+                      return (
+                        <p className="text-xs text-gray-500">
+                          Bonus una-tantum pagato alla scadenza (es. 0.8% per BTP Valore)
+                        </p>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Cost Basis Tracking */}
           <div className="space-y-2 rounded-lg border p-4">
             <div className="flex items-center justify-between">
@@ -1015,6 +1461,15 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                     <p className="text-xs text-gray-500">
                       Percentuale di tassazione sulle plusvalenze (es. 26 per 26%)
                     </p>
+                    {(selectedType === 'bond' || selectedAssetClass === 'bonds') && (
+                      <button
+                        type="button"
+                        onClick={() => setValue('taxRate', 12.5)}
+                        className="text-xs text-blue-600 dark:text-blue-400 underline hover:no-underline"
+                      >
+                        Titoli di Stato italiani (BTP, CCT, BOT): imposta 12,5%
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

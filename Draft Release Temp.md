@@ -86,6 +86,14 @@
 - Period-specific filtering: Notes only appear in tables matching their year/month and selected sections
 - Available for all 8 ranking tables: 4 monthly (Best/Worst by Net Worth/Income/Expenses) + 4 yearly
 
+### Bond Coupon Scheduling with Step-Up Rates and Final Premium
+- Bonds now support automatic coupon generation: configure coupon rate, frequency (monthly/quarterly/semiannual/annual), issue date, maturity date, and nominal value per unit to generate the next coupon automatically on every save
+- **Step-up coupon rates**: enable variable coupon rates with up to 5 rate tiers, each covering a range of bond years (e.g. BTP Valore: 2.50% years 1–2, 2.80% years 3–4, 3.20% years 5–6) — each coupon is calculated using the applicable rate for its payment date
+- **Final premium (Premio Finale)**: set an optional bonus percentage paid at maturity (e.g. BTP Valore 0.8% of nominal value) — automatically recorded as a "Premio Finale" dividend entry on the maturity date
+- **Italian government bond tax hint**: clickable shortcut under the tax rate field fills in 12.5% for BTP, BOT, and CCT bonds
+- Bond details (coupon schedule) and cost basis sections now open automatically when creating a new bond asset
+- Coupon and final premium entries are recreated automatically whenever you edit and save the asset (e.g. when updating quantity)
+
 ### Bond Price Tracking from Borsa Italiana
 - Added automatic bond price updates from Borsa Italiana for Italian MOT bonds with ISIN codes
 - ISIN field now editable for bonds in asset form (previously only available for stocks/ETFs for dividend tracking)
@@ -136,6 +144,12 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed dividend page asset filter not showing bond assets — bonds are now listed alongside stocks and ETFs in the filter dropdown so you can filter coupon entries by bond
+- Fixed dividend charts (by asset, by year, monthly trend) not updating when filtering by a specific asset — selecting an asset now refreshes both the table and all stats charts together
+- Fixed a zero-value coupon entry being created when a bond's quantity was set to 0 (sold position) — coupons are now correctly cleaned up and no €0 record is inserted
+
+- Fixed bond total value showing 10× lower than expected when using Borsa Italiana prices — bond prices are quoted as a percentage of par value (e.g. 104.2%) and are now correctly converted to EUR per unit using the nominal value before being saved (e.g. 104.2% × €1,000 nominal = €1,042 per bond)
+
 - Fixed Time-Weighted Return (TWR) showing inflated values for short time periods — on a YTD period with only 1–2 months of data, TWR could show values approximately 2× higher than CAGR for the same period. TWR and CAGR now use the same period duration calculation and produce consistent annualized results.
 
 - Fixed performance period filter silently dropping the first month of returns for all time periods (YTD, 1Y, 3Y, 5Y). For example, YTD in February only measured February's performance — January was lost because the first snapshot was used as baseline instead of having a proper pre-period baseline. All periods now include a baseline month so every month within the selected range contributes to performance calculations.
@@ -179,6 +193,12 @@
 - Previously, cards always showed doubling-related text regardless of mode selection
 
 ## 🔧 Improvements
+
+### Dividend Page Filter Repositioned to Top
+- Filters (asset, type, date range) are now displayed above the statistics charts instead of below them
+- Since filters affect both the charts and the transaction table, placing them at the top makes it immediately clear that they control the entire page
+
+
 
 ### Monte Carlo Smart Asset Allocation
 - Monte Carlo simulation now auto-populates asset allocation from your real portfolio instead of defaulting to 60/40/0/0
