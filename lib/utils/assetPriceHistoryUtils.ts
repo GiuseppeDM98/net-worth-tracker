@@ -232,8 +232,12 @@ export function transformPriceHistoryData(
         previousTotalValue = null;
       } else {
         const currentPrice = snapshotAsset.price;
-        // Fallback: calculate totalValue if missing in snapshot (for old data)
-        const currentTotalValue = snapshotAsset.totalValue ?? (snapshotAsset.price * snapshotAsset.quantity);
+        // Fallback: recalculate totalValue if missing or 0 in snapshot.
+        // Using || instead of ?? to also handle totalValue=0, which can happen when a
+        // snapshot was taken while the asset had quantity=0 (e.g. right after creation
+        // before quantity was set). price×quantity=0 for sold assets (qty=0), so they
+        // are unaffected.
+        const currentTotalValue = snapshotAsset.totalValue || (snapshotAsset.price * snapshotAsset.quantity);
 
         // Determine which value to use for color coding based on displayMode OR price=1 condition
         // Use totalValue if displayMode is 'totalValue' OR if price === 1 (cash/liquidity assets)

@@ -150,6 +150,8 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed asset value history (Current Year Values / Historical Values tabs) showing "0,00€" instead of the correct amount for assets whose monthly snapshot was captured while their quantity was 0 — value is now correctly recalculated from the stored unit price × quantity. Future snapshots also no longer include zero-quantity assets in the per-asset breakdown to prevent recurrence.
+
 - Fixed dividend page asset filter not showing bond assets — bonds are now listed alongside stocks and ETFs in the filter dropdown so you can filter coupon entries by bond
 - Fixed dividend charts (by asset, by year, monthly trend) not updating when filtering by a specific asset — selecting an asset now refreshes both the table and all stats charts together
 - Fixed a zero-value coupon entry being created when a bond's quantity was set to 0 (sold position) — coupons are now correctly cleaned up and no €0 record is inserted
@@ -201,6 +203,9 @@
 - Previously, cards always showed doubling-related text regardless of mode selection
 
 ## 🔧 Improvements
+
+### Income Metrics Section Renamed
+- The "Dividend Metrics" section on the Performance page is now called "Income Metrics" (Metriche da Proventi Finanziari) — the metrics it contains (YOC and Current Yield) apply equally to stock dividends and bond coupons, so the name now reflects both
 
 ### Bond Cost Basis Input Redesigned
 - The "Average Cost" field for bonds now uses the Borsa Italiana price convention (price per 100€ of nominal), consistent with how bond prices are displayed and auto-fetched — enter the price you paid as shown on Borsa Italiana (e.g. 100 for a bond bought at par, 95.50 for a discount bond)

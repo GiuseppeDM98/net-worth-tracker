@@ -75,14 +75,19 @@ export async function createSnapshot(
           : 0;
     });
 
-    const byAsset = assets.map((asset) => ({
-      assetId: asset.id,
-      ticker: asset.ticker,
-      name: asset.name,
-      quantity: asset.quantity,
-      price: asset.currentPrice,
-      totalValue: calculateAssetValue(asset),
-    }));
+    const byAsset = assets
+      // Skip assets with no quantity — they would store totalValue: 0 with a valid price,
+      // which corrupts the value history display (snapshots are immutable). Sold assets
+      // (quantity=0) already appear in past snapshots taken while they were held.
+      .filter((asset) => asset.quantity > 0)
+      .map((asset) => ({
+        assetId: asset.id,
+        ticker: asset.ticker,
+        name: asset.name,
+        quantity: asset.quantity,
+        price: asset.currentPrice,
+        totalValue: calculateAssetValue(asset),
+      }));
 
     const snapshotId = `${userId}-${snapshotYear}-${snapshotMonth}`;
 

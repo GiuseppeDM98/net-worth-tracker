@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio
-- Ultima implementazione: Imposta di bollo — aliquota configurabile in Settings, esenzione per-asset nel dialog, regola soglia >€5.000 per conti correnti, inclusa nel "Costo Annuale Portfolio" in dashboard (2026-03-02)
+- Ultima implementazione: Fix "0,00€" in tab Valori storico asset (snapshot corrotto con qty=0); rinominata sezione "Metriche Dividendi" → "Metriche da Proventi Finanziari" in Performance (2026-03-02)
 - In corso ora: nessuna attività attiva
 
 ## Architecture Snapshot
@@ -21,7 +21,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Snapshot mensili automatici + storico e CSV export.
 - Asset price/value history tables con aggregazione per nome e badge "Venduto".
 - History page: Net Worth evolution, Asset Class breakdown, Liquidity, YoY variation, Savings vs Investment Growth, Doubling Time Analysis (geometrico + soglie fisse, summary cards adattivi alla modalità), Current vs Target allocation.
-- Performance metrics (ROI, CAGR, TWR, IRR, Sharpe, drawdown suite, YOC, Current Yield) con heatmap, underwater chart, rolling charts. Organizzate in 4 categorie (Rendimento, Rischio, Contesto, Dividendi).
+- Performance metrics (ROI, CAGR, TWR, IRR, Sharpe, drawdown suite, YOC, Current Yield) con heatmap, underwater chart, rolling charts. Organizzate in 4 categorie (Rendimento, Rischio, Contesto, **Proventi Finanziari** — include dividendi e cedole).
 - Dividendi multi-currency con conversione EUR, scraping Borsa Italiana, calendario mensile con drill-down. Filtro asset include equity + bond (cedole); filtri posizionati in cima alla pagina e propagati anche ai grafici (DividendStats riceve assetId). Vendita bond (quantity=0): cedole future eliminate, nessuna voce €0 creata.
 - Hall of Fame con ranking mensili/annuali e sistema note dedicato multi-sezione.
 - FIRE calculator con esclusione casa abitazione, Proiezione Scenari Bear/Base/Bull con inflazione, FIRE Number per-scenario, stop risparmi al raggiungimento FIRE.

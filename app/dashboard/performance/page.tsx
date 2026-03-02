@@ -688,8 +688,8 @@ export default function PerformancePage() {
         {/* === METRICHE DIVIDENDI (conditional) === */}
         {(metrics.yocGross !== null || metrics.yocNet !== null || metrics.currentYield !== null || metrics.currentYieldNet !== null) && (
           <MetricSection
-            title="💰 Metriche Dividendi"
-            description="Rendimento da dividendi rispetto al costo di acquisto e al valore corrente"
+            title="💰 Metriche da Proventi Finanziari"
+            description="Rendimento da dividendi e cedole rispetto al costo di acquisto e al valore corrente"
           >
             <MetricCard
               title="YOC Lordo"

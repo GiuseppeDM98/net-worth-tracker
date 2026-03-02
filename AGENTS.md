@@ -103,6 +103,7 @@ ALL fields in settings types must be handled in THREE places:
 
 ### Asset Patterns
 - **Zero-Quantity Assets**: `quantity = 0` is valid and saved to Firestore (Zod uses `.min(0)`, not `.positive()`). In `assetPriceHistoryUtils.ts`, set `isDeleted: asset.quantity === 0` in the `currentAssets.forEach` loop so the "Venduto" badge appears in price history. Dashboard counter filters `quantity > 0`. No backend validation — client-side only by design.
+- **Snapshot byAsset filter**: `createSnapshot` (`snapshotService.ts`) skips assets with `quantity === 0` from `byAsset` — they'd store `totalValue: 0` with a valid price (corrupting immutable snapshot data). Totals/allocation are computed before the filter (all assets included).
 - **Cash Asset Balance**: For `assetClass === 'cash'` assets, `quantity` IS the balance (e.g., €8000 = quantity 8000, price stays fixed). Update balance via `updateDoc({ quantity: newQuantity })`, NOT via `updateAssetPrice`/`currentPrice`. See `updateCashAssetBalance()` in `assetService.ts`.
 - **Historical Aggregation**: Use `name` (not `assetId`) as key to unify re-purchased assets
 - **Borsa Italiana Dividends**: Pass `assetType` to scraper (ETF vs Stock table structures differ)
@@ -180,14 +181,9 @@ ALL fields in settings types must be handled in THREE places:
 **Symptom**: Build error when importing settings helpers from constants modules
 **Fix**: `getDefaultTargets`, `getSettings`, `setSettings` all live in `assetAllocationService.ts`
 
----
-
-## Key Files
-- **Utils**: `lib/utils/dateHelpers.ts`, `formatters.ts`, `assetPriceHistoryUtils.ts`
-- **Services**: `performanceService.ts`, `assetAllocationService.ts`, `fireService.ts`, `currencyConversionService.ts`, `chartService.ts`, `tavilySearchService.ts`, `goalService.ts`
-- **API Routes**: `app/api/performance/yoc/route.ts`, `app/api/ai/analyze-performance/route.ts`
-- **Components**: `CashflowSankeyChart.tsx`, `TotalHistoryTab.tsx`, `CurrentYearTab.tsx`, `MetricSection.tsx`
-- **Expenses**: `CategoryMoveDialog.tsx`, `CategoryDeleteConfirmDialog.tsx`, `CategoryManagementDialog.tsx`
-- **Pages**: `app/dashboard/settings/page.tsx`, `history/page.tsx`
+### Nullish `??` vs Falsy `||` for Snapshot Fallbacks
+**Symptom**: Asset value history shows "0,00€" instead of correct value or "—"
+**Context**: `snapshotAsset.totalValue` can be stored as `0` (not null) if a snapshot was taken when `quantity = 0` for a new asset. `??` only catches `null`/`undefined`, so `0` passes through unchanged.
+**Fix**: Use `||` when `0` is semantically invalid (e.g., `totalValue || (price * qty)` in `assetPriceHistoryUtils.ts`). `price × 0 = 0` for sold assets, so they are unaffected.
 
 **Last updated**: 2026-03-02
