@@ -106,6 +106,7 @@ const assetSchema = z.object({
   averageCost: z.number().positive('Average cost must be positive').optional().or(z.nan()),
   taxRate: z.number().min(0, 'Tax rate must be at least 0').max(100, 'Tax rate must be at most 100').optional().or(z.nan()),
   totalExpenseRatio: z.number().min(0, 'TER must be at least 0').max(100, 'TER must be at most 100').optional().or(z.nan()),
+  stampDutyExempt: z.boolean().optional(),
   isLiquid: z.boolean().optional(),
   autoUpdatePrice: z.boolean().optional(),
   isComposite: z.boolean().optional(),
@@ -322,6 +323,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         })(),
         taxRate: asset.taxRate || undefined,
         totalExpenseRatio: asset.totalExpenseRatio || undefined,
+        stampDutyExempt: asset.stampDutyExempt || false,
         isLiquid: defaultIsLiquid,
         autoUpdatePrice: asset.autoUpdatePrice !== undefined ? asset.autoUpdatePrice : shouldUpdatePrice(asset.type, asset.subCategory),
         isComposite: !!(asset.composition && asset.composition.length > 0),
@@ -383,6 +385,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         averageCost: undefined,
         taxRate: undefined,
         totalExpenseRatio: undefined,
+        stampDutyExempt: false,
         isLiquid: true,
         autoUpdatePrice: true,
         isComposite: false,
@@ -646,6 +649,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
           : undefined,
         taxRate: data.taxRate && !isNaN(data.taxRate) && data.taxRate >= 0 ? data.taxRate : undefined,
         totalExpenseRatio: data.totalExpenseRatio && !isNaN(data.totalExpenseRatio) && data.totalExpenseRatio >= 0 ? data.totalExpenseRatio : undefined,
+        stampDutyExempt: data.stampDutyExempt || false,
         currentPrice,
         isLiquid: data.isLiquid,
         autoUpdatePrice: data.autoUpdatePrice,
@@ -1581,6 +1585,21 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                 </p>
               </div>
             )}
+          </div>
+
+          {/* Stamp duty exemption (imposta di bollo) */}
+          <div className="flex items-center justify-between rounded-lg border p-4">
+            <div className="space-y-0.5">
+              <Label htmlFor="stampDutyExempt">Esente da imposta di bollo</Label>
+              <p className="text-xs text-gray-500">
+                Se attivo, questo asset non viene incluso nel calcolo dell&apos;imposta di bollo (es. fondi pensione, immobili)
+              </p>
+            </div>
+            <Switch
+              id="stampDutyExempt"
+              checked={!!watch('stampDutyExempt')}
+              onCheckedChange={(checked) => setValue('stampDutyExempt', checked)}
+            />
           </div>
 
           {shouldUpdatePrice(selectedType, selectedSubCategory) && (

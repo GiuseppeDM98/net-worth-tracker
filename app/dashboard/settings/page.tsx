@@ -122,6 +122,9 @@ export default function SettingsPage() {
   const [includePrimaryResidenceInFIRE, setIncludePrimaryResidenceInFIRE] = useState<boolean>(false);
   const [goalBasedInvestingEnabled, setGoalBasedInvestingEnabled] = useState<boolean>(false);
   const [goalDrivenAllocationEnabled, setGoalDrivenAllocationEnabled] = useState<boolean>(false);
+  const [stampDutyEnabled, setStampDutyEnabled] = useState<boolean>(false);
+  const [stampDutyRate, setStampDutyRate] = useState<number>(0.2);
+  const [checkingAccountSubCategory, setCheckingAccountSubCategory] = useState<string>('__none__');
   const [assetClassStates, setAssetClassStates] = useState<
     Record<AssetClass, AssetClassState>
   >({} as Record<AssetClass, AssetClassState>);
@@ -289,6 +292,10 @@ export default function SettingsPage() {
         // Load default cash account settings
         setDefaultDebitCashAssetId(settingsData.defaultDebitCashAssetId || '__none__');
         setDefaultCreditCashAssetId(settingsData.defaultCreditCashAssetId || '__none__');
+        // Load stamp duty settings
+        setStampDutyEnabled(settingsData.stampDutyEnabled ?? false);
+        setStampDutyRate(settingsData.stampDutyRate ?? 0.2);
+        setCheckingAccountSubCategory(settingsData.checkingAccountSubCategory || '__none__');
         // Load dividend settings
         setDividendIncomeCategoryId(settingsData.dividendIncomeCategoryId || '');
         setDividendIncomeSubCategoryId(settingsData.dividendIncomeSubCategoryId || '');
@@ -857,6 +864,9 @@ export default function SettingsPage() {
         dividendIncomeSubCategoryId: dividendIncomeSubCategoryId || undefined,
         defaultDebitCashAssetId: defaultDebitCashAssetId !== '__none__' ? defaultDebitCashAssetId : undefined,
         defaultCreditCashAssetId: defaultCreditCashAssetId !== '__none__' ? defaultCreditCashAssetId : undefined,
+        stampDutyEnabled,
+        stampDutyRate,
+        checkingAccountSubCategory,
       });
       toast.success('Impostazioni salvate con successo');
     } catch (error) {
@@ -1284,6 +1294,68 @@ export default function SettingsPage() {
                   checked={goalDrivenAllocationEnabled}
                   onCheckedChange={setGoalDrivenAllocationEnabled}
                 />
+              </div>
+            )}
+
+            {/* Stamp duty (imposta di bollo) */}
+            <div className="flex items-center justify-between border-t pt-4">
+              <div>
+                <Label htmlFor="stampDutyToggle" className="text-sm font-medium">
+                  Imposta di Bollo
+                </Label>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Includi l&apos;imposta di bollo nel costo annuale del portafoglio
+                </p>
+              </div>
+              <Switch
+                id="stampDutyToggle"
+                checked={stampDutyEnabled}
+                onCheckedChange={setStampDutyEnabled}
+              />
+            </div>
+
+            {stampDutyEnabled && (
+              <div className="space-y-4 rounded-lg border p-4">
+                <div className="space-y-2">
+                  <Label htmlFor="stampDutyRate">Aliquota (%)</Label>
+                  <Input
+                    id="stampDutyRate"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={stampDutyRate}
+                    onChange={(e) => setStampDutyRate(parseFloat(e.target.value) || 0)}
+                    placeholder="es. 0.20"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Aliquota annuale imposta di bollo (es. 0.20 per 0.20%). Si applica a tutti gli asset, tranne quelli marcati come esenti nel dialog di modifica asset.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Sottocategoria conti correnti</Label>
+                  {assetClassStates.cash?.subCategoryEnabled && (assetClassStates.cash?.categories?.length ?? 0) > 0 ? (
+                    <Select value={checkingAccountSubCategory} onValueChange={setCheckingAccountSubCategory}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleziona sottocategoria..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Nessuna (soglia non applicata)</SelectItem>
+                        {assetClassStates.cash.categories.map((cat) => (
+                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="text-xs text-amber-600">
+                      Configura le sottocategorie di Liquidità nella sezione &quot;Target Allocazione Asset Class&quot; per abilitare questa opzione.
+                    </p>
+                  )}
+                  <p className="text-xs text-gray-500">
+                    Per i conti correnti l&apos;imposta si applica solo se il valore supera €5.000
+                  </p>
+                </div>
               </div>
             )}
 

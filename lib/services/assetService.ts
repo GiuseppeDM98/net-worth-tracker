@@ -579,3 +579,30 @@ export function calculateAnnualPortfolioCost(assets: Asset[]): number {
 
   return totalValueWithTER * (portfolioTER / 100);
 }
+
+/**
+ * Calculate annual stamp duty (imposta di bollo) on the portfolio.
+ * Excluded: sold assets (quantity=0) and assets with stampDutyExempt=true.
+ * For checking accounts (cash with the specified subCategory): applies only if value strictly > 5000€.
+ */
+export function calculateStampDuty(
+  assets: Asset[],
+  stampDutyRate: number,
+  checkingAccountSubCategory?: string
+): number {
+  return assets
+    .filter(a => a.quantity > 0)
+    .filter(a => !a.stampDutyExempt)
+    .reduce((total, asset) => {
+      const value = calculateAssetValue(asset);
+      // Conti correnti: apply stamp duty only if value strictly > 5000€
+      if (
+        asset.assetClass === 'cash' &&
+        checkingAccountSubCategory &&
+        asset.subCategory === checkingAccountSubCategory
+      ) {
+        return value > 5000 ? total + value * (stampDutyRate / 100) : total;
+      }
+      return total + value * (stampDutyRate / 100);
+    }, 0);
+}

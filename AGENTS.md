@@ -62,6 +62,16 @@ ALL fields in settings types must be handled in THREE places:
 
 **Gotcha**: `setSettings()` has TWO write branches (with targets → `setDoc` without merge, without targets → `setDoc` with merge). New fields must be added to BOTH branches or they won't persist.
 
+### Per-Asset Boolean Flags Pattern
+- Prefer per-asset opt-in/opt-out flags (`stampDutyExempt`, `isLiquid`, etc.) over hardcoded category exclusions
+- More flexible: users have edge cases (pension funds in equity class, real estate exempt from stamp duty, etc.) that category-level rules can't cover
+- Add to `Asset` + `AssetFormData` types, Zod schema, reset defaults, edit-mode prefill, save payload, and UI toggle in `AssetDialog.tsx`
+
+### Dashboard Settings Loading
+- Dashboard page loads `AssetAllocationSettings` via `useEffect` + `useState` (NOT React Query) — one-time read per session
+- Pattern: `getSettings(user.uid).then(setPortfolioSettings).catch(() => {})`
+- Add `portfolioSettings` to the `portfolioMetrics` useMemo dependency array when calculations depend on it
+
 ### Firestore Nested Object Deletion
 - `merge: true` does RECURSIVE merge — cannot delete nested keys by omitting them
 - **Solution**: GET existing doc → spread + replace target field → `setDoc()` WITHOUT `merge: true`
@@ -106,28 +116,21 @@ ALL fields in settings types must be handled in THREE places:
 - **Bond Price Convention (% of par → EUR)**:
   - Borsa Italiana and Yahoo Finance return bond prices as **% of par** (e.g. 104.2 = 104.2%, not €104.2)
   - Stored `currentPrice` AND `averageCost` must be EUR per unit: `storedValue = biPrice × (nominalValue / 100)`
-  - **Borsa Italiana convention**: prices are quoted per 100€ of nominal (e.g. 104.2 means 104.2€ per 100€ nominal = 1042€ per 1000€ bond). Users naturally think and enter prices this way.
-  - Apply BI → EUR conversion in **four places**: `priceUpdater.ts` (cron/batch), `AssetDialog.onSubmit` Path 2 (auto-fetch), `AssetDialog.onSubmit` Path 1 (manualPrice), `AssetDialog.onSubmit` averageCost
+  - Apply BI → EUR conversion in **four places**: `priceUpdater.ts`, `AssetDialog.onSubmit` Path 2 (auto-fetch), Path 1 (manualPrice), averageCost
   - Condition: only when `isBondWithIsin` (type=bond, assetClass=bonds, ISIN present) AND `bondNominalValue > 1`
-  - Edit-mode prefill: both `manualPrice` and `averageCost` are back-converted to BI price (`eurValue / (nominalValue/100)`) so the round-trip is consistent.
-  - Without this: `totalValue = 104.2 × 30 = €3,126` instead of `€31,260` for 30 bonds at €1,000 nominal
-  - Convention: `nominalValue = 1000` (face value per bond), `quantity = number of bonds owned`
+  - Edit-mode prefill: both `manualPrice` and `averageCost` are back-converted to BI price so the round-trip is consistent
 - **Bond Coupon Scheduling (Cron Phase 3 Timezone)**:
   - `getNextCouponDate` uses `new Date()` with `setHours(0,0,0,0)` in LOCAL time → unsafe in Phase 3 where the comparison is against UTC Firestore Timestamps
   - **Phase 3 must use `getFollowingCouponDate(paidDate, frequency, maturityDate)`** — advances exactly one period from the PAID coupon's date, no "today" comparison
-  - `getApplicableCouponRate(paymentDate, issueDate, baseRate, schedule?)` — for step-up bonds; computes bond-year as `Math.ceil(elapsedMonths / 12)` (min 1), finds matching `CouponRateTier`, falls back to `baseRate`
-  - `nominalValue × quantity` = total face value; both coupon math and price conversion use this product
-- **Auto-generated dividend cleanup — never create zero-amount entries**: when `quantity === 0` (asset sold), `POST /api/dividends` still runs cleanup (`deleteUpcomingCouponsForAsset`) but returns early before creating the record. Check `if (quantity === 0)` server-side after cleanup, return 200 without insertion. Same pattern for `finalPremium`.
+  - `getApplicableCouponRate(paymentDate, issueDate, baseRate, schedule?)` — for step-up bonds
+- **Auto-generated dividend cleanup — never create zero-amount entries**: when `quantity === 0` (asset sold), `POST /api/dividends` still runs cleanup but returns early before creating the record
 - **Currency**: Use `currencyConversionService.ts` (Frankfurter API, 24h cache)
-- **Chart Y Axis**: Use `formatCurrencyCompact()` on mobile
-- **Doubling Time**: Skip pre-existing milestones (`threshold <= firstPositive.totalNetWorth`)
-- **Dividend Calendar**: Use `paymentDate` (not `exDate`) for display and filters
+- **Stamp Duty (Imposta di Bollo)**: `calculateStampDuty(assets, rate, checkingAccountSubCategory?)` in `assetService.ts`. Excluded: `quantity=0` + `stampDutyExempt=true`. Conti correnti (matching subcategory): apply only if value strictly > €5,000. Configured in Settings (`stampDutyEnabled`, `stampDutyRate`, `checkingAccountSubCategory`).
 
 ### DividendStats Filter Coupling
 - `DividendStats` makes an **independent** API fetch to `/api/dividends/stats` — it does NOT read from parent filtered state
-- Any filter added to `DividendTrackingTab` (asset, date range, type) **must be explicitly passed** as a prop to `DividendStats` and forwarded to the API, otherwise charts and table will be out of sync
-- Asset dropdown scope: only `equity` + `bonds` (not crypto/cash/realestate/commodity) — bonds included because coupons are tracked as dividend entries
-- `calculateDividendStats` in `dividendService.ts` accepts optional `assetId?` and filters after the Firestore fetch (no composite index needed; volume per user is manageable)
+- Any filter added to `DividendTrackingTab` **must be explicitly passed** as a prop to `DividendStats` and forwarded to the API
+- `calculateDividendStats` in `dividendService.ts` accepts optional `assetId?` — no composite index needed
 
 ### Anthropic API Patterns
 - **Current date in prompt**: Provide `Oggi è il ${today}` for time-sensitive analysis (knowledge cutoff)
@@ -136,95 +139,17 @@ ALL fields in settings types must be handled in THREE places:
 - **Web Search**: Multi-query with `Promise.allSettled`, top 2 per category, deduplicate by URL
 
 ### Consistent Data Source Pattern
-- When multiple values must be consistent (e.g., annual savings + annual expenses for projections), fetch them from the **same data source in a single function**
-- Avoids mismatches like "expenses from current year + savings from last year"
+- When multiple values must be consistent, fetch them from the **same data source in a single function**
 - **Example**: `getAnnualCashflowData()` returns both `annualSavings` and `annualExpensesFromCashflow` from the same reference year
-- **Files**: `lib/services/fireService.ts`
 
 ### Formatter Utility Duplication
 - **Gotcha**: `formatCurrency` exists in BOTH `lib/utils/formatters.ts` AND `lib/services/chartService.ts`
-- **Why**: Historical reasons - chartService is self-contained, 34 files import from it
-- **Solution**: When modifying formatters, update BOTH functions to keep signatures aligned
-- **Future**: Prefer importing from `formatters.ts` in new components to gradually reduce chartService dependency
-
-### Multi-Class Allocation Validation
-- With 2 classes: auto-complement (change one, adjust the other) works well
-- With 3+ classes: auto-complement is ambiguous — which class absorbs the difference?
-- **Solution**: Independent fields + "Rimanente: X%" badge with error if sum ≠ 100%
-- **Files**: `components/monte-carlo/ParametersForm.tsx`
-
-### ParametersForm Local State Sync
-- `ParametersForm` uses local `useState<string>` for each input to allow partial typing (e.g., "7." before "7.5")
-- Local state initializes from `params` at mount but does NOT auto-sync on prop changes
-- **Any field that can be updated asynchronously by the parent** (e.g., auto-fill from portfolio) needs a `useEffect` to sync local state
-- Pattern already exists for `initialPortfolio` (riga 82-86) — replicate for any new auto-filled field
-- **Files**: `components/monte-carlo/ParametersForm.tsx`
-
-### Scenario Mode hideMarketParams Pattern
-- When a form has fields also present in per-scenario cards, add `hideMarketParams?: boolean` prop
-- In scenario mode, market params are edited in scenario cards → hide them from the base form to avoid duplicated/conflicting inputs
-- **Files**: `components/monte-carlo/ParametersForm.tsx`, `MonteCarloTab.tsx`
-
-### Scenario Params Builder Pattern
-- When shared params (portfolio, allocation, withdrawal) must be combined with scenario-specific params (returns, volatility, inflation), use a builder function
-- `buildParamsFromScenario(baseParams, scenario)` spreads base + overrides market fields from scenario
-- **Files**: `lib/services/monteCarloService.ts`
-
-### PDF Past Period Export Pattern
-- `context.assets` in the PDF pipeline is **live current data**, not historical → sections that depend on it (Portfolio, Allocation, Summary, FIRE) must be disabled for past periods
-- `adjustSectionsForTimeFilter(timeFilter, sections, isPastPeriod)` handles the matrix: monthly → only Cashflow; past yearly → Cashflow + History + Performance; current yearly / total → all sections
-- `filterSnapshotsByTime` / `filterExpensesByTime` accept optional `year?`/`month?` with fallback to `new Date()` (backwards compatible)
-- For past-year performance: use `timePeriod = 'ALL'` (not `'YTD'`) because snapshots are already pre-filtered to the selected year
-- **Files**: `pdfTimeFilters.ts`, `PDFExportDialog.tsx`, `pdfDataService.ts`
-
-### Goal-Driven Allocation Override Pattern
-- When building `AssetAllocationTarget` from goal-derived data, always pass existing Settings targets to preserve sub-category structure
-- `buildTargetsFromGoalAllocation(derived, existingTargets)` overrides only `targetPercentage` at asset class level
-- **Files**: `assetAllocationService.ts`, `allocation/page.tsx`
-
-### Category/Expense Move vs Reassign
-- **`reassignExpenses*`**: Used during category **deletion** — does NOT update `type` field
-- **`moveExpenses*`**: Used for standalone **move** — updates `type` field + flips amount sign on cross-type
-- Both use `writeBatch` for atomic updates. Keep them separate (different use cases, different guarantees)
-- **Files**: `lib/services/expenseService.ts`, `components/expenses/CategoryMoveDialog.tsx`
-
-### Dialog useEffect Reset Pattern
-- When a dialog fetches data that updates a memoized list (e.g., inline category creation → `localCategories` → `availableCategories`), do NOT include that list in the reset `useEffect` deps
-- Split into two effects: one resets on `[open]`, another auto-selects only if no current selection (`!selectedId`)
-- **Why**: Otherwise the reset effect fires after data changes and wipes user selections
-- **Files**: `components/expenses/CategoryMoveDialog.tsx`, `CategoryDeleteConfirmDialog.tsx`
-
-### Dialog Async Pre-fill Pattern
-- A `useEffect` watching async state won't fire on dialog open if the dep already had that value (e.g., `selectedType` was already `'variable'` before open, so it doesn't re-trigger)
-- **Fix**: Call `setValue()` directly inside the async loader using `getValues('field')` to read current form state synchronously after the await
-- Keep the `useEffect` only for subsequent user-triggered changes (e.g., type change after open)
-- **Files**: `components/expenses/ExpenseDialog.tsx` (`loadCashAssets`)
-
-### useFieldArray Edit-Mode Repopulation
-- `setValue('fieldArrayName', someArray)` does **NOT** reliably update rendered `fields` managed by `useFieldArray`
-- **Fix**: destructure `replace` from `useFieldArray` and call `replace(newArray)` in edit-mode prefill
-- `setValue` works fine for scalar fields; only field arrays need `replace`
-- **Files**: `AssetDialog.tsx` (`replaceTiers()` for `bondCouponRateSchedule`)
-
-### Unit Testing with Vitest
-- **Config**: `vitest.config.ts` with `@/` path alias, tests in `__tests__/*.test.ts`
-- **Run**: `npm test` (single run), `npm run test:watch` (watch mode)
-- **Firebase mock**: Services import Firebase transitively → mock dependent modules before importing:
-  ```ts
-  vi.mock('@/lib/services/expenseService', () => ({}))
-  vi.mock('@/lib/services/snapshotService', () => ({}))
-  vi.mock('@/lib/services/assetAllocationService', () => ({}))
-  ```
-- **Scope**: Only test pure functions (no Firebase/API calls). Async functions that hit Firestore are NOT unit-tested.
-- **Intl locale**: Node.js small ICU may not format Italian locale correctly → use regex assertions for `Intl.NumberFormat` output (e.g., `/1[.,]?234/` instead of exact `'1.234'`)
+- When modifying formatters, update BOTH functions to keep signatures aligned
 
 ### Performance Period Baseline Pattern
-- `getSnapshotsForPeriod` includes 1 extra month before the period as **baseline** for YTD/1Y/3Y/5Y. Example: YTD Feb → [Dec, Jan, Feb]. The baseline provides `startNW` so all months in the period have a sub-period return.
-- **`hasBaseline`** in `calculatePerformanceForPeriod`: when true, period dates and `numberOfMonths` are computed from `sortedSnapshots[1]` (actual period start), not `sortedSnapshots[0]` (baseline). Active only for YTD/1Y/3Y/5Y with >= 3 snapshots; ALL and CUSTOM unaffected.
-- **TWR `periodMonths` override**: `calculateTimeWeightedReturn` accepts optional `periodMonths` to annualize over the performance period (excluding baseline). Without it, TWR computes from first/last snapshot (backward compatible).
-- **Heatmap year init**: `prepareMonthlyReturnsHeatmap` initializes years from `monthlyReturnsMap` (not from all snapshots) to exclude baseline months from display.
-- All metric functions that annualize **must use `calculateMonthsDifference(periodEnd, periodStart)`** — NOT `snapshots.length - 1`. Inclusive counting (`+1`): Jan→Feb = 2 months.
-- **Known limitation**: 1Y period starts from month+1, not same month last year (e.g., Mar 2025 for Feb 2026). This is because `calculateMonthsDifference` inclusive counting would make Feb→Feb = 13 months, displaying "1a 1m" instead of "1a 0m".
+- `getSnapshotsForPeriod` includes 1 extra month before the period as **baseline** for YTD/1Y/3Y/5Y
+- **`hasBaseline`** in `calculatePerformanceForPeriod`: period dates computed from `sortedSnapshots[1]` (not baseline). Active only for YTD/1Y/3Y/5Y with >= 3 snapshots
+- All metric functions that annualize **must use `calculateMonthsDifference(periodEnd, periodStart)`** — NOT `snapshots.length - 1`
 
 ---
 
@@ -236,7 +161,7 @@ ALL fields in settings types must be handled in THREE places:
 
 ### Settings Persistence Bug
 **Symptom**: UI toggles save but reset after reload
-**Fix**: Update BOTH `getSettings()` and `setSettings()` (three-place rule)
+**Fix**: Update BOTH `getSettings()` and `setSettings()` (three-place rule). Remember the TWO write branches in `setSettings()`.
 
 ### Radix Dialog Auto-Trigger Bug
 **Symptom**: Callback doesn't fire when component mounted with `open={true}`
@@ -253,7 +178,7 @@ ALL fields in settings types must be handled in THREE places:
 
 ### Wrong Import Source for Service Functions
 **Symptom**: Build error when importing settings helpers from constants modules
-**Fix**: `getDefaultTargets`, `getSettings`, `setSettings` all live in `assetAllocationService.ts` — do NOT import from `defaultSubCategories` or other constant files
+**Fix**: `getDefaultTargets`, `getSettings`, `setSettings` all live in `assetAllocationService.ts`
 
 ---
 

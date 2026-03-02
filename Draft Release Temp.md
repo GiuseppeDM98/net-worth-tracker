@@ -2,6 +2,12 @@
 
 ## ✨ New Features
 
+### Stamp Duty (Imposta di Bollo) Tracking
+- Enable stamp duty tracking from Settings with a configurable annual rate (e.g. 0.20%)
+- Stamp duty cost is included in the "Annual Portfolio Cost" card on the dashboard, alongside TER costs — a breakdown shows each component when both are active
+- Specify which cash sub-category represents checking accounts (conti correnti): stamp duty for these accounts applies only when their balance exceeds €5,000
+- Mark any individual asset as exempt from stamp duty directly from the asset edit dialog — useful for pension funds, real estate, or any other asset that qualifies for exemption
+
 ### Linked Cash Account for Transactions
 - Link any expense or income entry to a cash account (bank account, current account) directly from the transaction dialog
 - Account balance updates automatically when a transaction is saved — no manual adjustment needed

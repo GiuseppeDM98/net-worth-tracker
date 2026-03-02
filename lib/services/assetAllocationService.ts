@@ -40,6 +40,9 @@ export async function getSettings(
       goalDrivenAllocationEnabled: data.goalDrivenAllocationEnabled,
       defaultDebitCashAssetId: data.defaultDebitCashAssetId,
       defaultCreditCashAssetId: data.defaultCreditCashAssetId,
+      stampDutyEnabled: data.stampDutyEnabled,
+      stampDutyRate: data.stampDutyRate,
+      checkingAccountSubCategory: data.checkingAccountSubCategory,
       targets: data.targets as AssetAllocationTarget,
     };
   } catch (error) {
@@ -127,6 +130,15 @@ export async function setSettings(
       if (settings.defaultCreditCashAssetId !== undefined) {
         docData.defaultCreditCashAssetId = settings.defaultCreditCashAssetId;
       }
+      if (settings.stampDutyEnabled !== undefined) {
+        docData.stampDutyEnabled = settings.stampDutyEnabled;
+      }
+      if (settings.stampDutyRate !== undefined) {
+        docData.stampDutyRate = settings.stampDutyRate;
+      }
+      if (settings.checkingAccountSubCategory !== undefined) {
+        docData.checkingAccountSubCategory = settings.checkingAccountSubCategory;
+      }
 
       // Use setDoc WITHOUT merge to completely replace targets
       await setDoc(targetRef, docData);
@@ -175,6 +187,15 @@ export async function setSettings(
       }
       if (settings.defaultCreditCashAssetId !== undefined) {
         docData.defaultCreditCashAssetId = settings.defaultCreditCashAssetId;
+      }
+      if (settings.stampDutyEnabled !== undefined) {
+        docData.stampDutyEnabled = settings.stampDutyEnabled;
+      }
+      if (settings.stampDutyRate !== undefined) {
+        docData.stampDutyRate = settings.stampDutyRate;
+      }
+      if (settings.checkingAccountSubCategory !== undefined) {
+        docData.checkingAccountSubCategory = settings.checkingAccountSubCategory;
       }
 
       // Use merge: true to preserve existing fields

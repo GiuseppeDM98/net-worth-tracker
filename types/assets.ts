@@ -68,6 +68,7 @@ export interface Asset {
   averageCost?: number;
   taxRate?: number; // Tax rate percentage for unrealized gains (e.g., 26 for 26%)
   totalExpenseRatio?: number; // Total Expense Ratio (TER) as a percentage (e.g., 0.20 for 0.20%)
+  stampDutyExempt?: boolean; // If true, asset is excluded from stamp duty (imposta di bollo) calculation (e.g. pension funds, real estate)
   currentPrice: number;
   isLiquid?: boolean; // Default: true - indicates whether the asset is liquid or illiquid
   autoUpdatePrice?: boolean; // Default: true - indicates whether price should be automatically updated via Yahoo Finance
@@ -92,6 +93,7 @@ export interface AssetFormData {
   averageCost?: number;
   taxRate?: number; // Tax rate percentage for unrealized gains (e.g., 26 for 26%)
   totalExpenseRatio?: number; // Total Expense Ratio (TER) as a percentage (e.g., 0.20 for 0.20%)
+  stampDutyExempt?: boolean; // If true, asset is excluded from stamp duty (imposta di bollo) calculation
   currentPrice: number;
   isLiquid?: boolean;
   autoUpdatePrice?: boolean;
@@ -161,6 +163,9 @@ export interface AssetAllocationSettings {
   goalDrivenAllocationEnabled?: boolean; // When true AND goalBasedInvestingEnabled, derive allocation targets from goal recommended allocations instead of manual Settings targets
   defaultDebitCashAssetId?: string; // Default cash asset pre-selected for expenses/debts in expense dialog
   defaultCreditCashAssetId?: string; // Default cash asset pre-selected for income entries in expense dialog
+  stampDutyEnabled?: boolean; // Toggle to include stamp duty (imposta di bollo) in annual portfolio cost
+  stampDutyRate?: number; // Annual stamp duty rate as a percentage (e.g. 0.2 for 0.20%)
+  checkingAccountSubCategory?: string; // Cash subcategory name representing checking accounts (conti correnti); stamp duty applies only if value > 5000€
   targets: AssetAllocationTarget;
 }
 

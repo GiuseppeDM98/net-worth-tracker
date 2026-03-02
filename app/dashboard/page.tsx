@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { MonthlySnapshot } from '@/types/assets';
+import { AssetAllocationSettings, MonthlySnapshot } from '@/types/assets';
 import {
   calculateTotalValue,
   calculateLiquidNetWorth,
@@ -14,7 +14,9 @@ import {
   calculateNetTotal,
   calculatePortfolioWeightedTER,
   calculateAnnualPortfolioCost,
+  calculateStampDuty,
 } from '@/lib/services/assetService';
+import { getSettings } from '@/lib/services/assetAllocationService';
 import {
   formatCurrency,
   prepareAssetClassDistributionData,
@@ -90,6 +92,13 @@ export default function DashboardPage() {
   const [creatingSnapshot, setCreatingSnapshot] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [existingSnapshot, setExistingSnapshot] = useState<MonthlySnapshot | null>(null);
+  const [portfolioSettings, setPortfolioSettings] = useState<AssetAllocationSettings | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      getSettings(user.uid).then(setPortfolioSettings).catch(() => {});
+    }
+  }, [user]);
 
   /**
    * Calculate all portfolio metrics once per render cycle.
@@ -129,7 +138,16 @@ export default function DashboardPage() {
     netTotal: calculateNetTotal(assets),
     portfolioTER: calculatePortfolioWeightedTER(assets),
     annualPortfolioCost: calculateAnnualPortfolioCost(assets),
-  }), [assets]);
+    annualStampDuty: (portfolioSettings?.stampDutyEnabled && portfolioSettings?.stampDutyRate)
+      ? calculateStampDuty(
+          assets,
+          portfolioSettings.stampDutyRate,
+          portfolioSettings.checkingAccountSubCategory !== '__none__'
+            ? portfolioSettings.checkingAccountSubCategory
+            : undefined
+        )
+      : 0,
+  }), [assets, portfolioSettings]);
 
   /**
    * Calculate monthly and yearly portfolio variations.
@@ -328,6 +346,7 @@ export default function DashboardPage() {
   // Only show TER (Total Expense Ratio) cards if user tracks costs on any asset.
   // Similar rationale to cost basis: hide irrelevant metrics.
   const hasTERTracking = assets.some(a => a.totalExpenseRatio && a.totalExpenseRatio > 0);
+  const hasStampDuty = !!(portfolioSettings?.stampDutyEnabled && portfolioMetrics.annualStampDuty > 0);
 
   if (loading) {
     return (
@@ -589,36 +608,45 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* TER Cards - only show if any asset has TER tracking */}
-      {hasTERTracking && (
+      {/* Cost cards — shown if any asset has TER tracking or stamp duty is enabled */}
+      {(hasTERTracking || hasStampDuty) && (
         <div className="grid gap-6 md:grid-cols-2">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">TER Portfolio</CardTitle>
-              <Receipt className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-purple-600">
-                {portfolioMetrics.portfolioTER.toFixed(2)}%
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Total Expense Ratio medio ponderato
-              </p>
-            </CardContent>
-          </Card>
+          {hasTERTracking && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">TER Portfolio</CardTitle>
+                <Receipt className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-purple-600">
+                  {portfolioMetrics.portfolioTER.toFixed(2)}%
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Total Expense Ratio medio ponderato
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
-          <Card>
+          <Card className={!hasTERTracking ? 'md:col-span-2' : ''}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Costo Annuale Portfolio</CardTitle>
               <TrendingDown className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-orange-600">
-                {formatCurrency(portfolioMetrics.annualPortfolioCost)}
+                {formatCurrency(portfolioMetrics.annualPortfolioCost + portfolioMetrics.annualStampDuty)}
               </div>
-              <p className="text-xs text-muted-foreground">
-                Costi di gestione annuali stimati
-              </p>
+              {hasTERTracking && hasStampDuty ? (
+                <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                  <div>TER: {formatCurrency(portfolioMetrics.annualPortfolioCost)}</div>
+                  <div>Bollo: {formatCurrency(portfolioMetrics.annualStampDuty)}</div>
+                </div>
+              ) : hasTERTracking ? (
+                <p className="text-xs text-muted-foreground">Costi di gestione annuali stimati</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">Imposta di bollo annuale stimata</p>
+              )}
             </CardContent>
           </Card>
         </div>
