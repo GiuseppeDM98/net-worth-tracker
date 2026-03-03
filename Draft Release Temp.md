@@ -2,6 +2,13 @@
 
 ## ✨ New Features
 
+### Monthly View for Savings vs Investment Growth
+- Added a monthly breakdown mode to the "Savings vs Investment Growth" chart on the History page
+- Toggle between **Annual** (year-by-year) and **Monthly** (month-by-month) views directly in the chart header
+- In monthly view, select any year from the dropdown to see all 12 months side-by-side
+- Each bar shows how much of that month's net worth change came from disciplined saving vs market performance
+- Months where investment returns were negative are shown in red; positive months in blue — same visual language as the annual view
+
 ### Stamp Duty (Imposta di Bollo) Tracking
 - Enable stamp duty tracking from Settings with a configurable annual rate (e.g. 0.20%)
 - Stamp duty cost is included in the "Annual Portfolio Cost" card on the dashboard, alongside TER costs — a breakdown shows each component when both are active

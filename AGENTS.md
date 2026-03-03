@@ -186,4 +186,9 @@ ALL fields in settings types must be handled in THREE places:
 **Context**: `snapshotAsset.totalValue` can be stored as `0` (not null) if a snapshot was taken when `quantity = 0` for a new asset. `??` only catches `null`/`undefined`, so `0` passes through unchanged.
 **Fix**: Use `||` when `0` is semantically invalid (e.g., `totalValue || (price * qty)` in `assetPriceHistoryUtils.ts`). `price × 0 = 0` for sold assets, so they are unaffected.
 
-**Last updated**: 2026-03-02
+### Recharts Legend Color with Cell Overrides
+**Symptom**: `<Legend>` shows a black square for a bar series that uses `<Cell>` for conditional coloring (e.g. blue/red depending on value)
+**Context**: `<Cell>` overrides per-bar fill at render time but does NOT propagate to `<Legend>` — the legend reads `fill` directly from the `<Bar>` element. Without `fill` on `<Bar>`, Recharts defaults to black.
+**Fix**: Always set `fill` on `<Bar>` to the "default" color (e.g. `fill="#3B82F6"`) so the legend shows the expected color; `<Cell>` fills still override individual bars at runtime.
+
+**Last updated**: 2026-03-03

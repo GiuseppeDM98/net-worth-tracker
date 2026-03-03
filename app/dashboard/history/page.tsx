@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { getAllAssets, ASSET_CLASS_ORDER } from '@/lib/services/assetService';
@@ -16,11 +16,20 @@ import {
   prepareAssetClassHistoryData,
   prepareYoYVariationData,
   prepareSavingsVsInvestmentData,
+  prepareSavingsVsInvestmentDataMonthly,
   prepareDoublingTimeData,
   formatCurrency,
   formatCurrencyCompact,
   formatPercentage,
 } from '@/lib/services/chartService';
+import { getItalyYear } from '@/lib/utils/dateHelpers';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Asset, MonthlySnapshot, AssetAllocationTarget, DoublingMode } from '@/types/assets';
 import { DoublingTimeSummaryCards } from '@/components/history/DoublingTimeSummaryCards';
 import { DoublingMilestoneTimeline } from '@/components/history/DoublingMilestoneTimeline';
@@ -108,6 +117,8 @@ export default function HistoryPage() {
   const [showNotes, setShowNotes] = useState(false);
   const [snapshotSearchDialogOpen, setSnapshotSearchDialogOpen] = useState(false);
   const [doublingMode, setDoublingMode] = useState<DoublingMode>('geometric');
+  const [savingsView, setSavingsView] = useState<'annual' | 'monthly'>('annual');
+  const [savingsSelectedYear, setSavingsSelectedYear] = useState<number>(getItalyYear(new Date()));
 
   // Responsive breakpoints
   const isMobile = useMediaQuery('(max-width: 767px)');
@@ -244,6 +255,15 @@ export default function HistoryPage() {
   const assetClassHistory = prepareAssetClassHistoryData(snapshots);
   const yoyVariationData = prepareYoYVariationData(snapshots);
   const savingsVsInvestmentData = prepareSavingsVsInvestmentData(snapshots, expenses);
+  const savingsVsInvestmentDataMonthly = useMemo(
+    () => prepareSavingsVsInvestmentDataMonthly(snapshots, expenses, savingsSelectedYear),
+    [snapshots, expenses, savingsSelectedYear]
+  );
+  // Unique years from snapshots for the year selector, newest first
+  const savingsAvailableYears = useMemo(
+    () => [...new Set(snapshots.map((s) => s.year))].sort((a, b) => b - a),
+    [snapshots]
+  );
   const doublingTimeSummary = prepareDoublingTimeData(snapshots, doublingMode);
 
   // Calculate percentage split of liquid vs illiquid for each snapshot.
@@ -1223,88 +1243,203 @@ export default function HistoryPage() {
       </Card>
 
       {/* Savings vs Investment Growth Chart */}
-      {/* Shows year-by-year breakdown of net worth growth:
-          - Green bar (Net Savings): What user saved from income
+      {/* Shows breakdown of net worth growth into two components:
+          - Green bar (Net Savings): What user saved from income minus expenses
           - Blue/Red bar (Investment Growth): What markets contributed (positive/negative)
-          Stacked bars sum to total Net Worth Growth for the year */}
+          Stacked bars sum to total Net Worth Growth for the period.
+          Supports annual view (per-year) and monthly view (per-month within a year). */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg sm:text-xl">
-            Risparmio vs Crescita Investimenti
-          </CardTitle>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <CardTitle className="text-lg sm:text-xl">
+              Risparmio vs Crescita Investimenti
+            </CardTitle>
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Annual / Monthly view toggle */}
+              <div className="flex gap-1">
+                <Button
+                  variant={savingsView === 'annual' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSavingsView('annual')}
+                  className="text-xs sm:text-sm"
+                >
+                  Annuale
+                </Button>
+                <Button
+                  variant={savingsView === 'monthly' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSavingsView('monthly')}
+                  className="text-xs sm:text-sm"
+                >
+                  Mensile
+                </Button>
+              </div>
+              {/* Year selector shown only in monthly view */}
+              {savingsView === 'monthly' && savingsAvailableYears.length > 0 && (
+                <Select
+                  value={savingsSelectedYear.toString()}
+                  onValueChange={(v) => setSavingsSelectedYear(Number(v))}
+                >
+                  <SelectTrigger className="w-24 h-8 text-xs sm:text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {savingsAvailableYears.map((year) => (
+                      <SelectItem key={year} value={year.toString()}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          {savingsVsInvestmentData.length === 0 ? (
-            <div className="flex h-64 items-center justify-center text-gray-500">
-              Dati insufficienti per la visualizzazione.
-              Servono snapshot e transazioni cashflow per ogni anno.
-            </div>
+          {savingsView === 'annual' ? (
+            // Annual view
+            savingsVsInvestmentData.length === 0 ? (
+              <div className="flex h-64 items-center justify-center text-gray-500">
+                Dati insufficienti per la visualizzazione.
+                Servono snapshot e transazioni cashflow per ogni anno.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-savings-vs-investment">
+                <BarChart data={savingsVsInvestmentData} margin={getChartMargins()}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="year" />
+                  <YAxis
+                    width={getYAxisWidth()}
+                    tickFormatter={(value) => formatCurrencyCompact(value)}
+                  />
+                  <Tooltip
+                    formatter={(value: number, name: string) => [
+                      formatCurrency(value),
+                      name
+                    ]}
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                      border: '1px solid #ccc',
+                      borderRadius: '8px',
+                      padding: isMobile ? '8px' : '12px',
+                      fontSize: isMobile ? '14px' : '16px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    }}
+                    labelStyle={{
+                      color: '#000',
+                      fontWeight: 600,
+                      marginBottom: '4px',
+                    }}
+                    itemStyle={{
+                      fontSize: isMobile ? '14px' : '16px',
+                      padding: '2px 0',
+                    }}
+                  />
+                  <Legend
+                    wrapperStyle={{
+                      display: isMobile ? 'none' : 'block',
+                      paddingTop: isMobile ? '0' : '20px'
+                    }}
+                    iconSize={isMobile ? 8 : 10}
+                    fontSize={isMobile ? 11 : 12}
+                  />
+                  <Bar
+                    dataKey="netSavings"
+                    name="Risparmio Netto"
+                    fill="#10B981"
+                    stackId="a"
+                    isAnimationActive={false}
+                  />
+                  {/* fill="#3B82F6" sets the legend color; Cell overrides each bar's actual color */}
+                  <Bar
+                    dataKey="investmentGrowth"
+                    name="Crescita Investimenti"
+                    fill="#3B82F6"
+                    stackId="a"
+                    isAnimationActive={false}
+                  >
+                    {savingsVsInvestmentData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={entry.investmentGrowth >= 0 ? '#3B82F6' : '#EF4444'}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )
           ) : (
-            <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-savings-vs-investment">
-              <BarChart data={savingsVsInvestmentData} margin={getChartMargins()}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="year" />
-                <YAxis
-                  width={getYAxisWidth()}
-                  tickFormatter={(value) => formatCurrencyCompact(value)}
-                />
-                <Tooltip
-                  formatter={(value: number, name: string) => [
-                    formatCurrency(value),
-                    name
-                  ]}
-                  contentStyle={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                    border: '1px solid #ccc',
-                    borderRadius: '8px',
-                    padding: isMobile ? '8px' : '12px',
-                    fontSize: isMobile ? '14px' : '16px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                  }}
-                  labelStyle={{
-                    color: '#000',
-                    fontWeight: 600,
-                    marginBottom: '4px',
-                  }}
-                  itemStyle={{
-                    fontSize: isMobile ? '14px' : '16px',
-                    padding: '2px 0',
-                  }}
-                />
-                <Legend
-                  wrapperStyle={{
-                    display: isMobile ? 'none' : 'block',
-                    paddingTop: isMobile ? '0' : '20px'
-                  }}
-                  iconSize={isMobile ? 8 : 10}
-                  fontSize={isMobile ? 11 : 12}
-                />
-
-                {/* Bar 1: Net Savings (always green) */}
-                <Bar
-                  dataKey="netSavings"
-                  name="Risparmio Netto"
-                  fill="#10B981"
-                  stackId="a"
-                  isAnimationActive={false}
-                />
-
-                {/* Bar 2: Investment Growth (conditional color) */}
-                <Bar
-                  dataKey="investmentGrowth"
-                  name="Crescita Investimenti"
-                  stackId="a"
-                  isAnimationActive={false}
-                >
-                  {savingsVsInvestmentData.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={entry.investmentGrowth >= 0 ? '#3B82F6' : '#EF4444'}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            // Monthly view
+            savingsVsInvestmentDataMonthly.length === 0 ? (
+              <div className="flex h-64 items-center justify-center text-gray-500">
+                Nessun dato per l&apos;anno selezionato.
+                Servono snapshot consecutivi e transazioni cashflow.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-savings-vs-investment-monthly">
+                <BarChart data={savingsVsInvestmentDataMonthly} margin={getChartMargins()}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="period" />
+                  <YAxis
+                    width={getYAxisWidth()}
+                    tickFormatter={(value) => formatCurrencyCompact(value)}
+                  />
+                  <Tooltip
+                    formatter={(value: number, name: string) => [
+                      formatCurrency(value),
+                      name
+                    ]}
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                      border: '1px solid #ccc',
+                      borderRadius: '8px',
+                      padding: isMobile ? '8px' : '12px',
+                      fontSize: isMobile ? '14px' : '16px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    }}
+                    labelStyle={{
+                      color: '#000',
+                      fontWeight: 600,
+                      marginBottom: '4px',
+                    }}
+                    itemStyle={{
+                      fontSize: isMobile ? '14px' : '16px',
+                      padding: '2px 0',
+                    }}
+                  />
+                  <Legend
+                    wrapperStyle={{
+                      display: isMobile ? 'none' : 'block',
+                      paddingTop: isMobile ? '0' : '20px'
+                    }}
+                    iconSize={isMobile ? 8 : 10}
+                    fontSize={isMobile ? 11 : 12}
+                  />
+                  <Bar
+                    dataKey="netSavings"
+                    name="Risparmio Netto"
+                    fill="#10B981"
+                    stackId="a"
+                    isAnimationActive={false}
+                  />
+                  {/* fill="#3B82F6" sets the legend color; Cell overrides each bar's actual color */}
+                  <Bar
+                    dataKey="investmentGrowth"
+                    name="Crescita Investimenti"
+                    fill="#3B82F6"
+                    stackId="a"
+                    isAnimationActive={false}
+                  >
+                    {savingsVsInvestmentDataMonthly.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={entry.investmentGrowth >= 0 ? '#3B82F6' : '#EF4444'}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )
           )}
         </CardContent>
       </Card>

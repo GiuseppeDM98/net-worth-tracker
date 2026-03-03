@@ -48,7 +48,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Automatic monthly portfolio snapshots (via Vercel cron)
 - Net worth evolution, asset class breakdown, and liquidity charts
 - Year-over-Year variation analysis
-- Savings vs Investment Growth comparison
+- Savings vs Investment Growth comparison (annual and monthly views)
 - Doubling time analysis with geometric calculations and fixed thresholds
 
 ### FIRE Planning
