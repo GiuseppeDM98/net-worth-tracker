@@ -191,4 +191,11 @@ ALL fields in settings types must be handled in THREE places:
 **Context**: `<Cell>` overrides per-bar fill at render time but does NOT propagate to `<Legend>` — the legend reads `fill` directly from the `<Bar>` element. Without `fill` on `<Bar>`, Recharts defaults to black.
 **Fix**: Always set `fill` on `<Bar>` to the "default" color (e.g. `fill="#3B82F6"`) so the legend shows the expected color; `<Cell>` fills still override individual bars at runtime.
 
-**Last updated**: 2026-03-03 (session: cashflowHistoryStartYear)
+### Unit Testing Patterns
+
+- **Local Date constructor**: Use `new Date(year, month, day)` not ISO string `new Date('2024-03-09')` in test fixtures — ISO strings parse as UTC and shift by 1 hour in CET, causing off-by-one day bugs
+- **Float assertions**: Use `toBeCloseTo(expected, precision)` not `toBe` for results of float arithmetic (e.g. `2.8/100/2*1000` = `13.999…` in IEEE 754)
+- **Fake timers**: `vi.useFakeTimers()` + `vi.setSystemTime(new Date(year, month, day))` in `beforeEach`; `vi.useRealTimers()` in `afterEach` — required when function calls `new Date()` internally (e.g. `getNextCouponDate`)
+- **No mocks needed for pure utils**: Functions with zero external dependencies (only TS type imports) need no `vi.mock()` — directly testable
+
+**Last updated**: 2026-03-03 (session: couponUtils unit tests)
