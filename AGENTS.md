@@ -128,6 +128,13 @@ ALL fields in settings types must be handled in THREE places:
 - **Currency**: Use `currencyConversionService.ts` (Frankfurter API, 24h cache)
 - **Stamp Duty (Imposta di Bollo)**: `calculateStampDuty(assets, rate, checkingAccountSubCategory?)` in `assetService.ts`. Excluded: `quantity=0` + `stampDutyExempt=true`. Conti correnti (matching subcategory): apply only if value strictly > €5,000. Configured in Settings (`stampDutyEnabled`, `stampDutyRate`, `checkingAccountSubCategory`).
 
+### Dividend Net Amount Storage
+- `netAmount` is computed at creation time (`grossAmount - taxAmount`) and **stored in Firestore** — metrics read the saved field, never recalculate at runtime
+- Auto-scraped dividends (Borsa Italiana): `taxAmount = grossAmount × 0.26` (flat 26%, hardcoded)
+- Bond coupons (auto-generated): `taxRate = asset.taxRate ?? 26` — correctly applies 12.5% for BTPs
+- Manual entries: `taxAmount` is whatever the user entered; `netAmount` auto-filled if not provided
+- YOC/Current Yield netto: use `div.netAmountEur ?? div.netAmount` (prefer EUR conversion)
+
 ### DividendStats Filter Coupling
 - `DividendStats` makes an **independent** API fetch to `/api/dividends/stats` — it does NOT read from parent filtered state
 - Any filter added to `DividendTrackingTab` **must be explicitly passed** as a prop to `DividendStats` and forwarded to the API
@@ -151,6 +158,9 @@ ALL fields in settings types must be handled in THREE places:
 - `getSnapshotsForPeriod` includes 1 extra month before the period as **baseline** for YTD/1Y/3Y/5Y
 - **`hasBaseline`** in `calculatePerformanceForPeriod`: period dates computed from `sortedSnapshots[1]` (not baseline). Active only for YTD/1Y/3Y/5Y with >= 3 snapshots
 - All metric functions that annualize **must use `calculateMonthsDifference(periodEnd, periodStart)`** — NOT `snapshots.length - 1`
+- **Chart baseline hiding** — each chart function handles it independently:
+  - Heatmap (`prepareMonthlyReturnsHeatmap`): loop starts at `i = 1`
+  - Evoluzione Patrimonio (`preparePerformanceChartData`): optional `skipBaseline=true` → `.slice(1)` after sort. Pass `true` for YTD/1Y/3Y/5Y in `getChartData()`. Baseline is always `sortedSnapshots[0]` after chronological sort → slice is safe.
 
 ---
 

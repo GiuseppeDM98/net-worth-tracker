@@ -157,6 +157,8 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed the Net Worth Evolution chart ("Evoluzione Patrimonio") showing an extra data point from outside the selected time period — for example, December 2024 appearing as the first point in a YTD 2025 chart. The chart now correctly starts at the first month of the selected period for YTD, 1Y, 3Y, and 5Y views.
+
 - Fixed asset value history (Current Year Values / Historical Values tabs) showing "0,00€" instead of the correct amount for assets whose monthly snapshot was captured while their quantity was 0 — value is now correctly recalculated from the stored unit price × quantity. Future snapshots also no longer include zero-quantity assets in the per-asset breakdown to prevent recurrence.
 
 - Fixed dividend page asset filter not showing bond assets — bonds are now listed alongside stocks and ETFs in the filter dropdown so you can filter coupon entries by bond

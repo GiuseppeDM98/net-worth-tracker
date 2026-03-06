@@ -1499,15 +1499,29 @@ async function calculateRollingPeriods(
 
 /**
  * Prepare chart data for net worth evolution
+ *
+ * @param skipBaseline - When true, drops the first (baseline) snapshot.
+ *   getSnapshotsForPeriod includes an extra month before YTD/1Y/3Y/5Y periods
+ *   so the first month's return can be calculated, but that month falls outside
+ *   the selected period and should not appear as a chart data point.
  */
 export function preparePerformanceChartData(
   snapshots: MonthlySnapshot[],
-  cashFlows: CashFlowData[]
+  cashFlows: CashFlowData[],
+  skipBaseline = false
 ): PerformanceChartData[] {
   const sortedSnapshots = [...snapshots].sort((a, b) => {
     if (a.year !== b.year) return a.year - b.year;
     return a.month - b.month;
   });
+
+  // Skip the first snapshot when it is a baseline month (e.g., Dec for YTD).
+  // getSnapshotsForPeriod includes it for return calculations but it falls
+  // outside the selected period and should not appear as a chart data point.
+  const chartSnapshots =
+    skipBaseline && sortedSnapshots.length > 1
+      ? sortedSnapshots.slice(1)
+      : sortedSnapshots;
 
   let cumulativeContributions = 0;
   const cashFlowMap = new Map<string, number>();
@@ -1517,7 +1531,7 @@ export function preparePerformanceChartData(
     cashFlowMap.set(key, cf.netCashFlow);
   });
 
-  return sortedSnapshots.map(snapshot => {
+  return chartSnapshots.map(snapshot => {
     const key = `${snapshot.year}-${String(snapshot.month).padStart(2, '0')}`;
     const cashFlow = cashFlowMap.get(key) || 0;
     cumulativeContributions += cashFlow;

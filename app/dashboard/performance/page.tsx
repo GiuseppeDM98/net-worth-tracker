@@ -330,7 +330,10 @@ export default function PerformancePage() {
       metrics.endDate
     );
 
-    return preparePerformanceChartData(periodSnapshots, metrics.cashFlows);
+    // YTD/1Y/3Y/5Y periods include an extra baseline snapshot before the range;
+    // skip it so the chart starts at the first actual month of the selected period.
+    const hasBaseline = ['YTD', '1Y', '3Y', '5Y'].includes(metrics.timePeriod);
+    return preparePerformanceChartData(periodSnapshots, metrics.cashFlows, hasBaseline);
   };
 
   const [chartData, setChartData] = useState<any[]>([]);
