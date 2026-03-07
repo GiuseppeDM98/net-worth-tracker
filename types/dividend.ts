@@ -136,6 +136,34 @@ export interface TotalReturnAsset {
   totalReturnPercentage: number;    // capitalGainPercentage + dividendReturnPercentage
 }
 
+// DPS (Dividend Per Share) growth analysis — equity only, excludes coupons and finalPremium.
+// Tracks the sum of gross dividendPerShare per calendar year, then computes YoY and CAGR.
+// Only assets with quantity > 0 and at least 1 year of paid dividends are included.
+export interface AssetDividendGrowth {
+  assetId: string;
+  assetTicker: string;
+  assetName: string;
+  currency: string;
+  // Sum of dividendPerShare for all equity dividends paid in each year, sorted ascending
+  yearlyDps: Array<{ year: number; totalDps: number }>;
+  // YoY growth % from previous data-year to this year: { 2024: 5.2, 2025: 3.1 }
+  yoyGrowth: Record<number, number>;
+  // CAGR from first to last data year: (DPSlast/DPSfirst)^(1/(lastYear-firstYear))-1 × 100
+  // undefined when only 1 data year exists
+  cagr?: number;
+  // YoY growth for the most recent year with a predecessor (used for portfolio median)
+  latestYoyGrowth?: number;
+}
+
+// Portfolio-level DPS growth summary: aggregate across all active equity assets.
+export interface DividendGrowthData {
+  byAsset: AssetDividendGrowth[];
+  // Median of latestYoyGrowth across assets that have >= 2 data years
+  portfolioMedianGrowth?: number;
+  // Average of latestYoyGrowth across assets that have >= 2 data years
+  portfolioAvgGrowth?: number;
+}
+
 export interface ScrapedDividend {
   exDate: Date;
   paymentDate: Date;

@@ -44,6 +44,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Monthly calendar view with drill-down
 - Dividend statistics and yield calculations
 - **Total Return per Asset**: table combining unrealized capital gain % and all-time net dividends received % to show the true investment return per asset
+- **Dividend Per Share Growth**: year-by-year gross DPS history per equity asset with YoY% and CAGR columns; portfolio median growth rate shown as a summary
 
 ### Historical Analysis
 - Automatic monthly portfolio snapshots (via Vercel cron)

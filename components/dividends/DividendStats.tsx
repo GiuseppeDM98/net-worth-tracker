@@ -101,6 +101,21 @@ interface DividendStatsData {
     dividendReturnPercentage: number;
     totalReturnPercentage: number;
   }>;
+  // DPS growth per asset: equity only, excludes coupons and finalPremium
+  dividendGrowthData?: {
+    byAsset: Array<{
+      assetId: string;
+      assetTicker: string;
+      assetName: string;
+      currency: string;
+      yearlyDps: Array<{ year: number; totalDps: number }>;
+      yoyGrowth: Record<number, number>;
+      cagr?: number;
+      latestYoyGrowth?: number;
+    }>;
+    portfolioMedianGrowth?: number;
+    portfolioAvgGrowth?: number;
+  };
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF6B9D'];
@@ -362,6 +377,91 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
           </CardContent>
         </Card>
       )}
+
+      {/* DPS Growth Table — dividend per share growth analysis (equity only, coupons excluded).
+          Shown both for all assets and when filtered to a single asset. */}
+      {stats.dividendGrowthData && stats.dividendGrowthData.byAsset.length > 0 && (() => {
+        const { byAsset, portfolioMedianGrowth } = stats.dividendGrowthData!;
+        // Union of all years across all assets, used for consistent column headers
+        const allYears = [...new Set(byAsset.flatMap(a => a.yearlyDps.map(y => y.year)))].sort((a, b) => a - b);
+
+        return (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-emerald-500" />
+                  Crescita Dividendi per Azione
+                </CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  DPS lordo annuale (cedole escluse) — crescita anno su anno per asset
+                </p>
+              </div>
+              {/* Portfolio median shown only in the all-assets view */}
+              {!assetId && portfolioMedianGrowth !== undefined && (
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Mediana portafoglio</p>
+                  <p className={`text-xl font-bold ${portfolioMedianGrowth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {portfolioMedianGrowth >= 0 ? '+' : ''}{portfolioMedianGrowth.toFixed(1)}%
+                  </p>
+                </div>
+              )}
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-muted-foreground text-xs uppercase tracking-wide">
+                      <th className="text-left py-3 pr-4">Asset</th>
+                      {allYears.map(year => (
+                        <th key={year} className="text-right py-3 px-2">{year}</th>
+                      ))}
+                      <th className="text-right py-3 px-2 text-amber-600">YoY %</th>
+                      <th className="text-right py-3 pl-2 text-blue-600">CAGR %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {byAsset.map(asset => {
+                      const dpsMap = new Map(asset.yearlyDps.map(y => [y.year, y.totalDps]));
+                      return (
+                        <tr key={asset.assetId} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
+                          <td className="py-3 pr-4">
+                            <p className="font-medium">{asset.assetTicker || asset.assetName}</p>
+                            {asset.assetTicker && <p className="text-xs text-muted-foreground">{asset.assetName}</p>}
+                          </td>
+                          {allYears.map(year => (
+                            <td key={year} className="text-right py-3 px-2 tabular-nums text-muted-foreground">
+                              {dpsMap.has(year) ? dpsMap.get(year)!.toFixed(4) : '—'}
+                            </td>
+                          ))}
+                          {/* YoY growth for the most recent year that has a predecessor */}
+                          <td className={`text-right py-3 px-2 font-medium tabular-nums ${
+                            asset.latestYoyGrowth === undefined ? 'text-muted-foreground' :
+                            asset.latestYoyGrowth >= 0 ? 'text-emerald-600' : 'text-red-600'
+                          }`}>
+                            {asset.latestYoyGrowth === undefined
+                              ? '—'
+                              : `${asset.latestYoyGrowth >= 0 ? '+' : ''}${asset.latestYoyGrowth.toFixed(1)}%`}
+                          </td>
+                          {/* CAGR from first to last data year — uses calendar-year span */}
+                          <td className={`text-right py-3 pl-2 font-medium tabular-nums ${
+                            asset.cagr === undefined ? 'text-muted-foreground' :
+                            asset.cagr >= 0 ? 'text-blue-600' : 'text-red-600'
+                          }`}>
+                            {asset.cagr === undefined
+                              ? '—'
+                              : `${asset.cagr >= 0 ? '+' : ''}${asset.cagr.toFixed(1)}%`}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Total Return Table — combines unrealized capital gain and all-time dividend income.
           Hidden when filtered to a single asset (the table is only meaningful for comparisons). */}

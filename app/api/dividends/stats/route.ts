@@ -6,7 +6,7 @@ import {
   getAllDividends
 } from '@/lib/services/dividendService';
 import { adminDb } from '@/lib/firebase/admin';
-import { TotalReturnAsset, YieldOnCostAsset } from '@/types/dividend';
+import { AssetDividendGrowth, DividendGrowthData, TotalReturnAsset, YieldOnCostAsset } from '@/types/dividend';
 
 /**
  * GET /api/dividends/stats
@@ -145,6 +145,104 @@ export async function GET(request: NextRequest) {
         };
       })
       .sort((a, b) => b.totalReturnPercentage - a.totalReturnPercentage);
+
+    // Compute DPS growth for equity assets only (excludes coupons and finalPremium).
+    // Bond coupons have a fixed rate by contract — they don't grow organically, so they
+    // would dilute this metric without providing meaningful information on dividend growth.
+    // Groups paid dividends by assetId → calendar year → sums dividendPerShare (gross).
+    // Only active assets (quantity > 0) with at least 1 year of data are included.
+    const equityPaidDividends = paidDividends.filter(
+      div => div.dividendType !== 'coupon' && div.dividendType !== 'finalPremium'
+    );
+
+    // When assetId filter is active, scope growth data to that single asset
+    const growthDividends = assetId
+      ? equityPaidDividends.filter(div => div.assetId === assetId)
+      : equityPaidDividends;
+
+    // Group by assetId → year → sum DPS
+    const dpsByAsset = new Map<string, Map<number, number>>();
+    growthDividends.forEach(div => {
+      const paymentDate = toDate(div.paymentDate);
+      const year = paymentDate.getFullYear();
+      if (!dpsByAsset.has(div.assetId)) dpsByAsset.set(div.assetId, new Map());
+      const yearMap = dpsByAsset.get(div.assetId)!;
+      yearMap.set(year, (yearMap.get(year) ?? 0) + div.dividendPerShare);
+    });
+
+    // Build per-asset growth objects — only for active assets
+    const assetGrowthList: AssetDividendGrowth[] = [];
+    dpsByAsset.forEach((yearMap, aid) => {
+      const asset = assetsMap.get(aid);
+      if (!asset || asset.quantity <= 0) return;
+
+      const yearlyDps = Array.from(yearMap.entries())
+        .map(([year, totalDps]) => ({ year, totalDps }))
+        .sort((a, b) => a.year - b.year);
+
+      // Compute YoY growth for each year that has a predecessor in the data
+      const yoyGrowth: Record<number, number> = {};
+      for (let i = 1; i < yearlyDps.length; i++) {
+        const prev = yearlyDps[i - 1].totalDps;
+        if (prev > 0) {
+          yoyGrowth[yearlyDps[i].year] =
+            ((yearlyDps[i].totalDps - prev) / prev) * 100;
+        }
+      }
+
+      // CAGR uses calendar-year span so gaps (e.g. no dividend in 2023) are handled correctly
+      const firstEntry = yearlyDps[0];
+      const lastEntry = yearlyDps[yearlyDps.length - 1];
+      const yearSpan = lastEntry.year - firstEntry.year;
+      const cagr =
+        yearSpan > 0 && firstEntry.totalDps > 0
+          ? (Math.pow(lastEntry.totalDps / firstEntry.totalDps, 1 / yearSpan) - 1) * 100
+          : undefined;
+
+      // Most recent YoY growth where a prior data-year exists
+      const latestYoyGrowth =
+        yearlyDps.length >= 2 ? yoyGrowth[lastEntry.year] : undefined;
+
+      // Inherit currency from a sample dividend for this asset
+      const sampleDiv = growthDividends.find(d => d.assetId === aid);
+
+      assetGrowthList.push({
+        assetId: aid,
+        assetTicker: asset.ticker,
+        assetName: asset.name,
+        currency: sampleDiv?.currency ?? 'EUR',
+        yearlyDps,
+        yoyGrowth,
+        cagr,
+        latestYoyGrowth,
+      });
+    });
+
+    // Stable alphabetical order by asset name
+    assetGrowthList.sort((a, b) => a.assetName.localeCompare(b.assetName));
+
+    // Compute portfolio median of most-recent YoY growths across assets with >= 2 data years
+    const validGrowths = assetGrowthList
+      .map(a => a.latestYoyGrowth)
+      .filter((v): v is number => v !== undefined)
+      .sort((a, b) => a - b);
+
+    let portfolioMedianGrowth: number | undefined;
+    let portfolioAvgGrowth: number | undefined;
+    if (validGrowths.length > 0) {
+      const mid = Math.floor(validGrowths.length / 2);
+      portfolioMedianGrowth =
+        validGrowths.length % 2 !== 0
+          ? validGrowths[mid]
+          : (validGrowths[mid - 1] + validGrowths[mid]) / 2;
+      portfolioAvgGrowth =
+        validGrowths.reduce((s, v) => s + v, 0) / validGrowths.length;
+    }
+
+    const dividendGrowthData: DividendGrowthData | undefined =
+      assetGrowthList.length > 0
+        ? { byAsset: assetGrowthList, portfolioMedianGrowth, portfolioAvgGrowth }
+        : undefined;
 
     // Group by year
     const byYearMap = new Map<number, { totalGross: number; totalTax: number; totalNet: number }>();
@@ -304,6 +402,8 @@ export async function GET(request: NextRequest) {
       }),
       // Include total return breakdown only when data exists
       ...(totalReturnAssets.length > 0 && { totalReturnAssets }),
+      // Include DPS growth data only when equity dividends exist
+      ...(dividendGrowthData && { dividendGrowthData }),
     };
 
     return NextResponse.json({
