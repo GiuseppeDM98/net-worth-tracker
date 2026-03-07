@@ -638,17 +638,24 @@ export function calculateRecoveryTime(
  * - This ensures comparability across different time periods
  *
  * FORMULA:
- * YOC% = (Annualized Dividends / Cost Basis) × 100
+ * YOC% = (Projected Annual Dividends / Cost Basis) × 100
  *
  * Where:
- * - Annualized Dividends = Dividends adjusted to annual rate based on period length
- * - Cost Basis = Sum of (quantity × averageCost) for assets that paid dividends
+ * - Projected Annual Dividends = annualized DPS × current quantity per asset
+ * - Cost Basis = current quantity × averageCost for assets that paid dividends
+ *
+ * DPS-based projection is used instead of raw dividend totals to avoid a quantity mismatch:
+ * if shares are bought AFTER a dividend is paid, raw totals inflate the cost basis without
+ * a corresponding increase in dividends received, understating YOC.
+ * Using DPS (from dividend records) projected onto current quantity gives forward-looking
+ * YOC that is quantity-neutral per asset (annualizedDPS / averageCost cancels qty),
+ * correctly reflecting yield on cost regardless of when additional shares were purchased.
  *
  * FILTERING:
  * - Dividends filtered by payment date (when money actually received)
  * - endDate is CAPPED AT TODAY to exclude future dividends not yet received
  * - Only assets with quantity > 0 and averageCost > 0 included in cost basis
- * - Multi-currency dividends use EUR conversion if available
+ * - Multi-currency: EUR DPS derived as (grossAmountEur ?? grossAmount) / div.quantity
  *
  * @param dividends - All user dividends (will be filtered by period internally)
  * @param assets - All user assets (for cost basis calculation)
@@ -701,22 +708,8 @@ export function calculateYocMetrics(
     sum + (div.netAmountEur ?? div.netAmount), 0
   );
 
-  // STEP 3: Annualize dividends based on period length
-  // This allows meaningful comparison between different time periods
-  let annualizedGross: number;
-  let annualizedNet: number;
-
-  if (numberOfMonths >= 12) {
-    // For multi-year periods: calculate average annual dividends
-    const years = numberOfMonths / 12;
-    annualizedGross = totalGross / years;
-    annualizedNet = totalNet / years;
-  } else if (numberOfMonths > 0) {
-    // For periods < 1 year: scale up to annual rate
-    annualizedGross = (totalGross / numberOfMonths) * 12;
-    annualizedNet = (totalNet / numberOfMonths) * 12;
-  } else {
-    // Edge case: invalid period (zero months)
+  // Guard: invalid period length
+  if (numberOfMonths <= 0) {
     return {
       yocGross: null,
       yocNet: null,
@@ -727,27 +720,56 @@ export function calculateYocMetrics(
     };
   }
 
-  // STEP 4: Calculate cost basis for assets that paid dividends in this period
-  // Only include assets currently owned (quantity > 0) with known cost basis
-  const assetIdsWithDividends = new Set(periodDividends.map(d => d.assetId));
+  // STEP 3: Accumulate gross and net DPS in EUR per asset across all period dividends.
+  // Deriving DPS from each dividend record (grossAmountEur / div.quantity) and projecting
+  // onto the current quantity avoids the mismatch where shares bought after a payment inflate
+  // the cost basis denominator without a corresponding increase in dividends received.
   const assetsMap = new Map(assets.map(a => [a.id, a]));
+  const assetDpsGrossMap = new Map<string, number>(); // assetId → total gross DPS in EUR
+  const assetDpsNetMap = new Map<string, number>();   // assetId → total net DPS in EUR
 
+  periodDividends.forEach(div => {
+    if (!div.quantity || div.quantity <= 0) return; // guard: skip records with invalid quantity
+    const dpsGrossEur = (div.grossAmountEur ?? div.grossAmount) / div.quantity;
+    const dpsNetEur = (div.netAmountEur ?? div.netAmount) / div.quantity;
+    assetDpsGrossMap.set(div.assetId, (assetDpsGrossMap.get(div.assetId) ?? 0) + dpsGrossEur);
+    assetDpsNetMap.set(div.assetId, (assetDpsNetMap.get(div.assetId) ?? 0) + dpsNetEur);
+  });
+
+  // STEP 4: Annualize DPS per asset and project onto current quantity.
+  // Portfolio YOC = sum(annualizedDPS × qty) / sum(qty × averageCost)
+  //              = cost-basis-weighted average of per-asset YOCs (annualizedDPS / averageCost).
+  let totalProjectedGross = 0;
+  let totalProjectedNet = 0;
   let costBasis = 0;
   let assetCount = 0;
 
-  assetIdsWithDividends.forEach(assetId => {
+  assetDpsGrossMap.forEach((totalDpsGross, assetId) => {
     const asset = assetsMap.get(assetId);
-    // Include only assets that:
-    // 1. Still exist in portfolio
-    // 2. Have valid average cost
-    // 3. Have positive quantity (currently owned)
-    if (asset && asset.averageCost && asset.averageCost > 0 && asset.quantity > 0) {
-      costBasis += asset.quantity * asset.averageCost;
-      assetCount++;
+    // Include only assets currently owned with a known cost basis
+    if (!asset || !asset.averageCost || asset.averageCost <= 0 || asset.quantity <= 0) return;
+
+    // Annualize DPS using the same strategy as total-dividend annualization:
+    // >= 12 months → average annual rate; < 12 months → scale up to annual rate
+    let annualizedDpsGross: number;
+    let annualizedDpsNet: number;
+    const totalDpsNet = assetDpsNetMap.get(assetId) ?? 0;
+    if (numberOfMonths >= 12) {
+      const years = numberOfMonths / 12;
+      annualizedDpsGross = totalDpsGross / years;
+      annualizedDpsNet = totalDpsNet / years;
+    } else {
+      annualizedDpsGross = (totalDpsGross / numberOfMonths) * 12;
+      annualizedDpsNet = (totalDpsNet / numberOfMonths) * 12;
     }
+
+    totalProjectedGross += annualizedDpsGross * asset.quantity;
+    totalProjectedNet += annualizedDpsNet * asset.quantity;
+    costBasis += asset.quantity * asset.averageCost;
+    assetCount++;
   });
 
-  // STEP 5: Calculate YOC percentages
+  // STEP 5: Calculate YOC percentages.
   // Return null if no valid cost basis (prevents division by zero)
   if (costBasis === 0) {
     return {
@@ -760,11 +782,11 @@ export function calculateYocMetrics(
     };
   }
 
-  // Calculate YOC as percentage
-  // YOC = (Annualized Dividends / Cost Basis) × 100
+  // YOC = (Projected Annual Dividends / Cost Basis) × 100
+  // yocDividendsGross/Net remain the actual dividends received in period (unchanged, for display)
   return {
-    yocGross: (annualizedGross / costBasis) * 100,
-    yocNet: (annualizedNet / costBasis) * 100,
+    yocGross: (totalProjectedGross / costBasis) * 100,
+    yocNet: (totalProjectedNet / costBasis) * 100,
     yocDividendsGross: totalGross,
     yocDividendsNet: totalNet,
     yocCostBasis: costBasis,

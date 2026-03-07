@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio
-- Ultima implementazione: **Settings page tab navigation** — pagina Settings divisa in 4 tab (Allocazione, Preferenze, Spese, Dividendi) con lazy loading pattern; card "Profilo" (età, risk-free rate, auto-calculate) nel tab Allocazione; nota risk-free inline sotto l'input (`app/dashboard/settings/page.tsx`) (2026-03-07)
+- Ultima implementazione: **YOC bug fix** — `calculateYocMetrics` ora usa approccio DPS-based (`grossAmountEur / div.quantity`) invece di dividendi totali, evitando sottostima quando si acquistano azioni dopo il pagamento; 11 unit test aggiunti (`lib/services/performanceService.ts`) (2026-03-07)
 - In corso ora: nessuna attività attiva
 
 ## Architecture Snapshot
@@ -32,7 +32,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Testing
 - **Framework**: Vitest (`npm test`, `npm run test:watch`)
-- **186 unit test** across 8 files in `__tests__/` covering formatters, dateHelpers, fireService, performanceService, borsaItalianaBondScraper, goalService, couponUtils
+- **197 unit test** across 8 files in `__tests__/` covering formatters, dateHelpers, fireService, performanceService, borsaItalianaBondScraper, goalService, couponUtils
 - **Scope**: Pure functions only (no Firebase mocking). Services need `vi.mock()` on Firebase-dependent imports.
 - **Config**: `vitest.config.ts` with `@/` path alias
 
@@ -69,4 +69,4 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`, `components/pdf/PDFExportDialog.tsx`, `lib/utils/pdfTimeFilters.ts`, `lib/utils/pdfGenerator.tsx`
 - Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`, `borsaItalianaBondScraper.test.ts`, `goalService.test.ts`, `couponUtils.test.ts`
 
-**Last updated**: 2026-03-07 (session: Settings page tab navigation)
+**Last updated**: 2026-03-07 (session: YOC bug fix — DPS-based calculation)

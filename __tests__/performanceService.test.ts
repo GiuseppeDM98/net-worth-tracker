@@ -17,6 +17,7 @@ import {
   calculateRecoveryTime,
   getSnapshotsForPeriod,
   getCashFlowsFromExpenses,
+  calculateYocMetrics,
 } from '@/lib/services/performanceService'
 import { MonthlySnapshot } from '@/types/assets'
 import { CashFlowData } from '@/types/performance'
@@ -552,6 +553,180 @@ describe('calculateIRR', () => {
     // Both should be non-null and in a reasonable range, but they differ
     // because IRR accounts for the timing of the 10K contribution
     expect(irr!).not.toBeCloseTo(cagr!, 1)
+  })
+})
+
+// ─── calculateYocMetrics ───
+
+// Helper to create minimal dividend objects for YOC tests.
+// quantity here is the number of shares at ex-date (stored on the dividend record).
+function makeDividend(
+  assetId: string,
+  paymentDate: Date,
+  dividendPerShare: number,
+  quantity: number,
+  options: { grossAmountEur?: number; netAmountEur?: number } = {}
+) {
+  const grossAmount = dividendPerShare * quantity
+  const netAmount = grossAmount * 0.74 // 26% tax as default
+  return {
+    assetId,
+    paymentDate,
+    dividendPerShare,
+    quantity,
+    grossAmount,
+    netAmount,
+    grossAmountEur: options.grossAmountEur ?? grossAmount,
+    netAmountEur: options.netAmountEur ?? netAmount,
+    currency: 'EUR',
+  }
+}
+
+// Helper to create minimal asset objects for YOC tests
+function makeAsset(
+  id: string,
+  quantity: number,
+  averageCost: number,
+  currentPrice = averageCost
+) {
+  return { id, quantity, averageCost, currentPrice }
+}
+
+describe('calculateYocMetrics', () => {
+  const START = new Date(2025, 0, 1)  // Jan 1 2025
+  const END = new Date(2025, 11, 31)  // Dec 31 2025 (12-month period)
+
+  it('returns nulls when no dividends in period', () => {
+    const result = calculateYocMetrics([], [], START, END, 12)
+    expect(result.yocGross).toBeNull()
+    expect(result.yocNet).toBeNull()
+    expect(result.yocDividendsGross).toBe(0)
+    expect(result.yocAssetCount).toBe(0)
+  })
+
+  it('returns nulls when numberOfMonths is 0', () => {
+    const div = makeDividend('a1', new Date(2025, 2, 1), 1, 10)
+    const asset = makeAsset('a1', 10, 10)
+    const result = calculateYocMetrics([div], [asset], START, END, 0)
+    expect(result.yocGross).toBeNull()
+    expect(result.yocCostBasis).toBe(0)
+  })
+
+  it('returns nulls when all assets with dividends are sold (quantity=0)', () => {
+    const div = makeDividend('a1', new Date(2025, 2, 1), 1, 10)
+    const asset = makeAsset('a1', 0, 10) // sold
+    const result = calculateYocMetrics([div], [asset], START, END, 12)
+    expect(result.yocGross).toBeNull()
+    expect(result.yocCostBasis).toBe(0)
+    expect(result.yocAssetCount).toBe(0)
+  })
+
+  it('baseline: 10 shares × €1 DPS / €10 averageCost = 10% YOC (1-year period)', () => {
+    // March dividend: 10 shares × €1 = €10 gross
+    const div = makeDividend('eni', new Date(2025, 2, 1), 1, 10)
+    const asset = makeAsset('eni', 10, 10)
+    const result = calculateYocMetrics([div], [asset], START, END, 12)
+
+    // DPS = €1, averageCost = €10 → YOC = 10%
+    expect(result.yocGross).toBeCloseTo(10, 4)
+    expect(result.yocCostBasis).toBe(100)   // 10 × €10
+    expect(result.yocDividendsGross).toBe(10) // actual dividends received
+    expect(result.yocAssetCount).toBe(1)
+  })
+
+  it('buy-after-dividend: YOC stays 10% even when quantity doubles after dividend', () => {
+    // March dividend paid on 10 shares (DPS = €1)
+    // April: buy 10 more → current quantity = 20, averageCost still €10
+    // YOC must still reflect €1 DPS / €10 avgCost = 10%, not 5%
+    const div = makeDividend('eni', new Date(2025, 2, 1), 1, 10) // quantity at ex-date = 10
+    const asset = makeAsset('eni', 20, 10) // current quantity = 20
+
+    const result = calculateYocMetrics([div], [asset], START, END, 12)
+
+    // DPS = €1, averageCost = €10 → YOC = 10% regardless of current quantity
+    expect(result.yocGross).toBeCloseTo(10, 4)
+    // Cost basis uses current quantity: 20 × €10 = €200
+    expect(result.yocCostBasis).toBe(200)
+    // Actual dividends received remain €10 (paid on 10 original shares)
+    expect(result.yocDividendsGross).toBe(10)
+  })
+
+  it('buy-after-dividend at different price: YOC reflects blended averageCost', () => {
+    // 10 shares at €10 + 10 shares at €15 → averageCost = €12.50
+    // DPS = €1 → YOC = €1 / €12.50 = 8%
+    const div = makeDividend('eni', new Date(2025, 2, 1), 1, 10)
+    const asset = makeAsset('eni', 20, 12.5) // blended averageCost
+
+    const result = calculateYocMetrics([div], [asset], START, END, 12)
+    expect(result.yocGross).toBeCloseTo(8, 4) // 1 / 12.5 * 100 = 8%
+  })
+
+  it('multi-dividend same asset: DPS accumulates correctly', () => {
+    // Two semi-annual dividends of €0.50 each = €1 total DPS for the year
+    const div1 = makeDividend('eni', new Date(2025, 2, 1), 0.5, 10)
+    const div2 = makeDividend('eni', new Date(2025, 8, 1), 0.5, 10)
+    const asset = makeAsset('eni', 10, 10)
+
+    const result = calculateYocMetrics([div1, div2], [asset], START, END, 12)
+    expect(result.yocGross).toBeCloseTo(10, 4) // (€0.5+€0.5) / €10 = 10%
+    expect(result.yocDividendsGross).toBeCloseTo(10, 4) // €5 + €5 = €10 total
+  })
+
+  it('YTD annualization: 1 dividend in 4-month period scales up correctly', () => {
+    // 4-month YTD, 1 dividend of €1 DPS received → annualizedDPS = (€1/4)×12 = €3
+    // averageCost = €10 → YOC = €3/€10 = 30%
+    const ytdStart = new Date(2025, 0, 1)
+    const ytdEnd = new Date(2025, 3, 30)
+    const div = makeDividend('eni', new Date(2025, 2, 1), 1, 10)
+    const asset = makeAsset('eni', 10, 10)
+
+    const result = calculateYocMetrics([div], [asset], ytdStart, ytdEnd, 4)
+    expect(result.yocGross).toBeCloseTo(30, 4) // (1/4)*12/10*100 = 30%
+  })
+
+  it('multi-asset: portfolio YOC is cost-basis-weighted average', () => {
+    // Asset A: €1 DPS, avgCost €10 → 10% YOC, costBasis €100
+    // Asset B: €2 DPS, avgCost €20 → 10% YOC, costBasis €200
+    // Portfolio: (1×10 + 2×20)/(10+200)*100 = 50/300*100 = 16.67%? No wait:
+    // projected A = 1*10 = 10, projected B = 2*10 = 20, totalProjected = 30
+    // costBasis = 100+200 = 300
+    // YOC = 30/300*100 = 10%
+    const divA = makeDividend('assetA', new Date(2025, 2, 1), 1, 10)
+    const divB = makeDividend('assetB', new Date(2025, 2, 1), 2, 10)
+    const assetA = makeAsset('assetA', 10, 10) // costBasis €100
+    const assetB = makeAsset('assetB', 10, 20) // costBasis €200
+
+    const result = calculateYocMetrics([divA, divB], [assetA, assetB], START, END, 12)
+    // Both have 10% YOC individually, so portfolio YOC = 10%
+    expect(result.yocGross).toBeCloseTo(10, 4)
+    expect(result.yocCostBasis).toBe(300)
+    expect(result.yocAssetCount).toBe(2)
+  })
+
+  it('multi-currency: uses grossAmountEur for EUR-normalised DPS', () => {
+    // USD dividend: grossAmount=11 (USD), grossAmountEur=10 (EUR at 0.91 rate)
+    // div.quantity=10 → dpsEur = 10/10 = €1 → YOC = 10%
+    const div = makeDividend('usAsset', new Date(2025, 2, 1), 1.1, 10, {
+      grossAmountEur: 10,  // EUR-converted total
+      netAmountEur: 7.4,
+    })
+    const asset = makeAsset('usAsset', 10, 10)
+
+    const result = calculateYocMetrics([div], [asset], START, END, 12)
+    expect(result.yocGross).toBeCloseTo(10, 4) // uses EUR DPS = €10/10 = €1
+  })
+
+  it('dividends outside period are excluded', () => {
+    const divInPeriod = makeDividend('eni', new Date(2025, 2, 1), 1, 10)
+    const divOutsidePeriod = makeDividend('eni', new Date(2024, 2, 1), 1, 10) // prev year
+    const asset = makeAsset('eni', 10, 10)
+
+    const resultAll = calculateYocMetrics([divInPeriod, divOutsidePeriod], [asset], START, END, 12)
+    const resultOne = calculateYocMetrics([divInPeriod], [asset], START, END, 12)
+
+    // Only the in-period dividend should be counted
+    expect(resultAll.yocGross).toBeCloseTo(resultOne.yocGross!, 4)
+    expect(resultAll.yocDividendsGross).toBe(10) // only in-period dividend
   })
 })
 

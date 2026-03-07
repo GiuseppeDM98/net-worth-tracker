@@ -96,6 +96,8 @@ ALL fields in settings types must be handled in THREE places:
 - YOC uses `averageCost` (cost basis), Current Yield uses `currentPrice` (market value)
 - Filter dividends by `paymentDate` (not `exDate`); use API route (server-only service)
 - Time-sensitive: use dedicated `*EndDate` capped at TODAY for dividend metrics
+- **DPS-based YOC** (not raw dividend totals): derive EUR DPS as `(grossAmountEur ?? grossAmount) / div.quantity` per dividend record, annualize per asset, project onto current quantity. Formula simplifies to `annualizedDPS / averageCost` per asset (quantity cancels). This avoids the "buy-after-dividend" mismatch where current quantity inflates cost basis without a corresponding dividend increase.
+- `yocDividendsGross/Net` = actual dividends received (unchanged, for display); `yocCostBasis` = current `quantity × averageCost`
 
 ### Table Totals Row
 - Use `<TableFooter>` for semantic HTML
@@ -208,4 +210,4 @@ ALL fields in settings types must be handled in THREE places:
 - **Fake timers**: `vi.useFakeTimers()` + `vi.setSystemTime(new Date(year, month, day))` in `beforeEach`; `vi.useRealTimers()` in `afterEach` — required when function calls `new Date()` internally (e.g. `getNextCouponDate`)
 - **No mocks needed for pure utils**: Functions with zero external dependencies (only TS type imports) need no `vi.mock()` — directly testable
 
-**Last updated**: 2026-03-07 (session: Total Return per Asset in Dividends page)
+**Last updated**: 2026-03-07 (session: YOC bug fix — DPS-based calculation)
