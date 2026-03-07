@@ -1,4 +1,10 @@
 ## ✨ New Features
 
-- **Total Return per Asset in Dividends page**: new "Rendimento Totale per Asset" table showing, for each dividend-paying asset still held, the breakdown of unrealized capital gain %, all-time net dividends received %, and their combined total return % — all relative to the original purchase cost. Helps identify investments where dividend income compensates for price losses (e.g. stock down 10% but +15% in dividends = +5% total). Hovering over the percentage columns reveals the absolute EUR value.
-- **Dividend Per Share Growth table in Dividends page**: new "Crescita Dividendi per Azione" table tracking how the gross dividend per share has evolved year over year for each equity asset. Shows the annual DPS for each year, the YoY growth % for the most recent year, and the CAGR from the first to the last data year. A portfolio median growth rate is displayed in the card header when viewing all assets. Bond coupons are intentionally excluded (fixed by contract). Assets with fewer than 2 years of dividend history show "—" for growth metrics and do not affect the portfolio median.
+- Settings page is now organized into 4 tabs (Allocation, Preferences, Expenses, Dividends) — no more scrolling through a single long page
+- Profile settings (age, risk-free rate, auto-calculate allocation formula) are now in the Allocation tab, next to the target percentages they affect
+- Risk-free rate field now shows an inline link to retrieve the current BTP 10Y value directly below the input
+
+## 🔧 Improvements
+
+- "Ripristina Default" button in Settings is now only shown in the Allocation tab where it is relevant
+- Settings tabs use lazy loading — only the default tab (Allocation) renders on page load

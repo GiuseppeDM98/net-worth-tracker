@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio
-- Ultima implementazione: **Crescita Dividendi per Azione (DPS Growth)** in pagina Dividendi — tabella per-asset con DPS lordo annuale, YoY% e CAGR%; mediana portafoglio in header; cedole bond escluse (`DividendStats.tsx`, `AssetDividendGrowth`/`DividendGrowthData` in `types/dividend.ts`, `/api/dividends/stats/route.ts`) (2026-03-07)
+- Ultima implementazione: **Settings page tab navigation** — pagina Settings divisa in 4 tab (Allocazione, Preferenze, Spese, Dividendi) con lazy loading pattern; card "Profilo" (età, risk-free rate, auto-calculate) nel tab Allocazione; nota risk-free inline sotto l'input (`app/dashboard/settings/page.tsx`) (2026-03-07)
 - In corso ora: nessuna attività attiva
 
 ## Architecture Snapshot
@@ -69,4 +69,4 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`, `components/pdf/PDFExportDialog.tsx`, `lib/utils/pdfTimeFilters.ts`, `lib/utils/pdfGenerator.tsx`
 - Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`, `borsaItalianaBondScraper.test.ts`, `goalService.test.ts`, `couponUtils.test.ts`
 
-**Last updated**: 2026-03-07 (session: DPS Growth table in Dividends page)
+**Last updated**: 2026-03-07 (session: Settings page tab navigation)

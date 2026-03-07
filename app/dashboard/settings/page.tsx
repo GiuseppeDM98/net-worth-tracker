@@ -51,7 +51,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Save, RotateCcw, Plus, Trash2, ChevronDown, ChevronUp, Edit, Receipt, FlaskConical, Coins, ArrowRightLeft } from 'lucide-react';
+import { Save, RotateCcw, Plus, Trash2, ChevronDown, ChevronUp, Edit, Receipt, FlaskConical, Coins, ArrowRightLeft, Settings, PieChart } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { ExpenseCategory, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
@@ -165,6 +166,16 @@ export default function SettingsPage() {
   const [dummySnapshotModalOpen, setDummySnapshotModalOpen] = useState(false);
   const [deleteDummyDataDialogOpen, setDeleteDummyDataDialogOpen] = useState(false);
   const enableTestSnapshots = process.env.NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS === 'true';
+
+  // Tab navigation — lazy-loading pattern (same as Assets/Cashflow pages)
+  type SettingsTabId = 'generale' | 'allocazione' | 'spese' | 'dividendi';
+  const [mountedTabs, setMountedTabs] = useState<Set<SettingsTabId>>(new Set(['allocazione']));
+  const [activeTab, setActiveTab] = useState<SettingsTabId>('allocazione');
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value as SettingsTabId);
+    setMountedTabs((prev) => new Set(prev).add(value as SettingsTabId));
+  };
 
   useEffect(() => {
     if (user) {
@@ -1155,10 +1166,13 @@ export default function SettingsPage() {
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-          <Button variant="outline" onClick={handleReset} className="w-full sm:w-auto">
-            <RotateCcw className="mr-2 h-4 w-4" />
-            Ripristina Default
-          </Button>
+          {/* Reset is only meaningful for allocation targets */}
+          {activeTab === 'allocazione' && (
+            <Button variant="outline" onClick={handleReset} className="w-full sm:w-auto">
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Ripristina Default
+            </Button>
+          )}
           <Button onClick={handleSave} disabled={saving} className="w-full sm:w-auto">
             <Save className="mr-2 h-4 w-4" />
             {saving ? 'Salvataggio...' : 'Salva'}
@@ -1166,85 +1180,42 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* User Settings */}
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+        {/* Mobile: horizontal scroll, Desktop: 4-column grid — same pattern as Assets page */}
+        <div className="overflow-x-auto">
+          <TabsList className="inline-flex min-w-full desktop:w-auto desktop:grid desktop:grid-cols-4">
+            <TabsTrigger value="allocazione" className="flex items-center gap-2 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-4">
+              <PieChart className="h-4 w-4" />
+              <span className="hidden sm:inline">Allocazione</span>
+            </TabsTrigger>
+            <TabsTrigger value="generale" className="flex items-center gap-2 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-4">
+              <Settings className="h-4 w-4" />
+              <span className="hidden sm:inline">Preferenze</span>
+            </TabsTrigger>
+            <TabsTrigger value="spese" className="flex items-center gap-2 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-4">
+              <Receipt className="h-4 w-4" />
+              <span className="hidden sm:inline">Spese</span>
+            </TabsTrigger>
+            <TabsTrigger value="dividendi" className="flex items-center gap-2 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-4">
+              <Coins className="h-4 w-4" />
+              <span className="hidden sm:inline">Dividendi</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        {/* Tab: Impostazioni Generali (lazy) */}
+        {mountedTabs.has('generale') && (
+          <TabsContent value="generale" className="mt-6 space-y-4 sm:space-y-6">
+
+      {/* FIRE & Goals Settings */}
       <Card>
         <CardHeader>
-          <CardTitle>Impostazioni Utente</CardTitle>
+          <CardTitle>FIRE &amp; Obiettivi</CardTitle>
         </CardHeader>
         <CardContent className="p-4 sm:p-6">
           <div className="space-y-4 sm:space-y-6">
-            <div className="grid gap-6 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="userAge">Età (anni)</Label>
-                <Input
-                  id="userAge"
-                  type="number"
-                  min="0"
-                  max="120"
-                  value={userAge || ''}
-                  onChange={(e) => {
-                    const value = e.target.value ? parseInt(e.target.value) : undefined;
-                    setUserAge(value);
-                  }}
-                  placeholder="Inserisci la tua età"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="riskFreeRate">
-                  Tasso Risk-Free Rate (%)
-                </Label>
-                <Input
-                  id="riskFreeRate"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  value={riskFreeRate || ''}
-                  onChange={(e) => {
-                    const value = e.target.value ? parseFloat(e.target.value) : undefined;
-                    setRiskFreeRate(value);
-                  }}
-                  placeholder="Es: 3.5"
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-2">
-              <Switch
-                id="autoCalculate"
-                checked={autoCalculate}
-                onCheckedChange={setAutoCalculate}
-                disabled={userAge === undefined || riskFreeRate === undefined}
-                className="shrink-0"
-              />
-              <Label htmlFor="autoCalculate" className="text-sm block">
-                Calcola automaticamente % Azioni e Obbligazioni (Formula di{' '}
-                <a
-                  href="https://www.youtube.com/channel/UCNp1e5n6rlnfm5aWbHe3cJw"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
-                >
-                  The Bull
-                </a>
-                )
-              </Label>
-            </div>
-
-            {autoCalculate && userAge !== undefined && riskFreeRate !== undefined && (
-              <div className="rounded-lg bg-blue-50 p-4">
-                <p className="text-sm text-blue-900">
-                  <strong>Formula applicata:</strong> 125 - {userAge} - ({riskFreeRate} × 5) ={' '}
-                  <strong>{calculateEquityPercentage(userAge, riskFreeRate).toFixed(2)}% Azioni</strong>
-                </p>
-                <p className="mt-1 text-sm text-blue-800">
-                  La percentuale di Obbligazioni sarà calcolata come: 100% - (somma delle altre asset class)
-                </p>
-              </div>
-            )}
-
             {/* FIRE Settings (Bug #1 fix) */}
-            <div className="flex items-center justify-between border-t pt-4">
+            <div className="flex items-center justify-between">
               <div>
                 <Label htmlFor="firePrimaryResidence" className="text-sm font-medium">
                   Includi casa di abitazione nel calcolo FIRE
@@ -1299,9 +1270,19 @@ export default function SettingsPage() {
                 />
               </div>
             )}
+          </div>
+        </CardContent>
+      </Card>
 
+      {/* Portfolio Cost Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Costi Portfolio</CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 sm:p-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* Stamp duty (imposta di bollo) */}
-            <div className="flex items-center justify-between border-t pt-4">
+            <div className="flex items-center justify-between">
               <div>
                 <Label htmlFor="stampDutyToggle" className="text-sm font-medium">
                   Imposta di Bollo
@@ -1361,12 +1342,22 @@ export default function SettingsPage() {
                 </div>
               </div>
             )}
+          </div>
+        </CardContent>
+      </Card>
 
+      {/* Cashflow Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Cashflow</CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 sm:p-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* Default cash accounts for cashflow */}
             {cashAssets.length > 0 && (
-              <div className="border-t pt-4 space-y-4">
+              <div className="space-y-4">
                 <div>
-                  <Label className="text-sm font-medium">Conti di Default (Cashflow)</Label>
+                  <Label className="text-sm font-medium">Conti di Default</Label>
                   <p className="text-sm text-muted-foreground mt-1">
                     Pre-selezionati nel dialog delle spese/entrate per nuove transazioni
                   </p>
@@ -1413,7 +1404,7 @@ export default function SettingsPage() {
             )}
 
             {/* Cashflow history start year — lets users exclude pre-import bulk data from trend charts */}
-            <div className="border-t pt-4 space-y-2">
+            <div className={cashAssets.length > 0 ? 'border-t pt-4 space-y-2' : 'space-y-2'}>
               <Label htmlFor="cashflowHistoryStartYear" className="text-sm font-medium">
                 Anno inizio storico cashflow
               </Label>
@@ -1434,18 +1425,104 @@ export default function SettingsPage() {
                 className="w-32"
               />
             </div>
+          </div>
+        </CardContent>
+      </Card>
 
-            <p className="text-sm text-gray-600">
-              <strong>Nota:</strong> Il tasso risk-free può essere recuperato da{' '}
-              <a
-                href="https://www.investing.com/rates-bonds/italy-10-year-bond-yield"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:underline"
-              >
-                BTP 10 anni Italia su Investing.com
-              </a>
-            </p>
+          </TabsContent>
+        )}
+
+        {/* Tab: Allocazione (default, always mounted) */}
+        <TabsContent value="allocazione" className="mt-6 space-y-4 sm:space-y-6">
+
+      {/* Performance & Profile Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Profilo</CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 sm:p-6">
+          <div className="space-y-4 sm:space-y-6">
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="userAge">Età (anni)</Label>
+                <Input
+                  id="userAge"
+                  type="number"
+                  min="0"
+                  max="120"
+                  value={userAge || ''}
+                  onChange={(e) => {
+                    const value = e.target.value ? parseInt(e.target.value) : undefined;
+                    setUserAge(value);
+                  }}
+                  placeholder="Inserisci la tua età"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="riskFreeRate">
+                  Tasso Risk-Free Rate (%)
+                </Label>
+                <Input
+                  id="riskFreeRate"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={riskFreeRate || ''}
+                  onChange={(e) => {
+                    const value = e.target.value ? parseFloat(e.target.value) : undefined;
+                    setRiskFreeRate(value);
+                  }}
+                  placeholder="Es: 3.5"
+                />
+                {/* Inline hint so the source is visible next to the input */}
+                <p className="text-xs text-gray-500">
+                  Recupera il valore attuale da{' '}
+                  <a
+                    href="https://www.investing.com/rates-bonds/italy-10-year-bond-yield"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline"
+                  >
+                    BTP 10 anni Italia su Investing.com
+                  </a>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-2">
+              <Switch
+                id="autoCalculate"
+                checked={autoCalculate}
+                onCheckedChange={setAutoCalculate}
+                disabled={userAge === undefined || riskFreeRate === undefined}
+                className="shrink-0"
+              />
+              <Label htmlFor="autoCalculate" className="text-sm block">
+                Calcola automaticamente % Azioni e Obbligazioni (Formula di{' '}
+                <a
+                  href="https://www.youtube.com/channel/UCNp1e5n6rlnfm5aWbHe3cJw"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  The Bull
+                </a>
+                )
+              </Label>
+            </div>
+
+            {autoCalculate && userAge !== undefined && riskFreeRate !== undefined && (
+              <div className="rounded-lg bg-blue-50 p-4">
+                <p className="text-sm text-blue-900">
+                  <strong>Formula applicata:</strong> 125 - {userAge} - ({riskFreeRate} × 5) ={' '}
+                  <strong>{calculateEquityPercentage(userAge, riskFreeRate).toFixed(2)}% Azioni</strong>
+                </p>
+                <p className="mt-1 text-sm text-blue-800">
+                  La percentuale di Obbligazioni sarà calcolata come: 100% - (somma delle altre asset class)
+                </p>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -1819,8 +1896,14 @@ export default function SettingsPage() {
         </ul>
       </div>
 
+        </TabsContent>
+
+        {/* Tab: Spese (lazy) */}
+        {mountedTabs.has('spese') && (
+          <TabsContent value="spese" className="mt-6">
+
       {/* Expense Categories Management Section */}
-      <Card className="mt-4 sm:mt-8">
+      <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2">
@@ -1907,8 +1990,15 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+          </TabsContent>
+        )}
+
+        {/* Tab: Dividendi (lazy) */}
+        {mountedTabs.has('dividendi') && (
+          <TabsContent value="dividendi" className="mt-6 space-y-4 sm:space-y-6">
+
       {/* Dividend Settings Section */}
-      <Card className="mt-4 sm:mt-8">
+      <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
             <Coins className="h-5 w-5 text-green-600" />
@@ -2082,6 +2172,11 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       )}
+
+          </TabsContent>
+        )}
+
+      </Tabs>
 
       {/* Category Management Dialog */}
       <CategoryManagementDialog
