@@ -100,6 +100,7 @@ ALL fields in settings types must be handled in THREE places:
 - **Historical YOC (v3)**: numerator = actual `grossAmountEur` received; denominator = `maxDivQty × effectiveCostPerShare`. `effectiveCostPerShare` = gross-weighted average of `div.costPerShare` (stored on record at creation); fallback to `asset.averageCost` for legacy records. Uses `div.quantity` (not `asset.quantity`) so post-dividend purchases don't inflate portfolio weight.
 - `div.costPerShare` is set server-side at dividend creation from `asset.averageCost` — never from user input. All creation paths set it: POST `/api/dividends`, POST `/api/dividends/scrape`, cron Phase 1 + Phase 3.
 - `yocDividendsGross/Net` = actual dividends received (for display); `yocCostBasis` = `maxDivQty × effectiveCostPerShare`
+- **Dividendi % (Rendimento Totale per Asset)**: same costPerShare philosophy — `dividendReturnPercentage = sum(div.netAmountEur / (div.quantity × div.costPerShare)) × 100`. Buying new shares after a dividend does NOT reduce the historical percentage. Fallback to `asset.averageCost` for legacy records without `costPerShare`. Can exceed 100% (correct: dividends > original cost). Computed in `app/api/dividends/stats/route.ts`.
 
 ### Table Totals Row
 - Use `<TableFooter>` for semantic HTML
@@ -212,4 +213,4 @@ ALL fields in settings types must be handled in THREE places:
 - **Fake timers**: `vi.useFakeTimers()` + `vi.setSystemTime(new Date(year, month, day))` in `beforeEach`; `vi.useRealTimers()` in `afterEach` — required when function calls `new Date()` internally (e.g. `getNextCouponDate`)
 - **No mocks needed for pure utils**: Functions with zero external dependencies (only TS type imports) need no `vi.mock()` — directly testable
 
-**Last updated**: 2026-03-09 (session: YOC v3 costPerShare, category type change)
+**Last updated**: 2026-03-09 (session: Dividendi % fix, Costo/Az. column)

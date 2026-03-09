@@ -283,6 +283,7 @@ export function DividendTable({ dividends, onEdit, onRefresh, showTotals = false
               <TableHead className="text-right w-[90px]">Lordo/Azione</TableHead>
               <TableHead className="text-right w-[90px]">Tax/Azione</TableHead>
               <TableHead className="text-right w-[90px]">Netto/Azione</TableHead>
+              <TableHead className="text-right w-[90px]">Costo/Az.</TableHead>
               <TableHead className="text-right w-[70px]">Azioni</TableHead>
               <TableHead className="text-right w-[110px]">Totale Lordo</TableHead>
               <TableHead className="text-right w-[110px]">Tasse</TableHead>
@@ -326,6 +327,15 @@ export function DividendTable({ dividends, onEdit, onRefresh, showTotals = false
                     currency: dividend.currency,
                     minimumFractionDigits: 4,
                   }).format(dividend.netAmount / dividend.quantity)}
+                </TableCell>
+                <TableCell className="text-right text-sm text-muted-foreground">
+                  {dividend.costPerShare !== undefined
+                    ? new Intl.NumberFormat('it-IT', {
+                        style: 'currency',
+                        currency: 'EUR',
+                        minimumFractionDigits: 4,
+                      }).format(dividend.costPerShare)
+                    : '—'}
                 </TableCell>
                 <TableCell className="text-right text-sm">{dividend.quantity}</TableCell>
                 <TableCell className="text-right font-medium">
@@ -389,7 +399,7 @@ export function DividendTable({ dividends, onEdit, onRefresh, showTotals = false
           {showTotals && dividends.length > 0 && (
             <TableFooter>
               <TableRow>
-                <TableCell colSpan={7} className="text-right font-semibold">
+                <TableCell colSpan={8} className="text-right font-semibold">
                   Totale ({dividends.length} {dividends.length === 1 ? 'dividendo' : 'dividendi'}):
                 </TableCell>
                 <TableCell className="text-right font-bold">

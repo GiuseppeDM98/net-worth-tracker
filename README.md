@@ -43,7 +43,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Borsa Italiana scraping for Italian market data (dividends and bond prices)
 - Monthly calendar view with drill-down
 - Dividend statistics and yield calculations
-- **Total Return per Asset**: table combining unrealized capital gain % and all-time net dividends received % to show the true investment return per asset
+- **Total Return per Asset**: table combining unrealized capital gain % and all-time net dividends received % (calculated at historical cost basis per payment, not diluted by later purchases) to show the true investment return per asset
 - **Dividend Per Share Growth**: year-by-year gross DPS history per equity asset with YoY% and CAGR columns; portfolio median growth rate shown as a summary
 
 ### Historical Analysis
@@ -158,7 +158,7 @@ See [`.env.local.example`](.env.local.example) for detailed comments on each var
 | Forms | react-hook-form, zod | Form handling and validation |
 | Dates | date-fns, date-fns-tz | Timezone-aware date operations |
 | Scraping | cheerio | Borsa Italiana dividend and bond price data |
-| Testing | Vitest | Unit testing (186 tests) |
+| Testing | Vitest | Unit testing (201 tests) |
 
 ## Development
 

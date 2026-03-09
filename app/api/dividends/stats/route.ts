@@ -104,11 +104,17 @@ export async function GET(request: NextRequest) {
 
     // Group all-time paid dividends by asset using EUR amounts for multi-currency consistency.
     // averageCost is always stored in EUR, so dividends must also be in EUR for a meaningful %.
+    // Also group raw records per asset for per-payment historical cost basis (YOC v3 approach).
     const allTimeNetEurByAsset = new Map<string, number>();
+    const dividendsByAsset = new Map<string, typeof paidDividends>();
     paidDividends.forEach(div => {
       const current = allTimeNetEurByAsset.get(div.assetId) || 0;
       // Prefer EUR-converted amount; fall back to original currency if conversion was not available
       allTimeNetEurByAsset.set(div.assetId, current + (div.netAmountEur ?? div.netAmount));
+      // Group raw records to compute per-payment contribution using historical cost basis
+      const arr = dividendsByAsset.get(div.assetId) ?? [];
+      arr.push(div);
+      dividendsByAsset.set(div.assetId, arr);
     });
 
     // Compute total return per asset: unrealized capital gain % + all-time dividend return %.
@@ -127,7 +133,16 @@ export async function GET(request: NextRequest) {
         const allTimeNetDividends = allTimeNetEurByAsset.get(asset.id) ?? 0;
         const capitalGainAbsolute = currentValue - costBasis;
         const capitalGainPercentage = (capitalGainAbsolute / costBasis) * 100;
-        const dividendReturnPercentage = (allTimeNetDividends / costBasis) * 100;
+        // Use historical cost basis per payment (costPerShare snapshot stored at dividend creation,
+        // YOC v3). Fallback to current averageCost for legacy records without costPerShare.
+        // This prevents dilution: buying new shares after a dividend does not reduce past return %.
+        const assetDividends = dividendsByAsset.get(asset.id) ?? [];
+        const dividendReturnPercentage = assetDividends.reduce((sum, div) => {
+          const effectiveCostPerShare = div.costPerShare ?? asset.averageCost!;
+          const costBasisAtTime = div.quantity * effectiveCostPerShare;
+          if (costBasisAtTime <= 0) return sum;
+          return sum + (div.netAmountEur ?? div.netAmount) / costBasisAtTime * 100;
+        }, 0);
         return {
           assetId: asset.id,
           assetTicker: asset.ticker,
