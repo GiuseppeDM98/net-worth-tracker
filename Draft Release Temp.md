@@ -14,6 +14,7 @@
 
 ## 🔧 Improvements
 
+- Cashflow now shows an expense type breakdown (Fixed / Variable / Debt) pie chart in the filtered sections of both Current Year and Full History — the chart respects the active month or period filter, so it always reflects the selected time range
 - "Ripristina Default" button in Settings is now only shown in the Allocation tab where it is relevant
 - Settings tabs use lazy loading — only the default tab (Allocation) renders on page load
 - Expense category type (Fixed, Variable, Debt, Income) can now be changed after creation — all associated transactions are updated automatically, including amount sign correction when switching between income and expense types

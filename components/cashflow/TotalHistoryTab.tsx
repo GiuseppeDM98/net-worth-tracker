@@ -603,6 +603,42 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
   };
 
   /**
+   * Aggregates expenses by type (Fisse/Variabili/Debiti) for a given set of expenses.
+   * Uses the same fixed color mapping as CurrentYearTab for visual consistency.
+   * @param expenses - Expense array to aggregate (filtered by year+month)
+   */
+  const getExpensesByType = (expenses: Expense[]): ChartData[] => {
+    const typeMap = new Map<ExpenseType, number>();
+    const total = calculateTotalExpenses(expenses);
+    if (total === 0) return [];
+
+    expenses
+      .filter(e => e.type !== 'income')
+      .forEach(expense => {
+        const current = typeMap.get(expense.type) || 0;
+        typeMap.set(expense.type, current + Math.abs(expense.amount));
+      });
+
+    const typeColors: Record<ExpenseType, string> = {
+      fixed: '#3b82f6',
+      variable: '#8b5cf6',
+      debt: '#f59e0b',
+      income: '#10b981',
+    };
+
+    const data: ChartData[] = [];
+    typeMap.forEach((value, type) => {
+      data.push({
+        name: EXPENSE_TYPE_LABELS[type],
+        value,
+        percentage: (value / total) * 100,
+        color: typeColors[type],
+      });
+    });
+    return data.sort((a, b) => b.value - a.value);
+  };
+
+  /**
    * Color derivation for subcategory visualization
    * Gradually darkens parent color so subcategories are visually related but distinct
    */
@@ -997,6 +1033,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
             {(() => {
               const expensesByCategoryData = getExpensesByCategory(periodFilteredExpenses);
               const incomeByCategoryData = getIncomeByCategory(periodFilteredExpenses);
+              const expensesByTypeData = getExpensesByType(periodFilteredExpenses);
 
               return (
                 <>
@@ -1216,6 +1253,53 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                             Nessuna spesa trovata
                           </div>
                         )}
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* CHART 2b: Spese per Tipo - filtered by period */}
+                  {expensesByTypeData.length > 0 && (
+                    <Card className="md:col-span-2">
+                      <CardHeader>
+                        <CardTitle>Spese per Tipo - {periodLabel}</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={pieChartHeight}>
+                          <RechartsPC>
+                            <Pie
+                              data={expensesByTypeData as any}
+                              cx="50%"
+                              cy="50%"
+                              labelLine={false}
+                              label={!isMobile
+                                ? (entry: any) => entry.percentage >= 5
+                                  ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
+                                  : ''
+                                : false}
+                              outerRadius={pieOuterRadius}
+                              fill="#8884d8"
+                              dataKey="value"
+                            >
+                              {expensesByTypeData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              formatter={(value: number) => formatCurrency(value)}
+                              contentStyle={{
+                                backgroundColor: 'white',
+                                border: '1px solid #ccc',
+                                borderRadius: '4px',
+                              }}
+                            />
+                            <Legend
+                              layout={isMobile ? 'horizontal' : 'vertical'}
+                              align={isMobile ? 'center' : 'right'}
+                              verticalAlign={isMobile ? 'bottom' : 'middle'}
+                              content={() => renderLegendItems(expensesByTypeData)}
+                            />
+                          </RechartsPC>
+                        </ResponsiveContainer>
                       </CardContent>
                     </Card>
                   )}

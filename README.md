@@ -35,7 +35,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Bulk move transactions between categories/subcategories (cross-type supported)
 - 5-layer Sankey diagram visualization
 - 4-level drill-down for detailed expense analysis
-- Period analysis with year and month filters
+- Period analysis with year and month filters — filtered sections include expense type breakdown (Fixed / Variable / Debt) pie chart that updates with the active filter
 - CSV export
 
 ### Dividends

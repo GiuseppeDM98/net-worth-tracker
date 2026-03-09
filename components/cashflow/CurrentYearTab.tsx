@@ -243,6 +243,39 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
     return data.sort((a, b) => b.value - a.value);
   };
 
+  // Expenses-by-type breakdown using filtered data (respects month filter).
+  // Separate from getExpensesByType() which always uses the full-year dataset.
+  const getExpensesByTypeFiltered = (expenses: Expense[]): ChartData[] => {
+    const typeMap = new Map<ExpenseType, number>();
+    const total = calculateTotalExpenses(expenses);
+    if (total === 0) return [];
+
+    expenses
+      .filter(e => e.type !== 'income')
+      .forEach(expense => {
+        const current = typeMap.get(expense.type) || 0;
+        typeMap.set(expense.type, current + Math.abs(expense.amount));
+      });
+
+    const typeColors: Record<ExpenseType, string> = {
+      fixed: '#3b82f6',
+      variable: '#8b5cf6',
+      debt: '#f59e0b',
+      income: '#10b981',
+    };
+
+    const data: ChartData[] = [];
+    typeMap.forEach((value, type) => {
+      data.push({
+        name: EXPENSE_TYPE_LABELS[type],
+        value,
+        percentage: (value / total) * 100,
+        color: typeColors[type],
+      });
+    });
+    return data.sort((a, b) => b.value - a.value);
+  };
+
   // Prepare data for expenses by type
   const getExpensesByType = (): ChartData[] => {
     const typeMap = new Map<ExpenseType, number>();
@@ -1034,6 +1067,60 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                       </CardContent>
                     </Card>
                   )}
+
+                  {/* CHART 2b: Spese per Tipo - filtered by month */}
+                  {(() => {
+                    const expensesByTypeFilteredData = getExpensesByTypeFiltered(monthFilteredExpenses);
+                    return expensesByTypeFilteredData.length > 0 ? (
+                      <Card className="md:col-span-2">
+                        <CardHeader>
+                          <CardTitle>
+                            {selectedMonth
+                              ? `Spese per Tipo - ${ITALIAN_MONTHS[selectedMonth - 1]} ${currentYear}`
+                              : `Spese per Tipo - ${currentYear}`}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ResponsiveContainer width="100%" height={pieChartHeight}>
+                            <RechartsPC>
+                              <Pie
+                                data={expensesByTypeFilteredData as any}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                label={!isMobile
+                                  ? (entry: any) => entry.percentage >= 5
+                                    ? `${entry.name}: ${entry.percentage.toFixed(1)}%`
+                                    : ''
+                                  : false}
+                                outerRadius={pieOuterRadius}
+                                fill="#8884d8"
+                                dataKey="value"
+                              >
+                                {expensesByTypeFilteredData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={entry.color} />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                formatter={(value: number) => formatCurrency(value)}
+                                contentStyle={{
+                                  backgroundColor: 'white',
+                                  border: '1px solid #ccc',
+                                  borderRadius: '4px',
+                                }}
+                              />
+                              <Legend
+                                layout={isMobile ? 'horizontal' : 'vertical'}
+                                align={isMobile ? 'center' : 'right'}
+                                verticalAlign={isMobile ? 'bottom' : 'middle'}
+                                content={() => renderLegendItems(expensesByTypeFilteredData)}
+                              />
+                            </RechartsPC>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+                    ) : null;
+                  })()}
 
                   {/* CHART 3: Entrate per Categoria - Interactive Drill-Down */}
                   {(incomeByCategoryData.length > 0 || (drillDown.chartType === 'income' && drillDown.level !== 'category')) && (

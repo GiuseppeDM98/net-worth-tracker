@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio
-- Ultima implementazione: **Asset Class history tabs** — pagina Assets riorganizzata da 5 tab piatti a 3 macro-tab (Gestione / Anno Corrente / Storico), ciascuno con sub-tab Prezzi / Valori / Asset Class. Nuova tabella "Asset Class" mostra andamento mensile EUR per classe (Azioni, Obbligazioni, Crypto, Immobili, Liquidità, Materie Prime) con color coding MoM, YTD %, Mese Prec. %, From Start % e riga totale. Dati da `snapshot.byAssetClass`. (2026-03-09)
+- Ultima implementazione: **Grafico Spese per Tipo filtrato** — aggiunto pie chart "Spese per Tipo" (Fisse/Variabili/Debiti) nelle sezioni filtrate di Anno Corrente (rispetta filtro mese) e Storico Totale (rispetta filtro anno+mese). Posizionato tra "Spese per Categoria" e "Entrate per Categoria" nel box blu. `getExpensesByTypeFiltered(expenses)` in `CurrentYearTab` separata da `getExpensesByType()` full-year esistente. (2026-03-09)
 - In corso ora: nessuna attività attiva
 
 ## Architecture Snapshot
@@ -69,4 +69,4 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`, `components/pdf/PDFExportDialog.tsx`, `lib/utils/pdfTimeFilters.ts`, `lib/utils/pdfGenerator.tsx`
 - Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`, `borsaItalianaBondScraper.test.ts`, `goalService.test.ts`, `couponUtils.test.ts`
 
-**Last updated**: 2026-03-09 (session: Asset Class history tabs + 3-macro-tab reorganization)
+**Last updated**: 2026-03-09 (session: Filtered Spese per Tipo pie chart in Cashflow)
