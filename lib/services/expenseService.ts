@@ -1144,6 +1144,65 @@ export async function moveExpensesFromSubCategory(
 }
 
 /**
+ * Batch-update the type of all expenses in a category when the category type changes.
+ *
+ * Keeps categoryId and categoryName unchanged — only updates the `type` field
+ * and flips amount signs when crossing the income ↔ expense boundary.
+ *
+ * @param categoryId - The category whose expenses need updating
+ * @param oldType - Previous category type
+ * @param newType - New category type
+ * @param userId - Owner of the expenses
+ * @returns Number of expenses updated
+ */
+export async function updateExpensesType(
+  categoryId: string,
+  oldType: ExpenseType,
+  newType: ExpenseType,
+  userId: string
+): Promise<number> {
+  try {
+    const expensesRef = collection(db, EXPENSES_COLLECTION);
+    const q = query(
+      expensesRef,
+      where('userId', '==', userId),
+      where('categoryId', '==', categoryId)
+    );
+
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+      return 0;
+    }
+
+    const flipSign = needsSignFlip(oldType, newType);
+    const batch = writeBatch(db);
+    let count = 0;
+
+    querySnapshot.docs.forEach(docSnapshot => {
+      const updates: Record<string, unknown> = {
+        type: newType,
+        updatedAt: Timestamp.now(),
+      };
+
+      if (flipSign) {
+        const currentAmount = docSnapshot.data().amount as number;
+        updates.amount = -currentAmount;
+      }
+
+      batch.update(docSnapshot.ref, updates);
+      count++;
+    });
+
+    await batch.commit();
+    return count;
+  } catch (error) {
+    console.error('Error updating expense types in category:', error);
+    throw new Error('Failed to update expense types');
+  }
+}
+
+/**
  * Fetch all expenses in a recurring series by parent ID.
  *
  * Used before deleting a series to identify which entries had a linked cash asset

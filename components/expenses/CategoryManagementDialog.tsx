@@ -14,7 +14,8 @@
  * - Color Picker: Predefined palette with visual color swatches
  *
  * Design Considerations:
- * - Category type cannot be changed after creation to maintain data integrity
+ * - Category type can be changed; all associated expenses are batch-updated via updateExpensesType()
+ * - Crossing income ↔ expense boundary flips all amount signs automatically
  * - Deleting subcategories with expenses requires reassignment to prevent data loss
  * - Form resets on dialog close to clear stale state
  *
@@ -82,8 +83,8 @@ import { moveExpensesFromSubCategory } from '@/lib/services/expenseService';
  * - Type immutability on edit (type can't change after category created)
  * - Name uniqueness validation (no duplicate category names)
  *
- * Current implementation uses simple schema, with type immutability
- * enforced via disabled form field rather than schema validation.
+ * Current implementation uses simple schema. Type changes are allowed and
+ * cascade to all associated expenses via updateExpensesType() in expenseCategoryService.
  */
 const categorySchema = z.object({
   name: z.string().min(1, 'Category name is required'),
@@ -429,7 +430,6 @@ export function CategoryManagementDialog({
             <Select
               value={watch('type')}
               onValueChange={(value) => setValue('type', value as ExpenseType)}
-              disabled={!!category} // Non permettere di cambiare il tipo se si sta modificando
             >
               <SelectTrigger id="type">
                 <SelectValue placeholder="Seleziona tipo" />
@@ -445,11 +445,21 @@ export function CategoryManagementDialog({
             {errors.type && (
               <p className="text-sm text-red-500">{errors.type.message}</p>
             )}
-            {category && (
-              <p className="text-sm text-muted-foreground">
-                Il tipo di voce non può essere modificato dopo la creazione
-              </p>
-            )}
+            {/* Warn when type changes on edit — sign flip for income ↔ expense crossing */}
+            {category && watch('type') !== category.type && (() => {
+              const oldIsIncome = category.type === 'income';
+              const newIsIncome = watch('type') === 'income';
+              const crossesBoundary = oldIsIncome !== newIsIncome;
+              return crossesBoundary ? (
+                <p className="text-sm text-amber-600 dark:text-amber-400">
+                  Attenzione: tutte le transazioni cambieranno segno degli importi (da {EXPENSE_TYPE_LABELS[category.type]} a {EXPENSE_TYPE_LABELS[watch('type')]}).
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Il tipo verrà aggiornato per tutte le transazioni associate.
+                </p>
+              );
+            })()}
           </div>
 
           {/* Colore */}

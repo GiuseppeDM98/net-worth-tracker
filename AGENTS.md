@@ -34,6 +34,7 @@ End date must include full day: `new Date(year, month, 0, 23, 59, 59, 999)`
 - **Income**: POSITIVE, **Expenses**: NEGATIVE in database
 - **Net Savings**: `sum(income) + sum(expenses)` (NOT subtraction)
 - **Cross-type move**: When moving expenses between income ↔ expense types, flip the amount sign. Helper `needsSignFlip()` in `expenseService.ts`
+- **Category type change**: Allowed after creation. `updateExpensesType(categoryId, oldType, newType, userId)` in `expenseService.ts` batch-updates `type` + flips signs if crossing income ↔ expense. Called from `updateCategory()` in `expenseCategoryService.ts` which fetches old category once for both name and type change detection.
 
 ### Cashflow Tab Pattern (Parallel Siblings)
 - CurrentYearTab and TotalHistoryTab are parallel siblings with independent state
@@ -96,8 +97,9 @@ ALL fields in settings types must be handled in THREE places:
 - YOC uses `averageCost` (cost basis), Current Yield uses `currentPrice` (market value)
 - Filter dividends by `paymentDate` (not `exDate`); use API route (server-only service)
 - Time-sensitive: use dedicated `*EndDate` capped at TODAY for dividend metrics
-- **DPS-based YOC** (not raw dividend totals): derive EUR DPS as `(grossAmountEur ?? grossAmount) / div.quantity` per dividend record, annualize per asset, project onto current quantity. Formula simplifies to `annualizedDPS / averageCost` per asset (quantity cancels). This avoids the "buy-after-dividend" mismatch where current quantity inflates cost basis without a corresponding dividend increase.
-- `yocDividendsGross/Net` = actual dividends received (unchanged, for display); `yocCostBasis` = current `quantity × averageCost`
+- **Historical YOC (v3)**: numerator = actual `grossAmountEur` received; denominator = `maxDivQty × effectiveCostPerShare`. `effectiveCostPerShare` = gross-weighted average of `div.costPerShare` (stored on record at creation); fallback to `asset.averageCost` for legacy records. Uses `div.quantity` (not `asset.quantity`) so post-dividend purchases don't inflate portfolio weight.
+- `div.costPerShare` is set server-side at dividend creation from `asset.averageCost` — never from user input. All creation paths set it: POST `/api/dividends`, POST `/api/dividends/scrape`, cron Phase 1 + Phase 3.
+- `yocDividendsGross/Net` = actual dividends received (for display); `yocCostBasis` = `maxDivQty × effectiveCostPerShare`
 
 ### Table Totals Row
 - Use `<TableFooter>` for semantic HTML
@@ -210,4 +212,4 @@ ALL fields in settings types must be handled in THREE places:
 - **Fake timers**: `vi.useFakeTimers()` + `vi.setSystemTime(new Date(year, month, day))` in `beforeEach`; `vi.useRealTimers()` in `afterEach` — required when function calls `new Date()` internally (e.g. `getNextCouponDate`)
 - **No mocks needed for pure utils**: Functions with zero external dependencies (only TS type imports) need no `vi.mock()` — directly testable
 
-**Last updated**: 2026-03-07 (session: YOC bug fix — DPS-based calculation)
+**Last updated**: 2026-03-09 (session: YOC v3 costPerShare, category type change)

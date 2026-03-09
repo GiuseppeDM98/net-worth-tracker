@@ -7,8 +7,10 @@
 ## 🐛 Bug Fixes
 
 - Fixed Yield on Cost (YOC) calculation in the Performance page: buying additional shares after a dividend payment no longer understates YOC. The metric now correctly reflects the dividend yield relative to your average cost per share, regardless of when shares were purchased
+- Fixed YOC accuracy when your average cost per share changes over time: each dividend now records the exact cost basis at the time of payment, so the metric reflects what you actually paid for the shares that generated that income — not your current blended average
 
 ## 🔧 Improvements
 
 - "Ripristina Default" button in Settings is now only shown in the Allocation tab where it is relevant
 - Settings tabs use lazy loading — only the default tab (Allocation) renders on page load
+- Expense category type (Fixed, Variable, Debt, Income) can now be changed after creation — all associated transactions are updated automatically, including amount sign correction when switching between income and expense types

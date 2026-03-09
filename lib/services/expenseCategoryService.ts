@@ -37,6 +37,7 @@ import {
 import {
   updateExpensesCategoryName,
   updateExpensesSubCategoryName,
+  updateExpensesType,
 } from './expenseService';
 
 const CATEGORIES_COLLECTION = 'expenseCategories';
@@ -186,13 +187,20 @@ export async function updateCategory(
   userId?: string
 ): Promise<void> {
   try {
-    // If the name is being updated, also update all associated expenses
-    if (updates.name && userId) {
-      const oldCategory = await getCategoryById(categoryId);
-      if (oldCategory && oldCategory.name !== updates.name) {
-        // Update all expenses with this category
-        await updateExpensesCategoryName(categoryId, updates.name, userId);
-      }
+    // Fetch old category once to check both name and type changes
+    let oldCategory: Awaited<ReturnType<typeof getCategoryById>> | null = null;
+    if ((updates.name || updates.type) && userId) {
+      oldCategory = await getCategoryById(categoryId);
+    }
+
+    // Cascade name change to all associated expenses
+    if (updates.name && userId && oldCategory && oldCategory.name !== updates.name) {
+      await updateExpensesCategoryName(categoryId, updates.name, userId);
+    }
+
+    // Cascade type change to all associated expenses, flipping signs when crossing income ↔ expense
+    if (updates.type && userId && oldCategory && oldCategory.type !== updates.type) {
+      await updateExpensesType(categoryId, oldCategory.type, updates.type, userId);
     }
 
     const categoryRef = doc(db, CATEGORIES_COLLECTION, categoryId);

@@ -560,12 +560,13 @@ describe('calculateIRR', () => {
 
 // Helper to create minimal dividend objects for YOC tests.
 // quantity here is the number of shares at ex-date (stored on the dividend record).
+// costPerShare mirrors asset.averageCost at payment time — undefined for legacy records.
 function makeDividend(
   assetId: string,
   paymentDate: Date,
   dividendPerShare: number,
   quantity: number,
-  options: { grossAmountEur?: number; netAmountEur?: number } = {}
+  options: { grossAmountEur?: number; netAmountEur?: number; costPerShare?: number } = {}
 ) {
   const grossAmount = dividendPerShare * quantity
   const netAmount = grossAmount * 0.74 // 26% tax as default
@@ -579,6 +580,7 @@ function makeDividend(
     grossAmountEur: options.grossAmountEur ?? grossAmount,
     netAmountEur: options.netAmountEur ?? netAmount,
     currency: 'EUR',
+    costPerShare: options.costPerShare,
   }
 }
 
@@ -635,30 +637,64 @@ describe('calculateYocMetrics', () => {
   })
 
   it('buy-after-dividend: YOC stays 10% even when quantity doubles after dividend', () => {
-    // March dividend paid on 10 shares (DPS = €1)
+    // March dividend paid on 10 shares (DPS = €1, grossAmount = €10)
     // April: buy 10 more → current quantity = 20, averageCost still €10
-    // YOC must still reflect €1 DPS / €10 avgCost = 10%, not 5%
+    // YOC must still reflect actual €10 received / (10 div-shares × €10 avgCost) = 10%
     const div = makeDividend('eni', new Date(2025, 2, 1), 1, 10) // quantity at ex-date = 10
     const asset = makeAsset('eni', 20, 10) // current quantity = 20
 
     const result = calculateYocMetrics([div], [asset], START, END, 12)
 
-    // DPS = €1, averageCost = €10 → YOC = 10% regardless of current quantity
+    // Actual €10 received / (divQty 10 × avgCost €10 = €100) = 10%
     expect(result.yocGross).toBeCloseTo(10, 4)
-    // Cost basis uses current quantity: 20 × €10 = €200
-    expect(result.yocCostBasis).toBe(200)
+    // Cost basis uses div.quantity (not current quantity): 10 × €10 = €100
+    expect(result.yocCostBasis).toBe(100)
     // Actual dividends received remain €10 (paid on 10 original shares)
     expect(result.yocDividendsGross).toBe(10)
   })
 
   it('buy-after-dividend at different price: YOC reflects blended averageCost', () => {
     // 10 shares at €10 + 10 shares at €15 → averageCost = €12.50
-    // DPS = €1 → YOC = €1 / €12.50 = 8%
+    // Dividend was paid on original 10 shares: grossAmount = €10
+    // YOC = €10 actual / (divQty 10 × avgCost €12.50 = €125) = 8%
     const div = makeDividend('eni', new Date(2025, 2, 1), 1, 10)
     const asset = makeAsset('eni', 20, 12.5) // blended averageCost
 
     const result = calculateYocMetrics([div], [asset], START, END, 12)
-    expect(result.yocGross).toBeCloseTo(8, 4) // 1 / 12.5 * 100 = 8%
+    expect(result.yocGross).toBeCloseTo(8, 4) // €10 / €125 * 100 = 8%
+  })
+
+  it('buy-after-dividend cheaper: YOC changes minimally (not inflated by doubled weight)', () => {
+    // Scenario from bug report: buying shares at below-average price after dividend
+    // should cause only a small YOC change, not a large inflation of asset weight.
+    //
+    // Asset A paid €10 dividend on 10 shares (DPS €1), avgCost €10.
+    // Asset B paid €20 dividend on 10 shares (DPS €2), avgCost €20.
+    // Portfolio baseline YOC = (10+20)/(10×10 + 10×20) = 30/300 = 10%
+    //
+    // Now buy 90 more shares of Asset A at €8 (cheaper), new avgCost ≈ €8.20
+    // assetA.quantity = 100, avgCost = (10×10 + 90×8)/100 = (100+720)/100 = 8.20
+    //
+    // With div.quantity-based approach:
+    //   totalProjected = 10 + 20 = 30 (actual dividends received, unchanged)
+    //   costBasis = divQty_A × 8.20 + divQty_B × 20 = 10×8.20 + 10×20 = 82 + 200 = 282
+    //   YOC = 30/282 ≈ 10.64% (small change due to avgCost drop only)
+    //
+    // Old DPS-based approach would have used current_qty_A=100:
+    //   totalProjected = dps_A×100 + dps_B×10 = 100 + 20 = 120
+    //   costBasis = 100×8.20 + 10×20 = 820 + 200 = 1020
+    //   YOC = 120/1020 ≈ 11.76% (large inflation from doubled weight of A)
+    const divA = makeDividend('assetA', new Date(2025, 2, 1), 1, 10)   // 10 shares at ex-date
+    const divB = makeDividend('assetB', new Date(2025, 2, 1), 2, 10)
+    const assetA = makeAsset('assetA', 100, 8.20) // current qty=100, blended avgCost
+    const assetB = makeAsset('assetB', 10, 20)
+
+    const result = calculateYocMetrics([divA, divB], [assetA, assetB], START, END, 12)
+
+    // div.quantity-based: 30 / (10×8.20 + 10×20) = 30/282 ≈ 10.64%
+    expect(result.yocGross).toBeCloseTo(10.638, 2)
+    // Cost basis uses divQty (10 per asset), not current qty (100 for A)
+    expect(result.yocCostBasis).toBeCloseTo(282, 4)
   })
 
   it('multi-dividend same asset: DPS accumulates correctly', () => {
@@ -727,6 +763,55 @@ describe('calculateYocMetrics', () => {
     // Only the in-period dividend should be counted
     expect(resultAll.yocGross).toBeCloseTo(resultOne.yocGross!, 4)
     expect(resultAll.yocDividendsGross).toBe(10) // only in-period dividend
+  })
+
+  // ─── costPerShare tests ───
+
+  it('costPerShare: uses historical cost instead of current avgCost', () => {
+    // Dividend paid when avgCost was €10/share (costPerShare=10)
+    // Investor later buys more shares at €8 → current avgCost drops to €8.50
+    // YOC should use historical €10, not current €8.50
+    const div = makeDividend('eni', new Date(2025, 2, 1), 1, 10, { costPerShare: 10 })
+    const asset = makeAsset('eni', 20, 8.5) // current avgCost changed after more purchases
+
+    const result = calculateYocMetrics([div], [asset], START, END, 12)
+
+    // cost_basis = divQty(10) × historicalCostPerShare(10) = 100
+    // YOC = 10/100 = 10% — uses historical €10, NOT current €8.50
+    expect(result.yocGross).toBeCloseTo(10, 4)
+    expect(result.yocCostBasis).toBeCloseTo(100, 4)
+  })
+
+  it('costPerShare: legacy dividend without costPerShare falls back to current avgCost', () => {
+    // Legacy record (no costPerShare) → must fall back to asset.averageCost
+    const div = makeDividend('eni', new Date(2025, 2, 1), 1, 10) // no costPerShare
+    const asset = makeAsset('eni', 10, 12)
+
+    const result = calculateYocMetrics([div], [asset], START, END, 12)
+
+    // cost_basis = divQty(10) × asset.averageCost(12) = 120
+    // YOC = 10/120 * 100 = 8.33%
+    expect(result.yocGross).toBeCloseTo(8.333, 2)
+    expect(result.yocCostBasis).toBeCloseTo(120, 4)
+  })
+
+  it('costPerShare: multi-dividend weighted average uses gross-weighted costPerShare', () => {
+    // Q1: qty=100, costPerShare=10, gross=€25  (DPS=€0.25)
+    // Q2: qty=120, costPerShare=9.80, gross=€30 (DPS=€0.25)
+    // weighted_cost = (25×10 + 30×9.80) / 55 = (250+294)/55 = 544/55 ≈ 9.8909
+    // cost_basis = maxDivQty(120) × 9.8909 ≈ 1186.91
+    // YOC = annualized(55) / 1186.91 = 55/1186.91 * 100 ≈ 4.633%
+    const divQ1 = makeDividend('eni', new Date(2025, 2, 1), 0.25, 100, { costPerShare: 10 })
+    const divQ2 = makeDividend('eni', new Date(2025, 8, 1), 0.25, 120, { costPerShare: 9.8 })
+    const asset = makeAsset('eni', 120, 9.5) // current avgCost different from historical
+
+    const result = calculateYocMetrics([divQ1, divQ2], [asset], START, END, 12)
+
+    const weightedCost = (25 * 10 + 30 * 9.8) / 55 // ≈ 9.8909
+    const expectedCostBasis = 120 * weightedCost
+    const expectedYoc = (55 / expectedCostBasis) * 100
+    expect(result.yocCostBasis).toBeCloseTo(expectedCostBasis, 2)
+    expect(result.yocGross).toBeCloseTo(expectedYoc, 2)
   })
 })
 

@@ -720,52 +720,92 @@ export function calculateYocMetrics(
     };
   }
 
-  // STEP 3: Accumulate gross and net DPS in EUR per asset across all period dividends.
-  // Deriving DPS from each dividend record (grossAmountEur / div.quantity) and projecting
-  // onto the current quantity avoids the mismatch where shares bought after a payment inflate
-  // the cost basis denominator without a corresponding increase in dividends received.
+  // STEP 3: Accumulate actual gross/net dividends, max div.quantity, and weighted costPerShare per asset.
+  //
+  // We use actual dividends received (not DPS × current qty) and div.quantity (shares
+  // that actually received the dividend, not current holdings) for the cost basis denominator.
+  // This gives historical YOC: "what yield did I actually receive on the shares I held at ex-date?"
+  //
+  // For assets with multiple dividends in the period (e.g., semi-annual coupons), the cost basis
+  // uses a gross-amount-weighted average of each dividend's costPerShare — larger dividends contribute
+  // proportionally more to the representative cost basis.
+  //
+  // Fallback: if no dividends carry costPerShare (legacy records), falls back to current asset.averageCost.
   const assetsMap = new Map(assets.map(a => [a.id, a]));
-  const assetDpsGrossMap = new Map<string, number>(); // assetId → total gross DPS in EUR
-  const assetDpsNetMap = new Map<string, number>();   // assetId → total net DPS in EUR
+  const assetActualGrossMap = new Map<string, number>(); // assetId → total gross EUR received
+  const assetActualNetMap = new Map<string, number>();   // assetId → total net EUR received
+  const assetMaxDivQtyMap = new Map<string, number>();   // assetId → max div.quantity in period
+  // For gross-weighted average of costPerShare: sum(grossEur × costPerShare) and sum(grossEur)
+  const assetWeightedCostNumeratorMap = new Map<string, number>(); // sum(grossEur × costPerShare)
+  const assetWeightedCostGrossSumMap = new Map<string, number>();  // sum(grossEur) for divs with costPerShare
 
   periodDividends.forEach(div => {
     if (!div.quantity || div.quantity <= 0) return; // guard: skip records with invalid quantity
-    const dpsGrossEur = (div.grossAmountEur ?? div.grossAmount) / div.quantity;
-    const dpsNetEur = (div.netAmountEur ?? div.netAmount) / div.quantity;
-    assetDpsGrossMap.set(div.assetId, (assetDpsGrossMap.get(div.assetId) ?? 0) + dpsGrossEur);
-    assetDpsNetMap.set(div.assetId, (assetDpsNetMap.get(div.assetId) ?? 0) + dpsNetEur);
+    const grossEur = div.grossAmountEur ?? div.grossAmount;
+    const netEur = div.netAmountEur ?? div.netAmount;
+    assetActualGrossMap.set(div.assetId, (assetActualGrossMap.get(div.assetId) ?? 0) + grossEur);
+    assetActualNetMap.set(div.assetId, (assetActualNetMap.get(div.assetId) ?? 0) + netEur);
+    assetMaxDivQtyMap.set(div.assetId, Math.max(assetMaxDivQtyMap.get(div.assetId) ?? 0, div.quantity));
+
+    // Accumulate weighted costPerShare; only dividends with a stored costPerShare contribute
+    if (div.costPerShare && div.costPerShare > 0) {
+      assetWeightedCostNumeratorMap.set(
+        div.assetId,
+        (assetWeightedCostNumeratorMap.get(div.assetId) ?? 0) + grossEur * div.costPerShare
+      );
+      assetWeightedCostGrossSumMap.set(
+        div.assetId,
+        (assetWeightedCostGrossSumMap.get(div.assetId) ?? 0) + grossEur
+      );
+    }
   });
 
-  // STEP 4: Annualize DPS per asset and project onto current quantity.
-  // Portfolio YOC = sum(annualizedDPS × qty) / sum(qty × averageCost)
-  //              = cost-basis-weighted average of per-asset YOCs (annualizedDPS / averageCost).
+  // STEP 4: Annualize actual dividends per asset and compute cost basis.
+  //
+  // effectiveCostPerShare priority:
+  //   1. Gross-weighted average of div.costPerShare (historical snapshot, most accurate)
+  //   2. Current asset.averageCost (fallback for legacy records without costPerShare)
+  //
+  // Cost basis = maxDivQty × effectiveCostPerShare, using divQty (not current qty) so that
+  // post-dividend share purchases do not inflate the asset's portfolio weight in YOC.
   let totalProjectedGross = 0;
   let totalProjectedNet = 0;
   let costBasis = 0;
   let assetCount = 0;
 
-  assetDpsGrossMap.forEach((totalDpsGross, assetId) => {
+  assetActualGrossMap.forEach((totalActualGross, assetId) => {
     const asset = assetsMap.get(assetId);
     // Include only assets currently owned with a known cost basis
     if (!asset || !asset.averageCost || asset.averageCost <= 0 || asset.quantity <= 0) return;
 
-    // Annualize DPS using the same strategy as total-dividend annualization:
+    const totalActualNet = assetActualNetMap.get(assetId) ?? 0;
+    const divQty = assetMaxDivQtyMap.get(assetId) ?? 0;
+    if (divQty <= 0) return;
+
+    // Resolve effective cost per share using stored historical data if available
+    const weightedNumerator = assetWeightedCostNumeratorMap.get(assetId);
+    const weightedGrossSum = assetWeightedCostGrossSumMap.get(assetId);
+    const historicalCostPerShare = (weightedNumerator && weightedGrossSum)
+      ? weightedNumerator / weightedGrossSum
+      : null;
+    const effectiveCostPerShare = historicalCostPerShare ?? asset.averageCost;
+
+    // Annualize actual dividends using the same strategy as total-dividend annualization:
     // >= 12 months → average annual rate; < 12 months → scale up to annual rate
-    let annualizedDpsGross: number;
-    let annualizedDpsNet: number;
-    const totalDpsNet = assetDpsNetMap.get(assetId) ?? 0;
+    let annualizedGross: number;
+    let annualizedNet: number;
     if (numberOfMonths >= 12) {
       const years = numberOfMonths / 12;
-      annualizedDpsGross = totalDpsGross / years;
-      annualizedDpsNet = totalDpsNet / years;
+      annualizedGross = totalActualGross / years;
+      annualizedNet = totalActualNet / years;
     } else {
-      annualizedDpsGross = (totalDpsGross / numberOfMonths) * 12;
-      annualizedDpsNet = (totalDpsNet / numberOfMonths) * 12;
+      annualizedGross = (totalActualGross / numberOfMonths) * 12;
+      annualizedNet = (totalActualNet / numberOfMonths) * 12;
     }
 
-    totalProjectedGross += annualizedDpsGross * asset.quantity;
-    totalProjectedNet += annualizedDpsNet * asset.quantity;
-    costBasis += asset.quantity * asset.averageCost;
+    totalProjectedGross += annualizedGross;
+    totalProjectedNet += annualizedNet;
+    costBasis += divQty * effectiveCostPerShare;
     assetCount++;
   });
 

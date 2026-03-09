@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio
-- Ultima implementazione: **YOC bug fix** — `calculateYocMetrics` ora usa approccio DPS-based (`grossAmountEur / div.quantity`) invece di dividendi totali, evitando sottostima quando si acquistano azioni dopo il pagamento; 11 unit test aggiunti (`lib/services/performanceService.ts`) (2026-03-07)
+- Ultima implementazione: **YOC fix v3** — `costPerShare` (snapshot di `asset.averageCost`) ora salvato su ogni record dividendo al momento della creazione. `calculateYocMetrics` usa media pesata dei `costPerShare` storici (per grossAmount); fallback a `asset.averageCost` per record legacy. 201 unit test (2026-03-09)
 - In corso ora: nessuna attività attiva
 
 ## Architecture Snapshot
@@ -17,7 +17,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Key Features (Active)
 - Portfolio multi-asset con aggiornamento prezzi Yahoo Finance (prezzo e average cost a 4 decimali). Asset con quantità zero supportati: badge "Azzerato" in tabella, esclusi dal conteggio overview, marcati "Venduto" nello storico. Bond con ISIN: scraping automatico prezzi da Borsa Italiana con fallback Yahoo Finance. **Bond coupon scheduling**: cedole auto-generate da `BondDetails` (tasso, frequenza, emissione, scadenza, valore nominale). **Step-up coupon**: `CouponRateTier[]` con fasce annuali di tasso (es. BTP Valore). **Premio finale**: `finalPremiumRate` genera dividend `finalPremium` su scadenza. **Tax hint 12.5%** per Titoli di Stato italiani. **Convenzione Borsa Italiana**: `currentPrice` e `averageCost` sempre in EUR; input utente in quotazione BI (per 100€ nominale) → convertito con `biPrice × (nominalValue/100)`; edit-mode mostra il valore back-convertito; `isBondPctMode` (ISIN + nominalValue > 1) controlla label/conversione/preview. **Costo Annuale Portfolio**: TER medio ponderato + imposta di bollo configurabile (aliquota %, esenzione per-asset, soglia >€5.000 per conti correnti).
-- Cashflow con categorie, filtri, Sankey 5-layer, drill-down 4 livelli, Analisi Periodo con filtri anno+mese. Bulk move transazioni tra categorie (cross-type, da Settings). **Linked cash account**: ogni transazione può essere collegata a un asset cash; il saldo (quantity) viene aggiornato automaticamente su create/edit/delete. **Conti di default** configurabili in Settings (separati per spese e entrate). **Anno inizio storico**: `cashflowHistoryStartYear` in Settings filtra i dati del tab Storico Totale (esclude import bulk pre-data); default 2025.
+- Cashflow con categorie, filtri, Sankey 5-layer, drill-down 4 livelli, Analisi Periodo con filtri anno+mese. Bulk move transazioni tra categorie (cross-type, da Settings). **Cambio tipo categoria**: il tipo (`fixed`/`variable`/`debt`/`income`) è ora modificabile dopo la creazione; batch update su tutte le transazioni associate con inversione automatica dei segni se si attraversa il confine income ↔ spesa. **Linked cash account**: ogni transazione può essere collegata a un asset cash; il saldo (quantity) viene aggiornato automaticamente su create/edit/delete. **Conti di default** configurabili in Settings (separati per spese e entrate). **Anno inizio storico**: `cashflowHistoryStartYear` in Settings filtra i dati del tab Storico Totale (esclude import bulk pre-data); default 2025.
 - Snapshot mensili automatici + storico e CSV export.
 - Asset price/value history tables con aggregazione per nome e badge "Venduto". Tab anno corrente: colonne riepilogative **Mese Prec. %** (sfondo ambra, variazione MoM dell'ultimo mese), **YTD %** (sfondo blu). Tab storiche: **From Start %** (sfondo viola). Logica in `assetPriceHistoryUtils.ts`, `AssetHistoryTotalRow`, `AssetPriceHistoryRow`.
 - History page: Net Worth evolution, Asset Class breakdown, Liquidity, YoY variation, Savings vs Investment Growth (toggle Annuale/Mensile con selettore anno nella vista mensile), Doubling Time Analysis (geometrico + soglie fisse, summary cards adattivi alla modalità), Current vs Target allocation.
@@ -32,7 +32,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Testing
 - **Framework**: Vitest (`npm test`, `npm run test:watch`)
-- **197 unit test** across 8 files in `__tests__/` covering formatters, dateHelpers, fireService, performanceService, borsaItalianaBondScraper, goalService, couponUtils
+- **201 unit test** across 8 files in `__tests__/` covering formatters, dateHelpers, fireService, performanceService, borsaItalianaBondScraper, goalService, couponUtils
 - **Scope**: Pure functions only (no Firebase mocking). Services need `vi.mock()` on Firebase-dependent imports.
 - **Config**: `vitest.config.ts` with `@/` path alias
 
@@ -69,4 +69,4 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`, `components/pdf/PDFExportDialog.tsx`, `lib/utils/pdfTimeFilters.ts`, `lib/utils/pdfGenerator.tsx`
 - Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`, `borsaItalianaBondScraper.test.ts`, `goalService.test.ts`, `couponUtils.test.ts`
 
-**Last updated**: 2026-03-07 (session: YOC bug fix — DPS-based calculation)
+**Last updated**: 2026-03-09 (session: YOC v3 costPerShare, category type change)
