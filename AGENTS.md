@@ -213,4 +213,4 @@ ALL fields in settings types must be handled in THREE places:
 - **Fake timers**: `vi.useFakeTimers()` + `vi.setSystemTime(new Date(year, month, day))` in `beforeEach`; `vi.useRealTimers()` in `afterEach` — required when function calls `new Date()` internally (e.g. `getNextCouponDate`)
 - **No mocks needed for pure utils**: Functions with zero external dependencies (only TS type imports) need no `vi.mock()` — directly testable
 
-**Last updated**: 2026-03-09 (session: Dividendi % fix, Costo/Az. column)
+**Last updated**: 2026-03-09 (session: Asset Class history tabs + 3-macro-tab reorganization)
