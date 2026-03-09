@@ -32,4 +32,38 @@ Storico       → sub-tab: [Prezzi] [Valori] [Asset Class]
 - [x] assetClassHistoryUtils.ts creato
 - [x] AssetClassHistoryTable.tsx creato
 - [x] assets/page.tsx refactored
-- [ ] Test eseguiti
+- [x] Commit e push su branch `claude/add-assets-tabs-HxBHr`
+
+---
+
+## Cosa
+- Aggiunto `lib/utils/assetClassHistoryUtils.ts`: trasforma i dati `byAssetClass` degli
+  snapshot mensili in righe per tabella (una riga per asset class), con color coding MoM,
+  calcolo YTD, From Start %, Mese Prec. % e riga totale.
+- Aggiunto `components/assets/AssetClassHistoryTable.tsx`: tabella UI che mostra l'andamento
+  mensile in EUR per ogni asset class (Azioni, Obbligazioni, Crypto, Immobili, Liquidità,
+  Materie Prime), con badge colorato e colonne sommario.
+- Refactoring `app/dashboard/assets/page.tsx`: da 5 tab piatti a 3 macro-tab
+  (Gestione Asset / Anno Corrente / Storico), ciascuno con 3 sub-tab interni
+  (Prezzi / Valori / Asset Class).
+
+## Perché
+La pagina Assets aveva tab sempre più numerosi (5) e cresceva in modo lineare a ogni
+nuova vista. Il raggruppamento in macro-tab riduce la navigazione e rende evidente la
+distinzione temporale (anno corrente vs storico). I nuovi tab "Asset Class" colmano
+il gap informativo: si vedevano già i prezzi e i valori dei singoli asset, ma non l'andamento
+aggregato per classe — dato già presente in ogni snapshot (`byAssetClass`) ma non esposto
+in nessuna tabella.
+
+## Note / Gotcha
+- La fonte dati è `snapshot.byAssetClass` (EUR assoluti), già popolato da `calculateCurrentAllocation()`
+  al momento della creazione dello snapshot. Nessuna nuova API o scrittura Firestore necessaria.
+- Il reset della catena di color coding (`previousValue = null`) su celle null è intenzionale:
+  evita che un mese senza dati faccia colorare il mese successivo rispetto a due mesi prima.
+- I sub-tab interni non hanno lazy loading aggiuntivo: si montano tutti quando il macro-tab
+  padre viene attivato per la prima volta. Accettabile perché i dati (snapshots) sono già
+  in memoria via React Query.
+- `formatCurrency` e `formatNumber` sono importati da `chartService.ts` per coerenza con
+  gli altri componenti della pagina.
+- Classe `desktop:` usata nel TabsList del page: verificare che sia nel Tailwind config,
+  altrimenti sostituire con breakpoint standard (`lg:` o `md:`).
