@@ -23,12 +23,13 @@
 
 import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Wallet, Receipt, TrendingUp, BarChart3, Coins } from 'lucide-react';
+import { Wallet, Receipt, TrendingUp, BarChart3, Coins, Target } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ExpenseTrackingTab } from '@/components/cashflow/ExpenseTrackingTab';
 import { CurrentYearTab } from '@/components/cashflow/CurrentYearTab';
 import { TotalHistoryTab } from '@/components/cashflow/TotalHistoryTab';
 import { DividendTrackingTab } from '@/components/dividends/DividendTrackingTab';
+import { BudgetTab } from '@/components/cashflow/BudgetTab';
 import { useAuth } from '@/contexts/AuthContext';
 import { Dividend } from '@/types/dividend';
 import { Asset } from '@/types/assets';
@@ -139,7 +140,7 @@ export default function CashflowPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="tracking" value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full max-w-4xl grid-cols-4">
+        <TabsList className="grid w-full max-w-4xl grid-cols-5">
           <TabsTrigger value="tracking" className="flex items-center gap-2">
             <Receipt className="h-4 w-4" />
             <span className="hidden sm:inline">Tracciamento</span>
@@ -155,6 +156,10 @@ export default function CashflowPage() {
           <TabsTrigger value="total-history" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             <span className="hidden sm:inline">Storico Totale</span>
+          </TabsTrigger>
+          <TabsTrigger value="budget" className="flex items-center gap-2">
+            <Target className="h-4 w-4" />
+            <span className="hidden sm:inline">Budget</span>
           </TabsTrigger>
         </TabsList>
 
@@ -195,6 +200,18 @@ export default function CashflowPage() {
               loading={loading}
               onRefresh={handleRefresh}
               historyStartYear={cashflowHistoryStartYear}
+            />
+          </TabsContent>
+        )}
+
+        {mountedTabs.has('budget') && (
+          <TabsContent value="budget" className="mt-6">
+            <BudgetTab
+              allExpenses={allExpenses}
+              categories={categories}
+              loading={loading}
+              historyStartYear={cashflowHistoryStartYear}
+              userId={user?.uid ?? ''}
             />
           </TabsContent>
         )}

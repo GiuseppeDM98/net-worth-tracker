@@ -43,6 +43,13 @@ End date must include full day: `new Date(year, month, 0, 23, 59, 59, 999)`
 - Always reset drill-down state when filters change to prevent stale data
 - Blue-bordered card pattern for filtered sections: `border-blue-200 bg-blue-50/50 dark:bg-blue-950/10 dark:border-blue-800`
 
+### Budget Tab Pattern
+- **Auto-init**: `autoInitBudgetItems` merges saved amounts with live categories on every mount — new categories auto-appear without requiring an explicit save action
+- **Scope matching**: `expenseMatchesItem` matches by category/subcategory ID regardless of income/expense type — handles cross-type lookups correctly
+- **Income section**: `DeltaBadge` and `ProgressCell` accept `inverted?: boolean` — green means growth for income, red means underspend
+- **Firestore**: single doc `budgets/{userId}`, full replacement on save (same pattern as `goalBasedInvesting/{userId}`)
+- **Amount storage**: `monthlyAmount` stored internally as monthly; annual view multiplies by 12 for display and ratio calculation (`budgetUsedRatio = currentYearTotal / (monthlyAmount × 12)`)
+
 ### Radix UI Select Values
 - **Empty string NOT allowed** as `SelectItem` value (runtime error)
 - Use sentinel values: `__all_years__`, `__all__`, `__none__` for "unselected" options
@@ -216,4 +223,4 @@ ALL fields in settings types must be handled in THREE places:
 - **Fake timers**: `vi.useFakeTimers()` + `vi.setSystemTime(new Date(year, month, day))` in `beforeEach`; `vi.useRealTimers()` in `afterEach` — required when function calls `new Date()` internally (e.g. `getNextCouponDate`)
 - **No mocks needed for pure utils**: Functions with zero external dependencies (only TS type imports) need no `vi.mock()` — directly testable
 
-**Last updated**: 2026-03-11 (session: yahoo-finance2 update, Tavily → Claude native web search, AI dialog UX)
+**Last updated**: 2026-03-11 (session: Budget tab — auto-init categories, annual/monthly views, income tracking)

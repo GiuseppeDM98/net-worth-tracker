@@ -1,5 +1,15 @@
 ## ✨ New Features
 
+- Added **Budget** tab to Cashflow page with automatic budget tracking for all expense categories
+- Budget items auto-generated from your categories (Fixed Expenses, Variable, Debt, Income) — no manual setup required
+- Annual view: compare current year spending vs budget, previous year, and historical average with color-coded progress bars
+- Monthly view: per-category bar charts showing current year vs previous year vs historical average
+- Collapsible sections — click any section header to expand or collapse
+- Reorder budget items within sections using up/down arrows
+- Add subcategory-level budget items for more granular tracking
+- Income section with inverted color logic (green = income growth)
+- Contextual guide ("Come leggere questa pagina") explaining each view
+
 - Assets page now has a monthly Asset Class breakdown table — see how Equities, Bonds, Crypto, Real Estate, Liquidity, and Commodities evolved month by month in EUR totals, with color-coded month-over-month changes and summary columns (YTD %, Last Month %, From Start %)
 - Assets page reorganized from 5 separate tabs into 3 grouped tabs (Management, Current Year, Historical), each containing sub-tabs for Prices, Values, and Asset Class — easier to navigate between views while keeping the temporal grouping clear
 - Settings page is now organized into 4 tabs (Allocation, Preferences, Expenses, Dividends) — no more scrolling through a single long page
@@ -16,6 +26,8 @@
 - Fixed date filters on the Dividends page: setting only a start date (without an end date) now correctly filters the summary cards and charts. Previously, a single date bound was silently ignored
 
 ## 🔧 Improvements
+
+- Monthly chart Y-axis now shows actual values for small amounts (e.g. €25 instead of €0k)
 
 - Cashflow now shows an expense type breakdown (Fixed / Variable / Debt) pie chart in the filtered sections of both Current Year and Full History — the chart respects the active month or period filter, so it always reflects the selected time range
 - "Ripristina Default" button in Settings is now only shown in the Allocation tab where it is relevant

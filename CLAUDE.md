@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio
-- Ultima implementazione: **AI Analysis upgrade** — migrazione da Tavily a Claude native web search (`web_search_20250305`), modello aggiornato a `claude-sonnet-4-6`, prompt arricchito con `startNetWorth`/`endNetWorth` per decomposizione crescita organica vs apporti, dialog a due colonne con pannello metriche laterale, fix streaming (testo grezzo durante generazione). (2026-03-11)
+- Ultima implementazione: **Budget Tab** — nuovo tab Cashflow con auto-init da categorie, sezioni collassabili, vista annuale/mensile, entrate con colori invertiti, guida contestuale. (2026-03-11)
 - In corso ora: nessuna attività attiva
 
 ## Architecture Snapshot
@@ -17,6 +17,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Key Features (Active)
 - Portfolio multi-asset con aggiornamento prezzi Yahoo Finance (prezzo e average cost a 4 decimali). Asset con quantità zero supportati: badge "Azzerato" in tabella, esclusi dal conteggio overview, marcati "Venduto" nello storico. Bond con ISIN: scraping automatico prezzi da Borsa Italiana con fallback Yahoo Finance. **Bond coupon scheduling**: cedole auto-generate da `BondDetails` (tasso, frequenza, emissione, scadenza, valore nominale). **Step-up coupon**: `CouponRateTier[]` con fasce annuali di tasso (es. BTP Valore). **Premio finale**: `finalPremiumRate` genera dividend `finalPremium` su scadenza. **Tax hint 12.5%** per Titoli di Stato italiani. **Convenzione Borsa Italiana**: `currentPrice` e `averageCost` sempre in EUR; input utente in quotazione BI (per 100€ nominale) → convertito con `biPrice × (nominalValue/100)`; edit-mode mostra il valore back-convertito; `isBondPctMode` (ISIN + nominalValue > 1) controlla label/conversione/preview. **Costo Annuale Portfolio**: TER medio ponderato + imposta di bollo configurabile (aliquota %, esenzione per-asset, soglia >€5.000 per conti correnti).
+- **Budget Tab (Cashflow)**: auto-init items da tutte le categorie spesa/entrata; vista annuale con Budget/anno vs anno corrente/precedente/media storica e progress bar; vista mensile con bar chart grouped per categoria; sezioni collassabili; riordino items; add subcategory inline; sezione Entrate con colori invertiti; guida contestuale "Come leggere questa pagina". Firestore: `budgets/{userId}` doc singolo. 18 unit test.
 - Cashflow con categorie, filtri, Sankey 5-layer, drill-down 4 livelli, Analisi Periodo con filtri anno+mese. Bulk move transazioni tra categorie (cross-type, da Settings). **Cambio tipo categoria**: il tipo (`fixed`/`variable`/`debt`/`income`) è ora modificabile dopo la creazione; batch update su tutte le transazioni associate con inversione automatica dei segni se si attraversa il confine income ↔ spesa. **Linked cash account**: ogni transazione può essere collegata a un asset cash; il saldo (quantity) viene aggiornato automaticamente su create/edit/delete. **Conti di default** configurabili in Settings (separati per spese e entrate). **Anno inizio storico**: `cashflowHistoryStartYear` in Settings filtra i dati del tab Storico Totale (esclude import bulk pre-data); default 2025.
 - Snapshot mensili automatici + storico e CSV export.
 - **Pagina Assets — 3 macro-tab** (Gestione / Anno Corrente / Storico), ciascuno con sub-tab **Prezzi** / **Valori** / **Asset Class**. Lazy loading sui macro-tab. Tab Prezzi e Valori: aggregazione per nome e badge "Venduto"; colonne riepilogative Mese Prec. % (ambra), YTD % (blu, anno corrente), From Start % (viola, storico). Tab **Asset Class**: totali mensili EUR per classe (Azioni, Obbligazioni, Crypto, Immobili, Liquidità, Materie Prime) con stesse colonne sommario; dati da `snapshot.byAssetClass`. Logica in `assetPriceHistoryUtils.ts` e `assetClassHistoryUtils.ts`.
@@ -32,7 +33,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Testing
 - **Framework**: Vitest (`npm test`, `npm run test:watch`)
-- **201 unit test** across 8 files in `__tests__/` covering formatters, dateHelpers, fireService, performanceService, borsaItalianaBondScraper, goalService, couponUtils
+- **219 unit test** across 9 files in `__tests__/` covering formatters, dateHelpers, fireService, performanceService, borsaItalianaBondScraper, goalService, couponUtils, budgetService
 - **Scope**: Pure functions only (no Firebase mocking). Services need `vi.mock()` on Firebase-dependent imports.
 - **Config**: `vitest.config.ts` with `@/` path alias
 
@@ -51,7 +52,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Performance: `app/dashboard/performance/page.tsx`, `lib/services/performanceService.ts`, `types/performance.ts`
 - Performance API: `app/api/performance/yoc/route.ts`, `app/api/performance/current-yield/route.ts`
 - Performance UI: `components/performance/MonthlyReturnsHeatmap.tsx`, `UnderwaterDrawdownChart.tsx`, `MetricSection.tsx`
-- Cashflow: `components/cashflow/TotalHistoryTab.tsx`, `CurrentYearTab.tsx`, `CashflowSankeyChart.tsx`
+- Cashflow: `components/cashflow/TotalHistoryTab.tsx`, `CurrentYearTab.tsx`, `CashflowSankeyChart.tsx`, `BudgetTab.tsx`
+- Budget: `types/budget.ts`, `lib/services/budgetService.ts`, `__tests__/budgetService.test.ts`
 - Dividends: `components/dividends/DividendTrackingTab.tsx`, `DividendTable.tsx`, `DividendCalendar.tsx`
 - Hall of Fame: `app/dashboard/hall-of-fame/page.tsx`, `lib/services/hallOfFameService.ts`
 - FIRE: `components/fire-simulations/FireCalculatorTab.tsx`, `FIREProjectionSection.tsx`, `FIREProjectionChart.tsx`, `FIREProjectionTable.tsx`, `lib/services/fireService.ts`

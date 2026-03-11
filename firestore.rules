@@ -161,6 +161,19 @@ service cloud.firestore {
       allow delete: if isOwner(userId);
     }
 
+    // Collezione budgets - configurazione budget mensili dell'utente
+    match /budgets/{userId} {
+      // Read: use userId (doc ID) to allow reading non-existent documents (returns null)
+      allow read: if isOwner(userId);
+
+      // Write: only the owner can create/update/delete their budget config
+      allow create, update: if isOwner(userId) &&
+                               request.resource.data.userId == userId;
+
+      // Delete: only the owner
+      allow delete: if isOwner(userId);
+    }
+
     // Blocca tutto il resto per sicurezza
     match /{document=**} {
       allow read, write: if false;
