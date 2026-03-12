@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio
-- Ultima implementazione: **Budget footer split** — vista annuale mostra "Totale Spese" e "Totale Entrate" separati al posto di un unico totale privo di senso semantico. (2026-03-11)
+- Ultima implementazione: **Fix dividendi duplicati** — `createDividend()` usa ora ID deterministici (`{assetId}_{YYYY-MM-DD}_{dividendType}`) per i dividendi auto-generati, rendendo le scritture del cron idempotenti contro invocazioni concorrenti di Vercel. (2026-03-12)
 - In corso ora: nessuna attività attiva
 
 ## Architecture Snapshot
@@ -71,4 +71,4 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`, `components/pdf/PDFExportDialog.tsx`, `lib/utils/pdfTimeFilters.ts`, `lib/utils/pdfGenerator.tsx`
 - Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`, `borsaItalianaBondScraper.test.ts`, `goalService.test.ts`, `couponUtils.test.ts`
 
-**Last updated**: 2026-03-11 (session: Budget footer split — Totale Spese / Totale Entrate)
+**Last updated**: 2026-03-12 (session: Fix duplicate future dividends)
