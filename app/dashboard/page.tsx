@@ -35,7 +35,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Wallet, TrendingUp, PieChart, DollarSign, Camera, TrendingDown, Receipt } from 'lucide-react';
+import { Wallet, TrendingUp, PieChart, DollarSign, Camera, TrendingDown, Receipt, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useSnapshots, useCreateSnapshot } from '@/lib/hooks/useSnapshots';
@@ -93,6 +93,19 @@ export default function DashboardPage() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [existingSnapshot, setExistingSnapshot] = useState<MonthlySnapshot | null>(null);
   const [portfolioSettings, setPortfolioSettings] = useState<AssetAllocationSettings | null>(null);
+
+  // All three pie charts start expanded; on mobile the user can collapse them individually
+  // to reduce scroll length (~1050px of charts on portrait mobile)
+  const [expandedCharts, setExpandedCharts] = useState<Set<string>>(
+    new Set(['assetClass', 'asset', 'liquidity'])
+  );
+  const toggleChart = (id: string) => {
+    setExpandedCharts(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (user) {
@@ -357,11 +370,13 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    // pb-20 on portrait mobile compensates for the BottomNavigation bar (h-16 = 64px)
+    <div className="space-y-6 max-desktop:portrait:pb-20">
+      {/* Header stacks vertically on portrait mobile to prevent title/button overflow */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="mt-2 text-gray-600">
+          <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Dashboard</h1>
+          <p className="mt-1 text-gray-600 sm:mt-2">
             Panoramica del tuo portafoglio di investimenti
           </p>
         </div>
@@ -369,13 +384,15 @@ export default function DashboardPage() {
           onClick={handleCreateSnapshot}
           disabled={creatingSnapshot || portfolioMetrics.assetCount === 0}
           variant="default"
+          className="w-full sm:w-auto"
         >
           <Camera className="mr-2 h-4 w-4" />
           {creatingSnapshot ? 'Creazione...' : 'Crea Snapshot'}
         </Button>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {/* 3-col at desktop (1440px+); landscape phones get 3-col at md (768px+) */}
+      <div className="grid gap-6 md:grid-cols-2 landscape:md:grid-cols-3 desktop:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Patrimonio Totale Lordo</CardTitle>
@@ -652,35 +669,69 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle>Distribuzione per Asset Class</CardTitle>
+      {/* Pie charts — collapsible on mobile to reduce scroll length (~1050px on portrait) */}
+      <div className="space-y-6">
+        <Card>
+          <CardHeader
+            className="max-desktop:cursor-pointer"
+            onClick={() => toggleChart('assetClass')}
+          >
+            <div className="flex items-center justify-between">
+              <CardTitle>Distribuzione per Asset Class</CardTitle>
+              <ChevronDown
+                className={`h-4 w-4 transition-transform desktop:hidden ${
+                  expandedCharts.has('assetClass') ? 'rotate-180' : ''
+                }`}
+              />
+            </div>
           </CardHeader>
-          <CardContent>
-            <PieChartComponent data={chartData.assetClassData} />
-          </CardContent>
+          {expandedCharts.has('assetClass') && (
+            <CardContent>
+              <PieChartComponent data={chartData.assetClassData} />
+            </CardContent>
+          )}
         </Card>
 
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle>Distribuzione per Asset</CardTitle>
+        <Card>
+          <CardHeader
+            className="max-desktop:cursor-pointer"
+            onClick={() => toggleChart('asset')}
+          >
+            <div className="flex items-center justify-between">
+              <CardTitle>Distribuzione per Asset</CardTitle>
+              <ChevronDown
+                className={`h-4 w-4 transition-transform desktop:hidden ${
+                  expandedCharts.has('asset') ? 'rotate-180' : ''
+                }`}
+              />
+            </div>
           </CardHeader>
-          <CardContent>
-            <PieChartComponent data={chartData.assetData} />
-          </CardContent>
+          {expandedCharts.has('asset') && (
+            <CardContent>
+              <PieChartComponent data={chartData.assetData} />
+            </CardContent>
+          )}
         </Card>
-      </div>
 
-      {/* Liquidity Chart */}
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle>Liquidità Portfolio</CardTitle>
+        <Card>
+          <CardHeader
+            className="max-desktop:cursor-pointer"
+            onClick={() => toggleChart('liquidity')}
+          >
+            <div className="flex items-center justify-between">
+              <CardTitle>Liquidità Portfolio</CardTitle>
+              <ChevronDown
+                className={`h-4 w-4 transition-transform desktop:hidden ${
+                  expandedCharts.has('liquidity') ? 'rotate-180' : ''
+                }`}
+              />
+            </div>
           </CardHeader>
-          <CardContent>
-            <PieChartComponent data={chartData.liquidityData} />
-          </CardContent>
+          {expandedCharts.has('liquidity') && (
+            <CardContent>
+              <PieChartComponent data={chartData.liquidityData} />
+            </CardContent>
+          )}
         </Card>
       </div>
 

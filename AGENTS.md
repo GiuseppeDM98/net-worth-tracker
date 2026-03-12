@@ -17,7 +17,11 @@ For architecture and status, see [CLAUDE.md](CLAUDE.md).
 - **Why**: Server (UTC) and client (browser) produce same results
 
 ### Custom Tailwind Breakpoint
-- Use `desktop:` (1025px) instead of `lg:` (1024px), defined in `app/globals.css`
+- Use `desktop:` (1440px) instead of `lg:` (1024px), defined in `app/globals.css` (`--breakpoint-desktop: 1440px`)
+- Below 1440px = mobile/tablet — includes iPad Mini landscape (1024px)
+- Built-in orientation variants: `portrait:`, `landscape:`, compound `landscape:md:grid-cols-3`
+- **Never use `lg:`** — it's 1024px, which is the wrong threshold for this project
+- Bottom nav padding on portrait: `max-desktop:portrait:pb-20` on page root wrappers
 
 ---
 
