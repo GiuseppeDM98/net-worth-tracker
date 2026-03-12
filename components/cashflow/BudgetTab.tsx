@@ -28,7 +28,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Expense, ExpenseCategory, ExpenseType } from '@/types/expenses';
-import { BudgetItem, BudgetViewMode } from '@/types/budget';
+import { BudgetItem } from '@/types/budget';
 import { getBudgetConfig, saveBudgetConfig } from '@/lib/services/budgetService';
 import {
   buildBudgetComparison,
@@ -61,16 +61,6 @@ import {
   TableFooter,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts';
 import { Target, Plus, Trash2, Pencil, Save, X, Info, HelpCircle, ChevronUp, ChevronDown, ChevronRight } from 'lucide-react';
 import {
   Tooltip as UITooltip,
@@ -209,8 +199,7 @@ export function BudgetTab({
   const [savedItems, setSavedItems] = useState<BudgetItem[]>([]);
   const [budgetLoading, setBudgetLoading] = useState(true);
 
-  // View / edit mode
-  const [viewMode, setViewMode] = useState<BudgetViewMode>('annual');
+  // Edit mode
   const [isEditing, setIsEditing] = useState(false);
   const [draftItems, setDraftItems] = useState<BudgetItem[]>([]);
   const [saving, setSaving] = useState(false);
@@ -861,118 +850,6 @@ export function BudgetTab({
     );
   }
 
-  // ==================== View mode: Monthly charts ====================
-
-  function MonthlyCharts() {
-    const compMap = new Map(comparisons.map((c) => [c.item.id, c]));
-
-    // Aggregate Spese and Entrate monthly totals for the summary card at the top
-    const expComps = comparisons.filter((c) => (getItemSectionType(c.item, categories) as string) !== 'income');
-    const incComps = comparisons.filter((c) => (getItemSectionType(c.item, categories) as string) === 'income');
-    const totalExpBudgetMonthly = expComps.reduce((s, c) => s + c.item.monthlyAmount, 0);
-    const totalIncBudgetMonthly = incComps.reduce((s, c) => s + c.item.monthlyAmount, 0);
-    const summaryData = MONTH_LABELS.slice(0, currentMonth).map((month, i) => ({
-      month,
-      Spese: expComps.reduce((s, c) => s + c.currentYearMonthly[i], 0),
-      ...(incComps.length > 0 ? { Entrate: incComps.reduce((s, c) => s + c.currentYearMonthly[i], 0) } : {}),
-    }));
-    const hasSummaryData = summaryData.some((d) => d.Spese > 0);
-
-    return (
-      <div className="space-y-8">
-
-        {/* Summary card — aggregated Spese/Entrate per mese con linee budget totali */}
-        {hasSummaryData && (
-          <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/30 dark:bg-blue-950/10">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center justify-between flex-wrap gap-2">
-                <span>Riepilogo Mensile {currentYear}</span>
-                <div className="flex items-center gap-3 text-xs font-normal text-gray-500">
-                  {totalExpBudgetMonthly > 0 && (
-                    <span>Budget spese: <span className="font-medium text-gray-700 dark:text-gray-300">{formatCurrency(totalExpBudgetMonthly)}/mese</span></span>
-                  )}
-                  {totalIncBudgetMonthly > 0 && (
-                    <span>Budget entrate: <span className="font-medium text-gray-700 dark:text-gray-300">{formatCurrency(totalIncBudgetMonthly)}/mese</span></span>
-                  )}
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={summaryData} margin={{ top: 4, right: 12, bottom: 0, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => v === 0 ? '€0' : v < 1000 ? `€${Math.round(v)}` : `€${Math.round(v / 1000)}k`} width={52} />
-                  <Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={{ fontSize: 12 }} />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="Spese" fill="#3b82f6" radius={[2, 2, 0, 0]} />
-                  {incComps.length > 0 && <Bar dataKey="Entrate" fill="#22c55e" radius={[2, 2, 0, 0]} />}
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        )}
-
-        {SECTIONS.map(({ type: sectionType, label: sectionLabel, isIncome }) => {
-          const items = sectionItems(displayItems, sectionType);
-          if (items.length === 0) return null;
-
-          return (
-            <div key={sectionType} className="space-y-4">
-              <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 border-b pb-1">
-                {sectionLabel}
-              </h3>
-              {items.map((item) => {
-                const c = compMap.get(item.id);
-                if (!c) return null;
-
-                const hasHistory = c.historicalMonthlyAverage.some((v) => v > 0);
-                const hasPrevYear = c.previousYearMonthly.some((v) => v > 0);
-
-                const chartData = MONTH_LABELS.slice(0, currentMonth).map((month, i) => ({
-                  month,
-                  [String(currentYear)]: c.currentYearMonthly[i],
-                  ...(hasPrevYear ? { [String(currentYear - 1)]: c.previousYearMonthly[i] } : {}),
-                  ...(hasHistory ? { 'Media storica': c.historicalMonthlyAverage[i] } : {}),
-                }));
-
-                return (
-                  <Card key={item.id} className="border-gray-200 dark:border-gray-700">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm flex items-center justify-between flex-wrap gap-2">
-                        <span>{getItemLabel(item, categories)}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-normal text-gray-500">
-                            {formatCurrency(item.monthlyAmount)}/mese
-                          </span>
-                          <ProgressCell ratio={c.budgetUsedRatio} inverted={isIncome} />
-                        </div>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <ResponsiveContainer width="100%" height={200}>
-                        <BarChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                          <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                          <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => v === 0 ? '€0' : v < 1000 ? `€${Math.round(v)}` : `€${Math.round(v / 1000)}k`} width={52} />
-                          <Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={{ fontSize: 12 }} />
-                          <Legend wrapperStyle={{ fontSize: 12 }} />
-                          <Bar dataKey={String(currentYear)} fill="#3b82f6" radius={[2, 2, 0, 0]} />
-                          {hasPrevYear && <Bar dataKey={String(currentYear - 1)} fill="#f59e0b" radius={[2, 2, 0, 0]} />}
-                          {hasHistory && <Bar dataKey="Media storica" fill="#8b5cf6" radius={[2, 2, 0, 0]} />}
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-
   // ==================== Edit mode ====================
 
   function EditPanel() {
@@ -1246,83 +1123,47 @@ export function BudgetTab({
       {/* Edit panel */}
       {isEditing && <EditPanel />}
 
-      {/* View mode */}
+      {/* Annual table + deep dive */}
       {!isEditing && (
         <>
-          {/* View toggle + guide button */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 w-fit">
-              {(['annual', 'monthly'] as BudgetViewMode[]).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => { setViewMode(mode); setShowGuide(false); if (mode !== 'annual') setSelectedItemKey(null); }}
-                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                    viewMode === mode
-                      ? 'bg-white dark:bg-gray-700 shadow-sm font-medium'
-                      : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                  }`}
-                >
-                  {mode === 'annual' ? 'Annuale' : 'Mensile'}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setShowGuide((v) => !v)}
-              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-            >
-              <HelpCircle className="h-3.5 w-3.5" />
-              {showGuide ? 'Nascondi guida' : 'Come leggere questa pagina'}
-            </button>
-          </div>
+          {/* Guide toggle */}
+          <button
+            onClick={() => setShowGuide((v) => !v)}
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          >
+            <HelpCircle className="h-3.5 w-3.5" />
+            {showGuide ? 'Nascondi guida' : 'Come leggere questa pagina'}
+          </button>
 
           {/* Collapsible guide */}
           {showGuide && (
             <div className="rounded-lg border border-blue-200 bg-blue-50/60 dark:bg-blue-950/10 dark:border-blue-800 p-4 text-sm space-y-3">
-              {viewMode === 'annual' ? (
-                <>
-                  <p className="font-medium text-gray-700 dark:text-gray-300">Vista Annuale — come leggerla</p>
-                  <ul className="space-y-1.5 text-gray-600 dark:text-gray-400 text-xs list-disc list-inside">
-                    <li><span className="font-medium">Budget/anno</span> — il tetto annuale che hai impostato (budget/mese × 12). Di default corrisponde al totale speso l&apos;anno precedente.</li>
-                    <li><span className="font-medium text-blue-600 dark:text-blue-400">{currentYear}</span> — quanto hai speso finora nell&apos;anno corrente.</li>
-                    <li><span className="font-medium text-amber-600 dark:text-amber-400">{currentYear - 1}</span> — totale speso nello stesso periodo dell&apos;anno precedente.</li>
-                    <li><span className="font-medium">vs {currentYear - 1}</span> — variazione % rispetto all&apos;anno scorso (verde = stai spendendo meno, rosso = di più).</li>
-                    <li><span className="font-medium text-purple-600 dark:text-purple-400">Media storica</span> — media annuale dal {historyStartYear} al {currentYear - 1}.</li>
-                    <li><span className="font-medium">Avanzamento</span> — spesa corrente ÷ budget/anno. Verde &lt;80%, arancione 80–100%, rosso oltre.</li>
-                    <li>Clicca sull&apos;intestazione di una sezione per espanderla o collassarla.</li>
-                  </ul>
-                  <p className="text-xs text-gray-400">Per le <span className="font-medium">Entrate</span> i colori sono invertiti: verde = entrate in crescita.</p>
-                </>
-              ) : (
-                <>
-                  <p className="font-medium text-gray-700 dark:text-gray-300">Vista Mensile — come leggerla</p>
-                  <ul className="space-y-1.5 text-gray-600 dark:text-gray-400 text-xs list-disc list-inside">
-                    <li>Ogni card mostra una categoria con i mesi dell&apos;anno corrente sull&apos;asse X.</li>
-                    <li><span className="font-medium text-blue-600 dark:text-blue-400">Barre blu ({currentYear})</span> — spesa effettiva mese per mese.</li>
-                    <li><span className="font-medium text-amber-600 dark:text-amber-400">Barre arancioni ({currentYear - 1})</span> — stesso mese dell&apos;anno scorso, per confronto diretto.</li>
-                    <li><span className="font-medium text-purple-600 dark:text-purple-400">Barre viola (Media storica)</span> — media di quel mese negli anni dal {historyStartYear} al {currentYear - 1}.</li>
-                    <li>L&apos;<span className="font-medium">Avanzamento</span> in alto a destra mostra la % del budget annuale consumata finora.</li>
-                    <li>I mesi futuri non sono mostrati — il grafico si estende automaticamente con il passare del tempo.</li>
-                  </ul>
-                </>
-              )}
+              <p className="font-medium text-gray-700 dark:text-gray-300">Come leggere la tabella</p>
+              <ul className="space-y-1.5 text-gray-600 dark:text-gray-400 text-xs list-disc list-inside">
+                <li><span className="font-medium">Budget/anno</span> — il tetto annuale impostato (budget/mese × 12). Di default corrisponde al totale speso l&apos;anno precedente.</li>
+                <li><span className="font-medium text-blue-600 dark:text-blue-400">{currentYear}</span> — quanto hai speso finora nell&apos;anno corrente.</li>
+                <li><span className="font-medium text-amber-600 dark:text-amber-400">{currentYear - 1}</span> — totale speso nell&apos;anno precedente.</li>
+                <li><span className="font-medium">vs {currentYear - 1}</span> — variazione % rispetto all&apos;anno scorso (verde = stai spendendo meno, rosso = di più).</li>
+                <li><span className="font-medium text-purple-600 dark:text-purple-400">Media storica</span> — media annuale dal {historyStartYear} al {currentYear - 1}.</li>
+                <li><span className="font-medium">Avanzamento</span> — spesa corrente ÷ budget/anno. Verde &lt;80%, arancione 80–100%, rosso oltre.</li>
+                <li>Clicca sull&apos;intestazione di una sezione per espanderla o collassarla.</li>
+                <li>Clicca una voce per aprire l&apos;analisi storica anno per anno con dettaglio mensile.</li>
+              </ul>
+              <p className="text-xs text-gray-400">Per le <span className="font-medium">Entrate</span> i colori sono invertiti: verde = entrate in crescita.</p>
             </div>
           )}
 
           <Card>
             <CardContent className="pt-6">
-              {viewMode === 'annual' ? <AnnualTable /> : <MonthlyCharts />}
+              <AnnualTable />
             </CardContent>
           </Card>
 
-          {/* Deep dive panel — only visible in annual view after clicking a category row */}
-          {viewMode === 'annual' && <CategoryDeepDive />}
+          <CategoryDeepDive />
 
           <p className="text-xs text-gray-400 flex items-center gap-1">
             <Info className="h-3 w-3" />
-            Avanzamento calcolato sul budget annuale (budget/mese × 12).
-            {viewMode === 'annual' && (
-              <span> · Clicca una voce per vedere l&apos;analisi storica anno per anno.</span>
-            )}
+            Avanzamento calcolato sul budget annuale (budget/mese × 12). · Clicca una voce per l&apos;analisi storica mensile.
           </p>
         </>
       )}
