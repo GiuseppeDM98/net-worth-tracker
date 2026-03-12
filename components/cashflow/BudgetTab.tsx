@@ -28,13 +28,15 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Expense, ExpenseCategory, ExpenseType } from '@/types/expenses';
-import { BudgetItem, BudgetViewMode } from '@/types/budget';
+import { BudgetItem } from '@/types/budget';
 import { getBudgetConfig, saveBudgetConfig } from '@/lib/services/budgetService';
 import {
   buildBudgetComparison,
   getDefaultMonthlyAmount,
   autoInitBudgetItems,
   budgetItemKey,
+  getActualForItem,
+  getMonthlyActualsForItem,
 } from '@/lib/utils/budgetUtils';
 import { getItalyYear, getItalyMonth } from '@/lib/utils/dateHelpers';
 import { formatCurrency } from '@/lib/utils/formatters';
@@ -59,17 +61,7 @@ import {
   TableFooter,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts';
-import { Target, Plus, Trash2, Pencil, Save, X, Info, HelpCircle, ChevronUp, ChevronDown } from 'lucide-react';
+import { Target, Plus, Trash2, Pencil, Save, X, Info, HelpCircle, ChevronUp, ChevronDown, ChevronRight } from 'lucide-react';
 import {
   Tooltip as UITooltip,
   TooltipContent,
@@ -207,8 +199,7 @@ export function BudgetTab({
   const [savedItems, setSavedItems] = useState<BudgetItem[]>([]);
   const [budgetLoading, setBudgetLoading] = useState(true);
 
-  // View / edit mode
-  const [viewMode, setViewMode] = useState<BudgetViewMode>('annual');
+  // Edit mode
   const [isEditing, setIsEditing] = useState(false);
   const [draftItems, setDraftItems] = useState<BudgetItem[]>([]);
   const [saving, setSaving] = useState(false);
@@ -234,6 +225,10 @@ export function BudgetTab({
   // Tooltip open state for "Avanzamento" header
   const [progressTooltipOpen, setProgressTooltipOpen] = useState(false);
 
+  // Key of the budget item shown in the historical deep dive (null = hidden).
+  // Uses budgetItemKey() as stable identifier.
+  const [selectedItemKey, setSelectedItemKey] = useState<string | null>(null);
+
   // Load saved config on mount
   useEffect(() => {
     if (!userId) return;
@@ -242,6 +237,20 @@ export function BudgetTab({
       .catch(() => toast.error('Errore nel caricamento del budget'))
       .finally(() => setBudgetLoading(false));
   }, [userId]);
+
+  // Scroll to the deep dive panel shortly after it opens so the user sees it
+  // without losing context of which row they clicked. 100ms matches the
+  // CurrentYearTab pattern for post-DOM-update scroll timing.
+  useEffect(() => {
+    if (!selectedItemKey) return;
+    const timeout = setTimeout(() => {
+      document.getElementById('budget-deep-dive')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
+    }, 100);
+    return () => clearTimeout(timeout);
+  }, [selectedItemKey]);
 
   // Derive display items: auto-init merges saved amounts with live categories.
   // Runs on every render so new categories appear without an explicit save.
@@ -255,6 +264,30 @@ export function BudgetTab({
     () => displayItems.map((item) => buildBudgetComparison(item, allExpenses, currentYear, historyStartYear)),
     [displayItems, allExpenses, currentYear, historyStartYear]
   );
+
+  // Year-by-year breakdown for the selected item.
+  // Produces one row per year from historyStartYear to currentYear (newest first),
+  // with 12 monthly actuals so the deep dive table can render Gen–Dic columns.
+  const deepDiveData = useMemo(() => {
+    if (!selectedItemKey) return null;
+    const item = displayItems.find((i) => budgetItemKey(i) === selectedItemKey);
+    if (!item) return null;
+    const isIncome = (getItemSectionType(item, categories) as string) === 'income';
+    const years: number[] = [];
+    for (let y = historyStartYear; y <= currentYear; y++) years.push(y);
+    return {
+      item,
+      label: getItemLabel(item, categories),
+      isIncome,
+      // Newest year first — natural reading direction for historical tables
+      rows: [...years].reverse().map((year) => ({
+        year,
+        total: getActualForItem(item, allExpenses, year),
+        monthly: getMonthlyActualsForItem(item, allExpenses, year),
+        budgetAnnual: item.monthlyAmount * 12,
+      })),
+    };
+  }, [selectedItemKey, displayItems, allExpenses, historyStartYear, currentYear, categories]);
 
   // ==================== Grouping helpers ====================
 
@@ -270,6 +303,7 @@ export function BudgetTab({
   function handleStartEditing() {
     setDraftItems(displayItems.map((item) => ({ ...item })));
     setSubForm(null);
+    setSelectedItemKey(null);
     setIsEditing(true);
   }
 
@@ -526,10 +560,27 @@ export function BudgetTab({
                   {!isCollapsed && items.map((item) => {
                     const c = compMap.get(item.id);
                     if (!c) return null;
+                    const itemKey = budgetItemKey(item);
+                    const isSelected = selectedItemKey === itemKey;
                     return (
-                      <TableRow key={item.id} className="pl-4">
+                      <TableRow
+                        key={item.id}
+                        className={`pl-4 cursor-pointer transition-colors ${
+                          isSelected
+                            ? 'bg-blue-50/60 dark:bg-blue-950/20 hover:bg-blue-50/80 dark:hover:bg-blue-950/30'
+                            : 'hover:bg-muted/40'
+                        }`}
+                        onClick={() =>
+                          setSelectedItemKey((prev) => (prev === itemKey ? null : itemKey))
+                        }
+                      >
                         <TableCell className="pl-6 text-sm">
-                          {getItemLabel(item, categories)}
+                          <span className="flex items-center gap-1">
+                            {isSelected
+                              ? <ChevronDown className="h-3 w-3 text-blue-500 shrink-0" />
+                              : <ChevronRight className="h-3 w-3 text-gray-300 dark:text-gray-600 shrink-0" />}
+                            {getItemLabel(item, categories)}
+                          </span>
                         </TableCell>
                         <TableCell className="text-right tabular-nums text-sm">
                           {formatCurrency(item.monthlyAmount * 12)}
@@ -674,69 +725,127 @@ export function BudgetTab({
     );
   }
 
-  // ==================== View mode: Monthly charts ====================
+  // ==================== Category deep dive ====================
 
-  function MonthlyCharts() {
-    const compMap = new Map(comparisons.map((c) => [c.item.id, c]));
+  /**
+   * Historical deep dive panel, shown below the annual table when the user
+   * clicks a category row. Renders one row per year (newest first) with
+   * Jan–Dec columns so spending patterns across years are easy to compare.
+   *
+   * WHY inline rather than a modal: consistent with CurrentYearTab's inline
+   * drill-down pattern; keeps the user in context while viewing the main table.
+   */
+  function CategoryDeepDive() {
+    if (!deepDiveData) return null;
+    const { label, isIncome, rows } = deepDiveData;
 
     return (
-      <div className="space-y-8">
-        {SECTIONS.map(({ type: sectionType, label: sectionLabel, isIncome }) => {
-          const items = sectionItems(displayItems, sectionType);
-          if (items.length === 0) return null;
+      <div
+        id="budget-deep-dive"
+        className="rounded-lg border-2 border-blue-200 bg-blue-50/50 dark:bg-blue-950/10 dark:border-blue-800 p-4"
+      >
+        {/* Header with title and close button */}
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-sm text-blue-800 dark:text-blue-300">
+            Analisi Storica: {label}
+          </h3>
+          <button
+            onClick={() => setSelectedItemKey(null)}
+            aria-label="Chiudi analisi storica"
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
 
-          return (
-            <div key={sectionType} className="space-y-4">
-              <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 border-b pb-1">
-                {sectionLabel}
-              </h3>
-              {items.map((item) => {
-                const c = compMap.get(item.id);
-                if (!c) return null;
+        {/* Wide table — 12 month columns + totals. Scrolls horizontally on mobile. */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-blue-200 dark:border-blue-800">
+                <th className="text-left pr-3 py-1 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">Anno</th>
+                <th className="text-right pr-3 py-1 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">Budget</th>
+                {MONTH_LABELS.map((m) => (
+                  <th key={m} className="text-right px-1.5 py-1 font-medium text-gray-500 dark:text-gray-500 whitespace-nowrap">{m}</th>
+                ))}
+                <th className="text-right pl-3 py-1 font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">Totale</th>
+                <th className="text-right pl-2 py-1 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">vs Budget</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(({ year, total, monthly, budgetAnnual }) => {
+                const isCurrentYear = year === currentYear;
+                const ratio = budgetAnnual > 0 ? total / budgetAnnual : 0;
+                // Derive a text color from the same thresholds used elsewhere for consistency
+                const vsColorClass = total > 0 && budgetAnnual > 0
+                  ? progressColor(ratio, isIncome)
+                      .replace('bg-green-500', 'text-green-600 dark:text-green-500')
+                      .replace('bg-amber-500', 'text-amber-600 dark:text-amber-500')
+                      .replace('bg-red-500', 'text-red-600 dark:text-red-400')
+                  : 'text-gray-300 dark:text-gray-600';
 
-                const hasHistory = c.historicalMonthlyAverage.some((v) => v > 0);
-                const hasPrevYear = c.previousYearMonthly.some((v) => v > 0);
-
-                const chartData = MONTH_LABELS.slice(0, currentMonth).map((month, i) => ({
-                  month,
-                  [String(currentYear)]: c.currentYearMonthly[i],
-                  ...(hasPrevYear ? { [String(currentYear - 1)]: c.previousYearMonthly[i] } : {}),
-                  ...(hasHistory ? { 'Media storica': c.historicalMonthlyAverage[i] } : {}),
-                }));
+                // Identify the highest and lowest spending months for this year.
+                // Exclude future months and zero months — they don't carry real data.
+                // Skip highlight when fewer than 2 real months exist or all values are equal.
+                const realMonths = monthly
+                  .map((v, i) => ({ v, i }))
+                  .filter(({ v, i }) => !(isCurrentYear && i >= currentMonth) && v > 0);
+                const maxVal = realMonths.length >= 2 ? Math.max(...realMonths.map(({ v }) => v)) : null;
+                const minVal = realMonths.length >= 2 ? Math.min(...realMonths.map(({ v }) => v)) : null;
+                const highlightEnabled = maxVal !== null && minVal !== null && maxVal !== minVal;
 
                 return (
-                  <Card key={item.id} className="border-gray-200 dark:border-gray-700">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm flex items-center justify-between flex-wrap gap-2">
-                        <span>{getItemLabel(item, categories)}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-normal text-gray-500">
-                            {formatCurrency(item.monthlyAmount)}/mese
-                          </span>
-                          <ProgressCell ratio={c.budgetUsedRatio} />
-                        </div>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <ResponsiveContainer width="100%" height={200}>
-                        <BarChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                          <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                          <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => v === 0 ? '€0' : v < 1000 ? `€${Math.round(v)}` : `€${Math.round(v / 1000)}k`} width={52} />
-                          <Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={{ fontSize: 12 }} />
-                          <Legend wrapperStyle={{ fontSize: 12 }} />
-                          <Bar dataKey={String(currentYear)} fill="#3b82f6" radius={[2, 2, 0, 0]} />
-                          {hasPrevYear && <Bar dataKey={String(currentYear - 1)} fill="#f59e0b" radius={[2, 2, 0, 0]} />}
-                          {hasHistory && <Bar dataKey="Media storica" fill="#8b5cf6" radius={[2, 2, 0, 0]} />}
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
+                  <tr
+                    key={year}
+                    className={`border-b border-blue-100 dark:border-blue-900/50 ${
+                      isCurrentYear
+                        ? 'bg-blue-100/60 dark:bg-blue-900/30 font-medium'
+                        : 'hover:bg-blue-50/30 dark:hover:bg-blue-950/20'
+                    }`}
+                  >
+                    <td className="pr-3 py-1.5 tabular-nums whitespace-nowrap">
+                      {year}
+                      {/* Small marker so the current year stands out in a long list */}
+                      {isCurrentYear && <span className="ml-1 text-blue-500">◂</span>}
+                    </td>
+                    <td className="pr-3 py-1.5 text-right tabular-nums text-gray-500 whitespace-nowrap">
+                      {budgetAnnual > 0 ? formatCurrency(budgetAnnual) : '—'}
+                    </td>
+                    {monthly.map((v, i) => {
+                      // Future months in the current year haven't happened yet — show a dash
+                      const isFuture = isCurrentYear && i >= currentMonth;
+                      const isEmpty = isFuture || v === 0;
+                      // Max/min highlight: expenses use red=max, green=min; income inverts
+                      const isMax = !isEmpty && highlightEnabled && v === maxVal;
+                      const isMin = !isEmpty && highlightEnabled && v === minVal;
+                      const highlightClass = isMax
+                        ? (isIncome ? 'bg-green-100 dark:bg-green-900/30 font-semibold rounded' : 'bg-red-100 dark:bg-red-900/30 font-semibold rounded')
+                        : isMin
+                        ? (isIncome ? 'bg-red-100 dark:bg-red-900/30 font-semibold rounded' : 'bg-green-100 dark:bg-green-900/30 font-semibold rounded')
+                        : '';
+                      return (
+                        <td
+                          key={i}
+                          className={`px-1.5 py-1.5 text-right tabular-nums whitespace-nowrap ${
+                            isEmpty ? 'text-gray-300 dark:text-gray-600' : highlightClass
+                          }`}
+                        >
+                          {isEmpty ? '—' : formatCurrency(v)}
+                        </td>
+                      );
+                    })}
+                    <td className="pl-3 py-1.5 text-right tabular-nums font-semibold whitespace-nowrap">
+                      {total > 0 ? formatCurrency(total) : '—'}
+                    </td>
+                    <td className={`pl-2 py-1.5 text-right tabular-nums whitespace-nowrap ${vsColorClass}`}>
+                      {total > 0 && budgetAnnual > 0 ? `${Math.round(ratio * 100)}%` : '—'}
+                    </td>
+                  </tr>
                 );
               })}
-            </div>
-          );
-        })}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   }
@@ -1014,77 +1123,47 @@ export function BudgetTab({
       {/* Edit panel */}
       {isEditing && <EditPanel />}
 
-      {/* View mode */}
+      {/* Annual table + deep dive */}
       {!isEditing && (
         <>
-          {/* View toggle + guide button */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 w-fit">
-              {(['annual', 'monthly'] as BudgetViewMode[]).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => { setViewMode(mode); setShowGuide(false); }}
-                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                    viewMode === mode
-                      ? 'bg-white dark:bg-gray-700 shadow-sm font-medium'
-                      : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                  }`}
-                >
-                  {mode === 'annual' ? 'Annuale' : 'Mensile'}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setShowGuide((v) => !v)}
-              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-            >
-              <HelpCircle className="h-3.5 w-3.5" />
-              {showGuide ? 'Nascondi guida' : 'Come leggere questa pagina'}
-            </button>
-          </div>
+          {/* Guide toggle */}
+          <button
+            onClick={() => setShowGuide((v) => !v)}
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          >
+            <HelpCircle className="h-3.5 w-3.5" />
+            {showGuide ? 'Nascondi guida' : 'Come leggere questa pagina'}
+          </button>
 
           {/* Collapsible guide */}
           {showGuide && (
             <div className="rounded-lg border border-blue-200 bg-blue-50/60 dark:bg-blue-950/10 dark:border-blue-800 p-4 text-sm space-y-3">
-              {viewMode === 'annual' ? (
-                <>
-                  <p className="font-medium text-gray-700 dark:text-gray-300">Vista Annuale — come leggerla</p>
-                  <ul className="space-y-1.5 text-gray-600 dark:text-gray-400 text-xs list-disc list-inside">
-                    <li><span className="font-medium">Budget/anno</span> — il tetto annuale che hai impostato (budget/mese × 12). Di default corrisponde al totale speso l&apos;anno precedente.</li>
-                    <li><span className="font-medium text-blue-600 dark:text-blue-400">{currentYear}</span> — quanto hai speso finora nell&apos;anno corrente.</li>
-                    <li><span className="font-medium text-amber-600 dark:text-amber-400">{currentYear - 1}</span> — totale speso nello stesso periodo dell&apos;anno precedente.</li>
-                    <li><span className="font-medium">vs {currentYear - 1}</span> — variazione % rispetto all&apos;anno scorso (verde = stai spendendo meno, rosso = di più).</li>
-                    <li><span className="font-medium text-purple-600 dark:text-purple-400">Media storica</span> — media annuale dal {historyStartYear} al {currentYear - 1}.</li>
-                    <li><span className="font-medium">Avanzamento</span> — spesa corrente ÷ budget/anno. Verde &lt;80%, arancione 80–100%, rosso oltre.</li>
-                    <li>Clicca sull&apos;intestazione di una sezione per espanderla o collassarla.</li>
-                  </ul>
-                  <p className="text-xs text-gray-400">Per le <span className="font-medium">Entrate</span> i colori sono invertiti: verde = entrate in crescita.</p>
-                </>
-              ) : (
-                <>
-                  <p className="font-medium text-gray-700 dark:text-gray-300">Vista Mensile — come leggerla</p>
-                  <ul className="space-y-1.5 text-gray-600 dark:text-gray-400 text-xs list-disc list-inside">
-                    <li>Ogni card mostra una categoria con i mesi dell&apos;anno corrente sull&apos;asse X.</li>
-                    <li><span className="font-medium text-blue-600 dark:text-blue-400">Barre blu ({currentYear})</span> — spesa effettiva mese per mese.</li>
-                    <li><span className="font-medium text-amber-600 dark:text-amber-400">Barre arancioni ({currentYear - 1})</span> — stesso mese dell&apos;anno scorso, per confronto diretto.</li>
-                    <li><span className="font-medium text-purple-600 dark:text-purple-400">Barre viola (Media storica)</span> — media di quel mese negli anni dal {historyStartYear} al {currentYear - 1}.</li>
-                    <li>L&apos;<span className="font-medium">Avanzamento</span> in alto a destra mostra la % del budget annuale consumata finora.</li>
-                    <li>I mesi futuri non sono mostrati — il grafico si estende automaticamente con il passare del tempo.</li>
-                  </ul>
-                </>
-              )}
+              <p className="font-medium text-gray-700 dark:text-gray-300">Come leggere la tabella</p>
+              <ul className="space-y-1.5 text-gray-600 dark:text-gray-400 text-xs list-disc list-inside">
+                <li><span className="font-medium">Budget/anno</span> — il tetto annuale impostato (budget/mese × 12). Di default corrisponde al totale speso l&apos;anno precedente.</li>
+                <li><span className="font-medium text-blue-600 dark:text-blue-400">{currentYear}</span> — quanto hai speso finora nell&apos;anno corrente.</li>
+                <li><span className="font-medium text-amber-600 dark:text-amber-400">{currentYear - 1}</span> — totale speso nell&apos;anno precedente.</li>
+                <li><span className="font-medium">vs {currentYear - 1}</span> — variazione % rispetto all&apos;anno scorso (verde = stai spendendo meno, rosso = di più).</li>
+                <li><span className="font-medium text-purple-600 dark:text-purple-400">Media storica</span> — media annuale dal {historyStartYear} al {currentYear - 1}.</li>
+                <li><span className="font-medium">Avanzamento</span> — spesa corrente ÷ budget/anno. Verde &lt;80%, arancione 80–100%, rosso oltre.</li>
+                <li>Clicca sull&apos;intestazione di una sezione per espanderla o collassarla.</li>
+                <li>Clicca una voce per aprire l&apos;analisi storica anno per anno con dettaglio mensile.</li>
+              </ul>
+              <p className="text-xs text-gray-400">Per le <span className="font-medium">Entrate</span> i colori sono invertiti: verde = entrate in crescita.</p>
             </div>
           )}
 
           <Card>
             <CardContent className="pt-6">
-              {viewMode === 'annual' ? <AnnualTable /> : <MonthlyCharts />}
+              <AnnualTable />
             </CardContent>
           </Card>
 
+          <CategoryDeepDive />
+
           <p className="text-xs text-gray-400 flex items-center gap-1">
             <Info className="h-3 w-3" />
-            Avanzamento calcolato sul budget annuale (budget/mese × 12).
+            Avanzamento calcolato sul budget annuale (budget/mese × 12). · Clicca una voce per l&apos;analisi storica mensile.
           </p>
         </>
       )}
