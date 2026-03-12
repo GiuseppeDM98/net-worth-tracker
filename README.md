@@ -133,7 +133,7 @@ See [`.env.local.example`](.env.local.example) for detailed comments on each var
 │  Firebase Auth  │  Firestore DB     │
 └─────────────────┴───────────────────┘
          External APIs:
-   Yahoo Finance · Frankfurter · Borsa Italiana · Anthropic · Tavily
+   Yahoo Finance · Frankfurter · Borsa Italiana · Anthropic
 ```
 
 **Key design patterns:**
@@ -178,7 +178,7 @@ npm run test:watch # Run tests in watch mode
 
 - **UI language**: Italian
 - **Code language**: English (comments explain WHY, not WHAT — see [COMMENTS.md](COMMENTS.md))
-- **Responsive breakpoint**: `desktop:` (1025px) instead of Tailwind's default `lg:`
+- **Responsive breakpoint**: `desktop:` (1440px) instead of Tailwind's default `lg:`
 - **Radix Select**: No empty string values — use sentinel values like `__all__`
 - **Settings changes**: Always update type definition + getter + setter together
 

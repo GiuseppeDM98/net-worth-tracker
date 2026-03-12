@@ -45,3 +45,8 @@
 - Overview (Dashboard) page is now optimized for mobile: the header title and "Create Snapshot" button stack vertically on portrait to prevent overflow; the button spans full width for easier tapping
 - Overview distribution charts (Asset Class, Asset, Liquidity) are now collapsible on mobile — tap the header to expand or collapse each chart, reducing the page scroll from ~1050px of charts to three compact headers by default
 - Overview metric cards now correctly display in 3 columns on landscape phones (previously only 2 columns despite available space)
+- Assets page is now fully optimized for mobile: section navigation uses a styled dropdown (instead of icon-only tabs that were unreadable on small screens), asset cards display in 2 columns on landscape phones to reduce scrolling, and action buttons ("Edit", "Delete", "Calculate Taxes") now meet the 44px minimum touch target size
+- Assets page historical tables (Prices, Values, Asset Class) are now more readable on mobile — reduced cell padding and font size so more months are visible without horizontal scrolling
+- A "best viewed on desktop" banner appears on the Current Year and Historical sections on mobile, since dense monthly data tables are designed for larger screens
+- Assets page now correctly reserves space for the bottom navigation bar on portrait mobile (content was previously cut off)
+- Asset cards now use a 2-row button layout: "Calculate Taxes" as a full-width button on top (when available), with "Edit" and "Delete" side-by-side below — eliminates cramped 3-button rows on narrow screens

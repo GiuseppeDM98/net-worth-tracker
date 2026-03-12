@@ -88,7 +88,7 @@ export function AssetClassHistoryTable({
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
             Asset Class {filterYear ?? 'Storico'}
           </h2>
           <p className="text-sm text-gray-600">
@@ -102,7 +102,7 @@ export function AssetClassHistoryTable({
       </div>
 
       {/* Table container */}
-      <div className="overflow-x-auto max-h-[600px] border rounded-lg">
+      <div className="overflow-x-auto max-h-[600px] border rounded-lg text-xs sm:text-sm">
         {rows.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-gray-500">
             <p className="text-lg font-semibold">Nessun dato storico disponibile</p>
@@ -115,30 +115,30 @@ export function AssetClassHistoryTable({
             <TableHeader className="sticky top-0 bg-white z-20">
               <TableRow>
                 {/* Sticky first column */}
-                <TableHead className="sticky left-0 bg-white z-10 min-w-[180px] border-r">
+                <TableHead className="sticky left-0 bg-white z-10 min-w-[130px] sm:min-w-[180px] border-r">
                   Asset Class
                 </TableHead>
                 {/* Month columns */}
                 {monthColumns.map((month) => (
-                  <TableHead key={month.key} className="text-right min-w-[120px]">
+                  <TableHead key={month.key} className="text-right min-w-[80px] sm:min-w-[120px]">
                     {month.label}
                   </TableHead>
                 ))}
                 {/* Mese Prec. % — only for year filter */}
                 {filterYear !== undefined && (
-                  <TableHead className="text-right min-w-[100px] bg-amber-50 border-l-2 border-amber-300">
+                  <TableHead className="text-right min-w-[70px] sm:min-w-[100px] bg-amber-50 border-l-2 border-amber-300">
                     Mese Prec. %
                   </TableHead>
                 )}
                 {/* YTD — only for year filter */}
                 {filterYear !== undefined && (
-                  <TableHead className="text-right min-w-[100px] bg-blue-50 border-l-2 border-blue-300">
+                  <TableHead className="text-right min-w-[70px] sm:min-w-[100px] bg-blue-50 border-l-2 border-blue-300">
                     YTD %
                   </TableHead>
                 )}
                 {/* From Start % — only for date filter */}
                 {filterStartDate !== undefined && (
-                  <TableHead className="text-right min-w-[100px] bg-purple-50 border-l-2 border-purple-300">
+                  <TableHead className="text-right min-w-[70px] sm:min-w-[100px] bg-purple-50 border-l-2 border-purple-300">
                     From Start %
                   </TableHead>
                 )}
@@ -196,21 +196,21 @@ export function AssetClassHistoryTable({
 
                   {/* Mese Prec. % */}
                   {filterYear !== undefined && (
-                    <TableCell className="text-right min-w-[100px] bg-amber-50 border-l-2 border-amber-300">
+                    <TableCell className="text-right min-w-[70px] sm:min-w-[100px] bg-amber-50 border-l-2 border-amber-300">
                       <PercentCell value={row.lastMonthChange} />
                     </TableCell>
                   )}
 
                   {/* YTD % */}
                   {filterYear !== undefined && (
-                    <TableCell className="text-right min-w-[100px] bg-blue-50 border-l-2 border-blue-300">
+                    <TableCell className="text-right min-w-[70px] sm:min-w-[100px] bg-blue-50 border-l-2 border-blue-300">
                       <PercentCell value={row.ytd} />
                     </TableCell>
                   )}
 
                   {/* From Start % */}
                   {filterStartDate !== undefined && (
-                    <TableCell className="text-right min-w-[100px] bg-purple-50 border-l-2 border-purple-300">
+                    <TableCell className="text-right min-w-[70px] sm:min-w-[100px] bg-purple-50 border-l-2 border-purple-300">
                       <PercentCell value={row.fromStart} />
                     </TableCell>
                   )}

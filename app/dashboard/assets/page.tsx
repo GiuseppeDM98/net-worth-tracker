@@ -29,7 +29,8 @@ import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Wallet, CalendarClock, History } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Wallet, CalendarClock, History, Monitor } from 'lucide-react';
 import { AssetManagementTab } from '@/components/assets/AssetManagementTab';
 import { AssetPriceHistoryTable } from '@/components/assets/AssetPriceHistoryTable';
 import { AssetClassHistoryTable } from '@/components/assets/AssetClassHistoryTable';
@@ -71,27 +72,42 @@ export default function AssetsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-desktop:portrait:pb-20">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Assets</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Assets</h1>
         <p className="mt-2 text-gray-600">Gestisci e monitora i tuoi asset di investimento</p>
       </div>
 
       {/* Outer tabs: 3 macro-tabs */}
       <Tabs defaultValue="management" value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <div className="overflow-x-auto">
-          <TabsList className="inline-flex min-w-full desktop:w-auto desktop:grid desktop:grid-cols-3">
-            <TabsTrigger value="management" className="flex items-center gap-2 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-4">
+        {/* Mobile (< 1440px): Radix Select for section switching */}
+        <div className="desktop:hidden mb-4">
+          <Select value={activeTab} onValueChange={handleTabChange}>
+            <SelectTrigger className="w-full h-12 text-base">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="management">Gestione Asset</SelectItem>
+              <SelectItem value="anno-corrente">Anno Corrente</SelectItem>
+              <SelectItem value="storico">Storico</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Desktop (1440px+): standard tab list */}
+        <div className="hidden desktop:block mb-4">
+          <TabsList className="grid grid-cols-3 w-auto">
+            <TabsTrigger value="management" className="flex items-center gap-2 text-sm px-4">
               <Wallet className="h-4 w-4" />
-              <span className="hidden sm:inline">Gestione Asset</span>
+              Gestione Asset
             </TabsTrigger>
-            <TabsTrigger value="anno-corrente" className="flex items-center gap-2 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-4">
+            <TabsTrigger value="anno-corrente" className="flex items-center gap-2 text-sm px-4">
               <CalendarClock className="h-4 w-4" />
-              <span className="hidden sm:inline">Anno Corrente</span>
+              Anno Corrente
             </TabsTrigger>
-            <TabsTrigger value="storico" className="flex items-center gap-2 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-4">
+            <TabsTrigger value="storico" className="flex items-center gap-2 text-sm px-4">
               <History className="h-4 w-4" />
-              <span className="hidden sm:inline">Storico</span>
+              Storico
             </TabsTrigger>
           </TabsList>
         </div>
@@ -104,6 +120,11 @@ export default function AssetsPage() {
         {/* Macro-tab 2: Anno Corrente (lazy-loaded) — sub-tabs: Prezzi, Valori, Asset Class */}
         {mountedTabs.has('anno-corrente') && (
           <TabsContent value="anno-corrente" className="mt-6">
+            {/* Desktop recommended banner — hidden on 1440px+ where the table is fully usable */}
+            <div className="desktop:hidden flex items-center gap-2 mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700 dark:border-blue-800 dark:bg-blue-950/20 dark:text-blue-400">
+              <Monitor className="h-4 w-4 shrink-0" />
+              <span>Per una migliore esperienza si consiglia la visualizzazione su desktop.</span>
+            </div>
             <Tabs defaultValue="prezzi" className="w-full">
               <TabsList className="grid grid-cols-3 mb-4">
                 <TabsTrigger value="prezzi" className="text-xs sm:text-sm">
@@ -156,6 +177,11 @@ export default function AssetsPage() {
         {/* Macro-tab 3: Storico (lazy-loaded) — sub-tabs: Prezzi, Valori, Asset Class */}
         {mountedTabs.has('storico') && (
           <TabsContent value="storico" className="mt-6">
+            {/* Desktop recommended banner — hidden on 1440px+ where the table is fully usable */}
+            <div className="desktop:hidden flex items-center gap-2 mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700 dark:border-blue-800 dark:bg-blue-950/20 dark:text-blue-400">
+              <Monitor className="h-4 w-4 shrink-0" />
+              <span>Per una migliore esperienza si consiglia la visualizzazione su desktop.</span>
+            </div>
             <Tabs defaultValue="prezzi" className="w-full">
               <TabsList className="grid grid-cols-3 mb-4">
                 <TabsTrigger value="prezzi" className="text-xs sm:text-sm">

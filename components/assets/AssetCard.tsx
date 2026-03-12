@@ -260,7 +260,7 @@ export function AssetCard({
         {/* Toggle dettagli */}
         <Button
           variant="ghost"
-          size="sm"
+          size="default"
           onClick={() => setShowDetails(!showDetails)}
           className="w-full mb-3"
         >
@@ -275,41 +275,43 @@ export function AssetCard({
           )}
         </Button>
 
-        {/* Action buttons */}
-        <div className="flex gap-2">
+        {/* Action buttons — 2-row layout: Tasse full-width (if present) + Modifica/Elimina side-by-side */}
+        <div className="flex flex-col gap-2">
           {onCalculateTaxes && (
             <Button
               variant="outline"
-              size="sm"
+              size="default"
               onClick={() => onCalculateTaxes(asset)}
-              className="flex-1"
+              className="w-full"
             >
-              <Calculator className="mr-2 h-4 w-4 text-blue-600" />
-              Tasse
+              <Calculator className="h-4 w-4 text-blue-600" />
+              Calcola Tasse
             </Button>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onEdit(asset)}
-            className="flex-1"
-          >
-            <Pencil className="mr-2 h-4 w-4" />
-            Modifica
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (confirm('Sei sicuro di voler eliminare questo asset?')) {
-                onDelete(asset.id);
-              }
-            }}
-            className="flex-1"
-          >
-            <Trash2 className="mr-2 h-4 w-4 text-red-500" />
-            Elimina
-          </Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant="outline"
+              size="default"
+              onClick={() => onEdit(asset)}
+              className="w-full"
+            >
+              <Pencil className="h-4 w-4" />
+              Modifica
+            </Button>
+            <Button
+              variant="outline"
+              size="default"
+              onClick={() => {
+                if (confirm('Sei sicuro di voler eliminare questo asset?')) {
+                  onDelete(asset.id);
+                }
+              }}
+              className="w-full"
+            >
+              <Trash2 className="h-4 w-4 text-red-500" />
+              Elimina
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

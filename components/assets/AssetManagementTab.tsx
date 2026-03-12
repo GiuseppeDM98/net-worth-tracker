@@ -240,25 +240,25 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
 
   return (
     <div className="space-y-6">
-      {/* Header with action buttons */}
-      <div className="flex items-center justify-between">
+      {/* Header with action buttons — stacks vertically on portrait, row on landscape/desktop */}
+      <div className="flex flex-col gap-3 landscape:flex-row landscape:items-center landscape:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Gestione Asset</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Gestione Asset</h2>
           <p className="mt-1 text-sm text-gray-600">
             Gestisci i tuoi asset di investimento
           </p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-col landscape:flex-row gap-2">
           <Button
             variant="outline"
             onClick={handleUpdatePrices}
             disabled={updating || assets.length === 0}
-            className="w-full sm:w-auto"
+            className="w-full landscape:w-auto"
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${updating ? 'animate-spin' : ''}`} />
             Aggiorna Prezzi
           </Button>
-          <Button onClick={() => setDialogOpen(true)} className="w-full sm:w-auto">
+          <Button onClick={() => setDialogOpen(true)} className="w-full landscape:w-auto">
             <Plus className="mr-2 h-4 w-4" />
             Aggiungi Asset
           </Button>
@@ -323,8 +323,8 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
             </div>
           ) : (
             <>
-              {/* Mobile Card Layout */}
-              <div className="md:hidden space-y-4 pt-4">
+              {/* Mobile/Tablet Card Layout (< 1440px) */}
+              <div className="desktop:hidden grid grid-cols-1 gap-4 landscape:grid-cols-2 pt-4">
                 {assets.map((asset) => (
                   <AssetCard
                     key={asset.id}
@@ -338,8 +338,8 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
                 ))}
               </div>
 
-              {/* Desktop Table Layout */}
-              <div className="hidden md:block overflow-x-auto">
+              {/* Desktop Table Layout (1440px+) */}
+              <div className="hidden desktop:block overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
