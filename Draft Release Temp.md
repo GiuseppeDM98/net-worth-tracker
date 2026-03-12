@@ -3,7 +3,8 @@
 - Added **Budget** tab to Cashflow page with automatic budget tracking for all expense categories
 - Budget items auto-generated from your categories (Fixed Expenses, Variable, Debt, Income) — no manual setup required
 - Annual view: compare current year spending vs budget, previous year, and historical average with color-coded progress bars
-- Monthly view: per-category bar charts showing current year vs previous year vs historical average
+- **Category deep dive**: click any category row in the annual view to open a historical panel — a year × month table spanning all available years, so you can spot seasonal patterns across all your history at a glance
+- Highest and lowest spending month per year are highlighted in the deep dive (red/green, inverted for Income) — no manual scanning needed
 - Collapsible sections — click any section header to expand or collapse
 - Reorder budget items within sections using up/down arrows
 - Add subcategory-level budget items for more granular tracking
@@ -30,8 +31,6 @@
 ## 🔧 Improvements
 
 - Budget annual view now shows separate **Total Expenses** and **Total Income** rows in the footer, each with their own year-over-year delta and progress bar — previously a single combined total mixed expenses and income together, producing a meaningless number
-- Monthly chart Y-axis now shows actual values for small amounts (e.g. €25 instead of €0k)
-
 - Cashflow now shows an expense type breakdown (Fixed / Variable / Debt) pie chart in the filtered sections of both Current Year and Full History — the chart respects the active month or period filter, so it always reflects the selected time range
 - "Ripristina Default" button in Settings is now only shown in the Allocation tab where it is relevant
 - Settings tabs use lazy loading — only the default tab (Allocation) renders on page load
