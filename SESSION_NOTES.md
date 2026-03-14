@@ -24,3 +24,12 @@ Riduzione totale stimata: ~206px → tabella ~1220px su 1440px disponibili.
 
 ### Test
 - 219 unit test: tutti passati (nessuna modifica logica, solo layout)
+
+---
+
+### Fix post-sessione (2026-03-14)
+
+#### `components/assets/AssetManagementTab.tsx`
+- **Cosa**: ripristinato l'orario nella colonna "Aggiornato" (`dd/MM/yyyy HH:mm` invece di solo `dd/MM/yyyy`).
+- **Perché**: l'orario è necessario per verificare la corretta esecuzione del cron job di aggiornamento prezzi; rimuoverlo rendeva impossibile capire se il job era girato o meno.
+- **Nota**: il risparmio di ~40px stimato nella sessione precedente viene parzialmente perso (~20px), ma la tabella rimane comunque entro i 1440px disponibili.
