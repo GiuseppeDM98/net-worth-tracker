@@ -244,4 +244,4 @@ ALL fields in settings types must be handled in THREE places:
 - **Use `grid grid-cols-N`** instead: each cell has a fixed equal width, button fills with `w-full`, centering is guaranteed
 - For conditional buttons (e.g. optional "Tasse"): 2-row layout — optional full-width button on top, fixed 2-col grid below
 
-**Last updated**: 2026-03-12 (session: Mobile UI Assets Page)
+**Last updated**: 2026-03-14 (session: Assets Table Aggiornato time restore)

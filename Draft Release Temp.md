@@ -50,3 +50,4 @@
 - A "best viewed on desktop" banner appears on the Current Year and Historical sections on mobile, since dense monthly data tables are designed for larger screens
 - Assets page now correctly reserves space for the bottom navigation bar on portrait mobile (content was previously cut off)
 - Asset cards now use a 2-row button layout: "Calculate Taxes" as a full-width button on top (when available), with "Edit" and "Delete" side-by-side below — eliminates cramped 3-button rows on narrow screens
+- The "Last Updated" column in the Assets table now shows the exact time alongside the date, making it easy to confirm that the automatic daily price update ran as expected

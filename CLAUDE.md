@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio
-- Ultima implementazione: **Mobile UI Assets Page** — Radix Select per navigazione macro-tab su mobile, `desktop:hidden` per card view sotto 1440px, landscape 2-col grid, touch target 44px, tabelle storiche compatte, banner "si consiglia desktop". (2026-03-12)
+- Ultima implementazione: **Assets Table "Aggiornato" time restore** — ripristinato orario `HH:mm` nella colonna "Aggiornato" (era stato rimosso nell'ottimizzazione desktop); necessario per verificare la corretta esecuzione del cron job giornaliero. (2026-03-14)
 - In corso ora: nessuna attività attiva
 
 ## Architecture Snapshot
@@ -71,4 +71,4 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`, `components/pdf/PDFExportDialog.tsx`, `lib/utils/pdfTimeFilters.ts`, `lib/utils/pdfGenerator.tsx`
 - Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`, `borsaItalianaBondScraper.test.ts`, `goalService.test.ts`, `couponUtils.test.ts`
 
-**Last updated**: 2026-03-12 (session: Mobile UI Assets Page)
+**Last updated**: 2026-03-14 (session: Assets Table Aggiornato time restore)
