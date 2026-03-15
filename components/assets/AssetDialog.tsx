@@ -60,7 +60,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Plus, X } from 'lucide-react';
+import { Calculator, Plus, X } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 
 /**
@@ -171,6 +171,8 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
   const [showTER, setShowTER] = useState(false);
   const [showBondDetails, setShowBondDetails] = useState(false);
   const [showStepUp, setShowStepUp] = useState(false);
+  const [showCostCalculator, setShowCostCalculator] = useState(false);
+  const [brokerEntries, setBrokerEntries] = useState<{ qty: string; price: string }[]>([{ qty: '', price: '' }]);
   const {
     register,
     handleSubmit,
@@ -350,6 +352,10 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
       // Set showTER state based on asset data
       setShowTER(!!(asset.totalExpenseRatio && asset.totalExpenseRatio > 0));
 
+      // Reset calculator on every open to avoid stale data from previous session
+      setShowCostCalculator(false);
+      setBrokerEntries([{ qty: '', price: '' }]);
+
       // Set bond details state and pre-fill form fields
       setShowBondDetails(!!asset.bondDetails);
       if (asset.bondDetails) {
@@ -400,6 +406,8 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
       setShowTER(false);
       setShowBondDetails(false);
       setShowStepUp(false);
+      setShowCostCalculator(false);
+      setBrokerEntries([{ qty: '', price: '' }]);
     }
   }, [asset, reset]);
 
@@ -498,6 +506,22 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
     }
 
     return true;
+  };
+
+  // Weighted average cost across multiple broker positions.
+  // Returns null when no valid (qty > 0, price > 0) entries exist.
+  const calcWeightedAvg = (): number | null => {
+    let totalQty = 0;
+    let totalCost = 0;
+    for (const e of brokerEntries) {
+      const q = parseFloat(e.qty);
+      const p = parseFloat(e.price);
+      if (!isNaN(q) && q > 0 && !isNaN(p) && p > 0) {
+        totalQty += q;
+        totalCost += q * p;
+      }
+    }
+    return totalQty > 0 ? totalCost / totalQty : null;
   };
 
   /**
@@ -1489,11 +1513,26 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
               <div className="mt-4 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="averageCost">
-                      {isBondPctMode
-                        ? 'Prezzo di Carico (quotazione Borsa Italiana)'
-                        : `Costo Medio per Azione (${watch('currency')})`}
-                    </Label>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="averageCost">
+                        {isBondPctMode
+                          ? 'Prezzo di Carico (quotazione Borsa Italiana)'
+                          : `Costo Medio per Azione (${watch('currency')})`}
+                      </Label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowCostCalculator((prev) => !prev);
+                          if (!showCostCalculator) {
+                            setBrokerEntries([{ qty: '', price: '' }]);
+                          }
+                        }}
+                        className="flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                      >
+                        <Calculator className="h-3.5 w-3.5" />
+                        Calcola PMC
+                      </button>
+                    </div>
                     <Input
                       id="averageCost"
                       type="number"
@@ -1521,6 +1560,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                         </p>
                       );
                     })()}
+
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="taxRate">Aliquota Fiscale (%)</Label>
@@ -1550,6 +1590,87 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                     )}
                   </div>
                 </div>
+
+                {/* Inline multi-broker PMC calculator — full width, outside the 2-col grid */}
+                {showCostCalculator && (
+                  <div className="rounded-md border bg-muted/30 p-4 space-y-3">
+                    <p className="text-sm font-medium">Calcola il costo medio ponderato da più broker</p>
+
+                    <div className="space-y-2">
+                      {brokerEntries.map((entry, idx) => (
+                        <div key={idx} className="grid grid-cols-[1fr_1fr_auto] gap-3 items-center">
+                          <Input
+                            type="number"
+                            step="0.0001"
+                            min="0"
+                            placeholder="Quantità"
+                            value={entry.qty}
+                            onChange={(e) => {
+                              const updated = [...brokerEntries];
+                              updated[idx] = { ...updated[idx], qty: e.target.value };
+                              setBrokerEntries(updated);
+                            }}
+                          />
+                          <Input
+                            type="number"
+                            step="0.0001"
+                            min="0"
+                            placeholder={isBondPctMode ? 'Prezzo BI' : `Prezzo (${watch('currency')})`}
+                            value={entry.price}
+                            onChange={(e) => {
+                              const updated = [...brokerEntries];
+                              updated[idx] = { ...updated[idx], price: e.target.value };
+                              setBrokerEntries(updated);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setBrokerEntries(brokerEntries.filter((_, i) => i !== idx))}
+                            className={`text-muted-foreground hover:text-destructive transition-colors ${brokerEntries.length <= 1 ? 'invisible' : ''}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => setBrokerEntries([...brokerEntries, { qty: '', price: '' }])}
+                        className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                      >
+                        <Plus className="h-3 w-3" />
+                        Aggiungi broker
+                      </button>
+
+                      {(() => {
+                        const avg = calcWeightedAvg();
+                        if (avg === null) {
+                          return <span className="text-xs text-muted-foreground">Inserisci almeno una riga valida</span>;
+                        }
+                        return (
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-semibold">
+                              PMC: {avg.toLocaleString('it-IT', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
+                              {isBondPctMode ? '' : ` ${watch('currency')}`}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setValue('averageCost', parseFloat(avg.toFixed(4)));
+                                setShowCostCalculator(false);
+                              }}
+                              className="text-sm bg-primary text-primary-foreground rounded px-3 py-1 hover:opacity-90"
+                            >
+                              Usa
+                            </button>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

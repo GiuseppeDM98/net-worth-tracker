@@ -59,3 +59,4 @@
 - Asset Management table on desktop no longer shows the "Type" column — the Asset Class badge already conveys this visually, and removing it frees up horizontal space
 - Long asset names in the Management table are now truncated at a fixed width with a tooltip on hover, preventing the table from expanding unpredictably
 - The "Add / Edit Asset" dialog no longer overflows horizontally on narrow mobile screens (~375px) when subcategories are enabled — the composition row now wraps gracefully
+- Added a **weighted average cost calculator** to the Add / Edit Asset form — click "Calcola PMC" next to the Average Cost field to open an inline calculator where you can enter your holdings broker by broker (quantity + price per broker); the weighted PMC is computed live and a single click fills the field. Useful when you hold the same asset across multiple brokers at different purchase prices

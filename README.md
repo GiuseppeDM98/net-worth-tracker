@@ -20,7 +20,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Multi-asset tracking across stocks, ETFs, bonds, crypto, real estate, commodities, and cash
 - Automatic price updates via Yahoo Finance (all assets) and Borsa Italiana (Italian bonds with ISIN)
 - Bond coupon scheduling: automatic coupon generation with step-up rate tiers and final premium (Premio Finale) support — full BTP Valore compatible
-- Average cost tracking with 4-decimal precision
+- Average cost tracking with 4-decimal precision, including a built-in multi-broker PMC calculator for positions spread across multiple brokers
 - Current vs target asset allocation visualization
 
 ### Performance Analytics

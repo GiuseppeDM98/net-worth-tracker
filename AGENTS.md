@@ -255,6 +255,20 @@ ALL fields in settings types must be handled in THREE places:
 </div>
 ```
 
+### Controlled Numeric Inputs — Use String State
+**Symptom**: Controlled `<input type="number">` shows `NaN` or `0` when the user clears the field.
+**Cause**: Storing state as `number` means an empty field becomes `NaN`, which React renders as an empty string but the next `onChange` reads back as `NaN`, causing a feedback loop.
+**Fix**: Store transient input state as `string`; convert to `number` only when computing a result (e.g., `parseFloat(entry.qty)`). Pattern used in `brokerEntries` for the PMC calculator.
+
+### `invisible` vs `hidden` for Layout-Preserving Removal
+**Symptom**: Removing a button with `hidden` causes sibling elements to shift or resize.
+**Cause**: `display: none` removes the element from flow; the grid column or flex row collapses.
+**Fix**: Use `invisible` (Tailwind) — the element is hidden visually but still occupies space. Use when a placeholder must hold its position (e.g., the X button on the first calculator row when only one row exists).
+
+### Inline Panel vs Dialog-Within-Dialog
+**Symptom**: Opening a `<Dialog>` from inside another `<Dialog>` causes focus/z-index issues in Radix UI.
+**Fix**: Use an inline expandable panel (toggle state + conditional render) instead. Keeps visual context, avoids Radix nesting issues. Pattern used in the PMC multi-broker calculator in `AssetDialog.tsx`.
+
 ### Animated Float Values with Integer Display Formats
 **Symptom**: `format="months"` cards show decimals during count-up animation (e.g. `"1a 1.5m"` instead of `"1a 2m"`).
 **Cause**: `useCountUp` passes float intermediates (e.g. `13.5`) to `formatValue`. The `months` case uses `val % 12` which returns `1.5` on floats.
