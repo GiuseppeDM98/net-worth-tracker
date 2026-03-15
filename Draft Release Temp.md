@@ -30,6 +30,11 @@
 
 ## 🔧 Improvements
 
+- Performance page now shows a **skeleton loading screen** while data is being fetched — the placeholder mirrors the real layout (header, tabs, metric sections, charts) so the page feels faster and the transition is seamless instead of a centered spinner
+- Metric cards on the Performance page now animate their values on load and whenever you switch time periods — numbers count up smoothly from zero to their final value
+- Metric cards appear with a staggered cascade effect: each card slides up and fades in sequentially (left to right, section by section) instead of all appearing at once
+- The "Analizza con AI" button now glows purple on hover with a rotating sparkle icon, making it visually distinct from standard actions
+
 - Budget annual view now shows separate **Total Expenses** and **Total Income** rows in the footer, each with their own year-over-year delta and progress bar — previously a single combined total mixed expenses and income together, producing a meaningless number
 - Cashflow now shows an expense type breakdown (Fixed / Variable / Debt) pie chart in the filtered sections of both Current Year and Full History — the chart respects the active month or period filter, so it always reflects the selected time range
 - "Ripristina Default" button in Settings is now only shown in the Allocation tab where it is relevant

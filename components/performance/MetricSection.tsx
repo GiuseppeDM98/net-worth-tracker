@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import React from 'react';
 import { cn } from '@/lib/utils';
 
 interface MetricSectionProps {
@@ -6,6 +7,8 @@ interface MetricSectionProps {
   description?: string;
   children: ReactNode;
   className?: string;
+  /** Section order index used to stagger section-level entrance (0-based). */
+  sectionIndex?: number;
 }
 
 /**
@@ -28,12 +31,19 @@ export function MetricSection({
   title,
   description,
   children,
-  className
+  className,
+  sectionIndex = 0,
 }: MetricSectionProps) {
+  // Delay for the whole section based on its order in the page
+  const sectionDelay = sectionIndex * 120;
+
   return (
     <div className={cn('mt-8', className)}>
-      {/* Section Header */}
-      <div className="mb-4">
+      {/* Section Header — slides in from left */}
+      <div
+        className="mb-4 animate-in fade-in-0 slide-in-from-left-4 duration-500 [animation-fill-mode:both]"
+        style={{ animationDelay: `${sectionDelay}ms` }}
+      >
         <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
           {title}
         </h2>
@@ -44,9 +54,17 @@ export function MetricSection({
         )}
       </div>
 
-      {/* Metric Cards Grid */}
+      {/* Metric Cards Grid — each card fades+slides up with stagger */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {children}
+        {React.Children.map(children, (child, i) => (
+          <div
+            key={i}
+            className="animate-in fade-in-0 slide-in-from-bottom-4 duration-500 [animation-fill-mode:both] h-full"
+            style={{ animationDelay: `${sectionDelay + 80 + i * 80}ms` }}
+          >
+            {child}
+          </div>
+        ))}
       </div>
     </div>
   );

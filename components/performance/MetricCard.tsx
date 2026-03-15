@@ -4,6 +4,57 @@ import { HelpCircle } from 'lucide-react';
 import { formatCurrency, formatPercentage } from '@/lib/services/chartService';
 import { cn } from '@/lib/utils';
 
+/**
+ * Animates a numeric value from 0 to the target over ~700ms using ease-out-quart.
+ * Re-triggers whenever target changes (e.g. period switch).
+ * Respects prefers-reduced-motion.
+ */
+function useCountUp(target: number | null, startDelay = 60): number | null {
+  const [current, setCurrent] = useState<number | null>(null);
+  const rafRef = useRef<number | undefined>(undefined);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    if (timerRef.current) clearTimeout(timerRef.current);
+
+    if (target === null) {
+      setCurrent(null);
+      return;
+    }
+
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setCurrent(target);
+      return;
+    }
+
+    const duration = 700;
+    let startTime: number | null = null;
+
+    timerRef.current = setTimeout(() => {
+      const tick = (now: number) => {
+        if (startTime === null) startTime = now;
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        // ease-out-quart: fast start, smooth deceleration
+        const eased = 1 - Math.pow(1 - progress, 4);
+        setCurrent(progress >= 1 ? target : target * eased);
+        if (progress < 1) {
+          rafRef.current = requestAnimationFrame(tick);
+        }
+      };
+      rafRef.current = requestAnimationFrame(tick);
+    }, startDelay);
+
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [target]);
+
+  return current;
+}
+
 interface MetricCardProps {
   title: string;
   value: number | null;
@@ -84,13 +135,16 @@ export function MetricCard({
         return formatCurrency(val);
       case 'number':
         return val.toFixed(2);
-      case 'months':
-        // Convert total months to "years + months" format for better readability
-        // (e.g., 27 months becomes "2a 3m" instead of just "27m")
-        const years = Math.floor(val / 12);
-        const months = val % 12;
+      case 'months': {
+        // Round to the nearest integer first: during count-up animation the value is
+        // a float (e.g. 13.5), and `float % 12` would produce fractional months
+        // like "1a 1.5m" instead of clean integers like "1a 2m".
+        const totalMonths = Math.round(val);
+        const years = Math.floor(totalMonths / 12);
+        const months = totalMonths % 12;
         if (years > 0) return `${years}a ${months}m`;
         return `${months}m`;
+      }
       default:
         return val.toString();
     }
@@ -118,10 +172,16 @@ export function MetricCard({
     return 'text-foreground';
   };
 
+  // Animated value — counts up from 0 whenever `value` changes
+  const animatedValue = useCountUp(value);
+
   // === Rendering ===
 
   return (
-    <Card className={cn(isPrimary && 'border-primary')}>
+    <Card className={cn(
+      'h-full transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
+      isPrimary && 'border-primary'
+    )}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
         {tooltip && (
@@ -142,8 +202,8 @@ export function MetricCard({
         )}
       </CardHeader>
       <CardContent>
-        <div className={cn('text-2xl font-bold', getValueColor(value))}>
-          {formatValue(value)}
+        <div className={cn('text-2xl font-bold tabular-nums', getValueColor(value))}>
+          {formatValue(animatedValue)}
         </div>
         {subtitle && (
           <p className="text-xs text-muted-foreground mt-1 font-medium">

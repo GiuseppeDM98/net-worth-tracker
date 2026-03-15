@@ -244,4 +244,20 @@ ALL fields in settings types must be handled in THREE places:
 - **Use `grid grid-cols-N`** instead: each cell has a fixed equal width, button fills with `w-full`, centering is guaranteed
 - For conditional buttons (e.g. optional "Tasse"): 2-row layout — optional full-width button on top, fixed 2-col grid below
 
-**Last updated**: 2026-03-14 (session: Assets Table Aggiornato time restore)
+### CSS Grid Animation Wrapper — Equal Height Broken
+**Symptom**: Cards in the same grid row have different heights after wrapping them in a `<div>` for stagger animations.
+**Cause**: CSS grid stretches *direct children* to row height. A wrapper div is stretched, but the component inside takes only its natural height.
+**Fix**: Add `h-full` to **both** the wrapper div AND the inner component's root element. Missing either one breaks equal-height.
+```tsx
+// MetricSection.tsx
+<div className="... h-full" style={{ animationDelay: ... }}>  {/* wrapper */}
+  {child}  {/* child must also have h-full on its root Card */}
+</div>
+```
+
+### Animated Float Values with Integer Display Formats
+**Symptom**: `format="months"` cards show decimals during count-up animation (e.g. `"1a 1.5m"` instead of `"1a 2m"`).
+**Cause**: `useCountUp` passes float intermediates (e.g. `13.5`) to `formatValue`. The `months` case uses `val % 12` which returns `1.5` on floats.
+**Fix**: `Math.round(val)` before any integer math (`Math.floor`, `%`) in display-format functions that expect whole numbers.
+
+**Last updated**: 2026-03-15 (session: Performance page animations + skeleton loading)

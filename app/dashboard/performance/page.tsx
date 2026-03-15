@@ -32,6 +32,7 @@ import { MetricSection } from '@/components/performance/MetricSection';
 import { PerformanceTooltip } from '@/components/performance/PerformanceTooltip';
 import { MonthlyReturnsHeatmap } from '@/components/performance/MonthlyReturnsHeatmap';
 import { UnderwaterDrawdownChart } from '@/components/performance/UnderwaterDrawdownChart';
+import { PerformancePageSkeleton } from '@/components/performance/PerformancePageSkeleton';
 
 /**
  * PERFORMANCE PAGE ARCHITECTURE
@@ -471,14 +472,8 @@ export default function PerformancePage() {
   const rollingSharpeData = getRollingSharpeData(metrics);
 
   if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-center">
-          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Caricamento metriche...</p>
-        </div>
-      </div>
-    );
+    // Skeleton screen mirrors the real page layout so the transition feels seamless.
+    return <PerformancePageSkeleton />;
   }
 
   if (!performanceData || !metrics) {
@@ -554,9 +549,9 @@ export default function PerformancePage() {
             variant="outline"
             onClick={() => setShowAIAnalysisDialog(true)}
             disabled={!metrics || metrics.hasInsufficientData}
-            className="gap-2"
+            className="group gap-2 transition-all duration-300 hover:border-purple-400 hover:text-purple-600 hover:shadow-[0_0_14px_rgba(139,92,246,0.35)] dark:hover:text-purple-400 dark:hover:border-purple-500"
           >
-            <Sparkles className="h-4 w-4" />
+            <Sparkles className="h-4 w-4 transition-transform duration-500 group-hover:rotate-12 group-hover:scale-110" />
             Analizza con AI
           </Button>
           <Button onClick={loadPerformanceData}>
@@ -585,10 +580,14 @@ export default function PerformancePage() {
              - Performance documentation in /docs (if exists)
              Keep explanations consistent across all locations! */}
 
+        {/* key={selectedPeriod} forces remount on period switch, replaying entrance animations */}
+        <div key={selectedPeriod}>
+
         {/* === METRICHE DI RENDIMENTO === */}
         <MetricSection
           title="📈 Metriche di Rendimento"
           description="Misurano quanto il tuo portafoglio è cresciuto nel tempo"
+          sectionIndex={0}
         >
           <MetricCard
             title="ROI Totale"
@@ -626,6 +625,7 @@ export default function PerformancePage() {
         <MetricSection
           title="⚠️ Metriche di Rischio"
           description="Valutano la volatilità e i potenziali ribassi del portafoglio"
+          sectionIndex={1}
         >
           <MetricCard
             title="Volatilità"
@@ -671,6 +671,7 @@ export default function PerformancePage() {
         <MetricSection
           title="📊 Metriche di Contesto"
           description="Informazioni sul periodo e sui flussi di capitale"
+          sectionIndex={2}
         >
           <MetricCard
             title="Contributi Netti"
@@ -693,6 +694,7 @@ export default function PerformancePage() {
           <MetricSection
             title="💰 Metriche da Proventi Finanziari"
             description="Rendimento da dividendi e cedole rispetto al costo di acquisto e al valore corrente"
+            sectionIndex={3}
           >
             <MetricCard
               title="YOC Lordo"
@@ -744,6 +746,8 @@ export default function PerformancePage() {
             />
           </MetricSection>
         )}
+
+        </div>{/* end key={selectedPeriod} animation wrapper */}
 
         {/* Net Worth Evolution Chart */}
         <Card className="mt-6">

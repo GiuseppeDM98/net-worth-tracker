@@ -28,6 +28,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Yield on Cost (YOC) and Current Yield calculations
 - Monthly returns heatmap and underwater drawdown chart
 - Rolling performance charts
+- Animated metric cards: values count up on load and on period switch; staggered entrance cascade per section
 - AI-powered analysis using Claude with Extended Thinking and web search
 
 ### Cashflow
