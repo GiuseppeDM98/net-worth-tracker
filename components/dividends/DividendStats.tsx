@@ -15,7 +15,8 @@
 import { useEffect, useState} from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, TrendingDown, Calendar, TrendingUp } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DollarSign, TrendingDown, Calendar, TrendingUp, ChevronRight } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { formatCurrencyCompact } from '@/lib/services/chartService';
 import {
@@ -124,6 +125,8 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
   const { user } = useAuth();
   const [stats, setStats] = useState<DividendStatsData | null>(null);
   const [loading, setLoading] = useState(true);
+  type DpsAsset = NonNullable<DividendStatsData['dividendGrowthData']>['byAsset'][number];
+  const [selectedDpsAsset, setSelectedDpsAsset] = useState<DpsAsset | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -179,7 +182,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
   return (
     <div className="space-y-6">
       {/* Metric Cards Row 1: Period Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 desktop:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Dividendi Ricevuti (Netto)</CardTitle>
@@ -242,7 +245,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
       </div>
 
       {/* Charts Row 1: Pie Chart (Dividends by Asset) */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 desktop:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Dividendi per Asset</CardTitle>
@@ -252,31 +255,44 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
               <div className="flex h-64 items-center justify-center text-gray-500">
                 Nessun dato disponibile
               </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={stats.byAsset}
-                    dataKey="totalNet"
-                    nameKey="assetTicker"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={100}
-                    label={(entry: any) => `${entry.assetTicker}: ${formatCurrency(entry.totalNet)}`}
-                    isAnimationActive={false}
-                  >
-                    {stats.byAsset.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
-                    labelStyle={{ color: '#000' }}
-                  />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
+            ) : (() => {
+              // Limit to top 7 + group the rest as "Altri" to keep legend compact
+              const pieData = stats.byAsset.length > 8
+                ? [
+                    ...stats.byAsset.slice(0, 7),
+                    {
+                      assetTicker: 'Altri',
+                      assetName: 'Altri asset',
+                      totalNet: stats.byAsset.slice(7).reduce((sum, a) => sum + a.totalNet, 0),
+                      count: stats.byAsset.slice(7).reduce((sum, a) => sum + a.count, 0),
+                    },
+                  ]
+                : stats.byAsset;
+              return (
+                <ResponsiveContainer width="100%" height={280}>
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      dataKey="totalNet"
+                      nameKey="assetTicker"
+                      cx="50%"
+                      cy="45%"
+                      outerRadius={75}
+                      isAnimationActive={false}
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value: number) => formatCurrency(value)}
+                      labelStyle={{ color: '#000' }}
+                    />
+                    <Legend iconSize={10} wrapperStyle={{ fontSize: '11px' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              );
+            })()}
           </CardContent>
         </Card>
 
@@ -410,7 +426,92 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
               )}
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
+              {/* Mobile card view — tap to open year detail dialog */}
+              <div className="desktop:hidden space-y-3">
+                {byAsset.map(asset => (
+                  <button
+                    key={asset.assetId}
+                    className="w-full text-left rounded-md border p-3 space-y-1.5 hover:bg-muted/30 active:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() => setSelectedDpsAsset(asset)}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm">{asset.assetTicker || asset.assetName}</p>
+                        {asset.assetTicker && <p className="text-xs text-muted-foreground truncate">{asset.assetName}</p>}
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <span>
+                        YoY:{' '}
+                        <span className={`font-medium ${asset.latestYoyGrowth === undefined ? '' : asset.latestYoyGrowth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          {asset.latestYoyGrowth === undefined ? '—' : `${asset.latestYoyGrowth >= 0 ? '+' : ''}${asset.latestYoyGrowth.toFixed(1)}%`}
+                        </span>
+                      </span>
+                      <span>
+                        CAGR:{' '}
+                        <span className={`font-medium ${asset.cagr === undefined ? '' : asset.cagr >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                          {asset.cagr === undefined ? '—' : `${asset.cagr >= 0 ? '+' : ''}${asset.cagr.toFixed(1)}%`}
+                        </span>
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              {/* DPS detail dialog — shows years vertically on mobile */}
+              <Dialog open={selectedDpsAsset !== null} onOpenChange={(open) => { if (!open) setSelectedDpsAsset(null); }}>
+                <DialogContent className="max-w-xs">
+                  <DialogHeader>
+                    <DialogTitle className="text-base">
+                      {selectedDpsAsset?.assetTicker || selectedDpsAsset?.assetName}
+                    </DialogTitle>
+                    {selectedDpsAsset?.assetTicker && (
+                      <p className="text-sm text-muted-foreground">{selectedDpsAsset.assetName}</p>
+                    )}
+                  </DialogHeader>
+                  {selectedDpsAsset && (() => {
+                    const dpsMap = new Map(selectedDpsAsset.yearlyDps.map(y => [y.year, y.totalDps]));
+                    return (
+                      <div className="space-y-4 pt-1">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b text-xs text-muted-foreground uppercase tracking-wide">
+                              <th className="text-left py-2">Anno</th>
+                              <th className="text-right py-2">DPS Lordo</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {allYears.map(year => (
+                              <tr key={year} className="border-b last:border-0">
+                                <td className="py-2 text-muted-foreground">{year}</td>
+                                <td className="py-2 text-right tabular-nums font-medium">
+                                  {dpsMap.has(year) ? dpsMap.get(year)!.toFixed(4) : '—'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        <div className="flex gap-6 text-sm pt-1 border-t">
+                          <div>
+                            <p className="text-xs text-muted-foreground">YoY</p>
+                            <p className={`font-semibold ${selectedDpsAsset.latestYoyGrowth === undefined ? 'text-muted-foreground' : selectedDpsAsset.latestYoyGrowth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                              {selectedDpsAsset.latestYoyGrowth === undefined ? '—' : `${selectedDpsAsset.latestYoyGrowth >= 0 ? '+' : ''}${selectedDpsAsset.latestYoyGrowth.toFixed(1)}%`}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">CAGR</p>
+                            <p className={`font-semibold ${selectedDpsAsset.cagr === undefined ? 'text-muted-foreground' : selectedDpsAsset.cagr >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                              {selectedDpsAsset.cagr === undefined ? '—' : `${selectedDpsAsset.cagr >= 0 ? '+' : ''}${selectedDpsAsset.cagr.toFixed(1)}%`}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </DialogContent>
+              </Dialog>
+              {/* Desktop table */}
+              <div className="hidden desktop:block overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b text-muted-foreground text-xs uppercase tracking-wide">
@@ -436,7 +537,6 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                               {dpsMap.has(year) ? dpsMap.get(year)!.toFixed(4) : '—'}
                             </td>
                           ))}
-                          {/* YoY growth for the most recent year that has a predecessor */}
                           <td className={`text-right py-3 px-2 font-medium tabular-nums ${
                             asset.latestYoyGrowth === undefined ? 'text-muted-foreground' :
                             asset.latestYoyGrowth >= 0 ? 'text-emerald-600' : 'text-red-600'
@@ -445,7 +545,6 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                               ? '—'
                               : `${asset.latestYoyGrowth >= 0 ? '+' : ''}${asset.latestYoyGrowth.toFixed(1)}%`}
                           </td>
-                          {/* CAGR from first to last data year — uses calendar-year span */}
                           <td className={`text-right py-3 pl-2 font-medium tabular-nums ${
                             asset.cagr === undefined ? 'text-muted-foreground' :
                             asset.cagr >= 0 ? 'text-blue-600' : 'text-red-600'
@@ -481,7 +580,39 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
             </div>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
+            {/* Mobile card view */}
+            <div className="desktop:hidden space-y-3">
+              {stats.totalReturnAssets.map(asset => (
+                <div key={asset.assetId} className="rounded-md border p-3 space-y-2">
+                  <div>
+                    <p className="font-medium text-sm">{asset.assetTicker}</p>
+                    <p className="text-xs text-muted-foreground">{asset.assetName}</p>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <div className="space-y-1">
+                      <div>
+                        <span className="text-muted-foreground">Plusval.: </span>
+                        <span className={`font-medium ${asset.capitalGainPercentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {asset.capitalGainPercentage >= 0 ? '+' : ''}{asset.capitalGainPercentage.toFixed(2)}%
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Dividendi: </span>
+                        <span className="font-medium text-green-600">+{asset.dividendReturnPercentage.toFixed(2)}%</span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground">Rend. Totale</p>
+                      <p className={`text-base font-semibold ${asset.totalReturnPercentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {asset.totalReturnPercentage >= 0 ? '+' : ''}{asset.totalReturnPercentage.toFixed(2)}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* Desktop table */}
+            <div className="hidden desktop:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-muted-foreground text-xs uppercase tracking-wide">
@@ -498,19 +629,16 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                         <p className="font-medium">{asset.assetTicker}</p>
                         <p className="text-xs text-muted-foreground">{asset.assetName}</p>
                       </td>
-                      {/* Capital gain: negative = red, positive = green */}
                       <td className={`text-right py-3 px-3 ${asset.capitalGainPercentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         <span title={formatCurrency(asset.capitalGainAbsolute)}>
                           {asset.capitalGainPercentage >= 0 ? '+' : ''}{asset.capitalGainPercentage.toFixed(2)}%
                         </span>
                       </td>
-                      {/* Dividend return: always additive (never negative since dividends are receipts) */}
                       <td className="text-right py-3 px-3 text-green-600">
                         <span title={formatCurrency(asset.allTimeNetDividends)}>
                           +{asset.dividendReturnPercentage.toFixed(2)}%
                         </span>
                       </td>
-                      {/* Total return: bold highlight, colored by sign */}
                       <td className={`text-right py-3 pl-3 font-semibold ${asset.totalReturnPercentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         {asset.totalReturnPercentage >= 0 ? '+' : ''}{asset.totalReturnPercentage.toFixed(2)}%
                       </td>

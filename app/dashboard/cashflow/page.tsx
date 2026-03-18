@@ -25,6 +25,7 @@ import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Wallet, Receipt, TrendingUp, BarChart3, Coins, Target } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ExpenseTrackingTab } from '@/components/cashflow/ExpenseTrackingTab';
 import { CurrentYearTab } from '@/components/cashflow/CurrentYearTab';
 import { TotalHistoryTab } from '@/components/cashflow/TotalHistoryTab';
@@ -126,7 +127,7 @@ export default function CashflowPage() {
   };
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="space-y-6 p-4 desktop:p-8 max-desktop:portrait:pb-20">
       {/* Header */}
       <div>
         <h1 className="flex items-center gap-2 text-3xl font-bold text-gray-900">
@@ -140,26 +141,43 @@ export default function CashflowPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="tracking" value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full max-w-4xl grid-cols-5">
+        {/* Mobile tab selector — Radix Select replaces cramped 5-tab TabsList on small screens */}
+        <div className="desktop:hidden mb-2">
+          <Select value={activeTab} onValueChange={handleTabChange}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="tracking">Tracciamento</SelectItem>
+              <SelectItem value="dividends">Dividendi &amp; Cedole</SelectItem>
+              <SelectItem value="current-year">Anno Corrente</SelectItem>
+              <SelectItem value="total-history">Storico Totale</SelectItem>
+              <SelectItem value="budget">Budget</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Desktop TabsList — hidden on mobile/tablet */}
+        <TabsList className="hidden desktop:grid w-full max-w-4xl grid-cols-5">
           <TabsTrigger value="tracking" className="flex items-center gap-2">
             <Receipt className="h-4 w-4" />
-            <span className="hidden sm:inline">Tracciamento</span>
+            Tracciamento
           </TabsTrigger>
           <TabsTrigger value="dividends" className="flex items-center gap-2">
             <Coins className="h-4 w-4" />
-            <span className="hidden sm:inline">Dividendi & Cedole</span>
+            Dividendi &amp; Cedole
           </TabsTrigger>
           <TabsTrigger value="current-year" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
-            <span className="hidden sm:inline">Anno Corrente</span>
+            Anno Corrente
           </TabsTrigger>
           <TabsTrigger value="total-history" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
-            <span className="hidden sm:inline">Storico Totale</span>
+            Storico Totale
           </TabsTrigger>
           <TabsTrigger value="budget" className="flex items-center gap-2">
             <Target className="h-4 w-4" />
-            <span className="hidden sm:inline">Budget</span>
+            Budget
           </TabsTrigger>
         </TabsList>
 

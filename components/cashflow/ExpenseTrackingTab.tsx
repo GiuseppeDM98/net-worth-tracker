@@ -551,7 +551,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
             Gestisci le tue entrate e uscite
           </p>
         </div>
-        <Button onClick={handleAddExpense} className="hidden sm:flex">
+        <Button onClick={handleAddExpense} className="hidden desktop:flex">
           <Plus className="mr-2 h-4 w-4" />
           Nuova Spesa
         </Button>
@@ -560,14 +560,14 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
       {/* Mobile FAB - Fixed bottom-right */}
       <Button
         onClick={handleAddExpense}
-        className="fixed bottom-24 right-4 z-40 h-14 w-14 rounded-full shadow-lg sm:hidden"
+        className="fixed bottom-24 right-4 z-40 h-14 w-14 rounded-full shadow-lg desktop:hidden"
         aria-label="Nuova Spesa"
       >
         <Plus className="h-6 w-6" />
       </Button>
 
       {/* Statistics Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 desktop:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Entrate Totali</CardTitle>

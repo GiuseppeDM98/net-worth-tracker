@@ -286,7 +286,7 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
     <div className="space-y-6">
       {/* Action Buttons Row */}
       <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col desktop:flex-row desktop:flex-wrap desktop:items-center gap-2">
           <Button onClick={handleCreate}>
             <Plus className="h-4 w-4 mr-2" />
             Aggiungi Dividendo
@@ -323,12 +323,12 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
       {/* Filters Row — positioned at top so they affect both charts and table */}
       <div className="rounded-md border p-4 bg-muted/50">
         <h3 className="font-semibold mb-4">Filtri</h3>
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 desktop:grid-cols-4">
           {/* Asset Filter */}
           <div className="space-y-2">
             <Label htmlFor="assetFilter">Asset</Label>
             <Select value={assetFilter} onValueChange={setAssetFilter}>
-              <SelectTrigger id="assetFilter">
+              <SelectTrigger id="assetFilter" className="w-full">
                 <SelectValue placeholder="Tutti gli asset" />
               </SelectTrigger>
               <SelectContent>
@@ -346,7 +346,7 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
           <div className="space-y-2">
             <Label htmlFor="typeFilter">Tipo</Label>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger id="typeFilter">
+              <SelectTrigger id="typeFilter" className="w-full">
                 <SelectValue placeholder="Tutti i tipi" />
               </SelectTrigger>
               <SelectContent>

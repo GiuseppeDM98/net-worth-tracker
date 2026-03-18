@@ -17,7 +17,7 @@ import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { calculateIncomeExpenseRatio, calculateTotalExpenses, calculateTotalIncome } from '@/lib/services/expenseService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ExternalLink, RefreshCw } from 'lucide-react';
+import { ChevronLeft, ExternalLink, RefreshCw, Monitor } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { format } from 'date-fns';
@@ -934,6 +934,12 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
 
   return (
     <div className="space-y-6">
+      {/* Desktop recommendation banner — charts and drill-down are best on larger screens */}
+      <div className="desktop:hidden flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700 dark:border-blue-800 dark:bg-blue-950/20 dark:text-blue-400">
+        <Monitor className="h-4 w-4 shrink-0" />
+        <span>Per una migliore esperienza si consiglia la visualizzazione su desktop.</span>
+      </div>
+
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold">Storico Completo</h2>
@@ -946,7 +952,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
           ANALISI PERIODO: Year+month filtered charts
           (Sankey + Spese per Categoria + Entrate per Categoria)
           ============================================== */}
-      <div className="rounded-lg border-2 border-blue-200 bg-blue-50/50 dark:bg-blue-950/10 dark:border-blue-800 p-4 sm:p-6">
+      <div className="rounded-lg border-2 border-blue-200 bg-blue-50/50 dark:bg-blue-950/10 dark:border-blue-800 p-4 desktop:p-6">
         {/* Filter Controls */}
         <div className="flex flex-col gap-4 mb-6">
           {/* Year + Month filter dropdowns */}
@@ -1167,7 +1173,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                         {/* Level 3: Expense List */}
                         {drillDown.level === 'expenseList' && drillDown.chartType === 'expenses' && currentFilteredExpenses.length > 0 && (
                           <div className="space-y-4">
-                            <div className="space-y-3 sm:hidden">
+                            <div className="space-y-3 desktop:hidden">
                               {currentFilteredExpenses.map((expense) => {
                                 const date = toDate(expense.date);
                                 return (
@@ -1198,7 +1204,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                                 );
                               })}
                             </div>
-                            <div className="hidden rounded-md border sm:block">
+                            <div className="hidden desktop:block rounded-md border">
                               <div className="max-h-[500px] overflow-y-auto">
                                 <table className="w-full">
                                   <thead className="sticky top-0 bg-muted/50 border-b">
@@ -1429,7 +1435,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                         {/* Level 3: Income List */}
                         {drillDown.level === 'expenseList' && drillDown.chartType === 'income' && currentFilteredExpenses.length > 0 && (
                           <div className="space-y-4">
-                            <div className="space-y-3 sm:hidden">
+                            <div className="space-y-3 desktop:hidden">
                               {currentFilteredExpenses.map((expense) => {
                                 const date = toDate(expense.date);
                                 return (
@@ -1460,7 +1466,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                                 );
                               })}
                             </div>
-                            <div className="hidden rounded-md border sm:block">
+                            <div className="hidden desktop:block rounded-md border">
                               <div className="max-h-[500px] overflow-y-auto">
                                 <table className="w-full">
                                   <thead className="sticky top-0 bg-muted/50 border-b">

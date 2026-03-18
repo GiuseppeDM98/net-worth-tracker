@@ -269,7 +269,50 @@ export function DividendTable({ dividends, onEdit, onRefresh, showTotals = false
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border">
+      {/* Mobile card view — table has 13 columns, not suitable for small screens */}
+      <div className="desktop:hidden space-y-3">
+        {paginatedDividends.map((dividend) => (
+          <div key={dividend.id} className="rounded-md border p-3 space-y-2">
+            {/* Header: asset + type badge + actions */}
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="font-semibold text-sm">{dividend.assetTicker}</div>
+                <div className="text-xs text-muted-foreground truncate">{dividend.assetName}</div>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <Badge variant="outline" className={`text-xs ${dividendTypeBadgeColor[dividend.dividendType]}`}>
+                  {dividendTypeLabels[dividend.dividendType]}
+                </Badge>
+                <Button variant="ghost" size="sm" onClick={() => onEdit(dividend)} disabled={deletingId === dividend.id} title="Modifica">
+                  <Edit className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => handleDelete(dividend)} disabled={deletingId === dividend.id} title="Elimina">
+                  <Trash2 className="h-4 w-4 text-red-500" />
+                </Button>
+              </div>
+            </div>
+            {/* Dates */}
+            <div className="flex gap-4 text-xs text-muted-foreground">
+              <span>Ex-Date: <span className="text-foreground">{formatDate(dividend.exDate)}</span></span>
+              <span>Pagamento: <span className="text-foreground">{formatDate(dividend.paymentDate)}</span></span>
+            </div>
+            {/* Amounts */}
+            <div className="flex items-baseline justify-between gap-2">
+              <div className="text-xs text-muted-foreground space-y-0.5">
+                <div>Lordo: <AmountWithConversion originalAmount={dividend.grossAmount} eurAmount={dividend.grossAmountEur} currency={dividend.currency} /></div>
+                <div>Tasse: <AmountWithConversion originalAmount={dividend.taxAmount} eurAmount={dividend.taxAmountEur} currency={dividend.currency} textColor="text-red-600" /></div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-muted-foreground mb-0.5">Totale Netto</div>
+                <AmountWithConversion originalAmount={dividend.netAmount} eurAmount={dividend.netAmountEur} currency={dividend.currency} textColor="text-green-600 font-semibold text-base" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden desktop:block rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -417,6 +460,7 @@ export function DividendTable({ dividends, onEdit, onRefresh, showTotals = false
           )}
         </Table>
       </div>
+      {/* end desktop table */}
 
       {/* Pagination Controls */}
       {totalPages > 1 && (

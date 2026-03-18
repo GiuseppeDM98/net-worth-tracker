@@ -1360,6 +1360,12 @@ export function BudgetTab({
             </div>
           )}
 
+          {/* Mobile/tablet notice — budget table has 7-8 columns, desktop is recommended */}
+          <div className="desktop:hidden rounded-md border border-amber-200 bg-amber-50/50 dark:bg-amber-950/10 dark:border-amber-800 p-3 flex items-start gap-2 text-sm text-amber-700 dark:text-amber-400">
+            <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
+            <span>Per la miglior esperienza si consiglia la visualizzazione su desktop. La tabella è comunque navigabile scorrendo orizzontalmente.</span>
+          </div>
+
           <Card>
             <CardContent className="pt-6">
               <AnnualTable />

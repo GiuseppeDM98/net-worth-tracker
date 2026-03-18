@@ -19,7 +19,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { calculateTotalIncome, calculateTotalExpenses } from '@/lib/services/expenseService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { RefreshCw, ChevronLeft, ExternalLink, Info, X } from 'lucide-react';
+import { RefreshCw, ChevronLeft, ExternalLink, Info, X, Monitor } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -724,6 +724,12 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
 
   return (
     <div className="space-y-6">
+      {/* Desktop recommendation banner — charts and drill-down are best on larger screens */}
+      <div className="desktop:hidden flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700 dark:border-blue-800 dark:bg-blue-950/20 dark:text-blue-400">
+        <Monitor className="h-4 w-4 shrink-0" />
+        <span>Per una migliore esperienza si consiglia la visualizzazione su desktop.</span>
+      </div>
+
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold">Anno {currentYear}</h2>
@@ -978,7 +984,7 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                         {/* Level 3: Expense List */}
                         {drillDown.level === 'expenseList' && drillDown.chartType === 'expenses' && currentFilteredExpenses.length > 0 && (
                           <div className="space-y-4">
-                            <div className="space-y-3 sm:hidden">
+                            <div className="space-y-3 desktop:hidden">
                               {currentFilteredExpenses.map((expense) => {
                                 const date = toDate(expense.date);
                                 return (
@@ -1009,7 +1015,7 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                                 );
                               })}
                             </div>
-                            <div className="hidden rounded-md border sm:block">
+                            <div className="hidden desktop:block rounded-md border">
                               <div className="max-h-[500px] overflow-y-auto">
                                 <table className="w-full">
                                   <thead className="sticky top-0 bg-muted/50 border-b">
@@ -1249,7 +1255,7 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                         {/* Level 3: Expense List */}
                         {drillDown.level === 'expenseList' && drillDown.chartType === 'income' && currentFilteredExpenses.length > 0 && (
                           <div className="space-y-4">
-                            <div className="space-y-3 sm:hidden">
+                            <div className="space-y-3 desktop:hidden">
                               {currentFilteredExpenses.map((expense) => {
                                 const date = toDate(expense.date);
                                 return (
@@ -1280,7 +1286,7 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                                 );
                               })}
                             </div>
-                            <div className="hidden rounded-md border sm:block">
+                            <div className="hidden desktop:block rounded-md border">
                               <div className="max-h-[500px] overflow-y-auto">
                                 <table className="w-full">
                                   <thead className="sticky top-0 bg-muted/50 border-b">
