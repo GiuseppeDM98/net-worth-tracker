@@ -83,6 +83,12 @@ const SECTIONS: Array<{ type: ExpenseType; label: string; isIncome: boolean }> =
   { type: 'income', label: 'Entrate', isIncome: true },
 ];
 
+// Sentinel keys for aggregate deep-dive rows — subtotals per section and grand totals.
+// Format __subtotal_{sectionType}__ avoids collisions with real budgetItemKey values.
+const SUBTOTAL_KEY = (sectionType: string) => `__subtotal_${sectionType}__`;
+const TOTAL_EXPENSES_KEY = '__total_expenses__';
+const TOTAL_INCOME_KEY = '__total_income__';
+
 // Only spending types for type-scope budget items (income is category-scope only)
 const BUDGET_EXPENSE_TYPES: Array<Exclude<ExpenseType, 'income'>> = ['fixed', 'variable', 'debt'];
 const BUDGET_TYPE_LABELS: Record<Exclude<ExpenseType, 'income'>, string> = {
@@ -265,11 +271,63 @@ export function BudgetTab({
     [displayItems, allExpenses, currentYear, historyStartYear]
   );
 
-  // Year-by-year breakdown for the selected item.
+  // Year-by-year breakdown for the selected item (or aggregate key).
   // Produces one row per year from historyStartYear to currentYear (newest first),
   // with 12 monthly actuals so the deep dive table can render Gen–Dic columns.
   const deepDiveData = useMemo(() => {
     if (!selectedItemKey) return null;
+
+    // Aggregate branch: handles subtotals (__subtotal_{type}__) and grand totals.
+    // Sums getMonthlyActualsForItem across all relevant items — same functions as
+    // individual rows, so the CategoryDeepDive panel needs no changes.
+    if (
+      selectedItemKey === TOTAL_EXPENSES_KEY ||
+      selectedItemKey === TOTAL_INCOME_KEY ||
+      selectedItemKey.startsWith('__subtotal_')
+    ) {
+      let aggItems: BudgetItem[];
+      let label: string;
+      let isIncome: boolean;
+
+      if (selectedItemKey === TOTAL_EXPENSES_KEY) {
+        aggItems = displayItems.filter(i => (getItemSectionType(i, categories) as string) !== 'income');
+        label = 'Totale Spese';
+        isIncome = false;
+      } else if (selectedItemKey === TOTAL_INCOME_KEY) {
+        aggItems = displayItems.filter(i => (getItemSectionType(i, categories) as string) === 'income');
+        label = 'Totale Entrate';
+        isIncome = true;
+      } else {
+        // Strip __subtotal_ prefix (11 chars) and __ suffix (2 chars)
+        const sectionType = selectedItemKey.slice(11, -2);
+        aggItems = displayItems.filter(i => getItemSectionType(i, categories) === sectionType);
+        const section = SECTIONS.find(s => s.type === sectionType);
+        label = `Subtotale ${section?.label ?? sectionType}`;
+        isIncome = section?.isIncome ?? false;
+      }
+
+      const years: number[] = [];
+      for (let y = historyStartYear; y <= currentYear; y++) years.push(y);
+
+      return {
+        item: null as unknown as BudgetItem, // aggregate rows have no single BudgetItem
+        label,
+        isIncome,
+        rows: [...years].reverse().map((year) => ({
+          year,
+          total: aggItems.reduce((s, i) => s + getActualForItem(i, allExpenses, year), 0),
+          monthly: aggItems.reduce(
+            (sums, i) => {
+              const m = getMonthlyActualsForItem(i, allExpenses, year);
+              return sums.map((v, idx) => v + m[idx]);
+            },
+            new Array<number>(12).fill(0)
+          ),
+          budgetAnnual: aggItems.reduce((s, i) => s + i.monthlyAmount * 12, 0),
+        })),
+      };
+    }
+
     const item = displayItems.find((i) => budgetItemKey(i) === selectedItemKey);
     if (!item) return null;
     const isIncome = (getItemSectionType(item, categories) as string) === 'income';
@@ -613,8 +671,23 @@ export function BudgetTab({
 
                   {/* Section subtotal row — only shown when not collapsed */}
                   {!isCollapsed && (
-                  <TableRow key={`subtotal-${sectionType}`} className="border-t border-gray-200 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-800/30">
-                    <TableCell className="pl-6 text-xs font-medium text-gray-500">Subtotale {sectionLabel}</TableCell>
+                  <TableRow
+                    key={`subtotal-${sectionType}`}
+                    className={`border-t border-gray-200 dark:border-gray-700 cursor-pointer select-none transition-colors ${
+                      selectedItemKey === SUBTOTAL_KEY(sectionType)
+                        ? 'bg-blue-50/60 dark:bg-blue-950/20 hover:bg-blue-50/80 dark:hover:bg-blue-950/30'
+                        : 'bg-gray-50/60 dark:bg-gray-800/30 hover:bg-muted/40'
+                    }`}
+                    onClick={() => setSelectedItemKey(prev => prev === SUBTOTAL_KEY(sectionType) ? null : SUBTOTAL_KEY(sectionType))}
+                  >
+                    <TableCell className="pl-6 text-xs font-medium text-gray-500">
+                      <span className="flex items-center gap-1">
+                        {selectedItemKey === SUBTOTAL_KEY(sectionType)
+                          ? <ChevronDown className="h-3 w-3 text-blue-500 shrink-0" />
+                          : <ChevronRight className="h-3 w-3 text-gray-300 dark:text-gray-600 shrink-0" />}
+                        Subtotale {sectionLabel}
+                      </span>
+                    </TableCell>
                     <TableCell className="text-right tabular-nums text-xs font-medium">
                       {formatCurrency(secBudgetMonthly * 12)}
                     </TableCell>
@@ -652,8 +725,22 @@ export function BudgetTab({
           </TableBody>
           <TableFooter>
             {expenseItems.length > 0 && (
-              <TableRow>
-                <TableCell className="font-semibold">Totale Spese</TableCell>
+              <TableRow
+                className={`cursor-pointer select-none transition-colors ${
+                  selectedItemKey === TOTAL_EXPENSES_KEY
+                    ? 'bg-blue-50/60 dark:bg-blue-950/20 hover:bg-blue-50/80 dark:hover:bg-blue-950/30'
+                    : 'hover:bg-muted/40'
+                }`}
+                onClick={() => setSelectedItemKey(prev => prev === TOTAL_EXPENSES_KEY ? null : TOTAL_EXPENSES_KEY)}
+              >
+                <TableCell className="font-semibold">
+                  <span className="flex items-center gap-1">
+                    {selectedItemKey === TOTAL_EXPENSES_KEY
+                      ? <ChevronDown className="h-3 w-3 text-blue-500 shrink-0" />
+                      : <ChevronRight className="h-3 w-3 text-gray-300 dark:text-gray-600 shrink-0" />}
+                    Totale Spese
+                  </span>
+                </TableCell>
                 <TableCell className="text-right tabular-nums font-semibold">
                   {formatCurrency(totalExpBudgetMonthly * 12)}
                 </TableCell>
@@ -686,8 +773,22 @@ export function BudgetTab({
               </TableRow>
             )}
             {incomeItems.length > 0 && (
-              <TableRow>
-                <TableCell className="font-semibold">Totale Entrate</TableCell>
+              <TableRow
+                className={`cursor-pointer select-none transition-colors ${
+                  selectedItemKey === TOTAL_INCOME_KEY
+                    ? 'bg-blue-50/60 dark:bg-blue-950/20 hover:bg-blue-50/80 dark:hover:bg-blue-950/30'
+                    : 'hover:bg-muted/40'
+                }`}
+                onClick={() => setSelectedItemKey(prev => prev === TOTAL_INCOME_KEY ? null : TOTAL_INCOME_KEY)}
+              >
+                <TableCell className="font-semibold">
+                  <span className="flex items-center gap-1">
+                    {selectedItemKey === TOTAL_INCOME_KEY
+                      ? <ChevronDown className="h-3 w-3 text-blue-500 shrink-0" />
+                      : <ChevronRight className="h-3 w-3 text-gray-300 dark:text-gray-600 shrink-0" />}
+                    Totale Entrate
+                  </span>
+                </TableCell>
                 <TableCell className="text-right tabular-nums font-semibold">
                   {formatCurrency(totalIncBudgetMonthly * 12)}
                 </TableCell>
@@ -846,6 +947,112 @@ export function BudgetTab({
             </tbody>
           </table>
         </div>
+
+        {/* Per-type month-by-month breakdown — only shown for "Totale Spese".
+            One mini-table per expense type (Fisse / Variabili / Debiti), each with
+            the same Anno × Gen…Dic structure as the aggregate table above, so the
+            user can spot high-spend months per category at a glance. */}
+        {selectedItemKey === TOTAL_EXPENSES_KEY && SECTIONS.filter(s => !s.isIncome).map(section => {
+          const secItems = sectionItems(displayItems, section.type);
+          if (secItems.length === 0) return null;
+
+          const secBudgetAnnual = secItems.reduce((s, i) => s + i.monthlyAmount * 12, 0);
+          // Newest year first — matches the aggregate table order
+          const secRows = [...rows].map(({ year }) => {
+            const isCurrentYear = year === currentYear;
+            const monthly = secItems.reduce(
+              (sums, i) => { const m = getMonthlyActualsForItem(i, allExpenses, year); return sums.map((v, idx) => v + m[idx]); },
+              new Array<number>(12).fill(0)
+            );
+            const total = monthly.reduce((s, v) => s + v, 0);
+            return { year, isCurrentYear, monthly, total };
+          });
+
+          return (
+            <div key={section.type} className="mt-4 pt-4 border-t border-blue-200 dark:border-blue-800">
+              <p className="text-xs font-medium text-blue-700 dark:text-blue-400 mb-2">{section.label}</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-blue-200 dark:border-blue-800">
+                      <th className="text-left pr-3 py-1 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">Anno</th>
+                      <th className="text-right pr-3 py-1 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">Budget</th>
+                      {MONTH_LABELS.map((m) => (
+                        <th key={m} className="text-right px-1.5 py-1 font-medium text-gray-500 dark:text-gray-500 whitespace-nowrap">{m}</th>
+                      ))}
+                      <th className="text-right pl-3 py-1 font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">Totale</th>
+                      <th className="text-right pl-2 py-1 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">vs Budget</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {secRows.map(({ year, isCurrentYear, monthly, total }) => {
+                      const ratio = secBudgetAnnual > 0 ? total / secBudgetAnnual : 0;
+                      const vsColorClass = total > 0 && secBudgetAnnual > 0
+                        ? progressColor(ratio, false)
+                            .replace('bg-green-500', 'text-green-600 dark:text-green-500')
+                            .replace('bg-amber-500', 'text-amber-600 dark:text-amber-500')
+                            .replace('bg-red-500', 'text-red-600 dark:text-red-400')
+                        : 'text-gray-300 dark:text-gray-600';
+
+                      // Same min/max highlight logic as the aggregate table
+                      const realMonths = monthly
+                        .map((v, i) => ({ v, i }))
+                        .filter(({ v, i }) => !(isCurrentYear && i >= currentMonth) && v > 0);
+                      const maxVal = realMonths.length >= 2 ? Math.max(...realMonths.map(({ v }) => v)) : null;
+                      const minVal = realMonths.length >= 2 ? Math.min(...realMonths.map(({ v }) => v)) : null;
+                      const highlightEnabled = maxVal !== null && minVal !== null && maxVal !== minVal;
+
+                      return (
+                        <tr
+                          key={year}
+                          className={`border-b border-blue-100 dark:border-blue-900/50 ${
+                            isCurrentYear
+                              ? 'bg-blue-100/60 dark:bg-blue-900/30 font-medium'
+                              : 'hover:bg-blue-50/30 dark:hover:bg-blue-950/20'
+                          }`}
+                        >
+                          <td className="pr-3 py-1.5 tabular-nums whitespace-nowrap">
+                            {year}{isCurrentYear && <span className="ml-1 text-blue-500">◂</span>}
+                          </td>
+                          <td className="pr-3 py-1.5 text-right tabular-nums text-gray-500 whitespace-nowrap">
+                            {secBudgetAnnual > 0 ? formatCurrency(secBudgetAnnual) : '—'}
+                          </td>
+                          {monthly.map((v, i) => {
+                            const isFuture = isCurrentYear && i >= currentMonth;
+                            const isEmpty = isFuture || v === 0;
+                            const isMax = !isEmpty && highlightEnabled && v === maxVal;
+                            const isMin = !isEmpty && highlightEnabled && v === minVal;
+                            const highlightClass = isMax
+                              ? 'bg-red-100 dark:bg-red-900/30 font-semibold rounded'
+                              : isMin
+                              ? 'bg-green-100 dark:bg-green-900/30 font-semibold rounded'
+                              : '';
+                            return (
+                              <td
+                                key={i}
+                                className={`px-1.5 py-1.5 text-right tabular-nums whitespace-nowrap ${
+                                  isEmpty ? 'text-gray-300 dark:text-gray-600' : highlightClass
+                                }`}
+                              >
+                                {isEmpty ? '—' : formatCurrency(v)}
+                              </td>
+                            );
+                          })}
+                          <td className="pl-3 py-1.5 text-right tabular-nums font-semibold whitespace-nowrap">
+                            {total > 0 ? formatCurrency(total) : '—'}
+                          </td>
+                          <td className={`pl-2 py-1.5 text-right tabular-nums whitespace-nowrap ${vsColorClass}`}>
+                            {total > 0 && secBudgetAnnual > 0 ? `${Math.round(ratio * 100)}%` : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })}
       </div>
     );
   }

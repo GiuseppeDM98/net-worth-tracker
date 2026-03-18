@@ -79,3 +79,6 @@
 - Monte Carlo simulation: the percentile table now switches to a card layout on mobile — one card per year showing all five percentile values, instead of a 6-column table
 - Monte Carlo Scenario Comparison: the Bear / Base / Bull parameter cards stack vertically on mobile and tablet instead of sitting side-by-side in an unreadable layout; the header buttons no longer overflow the screen
 - Goals page: objective cards now display in a 2-column grid on mobile instead of a horizontal scrollable row — all goals are visible at a glance without swiping
+
+- Budget tab: **subtotal rows** (Subtotale Spese Fisse, Variabili, Debiti) and the **Total Expenses / Total Income** footer rows are now clickable — click any of them to open the same historical year × month deep dive panel that was previously only available for individual category rows
+- Budget tab: clicking **Total Expenses** now also shows a per-type breakdown below the aggregate view — three separate month-by-month tables (Fixed Expenses, Variable, Debt) spanning all available years, with the same red/green monthly highlighting, so you can immediately see which category drove spending in any given month

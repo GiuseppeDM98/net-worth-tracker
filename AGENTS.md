@@ -58,7 +58,10 @@ End date must include full day: `new Date(year, month, 0, 23, 59, 59, 999)`
 - **Firestore**: single doc `budgets/{userId}`, full replacement on save (same pattern as `goalBasedInvesting/{userId}`)
 - **Amount storage**: `monthlyAmount` stored internally as monthly; annual view multiplies by 12 for display and ratio calculation (`budgetUsedRatio = currentYearTotal / (monthlyAmount × 12)`)
 - **`monthlyAmount` ambiguity**: may be user-set (saved in Firestore) OR auto-computed as `previousYearTotal / 12` via `getDefaultMonthlyAmount()`. The UI does not distinguish between the two — "Budget/anno" column and progress bar use this value in both cases.
-- **Deep dive**: click on an item row in annual view → inline `CategoryDeepDive` panel (blue-bordered card, same pattern as Cashflow Tab Pattern). State `selectedItemKey: string | null`. Reset in `handleStartEditing()`. Auto-scroll `scrollIntoView('nearest')` with 100ms delay (same pattern as `CurrentYearTab.tsx`). Min/max month highlight per year row: guards for <2 real months or all equal → no highlight. Colors inverted for Income section.
+- **Deep dive**: click on any row (item, subtotal, total footer) in annual view → inline `CategoryDeepDive` panel (blue-bordered card, same pattern as Cashflow Tab Pattern). State `selectedItemKey: string | null`. Reset in `handleStartEditing()`. Auto-scroll `scrollIntoView('nearest')` with 100ms delay (same pattern as `CurrentYearTab.tsx`). Min/max month highlight per year row: guards for <2 real months or all equal → no highlight. Colors inverted for Income section.
+- **Aggregate sentinel keys**: subtotal rows use `__subtotal_{sectionType}__` (e.g. `__subtotal_fixed__`); footer rows use `__total_expenses__` / `__total_income__`. Format chosen to avoid collision with real `budgetItemKey` values (which use `scope:categoryId` format). Constants: `SUBTOTAL_KEY(sectionType)`, `TOTAL_EXPENSES_KEY`, `TOTAL_INCOME_KEY`.
+- **Aggregate `deepDiveData`**: branch runs before the normal item lookup in the useMemo. Sums `getMonthlyActualsForItem` element-by-element across all relevant items — no new logic, same functions as individual rows. `item` field set to `null as unknown as BudgetItem` (not used by `CategoryDeepDive` which only reads `label`/`isIncome`/`rows`).
+- **Per-type breakdown** (`TOTAL_EXPENSES_KEY` only): rendered as 3 stacked mini-tables inside `CategoryDeepDive` (one per non-income SECTION). Each has the same Anno×Gen…Dic structure with identical min/max highlight logic. Inline IIFE replaced by `.map()` over `SECTIONS.filter(s => !s.isIncome)`. Sections with zero items are skipped.
 
 ### Radix UI Select Values
 - **Empty string NOT allowed** as `SelectItem` value (runtime error)
@@ -286,4 +289,4 @@ ALL fields in settings types must be handled in THREE places:
 **Cause**: `useCountUp` passes float intermediates (e.g. `13.5`) to `formatValue`. The `months` case uses `val % 12` which returns `1.5` on floats.
 **Fix**: `Math.round(val)` before any integer math (`Math.floor`, `%`) in display-format functions that expect whole numbers.
 
-**Last updated**: 2026-03-18 (session: FIRE & Simulazioni mobile & tablet responsive audit)
+**Last updated**: 2026-03-18 (session: Budget Tab — aggregate deep dive + per-type breakdown)
