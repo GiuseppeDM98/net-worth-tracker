@@ -82,3 +82,10 @@
 
 - Budget tab: **subtotal rows** (Subtotale Spese Fisse, Variabili, Debiti) and the **Total Expenses / Total Income** footer rows are now clickable — click any of them to open the same historical year × month deep dive panel that was previously only available for individual category rows
 - Budget tab: clicking **Total Expenses** now also shows a per-type breakdown below the aggregate view — three separate month-by-month tables (Fixed Expenses, Variable, Debt) spanning all available years, with the same red/green monthly highlighting, so you can immediately see which category drove spending in any given month
+
+- Budget tab is now fully usable on mobile — each category displays as a tappable card (tap anywhere to open a detail dialog showing budget vs actual, year-over-year delta, and historical average); sections can be expanded or collapsed with a single tap
+- The historical year-by-month deep dive ("Analisi Storica") is now a desktop-exclusive feature — mobile shows a clear "available on desktop" hint inside the item detail dialog instead of an unreadable wide table that required horizontal scrolling
+- Dividends page: the "Dividends by Asset" pie chart on mobile now shows the top 7 assets plus a grouped "Others" slice — previously all assets were shown, making the legend too long to read on small screens
+- Dividends page: the "Dividend Per Share Growth" table is now usable on mobile — tap any asset to open a dialog showing the year-by-year DPS history as a vertical list instead of a horizontally scrollable wide table
+- Dividends page: the "Total Return per Asset" table now shows a compact card layout on mobile instead of a horizontally scrolling table
+- Dividends page filter dropdowns now fill the full width of the screen on mobile for visual consistency with other form elements

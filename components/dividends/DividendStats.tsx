@@ -460,7 +460,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
               </div>
               {/* DPS detail dialog — shows years vertically on mobile */}
               <Dialog open={selectedDpsAsset !== null} onOpenChange={(open) => { if (!open) setSelectedDpsAsset(null); }}>
-                <DialogContent className="max-w-xs">
+                <DialogContent className="max-w-xs" aria-describedby={undefined}>
                   <DialogHeader>
                     <DialogTitle className="text-base">
                       {selectedDpsAsset?.assetTicker || selectedDpsAsset?.assetName}

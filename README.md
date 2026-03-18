@@ -34,7 +34,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 
 ### Cashflow
 - Income and expense tracking with custom categories and subcategories
-- **Budget tab**: automatic budget tracking for all expense categories — items auto-generated from your categories with no manual setup; annual view with progress bars comparing current year vs budget, previous year, and historical average; click any row (category, section subtotal, or Total Expenses/Income) to open a historical year×month panel with min/max month highlights; Total Expenses also shows a per-type breakdown (Fixed / Variable / Debt) as separate month-by-month tables; collapsible sections with reordering
+- **Budget tab**: automatic budget tracking for all expense categories — items auto-generated from your categories with no manual setup; annual view with progress bars comparing current year vs budget, previous year, and historical average; click any row (category, section subtotal, or Total Expenses/Income) to open a historical year×month panel with min/max month highlights; Total Expenses also shows a per-type breakdown (Fixed / Variable / Debt) as separate month-by-month tables; collapsible sections with reordering; fully responsive on mobile with tappable cards and a per-item detail dialog
 - Bulk move transactions between categories/subcategories (cross-type supported)
 - 5-layer Sankey diagram visualization
 - 4-level drill-down for detailed expense analysis
@@ -46,8 +46,8 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Borsa Italiana scraping for Italian market data (dividends and bond prices)
 - Monthly calendar view with drill-down
 - Dividend statistics and yield calculations
-- **Total Return per Asset**: table combining unrealized capital gain % and all-time net dividends received % (calculated at historical cost basis per payment, not diluted by later purchases) to show the true investment return per asset
-- **Dividend Per Share Growth**: year-by-year gross DPS history per equity asset with YoY% and CAGR columns; portfolio median growth rate shown as a summary
+- **Total Return per Asset**: table combining unrealized capital gain % and all-time net dividends received % (calculated at historical cost basis per payment, not diluted by later purchases) to show the true investment return per asset; card layout on mobile
+- **Dividend Per Share Growth**: year-by-year gross DPS history per equity asset with YoY% and CAGR columns; portfolio median growth rate shown as a summary; tap any asset on mobile to open a vertical year-by-year dialog
 
 ### Historical Analysis
 - Automatic monthly portfolio snapshots (via Vercel cron)

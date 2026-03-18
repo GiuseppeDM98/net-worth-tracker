@@ -41,6 +41,7 @@ import {
 import { getItalyYear, getItalyMonth } from '@/lib/utils/dateHelpers';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -74,6 +75,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 // ==================== Constants ====================
 
 const MONTH_LABELS = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
+const MONTH_LETTERS = ['G', 'F', 'M', 'A', 'M', 'G', 'L', 'A', 'S', 'O', 'N', 'D'];
 
 // Fixed sections in display order (income last)
 const SECTIONS: Array<{ type: ExpenseType; label: string; isIncome: boolean }> = [
@@ -234,6 +236,9 @@ export function BudgetTab({
   // Key of the budget item shown in the historical deep dive (null = hidden).
   // Uses budgetItemKey() as stable identifier.
   const [selectedItemKey, setSelectedItemKey] = useState<string | null>(null);
+
+  // Mobile-only: item.id of the budget item whose comparison dialog is open.
+  const [mobileDetailItemId, setMobileDetailItemId] = useState<string | null>(null);
 
   // Load saved config on mount
   useEffect(() => {
@@ -859,18 +864,22 @@ export function BudgetTab({
           </button>
         </div>
 
-        {/* Wide table — 12 month columns + totals. Scrolls horizontally on mobile. */}
+        {/* Wide table — 12 month columns + totals.
+            Mobile: sticky Anno column, single-letter month headers, Budget/vs Budget hidden. */}
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-blue-200 dark:border-blue-800">
-                <th className="text-left pr-3 py-1 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">Anno</th>
-                <th className="text-right pr-3 py-1 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">Budget</th>
-                {MONTH_LABELS.map((m) => (
-                  <th key={m} className="text-right px-1.5 py-1 font-medium text-gray-500 dark:text-gray-500 whitespace-nowrap">{m}</th>
+                <th className="text-left pr-2 py-1 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap sticky left-0 z-10 bg-blue-50 dark:bg-blue-950/30">Anno</th>
+                <th className="text-right pr-3 py-1 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap hidden sm:table-cell">Budget</th>
+                {MONTH_LABELS.map((m, idx) => (
+                  <th key={m} className="text-right px-0.5 sm:px-1.5 py-1 font-medium text-gray-500 dark:text-gray-500 whitespace-nowrap">
+                    <span className="hidden sm:inline">{m}</span>
+                    <span className="sm:hidden">{MONTH_LETTERS[idx]}</span>
+                  </th>
                 ))}
-                <th className="text-right pl-3 py-1 font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">Totale</th>
-                <th className="text-right pl-2 py-1 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">vs Budget</th>
+                <th className="text-right pl-2 sm:pl-3 py-1 font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">Tot.</th>
+                <th className="text-right pl-1 sm:pl-2 py-1 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap hidden sm:table-cell">vs Budget</th>
               </tr>
             </thead>
             <tbody>
@@ -904,12 +913,12 @@ export function BudgetTab({
                         : 'hover:bg-blue-50/30 dark:hover:bg-blue-950/20'
                     }`}
                   >
-                    <td className="pr-3 py-1.5 tabular-nums whitespace-nowrap">
+                    <td className="pr-2 py-1.5 tabular-nums whitespace-nowrap sticky left-0 z-10 bg-inherit">
                       {year}
                       {/* Small marker so the current year stands out in a long list */}
                       {isCurrentYear && <span className="ml-1 text-blue-500">◂</span>}
                     </td>
-                    <td className="pr-3 py-1.5 text-right tabular-nums text-gray-500 whitespace-nowrap">
+                    <td className="pr-3 py-1.5 text-right tabular-nums text-gray-500 whitespace-nowrap hidden sm:table-cell">
                       {budgetAnnual > 0 ? formatCurrency(budgetAnnual) : '—'}
                     </td>
                     {monthly.map((v, i) => {
@@ -927,7 +936,7 @@ export function BudgetTab({
                       return (
                         <td
                           key={i}
-                          className={`px-1.5 py-1.5 text-right tabular-nums whitespace-nowrap ${
+                          className={`px-0.5 sm:px-1.5 py-1.5 text-right tabular-nums whitespace-nowrap ${
                             isEmpty ? 'text-gray-300 dark:text-gray-600' : highlightClass
                           }`}
                         >
@@ -935,10 +944,10 @@ export function BudgetTab({
                         </td>
                       );
                     })}
-                    <td className="pl-3 py-1.5 text-right tabular-nums font-semibold whitespace-nowrap">
+                    <td className="pl-2 sm:pl-3 py-1.5 text-right tabular-nums font-semibold whitespace-nowrap">
                       {total > 0 ? formatCurrency(total) : '—'}
                     </td>
-                    <td className={`pl-2 py-1.5 text-right tabular-nums whitespace-nowrap ${vsColorClass}`}>
+                    <td className={`pl-1 sm:pl-2 py-1.5 text-right tabular-nums whitespace-nowrap hidden sm:table-cell ${vsColorClass}`}>
                       {total > 0 && budgetAnnual > 0 ? `${Math.round(ratio * 100)}%` : '—'}
                     </td>
                   </tr>
@@ -975,13 +984,16 @@ export function BudgetTab({
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-blue-200 dark:border-blue-800">
-                      <th className="text-left pr-3 py-1 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">Anno</th>
-                      <th className="text-right pr-3 py-1 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">Budget</th>
-                      {MONTH_LABELS.map((m) => (
-                        <th key={m} className="text-right px-1.5 py-1 font-medium text-gray-500 dark:text-gray-500 whitespace-nowrap">{m}</th>
+                      <th className="text-left pr-2 py-1 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap sticky left-0 z-10 bg-blue-50 dark:bg-blue-950/30">Anno</th>
+                      <th className="text-right pr-3 py-1 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap hidden sm:table-cell">Budget</th>
+                      {MONTH_LABELS.map((m, idx) => (
+                        <th key={m} className="text-right px-0.5 sm:px-1.5 py-1 font-medium text-gray-500 dark:text-gray-500 whitespace-nowrap">
+                          <span className="hidden sm:inline">{m}</span>
+                          <span className="sm:hidden">{MONTH_LETTERS[idx]}</span>
+                        </th>
                       ))}
-                      <th className="text-right pl-3 py-1 font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">Totale</th>
-                      <th className="text-right pl-2 py-1 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">vs Budget</th>
+                      <th className="text-right pl-2 sm:pl-3 py-1 font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">Tot.</th>
+                      <th className="text-right pl-1 sm:pl-2 py-1 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap hidden sm:table-cell">vs Budget</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1011,10 +1023,10 @@ export function BudgetTab({
                               : 'hover:bg-blue-50/30 dark:hover:bg-blue-950/20'
                           }`}
                         >
-                          <td className="pr-3 py-1.5 tabular-nums whitespace-nowrap">
+                          <td className="pr-2 py-1.5 tabular-nums whitespace-nowrap sticky left-0 z-10 bg-inherit">
                             {year}{isCurrentYear && <span className="ml-1 text-blue-500">◂</span>}
                           </td>
-                          <td className="pr-3 py-1.5 text-right tabular-nums text-gray-500 whitespace-nowrap">
+                          <td className="pr-3 py-1.5 text-right tabular-nums text-gray-500 whitespace-nowrap hidden sm:table-cell">
                             {secBudgetAnnual > 0 ? formatCurrency(secBudgetAnnual) : '—'}
                           </td>
                           {monthly.map((v, i) => {
@@ -1030,7 +1042,7 @@ export function BudgetTab({
                             return (
                               <td
                                 key={i}
-                                className={`px-1.5 py-1.5 text-right tabular-nums whitespace-nowrap ${
+                                className={`px-0.5 sm:px-1.5 py-1.5 text-right tabular-nums whitespace-nowrap ${
                                   isEmpty ? 'text-gray-300 dark:text-gray-600' : highlightClass
                                 }`}
                               >
@@ -1038,10 +1050,10 @@ export function BudgetTab({
                               </td>
                             );
                           })}
-                          <td className="pl-3 py-1.5 text-right tabular-nums font-semibold whitespace-nowrap">
+                          <td className="pl-2 sm:pl-3 py-1.5 text-right tabular-nums font-semibold whitespace-nowrap">
                             {total > 0 ? formatCurrency(total) : '—'}
                           </td>
-                          <td className={`pl-2 py-1.5 text-right tabular-nums whitespace-nowrap ${vsColorClass}`}>
+                          <td className={`pl-1 sm:pl-2 py-1.5 text-right tabular-nums whitespace-nowrap hidden sm:table-cell ${vsColorClass}`}>
                             {total > 0 && secBudgetAnnual > 0 ? `${Math.round(ratio * 100)}%` : '—'}
                           </td>
                         </tr>
@@ -1281,6 +1293,235 @@ export function BudgetTab({
     );
   }
 
+  // ==================== Mobile card view (view mode only) ====================
+
+  /**
+   * Mobile alternative to AnnualTable: one card per budget item, grouped by section.
+   * - Item cards: name + progress bar + budget/current year amounts + chevron → comparison dialog
+   * - Subtotal cards: tap → deep dive (same as desktop row click)
+   * - Total cards: tap → deep dive
+   * - Edit mode is handled by the existing EditPanel (already card-based)
+   */
+  function MobileAnnualView() {
+    const hasHistory = comparisons.some((c) => c.historicalAverage > 0);
+    const compMap = new Map(comparisons.map((c) => [c.item.id, c]));
+
+    const isIncomeItem = (item: BudgetItem) => (getItemSectionType(item, categories) as string) === 'income';
+    const expenseItems = displayItems.filter(i => !isIncomeItem(i));
+    const incomeItems = displayItems.filter(i => isIncomeItem(i));
+    const expenseComparisons = comparisons.filter(c => !isIncomeItem(c.item));
+    const incomeComparisons = comparisons.filter(c => isIncomeItem(c.item));
+
+    const totalExpCurrentYear = expenseComparisons.reduce((s, c) => s + c.currentYearTotal, 0);
+    const totalExpPrevYear = expenseComparisons.reduce((s, c) => s + c.previousYearTotal, 0);
+    const totalExpHistAvg = expenseComparisons.reduce((s, c) => s + c.historicalAverage, 0);
+    const totalExpBudgetMonthly = expenseItems.reduce((s, i) => s + i.monthlyAmount, 0);
+
+    const totalIncCurrentYear = incomeComparisons.reduce((s, c) => s + c.currentYearTotal, 0);
+    const totalIncPrevYear = incomeComparisons.reduce((s, c) => s + c.previousYearTotal, 0);
+    const totalIncHistAvg = incomeComparisons.reduce((s, c) => s + c.historicalAverage, 0);
+    const totalIncBudgetMonthly = incomeItems.reduce((s, i) => s + i.monthlyAmount, 0);
+
+    // Detail dialog data
+    const detailItem = mobileDetailItemId ? displayItems.find(i => i.id === mobileDetailItemId) : null;
+    const detailComp = mobileDetailItemId ? comparisons.find(c => c.item.id === mobileDetailItemId) : null;
+    const detailIsIncome = detailItem ? (getItemSectionType(detailItem, categories) as string) === 'income' : false;
+
+    return (
+      <>
+        <div className="space-y-4">
+          {SECTIONS.map(({ type: sectionType, label: sectionLabel, isIncome }) => {
+            const items = sectionItems(displayItems, sectionType);
+            if (items.length === 0) return null;
+
+            const isCollapsed = collapsedSections.has(sectionType);
+            const sectionComparisons = items.map(i => compMap.get(i.id)!).filter(Boolean);
+            const secCurrentYear = sectionComparisons.reduce((s, c) => s + c.currentYearTotal, 0);
+            const secPrevYear = sectionComparisons.reduce((s, c) => s + c.previousYearTotal, 0);
+            const secHistAvg = sectionComparisons.reduce((s, c) => s + c.historicalAverage, 0);
+            const secBudgetMonthly = items.reduce((s, i) => s + i.monthlyAmount, 0);
+            const secRatio = secBudgetMonthly > 0 ? secCurrentYear / (secBudgetMonthly * 12) : 0;
+
+            return (
+              <div key={sectionType} className="space-y-2">
+                {/* Section header — click to collapse/expand */}
+                <button
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-md bg-muted/60 hover:bg-muted/80 transition-colors"
+                  onClick={() => toggleSection(sectionType)}
+                >
+                  <span className="font-semibold text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                    <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
+                    {sectionLabel}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{items.length} {items.length === 1 ? 'voce' : 'voci'}</span>
+                </button>
+
+                {!isCollapsed && (
+                  <>
+                    {/* Item cards */}
+                    {items.map(item => {
+                      const c = compMap.get(item.id);
+                      if (!c) return null;
+                      return (
+                        <button
+                          key={item.id}
+                          className={`w-full text-left rounded-md border p-3 space-y-2 transition-colors hover:bg-muted/40 active:bg-muted/60 ${item.scope === 'subcategory' ? 'ml-3 border-l-2 border-l-gray-200 dark:border-l-gray-700' : ''}`}
+                          onClick={() => setMobileDetailItemId(item.id)}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span className="flex-1 text-sm font-medium truncate">{getItemLabel(item, categories)}</span>
+                            <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
+                          </div>
+                          <ProgressCell ratio={c.budgetUsedRatio} inverted={isIncome} />
+                          <div className="flex items-baseline justify-between text-xs">
+                            <span className="text-muted-foreground">
+                              Budget: <span className="font-medium text-foreground">{formatCurrency(item.monthlyAmount * 12)}</span>
+                            </span>
+                            <span className="font-semibold text-sm">{formatCurrency(c.currentYearTotal)}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+
+                    {/* Section subtotal card */}
+                    <div className="w-full rounded-md border p-3 text-left space-y-2 bg-muted/30">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-muted-foreground">Subtotale {sectionLabel}</span>
+                      </div>
+                      <ProgressCell ratio={secRatio} inverted={isIncome} />
+                      <div className="flex items-baseline justify-between text-xs">
+                        <span className="text-muted-foreground">
+                          Budget: <span className="font-medium text-foreground">{formatCurrency(secBudgetMonthly * 12)}</span>
+                        </span>
+                        <span className="font-semibold">{formatCurrency(secCurrentYear)}</span>
+                      </div>
+                      {secPrevYear > 0 && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>{currentYear - 1}: {formatCurrency(secPrevYear)}</span>
+                          <DeltaBadge value={secCurrentYear} reference={secPrevYear} inverted={isIncome} />
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Totale Spese card */}
+          {expenseItems.length > 0 && (
+            <div className="w-full rounded-md border p-3 text-left space-y-2 bg-muted/50">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold">Totale Spese</span>
+              </div>
+              <ProgressCell ratio={totalExpBudgetMonthly > 0 ? totalExpCurrentYear / (totalExpBudgetMonthly * 12) : 0} inverted={false} />
+              <div className="flex items-baseline justify-between text-xs">
+                <span className="text-muted-foreground">
+                  Budget: <span className="font-medium text-foreground">{formatCurrency(totalExpBudgetMonthly * 12)}</span>
+                </span>
+                <span className="font-semibold text-sm">{formatCurrency(totalExpCurrentYear)}</span>
+              </div>
+              {totalExpPrevYear > 0 && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span>{currentYear - 1}: {formatCurrency(totalExpPrevYear)}</span>
+                  <DeltaBadge value={totalExpCurrentYear} reference={totalExpPrevYear} inverted={false} />
+                  {hasHistory && totalExpHistAvg > 0 && (
+                    <>
+                      <span className="ml-2 text-purple-600 dark:text-purple-400">Media: {formatCurrency(totalExpHistAvg)}</span>
+                      <DeltaBadge value={totalExpCurrentYear} reference={totalExpHistAvg} inverted={false} />
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Totale Entrate card */}
+          {incomeItems.length > 0 && (
+            <div className="w-full rounded-md border p-3 text-left space-y-2 bg-muted/50">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold">Totale Entrate</span>
+              </div>
+              <ProgressCell ratio={totalIncBudgetMonthly > 0 ? totalIncCurrentYear / (totalIncBudgetMonthly * 12) : 0} inverted={true} />
+              <div className="flex items-baseline justify-between text-xs">
+                <span className="text-muted-foreground">
+                  Budget: <span className="font-medium text-foreground">{formatCurrency(totalIncBudgetMonthly * 12)}</span>
+                </span>
+                <span className="font-semibold text-sm">{formatCurrency(totalIncCurrentYear)}</span>
+              </div>
+              {totalIncPrevYear > 0 && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span>{currentYear - 1}: {formatCurrency(totalIncPrevYear)}</span>
+                  <DeltaBadge value={totalIncCurrentYear} reference={totalIncPrevYear} inverted={true} />
+                  {hasHistory && totalIncHistAvg > 0 && (
+                    <>
+                      <span className="ml-2 text-purple-600 dark:text-purple-400">Media: {formatCurrency(totalIncHistAvg)}</span>
+                      <DeltaBadge value={totalIncCurrentYear} reference={totalIncHistAvg} inverted={true} />
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Item comparison dialog */}
+        <Dialog open={mobileDetailItemId !== null} onOpenChange={(open) => { if (!open) setMobileDetailItemId(null); }}>
+          <DialogContent className="max-w-xs" aria-describedby={undefined}>
+            {detailItem && detailComp && (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="text-base leading-snug">{getItemLabel(detailItem, categories)}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 pt-1">
+                  <table className="w-full text-sm">
+                    <tbody>
+                      <tr className="border-b">
+                        <td className="py-2 text-xs text-muted-foreground">Budget/anno</td>
+                        <td className="py-2 text-right font-medium tabular-nums">{formatCurrency(detailItem.monthlyAmount * 12)}</td>
+                      </tr>
+                      <tr className="border-b">
+                        <td className="py-2 text-xs font-medium text-blue-600 dark:text-blue-400">{currentYear}</td>
+                        <td className="py-2 text-right font-semibold tabular-nums">{formatCurrency(detailComp.currentYearTotal)}</td>
+                      </tr>
+                      <tr className="border-b">
+                        <td className="py-2 text-xs text-amber-600 dark:text-amber-400">{currentYear - 1}</td>
+                        <td className="py-2 text-right tabular-nums">
+                          <div className="flex items-center justify-end gap-2">
+                            <span className="text-muted-foreground">{detailComp.previousYearTotal > 0 ? formatCurrency(detailComp.previousYearTotal) : '—'}</span>
+                            <DeltaBadge value={detailComp.currentYearTotal} reference={detailComp.previousYearTotal} inverted={detailIsIncome} />
+                          </div>
+                        </td>
+                      </tr>
+                      {hasHistory && detailComp.historicalAverage > 0 && (
+                        <tr className="border-b">
+                          <td className="py-2 text-xs text-purple-600 dark:text-purple-400">Media storica</td>
+                          <td className="py-2 text-right tabular-nums">
+                            <div className="flex items-center justify-end gap-2">
+                              <span className="text-muted-foreground">{formatCurrency(detailComp.historicalAverage)}</span>
+                              <DeltaBadge value={detailComp.currentYearTotal} reference={detailComp.historicalAverage} inverted={detailIsIncome} />
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground">Avanzamento</p>
+                    <ProgressCell ratio={detailComp.budgetUsedRatio} inverted={detailIsIncome} />
+                  </div>
+                  <p className="text-xs text-center text-muted-foreground">
+                    Analisi storica mensile disponibile su desktop
+                  </p>
+                </div>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
+      </>
+    );
+  }
+
   // ==================== Render ====================
 
   if (budgetLoading || loading) {
@@ -1360,19 +1601,23 @@ export function BudgetTab({
             </div>
           )}
 
-          {/* Mobile/tablet notice — budget table has 7-8 columns, desktop is recommended */}
-          <div className="desktop:hidden rounded-md border border-amber-200 bg-amber-50/50 dark:bg-amber-950/10 dark:border-amber-800 p-3 flex items-start gap-2 text-sm text-amber-700 dark:text-amber-400">
-            <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
-            <span>Per la miglior esperienza si consiglia la visualizzazione su desktop. La tabella è comunque navigabile scorrendo orizzontalmente.</span>
+          {/* Mobile card view */}
+          <div className="desktop:hidden">
+            <MobileAnnualView />
           </div>
 
-          <Card>
-            <CardContent className="pt-6">
-              <AnnualTable />
-            </CardContent>
-          </Card>
+          {/* Desktop table */}
+          <div className="hidden desktop:block">
+            <Card>
+              <CardContent className="pt-6">
+                <AnnualTable />
+              </CardContent>
+            </Card>
+          </div>
 
-          <CategoryDeepDive />
+          <div className="hidden desktop:block">
+            <CategoryDeepDive />
+          </div>
 
           <p className="text-xs text-gray-400 flex items-center gap-1">
             <Info className="h-3 w-3" />
