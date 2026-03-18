@@ -360,7 +360,10 @@ export default function PerformancePage() {
         const heatmap = prepareMonthlyReturnsHeatmap(periodSnapshots, metrics.cashFlows);
         setHeatmapData(heatmap);
 
-        const underwater = prepareUnderwaterDrawdownData(periodSnapshots, metrics.cashFlows);
+        // YTD/1Y/3Y/5Y include an extra baseline snapshot; skip it from the chart
+        // (same logic as preparePerformanceChartData and prepareMonthlyReturnsHeatmap).
+        const hasBaselineUnderwater = ['YTD', '1Y', '3Y', '5Y'].includes(metrics.timePeriod);
+        const underwater = prepareUnderwaterDrawdownData(periodSnapshots, metrics.cashFlows, hasBaselineUnderwater);
         setUnderwaterData(underwater);
       }
     }
