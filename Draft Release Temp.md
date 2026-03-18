@@ -63,5 +63,6 @@
 - Performance page is now fully usable on mobile and tablet — the period selector (YTD / 1Y / 3Y / 5Y / Storico / Custom) becomes a dropdown on phones instead of cramped tabs, the header and action buttons stack vertically on narrow screens, and the "Periodo Personalizzato" button collapses to an icon to save space
 - Monthly returns heatmap now works without horizontal scrolling on mobile — each month cell shows its color coding only (green/red scale), with no numbers cluttering the view; the exact return percentage is still available on tap-and-hold. The Year column stays pinned while scrolling on tablet
 - Fixed chart legends overlapping the x-axis date labels on the Performance page
+- Fixed chart legends overlapping the x-axis date labels on the History page (Asset Class and Liquidity charts) on tablet portrait
 - Allocation page is now fully usable on mobile and tablet — asset class cards display in a 2-column grid on tablets (768–1023px) instead of cramped 8-column tables that required horizontal scrolling; drill-down into subcategories and specific assets uses the existing bottom sheet navigation on both mobile and tablet
 - "Modifica Target" button on the Allocation page is now full-width on mobile, making it easier to tap and always showing the label text

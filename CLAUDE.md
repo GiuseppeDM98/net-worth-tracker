@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio
-- Ultima implementazione: **Allocation Page Mobile & Tablet Responsive** — pagina Allocazione adattata per mobile/tablet: aggiunto tier tablet (768–1023px) con card 2 colonne + bottom sheet (tabelle 8 colonne erano cramped); `useCardView = isMobile || isTablet` sostituisce il guard `isMobile`; header `flex-col sm:flex-row`; bottone "Modifica Target" full-width su mobile. (2026-03-18)
+- Ultima implementazione: **History Page Mobile/Tablet Audit** — audit `/adapt` pagina Storico: `lg:grid-cols-3` → `desktop:grid-cols-3` negli Snapshot Cards; `max-desktop:portrait:pb-20` sul root wrapper; fix legend che si sovrappone alle label asse X su tablet portrait via `bottom: 20` in `getChartMargins()` per non-mobile. (2026-03-18)
 - In corso ora: nessuna attività attiva
 
 ## Architecture Snapshot

@@ -133,7 +133,9 @@ export default function HistoryPage() {
 
   const getChartMargins = () => {
     if (isMobile) return { left: 10, right: 10, top: 5, bottom: 5 };
-    return { left: 50 };
+    // bottom: 20 prevents legend from overlapping X-axis labels (Recharts renders
+    // legend inside SVG height, eating into chart space without explicit bottom margin)
+    return { left: 50, bottom: 20 };
   };
 
   const getYAxisWidth = () => (isMobile ? 70 : 100);
@@ -508,7 +510,7 @@ export default function HistoryPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-desktop:portrait:pb-20">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex-1">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Storico</h1>
@@ -1564,7 +1566,7 @@ export default function HistoryPage() {
             <div className={cn(
               "grid gap-4",
               isLandscape ? "grid-cols-2" : "grid-cols-1",
-              "md:grid-cols-2 lg:grid-cols-3"
+              "md:grid-cols-2 desktop:grid-cols-3"
             )}>
               {snapshots.slice(-6).reverse().map((snapshot) => (
                 <div
