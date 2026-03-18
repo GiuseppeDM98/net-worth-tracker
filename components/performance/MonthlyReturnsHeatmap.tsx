@@ -51,15 +51,17 @@ export function MonthlyReturnsHeatmap({ data }: MonthlyReturnsHeatmapProps) {
   }
 
   return (
-    <div className="overflow-x-auto sm:overflow-x-visible">
-      <table className="w-full border-collapse text-xs sm:text-sm">
+    // Always overflow-x-auto: the full table (13 cols + percentages) needs ~850px,
+    // so compact color-only view is shown below desktop:, full view at 1440px+ where it fits.
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse text-xs desktop:text-sm">
         <thead>
           <tr>
-            <th className="border border-border p-1 sm:p-2 bg-muted font-semibold text-left sticky left-0 z-10">Anno</th>
+            <th className="border border-border p-1 desktop:p-2 bg-muted font-semibold text-left sticky left-0 z-10">Anno</th>
             {MONTH_NAMES.map((month, i) => (
-              <th key={month} className="border border-border p-1 sm:p-2 bg-muted font-semibold text-center">
-                <span className="sm:hidden">{MONTH_LETTERS[i]}</span>
-                <span className="hidden sm:inline">{month}</span>
+              <th key={month} className="border border-border p-1 desktop:p-2 bg-muted font-semibold text-center">
+                <span className="desktop:hidden">{MONTH_LETTERS[i]}</span>
+                <span className="hidden desktop:inline">{month}</span>
               </th>
             ))}
           </tr>
@@ -67,7 +69,7 @@ export function MonthlyReturnsHeatmap({ data }: MonthlyReturnsHeatmapProps) {
         <tbody>
           {data.map((yearData) => (
             <tr key={yearData.year}>
-              <td className="border border-border p-1 sm:p-2 bg-muted font-semibold sticky left-0 z-10">{yearData.year}</td>
+              <td className="border border-border p-1 desktop:p-2 bg-muted font-semibold sticky left-0 z-10">{yearData.year}</td>
               {yearData.months.map((monthData) => {
                 const bgColor = getReturnColor(monthData.return);
                 const textColor = getTextColor(monthData.return);
@@ -75,17 +77,17 @@ export function MonthlyReturnsHeatmap({ data }: MonthlyReturnsHeatmapProps) {
                 return (
                   <td
                     key={monthData.month}
-                    className={`border border-border p-1 sm:p-2 text-center ${bgColor} ${textColor}`}
+                    className={`border border-border p-1 desktop:p-2 text-center ${bgColor} ${textColor}`}
                     title={
                       monthData.return !== null
                         ? `${MONTH_NAMES[monthData.month - 1]} ${yearData.year}: ${formatPercentage(monthData.return)}`
                         : 'Nessun dato disponibile'
                     }
                   >
-                    <span className="hidden sm:inline">
+                    <span className="hidden desktop:inline">
                       {monthData.return !== null ? formatPercentage(monthData.return) : '-'}
                     </span>
-                    <span className="sm:hidden" aria-hidden="true" />
+                    <span className="desktop:hidden" aria-hidden="true" />
                   </td>
                 );
               })}

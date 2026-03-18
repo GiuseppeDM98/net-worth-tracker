@@ -19,6 +19,8 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed the monthly returns heatmap on the Performance page overflowing its container on iPad Mini and similar ~744px-wide devices: the compact color-only view (green/red cells, no numbers) now correctly appears on all devices below 1440px wide — previously the full table with month names and percentages was incorrectly triggered at 640px, causing it to overflow without a scrollbar
+
 - Fixed duplicate upcoming dividends appearing in the dividend table after the daily cron job ran: equity dividends (e.g. NEXI, FBK, ENI) could appear twice with identical data if Vercel retried or double-fired the cron endpoint. Auto-generated dividends now use a deterministic ID so concurrent writes are idempotent
 
 - Fixed Yield on Cost (YOC) calculation in the Performance page: buying additional shares after a dividend payment no longer understates YOC. The metric now correctly reflects the dividend yield relative to your average cost per share, regardless of when shares were purchased
@@ -89,3 +91,5 @@
 - Dividends page: the "Dividend Per Share Growth" table is now usable on mobile — tap any asset to open a dialog showing the year-by-year DPS history as a vertical list instead of a horizontally scrollable wide table
 - Dividends page: the "Total Return per Asset" table now shows a compact card layout on mobile instead of a horizontally scrolling table
 - Dividends page filter dropdowns now fill the full width of the screen on mobile for visual consistency with other form elements
+
+- Settings page is now fully usable on mobile and tablet — the tab navigation (Allocation / Preferences / Expenses / Dividends) becomes a full-width dropdown on devices below 1440px wide; form sections stack to a single column on narrow screens; subcategory target card headers no longer overflow at phone widths

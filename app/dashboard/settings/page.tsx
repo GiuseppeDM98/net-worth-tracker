@@ -1157,23 +1157,23 @@ export default function SettingsPage() {
   const isValidTotal = Math.abs(total - 100) < 0.01;
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div className="space-y-4 sm:space-y-6 max-desktop:portrait:pb-20">
+      <div className="flex flex-col gap-3 landscape:flex-row landscape:items-center landscape:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Impostazioni</h1>
           <p className="mt-2 text-gray-600">
             Configura i tuoi target di allocazione del portafoglio
           </p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+        <div className="flex flex-col landscape:flex-row gap-2 w-full landscape:w-auto">
           {/* Reset is only meaningful for allocation targets */}
           {activeTab === 'allocazione' && (
-            <Button variant="outline" onClick={handleReset} className="w-full sm:w-auto">
+            <Button variant="outline" onClick={handleReset} className="w-full landscape:w-auto">
               <RotateCcw className="mr-2 h-4 w-4" />
               Ripristina Default
             </Button>
           )}
-          <Button onClick={handleSave} disabled={saving} className="w-full sm:w-auto">
+          <Button onClick={handleSave} disabled={saving} className="w-full landscape:w-auto">
             <Save className="mr-2 h-4 w-4" />
             {saving ? 'Salvataggio...' : 'Salva'}
           </Button>
@@ -1181,27 +1181,38 @@ export default function SettingsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        {/* Mobile: horizontal scroll, Desktop: 4-column grid — same pattern as Assets page */}
-        <div className="overflow-x-auto">
-          <TabsList className="inline-flex min-w-full desktop:w-auto desktop:grid desktop:grid-cols-4">
-            <TabsTrigger value="allocazione" className="flex items-center gap-2 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-4">
-              <PieChart className="h-4 w-4" />
-              <span className="hidden sm:inline">Allocazione</span>
-            </TabsTrigger>
-            <TabsTrigger value="generale" className="flex items-center gap-2 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-4">
-              <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">Preferenze</span>
-            </TabsTrigger>
-            <TabsTrigger value="spese" className="flex items-center gap-2 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-4">
-              <Receipt className="h-4 w-4" />
-              <span className="hidden sm:inline">Spese</span>
-            </TabsTrigger>
-            <TabsTrigger value="dividendi" className="flex items-center gap-2 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-4">
-              <Coins className="h-4 w-4" />
-              <span className="hidden sm:inline">Dividendi</span>
-            </TabsTrigger>
-          </TabsList>
+        {/* Mobile: Radix Select, Desktop: TabsList — same pattern as Assets/FIRE/Performance pages */}
+        <div className="desktop:hidden mb-4">
+          <Select value={activeTab} onValueChange={handleTabChange}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="allocazione">Allocazione</SelectItem>
+              <SelectItem value="generale">Preferenze</SelectItem>
+              <SelectItem value="spese">Spese</SelectItem>
+              <SelectItem value="dividendi">Dividendi</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
+        <TabsList className="hidden desktop:grid desktop:grid-cols-4 w-full">
+          <TabsTrigger value="allocazione" className="flex items-center gap-2">
+            <PieChart className="h-4 w-4" />
+            Allocazione
+          </TabsTrigger>
+          <TabsTrigger value="generale" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Preferenze
+          </TabsTrigger>
+          <TabsTrigger value="spese" className="flex items-center gap-2">
+            <Receipt className="h-4 w-4" />
+            Spese
+          </TabsTrigger>
+          <TabsTrigger value="dividendi" className="flex items-center gap-2">
+            <Coins className="h-4 w-4" />
+            Dividendi
+          </TabsTrigger>
+        </TabsList>
 
         {/* Tab: Impostazioni Generali (lazy) */}
         {mountedTabs.has('generale') && (
@@ -1442,7 +1453,7 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="p-4 sm:p-6">
           <div className="space-y-4 sm:space-y-6">
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-6 desktop:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="userAge">Età (anni)</Label>
                 <Input
@@ -1544,7 +1555,7 @@ export default function SettingsPage() {
           </div>
         </CardHeader>
         <CardContent className="p-4 sm:p-6">
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-6 desktop:grid-cols-2">
             {assetClasses.map((assetClass) => {
               const isAutoCalculated = autoCalculate && (assetClass === 'equity' || assetClass === 'bonds');
               const isCash = assetClass === 'cash';
@@ -1614,7 +1625,8 @@ export default function SettingsPage() {
         return (
           <Card key={`sub-${assetClass}`}>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              {/* Two-row on mobile, single row on desktop — title is too long to share a line with controls */}
+              <div className="flex flex-col gap-2 desktop:flex-row desktop:items-center desktop:justify-between">
                 <div className="flex items-center gap-3">
                   <Button
                     variant="ghost"
@@ -1635,7 +1647,7 @@ export default function SettingsPage() {
                     Sotto-Categorie {assetClassLabels[assetClass]}
                   </CardTitle>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 justify-between desktop:justify-start">
                   <div className="flex items-center gap-2">
                     <Label htmlFor={`toggle-${assetClass}`} className="text-sm">
                       Abilita
@@ -2010,7 +2022,7 @@ export default function SettingsPage() {
             Configura la categoria per le entrate automatiche da dividendi
           </p>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 desktop:grid-cols-2">
             {/* Dividend Income Category */}
             <div className="space-y-2">
               <Label htmlFor="dividendIncomeCategory">Categoria Entrate Dividendi</Label>
