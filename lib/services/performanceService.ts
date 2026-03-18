@@ -1711,11 +1711,17 @@ export function prepareMonthlyReturnsHeatmap(
  *
  * @param snapshots - Monthly snapshots (will be sorted chronologically)
  * @param cashFlows - Monthly cash flows
+ * @param skipBaseline - When true, drops the first (baseline) snapshot from output.
+ *   getSnapshotsForPeriod includes an extra month before YTD/1Y/3Y/5Y periods for
+ *   return calculations; that month falls outside the selected period and should
+ *   not appear as a chart data point. The baseline is still used internally to
+ *   seed the running peak and cumulative cash flow before being excluded.
  * @returns Array of underwater drawdown data points
  */
 export function prepareUnderwaterDrawdownData(
   snapshots: MonthlySnapshot[],
-  cashFlows: CashFlowData[]
+  cashFlows: CashFlowData[],
+  skipBaseline = false
 ): UnderwaterDrawdownData[] {
   if (snapshots.length < 1) return [];
 
@@ -1749,7 +1755,9 @@ export function prepareUnderwaterDrawdownData(
   let runningPeak = adjustedValues[0].value;
   const underwaterData: UnderwaterDrawdownData[] = [];
 
-  for (const { value, snapshot } of adjustedValues) {
+  for (let i = 0; i < adjustedValues.length; i++) {
+    const { value, snapshot } = adjustedValues[i];
+
     // Update peak if new high is reached
     if (value > runningPeak) {
       runningPeak = value;
@@ -1760,6 +1768,10 @@ export function prepareUnderwaterDrawdownData(
     if (runningPeak > 0 && value < runningPeak) {
       drawdown = ((value - runningPeak) / runningPeak) * 100; // Negative value
     }
+
+    // Skip the baseline month (index 0) from the output — it falls outside the
+    // selected period. We still process it above so runningPeak is seeded correctly.
+    if (skipBaseline && i === 0) continue;
 
     underwaterData.push({
       date: `${String(snapshot.month).padStart(2, '0')}/${String(snapshot.year).slice(-2)}`,

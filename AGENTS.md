@@ -190,6 +190,7 @@ ALL fields in settings types must be handled in THREE places:
 - **Chart baseline hiding** — each chart function handles it independently:
   - Heatmap (`prepareMonthlyReturnsHeatmap`): loop starts at `i = 1`
   - Evoluzione Patrimonio (`preparePerformanceChartData`): optional `skipBaseline=true` → `.slice(1)` after sort. Pass `true` for YTD/1Y/3Y/5Y in `getChartData()`. Baseline is always `sortedSnapshots[0]` after chronological sort → slice is safe.
+  - Underwater/Drawdown (`prepareUnderwaterDrawdownData`): optional `skipBaseline=true` → `continue` at `i === 0` in indexed loop. Baseline is still processed to seed `runningPeak` before being excluded from output. Pass `hasBaselineUnderwater` in the `useEffect` that sets `underwaterData`.
 
 ---
 
@@ -269,4 +270,4 @@ ALL fields in settings types must be handled in THREE places:
 **Fix**: Use `overflow-x-auto` always on wide table wrappers — never remove it at a breakpoint. `sticky left-0` columns work correctly inside `overflow-x-auto` without needing `overflow-x-visible`.
 **File**: `MonthlyReturnsHeatmap.tsx` (fixed: `sm:` → `desktop:`, removed `sm:overflow-x-visible`)
 
-**Last updated**: 2026-03-18 (session: Settings + Performance heatmap mobile responsive audit)
+**Last updated**: 2026-03-18 (session: Fix underwater chart baseline month visibility)
