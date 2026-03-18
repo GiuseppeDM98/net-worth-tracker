@@ -183,6 +183,12 @@ ALL fields in settings types must be handled in THREE places:
 - **Gotcha**: `formatCurrency` exists in BOTH `lib/utils/formatters.ts` AND `lib/services/chartService.ts`
 - When modifying formatters, update BOTH functions to keep signatures aligned
 
+### Performance Metrics & Capital Flows
+- TWR/CAGR/ROI use cashflow expense records as the sole source of contributions/withdrawals
+- **Internal transfer** (cash asset ↔ investment asset both tracked in app): NW stays flat → no cashflow entry needed → metrics unaffected
+- **External capital** (money enters/exits the tracked system): requires a cashflow entry — without it, the NW change is misread as investment return/loss
+- `AssetDialog` shows a contextual amber hint when `quantity` changes in edit mode (non-cash assets only), reminding users to record the corresponding cashflow entry if needed
+
 ### Performance Period Baseline Pattern
 - `getSnapshotsForPeriod` includes 1 extra month before the period as **baseline** for YTD/1Y/3Y/5Y
 - **`hasBaseline`** in `calculatePerformanceForPeriod`: period dates computed from `sortedSnapshots[1]` (not baseline). Active only for YTD/1Y/3Y/5Y with >= 3 snapshots

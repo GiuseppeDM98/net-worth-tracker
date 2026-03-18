@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio, framer-motion
-- Ultima implementazione: **Framer Motion animations** — Dashboard, Hall of Fame, History, DoublingMilestoneTimeline. Shared variants in `lib/utils/motionVariants.ts`; global `MotionConfig reducedMotion="user"` via `MotionProvider` in root layout. Page fade-in, stagger card grids, `AnimatePresence` + `slideDown` per collapsibles, animated progress bar. (2026-03-18)
+- Ultima implementazione: **AssetDialog cashflow hint** — hint contestuale ambra sotto il campo Quantità in edit mode: aumenti → "registra entrata cashflow", diminuzioni → "registra uscita cashflow". Non appare per asset `cash`. Educa l'utente sull'integrità delle metriche di performance senza cambiamenti al modello dati. (2026-03-18)
 - In corso ora: nessuna attività attiva
 
 ## Architecture Snapshot

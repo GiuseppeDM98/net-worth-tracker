@@ -32,6 +32,8 @@
 
 ## 🔧 Improvements
 
+- When editing an asset's quantity, the form now shows a contextual reminder if the quantity increases ("did you invest new capital? record a cashflow income entry") or decreases ("did you sell this asset? record a cashflow expense entry") — helps keep performance metrics (TWR, CAGR) accurate by ensuring capital flows are properly tracked. The reminder does not appear for cash assets or when the quantity is unchanged
+
 - Performance page now shows a **skeleton loading screen** while data is being fetched — the placeholder mirrors the real layout (header, tabs, metric sections, charts) so the page feels faster and the transition is seamless instead of a centered spinner
 - Metric cards on the Performance page now animate their values on load and whenever you switch time periods — numbers count up smoothly from zero to their final value
 - Metric cards appear with a staggered cascade effect: each card slides up and fades in sequentially (left to right, section by section) instead of all appearing at once

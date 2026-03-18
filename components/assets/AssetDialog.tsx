@@ -1004,6 +1004,23 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
               {errors.quantity && (
                 <p className="text-sm text-red-500">{errors.quantity.message}</p>
               )}
+              {/* Show hint when changing quantity in edit mode for non-cash assets.
+                  Quantity changes represent capital flowing in/out of the portfolio.
+                  If the money comes from/goes to outside the tracked system, a cashflow
+                  entry is needed so TWR/CAGR correctly treat it as a contribution/withdrawal
+                  rather than investment return/loss.
+                  Exception: if the counterpart is a tracked cash asset, NW stays flat and
+                  no cashflow entry is needed. */}
+              {asset && selectedAssetClass !== 'cash' && watch('quantity') > (asset.quantity ?? 0) && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  Hai investito nuovo capitale? Se i fondi provengono dall&apos;esterno del portafoglio tracciato, registra un&apos;entrata nel cashflow per mantenere le metriche di performance accurate.
+                </p>
+              )}
+              {asset && selectedAssetClass !== 'cash' && watch('quantity') < (asset.quantity ?? 0) && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  Hai venduto questo asset? Se il ricavato è uscito dal portafoglio tracciato, registra un&apos;uscita nel cashflow per mantenere le metriche di performance accurate.
+                </p>
+              )}
             </div>
           </div>
 
