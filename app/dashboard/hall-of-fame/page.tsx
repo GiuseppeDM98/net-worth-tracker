@@ -28,6 +28,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import {
+  pageVariants,
+  staggerContainer,
+  cardItem,
+  fastStaggerContainer,
+  listItem,
+} from '@/lib/utils/motionVariants';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   HallOfFameData,
@@ -296,7 +304,12 @@ export default function HallOfFamePage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 max-desktop:portrait:pb-20">
+    <motion.div
+      variants={pageVariants}
+      initial="hidden"
+      animate="visible"
+      className="p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 max-desktop:portrait:pb-20"
+    >
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -341,9 +354,14 @@ export default function HallOfFamePage() {
       {/* Ranking Mensili */}
       <div>
         <h2 className="text-xl sm:text-2xl font-semibold mb-4">Ranking Mensili (Top 20)</h2>
-        <div className="grid gap-4 sm:gap-6 grid-cols-1 desktop:grid-cols-2">
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+          className="grid gap-4 sm:gap-6 grid-cols-1 desktop:grid-cols-2"
+        >
           {/* Miglior Mese: Differenza NW */}
-          <Card>
+          <motion.div variants={cardItem}><Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-green-600">
                 <TrendingUp className="h-5 w-5" />
@@ -355,7 +373,7 @@ export default function HallOfFamePage() {
             </CardHeader>
             <CardContent>
               {/* Mobile: Cards */}
-              <div className="desktop:hidden space-y-2">
+              <motion.div variants={fastStaggerContainer} initial="hidden" animate="visible" className="desktop:hidden space-y-2">
                 {data.bestMonthsByNetWorthGrowth.length > 0 ? (
                   data.bestMonthsByNetWorthGrowth.map((record, idx) => (
                     <MonthlyRecordCard
@@ -374,7 +392,7 @@ export default function HallOfFamePage() {
                     Nessun dato disponibile
                   </p>
                 )}
-              </div>
+              </motion.div>
 
               {/* Desktop: Table */}
               <div className="hidden desktop:block">
@@ -390,8 +408,9 @@ export default function HallOfFamePage() {
             </CardContent>
           </Card>
 
+          </motion.div>
           {/* Miglior Mese: Entrate */}
-          <Card>
+          <motion.div variants={cardItem}><Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-green-600">
                 <DollarSign className="h-5 w-5" />
@@ -403,7 +422,7 @@ export default function HallOfFamePage() {
             </CardHeader>
             <CardContent>
               {/* Mobile: Cards */}
-              <div className="desktop:hidden space-y-2">
+              <motion.div variants={fastStaggerContainer} initial="hidden" animate="visible" className="desktop:hidden space-y-2">
                 {data.bestMonthsByIncome.length > 0 ? (
                   data.bestMonthsByIncome.map((record, idx) => (
                     <MonthlyRecordCard
@@ -422,7 +441,7 @@ export default function HallOfFamePage() {
                     Nessun dato disponibile
                   </p>
                 )}
-              </div>
+              </motion.div>
 
               {/* Desktop: Table */}
               <div className="hidden desktop:block">
@@ -438,8 +457,9 @@ export default function HallOfFamePage() {
             </CardContent>
           </Card>
 
+          </motion.div>
           {/* Peggior Mese: Differenza NW */}
-          <Card>
+          <motion.div variants={cardItem}><Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-red-600">
                 <TrendingDown className="h-5 w-5" />
@@ -451,7 +471,7 @@ export default function HallOfFamePage() {
             </CardHeader>
             <CardContent>
               {/* Mobile: Cards */}
-              <div className="desktop:hidden space-y-2">
+              <motion.div variants={fastStaggerContainer} initial="hidden" animate="visible" className="desktop:hidden space-y-2">
                 {data.worstMonthsByNetWorthDecline.length > 0 ? (
                   data.worstMonthsByNetWorthDecline.map((record, idx) => (
                     <MonthlyRecordCard
@@ -470,7 +490,7 @@ export default function HallOfFamePage() {
                     Nessun dato disponibile
                   </p>
                 )}
-              </div>
+              </motion.div>
 
               {/* Desktop: Table */}
               <div className="hidden desktop:block">
@@ -486,8 +506,9 @@ export default function HallOfFamePage() {
             </CardContent>
           </Card>
 
+          </motion.div>
           {/* Peggior Mese: Spese */}
-          <Card>
+          <motion.div variants={cardItem}><Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-red-600">
                 <TrendingDown className="h-5 w-5" />
@@ -499,7 +520,7 @@ export default function HallOfFamePage() {
             </CardHeader>
             <CardContent>
               {/* Mobile: Cards */}
-              <div className="desktop:hidden space-y-2">
+              <motion.div variants={fastStaggerContainer} initial="hidden" animate="visible" className="desktop:hidden space-y-2">
                 {data.worstMonthsByExpenses.length > 0 ? (
                   data.worstMonthsByExpenses.map((record, idx) => (
                     <MonthlyRecordCard
@@ -518,7 +539,7 @@ export default function HallOfFamePage() {
                     Nessun dato disponibile
                   </p>
                 )}
-              </div>
+              </motion.div>
 
               {/* Desktop: Table */}
               <div className="hidden desktop:block">
@@ -532,16 +553,21 @@ export default function HallOfFamePage() {
                 />
               </div>
             </CardContent>
-          </Card>
-        </div>
+          </Card></motion.div>
+        </motion.div>
       </div>
 
       {/* Ranking Annuali */}
       <div>
         <h2 className="text-xl sm:text-2xl font-semibold mb-4">Ranking Annuali (Top 10)</h2>
-        <div className="grid gap-4 sm:gap-6 grid-cols-1 desktop:grid-cols-2">
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+          className="grid gap-4 sm:gap-6 grid-cols-1 desktop:grid-cols-2"
+        >
           {/* Miglior Anno: Differenza NW */}
-          <Card>
+          <motion.div variants={cardItem}><Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-green-600">
                 <TrendingUp className="h-5 w-5" />
@@ -553,7 +579,7 @@ export default function HallOfFamePage() {
             </CardHeader>
             <CardContent>
               {/* Mobile: Cards */}
-              <div className="desktop:hidden space-y-2">
+              <motion.div variants={fastStaggerContainer} initial="hidden" animate="visible" className="desktop:hidden space-y-2">
                 {data.bestYearsByNetWorthGrowth.length > 0 ? (
                   data.bestYearsByNetWorthGrowth.map((record, idx) => (
                     <YearlyRecordCard
@@ -572,7 +598,7 @@ export default function HallOfFamePage() {
                     Nessun dato disponibile
                   </p>
                 )}
-              </div>
+              </motion.div>
 
               {/* Desktop: Table */}
               <div className="hidden desktop:block">
@@ -588,8 +614,9 @@ export default function HallOfFamePage() {
             </CardContent>
           </Card>
 
+          </motion.div>
           {/* Miglior Anno: Entrate */}
-          <Card>
+          <motion.div variants={cardItem}><Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-green-600">
                 <DollarSign className="h-5 w-5" />
@@ -601,7 +628,7 @@ export default function HallOfFamePage() {
             </CardHeader>
             <CardContent>
               {/* Mobile: Cards */}
-              <div className="desktop:hidden space-y-2">
+              <motion.div variants={fastStaggerContainer} initial="hidden" animate="visible" className="desktop:hidden space-y-2">
                 {data.bestYearsByIncome.length > 0 ? (
                   data.bestYearsByIncome.map((record, idx) => (
                     <YearlyRecordCard
@@ -620,7 +647,7 @@ export default function HallOfFamePage() {
                     Nessun dato disponibile
                   </p>
                 )}
-              </div>
+              </motion.div>
 
               {/* Desktop: Table */}
               <div className="hidden desktop:block">
@@ -636,8 +663,9 @@ export default function HallOfFamePage() {
             </CardContent>
           </Card>
 
+          </motion.div>
           {/* Peggior Anno: Differenza NW */}
-          <Card>
+          <motion.div variants={cardItem}><Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-red-600">
                 <TrendingDown className="h-5 w-5" />
@@ -649,7 +677,7 @@ export default function HallOfFamePage() {
             </CardHeader>
             <CardContent>
               {/* Mobile: Cards */}
-              <div className="desktop:hidden space-y-2">
+              <motion.div variants={fastStaggerContainer} initial="hidden" animate="visible" className="desktop:hidden space-y-2">
                 {data.worstYearsByNetWorthDecline.length > 0 ? (
                   data.worstYearsByNetWorthDecline.map((record, idx) => (
                     <YearlyRecordCard
@@ -668,7 +696,7 @@ export default function HallOfFamePage() {
                     Nessun dato disponibile
                   </p>
                 )}
-              </div>
+              </motion.div>
 
               {/* Desktop: Table */}
               <div className="hidden desktop:block">
@@ -684,8 +712,9 @@ export default function HallOfFamePage() {
             </CardContent>
           </Card>
 
+          </motion.div>
           {/* Peggior Anno: Uscite */}
-          <Card>
+          <motion.div variants={cardItem}><Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-red-600">
                 <TrendingDown className="h-5 w-5" />
@@ -697,7 +726,7 @@ export default function HallOfFamePage() {
             </CardHeader>
             <CardContent>
               {/* Mobile: Cards */}
-              <div className="desktop:hidden space-y-2">
+              <motion.div variants={fastStaggerContainer} initial="hidden" animate="visible" className="desktop:hidden space-y-2">
                 {data.worstYearsByExpenses.length > 0 ? (
                   data.worstYearsByExpenses.map((record, idx) => (
                     <YearlyRecordCard
@@ -716,7 +745,7 @@ export default function HallOfFamePage() {
                     Nessun dato disponibile
                   </p>
                 )}
-              </div>
+              </motion.div>
 
               {/* Desktop: Table */}
               <div className="hidden desktop:block">
@@ -730,8 +759,8 @@ export default function HallOfFamePage() {
                 />
               </div>
             </CardContent>
-          </Card>
-        </div>
+          </Card></motion.div>
+        </motion.div>
       </div>
 
       {/* View Dialog (Read-only note display) */}
@@ -756,7 +785,7 @@ export default function HallOfFamePage() {
           onDelete={handleNoteDelete}
         />
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -798,7 +827,8 @@ function MonthlyRecordCard({
   const percentageColor = percentage >= 0 ? 'text-green-600' : 'text-red-600';
 
   return (
-    <div
+    <motion.div
+      variants={listItem}
       className={`p-3 rounded-lg border ${
         isCurrentMonth ? 'bg-amber-50/70 border-amber-200' : 'bg-muted/50'
       }`}
@@ -835,7 +865,7 @@ function MonthlyRecordCard({
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -877,7 +907,8 @@ function YearlyRecordCard({
   const percentageColor = percentage >= 0 ? 'text-green-600' : 'text-red-600';
 
   return (
-    <div
+    <motion.div
+      variants={listItem}
       className={`p-3 rounded-lg border ${
         isCurrentYear ? 'bg-amber-50/70 border-amber-200' : 'bg-muted/50'
       }`}
@@ -905,7 +936,7 @@ function YearlyRecordCard({
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -959,9 +990,13 @@ function MonthlyTable({
             const isCurrentMonth = record.year === currentYear && record.month === currentMonth;
 
             return (
-              <TableRow
+              <motion.tr
                 key={`${record.year}-${record.month}`}
-                className={isCurrentMonth ? 'bg-amber-50/70 hover:bg-amber-50/80' : undefined}
+                variants={listItem}
+                initial="hidden"
+                animate="visible"
+                transition={{ delay: Math.min(index, 14) * 0.04 }}
+                className={`border-b transition-colors hover:bg-muted/50 ${isCurrentMonth ? 'bg-amber-50/70 hover:bg-amber-50/80' : ''}`}
               >
                 <TableCell className="font-medium">{index + 1}</TableCell>
                 <TableCell className="whitespace-nowrap">{record.monthYear}</TableCell>
@@ -986,7 +1021,7 @@ function MonthlyTable({
                     onNoteClick={onNoteClick}
                   />
                 </TableCell>
-              </TableRow>
+              </motion.tr>
             );
           })}
         </TableBody>
@@ -1044,9 +1079,13 @@ function YearlyTable({
             const isCurrentYear = record.year === currentYear;
 
             return (
-              <TableRow
+              <motion.tr
                 key={record.year}
-                className={isCurrentYear ? 'bg-amber-50/70 hover:bg-amber-50/80' : undefined}
+                variants={listItem}
+                initial="hidden"
+                animate="visible"
+                transition={{ delay: index * 0.04 }}
+                className={`border-b transition-colors hover:bg-muted/50 ${isCurrentYear ? 'bg-amber-50/70 hover:bg-amber-50/80' : ''}`}
               >
                 <TableCell className="font-medium">{index + 1}</TableCell>
                 <TableCell>{record.year}</TableCell>
@@ -1062,7 +1101,7 @@ function YearlyTable({
                     {percentage >= 0 ? '+' : ''}{percentage.toFixed(2)}%
                   </TableCell>
                 )}
-              </TableRow>
+              </motion.tr>
             );
           })}
         </TableBody>

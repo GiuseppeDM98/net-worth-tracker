@@ -1,6 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  pageVariants,
+  staggerContainer,
+  cardItem,
+  slideDown,
+} from '@/lib/utils/motionVariants';
 import { useAuth } from '@/contexts/AuthContext';
 import { AssetAllocationSettings, MonthlySnapshot } from '@/types/assets';
 import {
@@ -371,7 +378,12 @@ export default function DashboardPage() {
 
   return (
     // pb-20 on portrait mobile compensates for the BottomNavigation bar (h-16 = 64px)
-    <div className="space-y-6 max-desktop:portrait:pb-20">
+    <motion.div
+      variants={pageVariants}
+      initial="hidden"
+      animate="visible"
+      className="space-y-6 max-desktop:portrait:pb-20"
+    >
       {/* Header stacks vertically on portrait mobile to prevent title/button overflow */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -392,119 +404,163 @@ export default function DashboardPage() {
       </div>
 
       {/* 3-col at desktop (1440px+); landscape phones get 3-col at md (768px+) */}
-      <div className="grid gap-6 md:grid-cols-2 landscape:md:grid-cols-3 desktop:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Patrimonio Totale Lordo</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(portfolioMetrics.totalValue)}</div>
-            <p className="text-xs text-muted-foreground">
-              {portfolioMetrics.assetCount === 0 ? 'Aggiungi assets per iniziare' : `${portfolioMetrics.assetCount} asset${portfolioMetrics.assetCount !== 1 ? 's' : ''}`}
-            </p>
-          </CardContent>
-        </Card>
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+        className="grid gap-6 md:grid-cols-2 landscape:md:grid-cols-3 desktop:grid-cols-3"
+      >
+        <motion.div variants={cardItem}>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Patrimonio Totale Lordo</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(portfolioMetrics.totalValue)}</div>
+              <p className="text-xs text-muted-foreground">
+                {portfolioMetrics.assetCount === 0 ? 'Aggiungi assets per iniziare' : `${portfolioMetrics.assetCount} asset${portfolioMetrics.assetCount !== 1 ? 's' : ''}`}
+              </p>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Patrimonio Liquido Lordo</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(portfolioMetrics.liquidNetWorth)}</div>
-          </CardContent>
-        </Card>
+        <motion.div variants={cardItem}>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Patrimonio Liquido Lordo</CardTitle>
+              <Wallet className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(portfolioMetrics.liquidNetWorth)}</div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Numero Assets</CardTitle>
-            <PieChart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{portfolioMetrics.assetCount}</div>
-            <p className="text-xs text-muted-foreground">
-              {portfolioMetrics.assetCount === 0 ? 'Nessun asset presente' : 'Asset in portafoglio'}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+        <motion.div variants={cardItem}>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Numero Assets</CardTitle>
+              <PieChart className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{portfolioMetrics.assetCount}</div>
+              <p className="text-xs text-muted-foreground">
+                {portfolioMetrics.assetCount === 0 ? 'Nessun asset presente' : 'Asset in portafoglio'}
+              </p>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </motion.div>
 
       {/* Cost Basis Cards - only show if any asset has cost basis tracking */}
-      {hasCostBasisTracking && (
-        <>
-          {/* Net Worth Cards */}
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Patrimonio Totale Netto</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-600">
-                  {formatCurrency(portfolioMetrics.netTotal)}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Dopo tasse stimate
-                </p>
-              </CardContent>
-            </Card>
+      <AnimatePresence>
+        {hasCostBasisTracking && (
+          <motion.div
+            key="cost-basis-section"
+            variants={slideDown}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            className="space-y-6"
+          >
+            {/* Net Worth Cards */}
+            <motion.div
+              variants={staggerContainer}
+              initial="hidden"
+              animate="visible"
+              className="grid gap-6 md:grid-cols-2"
+            >
+              <motion.div variants={cardItem}>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Patrimonio Totale Netto</CardTitle>
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-blue-600">
+                      {formatCurrency(portfolioMetrics.netTotal)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Dopo tasse stimate
+                    </p>
+                  </CardContent>
+                </Card>
+              </motion.div>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Patrimonio Liquido Netto</CardTitle>
-                <Wallet className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-600">
-                  {formatCurrency(liquidNetTotal)}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Liquidità dopo tasse stimate
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+              <motion.div variants={cardItem}>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Patrimonio Liquido Netto</CardTitle>
+                    <Wallet className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-blue-600">
+                      {formatCurrency(liquidNetTotal)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Liquidità dopo tasse stimate
+                    </p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </motion.div>
 
-          {/* Gains and Taxes Cards */}
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Plusvalenze Non Realizzate</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className={`text-2xl font-bold ${
-                  portfolioMetrics.unrealizedGains >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {portfolioMetrics.unrealizedGains >= 0 ? '+' : ''}{formatCurrency(portfolioMetrics.unrealizedGains)}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Guadagno/perdita rispetto al costo medio
-                </p>
-              </CardContent>
-            </Card>
+            {/* Gains and Taxes Cards */}
+            <motion.div
+              variants={staggerContainer}
+              initial="hidden"
+              animate="visible"
+              className="grid gap-6 md:grid-cols-2"
+            >
+              <motion.div variants={cardItem}>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Plusvalenze Non Realizzate</CardTitle>
+                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className={`text-2xl font-bold ${
+                      portfolioMetrics.unrealizedGains >= 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {portfolioMetrics.unrealizedGains >= 0 ? '+' : ''}{formatCurrency(portfolioMetrics.unrealizedGains)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Guadagno/perdita rispetto al costo medio
+                    </p>
+                  </CardContent>
+                </Card>
+              </motion.div>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Tasse Stimate</CardTitle>
-                <Receipt className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-orange-600">
-                  {formatCurrency(portfolioMetrics.estimatedTaxes)}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Imposte su plusvalenze non realizzate
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </>
-      )}
+              <motion.div variants={cardItem}>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Tasse Stimate</CardTitle>
+                    <Receipt className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-orange-600">
+                      {formatCurrency(portfolioMetrics.estimatedTaxes)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Imposte su plusvalenze non realizzate
+                    </p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Variazioni Cards */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+        className="grid gap-6 md:grid-cols-2"
+      >
+        <motion.div variants={cardItem}>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Variazione Mensile</CardTitle>
@@ -534,7 +590,9 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
+        </motion.div>
 
+        <motion.div variants={cardItem}>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Variazione Annuale (YTD)</CardTitle>
@@ -564,10 +622,17 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-      </div>
+        </motion.div>
+      </motion.div>
 
       {/* Expense Stats Cards */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+        className="grid gap-6 md:grid-cols-2"
+      >
+        <motion.div variants={cardItem}>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Entrate Questo Mese</CardTitle>
@@ -595,7 +660,9 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
+        </motion.div>
 
+        <motion.div variants={cardItem}>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Spese Questo Mese</CardTitle>
@@ -623,12 +690,22 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-      </div>
+        </motion.div>
+      </motion.div>
 
       {/* Cost cards — shown if any asset has TER tracking or stamp duty is enabled */}
-      {(hasTERTracking || hasStampDuty) && (
-        <div className="grid gap-6 md:grid-cols-2">
+      <AnimatePresence>
+        {(hasTERTracking || hasStampDuty) && (
+        <motion.div
+          key="cost-cards"
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          className="grid gap-6 md:grid-cols-2"
+        >
           {hasTERTracking && (
+            <motion.div variants={cardItem}>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">TER Portfolio</CardTitle>
@@ -643,9 +720,11 @@ export default function DashboardPage() {
                 </p>
               </CardContent>
             </Card>
+            </motion.div>
           )}
 
-          <Card className={!hasTERTracking ? 'md:col-span-2' : ''}>
+          <motion.div variants={cardItem} className={!hasTERTracking ? 'md:col-span-2' : ''}>
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Costo Annuale Portfolio</CardTitle>
               <TrendingDown className="h-4 w-4 text-muted-foreground" />
@@ -666,8 +745,10 @@ export default function DashboardPage() {
               )}
             </CardContent>
           </Card>
-        </div>
-      )}
+          </motion.div>
+        </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Pie charts — collapsible on mobile to reduce scroll length (~1050px on portrait) */}
       <div className="space-y-6">
@@ -685,11 +766,15 @@ export default function DashboardPage() {
               />
             </div>
           </CardHeader>
-          {expandedCharts.has('assetClass') && (
-            <CardContent>
-              <PieChartComponent data={chartData.assetClassData} />
-            </CardContent>
-          )}
+          <AnimatePresence initial={false}>
+            {expandedCharts.has('assetClass') && (
+              <motion.div key="assetClass-content" variants={slideDown} initial="hidden" animate="visible" exit="exit">
+                <CardContent>
+                  <PieChartComponent data={chartData.assetClassData} />
+                </CardContent>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </Card>
 
         <Card>
@@ -706,11 +791,15 @@ export default function DashboardPage() {
               />
             </div>
           </CardHeader>
-          {expandedCharts.has('asset') && (
-            <CardContent>
-              <PieChartComponent data={chartData.assetData} />
-            </CardContent>
-          )}
+          <AnimatePresence initial={false}>
+            {expandedCharts.has('asset') && (
+              <motion.div key="asset-content" variants={slideDown} initial="hidden" animate="visible" exit="exit">
+                <CardContent>
+                  <PieChartComponent data={chartData.assetData} />
+                </CardContent>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </Card>
 
         <Card>
@@ -727,11 +816,15 @@ export default function DashboardPage() {
               />
             </div>
           </CardHeader>
-          {expandedCharts.has('liquidity') && (
-            <CardContent>
-              <PieChartComponent data={chartData.liquidityData} />
-            </CardContent>
-          )}
+          <AnimatePresence initial={false}>
+            {expandedCharts.has('liquidity') && (
+              <motion.div key="liquidity-content" variants={slideDown} initial="hidden" animate="visible" exit="exit">
+                <CardContent>
+                  <PieChartComponent data={chartData.liquidityData} />
+                </CardContent>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </Card>
       </div>
 
@@ -764,6 +857,6 @@ export default function DashboardPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </motion.div>
   );
 }

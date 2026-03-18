@@ -29,6 +29,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Monthly returns heatmap and underwater drawdown chart
 - Rolling performance charts
 - Animated metric cards: values count up on load and on period switch; staggered entrance cascade per section
+- All major pages (Dashboard, Hall of Fame, History) animate on load with staggered card entrances and smooth expand/collapse transitions; respects system "Reduce Motion" preference
 - AI-powered analysis using Claude with Extended Thinking and web search
 - Fully responsive on mobile and tablet: dropdown period selector, stacked header, color-only heatmap view on small screens
 
@@ -156,6 +157,7 @@ See [`.env.local.example`](.env.local.example) for detailed comments on each var
 | Styling | Tailwind CSS v4, shadcn/ui | UI components and design system |
 | Data | React Query (TanStack) | Client-side caching and server state |
 | Backend | Firebase (Firestore + Auth) | Database and authentication |
+| Animation | framer-motion | Page transitions and micro-interactions |
 | Charts | Recharts, @nivo/sankey | Data visualization |
 | Finance | yahoo-finance2 | Real-time price data |
 | AI | @anthropic-ai/sdk | Performance analysis |
@@ -163,7 +165,7 @@ See [`.env.local.example`](.env.local.example) for detailed comments on each var
 | Forms | react-hook-form, zod | Form handling and validation |
 | Dates | date-fns, date-fns-tz | Timezone-aware date operations |
 | Scraping | cheerio | Borsa Italiana dividend and bond price data |
-| Testing | Vitest | Unit testing (201 tests) |
+| Testing | Vitest | Unit testing (218 tests) |
 
 ## Development
 

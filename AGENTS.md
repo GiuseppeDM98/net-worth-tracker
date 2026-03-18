@@ -192,6 +192,15 @@ ALL fields in settings types must be handled in THREE places:
   - Evoluzione Patrimonio (`preparePerformanceChartData`): optional `skipBaseline=true` → `.slice(1)` after sort. Pass `true` for YTD/1Y/3Y/5Y in `getChartData()`. Baseline is always `sortedSnapshots[0]` after chronological sort → slice is safe.
   - Underwater/Drawdown (`prepareUnderwaterDrawdownData`): optional `skipBaseline=true` → `continue` at `i === 0` in indexed loop. Baseline is still processed to seed `runningPeak` before being excluded from output. Pass `hasBaselineUnderwater` in the `useEffect` that sets `underwaterData`.
 
+### Framer Motion Animation Patterns
+- **Shared variants**: `lib/utils/motionVariants.ts` — `pageVariants`, `staggerContainer`, `fastStaggerContainer`, `cardItem`, `listItem`, `slideDown`, `fadeVariants`. Never define variants inline; import from this file.
+- **Global reduced-motion**: `components/providers/MotionProvider.tsx` wraps the app in `<MotionConfig reducedMotion="user">` — single point of accessibility config. Must be `"use client"` (uses React context).
+- **Stagger + conditional elements**: a `staggerContainer` parent counts ALL children including conditional slots — gaps in the DOM (hidden elements, IIFE blocks, `{condition && ...}`) break sequence. **Fix**: use explicit `transition={{ delay: index * 0.1 }}` on each `motion.div` individually, no parent stagger container.
+- **`motion.tr` for table rows**: wrapping shadcn `<TableRow>` with `motion()` breaks table structure. Use `motion.tr` directly with the same className as `TableRow` copied manually.
+- **`AnimatePresence initial={false}`** on collapsibles that start open: without it, Framer runs exit animation on mount for already-visible children (visible sections would slide up on first load).
+- **`slideDown` variant**: must include `overflow: 'hidden'` in both `hidden` and `exit` states, otherwise content bleeds outside the card during close transition.
+- **Easing**: always `[0.25, 1, 0.5, 1]` (ease-out-quart) — matches `useCountUp`. Never bounce or elastic.
+
 ---
 
 ## Common Errors to Avoid
@@ -270,4 +279,4 @@ ALL fields in settings types must be handled in THREE places:
 **Fix**: Use `overflow-x-auto` always on wide table wrappers — never remove it at a breakpoint. `sticky left-0` columns work correctly inside `overflow-x-auto` without needing `overflow-x-visible`.
 **File**: `MonthlyReturnsHeatmap.tsx` (fixed: `sm:` → `desktop:`, removed `sm:overflow-x-visible`)
 
-**Last updated**: 2026-03-18 (session: Fix underwater chart baseline month visibility)
+**Last updated**: 2026-03-18 (session: Framer Motion animations — Dashboard, Hall of Fame, History)

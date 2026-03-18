@@ -1,6 +1,13 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  pageVariants,
+  staggerContainer,
+  cardItem,
+  slideDown,
+} from '@/lib/utils/motionVariants';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { getAllAssets, ASSET_CLASS_ORDER } from '@/lib/services/assetService';
@@ -510,7 +517,12 @@ export default function HistoryPage() {
   }
 
   return (
-    <div className="space-y-6 max-desktop:portrait:pb-20">
+    <motion.div
+      variants={pageVariants}
+      initial="hidden"
+      animate="visible"
+      className="space-y-6 max-desktop:portrait:pb-20"
+    >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex-1">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Storico</h1>
@@ -546,6 +558,7 @@ export default function HistoryPage() {
       </div>
 
       {/* Net Worth History Chart */}
+      <motion.div variants={cardItem} initial="hidden" animate="visible">
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -648,6 +661,7 @@ export default function HistoryPage() {
           )}
         </CardContent>
       </Card>
+      </motion.div>
 
       {/*
         NOTES TABLE PATTERN
@@ -667,7 +681,10 @@ export default function HistoryPage() {
         The note field is optional in MonthlySnapshot, stored as undefined when empty
         (Firebase best practice to avoid storing empty strings).
       */}
-      {showNotes && (() => {
+      <AnimatePresence>
+      {showNotes && (
+        <motion.div key="notes-section" variants={slideDown} initial="hidden" animate="visible" exit="exit">
+        {(() => {
         // Filter snapshots that have notes (note field exists and is not empty).
         // prepareNetWorthHistoryData() already includes note, month, year fields
         // from the original snapshots, so we can use them directly without
@@ -761,9 +778,13 @@ export default function HistoryPage() {
             </CardContent>
           </Card>
         );
-      })()}
+        })()}
+        </motion.div>
+      )}
+      </AnimatePresence>
 
       {/* Asset Class Evolution Chart */}
+      <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.1 }}>
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1011,8 +1032,10 @@ export default function HistoryPage() {
           )}
         </CardContent>
       </Card>
+      </motion.div>
 
       {/* Liquidity Evolution Chart */}
+      <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.2 }}>
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1157,8 +1180,10 @@ export default function HistoryPage() {
           )}
         </CardContent>
       </Card>
+      </motion.div>
 
       {/* YoY Variation Chart */}
+      <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.3 }}>
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1243,6 +1268,7 @@ export default function HistoryPage() {
           )}
         </CardContent>
       </Card>
+      </motion.div>
 
       {/* Savings vs Investment Growth Chart */}
       {/* Shows breakdown of net worth growth into two components:
@@ -1250,6 +1276,7 @@ export default function HistoryPage() {
           - Blue/Red bar (Investment Growth): What markets contributed (positive/negative)
           Stacked bars sum to total Net Worth Growth for the period.
           Supports annual view (per-year) and monthly view (per-month within a year). */}
+      <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.4 }}>
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -1445,8 +1472,10 @@ export default function HistoryPage() {
           )}
         </CardContent>
       </Card>
+      </motion.div>
 
       {/* Doubling Time Analysis */}
+      <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.5 }}>
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -1556,21 +1585,29 @@ export default function HistoryPage() {
             )}
           </CardContent>
         </Card>
+        </motion.div>
 
       {snapshots.length > 0 && (
+        <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0 }}>
         <Card>
           <CardHeader>
             <CardTitle>Snapshot Mensili</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={cn(
-              "grid gap-4",
-              isLandscape ? "grid-cols-2" : "grid-cols-1",
-              "md:grid-cols-2 desktop:grid-cols-3"
-            )}>
+            <motion.div
+              variants={staggerContainer}
+              initial="hidden"
+              animate="visible"
+              className={cn(
+                "grid gap-4",
+                isLandscape ? "grid-cols-2" : "grid-cols-1",
+                "md:grid-cols-2 desktop:grid-cols-3"
+              )}
+            >
               {snapshots.slice(-6).reverse().map((snapshot) => (
-                <div
+                <motion.div
                   key={`${snapshot.year}-${snapshot.month}`}
+                  variants={cardItem}
                   className="rounded-lg border p-4"
                 >
                   <div>
@@ -1607,11 +1644,12 @@ export default function HistoryPage() {
                       </div>
                     </div>
                   )}
-                </div>
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           </CardContent>
         </Card>
+        </motion.div>
       )}
 
       <CreateManualSnapshotModal
@@ -1627,6 +1665,6 @@ export default function HistoryPage() {
         snapshots={snapshots}
         onSave={handleSaveNote}
       />
-    </div>
+    </motion.div>
   );
 }

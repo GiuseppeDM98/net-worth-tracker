@@ -1,6 +1,8 @@
 import { DoublingMilestone } from '@/types/assets';
 import { formatCurrency } from '@/lib/services/chartService';
 import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
+import { fastStaggerContainer, listItem } from '@/lib/utils/motionVariants';
 
 interface DoublingMilestoneTimelineProps {
   milestones: DoublingMilestone[];
@@ -80,14 +82,20 @@ export function DoublingMilestoneTimeline({
   }
 
   return (
-    <div className="space-y-3">
+    <motion.div
+      variants={fastStaggerContainer}
+      initial="hidden"
+      animate="visible"
+      className="space-y-3"
+    >
       {/* Guide comment: Render milestone cards with visual distinction
           Complete milestones: green badge with checkmark
           In-progress milestones: blue badge with progress bar
           This creates clear visual hierarchy for user engagement */}
       {allMilestones.map((milestone) => (
-        <div
+        <motion.div
           key={`${milestone.milestoneType}-${milestone.milestoneNumber}`}
+          variants={listItem}
           className={cn(
             'rounded-lg border p-4 transition-colors',
             !milestone.isComplete && 'border-blue-300 bg-blue-50/50 dark:bg-blue-950/20'
@@ -137,15 +145,17 @@ export function DoublingMilestoneTimeline({
                 <span>{milestone.progressPercentage.toFixed(0)}%</span>
               </div>
               <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-blue-500 transition-all"
-                  style={{ width: `${milestone.progressPercentage}%` }}
+                <motion.div
+                  className="h-full bg-blue-500 rounded-full"
+                  initial={{ width: '0%' }}
+                  animate={{ width: `${milestone.progressPercentage}%` }}
+                  transition={{ duration: 0.8, ease: [0.25, 1, 0.5, 1] }}
                 />
               </div>
             </div>
           )}
-        </div>
+        </motion.div>
       ))}
-    </div>
+    </motion.div>
   );
 }

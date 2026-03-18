@@ -93,3 +93,8 @@
 - Dividends page filter dropdowns now fill the full width of the screen on mobile for visual consistency with other form elements
 
 - Settings page is now fully usable on mobile and tablet — the tab navigation (Allocation / Preferences / Expenses / Dividends) becomes a full-width dropdown on devices below 1440px wide; form sections stack to a single column on narrow screens; subcategory target card headers no longer overflow at phone widths
+
+- Dashboard, Hall of Fame, and History pages now animate on load — metric cards, ranking cards, and chart sections slide up and fade in sequentially instead of appearing all at once
+- Collapsible sections on the Dashboard (pie charts, cost basis) and the Notes section on the History page now animate smoothly open and closed instead of snapping instantly
+- Doubling Time milestone cards on the History page appear with a staggered cascade effect; the in-progress milestone's progress bar fills in from left to right on load
+- All new animations automatically disable for users who have enabled "Reduce Motion" in their system accessibility settings
