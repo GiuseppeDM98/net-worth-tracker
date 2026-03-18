@@ -72,14 +72,14 @@ export function ScenarioParameterCards({
   return (
     <div className="space-y-4">
       {/* Header with actions */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-base font-semibold">Parametri Scenari</h3>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={onReset}>
+          <Button variant="outline" size="sm" onClick={onReset} className="flex-1 sm:flex-none">
             <RotateCcw className="h-3.5 w-3.5 mr-1" />
             Ripristina Default
           </Button>
-          <Button size="sm" onClick={onSave} disabled={isSaving}>
+          <Button size="sm" onClick={onSave} disabled={isSaving} className="flex-1 sm:flex-none">
             <Save className="h-3.5 w-3.5 mr-1" />
             {isSaving ? 'Salvataggio...' : 'Salva Parametri'}
           </Button>
@@ -87,7 +87,7 @@ export function ScenarioParameterCards({
       </div>
 
       {/* 3 scenario cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 desktop:grid-cols-3">
         {(Object.keys(SCENARIO_CONFIG) as ScenarioKey[]).map((key) => {
           const config = SCENARIO_CONFIG[key];
           const Icon = config.icon;

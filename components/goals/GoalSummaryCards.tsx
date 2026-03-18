@@ -19,11 +19,10 @@ export function GoalSummaryCards({
   unassignedValue,
 }: GoalSummaryCardsProps) {
   return (
-    <div className="flex gap-4 overflow-x-auto pb-2">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 desktop:grid-cols-4">
       {progressList.map((progress) => (
         <Card
           key={progress.goalId}
-          className="min-w-[200px] flex-shrink-0"
         >
           <CardContent className="p-4">
             {/* Goal name with color indicator */}
@@ -71,7 +70,7 @@ export function GoalSummaryCards({
       ))}
 
       {/* Unassigned value card */}
-      <Card className="min-w-[200px] flex-shrink-0 border-dashed">
+      <Card className="border-dashed">
         <CardContent className="p-4">
           <div className="flex items-center gap-2 mb-3">
             <div className="w-3 h-3 rounded-full bg-gray-300 shrink-0" />

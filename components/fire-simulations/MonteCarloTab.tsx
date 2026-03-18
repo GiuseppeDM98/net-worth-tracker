@@ -319,7 +319,7 @@ export function MonteCarloTab() {
         <div className="inline-flex rounded-lg border bg-muted p-1">
           <button
             onClick={() => setScenarioMode(false)}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+            className={`px-3 py-1.5 sm:px-4 sm:py-2 text-sm font-medium rounded-md transition-colors ${
               !scenarioMode
                 ? 'bg-background text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'
@@ -329,7 +329,7 @@ export function MonteCarloTab() {
           </button>
           <button
             onClick={() => setScenarioMode(true)}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+            className={`px-3 py-1.5 sm:px-4 sm:py-2 text-sm font-medium rounded-md transition-colors ${
               scenarioMode
                 ? 'bg-background text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'
@@ -387,7 +387,7 @@ export function MonteCarloTab() {
                 <CardTitle className="text-red-900">Analisi Fallimenti</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 desktop:grid-cols-2">
                   <div>
                     <p className="text-sm text-red-700 mb-1">Anno Medio di Fallimento</p>
                     <p className="text-2xl font-bold text-red-900">
@@ -418,7 +418,41 @@ export function MonteCarloTab() {
               </p>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
+              {/* Mobile/tablet: card view — one card per row */}
+              <div className="desktop:hidden space-y-2">
+                {results.percentiles
+                  .filter((_, index) => index % 5 === 0)
+                  .map((p) => (
+                    <div key={p.year} className="rounded-lg border bg-gray-50/50 p-3">
+                      <p className="font-semibold text-sm mb-2">Anno {p.year}</p>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">10° %ile</span>
+                          <span>{formatCurrencyCompact(p.p10)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">25° %ile</span>
+                          <span>{formatCurrencyCompact(p.p25)}</span>
+                        </div>
+                        <div className="flex justify-between font-bold">
+                          <span className="text-gray-500">Mediana</span>
+                          <span>{formatCurrencyCompact(p.p50)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">75° %ile</span>
+                          <span>{formatCurrencyCompact(p.p75)}</span>
+                        </div>
+                        <div className="flex justify-between col-span-2">
+                          <span className="text-gray-500">90° %ile</span>
+                          <span>{formatCurrencyCompact(p.p90)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+
+              {/* Desktop: full table */}
+              <div className="hidden desktop:block overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b">
@@ -432,7 +466,7 @@ export function MonteCarloTab() {
                   </thead>
                   <tbody>
                     {results.percentiles
-                      .filter((_, index) => index % 5 === 0) // Show every 5 years
+                      .filter((_, index) => index % 5 === 0)
                       .map((p) => (
                         <tr key={p.year} className="border-b">
                           <td className="p-2">{p.year}</td>

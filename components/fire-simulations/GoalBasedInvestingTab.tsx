@@ -231,16 +231,16 @@ export function GoalBasedInvestingTab() {
   return (
     <div className="space-y-6">
       {/* Header with create button */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
             Obiettivi di Investimento
           </h2>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             Alloca mentalmente il tuo portafoglio verso obiettivi finanziari
           </p>
         </div>
-        <Button onClick={handleCreateGoal}>
+        <Button onClick={handleCreateGoal} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" />
           Nuovo Obiettivo
         </Button>

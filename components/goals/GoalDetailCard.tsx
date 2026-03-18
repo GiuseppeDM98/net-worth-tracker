@@ -263,7 +263,7 @@ export function GoalDetailCard({
                               variant="ghost"
                               size="sm"
                               onClick={() => onRemoveAssignment(a.assetId)}
-                              className="h-7 w-7 p-0"
+                              className="h-10 w-10 p-0"
                             >
                               <X className="h-3 w-3 text-red-500" />
                             </Button>

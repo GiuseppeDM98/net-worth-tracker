@@ -49,6 +49,7 @@
 
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAllAssets, calculateTotalValue, calculateFIRENetWorth } from '@/lib/services/assetService';
 import { getSettings, setSettings, getDefaultTargets } from '@/lib/services/assetAllocationService';
@@ -77,6 +78,8 @@ import { FIREProjectionSection } from './FIREProjectionSection';
 export function FireCalculatorTab() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  // Responsive chart sizing: reduce height and margins on mobile
+  const isMobile = useMediaQuery('(max-width: 767px)');
 
   const [tempWithdrawalRate, setTempWithdrawalRate] = useState<string>('4.0');
   const [tempPlannedAnnualExpenses, setTempPlannedAnnualExpenses] = useState<string>('');
@@ -189,7 +192,7 @@ export function FireCalculatorTab() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 mb-4">
+          <div className="grid gap-4 desktop:grid-cols-2 mb-4">
             <div>
               <Label htmlFor="withdrawalRate">Safe Withdrawal Rate (%)</Label>
               <Input
@@ -247,7 +250,7 @@ export function FireCalculatorTab() {
           <Button
             onClick={handleSaveSettings}
             disabled={mutation.isPending}
-            className="w-full md:w-auto"
+            className="w-full desktop:w-auto"
           >
             {mutation.isPending ? 'Salvataggio...' : 'Salva Impostazioni'}
           </Button>
@@ -266,7 +269,7 @@ export function FireCalculatorTab() {
           </div>
 
           {/* Row 1: FIRE Number and Progress (Current) */}
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-6 desktop:grid-cols-2">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
@@ -325,7 +328,7 @@ export function FireCalculatorTab() {
                 </p>
               </div>
 
-              <div className="grid gap-6 md:grid-cols-2">
+              <div className="grid gap-6 desktop:grid-cols-2">
                 <Card className="border-purple-200 bg-purple-50">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg">
@@ -385,7 +388,7 @@ export function FireCalculatorTab() {
           )}
 
           {/* Row 2: Allowances */}
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="grid gap-6 sm:grid-cols-3">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
@@ -439,7 +442,7 @@ export function FireCalculatorTab() {
           </div>
 
           {/* Row 3: Current WR and Years of Expenses */}
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-6 desktop:grid-cols-2">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
@@ -493,13 +496,14 @@ export function FireCalculatorTab() {
               Nessuno storico disponibile. Gli snapshot mensili verranno creati automaticamente.
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={400}>
-              <LineChart data={chartData} margin={{ left: 50 }}>
+            <ResponsiveContainer width="100%" height={isMobile ? 280 : 400}>
+              <LineChart data={chartData} margin={{ left: isMobile ? 10 : 50, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="monthLabel" />
+                <XAxis dataKey="monthLabel" tick={{ fontSize: isMobile ? 10 : 12 }} />
                 <YAxis
-                  width={100}
+                  width={isMobile ? 70 : 100}
                   tickFormatter={(value) => formatCurrencyCompact(value)}
+                  tick={{ fontSize: isMobile ? 10 : 12 }}
                 />
                 <Tooltip
                   formatter={(value: number) => formatCurrency(value)}

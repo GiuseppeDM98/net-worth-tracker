@@ -35,9 +35,13 @@ interface FIREProjectionChartProps {
   bearYearsToFIRE: number | null;
   baseYearsToFIRE: number | null;
   bullYearsToFIRE: number | null;
+  /** Chart height in pixels — pass responsive value from parent via useMediaQuery */
+  height?: number;
+  /** Left margin for YAxis labels */
+  marginLeft?: number;
 }
 
-export function FIREProjectionChart({ yearlyData, bearYearsToFIRE, baseYearsToFIRE, bullYearsToFIRE }: FIREProjectionChartProps) {
+export function FIREProjectionChart({ yearlyData, bearYearsToFIRE, baseYearsToFIRE, bullYearsToFIRE, height = 400, marginLeft = 50 }: FIREProjectionChartProps) {
   if (yearlyData.length === 0) {
     return (
       <div className="flex h-64 items-center justify-center text-gray-500">
@@ -47,12 +51,12 @@ export function FIREProjectionChart({ yearlyData, bearYearsToFIRE, baseYearsToFI
   }
 
   return (
-    <ResponsiveContainer width="100%" height={400}>
-      <LineChart data={yearlyData} margin={{ left: 50 }}>
+    <ResponsiveContainer width="100%" height={height}>
+      <LineChart data={yearlyData} margin={{ left: marginLeft, bottom: 20 }}>
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey="calendarYear" />
         <YAxis
-          width={100}
+          width={marginLeft <= 20 ? 70 : 100}
           tickFormatter={(value) => formatCurrencyCompact(value)}
         />
         <Tooltip

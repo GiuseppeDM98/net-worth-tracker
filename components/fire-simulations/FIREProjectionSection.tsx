@@ -18,6 +18,7 @@
  */
 
 import { useState, useMemo, useEffect } from 'react';
+import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FIREProjectionScenarios, FIREScenarioParams } from '@/types/assets';
 import { Settings } from '@/types/settings';
@@ -57,6 +58,7 @@ export function FIREProjectionSection({
 }: FIREProjectionSectionProps) {
   const queryClient = useQueryClient();
   const defaults = getDefaultScenarios();
+  const isMobile = useMediaQuery('(max-width: 767px)');
 
   // Local state for scenario parameters (editable, recalculates immediately)
   const [scenarios, setScenarios] = useState<FIREProjectionScenarios>(
@@ -177,7 +179,7 @@ export function FIREProjectionSection({
       </Card>
 
       {/* Scenario Parameter Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 desktop:grid-cols-3">
         {(Object.keys(SCENARIO_CONFIG) as ScenarioKey[]).map((key) => {
           const config = SCENARIO_CONFIG[key];
           const Icon = config.icon;
@@ -221,12 +223,12 @@ export function FIREProjectionSection({
       </div>
 
       {/* Action Buttons */}
-      <div className="flex gap-3">
-        <Button variant="outline" size="sm" onClick={handleResetDefaults}>
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+        <Button variant="outline" size="sm" onClick={handleResetDefaults} className="w-full sm:w-auto">
           <RotateCcw className="mr-2 h-4 w-4" />
           Ripristina Default
         </Button>
-        <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+        <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="w-full sm:w-auto">
           <Save className="mr-2 h-4 w-4" />
           {saveMutation.isPending ? 'Salvataggio...' : 'Salva Parametri'}
         </Button>
@@ -235,7 +237,7 @@ export function FIREProjectionSection({
       {projection && (
         <>
           {/* Summary Cards: Years to FIRE */}
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 desktop:grid-cols-3">
             {(Object.keys(SCENARIO_CONFIG) as ScenarioKey[]).map((key) => {
               const config = SCENARIO_CONFIG[key];
               const Icon = config.icon;
@@ -280,6 +282,8 @@ export function FIREProjectionSection({
                 bearYearsToFIRE={projection.bearYearsToFIRE}
                 baseYearsToFIRE={projection.baseYearsToFIRE}
                 bullYearsToFIRE={projection.bullYearsToFIRE}
+                height={isMobile ? 280 : 400}
+                marginLeft={isMobile ? 10 : 50}
               />
             </CardContent>
           </Card>

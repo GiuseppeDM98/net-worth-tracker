@@ -245,13 +245,13 @@ export function ParametersForm({
           <Label htmlFor="initialPortfolio" className="text-base font-semibold">
             Patrimonio Iniziale
           </Label>
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={handleUseTotalPortfolio}
-              className="flex-1"
+              className="w-full sm:flex-1"
             >
               Usa Patrimonio Totale ({formatCurrency(totalNetWorth)})
             </Button>
@@ -260,7 +260,7 @@ export function ParametersForm({
               variant="outline"
               size="sm"
               onClick={handleUseLiquidPortfolio}
-              className="flex-1"
+              className="w-full sm:flex-1"
             >
               Usa Patrimonio Liquido ({formatCurrency(liquidNetWorth)})
             </Button>
@@ -276,7 +276,7 @@ export function ParametersForm({
         </div>
 
         {/* Retirement Years & Annual Withdrawal */}
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <Label htmlFor="retirementYears">Anni di Pensionamento</Label>
             <Input
@@ -324,7 +324,7 @@ export function ParametersForm({
               }
             </span>
           </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 grid-cols-2 desktop:grid-cols-4">
             <div>
               <Label htmlFor="equityPercentage">Equity (%)</Label>
               <Input
@@ -405,7 +405,7 @@ export function ParametersForm({
             </div>
             <div className="space-y-4">
               {/* Equity */}
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <Label htmlFor="equityReturn">Rendimento Equity (%/anno)</Label>
                   <Input
@@ -434,7 +434,7 @@ export function ParametersForm({
                 </div>
               </div>
               {/* Bonds */}
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <Label htmlFor="bondsReturn">Rendimento Bonds (%/anno)</Label>
                   <Input
@@ -463,7 +463,7 @@ export function ParametersForm({
                 </div>
               </div>
               {/* Real Estate */}
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <Label htmlFor="realEstateReturn">Rendimento Immobili (%/anno)</Label>
                   <Input
@@ -492,7 +492,7 @@ export function ParametersForm({
                 </div>
               </div>
               {/* Commodities */}
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <Label htmlFor="commoditiesReturn">Rendimento Materie Prime (%/anno)</Label>
                   <Input

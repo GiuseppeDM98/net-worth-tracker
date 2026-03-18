@@ -57,8 +57,8 @@ export function GoalAllocationPieChart({
         <CardTitle className="text-base">Allocazione per Obiettivo</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
+        {/* Explicit height avoids Recharts measuring -1 when the tab is hidden */}
+        <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
                 data={chartData}
@@ -87,7 +87,6 @@ export function GoalAllocationPieChart({
               />
             </PieChart>
           </ResponsiveContainer>
-        </div>
       </CardContent>
     </Card>
   );

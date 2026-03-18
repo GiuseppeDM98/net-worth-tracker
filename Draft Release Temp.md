@@ -70,3 +70,12 @@
 - Hall of Fame page content is no longer cut off by the bottom navigation bar on portrait mobile
 - Adding or editing a note on the Hall of Fame page now stacks the Year and Month selectors vertically on phones, making them easier to tap
 - Note icon tap target on Hall of Fame has been enlarged for easier interaction on touch devices
+
+- FIRE & Simulations page is now fully usable on mobile and tablet — the tab navigation (FIRE Calculator / Monte Carlo / Goals) becomes a dropdown on devices below 1440px wide, and all metric cards display in a single column on small screens instead of cramped multi-column grids
+- FIRE page content is no longer cut off by the bottom navigation bar on portrait mobile
+- FIRE projection chart height adapts to screen size — taller on desktop for detail, more compact on mobile so the chart fits without excessive scrolling; axis labels scale accordingly
+- The year-by-year projection table now switches to a card-per-year layout on mobile — each card shows Bear / Base / Bull values in a compact 3-column grid instead of a 7-column table that required horizontal scrolling
+- Monte Carlo simulation: the "Use Total Portfolio" and "Use Liquid Portfolio" buttons now stack vertically on mobile instead of overflowing the screen edge
+- Monte Carlo simulation: the percentile table now switches to a card layout on mobile — one card per year showing all five percentile values, instead of a 6-column table
+- Monte Carlo Scenario Comparison: the Bear / Base / Bull parameter cards stack vertically on mobile and tablet instead of sitting side-by-side in an unreadable layout; the header buttons no longer overflow the screen
+- Goals page: objective cards now display in a 2-column grid on mobile instead of a horizontal scrollable row — all goals are visible at a glance without swiping

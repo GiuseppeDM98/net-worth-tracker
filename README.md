@@ -62,12 +62,14 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Per-scenario FIRE numbers with automatic savings stop at FIRE reached
 - **Goal-Based Investing**: allocate portfolio portions to financial goals (house, retirement, emergency fund, etc.) with progress tracking, recommended allocation comparison, and open-ended goal support
 - **Goal-Driven Allocation**: optionally derive portfolio allocation targets as a weighted average of goal recommended allocations, with automatic fallback to manual targets
+- Fully responsive on mobile and tablet — tab navigation uses a dropdown on small screens, year-by-year projection table switches to a card layout
 
 ### Monte Carlo Simulations
 - 4 asset classes: Equity, Bonds, Real Estate, Commodities
 - Editable parameters per asset class (returns, volatility)
 - Bear/Base/Bull scenario comparison with overlay charts and distribution analysis
 - Auto-fill allocation from real portfolio (crypto and cash excluded, normalized to 100%)
+- Fully responsive on mobile and tablet — percentile table switches to a card layout, scenario parameter cards stack vertically
 
 ### Other
 - **Hall of Fame** — Monthly and annual performance rankings with multi-section note system; fully responsive on mobile and tablet with touch-friendly card layouts
