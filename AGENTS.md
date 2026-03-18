@@ -25,6 +25,7 @@ For architecture and status, see [CLAUDE.md](CLAUDE.md).
 - Mobile header pattern (title + buttons): `flex flex-col gap-3 landscape:flex-row landscape:items-center landscape:justify-between` — buttons `w-full landscape:w-auto` (same as Overview "Crea Snapshot")
 - Card layout in landscape: `grid grid-cols-1 gap-4 landscape:grid-cols-2`
 - Desktop-only tables/views: `desktop:hidden` banner to warn mobile users ("si consiglia la visualizzazione su desktop")
+- **Exception — data-dense table pages**: pages with 8+ column tables may use `isTablet = useMediaQuery('(min-width: 768px) and (max-width: 1023px)')` + `useCardView = isMobile || isTablet` to switch to cards below 1024px. The `desktop:` 1440px breakpoint is for layout/navigation patterns, not card-vs-table decisions on dense data pages (e.g. Allocation page).
 
 ---
 
@@ -280,4 +281,4 @@ ALL fields in settings types must be handled in THREE places:
 **Cause**: `useCountUp` passes float intermediates (e.g. `13.5`) to `formatValue`. The `months` case uses `val % 12` which returns `1.5` on floats.
 **Fix**: `Math.round(val)` before any integer math (`Math.floor`, `%`) in display-format functions that expect whole numbers.
 
-**Last updated**: 2026-03-18 (session: Performance page mobile responsive overhaul)
+**Last updated**: 2026-03-18 (session: Allocation page mobile & tablet responsive adaptation)

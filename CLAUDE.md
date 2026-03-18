@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio
-- Ultima implementazione: **Performance Page Mobile Responsive** — pagina Performance adattata per mobile/tablet (< 768px): selettore periodo `<Select>` su mobile (TabsList su tablet+), header `flex-col` stackato, bottone "Periodo Personalizzato" ridotto a icona `CalendarDays`, `p-3 sm:p-6`, heatmap rendimenti a colori puri su mobile (testo nascosto, header a lettera singola, sticky Anno), tooltip MetricCard `max-w-[calc(100vw-2rem)]`, `margin={{ bottom: 20 }}` su tutti i grafici Recharts con `<Legend />` per evitare overlap asse X. (2026-03-18)
+- Ultima implementazione: **Allocation Page Mobile & Tablet Responsive** — pagina Allocazione adattata per mobile/tablet: aggiunto tier tablet (768–1023px) con card 2 colonne + bottom sheet (tabelle 8 colonne erano cramped); `useCardView = isMobile || isTablet` sostituisce il guard `isMobile`; header `flex-col sm:flex-row`; bottone "Modifica Target" full-width su mobile. (2026-03-18)
 - In corso ora: nessuna attività attiva
 
 ## Architecture Snapshot
@@ -70,4 +70,4 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`, `components/pdf/PDFExportDialog.tsx`, `lib/utils/pdfTimeFilters.ts`, `lib/utils/pdfGenerator.tsx`
 - Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`, `borsaItalianaBondScraper.test.ts`, `goalService.test.ts`, `couponUtils.test.ts`
 
-**Last updated**: 2026-03-18 (session: Performance page mobile responsive overhaul)
+**Last updated**: 2026-03-18 (session: Allocation page mobile & tablet responsive adaptation)

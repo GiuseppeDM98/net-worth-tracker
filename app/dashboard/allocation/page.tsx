@@ -115,7 +115,12 @@ export default function AllocationPage() {
   });
 
   // Responsive detection
+  // isMobile: phone-sized screens (cards + bottom sheets)
+  // isTablet: medium screens — reuses card view but in 2-col grid (tables are too cramped at 768-1023px)
+  // useCardView: true for both mobile and tablet; false only on desktop (≥1024px)
   const isMobile = useMediaQuery('(max-width: 767px)');
+  const isTablet = useMediaQuery('(min-width: 768px) and (max-width: 1023px)');
+  const useCardView = isMobile || isTablet;
 
   useEffect(() => {
     if (user) {
@@ -330,7 +335,7 @@ export default function AllocationPage() {
   // ========== MOBILE RENDERING FUNCTIONS ==========
 
   const renderAssetClassCards = () => (
-    <div className="space-y-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {Object.entries(allocation!.byAssetClass)
         .sort(([a], [b]) => {
           const orderA = ASSET_CLASS_ORDER[a] || 999;
@@ -361,7 +366,7 @@ export default function AllocationPage() {
     if (!subCategories) return null;
 
     return (
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {Object.entries(subCategories)
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([subCategory, data]) => {
@@ -403,7 +408,7 @@ export default function AllocationPage() {
     }
 
     return (
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {Object.entries(specificAssets)
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([assetName, data]) => (
@@ -449,7 +454,7 @@ export default function AllocationPage() {
 
   // ========== DESKTOP: DRILL-DOWN VIEW FOR SPECIFIC ASSETS ==========
 
-  if (drillDown.level === 'specificAsset' && drillDown.assetClass && drillDown.subCategory && !isMobile) {
+  if (drillDown.level === 'specificAsset' && drillDown.assetClass && drillDown.subCategory && !useCardView) {
     const specificAssets = getSpecificAssetsForSubCategory(drillDown.assetClass, drillDown.subCategory);
 
     return (
@@ -585,21 +590,21 @@ export default function AllocationPage() {
   // ========== MAIN VIEW (MOBILE + DESKTOP) ==========
 
   return (
-    <div className="space-y-6">
-      {/* Header (shared for both mobile and desktop) */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
             Allocazione Asset
           </h1>
-          <p className="mt-2 text-gray-600">
+          <p className="mt-1 text-sm sm:text-base text-gray-600">
             Confronta l'allocazione corrente con i tuoi obiettivi
           </p>
         </div>
         {!usingGoalTargets && (
-          <Link href="/dashboard/settings">
-            <Button variant="outline">
-              <Settings className="mr-2 h-4 w-4" />
+          <Link href="/dashboard/settings" className="w-full sm:w-auto shrink-0">
+            <Button variant="outline" size="sm" className="w-full sm:w-auto">
+              <Settings className="h-4 w-4 mr-2" />
               Modifica Target
             </Button>
           </Link>
@@ -608,25 +613,25 @@ export default function AllocationPage() {
 
       {/* Goal-derived targets indicator */}
       {usingGoalTargets && (
-        <div className="rounded-lg border border-green-200 bg-green-50/50 p-4 dark:border-green-800 dark:bg-green-950/10">
+        <div className="rounded-lg border border-green-200 bg-green-50/50 p-3 sm:p-4 dark:border-green-800 dark:bg-green-950/10">
           <p className="text-sm text-green-800 dark:text-green-200">
             <strong>Target calcolati dagli obiettivi</strong> — I target di allocazione sono derivati come media pesata delle allocazioni raccomandate dei tuoi obiettivi finanziari.
           </p>
         </div>
       )}
 
-      {/* Legend (shared for both mobile and desktop) */}
-      <div className="rounded-lg bg-blue-50 p-4">
-        <h3 className="font-semibold text-blue-900">Legenda</h3>
-        <ul className="mt-2 space-y-1 text-sm text-blue-800">
+      {/* Legend */}
+      <div className="rounded-lg bg-blue-50 p-3 sm:p-4">
+        <h3 className="font-semibold text-blue-900 text-sm sm:text-base">Legenda</h3>
+        <ul className="mt-2 space-y-1 text-xs sm:text-sm text-blue-800">
           <li><strong>COMPRA:</strong> Sotto-allocato (compra di più)</li>
           <li><strong>VENDI:</strong> Sovra-allocato (riduci posizione)</li>
           <li><strong>OK:</strong> Allocazione ottimale (±2%)</li>
         </ul>
       </div>
 
-      {/* ========== MOBILE VIEW ========== */}
-      {isMobile && (
+      {/* ========== MOBILE + TABLET VIEW ========== */}
+      {useCardView && (
         <>
           {/* Asset Class Cards */}
           {Object.keys(allocation.byAssetClass).length === 0 ? (
@@ -666,8 +671,8 @@ export default function AllocationPage() {
         </>
       )}
 
-      {/* ========== DESKTOP VIEW (unchanged tables) ========== */}
-      {!isMobile && (
+      {/* ========== DESKTOP VIEW (≥1024px — tables) ========== */}
+      {!useCardView && (
         <>
           {/* Asset Class Table */}
           <Card>
