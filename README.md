@@ -30,6 +30,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Rolling performance charts
 - Animated metric cards: values count up on load and on period switch; staggered entrance cascade per section
 - AI-powered analysis using Claude with Extended Thinking and web search
+- Fully responsive on mobile and tablet: dropdown period selector, stacked header, color-only heatmap view on small screens
 
 ### Cashflow
 - Income and expense tracking with custom categories and subcategories
@@ -247,7 +248,6 @@ Contributions are welcome! When contributing:
 
 ## Known Issues
 
-- Legend labels may be truncated on mobile (shows top 3 elements only)
 - Currency conversion depends on the Frankfurter API (falls back to cached rates)
 
 ## License

@@ -106,16 +106,16 @@ function ChartSkeleton() {
  */
 export function PerformancePageSkeleton() {
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-3 sm:p-6">
 
       {/* Header: title block + button group */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-2">
           <SkeletonBar className="h-8 w-72" />
           <SkeletonBar className="h-4 w-80" />
         </div>
-        <div className="flex gap-2">
-          <SkeletonBar className="h-9 w-40 rounded-md" />
+        <div className="flex flex-wrap gap-2 sm:justify-end">
+          <SkeletonBar className="h-9 w-9 rounded-md sm:w-40" />
           <SkeletonBar className="h-9 w-36 rounded-md" />
           <SkeletonBar className="h-9 w-28 rounded-md" />
         </div>

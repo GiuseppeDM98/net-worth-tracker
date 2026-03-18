@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio
-- Ultima implementazione: **PMC Multi-Broker Calculator** — calcolatore inline nel form asset (sezione "Tracciamento Cost Basis"): pulsante "Calcola PMC" (blu, testo+icona) accanto al label `averageCost`; pannello a larghezza piena con righe qty/prezzo per broker, PMC live Σ(qty×price)/Σ(qty), pulsante "Usa" popola il campo e chiude. `brokerEntries` usa `string` (non `number`) per evitare NaN in controlled inputs; pannello posizionato fuori dal `grid grid-cols-2` per occupare larghezza piena; `invisible` sul tasto X per preservare allineamento con singola riga; compatibile con `isBondPctMode`. (2026-03-15)
+- Ultima implementazione: **Performance Page Mobile Responsive** — pagina Performance adattata per mobile/tablet (< 768px): selettore periodo `<Select>` su mobile (TabsList su tablet+), header `flex-col` stackato, bottone "Periodo Personalizzato" ridotto a icona `CalendarDays`, `p-3 sm:p-6`, heatmap rendimenti a colori puri su mobile (testo nascosto, header a lettera singola, sticky Anno), tooltip MetricCard `max-w-[calc(100vw-2rem)]`, `margin={{ bottom: 20 }}` su tutti i grafici Recharts con `<Legend />` per evitare overlap asse X. (2026-03-18)
 - In corso ora: nessuna attività attiva
 
 ## Architecture Snapshot
@@ -22,7 +22,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Snapshot mensili automatici + storico e CSV export.
 - **Pagina Assets — 3 macro-tab** (Gestione / Anno Corrente / Storico), ciascuno con sub-tab **Prezzi** / **Valori** / **Asset Class**. Lazy loading sui macro-tab. Tab Prezzi e Valori: aggregazione per nome e badge "Venduto"; colonne riepilogative Mese Prec. % (ambra), YTD % (blu, anno corrente), From Start % (viola, storico). Tab **Asset Class**: totali mensili EUR per classe (Azioni, Obbligazioni, Crypto, Immobili, Liquidità, Materie Prime) con stesse colonne sommario; dati da `snapshot.byAssetClass`. Logica in `assetPriceHistoryUtils.ts` e `assetClassHistoryUtils.ts`. **Mobile**: Radix Select per navigazione sezioni (< 1440px), card view sotto 1440px, tabelle storiche compatte (`text-xs sm:text-sm`, `min-w-` ridotti), banner "si consiglia desktop" su Anno Corrente e Storico.
 - History page: Net Worth evolution, Asset Class breakdown, Liquidity, YoY variation, Savings vs Investment Growth (toggle Annuale/Mensile con selettore anno nella vista mensile), Doubling Time Analysis (geometrico + soglie fisse, summary cards adattivi alla modalità), Current vs Target allocation.
-- Performance metrics (ROI, CAGR, TWR, IRR, Sharpe, drawdown suite, YOC, Current Yield) con heatmap, underwater chart, rolling charts. Organizzate in 4 categorie (Rendimento, Rischio, Contesto, **Proventi Finanziari** — include dividendi e cedole). **Animazioni**: `useCountUp` hook anima i valori al caricamento e cambio periodo (ease-out-quart, 700ms, rispetta `prefers-reduced-motion`); `MetricSection` con stagger cascade (80ms/card, 120ms/sezione); skeleton screen al posto dello spinner; hover lift sulle card.
+- Performance metrics (ROI, CAGR, TWR, IRR, Sharpe, drawdown suite, YOC, Current Yield) con heatmap, underwater chart, rolling charts. Organizzate in 4 categorie (Rendimento, Rischio, Contesto, **Proventi Finanziari** — include dividendi e cedole). **Animazioni**: `useCountUp` hook anima i valori al caricamento e cambio periodo (ease-out-quart, 700ms, rispetta `prefers-reduced-motion`); `MetricSection` con stagger cascade (80ms/card, 120ms/sezione); skeleton screen al posto dello spinner; hover lift sulle card. **Mobile**: selettore periodo a `<Select>` dropdown su mobile (< 768px), header stackato, heatmap a colori puri (solo colore per cella, lettera singola per mese, sticky colonna Anno).
 - Dividendi multi-currency con conversione EUR, scraping Borsa Italiana, calendario mensile con drill-down. Filtro asset include equity + bond (cedole); filtri posizionati in cima alla pagina e propagati anche ai grafici (DividendStats riceve assetId). Vendita bond (quantity=0): cedole future eliminate, nessuna voce €0 creata. **Rendimento Totale per Asset**: tabella in `DividendStats.tsx` con plusvalenza non realizzata % + dividendi storici netti % = rendimento totale %; `dividendReturnPercentage` = somma di `(div.netAmountEur / (div.quantity × div.costPerShare))` per ogni dividendo pagato (costo storico per-pagamento, stessa filosofia YOC v3); fallback a `asset.averageCost` per record legacy; può superare 100%; esclusi venduti (qty=0) e asset senza averageCost; calcolo in `/api/dividends/stats/route.ts`. **Crescita Dividendi per Azione**: tabella in `DividendStats.tsx` con DPS lordo annuale per asset, YoY% e CAGR%; solo equity (cedole `coupon`/`finalPremium` escluse); mediana portafoglio in header (solo vista all-assets); asset con 1 solo anno di dati mostrano "—"; interfacce `AssetDividendGrowth`, `DividendGrowthData` in `types/dividend.ts`.
 - Hall of Fame con ranking mensili/annuali e sistema note dedicato multi-sezione.
 - FIRE calculator con esclusione casa abitazione, Proiezione Scenari Bear/Base/Bull con inflazione, FIRE Number per-scenario, stop risparmi al raggiungimento FIRE.
@@ -43,7 +43,6 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Anthropic native web search per AI analysis (no Tavily).
 
 ## Known Issues (Active)
-- Etichette legenda su mobile troncate (top 3 elementi).
 - Conversione valuta dipende da Frankfurter API (fallback su cache).
 
 ## Key Files
@@ -71,4 +70,4 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`, `components/pdf/PDFExportDialog.tsx`, `lib/utils/pdfTimeFilters.ts`, `lib/utils/pdfGenerator.tsx`
 - Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`, `borsaItalianaBondScraper.test.ts`, `goalService.test.ts`, `couponUtils.test.ts`
 
-**Last updated**: 2026-03-15 (session: Performance page animations + skeleton loading)
+**Last updated**: 2026-03-18 (session: Performance page mobile responsive overhaul)

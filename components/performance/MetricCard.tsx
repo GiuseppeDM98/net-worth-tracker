@@ -194,7 +194,7 @@ export function MetricCard({
               <HelpCircle className="h-4 w-4 text-muted-foreground" />
             </button>
             {showTooltip && (
-              <div className="absolute right-0 top-6 z-50 w-72 rounded-md border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95">
+              <div className="absolute right-0 top-6 z-50 w-64 max-w-[calc(100vw-2rem)] rounded-md border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95">
                 <p>{tooltip}</p>
               </div>
             )}

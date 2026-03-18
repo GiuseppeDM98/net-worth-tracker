@@ -64,6 +64,7 @@ End date must include full day: `new Date(year, month, 0, 23, 59, 59, 999)`
 - Use sentinel values: `__all_years__`, `__all__`, `__none__` for "unselected" options
 - For optional fields: use `undefined` value + placeholder text
 - **Always use Radix `Select` (`@/components/ui/select`) for styled dropdowns** — native HTML `<select>` ignores `height`, `padding-y`, and most CSS on iOS. Radix renders a fully styleable trigger button.
+- **Mobile tab-to-Select pattern**: when a `<TabsList>` has ≥ 5 tabs that become cramped on mobile, replace with a `<Select>` on mobile and keep TabsList on desktop: `{isMobile ? <Select value={...} onValueChange={...}>...</Select> : <TabsList>...</TabsList>}`. The Select updates the same state variable — tab content renders correctly because it reads state, not DOM. Pattern used in Assets (< 1440px) and Performance page (< 768px).
 
 ### Sankey Diagram Multi-Layer Pattern
 - 4-layer structure: Income → Budget → Types → Categories + Savings (5th optional: Subcategories)
@@ -226,6 +227,11 @@ ALL fields in settings types must be handled in THREE places:
 **Context**: `<Cell>` overrides per-bar fill at render time but does NOT propagate to `<Legend>` — the legend reads `fill` directly from the `<Bar>` element. Without `fill` on `<Bar>`, Recharts defaults to black.
 **Fix**: Always set `fill` on `<Bar>` to the "default" color (e.g. `fill="#3B82F6"`) so the legend shows the expected color; `<Cell>` fills still override individual bars at runtime.
 
+### Recharts Legend Overlapping X-Axis Labels
+**Symptom**: `<Legend>` renders on top of the x-axis tick labels inside a `ResponsiveContainer`.
+**Context**: Recharts renders the legend inside the SVG height — it eats into chart space and can overlap the bottom axis without explicit margin.
+**Fix**: Add `margin={{ bottom: 20 }}` to the chart root element (`<AreaChart>`, `<LineChart>`, etc.). Apply to every chart component that uses `<Legend />`.
+
 ### Unit Testing Patterns
 
 - **Local Date constructor**: Use `new Date(year, month, day)` not ISO string `new Date('2024-03-09')` in test fixtures — ISO strings parse as UTC and shift by 1 hour in CET, causing off-by-one day bugs
@@ -274,4 +280,4 @@ ALL fields in settings types must be handled in THREE places:
 **Cause**: `useCountUp` passes float intermediates (e.g. `13.5`) to `formatValue`. The `months` case uses `val % 12` which returns `1.5` on floats.
 **Fix**: `Math.round(val)` before any integer math (`Math.floor`, `%`) in display-format functions that expect whole numbers.
 
-**Last updated**: 2026-03-15 (session: Performance page animations + skeleton loading)
+**Last updated**: 2026-03-18 (session: Performance page mobile responsive overhaul)

@@ -9,8 +9,9 @@ import { PerformanceData, PerformanceMetrics, TimePeriod, MonthlyReturnHeatmapDa
 import { MonthlySnapshot } from '@/types/assets';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, TrendingUp, Info, Sparkles } from 'lucide-react';
+import { RefreshCw, TrendingUp, Info, Sparkles, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency, formatPercentage, formatCurrencyCompact } from '@/lib/services/chartService';
 import {
@@ -492,8 +493,8 @@ export default function PerformancePage() {
 
   if (metrics.hasInsufficientData) {
     return (
-      <div className="space-y-6 p-6">
-        <div className="flex items-center justify-between">
+      <div className="space-y-6 p-3 sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Performance Portafoglio</h1>
             <p className="text-muted-foreground mt-1">
@@ -503,16 +504,32 @@ export default function PerformancePage() {
         </div>
 
         <Tabs value={selectedPeriod} onValueChange={(value) => setSelectedPeriod(value as TimePeriod)}>
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="YTD">YTD</TabsTrigger>
-            <TabsTrigger value="1Y">1 Anno</TabsTrigger>
-            <TabsTrigger value="3Y">3 Anni</TabsTrigger>
-            <TabsTrigger value="5Y">5 Anni</TabsTrigger>
-            <TabsTrigger value="ALL">Storico</TabsTrigger>
-            <TabsTrigger value="CUSTOM" disabled={!performanceData.custom}>
-              Personalizzato
-            </TabsTrigger>
-          </TabsList>
+          {isMobile ? (
+            <Select value={selectedPeriod} onValueChange={(value) => setSelectedPeriod(value as TimePeriod)}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="YTD">YTD</SelectItem>
+                <SelectItem value="1Y">1 Anno</SelectItem>
+                <SelectItem value="3Y">3 Anni</SelectItem>
+                <SelectItem value="5Y">5 Anni</SelectItem>
+                <SelectItem value="ALL">Storico</SelectItem>
+                <SelectItem value="CUSTOM" disabled={!performanceData.custom}>Personalizzato</SelectItem>
+              </SelectContent>
+            </Select>
+          ) : (
+            <TabsList className="grid w-full grid-cols-6">
+              <TabsTrigger value="YTD">YTD</TabsTrigger>
+              <TabsTrigger value="1Y">1 Anno</TabsTrigger>
+              <TabsTrigger value="3Y">3 Anni</TabsTrigger>
+              <TabsTrigger value="5Y">5 Anni</TabsTrigger>
+              <TabsTrigger value="ALL">Storico</TabsTrigger>
+              <TabsTrigger value="CUSTOM" disabled={!performanceData.custom}>
+                Personalizzato
+              </TabsTrigger>
+            </TabsList>
+          )}
 
           <Card className="mt-6">
             <CardContent className="pt-6">
@@ -532,18 +549,18 @@ export default function PerformancePage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-3 sm:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Performance Portafoglio</h1>
           <p className="text-muted-foreground mt-1">
             Analisi dei rendimenti e metriche di rischio-rendimento
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowCustomDateDialog(true)}>
-            Periodo Personalizzato
+        <div className="flex flex-wrap gap-2 sm:justify-end">
+          <Button variant="outline" onClick={() => setShowCustomDateDialog(true)} title="Periodo Personalizzato">
+            {isMobile ? <CalendarDays className="h-4 w-4" /> : 'Periodo Personalizzato'}
           </Button>
           <Button
             variant="outline"
@@ -563,16 +580,32 @@ export default function PerformancePage() {
 
       {/* Period Selector */}
       <Tabs value={selectedPeriod} onValueChange={(value) => setSelectedPeriod(value as TimePeriod)}>
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="YTD">YTD</TabsTrigger>
-          <TabsTrigger value="1Y">1 Anno</TabsTrigger>
-          <TabsTrigger value="3Y">3 Anni</TabsTrigger>
-          <TabsTrigger value="5Y">5 Anni</TabsTrigger>
-          <TabsTrigger value="ALL">Storico</TabsTrigger>
-          <TabsTrigger value="CUSTOM" disabled={!performanceData.custom}>
-            Personalizzato
-          </TabsTrigger>
-        </TabsList>
+        {isMobile ? (
+          <Select value={selectedPeriod} onValueChange={(value) => setSelectedPeriod(value as TimePeriod)}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="YTD">YTD</SelectItem>
+              <SelectItem value="1Y">1 Anno</SelectItem>
+              <SelectItem value="3Y">3 Anni</SelectItem>
+              <SelectItem value="5Y">5 Anni</SelectItem>
+              <SelectItem value="ALL">Storico</SelectItem>
+              <SelectItem value="CUSTOM" disabled={!performanceData.custom}>Personalizzato</SelectItem>
+            </SelectContent>
+          </Select>
+        ) : (
+          <TabsList className="grid w-full grid-cols-6">
+            <TabsTrigger value="YTD">YTD</TabsTrigger>
+            <TabsTrigger value="1Y">1 Anno</TabsTrigger>
+            <TabsTrigger value="3Y">3 Anni</TabsTrigger>
+            <TabsTrigger value="5Y">5 Anni</TabsTrigger>
+            <TabsTrigger value="ALL">Storico</TabsTrigger>
+            <TabsTrigger value="CUSTOM" disabled={!performanceData.custom}>
+              Personalizzato
+            </TabsTrigger>
+          </TabsList>
+        )}
 
         {/* WARNING: If you change metric tooltips or formulas here, also update:
              - Methodology section at bottom of this file (lines ~595-716)
@@ -757,7 +790,7 @@ export default function PerformancePage() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={getChartHeight()}>
-                <AreaChart data={chartData}>
+                <AreaChart data={chartData} margin={{ bottom: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
@@ -803,7 +836,7 @@ export default function PerformancePage() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={getChartHeight()}>
-                  <LineChart data={rollingCagrData}>
+                  <LineChart data={rollingCagrData} margin={{ bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis
                       dataKey="periodEndDate"
@@ -849,7 +882,7 @@ export default function PerformancePage() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={getChartHeight()}>
-                <LineChart data={rollingSharpeData}>
+                <LineChart data={rollingSharpeData} margin={{ bottom: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis
                     dataKey="periodEndDate"
