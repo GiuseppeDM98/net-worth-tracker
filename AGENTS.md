@@ -281,4 +281,4 @@ ALL fields in settings types must be handled in THREE places:
 **Cause**: `useCountUp` passes float intermediates (e.g. `13.5`) to `formatValue`. The `months` case uses `val % 12` which returns `1.5` on floats.
 **Fix**: `Math.round(val)` before any integer math (`Math.floor`, `%`) in display-format functions that expect whole numbers.
 
-**Last updated**: 2026-03-18 (session: Allocation page mobile & tablet responsive adaptation)
+**Last updated**: 2026-03-18 (session: Hall of Fame mobile & tablet responsive audit)

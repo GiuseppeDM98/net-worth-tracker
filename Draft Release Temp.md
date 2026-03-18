@@ -66,3 +66,7 @@
 - Fixed chart legends overlapping the x-axis date labels on the History page (Asset Class and Liquidity charts) on tablet portrait
 - Allocation page is now fully usable on mobile and tablet — asset class cards display in a 2-column grid on tablets (768–1023px) instead of cramped 8-column tables that required horizontal scrolling; drill-down into subcategories and specific assets uses the existing bottom sheet navigation on both mobile and tablet
 - "Modifica Target" button on the Allocation page is now full-width on mobile, making it easier to tap and always showing the label text
+- Hall of Fame page now shows touch-friendly cards on mobile and tablet — monthly and yearly rankings display cards (instead of dense tables) on all devices below 1440px wide, including iPads in both portrait and landscape
+- Hall of Fame page content is no longer cut off by the bottom navigation bar on portrait mobile
+- Adding or editing a note on the Hall of Fame page now stacks the Year and Month selectors vertically on phones, making them easier to tap
+- Note icon tap target on Hall of Fame has been enlarged for easier interaction on touch devices

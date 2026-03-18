@@ -70,7 +70,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Auto-fill allocation from real portfolio (crypto and cash excluded, normalized to 100%)
 
 ### Other
-- **Hall of Fame** — Monthly and annual performance rankings with multi-section note system
+- **Hall of Fame** — Monthly and annual performance rankings with multi-section note system; fully responsive on mobile and tablet with touch-friendly card layouts
 - **PDF Export** — 8 configurable sections with custom year/month period selection; sections auto-disabled for past periods when historical data is unavailable
 
 ## Quick Start

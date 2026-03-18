@@ -296,7 +296,7 @@ export default function HallOfFamePage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 max-desktop:portrait:pb-20">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -341,7 +341,7 @@ export default function HallOfFamePage() {
       {/* Ranking Mensili */}
       <div>
         <h2 className="text-xl sm:text-2xl font-semibold mb-4">Ranking Mensili (Top 20)</h2>
-        <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 desktop:grid-cols-2">
           {/* Miglior Mese: Differenza NW */}
           <Card>
             <CardHeader>
@@ -355,7 +355,7 @@ export default function HallOfFamePage() {
             </CardHeader>
             <CardContent>
               {/* Mobile: Cards */}
-              <div className="md:hidden space-y-2">
+              <div className="desktop:hidden space-y-2">
                 {data.bestMonthsByNetWorthGrowth.length > 0 ? (
                   data.bestMonthsByNetWorthGrowth.map((record, idx) => (
                     <MonthlyRecordCard
@@ -377,7 +377,7 @@ export default function HallOfFamePage() {
               </div>
 
               {/* Desktop: Table */}
-              <div className="hidden md:block">
+              <div className="hidden desktop:block">
                 <MonthlyTable
                   records={data.bestMonthsByNetWorthGrowth}
                   valueKey="netWorthDiff"
@@ -403,7 +403,7 @@ export default function HallOfFamePage() {
             </CardHeader>
             <CardContent>
               {/* Mobile: Cards */}
-              <div className="md:hidden space-y-2">
+              <div className="desktop:hidden space-y-2">
                 {data.bestMonthsByIncome.length > 0 ? (
                   data.bestMonthsByIncome.map((record, idx) => (
                     <MonthlyRecordCard
@@ -425,7 +425,7 @@ export default function HallOfFamePage() {
               </div>
 
               {/* Desktop: Table */}
-              <div className="hidden md:block">
+              <div className="hidden desktop:block">
                 <MonthlyTable
                   records={data.bestMonthsByIncome}
                   valueKey="totalIncome"
@@ -451,7 +451,7 @@ export default function HallOfFamePage() {
             </CardHeader>
             <CardContent>
               {/* Mobile: Cards */}
-              <div className="md:hidden space-y-2">
+              <div className="desktop:hidden space-y-2">
                 {data.worstMonthsByNetWorthDecline.length > 0 ? (
                   data.worstMonthsByNetWorthDecline.map((record, idx) => (
                     <MonthlyRecordCard
@@ -473,7 +473,7 @@ export default function HallOfFamePage() {
               </div>
 
               {/* Desktop: Table */}
-              <div className="hidden md:block">
+              <div className="hidden desktop:block">
                 <MonthlyTable
                   records={data.worstMonthsByNetWorthDecline}
                   valueKey="netWorthDiff"
@@ -499,7 +499,7 @@ export default function HallOfFamePage() {
             </CardHeader>
             <CardContent>
               {/* Mobile: Cards */}
-              <div className="md:hidden space-y-2">
+              <div className="desktop:hidden space-y-2">
                 {data.worstMonthsByExpenses.length > 0 ? (
                   data.worstMonthsByExpenses.map((record, idx) => (
                     <MonthlyRecordCard
@@ -521,7 +521,7 @@ export default function HallOfFamePage() {
               </div>
 
               {/* Desktop: Table */}
-              <div className="hidden md:block">
+              <div className="hidden desktop:block">
                 <MonthlyTable
                   records={data.worstMonthsByExpenses}
                   valueKey="totalExpenses"
@@ -539,7 +539,7 @@ export default function HallOfFamePage() {
       {/* Ranking Annuali */}
       <div>
         <h2 className="text-xl sm:text-2xl font-semibold mb-4">Ranking Annuali (Top 10)</h2>
-        <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 desktop:grid-cols-2">
           {/* Miglior Anno: Differenza NW */}
           <Card>
             <CardHeader>
@@ -553,7 +553,7 @@ export default function HallOfFamePage() {
             </CardHeader>
             <CardContent>
               {/* Mobile: Cards */}
-              <div className="md:hidden space-y-2">
+              <div className="desktop:hidden space-y-2">
                 {data.bestYearsByNetWorthGrowth.length > 0 ? (
                   data.bestYearsByNetWorthGrowth.map((record, idx) => (
                     <YearlyRecordCard
@@ -575,7 +575,7 @@ export default function HallOfFamePage() {
               </div>
 
               {/* Desktop: Table */}
-              <div className="hidden md:block">
+              <div className="hidden desktop:block">
                 <YearlyTable
                   records={data.bestYearsByNetWorthGrowth}
                   valueKey="netWorthDiff"
@@ -601,7 +601,7 @@ export default function HallOfFamePage() {
             </CardHeader>
             <CardContent>
               {/* Mobile: Cards */}
-              <div className="md:hidden space-y-2">
+              <div className="desktop:hidden space-y-2">
                 {data.bestYearsByIncome.length > 0 ? (
                   data.bestYearsByIncome.map((record, idx) => (
                     <YearlyRecordCard
@@ -623,7 +623,7 @@ export default function HallOfFamePage() {
               </div>
 
               {/* Desktop: Table */}
-              <div className="hidden md:block">
+              <div className="hidden desktop:block">
                 <YearlyTable
                   records={data.bestYearsByIncome}
                   valueKey="totalIncome"
@@ -649,7 +649,7 @@ export default function HallOfFamePage() {
             </CardHeader>
             <CardContent>
               {/* Mobile: Cards */}
-              <div className="md:hidden space-y-2">
+              <div className="desktop:hidden space-y-2">
                 {data.worstYearsByNetWorthDecline.length > 0 ? (
                   data.worstYearsByNetWorthDecline.map((record, idx) => (
                     <YearlyRecordCard
@@ -671,7 +671,7 @@ export default function HallOfFamePage() {
               </div>
 
               {/* Desktop: Table */}
-              <div className="hidden md:block">
+              <div className="hidden desktop:block">
                 <YearlyTable
                   records={data.worstYearsByNetWorthDecline}
                   valueKey="netWorthDiff"
@@ -697,7 +697,7 @@ export default function HallOfFamePage() {
             </CardHeader>
             <CardContent>
               {/* Mobile: Cards */}
-              <div className="md:hidden space-y-2">
+              <div className="desktop:hidden space-y-2">
                 {data.worstYearsByExpenses.length > 0 ? (
                   data.worstYearsByExpenses.map((record, idx) => (
                     <YearlyRecordCard
@@ -719,7 +719,7 @@ export default function HallOfFamePage() {
               </div>
 
               {/* Desktop: Table */}
-              <div className="hidden md:block">
+              <div className="hidden desktop:block">
                 <YearlyTable
                   records={data.worstYearsByExpenses}
                   valueKey="totalExpenses"

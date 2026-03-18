@@ -36,7 +36,7 @@ export function NoteIconCell({ notes, section, year, month, onNoteClick }: NoteI
 
   // No note exists: show spacer for alignment
   if (matchingNotes.length === 0) {
-    return <div className="w-8" />;
+    return <div className="w-10" />;
   }
 
   // Note exists: show clickable amber icon
@@ -46,7 +46,7 @@ export function NoteIconCell({ notes, section, year, month, onNoteClick }: NoteI
   return (
     <button
       onClick={() => onNoteClick(noteToDisplay)}
-      className="flex items-center justify-center w-8 h-8 rounded hover:bg-amber-100 dark:hover:bg-amber-950 transition-colors"
+      className="flex items-center justify-center w-10 h-10 rounded hover:bg-amber-100 dark:hover:bg-amber-950 transition-colors"
       aria-label="Visualizza nota"
     >
       <MessageSquare className="h-4 w-4 text-amber-500" />
