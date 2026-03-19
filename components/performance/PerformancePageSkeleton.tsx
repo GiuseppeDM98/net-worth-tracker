@@ -76,7 +76,7 @@ function MetricSectionSkeleton({
       {/* Section title placeholder */}
       <SkeletonBar className="h-5 w-52 mb-4" />
       {/* Cards grid — same breakpoints as the real MetricSection grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 desktop:grid-cols-4 gap-4">
         {Array.from({ length: cardCount }).map((_, i) => (
           <MetricCardSkeleton key={i} delayMs={baseDelay + i * 100} />
         ))}

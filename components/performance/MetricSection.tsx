@@ -55,7 +55,7 @@ export function MetricSection({
       </div>
 
       {/* Metric Cards Grid — each card fades+slides up with stagger */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 desktop:grid-cols-4 gap-4">
         {React.Children.map(children, (child, i) => (
           <div
             key={i}

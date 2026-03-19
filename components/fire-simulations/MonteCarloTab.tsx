@@ -281,14 +281,14 @@ export function MonteCarloTab() {
   return (
     <div className="space-y-6">
       {/* ========== Information Card ========== */}
-      <Card className="bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200">
+      <Card className="bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200 dark:from-purple-950/30 dark:to-blue-950/30 dark:border-purple-800">
         <CardHeader>
           <CardTitle className="text-lg">Come Funzionano le Simulazioni</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <div>
             <p className="font-semibold mb-1">Parametri di Mercato</p>
-            <ul className="list-disc list-inside space-y-1 text-gray-700 ml-2">
+            <ul className="list-disc list-inside space-y-1 text-gray-700 dark:text-gray-300 ml-2">
               <li>
                 <strong>4 Asset Class:</strong> Equity, Bonds, Immobili e Materie Prime con
                 rendimenti e volatilità personalizzabili
@@ -301,7 +301,7 @@ export function MonteCarloTab() {
           </div>
           <div>
             <p className="font-semibold mb-1">Interpretazione Risultati</p>
-            <ul className="list-disc list-inside space-y-1 text-gray-700 ml-2">
+            <ul className="list-disc list-inside space-y-1 text-gray-700 dark:text-gray-300 ml-2">
               <li>
                 <strong>Tasso di Successo:</strong> % di simulazioni dove il patrimonio
                 dura almeno N anni
@@ -382,26 +382,26 @@ export function MonteCarloTab() {
 
           {/* Failure Analysis (if applicable) */}
           {results.failureAnalysis && (
-            <Card className="border-red-200 bg-red-50">
+            <Card className="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800">
               <CardHeader>
-                <CardTitle className="text-red-900">Analisi Fallimenti</CardTitle>
+                <CardTitle className="text-red-900 dark:text-red-200">Analisi Fallimenti</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4 desktop:grid-cols-2">
                   <div>
-                    <p className="text-sm text-red-700 mb-1">Anno Medio di Fallimento</p>
-                    <p className="text-2xl font-bold text-red-900">
+                    <p className="text-sm text-red-700 dark:text-red-300 mb-1">Anno Medio di Fallimento</p>
+                    <p className="text-2xl font-bold text-red-900 dark:text-red-200">
                       Anno {Math.round(results.failureAnalysis.averageFailureYear)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-red-700 mb-1">Anno Mediano di Fallimento</p>
-                    <p className="text-2xl font-bold text-red-900">
+                    <p className="text-sm text-red-700 dark:text-red-300 mb-1">Anno Mediano di Fallimento</p>
+                    <p className="text-2xl font-bold text-red-900 dark:text-red-200">
                       Anno {results.failureAnalysis.medianFailureYear}
                     </p>
                   </div>
                 </div>
-                <p className="mt-4 text-sm text-red-800">
+                <p className="mt-4 text-sm text-red-800 dark:text-red-300">
                   In {results.failureCount} simulazioni ({(results.failureCount / params.numberOfSimulations * 100).toFixed(1)}%)
                   il patrimonio si è esaurito prima di raggiungere {params.retirementYears} anni.
                 </p>

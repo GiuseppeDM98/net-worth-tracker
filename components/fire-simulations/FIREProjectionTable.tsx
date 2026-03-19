@@ -48,7 +48,7 @@ export function FIREProjectionTable({ yearlyData }: FIREProjectionTableProps) {
               return (
                 <div
                   key={row.year}
-                  className={`rounded-lg border p-3 ${allReached ? 'bg-green-50 border-green-200' : row.baseFireReached ? 'bg-green-50/50 border-green-100' : 'bg-gray-50/50'}`}
+                  className={`rounded-lg border p-3 ${allReached ? 'bg-green-50 border-green-200 dark:bg-green-950/25 dark:border-green-800' : row.baseFireReached ? 'bg-green-50/50 border-green-100 dark:bg-green-950/15 dark:border-green-900' : 'bg-gray-50/50 dark:bg-gray-800/30 dark:border-gray-700'}`}
                 >
                   {/* Year header */}
                   <div className="flex items-center justify-between mb-2">
@@ -114,7 +114,7 @@ export function FIREProjectionTable({ yearlyData }: FIREProjectionTableProps) {
                   return (
                     <tr
                       key={row.year}
-                      className={`border-b ${allReached ? 'bg-green-50' : row.baseFireReached ? 'bg-green-50/50' : ''}`}
+                      className={`border-b ${allReached ? 'bg-green-50 dark:bg-green-950/25' : row.baseFireReached ? 'bg-green-50/50 dark:bg-green-950/15' : ''}`}
                     >
                       <td className="py-1.5 sm:py-2 pr-4 font-medium">{row.calendarYear}</td>
                       {/* Bear scenario */}

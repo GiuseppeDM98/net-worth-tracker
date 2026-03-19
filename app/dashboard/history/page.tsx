@@ -511,7 +511,7 @@ export default function HistoryPage() {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="text-gray-500">Caricamento...</div>
+        <div className="text-muted-foreground">Caricamento...</div>
       </div>
     );
   }
@@ -525,8 +525,8 @@ export default function HistoryPage() {
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex-1">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Storico</h1>
-          <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">Storico</h1>
+          <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-400">
             Analizza l'evoluzione del tuo patrimonio (lordo) nel tempo
           </p>
         </div>
@@ -589,7 +589,7 @@ export default function HistoryPage() {
         </CardHeader>
         <CardContent>
           {netWorthHistory.length === 0 ? (
-            <div className="flex h-64 items-center justify-center text-gray-500">
+            <div className="flex h-64 items-center justify-center text-gray-500 dark:text-gray-400">
               Nessuno storico disponibile. Gli snapshot mensili verranno creati
               automaticamente.
             </div>
@@ -609,15 +609,15 @@ export default function HistoryPage() {
                 <Tooltip
                   formatter={(value: number) => formatCurrency(value)}
                   contentStyle={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                    border: '1px solid #ccc',
+                    backgroundColor: 'var(--card)',
+                    border: '1px solid var(--border)',
                     borderRadius: '8px',
                     padding: isMobile ? '8px' : '12px',
                     fontSize: isMobile ? '11px' : '13px',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                   }}
                   labelStyle={{
-                    color: '#000',
+                    color: 'var(--foreground)',
                     fontWeight: 600,
                     marginBottom: '4px',
                     fontSize: isMobile ? '14px' : '16px',
@@ -625,6 +625,7 @@ export default function HistoryPage() {
                   itemStyle={{
                     fontSize: isMobile ? '14px' : '16px',
                     padding: '2px 0',
+                    color: 'var(--card-foreground)',
                   }}
                   cursor={{ stroke: '#3B82F6', strokeWidth: 1, strokeDasharray: '5 5' }}
                 />
@@ -801,7 +802,7 @@ export default function HistoryPage() {
         </CardHeader>
         <CardContent>
           {assetClassHistory.length === 0 ? (
-            <div className="flex h-64 items-center justify-center text-gray-500">
+            <div className="flex h-64 items-center justify-center text-gray-500 dark:text-gray-400">
               Nessuno storico disponibile.
             </div>
           ) : (
@@ -843,22 +844,24 @@ export default function HistoryPage() {
                   <Tooltip
                     formatter={(value: number) => `${value.toFixed(2)}%`}
                     contentStyle={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                      border: '1px solid #ccc',
+                      backgroundColor: 'var(--card)',
+                      border: '1px solid var(--border)',
                       borderRadius: '8px',
                       padding: isMobile ? '8px' : '12px',
                       fontSize: isMobile ? '14px' : '16px',
                       boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                     }}
                     labelStyle={{
-                      color: '#000',
+                      color: 'var(--foreground)',
                       fontWeight: 600,
                       marginBottom: '4px',
                     }}
                     itemStyle={{
                       fontSize: isMobile ? '14px' : '16px',
                       padding: '2px 0',
+                      color: 'var(--card-foreground)',
                     }}
+                    cursor={{ fill: 'rgba(255,255,255,0.06)' }}
                   />
                   <Legend
                     wrapperStyle={{
@@ -941,22 +944,24 @@ export default function HistoryPage() {
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
                     contentStyle={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                      border: '1px solid #ccc',
+                      backgroundColor: 'var(--card)',
+                      border: '1px solid var(--border)',
                       borderRadius: '8px',
                       padding: isMobile ? '8px' : '12px',
                       fontSize: isMobile ? '14px' : '16px',
                       boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                     }}
                     labelStyle={{
-                      color: '#000',
+                      color: 'var(--foreground)',
                       fontWeight: 600,
                       marginBottom: '4px',
                     }}
                     itemStyle={{
                       fontSize: isMobile ? '14px' : '16px',
                       padding: '2px 0',
+                      color: 'var(--card-foreground)',
                     }}
+                    cursor={{ fill: 'rgba(255,255,255,0.06)' }}
                   />
                   <Legend
                     wrapperStyle={{
@@ -1052,7 +1057,7 @@ export default function HistoryPage() {
         </CardHeader>
         <CardContent>
           {netWorthHistory.length === 0 ? (
-            <div className="flex h-64 items-center justify-center text-gray-500">
+            <div className="flex h-64 items-center justify-center text-gray-500 dark:text-gray-400">
               Nessuno storico disponibile.
             </div>
           ) : (
@@ -1070,22 +1075,24 @@ export default function HistoryPage() {
                   <Tooltip
                     formatter={(value: number) => `${value.toFixed(2)}%`}
                     contentStyle={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                      border: '1px solid #ccc',
+                      backgroundColor: 'var(--card)',
+                      border: '1px solid var(--border)',
                       borderRadius: '8px',
                       padding: isMobile ? '8px' : '12px',
                       fontSize: isMobile ? '14px' : '16px',
                       boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                     }}
                     labelStyle={{
-                      color: '#000',
+                      color: 'var(--foreground)',
                       fontWeight: 600,
                       marginBottom: '4px',
                     }}
                     itemStyle={{
                       fontSize: isMobile ? '14px' : '16px',
                       padding: '2px 0',
+                      color: 'var(--card-foreground)',
                     }}
+                    cursor={{ fill: 'rgba(255,255,255,0.06)' }}
                   />
                   <Legend
                     wrapperStyle={{
@@ -1129,22 +1136,24 @@ export default function HistoryPage() {
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
                     contentStyle={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                      border: '1px solid #ccc',
+                      backgroundColor: 'var(--card)',
+                      border: '1px solid var(--border)',
                       borderRadius: '8px',
                       padding: isMobile ? '8px' : '12px',
                       fontSize: isMobile ? '14px' : '16px',
                       boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                     }}
                     labelStyle={{
-                      color: '#000',
+                      color: 'var(--foreground)',
                       fontWeight: 600,
                       marginBottom: '4px',
                     }}
                     itemStyle={{
                       fontSize: isMobile ? '14px' : '16px',
                       padding: '2px 0',
+                      color: 'var(--card-foreground)',
                     }}
+                    cursor={{ fill: 'rgba(255,255,255,0.06)' }}
                   />
                   <Legend
                     wrapperStyle={{
@@ -1200,7 +1209,7 @@ export default function HistoryPage() {
         </CardHeader>
         <CardContent>
           {yoyVariationData.length === 0 ? (
-            <div className="flex h-64 items-center justify-center text-gray-500">
+            <div className="flex h-64 items-center justify-center text-gray-500 dark:text-gray-400">
               Nessuno storico disponibile.
             </div>
           ) : (
@@ -1226,22 +1235,24 @@ export default function HistoryPage() {
                     return formatCurrency(value);
                   }}
                   contentStyle={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                    border: '1px solid #ccc',
+                    backgroundColor: 'var(--card)',
+                    border: '1px solid var(--border)',
                     borderRadius: '8px',
                     padding: isMobile ? '8px' : '12px',
                     fontSize: isMobile ? '14px' : '16px',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                   }}
                   labelStyle={{
-                    color: '#000',
+                    color: 'var(--foreground)',
                     fontWeight: 600,
                     marginBottom: '4px',
                   }}
                   itemStyle={{
                     fontSize: isMobile ? '14px' : '16px',
                     padding: '2px 0',
+                    color: 'var(--card-foreground)',
                   }}
+                  cursor={{ fill: 'rgba(255,255,255,0.06)' }}
                 />
                 <Legend
                   wrapperStyle={{
@@ -1290,7 +1301,7 @@ export default function HistoryPage() {
                   variant={savingsView === 'annual' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setSavingsView('annual')}
-                  className="text-xs sm:text-sm"
+                  className={cn("text-xs sm:text-sm", savingsView === 'annual' && "dark:bg-gray-700 dark:text-white")}
                 >
                   Annuale
                 </Button>
@@ -1298,7 +1309,7 @@ export default function HistoryPage() {
                   variant={savingsView === 'monthly' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setSavingsView('monthly')}
-                  className="text-xs sm:text-sm"
+                  className={cn("text-xs sm:text-sm", savingsView === 'monthly' && "dark:bg-gray-700 dark:text-white")}
                 >
                   Mensile
                 </Button>
@@ -1328,7 +1339,7 @@ export default function HistoryPage() {
           {savingsView === 'annual' ? (
             // Annual view
             savingsVsInvestmentData.length === 0 ? (
-              <div className="flex h-64 items-center justify-center text-gray-500">
+              <div className="flex h-64 items-center justify-center text-gray-500 dark:text-gray-400">
                 Dati insufficienti per la visualizzazione.
                 Servono snapshot e transazioni cashflow per ogni anno.
               </div>
@@ -1347,22 +1358,24 @@ export default function HistoryPage() {
                       name
                     ]}
                     contentStyle={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                      border: '1px solid #ccc',
+                      backgroundColor: 'var(--card)',
+                      border: '1px solid var(--border)',
                       borderRadius: '8px',
                       padding: isMobile ? '8px' : '12px',
                       fontSize: isMobile ? '14px' : '16px',
                       boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                     }}
                     labelStyle={{
-                      color: '#000',
+                      color: 'var(--foreground)',
                       fontWeight: 600,
                       marginBottom: '4px',
                     }}
                     itemStyle={{
                       fontSize: isMobile ? '14px' : '16px',
                       padding: '2px 0',
+                      color: 'var(--card-foreground)',
                     }}
+                    cursor={{ fill: 'rgba(255,255,255,0.06)' }}
                   />
                   <Legend
                     wrapperStyle={{
@@ -1400,7 +1413,7 @@ export default function HistoryPage() {
           ) : (
             // Monthly view
             savingsVsInvestmentDataMonthly.length === 0 ? (
-              <div className="flex h-64 items-center justify-center text-gray-500">
+              <div className="flex h-64 items-center justify-center text-gray-500 dark:text-gray-400">
                 Nessun dato per l&apos;anno selezionato.
                 Servono snapshot consecutivi e transazioni cashflow.
               </div>
@@ -1419,22 +1432,24 @@ export default function HistoryPage() {
                       name
                     ]}
                     contentStyle={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                      border: '1px solid #ccc',
+                      backgroundColor: 'var(--card)',
+                      border: '1px solid var(--border)',
                       borderRadius: '8px',
                       padding: isMobile ? '8px' : '12px',
                       fontSize: isMobile ? '14px' : '16px',
                       boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                     }}
                     labelStyle={{
-                      color: '#000',
+                      color: 'var(--foreground)',
                       fontWeight: 600,
                       marginBottom: '4px',
                     }}
                     itemStyle={{
                       fontSize: isMobile ? '14px' : '16px',
                       padding: '2px 0',
+                      color: 'var(--card-foreground)',
                     }}
+                    cursor={{ fill: 'rgba(255,255,255,0.06)' }}
                   />
                   <Legend
                     wrapperStyle={{
@@ -1492,7 +1507,7 @@ export default function HistoryPage() {
                 variant={doublingMode === 'geometric' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setDoublingMode('geometric')}
-                className="text-xs sm:text-sm"
+                className={cn("text-xs sm:text-sm", doublingMode === 'geometric' && "dark:bg-gray-700 dark:text-white")}
               >
                 Raddoppi (2x, 4x...)
               </Button>
@@ -1500,7 +1515,7 @@ export default function HistoryPage() {
                 variant={doublingMode === 'threshold' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setDoublingMode('threshold')}
-                className="text-xs sm:text-sm"
+                className={cn("text-xs sm:text-sm", doublingMode === 'threshold' && "dark:bg-gray-700 dark:text-white")}
               >
                 Traguardi (€100k...)
               </Button>
@@ -1509,7 +1524,7 @@ export default function HistoryPage() {
         </CardHeader>
         <CardContent>
           {doublingTimeSummary.totalDoublings === 0 && !doublingTimeSummary.currentDoublingInProgress ? (
-            <div className="flex h-32 items-center justify-center text-gray-500">
+            <div className="flex h-32 items-center justify-center text-gray-500 dark:text-gray-400">
               Nessuna milestone ancora completata. Continua a costruire il tuo patrimonio!
             </div>
           ) : (
@@ -1532,14 +1547,14 @@ export default function HistoryPage() {
         </CardContent>
       </Card>
 
-      {/* Current vs Target Comparison */}
-      <Card>
+      {/* Current vs Target Comparison — mt-6 separates it from Doubling Time card above (both inside same motion.div) */}
+      <Card className="mt-6">
           <CardHeader>
             <CardTitle>Asset Class: Corrente vs Desiderata</CardTitle>
           </CardHeader>
           <CardContent>
             {currentVsTargetData.length === 0 ? (
-              <div className="flex h-64 items-center justify-center text-gray-500">
+              <div className="flex h-64 items-center justify-center text-gray-500 dark:text-gray-400">
                 Nessun dato disponibile.
               </div>
             ) : (
@@ -1548,15 +1563,15 @@ export default function HistoryPage() {
                   <div key={item.name} className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium">{item.name}</span>
-                      <span className="text-gray-600">
+                      <span className="text-gray-600 dark:text-gray-400">
                         {formatPercentage(item.corrente)} /{' '}
                         {formatPercentage(item.target)}
                       </span>
                     </div>
-                    <div className="relative h-6 w-full overflow-hidden rounded-full bg-gray-200">
+                    <div className="relative h-6 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
                       {/* Target bar (background) */}
                       <div
-                        className="absolute h-full bg-gray-300"
+                        className="absolute h-full bg-gray-300 dark:bg-gray-600"
                         style={{
                           width: `${Math.min(item.target, 100)}%`,
                         }}
@@ -1575,7 +1590,7 @@ export default function HistoryPage() {
                         Corrente
                       </div>
                     </div>
-                    <div className="flex justify-between text-xs text-gray-500">
+                    <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
                       <span>Corrente: {formatPercentage(item.corrente)}</span>
                       <span>Target: {formatPercentage(item.target)}</span>
                     </div>
@@ -1614,7 +1629,7 @@ export default function HistoryPage() {
                     <div className="text-lg font-semibold">
                       {getMonthName(snapshot.month)} {snapshot.year}
                     </div>
-                    <div className="text-xs text-gray-500 mt-1">
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       Creato il: {snapshot.createdAt.toLocaleString('it-IT', {
                         day: '2-digit',
                         month: '2-digit',
@@ -1627,7 +1642,7 @@ export default function HistoryPage() {
                     <div className="text-lg font-bold">
                       {formatCurrency(snapshot.totalNetWorth)}
                     </div>
-                    <div className="text-sm text-gray-600">
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
                       Liquido: {formatCurrency(snapshot.liquidNetWorth)}
                     </div>
                   </div>

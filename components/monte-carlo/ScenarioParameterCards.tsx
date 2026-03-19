@@ -7,9 +7,9 @@ import { MonteCarloScenarios, MonteCarloScenarioParams } from '@/types/assets';
 
 // Consistent scenario styling, same pattern as FIREProjectionSection
 const SCENARIO_CONFIG = {
-  bear: { label: 'Scenario Orso', icon: TrendingDown, bgColor: 'bg-red-50', borderColor: 'border-red-200', textColor: 'text-red-600', boldColor: 'text-red-700' },
-  base: { label: 'Scenario Base', icon: Target, bgColor: 'bg-indigo-50', borderColor: 'border-indigo-200', textColor: 'text-indigo-600', boldColor: 'text-indigo-700' },
-  bull: { label: 'Scenario Toro', icon: TrendingUp, bgColor: 'bg-green-50', borderColor: 'border-green-200', textColor: 'text-green-600', boldColor: 'text-green-700' },
+  bear: { label: 'Scenario Orso', icon: TrendingDown, bgColor: 'bg-red-50 dark:bg-red-950/20', borderColor: 'border-red-200 dark:border-red-800', textColor: 'text-red-600', boldColor: 'text-red-700' },
+  base: { label: 'Scenario Base', icon: Target, bgColor: 'bg-indigo-50 dark:bg-indigo-950/20', borderColor: 'border-indigo-200 dark:border-indigo-800', textColor: 'text-indigo-600', boldColor: 'text-indigo-700' },
+  bull: { label: 'Scenario Toro', icon: TrendingUp, bgColor: 'bg-green-50 dark:bg-green-950/20', borderColor: 'border-green-200 dark:border-green-800', textColor: 'text-green-600', boldColor: 'text-green-700' },
 } as const;
 
 type ScenarioKey = keyof typeof SCENARIO_CONFIG;
@@ -75,11 +75,11 @@ export function ScenarioParameterCards({
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-base font-semibold">Parametri Scenari</h3>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={onReset} className="flex-1 sm:flex-none">
+          <Button variant="outline" size="sm" onClick={onReset} className="flex-1 sm:flex-none dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">
             <RotateCcw className="h-3.5 w-3.5 mr-1" />
             Ripristina Default
           </Button>
-          <Button size="sm" onClick={onSave} disabled={isSaving} className="flex-1 sm:flex-none">
+          <Button size="sm" onClick={onSave} disabled={isSaving} className="flex-1 sm:flex-none dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
             <Save className="h-3.5 w-3.5 mr-1" />
             {isSaving ? 'Salvataggio...' : 'Salva Parametri'}
           </Button>

@@ -69,10 +69,12 @@ export function UnderwaterDrawdownChart({ data, height = 400 }: UnderwaterDrawdo
   return (
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" />
+        {/* stroke="var(--border)" makes the grid theme-aware without JS theme detection */}
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
         <XAxis
           dataKey="date"
-          tick={{ fontSize: 12 }}
+          tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
+          stroke="var(--border)"
           interval="preserveStartEnd"
         />
         <YAxis
@@ -81,7 +83,8 @@ export function UnderwaterDrawdownChart({ data, height = 400 }: UnderwaterDrawdo
           // values extending downward. This makes the visual metaphor clearer:
           // the further down the chart goes, the deeper the drawdown.
           domain={['auto', 0]}
-          tick={{ fontSize: 12 }}
+          tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
+          stroke="var(--border)"
         />
         <Tooltip content={<CustomTooltip />} />
         <Area

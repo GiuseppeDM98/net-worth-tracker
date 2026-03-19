@@ -194,18 +194,18 @@ export default function AllocationPage() {
   const getActionColor = (action: 'COMPRA' | 'VENDI' | 'OK') => {
     switch (action) {
       case 'COMPRA':
-        return 'text-orange-600 bg-orange-50';
+        return 'text-orange-600 bg-orange-50 dark:text-orange-400 dark:bg-orange-950/40';
       case 'VENDI':
-        return 'text-red-600 bg-red-50';
+        return 'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-950/40';
       case 'OK':
-        return 'text-green-600 bg-green-50';
+        return 'text-green-600 bg-green-50 dark:text-green-400 dark:bg-green-950/40';
     }
   };
 
   const getDifferenceColor = (difference: number) => {
-    if (Math.abs(difference) <= 1) return 'text-green-600';
-    if (difference > 1) return 'text-red-600';
-    return 'text-orange-600';
+    if (Math.abs(difference) <= 1) return 'text-green-600 dark:text-green-400';
+    if (difference > 1) return 'text-red-600 dark:text-red-400';
+    return 'text-orange-600 dark:text-orange-400';
   };
 
   const assetClassLabels: Record<string, string> = {
@@ -466,13 +466,13 @@ export default function AllocationPage() {
                 <ArrowLeft className="h-4 w-4" />
               </Button>
               <div>
-                <div className="text-sm text-gray-500">
+                <div className="text-sm text-gray-500 dark:text-gray-400">
                   {assetClassLabels[drillDown.assetClass]} → {drillDown.subCategory}
                 </div>
-                <h1 className="text-3xl font-bold text-gray-900">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
                   Specific Assets
                 </h1>
-                <p className="mt-2 text-gray-600">
+                <p className="mt-2 text-gray-600 dark:text-gray-400">
                   Target teorici per asset specifici
                 </p>
               </div>
@@ -569,9 +569,9 @@ export default function AllocationPage() {
           </CardContent>
         </Card>
 
-        <div className="rounded-lg bg-blue-50 p-4">
-          <h3 className="font-semibold text-blue-900">Nota</h3>
-          <ul className="mt-2 space-y-1 text-sm text-blue-800">
+        <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 p-4">
+          <h3 className="font-semibold text-blue-900 dark:text-blue-200">Nota</h3>
+          <ul className="mt-2 space-y-1 text-sm text-blue-800 dark:text-blue-300">
             <li>
               • Gli specific assets sono target teorici e non sono collegati agli asset reali del portfolio
             </li>
@@ -594,16 +594,16 @@ export default function AllocationPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
             Allocazione Asset
           </h1>
-          <p className="mt-1 text-sm sm:text-base text-gray-600">
+          <p className="mt-1 text-sm sm:text-base text-gray-600 dark:text-gray-400">
             Confronta l'allocazione corrente con i tuoi obiettivi
           </p>
         </div>
         {!usingGoalTargets && (
           <Link href="/dashboard/settings" className="w-full sm:w-auto shrink-0">
-            <Button variant="outline" size="sm" className="w-full sm:w-auto">
+            <Button variant="outline" size="sm" className="w-full sm:w-auto dark:border-gray-600 dark:text-gray-200">
               <Settings className="h-4 w-4 mr-2" />
               Modifica Target
             </Button>
@@ -621,9 +621,9 @@ export default function AllocationPage() {
       )}
 
       {/* Legend */}
-      <div className="rounded-lg bg-blue-50 p-3 sm:p-4">
-        <h3 className="font-semibold text-blue-900 text-sm sm:text-base">Legenda</h3>
-        <ul className="mt-2 space-y-1 text-xs sm:text-sm text-blue-800">
+      <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 p-3 sm:p-4">
+        <h3 className="font-semibold text-blue-900 dark:text-blue-200 text-sm sm:text-base">Legenda</h3>
+        <ul className="mt-2 space-y-1 text-xs sm:text-sm text-blue-800 dark:text-blue-300">
           <li><strong>COMPRA:</strong> Sotto-allocato (compra di più)</li>
           <li><strong>VENDI:</strong> Sovra-allocato (riduci posizione)</li>
           <li><strong>OK:</strong> Allocazione ottimale (±2%)</li>
@@ -800,7 +800,7 @@ export default function AllocationPage() {
                             return (
                               <TableRow
                                 key={subCategory}
-                                className={hasSpecificAssets ? 'cursor-pointer hover:bg-gray-50' : ''}
+                                className={hasSpecificAssets ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800' : ''}
                                 onClick={() => {
                                   if (hasSpecificAssets) {
                                     handleDrillDownToSpecificAssets(assetClass, subCategory);

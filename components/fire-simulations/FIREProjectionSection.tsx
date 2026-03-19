@@ -43,9 +43,9 @@ interface FIREProjectionSectionProps {
 
 // Scenario display config for consistent UI rendering
 const SCENARIO_CONFIG = {
-  bear: { label: 'Scenario Orso', icon: TrendingDown, color: 'red', bgColor: 'bg-red-50', borderColor: 'border-red-200', textColor: 'text-red-600', boldColor: 'text-red-700' },
-  base: { label: 'Scenario Base', icon: Target, color: 'indigo', bgColor: 'bg-indigo-50', borderColor: 'border-indigo-200', textColor: 'text-indigo-600', boldColor: 'text-indigo-700' },
-  bull: { label: 'Scenario Toro', icon: TrendingUp, color: 'green', bgColor: 'bg-green-50', borderColor: 'border-green-200', textColor: 'text-green-600', boldColor: 'text-green-700' },
+  bear: { label: 'Scenario Orso', icon: TrendingDown, color: 'red', bgColor: 'bg-red-50 dark:bg-red-950/20', borderColor: 'border-red-200 dark:border-red-800', textColor: 'text-red-600', boldColor: 'text-red-700' },
+  base: { label: 'Scenario Base', icon: Target, color: 'indigo', bgColor: 'bg-indigo-50 dark:bg-indigo-950/20', borderColor: 'border-indigo-200 dark:border-indigo-800', textColor: 'text-indigo-600', boldColor: 'text-indigo-700' },
+  bull: { label: 'Scenario Toro', icon: TrendingUp, color: 'green', bgColor: 'bg-green-50 dark:bg-green-950/20', borderColor: 'border-green-200 dark:border-green-800', textColor: 'text-green-600', boldColor: 'text-green-700' },
 } as const;
 
 type ScenarioKey = keyof typeof SCENARIO_CONFIG;
@@ -144,32 +144,32 @@ export function FIREProjectionSection({
     <div className="space-y-6">
       {/* Section Header */}
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">📈 Proiezione Scenari</h2>
-        <p className="text-sm text-gray-600">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">📈 Proiezione Scenari</h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
           Proiezione del patrimonio sotto 3 scenari di mercato con inflazione sulle spese.
           Il FIRE Number cresce ogni anno perché le spese aumentano con l&apos;inflazione.
         </p>
       </div>
 
       {/* Annual Cashflow Data Banner */}
-      <Card className={`${annualSavings > 0 ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50'}`}>
+      <Card className={`${annualSavings > 0 ? 'border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-800' : 'border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800'}`}>
         <CardContent className="pt-6">
           <div className="flex flex-col gap-1 desktop:flex-row desktop:gap-6">
             <div className="flex items-center gap-2">
-              <Wallet className={`h-5 w-5 ${annualSavings > 0 ? 'text-green-600' : 'text-amber-600'}`} />
-              <span className={`font-semibold ${annualSavings > 0 ? 'text-green-800' : 'text-amber-800'}`}>
+              <Wallet className={`h-5 w-5 ${annualSavings > 0 ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`} />
+              <span className={`font-semibold ${annualSavings > 0 ? 'text-green-800 dark:text-green-200' : 'text-amber-800 dark:text-amber-200'}`}>
                 Risparmio Annuale: {formatCurrency(annualSavings)}
               </span>
             </div>
             {annualExpenses > 0 && (
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-green-800">
+                <span className="font-semibold text-green-800 dark:text-green-200">
                   Spese Annuali: {formatCurrency(annualExpenses)}
                 </span>
               </div>
             )}
           </div>
-          <p className={`mt-1 text-xs ${annualSavings > 0 ? 'text-green-700' : 'text-amber-700'}`}>
+          <p className={`mt-1 text-xs ${annualSavings > 0 ? 'text-green-700 dark:text-green-300' : 'text-amber-700 dark:text-amber-300'}`}>
             {cashflowData && annualSavings > 0
               ? `Dati dal ${cashflowData.referenceYear}${cashflowData.isAnnualized ? ' (annualizzati)' : ''}. Calcolati automaticamente dal cashflow (entrate - uscite).`
               : 'Nessun dato cashflow disponibile. Aggiungi entrate e uscite nella sezione Cashflow per una proiezione accurata.'
@@ -201,7 +201,7 @@ export function FIREProjectionSection({
                     max="30"
                     value={scenarios[key].growthRate}
                     onChange={(e) => updateScenario(key, 'growthRate', e.target.value)}
-                    className="mt-1 h-8 bg-white"
+                    className="mt-1 h-8 bg-white dark:bg-gray-800"
                   />
                 </div>
                 <div>
@@ -213,7 +213,7 @@ export function FIREProjectionSection({
                     max="15"
                     value={scenarios[key].inflationRate}
                     onChange={(e) => updateScenario(key, 'inflationRate', e.target.value)}
-                    className="mt-1 h-8 bg-white"
+                    className="mt-1 h-8 bg-white dark:bg-gray-800"
                   />
                 </div>
               </CardContent>
@@ -224,11 +224,11 @@ export function FIREProjectionSection({
 
       {/* Action Buttons */}
       <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-        <Button variant="outline" size="sm" onClick={handleResetDefaults} className="w-full sm:w-auto">
+        <Button variant="outline" size="sm" onClick={handleResetDefaults} className="w-full sm:w-auto dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">
           <RotateCcw className="mr-2 h-4 w-4" />
           Ripristina Default
         </Button>
-        <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="w-full sm:w-auto">
+        <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="w-full sm:w-auto dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
           <Save className="mr-2 h-4 w-4" />
           {saveMutation.isPending ? 'Salvataggio...' : 'Salva Parametri'}
         </Button>
@@ -256,7 +256,7 @@ export function FIREProjectionSection({
                     <div className={`text-3xl font-bold ${config.boldColor}`}>
                       {years !== null ? `${years} anni` : '50+ anni'}
                     </div>
-                    <p className="mt-1 text-xs text-gray-500">
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       {years !== null
                         ? `FIRE raggiunto nel ${new Date().getFullYear() + years}`
                         : 'Non raggiunto entro 50 anni'
@@ -294,11 +294,11 @@ export function FIREProjectionSection({
       )}
 
       {/* Info Box */}
-      <Card className="border-blue-200 bg-blue-50">
+      <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800">
         <CardContent className="pt-6">
           <div className="flex items-start gap-2">
-            <Info className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
-            <div className="text-sm text-blue-800 space-y-2">
+            <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+            <div className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
               <p>
                 <strong>Come funziona la proiezione:</strong> Ogni anno il patrimonio cresce con il rendimento di mercato
                 dello scenario, poi si aggiungono i risparmi annuali (fino al raggiungimento del FIRE). Le spese aumentano

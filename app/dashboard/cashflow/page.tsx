@@ -130,11 +130,11 @@ export default function CashflowPage() {
     <div className="space-y-6 p-4 desktop:p-8 max-desktop:portrait:pb-20">
       {/* Header */}
       <div>
-        <h1 className="flex items-center gap-2 text-3xl font-bold text-gray-900">
+        <h1 className="flex items-center gap-2 text-3xl font-bold text-gray-900 dark:text-gray-100">
           <Wallet className="h-8 w-8 text-blue-500" />
           Cashflow
         </h1>
-        <p className="mt-2 text-gray-600">
+        <p className="mt-2 text-gray-600 dark:text-gray-400">
           Traccia e analizza le tue entrate e uscite nel tempo
         </p>
       </div>

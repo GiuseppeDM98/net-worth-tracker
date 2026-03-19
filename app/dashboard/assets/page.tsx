@@ -66,7 +66,7 @@ export default function AssetsPage() {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="text-gray-500">Caricamento...</div>
+        <div className="text-gray-500 dark:text-gray-400">Caricamento...</div>
       </div>
     );
   }
@@ -74,8 +74,8 @@ export default function AssetsPage() {
   return (
     <div className="space-y-6 max-desktop:portrait:pb-20">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Assets</h1>
-        <p className="mt-2 text-gray-600">Gestisci e monitora i tuoi asset di investimento</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">Assets</h1>
+        <p className="mt-2 text-gray-600 dark:text-gray-400">Gestisci e monitora i tuoi asset di investimento</p>
       </div>
 
       {/* Outer tabs: 3 macro-tabs */}

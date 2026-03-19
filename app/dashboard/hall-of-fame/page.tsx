@@ -325,7 +325,7 @@ export default function HallOfFamePage() {
           <Button
             onClick={handleAddNoteClick}
             variant="default"
-            className="gap-2"
+            className="gap-2 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
           >
             <Plus className="h-4 w-4" />
             Aggiungi Nota
@@ -361,7 +361,7 @@ export default function HallOfFamePage() {
           className="grid gap-4 sm:gap-6 grid-cols-1 desktop:grid-cols-2"
         >
           {/* Miglior Mese: Differenza NW */}
-          <motion.div variants={cardItem}><Card>
+          <motion.div variants={cardItem} className="h-full"><Card className="h-full">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-green-600">
                 <TrendingUp className="h-5 w-5" />
@@ -410,7 +410,7 @@ export default function HallOfFamePage() {
 
           </motion.div>
           {/* Miglior Mese: Entrate */}
-          <motion.div variants={cardItem}><Card>
+          <motion.div variants={cardItem} className="h-full"><Card className="h-full">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-green-600">
                 <DollarSign className="h-5 w-5" />
@@ -459,7 +459,7 @@ export default function HallOfFamePage() {
 
           </motion.div>
           {/* Peggior Mese: Differenza NW */}
-          <motion.div variants={cardItem}><Card>
+          <motion.div variants={cardItem} className="h-full"><Card className="h-full">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-red-600">
                 <TrendingDown className="h-5 w-5" />
@@ -508,7 +508,7 @@ export default function HallOfFamePage() {
 
           </motion.div>
           {/* Peggior Mese: Spese */}
-          <motion.div variants={cardItem}><Card>
+          <motion.div variants={cardItem} className="h-full"><Card className="h-full">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-red-600">
                 <TrendingDown className="h-5 w-5" />
@@ -567,7 +567,7 @@ export default function HallOfFamePage() {
           className="grid gap-4 sm:gap-6 grid-cols-1 desktop:grid-cols-2"
         >
           {/* Miglior Anno: Differenza NW */}
-          <motion.div variants={cardItem}><Card>
+          <motion.div variants={cardItem} className="h-full"><Card className="h-full">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-green-600">
                 <TrendingUp className="h-5 w-5" />
@@ -616,7 +616,7 @@ export default function HallOfFamePage() {
 
           </motion.div>
           {/* Miglior Anno: Entrate */}
-          <motion.div variants={cardItem}><Card>
+          <motion.div variants={cardItem} className="h-full"><Card className="h-full">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-green-600">
                 <DollarSign className="h-5 w-5" />
@@ -665,7 +665,7 @@ export default function HallOfFamePage() {
 
           </motion.div>
           {/* Peggior Anno: Differenza NW */}
-          <motion.div variants={cardItem}><Card>
+          <motion.div variants={cardItem} className="h-full"><Card className="h-full">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-red-600">
                 <TrendingDown className="h-5 w-5" />
@@ -714,7 +714,7 @@ export default function HallOfFamePage() {
 
           </motion.div>
           {/* Peggior Anno: Uscite */}
-          <motion.div variants={cardItem}><Card>
+          <motion.div variants={cardItem} className="h-full"><Card className="h-full">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-red-600">
                 <TrendingDown className="h-5 w-5" />
@@ -817,7 +817,7 @@ function MonthlyRecordCard({
   // Color coding
   const isPositive = displayValue > 0;
   const isNegative = displayValue < 0;
-  const valueColor = isPositive ? 'text-green-600' : isNegative ? 'text-red-600' : 'text-gray-900';
+  const valueColor = isPositive ? 'text-green-600' : isNegative ? 'text-red-600' : 'text-gray-900 dark:text-gray-100';
 
   // Percentage calculation (if needed)
   let percentage = 0;
@@ -830,7 +830,7 @@ function MonthlyRecordCard({
     <motion.div
       variants={listItem}
       className={`p-3 rounded-lg border ${
-        isCurrentMonth ? 'bg-amber-50/70 border-amber-200' : 'bg-muted/50'
+        isCurrentMonth ? 'bg-amber-50/70 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800/40' : 'bg-muted/50'
       }`}
     >
       {/* Row 1: Rank badge + Month + Note icon */}
@@ -897,7 +897,7 @@ function YearlyRecordCard({
   // Color coding
   const isPositive = displayValue > 0;
   const isNegative = displayValue < 0;
-  const valueColor = isPositive ? 'text-green-600' : isNegative ? 'text-red-600' : 'text-gray-900';
+  const valueColor = isPositive ? 'text-green-600' : isNegative ? 'text-red-600' : 'text-gray-900 dark:text-gray-100';
 
   // Percentage calculation (if needed)
   let percentage = 0;
@@ -910,7 +910,7 @@ function YearlyRecordCard({
     <motion.div
       variants={listItem}
       className={`p-3 rounded-lg border ${
-        isCurrentYear ? 'bg-amber-50/70 border-amber-200' : 'bg-muted/50'
+        isCurrentYear ? 'bg-amber-50/70 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800/40' : 'bg-muted/50'
       }`}
     >
       {/* Row 1: Rank badge + Year */}
@@ -996,7 +996,7 @@ function MonthlyTable({
                 initial="hidden"
                 animate="visible"
                 transition={{ delay: Math.min(index, 14) * 0.04 }}
-                className={`border-b transition-colors hover:bg-muted/50 ${isCurrentMonth ? 'bg-amber-50/70 hover:bg-amber-50/80' : ''}`}
+                className={`border-b transition-colors hover:bg-muted/50 ${isCurrentMonth ? 'bg-amber-50/70 hover:bg-amber-50/80 dark:bg-amber-950/20 dark:hover:bg-amber-950/30' : ''}`}
               >
                 <TableCell className="font-medium">{index + 1}</TableCell>
                 <TableCell className="whitespace-nowrap">{record.monthYear}</TableCell>
@@ -1085,7 +1085,7 @@ function YearlyTable({
                 initial="hidden"
                 animate="visible"
                 transition={{ delay: index * 0.04 }}
-                className={`border-b transition-colors hover:bg-muted/50 ${isCurrentYear ? 'bg-amber-50/70 hover:bg-amber-50/80' : ''}`}
+                className={`border-b transition-colors hover:bg-muted/50 ${isCurrentYear ? 'bg-amber-50/70 hover:bg-amber-50/80 dark:bg-amber-950/20 dark:hover:bg-amber-950/30' : ''}`}
               >
                 <TableCell className="font-medium">{index + 1}</TableCell>
                 <TableCell>{record.year}</TableCell>

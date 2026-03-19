@@ -574,7 +574,7 @@ export default function PerformancePage() {
             <Sparkles className="h-4 w-4 transition-transform duration-500 group-hover:rotate-12 group-hover:scale-110" />
             Analizza con AI
           </Button>
-          <Button onClick={loadPerformanceData}>
+          <Button onClick={loadPerformanceData} className="dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
             <RefreshCw className="mr-2 h-4 w-4" />
             Aggiorna
           </Button>
@@ -794,9 +794,10 @@ export default function PerformancePage() {
           <CardContent>
             <ResponsiveContainer width="100%" height={getChartHeight()}>
                 <AreaChart data={chartData} margin={{ bottom: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
+                  {/* stroke="var(--border)" makes the grid theme-aware without JS theme detection */}
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="date" tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }} stroke="var(--border)" />
+                  <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }} stroke="var(--border)" />
                   <Tooltip content={<PerformanceTooltip />} />
                   <Legend />
                   <Area
@@ -840,15 +841,23 @@ export default function PerformancePage() {
             <CardContent>
               <ResponsiveContainer width="100%" height={getChartHeight()}>
                   <LineChart data={rollingCagrData} margin={{ bottom: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis
                       dataKey="periodEndDate"
                       tickFormatter={(date) => new Date(date).toLocaleDateString('it-IT', { month: 'short', year: '2-digit' })}
+                      tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
+                      stroke="var(--border)"
                     />
-                    <YAxis tickFormatter={(value) => `${value.toFixed(1)}%`} />
+                    <YAxis
+                      tickFormatter={(value) => `${value.toFixed(1)}%`}
+                      tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
+                      stroke="var(--border)"
+                    />
                     <Tooltip
                       formatter={(value: number) => `${value.toFixed(2)}%`}
                       labelFormatter={(date) => new Date(date).toLocaleDateString('it-IT')}
+                      contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--card-foreground)' }}
+                      labelStyle={{ color: 'var(--card-foreground)' }}
                     />
                     <Legend />
                     <Line
@@ -886,12 +895,18 @@ export default function PerformancePage() {
             <CardContent>
               <ResponsiveContainer width="100%" height={getChartHeight()}>
                 <LineChart data={rollingSharpeData} margin={{ bottom: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis
                     dataKey="periodEndDate"
                     tickFormatter={(date) => new Date(date).toLocaleDateString('it-IT', { month: 'short', year: '2-digit' })}
+                    tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
+                    stroke="var(--border)"
                   />
-                  <YAxis tickFormatter={(value) => value.toFixed(2)} />
+                  <YAxis
+                    tickFormatter={(value) => value.toFixed(2)}
+                    tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
+                    stroke="var(--border)"
+                  />
                   <Tooltip
                     formatter={(value) => {
                       if (typeof value !== 'number' || Number.isNaN(value)) {
@@ -900,6 +915,8 @@ export default function PerformancePage() {
                       return value.toFixed(2);
                     }}
                     labelFormatter={(date) => new Date(date).toLocaleDateString('it-IT')}
+                    contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--card-foreground)' }}
+                    labelStyle={{ color: 'var(--card-foreground)' }}
                   />
                   <Legend formatter={(value) => String(value).replace(/^\d+\.\s*/, '')} />
                   <Line

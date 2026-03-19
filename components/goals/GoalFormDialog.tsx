@@ -177,7 +177,7 @@ export function GoalFormDialog({
           {/* Templates (only when creating) */}
           {!isEditing && (
             <div className="space-y-2">
-              <Label className="text-xs text-gray-500">Template rapidi</Label>
+              <Label className="text-xs text-gray-500 dark:text-gray-400">Template rapidi</Label>
               <div className="flex flex-wrap gap-2">
                 {GOAL_TEMPLATES.map((t) => (
                   <Button
@@ -282,7 +282,7 @@ export function GoalFormDialog({
             <Label className="text-sm">
               Allocazione Consigliata (opzionale)
             </Label>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Definisci il mix ideale di asset class per questo obiettivo
             </p>
             <div className="grid grid-cols-2 gap-2">
@@ -300,7 +300,7 @@ export function GoalFormDialog({
                     }
                     placeholder="0"
                   />
-                  <span className="text-xs text-gray-600">% {cls.label}</span>
+                  <span className="text-xs text-gray-600 dark:text-gray-400">% {cls.label}</span>
                 </div>
               ))}
             </div>
@@ -354,6 +354,7 @@ export function GoalFormDialog({
               (targetAmount !== '' && parseFloat(targetAmount) < 0) ||
               !isAllocationValid
             }
+            className="dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
           >
             {saving
               ? 'Salvataggio...'

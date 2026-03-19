@@ -240,7 +240,7 @@ export function GoalBasedInvestingTab() {
             Alloca mentalmente il tuo portafoglio verso obiettivi finanziari
           </p>
         </div>
-        <Button onClick={handleCreateGoal} className="w-full sm:w-auto">
+        <Button onClick={handleCreateGoal} className="w-full sm:w-auto dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
           <Plus className="mr-2 h-4 w-4" />
           Nuovo Obiettivo
         </Button>

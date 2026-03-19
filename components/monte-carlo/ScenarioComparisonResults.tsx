@@ -27,9 +27,9 @@ interface ScenarioComparisonResultsProps {
 
 // Scenario styling
 const SCENARIOS = [
-  { key: 'bear' as const, label: 'Scenario Orso', icon: TrendingDown, color: '#EF4444', bgColor: 'bg-red-50', borderColor: 'border-red-200', textColor: 'text-red-700' },
-  { key: 'base' as const, label: 'Scenario Base', icon: Target, color: '#6366F1', bgColor: 'bg-indigo-50', borderColor: 'border-indigo-200', textColor: 'text-indigo-700' },
-  { key: 'bull' as const, label: 'Scenario Toro', icon: TrendingUp, color: '#10B981', bgColor: 'bg-green-50', borderColor: 'border-green-200', textColor: 'text-green-700' },
+  { key: 'bear' as const, label: 'Scenario Orso', icon: TrendingDown, color: '#EF4444', bgColor: 'bg-red-50 dark:bg-red-950/20', borderColor: 'border-red-200 dark:border-red-800', textColor: 'text-red-700' },
+  { key: 'base' as const, label: 'Scenario Base', icon: Target, color: '#6366F1', bgColor: 'bg-indigo-50 dark:bg-indigo-950/20', borderColor: 'border-indigo-200 dark:border-indigo-800', textColor: 'text-indigo-700' },
+  { key: 'bull' as const, label: 'Scenario Toro', icon: TrendingUp, color: '#10B981', bgColor: 'bg-green-50 dark:bg-green-950/20', borderColor: 'border-green-200 dark:border-green-800', textColor: 'text-green-700' },
 ] as const;
 
 /**
@@ -214,6 +214,7 @@ export function ScenarioComparisonResults({
                       tick={{ fontSize: 9 }}
                     />
                     <Tooltip
+                      cursor={{ fill: 'rgba(128, 128, 128, 0.1)' }}
                       content={({ active, payload }: any) => {
                         if (active && payload && payload.length) {
                           return (

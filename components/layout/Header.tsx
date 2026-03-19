@@ -10,8 +10,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, User } from 'lucide-react';
+import { LogOut, User, Sun, Moon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
 
 /**
@@ -28,6 +29,7 @@ import { toast } from 'sonner';
 export function Header() {
   const { user, signOut } = useAuth();
   const router = useRouter();
+  const { resolvedTheme, setTheme } = useTheme();
 
   /**
    * Handles user logout with error handling and user feedback.
@@ -64,6 +66,14 @@ export function Header() {
         </h2>
       </div>
       <div className="flex items-center gap-4">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+          className="rounded-full"
+        >
+          {resolvedTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="rounded-full">

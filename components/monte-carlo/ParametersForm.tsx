@@ -222,10 +222,10 @@ export function ParametersForm({
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Instructions */}
-        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg dark:bg-blue-950/20 dark:border-blue-800">
           <div className="flex gap-2">
-            <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-            <div className="text-sm text-blue-900">
+            <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-blue-900 dark:text-blue-100">
               <p className="font-semibold mb-2">Come Funziona</p>
               <ul className="list-disc list-inside space-y-1">
                 <li>Vengono eseguite migliaia di simulazioni con rendimenti casuali</li>
@@ -563,7 +563,7 @@ export function ParametersForm({
         <Button
           onClick={onRunSimulation}
           disabled={!canRunSimulation || isRunning}
-          className="w-full"
+          className="w-full dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
           size="lg"
         >
           {isRunning ? 'Simulazione in corso...' : 'Esegui Simulazione'}

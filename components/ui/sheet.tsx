@@ -68,8 +68,8 @@ const SheetContent = React.forwardRef<
     >
       {children}
       {showCloseButton && (
-        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-full bg-gray-100 p-2 opacity-100 ring-offset-background transition-colors hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
-          <XIcon className="h-5 w-5 text-gray-700" />
+        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-full bg-gray-100 dark:bg-gray-700 p-2 opacity-100 ring-offset-background transition-colors hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
+          <XIcon className="h-5 w-5 text-gray-700 dark:text-gray-200" />
           <span className="sr-only">Close</span>
         </DialogPrimitive.Close>
       )}

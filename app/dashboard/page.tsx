@@ -371,7 +371,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="text-gray-500">Caricamento...</div>
+        <div className="text-gray-500 dark:text-gray-400">Caricamento...</div>
       </div>
     );
   }
@@ -387,8 +387,8 @@ export default function DashboardPage() {
       {/* Header stacks vertically on portrait mobile to prevent title/button overflow */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Dashboard</h1>
-          <p className="mt-1 text-gray-600 sm:mt-2">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 sm:text-3xl">Dashboard</h1>
+          <p className="mt-1 text-gray-600 dark:text-gray-400 sm:mt-2">
             Panoramica del tuo portafoglio di investimenti
           </p>
         </div>
@@ -396,7 +396,7 @@ export default function DashboardPage() {
           onClick={handleCreateSnapshot}
           disabled={creatingSnapshot || portfolioMetrics.assetCount === 0}
           variant="default"
-          className="w-full sm:w-auto"
+          className="w-full sm:w-auto dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
         >
           <Camera className="mr-2 h-4 w-4" />
           {creatingSnapshot ? 'Creazione...' : 'Crea Snapshot'}
@@ -411,7 +411,7 @@ export default function DashboardPage() {
         className="grid gap-6 md:grid-cols-2 landscape:md:grid-cols-3 desktop:grid-cols-3"
       >
         <motion.div variants={cardItem}>
-          <Card>
+          <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Patrimonio Totale Lordo</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -426,7 +426,7 @@ export default function DashboardPage() {
         </motion.div>
 
         <motion.div variants={cardItem}>
-          <Card>
+          <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Patrimonio Liquido Lordo</CardTitle>
               <Wallet className="h-4 w-4 text-muted-foreground" />
@@ -438,7 +438,7 @@ export default function DashboardPage() {
         </motion.div>
 
         <motion.div variants={cardItem}>
-          <Card>
+          <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Numero Assets</CardTitle>
               <PieChart className="h-4 w-4 text-muted-foreground" />
@@ -706,7 +706,7 @@ export default function DashboardPage() {
         >
           {hasTERTracking && (
             <motion.div variants={cardItem}>
-            <Card>
+            <Card className="h-full">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">TER Portfolio</CardTitle>
                 <Receipt className="h-4 w-4 text-muted-foreground" />
@@ -724,7 +724,7 @@ export default function DashboardPage() {
           )}
 
           <motion.div variants={cardItem} className={!hasTERTracking ? 'md:col-span-2' : ''}>
-          <Card>
+          <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Costo Annuale Portfolio</CardTitle>
               <TrendingDown className="h-4 w-4 text-muted-foreground" />

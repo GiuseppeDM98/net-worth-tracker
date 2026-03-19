@@ -36,6 +36,36 @@ import {
 } from 'recharts';
 import { toast } from 'sonner';
 
+// Custom tooltip that uses Tailwind dark-mode tokens for background/border,
+// while preserving per-series colors via entry.color.
+const ChartTooltip = ({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; color?: string; fill?: string; payload?: { fill?: string } }>;
+  label?: string | number;
+}) => {
+  if (!active || !payload || !payload.length) return null;
+  return (
+    <div className="rounded-md border border-border bg-popover px-3 py-2 shadow-md text-sm min-w-[140px]">
+      {label !== undefined && (
+        <p className="font-medium text-popover-foreground mb-1">{label}</p>
+      )}
+      {payload.map((entry, index) => {
+        // Bar/Line: entry.color; PieChart: entry.payload.fill or entry.fill
+        const color = entry.color || entry.fill || entry.payload?.fill || 'var(--popover-foreground)';
+        return (
+          <p key={index} className="tabular-nums" style={{ color }}>
+            {entry.name} : {formatCurrency(entry.value)}
+          </p>
+        );
+      })}
+    </div>
+  );
+};
+
 interface DividendStatsProps {
   startDate?: Date;
   endDate?: Date;
@@ -284,10 +314,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip
-                      formatter={(value: number) => formatCurrency(value)}
-                      labelStyle={{ color: '#000' }}
-                    />
+                    <Tooltip content={<ChartTooltip />} />
                     <Legend iconSize={10} wrapperStyle={{ fontSize: '11px' }} />
                   </PieChart>
                 </ResponsiveContainer>
@@ -312,10 +339,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="year" />
                   <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
-                  <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
-                    labelStyle={{ color: '#000' }}
-                  />
+                  <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--muted)' }} />
                   <Legend />
                   <Bar dataKey="totalGross" fill="#10B981" name="Lordo" isAnimationActive={false} />
                   <Bar dataKey="totalTax" fill="#EF4444" name="Tasse" isAnimationActive={false} />
@@ -343,10 +367,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis tickFormatter={(value) => formatCurrency(value).replace(/,00$/, '')} />
-                <Tooltip
-                  formatter={(value: number) => formatCurrency(value)}
-                  labelStyle={{ color: '#000' }}
-                />
+                <Tooltip content={<ChartTooltip />} />
                 <Legend />
                 <Line
                   type="monotone"

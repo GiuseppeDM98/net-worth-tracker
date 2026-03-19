@@ -287,7 +287,7 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
       {/* Action Buttons Row */}
       <div className="space-y-2">
         <div className="flex flex-col desktop:flex-row desktop:flex-wrap desktop:items-center gap-2">
-          <Button onClick={handleCreate}>
+          <Button onClick={handleCreate} className="dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
             <Plus className="h-4 w-4 mr-2" />
             Aggiungi Dividendo
           </Button>
@@ -425,14 +425,14 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
         <Button
           variant={viewMode === 'table' ? 'default' : 'ghost'}
           onClick={() => setViewMode('table')}
-          className="rounded-b-none"
+          className={`rounded-b-none ${viewMode === 'table' ? 'dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600' : ''}`}
         >
           Tabella
         </Button>
         <Button
           variant={viewMode === 'calendar' ? 'default' : 'ghost'}
           onClick={() => setViewMode('calendar')}
-          className="rounded-b-none"
+          className={`rounded-b-none ${viewMode === 'calendar' ? 'dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600' : ''}`}
         >
           Calendario
         </Button>

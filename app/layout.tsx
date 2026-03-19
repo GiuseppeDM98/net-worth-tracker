@@ -28,6 +28,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { QueryClientProvider } from "@/lib/providers/QueryClientProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { MotionProvider } from "@/components/providers/MotionProvider";
+import { ThemeProvider } from "@/components/providers/ThemeProvider";
 
 // Load Geist fonts with CSS variables for Tailwind integration
 const geistSans = Geist({
@@ -64,21 +65,23 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="it">
+    <html lang="it" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {/* Provider hierarchy: AuthProvider → QueryClientProvider → Children
             AuthProvider MUST be outermost to ensure auth state is available
             before React Query hooks run (they may need user.uid for keys) */}
-        <MotionProvider>
-          <AuthProvider>
-            <QueryClientProvider>
-              {children}
-              <Toaster />
-            </QueryClientProvider>
-          </AuthProvider>
-        </MotionProvider>
+        <ThemeProvider>
+          <MotionProvider>
+            <AuthProvider>
+              <QueryClientProvider>
+                {children}
+                <Toaster />
+              </QueryClientProvider>
+            </AuthProvider>
+          </MotionProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -233,7 +233,7 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="text-gray-500">Caricamento...</div>
+        <div className="text-gray-500 dark:text-gray-400">Caricamento...</div>
       </div>
     );
   }
@@ -243,8 +243,8 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
       {/* Header with action buttons — stacks vertically on portrait, row on landscape/desktop */}
       <div className="flex flex-col gap-3 landscape:flex-row landscape:items-center landscape:justify-between">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Gestione Asset</h2>
-          <p className="mt-1 text-sm text-gray-600">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Gestione Asset</h2>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
             Gestisci i tuoi asset di investimento
           </p>
         </div>
@@ -253,12 +253,12 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
             variant="outline"
             onClick={handleUpdatePrices}
             disabled={updating || assets.length === 0}
-            className="w-full landscape:w-auto"
+            className="w-full landscape:w-auto dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${updating ? 'animate-spin' : ''}`} />
             Aggiorna Prezzi
           </Button>
-          <Button onClick={() => setDialogOpen(true)} className="w-full landscape:w-auto">
+          <Button onClick={() => setDialogOpen(true)} className="w-full landscape:w-auto dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
             <Plus className="mr-2 h-4 w-4" />
             Aggiungi Asset
           </Button>
@@ -270,8 +270,8 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
         <CardContent className="p-4">
           <div className="flex justify-between items-center">
             <div>
-              <p className="text-sm text-gray-500">Totale Patrimonio</p>
-              <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalValue)}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Totale Patrimonio</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{formatCurrency(totalValue)}</p>
             </div>
             {(() => {
               const assetsWithCostBasis = assets.filter((a) => a.averageCost);
@@ -293,11 +293,11 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
                 ? 'text-green-600'
                 : isNegative
                 ? 'text-red-600'
-                : 'text-gray-600';
+                : 'text-gray-600 dark:text-gray-400';
 
               return (
                 <div className="text-right">
-                  <p className="text-sm text-gray-500">G/P Totale</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">G/P Totale</p>
                   <div className={`font-semibold ${textColor}`}>
                     <div className="text-lg">
                       {isPositive ? '+' : ''}
@@ -318,7 +318,7 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
       <Card>
         <CardContent>
           {assets.length === 0 ? (
-            <div className="flex h-64 items-center justify-center text-gray-500">
+            <div className="flex h-64 items-center justify-center text-gray-500 dark:text-gray-400">
               Nessun asset presente. Clicca su "Aggiungi Asset" per iniziare.
             </div>
           ) : (
@@ -366,7 +366,7 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
                       const assetClassColor = getAssetClassColor(asset.assetClass);
 
                       return (
-                        <TableRow key={asset.id} className={isManualPrice ? 'bg-amber-50' : ''}>
+                        <TableRow key={asset.id} className={isManualPrice ? 'bg-amber-50 dark:bg-amber-950/20' : ''}>
                           <TableCell className="font-medium max-w-[180px]">
                             <div className="flex items-center gap-2 min-w-0">
                               <TooltipProvider>
@@ -378,7 +378,7 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
                                 </Tooltip>
                               </TooltipProvider>
                               {asset.quantity === 0 && (
-                                <span className="shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-500 border border-gray-300">
+                                <span className="shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-500 border border-gray-300 dark:bg-gray-700 dark:text-gray-400 dark:border-gray-600">
                                   Azzerato
                                 </span>
                               )}
@@ -460,7 +460,7 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
                                   ? 'text-green-600'
                                   : isNegative
                                   ? 'text-red-600'
-                                  : 'text-gray-600';
+                                  : 'text-gray-600 dark:text-gray-400';
 
                                 return (
                                   <div className={`${textColor} font-medium`}>
@@ -536,7 +536,7 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
                             ? 'text-green-600'
                             : isNegative
                             ? 'text-red-600'
-                            : 'text-gray-600';
+                            : 'text-gray-600 dark:text-gray-400';
 
                           return assetsWithCostBasis.length > 0 ? (
                             <div className={`${textColor}`}>

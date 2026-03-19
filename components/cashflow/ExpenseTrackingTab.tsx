@@ -551,7 +551,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
             Gestisci le tue entrate e uscite
           </p>
         </div>
-        <Button onClick={handleAddExpense} className="hidden desktop:flex">
+        <Button onClick={handleAddExpense} className="hidden desktop:flex dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
           <Plus className="mr-2 h-4 w-4" />
           Nuova Spesa
         </Button>
@@ -649,7 +649,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                   key={year}
                   variant={selectedYear === year ? "default" : "outline"}
                   onClick={() => handleYearChange(year)}
-                  className="min-w-[100px]"
+                  className={cn("min-w-[100px]", selectedYear === year && "dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600")}
                 >
                   {year}
                 </Button>
@@ -726,7 +726,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                     {isTypeDropdownOpen && (
                       <div
                         ref={typeDropdownRef}
-                        className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto"
+                        className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-60 overflow-auto text-popover-foreground"
                       >
                         {typeOptions.length === 0 ? (
                           <div className="p-3 text-sm text-muted-foreground text-center">
@@ -738,8 +738,8 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                               key={type.value}
                               type="button"
                               className={cn(
-                                "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer text-left",
-                                selectedType === type.value && "bg-gray-100"
+                                "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer text-left",
+                                selectedType === type.value && "bg-accent text-accent-foreground"
                               )}
                               onClick={() => handleSelectType(type.value)}
                             >
@@ -754,17 +754,17 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                     )}
                   </div>
                   {selectedType !== 'all' && (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-md border border-border">
                       <span className="text-sm font-medium">
                         {typeOptions.find(t => t.value === selectedType)?.label}
                       </span>
                       <button
                         type="button"
                         onClick={handleClearType}
-                        className="ml-1 hover:bg-gray-200 rounded-full p-0.5 transition-colors"
+                        className="ml-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full p-0.5 transition-colors"
                         aria-label="Rimuovi filtro tipo"
                       >
-                        <X className="h-3 w-3 text-gray-600" />
+                        <X className="h-3 w-3 text-gray-600 dark:text-gray-400" />
                       </button>
                     </div>
                   )}
@@ -788,14 +788,14 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                     {isCategoryDropdownOpen && selectedType !== 'all' && categoryOptions.length > 0 && (
                       <div
                         ref={categoryDropdownRef}
-                        className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto"
+                        className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-60 overflow-auto text-popover-foreground"
                       >
                         {/* Always show "Tutte" option */}
                         <button
                           type="button"
                           className={cn(
-                            "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer text-left",
-                            selectedCategoryId === 'all' && "bg-gray-100"
+                            "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer text-left",
+                            selectedCategoryId === 'all' && "bg-accent text-accent-foreground"
                           )}
                           onClick={() => handleSelectCategory('all')}
                         >
@@ -809,8 +809,8 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                             key={category.id}
                             type="button"
                             className={cn(
-                              "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer text-left",
-                              selectedCategoryId === category.id && "bg-gray-100"
+                              "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer text-left",
+                              selectedCategoryId === category.id && "bg-accent text-accent-foreground"
                             )}
                             onClick={() => handleSelectCategory(category.id)}
                           >
@@ -830,7 +830,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                     )}
                   </div>
                   {selectedCategoryId !== 'all' && (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-md border border-border">
                       {categories.find(c => c.id === selectedCategoryId)?.color && (
                         <div
                           className="w-3 h-3 rounded-full"
@@ -843,10 +843,10 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                       <button
                         type="button"
                         onClick={handleClearCategory}
-                        className="ml-1 hover:bg-gray-200 rounded-full p-0.5 transition-colors"
+                        className="ml-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full p-0.5 transition-colors"
                         aria-label="Rimuovi filtro categoria"
                       >
-                        <X className="h-3 w-3 text-gray-600" />
+                        <X className="h-3 w-3 text-gray-600 dark:text-gray-400" />
                       </button>
                     </div>
                   )}
@@ -870,14 +870,14 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                     {isSubCategoryDropdownOpen && selectedCategoryId !== 'all' && subCategoryOptions.length > 0 && (
                       <div
                         ref={subCategoryDropdownRef}
-                        className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto"
+                        className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-60 overflow-auto text-popover-foreground"
                       >
                         {/* Always show "Tutte" option */}
                         <button
                           type="button"
                           className={cn(
-                            "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer text-left",
-                            selectedSubCategoryId === 'all' && "bg-gray-100"
+                            "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer text-left",
+                            selectedSubCategoryId === 'all' && "bg-accent text-accent-foreground"
                           )}
                           onClick={() => handleSelectSubCategory('all')}
                         >
@@ -891,8 +891,8 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                             key={subCategory.id}
                             type="button"
                             className={cn(
-                              "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer text-left",
-                              selectedSubCategoryId === subCategory.id && "bg-gray-100"
+                              "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer text-left",
+                              selectedSubCategoryId === subCategory.id && "bg-accent text-accent-foreground"
                             )}
                             onClick={() => handleSelectSubCategory(subCategory.id)}
                           >
@@ -906,17 +906,17 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                     )}
                   </div>
                   {selectedSubCategoryId !== 'all' && (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-md border border-border">
                       <span className="text-sm font-medium">
                         {subCategoryOptions.find(s => s.id === selectedSubCategoryId)?.name}
                       </span>
                       <button
                         type="button"
                         onClick={handleClearSubCategory}
-                        className="ml-1 hover:bg-gray-200 rounded-full p-0.5 transition-colors"
+                        className="ml-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full p-0.5 transition-colors"
                         aria-label="Rimuovi filtro sottocategoria"
                       >
-                        <X className="h-3 w-3 text-gray-600" />
+                        <X className="h-3 w-3 text-gray-600 dark:text-gray-400" />
                       </button>
                     </div>
                   )}
