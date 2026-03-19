@@ -111,5 +111,5 @@ Fix 2 — CurrentYearTab.tsx:
 Trova il hint card con 💡 inline. Sostituisci con struttura flex + icona Info o Lightbulb da lucide-react.
 
 Dopo le modifiche aggiorna SESSION_NOTES.md con le righe della tabella Session 6.
-Alla fine esegui npm test.
+Alla fine esegui npm test e dimmi che test devo fare per ciò che hai implementato in questa sessione.
 ```

@@ -58,11 +58,20 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-950 dark:to-gray-900 p-4">
-      <Card className="w-full max-w-md">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950 p-4">
+      <div className="w-full max-w-md space-y-6">
+        {/* App branding */}
+        <div className="text-center space-y-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/favicon/favicon-48x48.png" alt="Portfolio Tracker" className="w-12 h-12 mx-auto" />
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Portfolio Tracker</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Gestisci il tuo patrimonio</p>
+        </div>
+
+      <Card className="w-full border-gray-200 dark:border-gray-800 dark:bg-gray-900 shadow-sm">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">Accedi</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100">Accedi</CardTitle>
+          <CardDescription className="text-gray-500 dark:text-gray-400">
             Inserisci le tue credenziali per accedere al tuo portfolio
           </CardDescription>
         </CardHeader>
@@ -136,14 +145,15 @@ export default function LoginPage() {
             Accedi con Google
           </Button>
 
-          <div className="mt-4 text-center text-sm">
+          <div className="mt-4 text-center text-sm text-gray-600 dark:text-gray-400">
             Non hai un account?{' '}
-            <Link href="/register" className="text-blue-600 dark:text-blue-400 hover:underline">
+            <Link href="/register" className="text-emerald-600 dark:text-emerald-400 hover:underline font-medium">
               Registrati
             </Link>
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

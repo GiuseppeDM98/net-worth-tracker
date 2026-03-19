@@ -88,5 +88,5 @@ Pattern da applicare:
   DialogFooter/bottoni: className="px-6 pb-6 pt-4 border-t shrink-0"
 
 Dopo le modifiche aggiorna SESSION_NOTES.md con le righe della tabella Session 7.
-Alla fine esegui npm test.
+Alla fine esegui npm test e dimmi che test devo fare per ciò che hai implementato in questa sessione.
 ```

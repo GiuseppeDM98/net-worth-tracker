@@ -88,4 +88,5 @@ Verifica che il dialog funzioni ancora aprendo la pagina — il component viene 
 
 Dopo le modifiche aggiorna SESSION_NOTES.md con le righe della tabella Session 5.
 Esegui npx next build per verificare che non ci siano errori TypeScript e controllare l'output del bundle.
+Alla fine esegui npm test e dimmi che test devo fare per ciò che hai implementato in questa sessione.
 ```

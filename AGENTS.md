@@ -37,6 +37,9 @@ For architecture and status, see [CLAUDE.md](CLAUDE.md).
 - Use semantic tokens: `bg-background`, `text-foreground`, `border-border` for chrome; `bg-sidebar`, `text-sidebar-foreground`, `bg-sidebar-accent`, `border-sidebar-border` for sidebar
 - `bg-white` / `bg-gray-900` / `text-gray-900` in layout = bug — they break the opposite color mode
 - Gain/loss colors (`text-green-600`, `text-red-600`) are intentionally hardcoded — they are domain-semantic, not theme-structural
+- **Auth pages (login/register) background**: use `bg-gray-50 dark:bg-gray-950` — same as the dashboard main content area (`dark:bg-gray-950`). Do NOT use gradient variants (`bg-gradient-to-br from-blue-50 ... dark:from-gray-950`): they produce an inconsistent dark appearance.
+- **Card dark mode on auth pages**: explicitly add `dark:bg-gray-900 dark:border-gray-800` to the `<Card>` — same as dashboard panels. shadcn `CardTitle`/`CardDescription` may also need explicit `dark:text-gray-100`/`dark:text-gray-400` when used outside the normal theme context.
+- **`bg-background` in shadcn separators** (e.g. "Oppure" divider): correct as-is — it is a CSS variable that already handles both modes. Do not replace.
 
 ---
 
@@ -201,4 +204,4 @@ When an icon switches between TrendingUp/TrendingDown (or similar) based on a va
 }
 ```
 
-**Last updated**: 2026-03-19 (session 02: dashboard icon semantics + null-state fallback pattern)
+**Last updated**: 2026-03-19 (session 03: auth page dark mode tokens + Card dark mode pattern)

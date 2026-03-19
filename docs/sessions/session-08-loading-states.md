@@ -96,5 +96,5 @@ Mantieni l'altezza placeholder (h-64 o quella esistente) per evitare layout shif
 NON cambiare i RefreshCw animate-spin che indicano un refresh attivo — solo i loading states iniziali al mount del componente.
 
 Dopo le modifiche aggiorna SESSION_NOTES.md con le righe della tabella Session 8.
-Alla fine esegui npm test.
+Alla fine esegui npm test e dimmi che test devo fare per ciò che hai implementato in questa sessione.
 ```

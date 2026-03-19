@@ -93,5 +93,5 @@ ATTENZIONE: Non rimuovere altri useEffect che gestiscono side effects reali (res
 Fix 3: In ExpenseTable.tsx, cerca formatCurrency definita come funzione locale (~riga 76). Sostituiscila con l'import da @/lib/utils/formatters. Verifica che il comportamento sia identico prima di rimuovere la versione locale.
 
 Dopo le modifiche aggiorna SESSION_NOTES.md con le righe della tabella Session 4.
-Alla fine esegui npm test.
+Alla fine esegui npm test e dimmi che test devo fare per ciò che hai implementato in questa sessione.
 ```

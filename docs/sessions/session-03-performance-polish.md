@@ -90,5 +90,5 @@ Fix 2: In MetricCard.tsx, aggiungi un check prefers-reduced-motion prima di appl
 Convenzione: usa window.matchMedia('(prefers-reduced-motion: reduce)').matches — se è un client component, puoi farlo in un useEffect/useState. Non usare un hook esterno se non già presente nel progetto.
 
 Dopo le modifiche aggiorna SESSION_NOTES.md con le righe della tabella Session 3.
-Alla fine esegui npm test.
+Alla fine esegui npm test e dimmi che test devo fare per ciò che hai implementato in questa sessione.
 ```

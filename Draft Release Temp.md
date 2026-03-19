@@ -113,3 +113,6 @@
 - The sidebar, header, and bottom navigation bar now correctly adapt to light and dark mode — these components previously used fixed colors regardless of the active theme
 - Settings page (all four tabs: Allocation, Preferences, Expenses, Dividends) now fully supports dark mode — page header, formula cards, subcategory rows, the Notes card at the bottom, and all buttons are correctly styled in both light and dark themes
 - The on/off toggle (Switch) throughout the app is now visually distinct in dark mode — the "on" state was previously near-white and almost indistinguishable from the background
+- Login and registration pages now fully match the app's dark mode design — the background uses the same dark gray as the main dashboard, cards are properly styled with dark borders and backgrounds, and text colors are consistent with the rest of the interface
+- Login and registration pages now display the app's logo above the sign-in form, along with the "Portfolio Tracker" title — bringing these pages in line with the visual identity of the rest of the app
+- Links on the Login and Registration pages now use the app's emerald brand color instead of blue, consistent with the rest of the interface
