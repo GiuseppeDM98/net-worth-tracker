@@ -113,3 +113,5 @@
 - Password fields on the Login and Registration pages now have a show/hide toggle — tap the eye icon to reveal your password while typing
 - The "Sign in with Google" and "Register with Google" buttons now display the Google logo alongside the text for clearer visual identification
 - The "Create new subcategory" action in the asset form is now integrated directly into the subcategory dropdown — the standalone "+" button in the field header has been removed
+- Cashflow tracking page summary cards (Total Income, Total Expenses, Net Balance, Income/Expense Ratio) now scale their font size on mobile — large amounts with 6 or more digits no longer overflow their cards on small screens
+- All filters in the Cashflow tracking section (Month, Type, Category, Subcategory, Reset) now expand to fill the full screen width on mobile — previously they only took their minimum width, leaving visible gaps. The "Month" selector and "Mese corrente" button are now paired side-by-side in one row at all screen sizes

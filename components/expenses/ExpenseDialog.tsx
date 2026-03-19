@@ -863,7 +863,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
 
           {/* Linked cash account — only shown when user has at least one cash asset */}
           {cashAssets.length > 0 && (
-            <div className="space-y-2">
+            <div className="w-full space-y-2">
               <Label htmlFor="linkedCashAssetId">
                 {selectedType === 'income' ? 'Conto di Accredito' : 'Conto di Prelievo'}
                 <span className="text-muted-foreground font-normal ml-1">(opzionale)</span>

@@ -574,7 +574,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
             <TrendingUp className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-lg desktop:text-2xl font-bold text-green-600">
               {formatCurrency(totalIncome)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -589,7 +589,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
             <TrendingDown className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">
+            <div className="text-lg desktop:text-2xl font-bold text-red-600">
               {formatCurrency(totalExpenses)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -605,7 +605,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
           </CardHeader>
           <CardContent>
             <div
-              className={`text-2xl font-bold ${
+              className={`text-lg desktop:text-2xl font-bold ${
                 netBalance >= 0 ? 'text-green-600' : 'text-red-600'
               }`}
             >
@@ -623,7 +623,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
             <Scale className="h-4 w-4 text-purple-600" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${getRatioColor(incomeExpenseRatio)}`}>
+            <div className={`text-lg desktop:text-2xl font-bold ${getRatioColor(incomeExpenseRatio)}`}>
               {formatRatio(incomeExpenseRatio)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -675,42 +675,42 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
           </CardHeader>
           <CollapsibleContent>
             <CardContent>
-              <div className="flex flex-wrap items-end gap-4">
-                {/* Month Filter */}
-                <div className="flex flex-col gap-2 min-w-[150px]">
+              <div className="grid grid-cols-1 gap-3 desktop:flex desktop:flex-wrap desktop:items-end desktop:gap-4">
+                {/* Month Filter + current month quick button, always side by side */}
+                <div className="flex flex-col gap-2 desktop:min-w-[150px]">
                   <label className="text-sm font-medium">Mese</label>
-                  <Select
-                    value={selectedMonth}
-                    onValueChange={setSelectedMonth}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleziona mese" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tutti</SelectItem>
-                      {MONTHS.map(month => (
-                        <SelectItem key={month.value} value={month.value}>
-                          {month.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Current Month Quick Filter Button */}
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium">&nbsp;</label>
-                  <Button
-                    onClick={handleCurrentMonth}
-                    variant="secondary"
-                    size="default"
-                  >
-                    Mese corrente
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <Select
+                        value={selectedMonth}
+                        onValueChange={setSelectedMonth}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleziona mese" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tutti</SelectItem>
+                          {MONTHS.map(month => (
+                            <SelectItem key={month.value} value={month.value}>
+                              {month.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      onClick={handleCurrentMonth}
+                      variant="secondary"
+                      size="default"
+                      className="shrink-0"
+                    >
+                      Mese corrente
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Type Filter with Search */}
-                <div className="flex flex-col gap-2 min-w-[150px]">
+                <div className="flex flex-col gap-2 desktop:min-w-[150px]">
                   <Label htmlFor="type-combobox">Tipo</Label>
                   <div className="relative">
                     <Input
@@ -771,7 +771,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                 </div>
 
                 {/* Category Filter with Search */}
-                <div className="flex flex-col gap-2 min-w-[150px]">
+                <div className="flex flex-col gap-2 desktop:min-w-[150px]">
                   <Label htmlFor="category-combobox">Categoria</Label>
                   <div className="relative">
                     <Input
@@ -853,7 +853,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                 </div>
 
                 {/* Subcategory Filter with Search */}
-                <div className="flex flex-col gap-2 min-w-[150px]">
+                <div className="flex flex-col gap-2 desktop:min-w-[150px]">
                   <Label htmlFor="subcategory-combobox">Sotto-categoria</Label>
                   <div className="relative">
                     <Input
@@ -924,10 +924,11 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
 
                 {/* Reset Filters Button */}
                 {hasActiveFilters && (
-                  <div className="flex items-end">
+                  <div className="flex items-end desktop:flex-none">
                     <Button
                       variant="outline"
                       onClick={handleResetFilters}
+                      className="w-full desktop:w-auto"
                     >
                       Ripristina Filtri
                     </Button>

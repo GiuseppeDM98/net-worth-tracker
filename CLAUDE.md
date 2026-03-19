@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio, framer-motion
-- Ultima implementazione: **Mobile/tablet responsive audit** — AssetDialog completamente adattato per mobile (`sm:grid-cols-2` su tutti i grid a 2 colonne, step-up coupon tiers a 2 righe su phone, PMC calculator flex+inner-grid); `SelectTrigger` base cambiato da `w-fit` a `w-full`; sotto-categoria ora ha opzione "Crea nuova" integrata nel Select (sentinel `__create_new__`); Login/Register: dark mode gradiente, password show/hide toggle, Google button con SVG icon, link dark mode. (2026-03-19)
+- Ultima implementazione: **Cashflow tracking tab mobile responsive** — card riepilogative (Entrate/Spese/Bilancio/Rapporto) ora `text-lg desktop:text-2xl` per evitare overflow con importi a 6+ cifre; sezione filtri refactored da `flex flex-wrap` a `grid grid-cols-1 desktop:flex desktop:flex-wrap` con filtro Mese + bottone "Mese corrente" unificati in un unico flex row; tutti i filtri e "Ripristina Filtri" a piena larghezza su mobile. (2026-03-19)
 - In corso ora: nessuna attività attiva
 
 ## Architecture Snapshot
@@ -71,4 +71,4 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`, `components/pdf/PDFExportDialog.tsx`, `lib/utils/pdfTimeFilters.ts`, `lib/utils/pdfGenerator.tsx`
 - Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`, `borsaItalianaBondScraper.test.ts`, `goalService.test.ts`, `couponUtils.test.ts`
 
-**Last updated**: 2026-03-19 (session: AssetDialog mobile/tablet adapt + Login/Register normalize)
+**Last updated**: 2026-03-19 (session: Cashflow tracking tab mobile responsive)
