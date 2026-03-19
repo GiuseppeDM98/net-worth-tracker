@@ -26,6 +26,7 @@ For architecture and status, see [CLAUDE.md](CLAUDE.md).
 - Card layout in landscape: `grid grid-cols-1 gap-4 landscape:grid-cols-2`
 - Desktop-only tables/views: `desktop:hidden` banner to warn mobile users ("si consiglia la visualizzazione su desktop")
 - **Structural overflow** (13+ columns, e.g. Anno + 12 months + Total): even with single-letter headers, reduced padding, and hidden columns these tables still scroll on mobile. Use `hidden desktop:block` wrapper on the component + contextual hint ("disponibile su desktop") in the mobile UI where the feature would have been triggered (e.g. inside a detail dialog or card). This is preferable to an amber banner — it's contextual and doesn't block the page.
+- **Dialog-internal breakpoints**: dialogs (`max-w-2xl` = 672px) never reach `desktop:` (1440px). Use `sm:` (640px) for 2-column grids inside dialogs — e.g. `grid grid-cols-1 sm:grid-cols-2 gap-4`. `desktop:` is reserved for full-page layout patterns only.
 - **Exception — data-dense table pages**: pages with 8+ column tables may use `isTablet = useMediaQuery('(min-width: 768px) and (max-width: 1023px)')` + `useCardView = isMobile || isTablet` to switch to cards below 1024px. The `desktop:` 1440px breakpoint is for layout/navigation patterns, not card-vs-table decisions on dense data pages (e.g. Allocation page).
 - **Card header with long title + action controls**: when a CardHeader row contains a long title (e.g. "Sotto-Categorie Azioni (Equity)") alongside toggles/badges, use `flex flex-col gap-2 desktop:flex-row desktop:items-center desktop:justify-between`. On the controls row, add `justify-between desktop:justify-start` so controls spread to both ends on mobile instead of collapsing left.
 
@@ -68,9 +69,11 @@ End date must include full day: `new Date(year, month, 0, 23, 59, 59, 999)`
 
 ### Radix UI Select Values
 - **Empty string NOT allowed** as `SelectItem` value (runtime error)
-- Use sentinel values: `__all_years__`, `__all__`, `__none__` for "unselected" options
+- Use sentinel values: `__all_years__`, `__all__`, `__none__` for "unselected" options; `__create_new__` for inline creation flows (see below)
 - For optional fields: use `undefined` value + placeholder text
 - **Always use Radix `Select` (`@/components/ui/select`) for styled dropdowns** — native HTML `<select>` ignores `height`, `padding-y`, and most CSS on iOS. Radix renders a fully styleable trigger button.
+- **`SelectTrigger` is `w-full` by default** in this project (changed from shadcn's `w-fit`). Do not add `w-full` manually — it's already in the base component. If a trigger needs a fixed width, pass `className="w-fit"` explicitly.
+- **"Create new" option in Select**: use a `__create_new__` sentinel as the last `SelectItem` (preceded by `<SelectSeparator />`). Intercept it in `onValueChange` before calling `setValue` — show an inline creation form instead. Radix closes the dropdown automatically on selection; the inline form replaces the Select in the DOM. Pattern used in `AssetDialog` subcategory field.
 - **Mobile tab-to-Select pattern**: when a `<TabsList>` becomes cramped on mobile (long labels, icons, or ≥ 3 tabs), replace with a `<Select>` on `max-desktop:` and keep TabsList on `hidden desktop:block`. The Select updates the same controlled state variable — tab content renders correctly because it reads state, not DOM. Pattern used in Assets, FIRE, and Performance pages. Use `useState<TabValue>` + `<Tabs value={activeTab} onValueChange={...}>` in the page; both Select and TabsList call the same setter.
 
 ### Sankey Diagram Multi-Layer Pattern
@@ -285,4 +288,4 @@ ALL fields in settings types must be handled in THREE places:
 **Fix**: Use `overflow-x-auto` always on wide table wrappers — never remove it at a breakpoint. `sticky left-0` columns work correctly inside `overflow-x-auto` without needing `overflow-x-visible`.
 **File**: `MonthlyReturnsHeatmap.tsx` (fixed: `sm:` → `desktop:`, removed `sm:overflow-x-visible`)
 
-**Last updated**: 2026-03-18 (session: Framer Motion animations — Dashboard, Hall of Fame, History)
+**Last updated**: 2026-03-19 (session: AssetDialog mobile/tablet adapt + Login/Register normalize)

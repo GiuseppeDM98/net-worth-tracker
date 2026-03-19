@@ -56,6 +56,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -811,7 +812,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="ticker">Ticker *</Label>
               <Input
@@ -859,7 +860,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="type">Tipo *</Label>
               <Select
@@ -911,21 +912,10 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
 
           {isSubCategoryEnabled() && (
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="subCategory">
-                  Sotto-categoria
-                  {isSubCategoryEnabled() && availableSubCategories().length > 0 && ' *'}
-                </Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowNewSubCategory(!showNewSubCategory)}
-                  className="h-7 px-2"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
+              <Label htmlFor="subCategory">
+                Sotto-categoria
+                {isSubCategoryEnabled() && availableSubCategories().length > 0 && ' *'}
+              </Label>
 
               {showNewSubCategory ? (
                 <div className="flex gap-2">
@@ -961,9 +951,17 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                   </Button>
                 </div>
               ) : (
+                // __create_new__ is a sentinel value — intercepted in onValueChange
+                // to open the inline creation form instead of setting the field.
                 <Select
                   value={watch('subCategory')}
-                  onValueChange={(value) => setValue('subCategory', value)}
+                  onValueChange={(value) => {
+                    if (value === '__create_new__') {
+                      setShowNewSubCategory(true);
+                    } else {
+                      setValue('subCategory', value);
+                    }
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Seleziona sotto-categoria" />
@@ -974,13 +972,18 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                         {cat}
                       </SelectItem>
                     ))}
+                    {availableSubCategories().length > 0 && <SelectSeparator />}
+                    <SelectItem value="__create_new__" className="text-blue-600 dark:text-blue-400">
+                      <Plus className="h-3.5 w-3.5" />
+                      Crea nuova sotto-categoria
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               )}
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="currency">Valuta *</Label>
               <Input
@@ -1273,7 +1276,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
 
               {showBondDetails && (
                 <div className="mt-4 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="bondCouponRate">Tasso Cedolare Annuo (%)</Label>
                       <Input
@@ -1308,7 +1311,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="bondIssueDate">Data di Emissione</Label>
                       <Input
@@ -1403,7 +1406,9 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                           Il tasso base sopra è usato come fallback se nessuna fascia corrisponde.
                         </p>
                         {tierFields.map((field, index) => (
-                          <div key={field.id} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end">
+                          // On mobile: 2-col grid → 4 children flow as 2 rows (Anno da|Anno a / Tasso|Delete).
+                          // At sm+: custom 4-col template restores single-row layout.
+                          <div key={field.id} className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_1fr_1fr_auto] items-end">
                             <div className="space-y-1">
                               {index === 0 && <Label className="text-xs">Anno da</Label>}
                               <Input
@@ -1440,7 +1445,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                               variant="ghost"
                               size="icon"
                               onClick={() => removeTier(index)}
-                              className={index === 0 ? 'mt-5' : ''}
+                              className={`self-end ${index === 0 ? 'sm:mt-5' : ''}`}
                             >
                               <X className="h-4 w-4" />
                             </Button>
@@ -1528,7 +1533,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
 
             {showCostBasis && (
               <div className="mt-4 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <Label htmlFor="averageCost">
@@ -1615,35 +1620,39 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
 
                     <div className="space-y-2">
                       {brokerEntries.map((entry, idx) => (
-                        <div key={idx} className="grid grid-cols-[1fr_1fr_auto] gap-3 items-center">
-                          <Input
-                            type="number"
-                            step="0.0001"
-                            min="0"
-                            placeholder="Quantità"
-                            value={entry.qty}
-                            onChange={(e) => {
-                              const updated = [...brokerEntries];
-                              updated[idx] = { ...updated[idx], qty: e.target.value };
-                              setBrokerEntries(updated);
-                            }}
-                          />
-                          <Input
-                            type="number"
-                            step="0.0001"
-                            min="0"
-                            placeholder={isBondPctMode ? 'Prezzo BI' : `Prezzo (${watch('currency')})`}
-                            value={entry.price}
-                            onChange={(e) => {
-                              const updated = [...brokerEntries];
-                              updated[idx] = { ...updated[idx], price: e.target.value };
-                              setBrokerEntries(updated);
-                            }}
-                          />
+                        // Flex outer keeps delete button inline at all widths.
+                        // Inner grid-cols-2 gives both inputs equal space on any screen size.
+                        <div key={idx} className="flex gap-2 items-center">
+                          <div className="grid grid-cols-2 gap-2 flex-1">
+                            <Input
+                              type="number"
+                              step="0.0001"
+                              min="0"
+                              placeholder="Quantità"
+                              value={entry.qty}
+                              onChange={(e) => {
+                                const updated = [...brokerEntries];
+                                updated[idx] = { ...updated[idx], qty: e.target.value };
+                                setBrokerEntries(updated);
+                              }}
+                            />
+                            <Input
+                              type="number"
+                              step="0.0001"
+                              min="0"
+                              placeholder={isBondPctMode ? 'Prezzo BI' : `Prezzo (${watch('currency')})`}
+                              value={entry.price}
+                              onChange={(e) => {
+                                const updated = [...brokerEntries];
+                                updated[idx] = { ...updated[idx], price: e.target.value };
+                                setBrokerEntries(updated);
+                              }}
+                            />
+                          </div>
                           <button
                             type="button"
                             onClick={() => setBrokerEntries(brokerEntries.filter((_, i) => i !== idx))}
-                            className={`text-muted-foreground hover:text-destructive transition-colors ${brokerEntries.length <= 1 ? 'invisible' : ''}`}
+                            className={`shrink-0 text-muted-foreground hover:text-destructive transition-colors ${brokerEntries.length <= 1 ? 'invisible' : ''}`}
                           >
                             <X className="h-4 w-4" />
                           </button>
@@ -1775,8 +1784,8 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
             </div>
           )}
 
-          <div className="rounded-lg bg-blue-50 p-3">
-            <p className="text-sm text-blue-800">
+          <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-3 border border-blue-200 dark:border-blue-800">
+            <p className="text-sm text-blue-800 dark:text-blue-200">
               <strong>Nota:</strong>
               {selectedType === 'cash' && ' Per asset di tipo liquidità, il prezzo sarà impostato a 1.'}
               {selectedType === 'realestate' && ' Per immobili, il prezzo deve essere aggiornato manualmente.'}

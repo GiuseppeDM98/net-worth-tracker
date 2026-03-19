@@ -100,3 +100,16 @@
 - Collapsible sections on the Dashboard (pie charts, cost basis) and the Notes section on the History page now animate smoothly open and closed instead of snapping instantly
 - Doubling Time milestone cards on the History page appear with a staggered cascade effect; the in-progress milestone's progress bar fills in from left to right on load
 - All new animations automatically disable for users who have enabled "Reduce Motion" in their system accessibility settings
+
+- The subcategory dropdown in the Add / Edit Asset form now includes a **"Create new subcategory"** option at the bottom of the list — no need to find the separate "+" button in the header; the option appears naturally while browsing existing categories
+
+## 🔧 Improvements
+
+- Add / Edit Asset form is now fully usable on mobile and tablet — all two-column field rows (Ticker/Name, Type/Asset Class, Currency/Quantity, Coupon rate/frequency, Issue/Maturity dates, Average Cost/Tax Rate) now stack to a single column on phones and expand to two columns on wider screens
+- The step-up coupon rate schedule (BTP Valore style) now displays as two rows on phones — year range on the first row, rate and delete button on the second — instead of four cramped columns that overflowed the screen
+- The multi-broker PMC calculator rows now use a two-column layout for the quantity and price inputs at all screen sizes, with the delete button kept inline — inputs are comfortably sized even on small phones
+- All dropdown selectors (asset type, asset class, subcategory, coupon frequency, etc.) now fill the full available width of their container — previously they only expanded to fit their content, leaving visual gaps in the form layout
+- Login and registration pages now correctly apply dark mode — the background gradient transitions from light blue to a dark gray/black in dark mode instead of remaining light
+- Password fields on the Login and Registration pages now have a show/hide toggle — tap the eye icon to reveal your password while typing
+- The "Sign in with Google" and "Register with Google" buttons now display the Google logo alongside the text for clearer visual identification
+- The "Create new subcategory" action in the asset form is now integrated directly into the subcategory dropdown — the standalone "+" button in the field header has been removed
