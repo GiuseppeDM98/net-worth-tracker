@@ -65,5 +65,5 @@ Fix da fare:
 3. Controlla se ci sono text-gray-900/600/500 senza dark: sull'h1 e subtitle della pagina — aggiungili se mancano (possibile che la Session 01 li abbia già fixati).
 
 Dopo le modifiche aggiorna SESSION_NOTES.md con le righe della tabella Session 2.
-Alla fine esegui npm test.
+Alla fine esegui npm test e dimmi cosa testare di questa testione
 ```

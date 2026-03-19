@@ -338,7 +338,6 @@ export default function DashboardPage() {
       // Hall of Fame can be manually recalculated from Hall of Fame page if needed.
       try {
         await updateHallOfFame(user.uid);
-        console.log('Hall of Fame updated successfully');
       } catch (error) {
         console.error('Error updating Hall of Fame:', error);
         // Don't show error to user - Hall of Fame update is non-critical
@@ -564,7 +563,10 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Variazione Mensile</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            {variations.monthly && variations.monthly.value < 0
+              ? <TrendingDown className="h-4 w-4 text-red-500" />
+              : <TrendingUp className="h-4 w-4 text-green-500" />
+            }
           </CardHeader>
           <CardContent>
             {variations.monthly ? (
@@ -596,7 +598,10 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Variazione Annuale (YTD)</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            {variations.yearly && variations.yearly.value < 0
+              ? <TrendingDown className="h-4 w-4 text-red-500" />
+              : <TrendingUp className="h-4 w-4 text-green-500" />
+            }
           </CardHeader>
           <CardContent>
             {variations.yearly ? (

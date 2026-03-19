@@ -19,6 +19,8 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed the Monthly Change and Yearly Change (YTD) cards on the Dashboard always showing a green upward arrow regardless of the portfolio direction — the icon is now a red downward arrow when the value is negative, and a green upward arrow when positive
+
 - Fixed the monthly returns heatmap on the Performance page overflowing its container on iPad Mini and similar ~744px-wide devices: the compact color-only view (green/red cells, no numbers) now correctly appears on all devices below 1440px wide — previously the full table with month names and percentages was incorrectly triggered at 640px, causing it to overflow without a scrollbar
 
 - Fixed duplicate upcoming dividends appearing in the dividend table after the daily cron job ran: equity dividends (e.g. NEXI, FBK, ENI) could appear twice with identical data if Vercel retried or double-fired the cron endpoint. Auto-generated dividends now use a deterministic ID so concurrent writes are idempotent
