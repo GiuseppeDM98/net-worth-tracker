@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio, framer-motion
-- Ultima implementazione: **UX copy + design system normalization** — uniformato "Sottocategoria" (no trattino) in tutta l'app (9 file); "Aggiorna" → "Salva Modifiche" in AssetDialog (ora consistente con tutti gli altri dialog); layout shell (Header, Sidebar, BottomNavigation, SecondaryMenuDrawer) migrati a token semantici (`bg-background`, `bg-sidebar`, `border-border`, ecc.) — dark mode ora funziona correttamente in tutti i componenti di navigazione; Tabs UI component usa `bg-muted` e `ring-ring` al posto di gray hardcoded; Dialog close button usa `rounded-sm` (era `rounded-xs`, non standard). (2026-03-19)
-- In corso ora: nessuna attività attiva
+- Ultima implementazione: **Polish + Optimize audit** — audit completo /polish + /optimize: identificati 22 issues (dark mode gaps ~344 occorrenze, useEffect→useMemo antipattern in filtri, AIAnalysisDialog bundle non lazy, breakpoint md:/lg: invece di desktop:, emoji in titoli di sezione, loading states non animati). Nessun codice modificato — prodotto piano strutturato in 8 sessioni eseguibili indipendentemente in `docs/sessions/`. (2026-03-19)
+- In corso ora: 8 sessioni polish/optimize da eseguire (vedi `docs/sessions/README.md`)
 
 ## Architecture Snapshot
 - App Router con pagine protette sotto `app/dashboard/*`.
@@ -71,4 +71,4 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`, `components/pdf/PDFExportDialog.tsx`, `lib/utils/pdfTimeFilters.ts`, `lib/utils/pdfGenerator.tsx`
 - Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`, `borsaItalianaBondScraper.test.ts`, `goalService.test.ts`, `couponUtils.test.ts`
 
-**Last updated**: 2026-03-19 (session: /clarify + /normalize — copy consistency + design tokens)
+**Last updated**: 2026-03-19 (session: /polish + /optimize audit — 22 issues catalogati, docs/sessions/ con 8 sessioni pronte)
