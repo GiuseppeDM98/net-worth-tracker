@@ -109,3 +109,5 @@
 - "Subcategory" is now spelled consistently across all forms, dialogs, tables, and toast messages throughout the app — previously it appeared as three different variants depending on where you looked
 - The "Save Changes" button in the Add / Edit Asset dialog is now consistent with all other forms — previously it was labeled "Update" while every other dialog already used "Save Changes"
 - The sidebar, header, and bottom navigation bar now correctly adapt to light and dark mode — these components previously used fixed colors regardless of the active theme
+- Settings page (all four tabs: Allocation, Preferences, Expenses, Dividends) now fully supports dark mode — page header, formula cards, subcategory rows, the Notes card at the bottom, and all buttons are correctly styled in both light and dark themes
+- The on/off toggle (Switch) throughout the app is now visually distinct in dark mode — the "on" state was previously near-white and almost indistinguishable from the background

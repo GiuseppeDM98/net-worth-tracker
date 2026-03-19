@@ -73,6 +73,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Fully responsive on mobile and tablet — percentile table switches to a card layout, scenario parameter cards stack vertically
 
 ### Other
+- **Dark mode** — Full dark/light mode support with a toggle in the header; respects system preference by default. Every page, chart tooltip, and UI component is properly themed
 - **Hall of Fame** — Monthly and annual performance rankings with multi-section note system; fully responsive on mobile and tablet with touch-friendly card layouts
 - **PDF Export** — 8 configurable sections with custom year/month period selection; sections auto-disabled for past periods when historical data is unavailable
 

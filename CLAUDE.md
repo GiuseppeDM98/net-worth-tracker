@@ -5,8 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio, framer-motion
-- Ultima implementazione: **Polish + Optimize audit** — audit completo /polish + /optimize: identificati 22 issues (dark mode gaps ~344 occorrenze, useEffect→useMemo antipattern in filtri, AIAnalysisDialog bundle non lazy, breakpoint md:/lg: invece di desktop:, emoji in titoli di sezione, loading states non animati). Nessun codice modificato — prodotto piano strutturato in 8 sessioni eseguibili indipendentemente in `docs/sessions/`. (2026-03-19)
-- In corso ora: 8 sessioni polish/optimize da eseguire (vedi `docs/sessions/README.md`)
+- Ultima implementazione: **Dark Mode sweep completo** — 15 sessioni di dark mode fixes su tutte le pagine: Dashboard, Assets, Allocation, History, Performance, Hall of Fame, FIRE+Simulazioni, Cashflow (tutti i tab: Tracciamento, Anno Corrente, Storico, Budget, Dividendi), Settings (tutti i tab). Switch tema sole/luna nel Header. ThemeProvider con `next-themes`. (2026-03-19)
 
 ## Architecture Snapshot
 - App Router con pagine protette sotto `app/dashboard/*`.
