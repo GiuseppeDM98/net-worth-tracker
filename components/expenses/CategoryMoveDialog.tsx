@@ -343,17 +343,17 @@ export function CategoryMoveDialog({
           {selectedCategoryId && availableSubCategories.length > 0 && (
             <div className="space-y-2">
               <Label htmlFor="move-subcategory">
-                Sotto-categoria Destinazione (opzionale)
+                Sottocategoria Destinazione (opzionale)
               </Label>
               <Select
                 value={selectedSubCategoryId}
                 onValueChange={setSelectedSubCategoryId}
               >
                 <SelectTrigger id="move-subcategory">
-                  <SelectValue placeholder="Nessuna sotto-categoria" />
+                  <SelectValue placeholder="Nessuna sottocategoria" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">Nessuna sotto-categoria</SelectItem>
+                  <SelectItem value="__none__">Nessuna sottocategoria</SelectItem>
                   {availableSubCategories.map((subCategory) => (
                     <SelectItem key={subCategory.id} value={subCategory.id}>
                       {subCategory.name}

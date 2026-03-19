@@ -74,7 +74,6 @@
 - Hall of Fame page content is no longer cut off by the bottom navigation bar on portrait mobile
 - Adding or editing a note on the Hall of Fame page now stacks the Year and Month selectors vertically on phones, making them easier to tap
 - Note icon tap target on Hall of Fame has been enlarged for easier interaction on touch devices
-
 - FIRE & Simulations page is now fully usable on mobile and tablet — the tab navigation (FIRE Calculator / Monte Carlo / Goals) becomes a dropdown on devices below 1440px wide, and all metric cards display in a single column on small screens instead of cramped multi-column grids
 - FIRE page content is no longer cut off by the bottom navigation bar on portrait mobile
 - FIRE projection chart height adapts to screen size — taller on desktop for detail, more compact on mobile so the chart fits without excessive scrolling; axis labels scale accordingly
@@ -83,28 +82,20 @@
 - Monte Carlo simulation: the percentile table now switches to a card layout on mobile — one card per year showing all five percentile values, instead of a 6-column table
 - Monte Carlo Scenario Comparison: the Bear / Base / Bull parameter cards stack vertically on mobile and tablet instead of sitting side-by-side in an unreadable layout; the header buttons no longer overflow the screen
 - Goals page: objective cards now display in a 2-column grid on mobile instead of a horizontal scrollable row — all goals are visible at a glance without swiping
-
 - Budget tab: **subtotal rows** (Subtotale Spese Fisse, Variabili, Debiti) and the **Total Expenses / Total Income** footer rows are now clickable — click any of them to open the same historical year × month deep dive panel that was previously only available for individual category rows
 - Budget tab: clicking **Total Expenses** now also shows a per-type breakdown below the aggregate view — three separate month-by-month tables (Fixed Expenses, Variable, Debt) spanning all available years, with the same red/green monthly highlighting, so you can immediately see which category drove spending in any given month
-
 - Budget tab is now fully usable on mobile — each category displays as a tappable card (tap anywhere to open a detail dialog showing budget vs actual, year-over-year delta, and historical average); sections can be expanded or collapsed with a single tap
 - The historical year-by-month deep dive ("Analisi Storica") is now a desktop-exclusive feature — mobile shows a clear "available on desktop" hint inside the item detail dialog instead of an unreadable wide table that required horizontal scrolling
 - Dividends page: the "Dividends by Asset" pie chart on mobile now shows the top 7 assets plus a grouped "Others" slice — previously all assets were shown, making the legend too long to read on small screens
 - Dividends page: the "Dividend Per Share Growth" table is now usable on mobile — tap any asset to open a dialog showing the year-by-year DPS history as a vertical list instead of a horizontally scrollable wide table
 - Dividends page: the "Total Return per Asset" table now shows a compact card layout on mobile instead of a horizontally scrolling table
 - Dividends page filter dropdowns now fill the full width of the screen on mobile for visual consistency with other form elements
-
 - Settings page is now fully usable on mobile and tablet — the tab navigation (Allocation / Preferences / Expenses / Dividends) becomes a full-width dropdown on devices below 1440px wide; form sections stack to a single column on narrow screens; subcategory target card headers no longer overflow at phone widths
-
 - Dashboard, Hall of Fame, and History pages now animate on load — metric cards, ranking cards, and chart sections slide up and fade in sequentially instead of appearing all at once
 - Collapsible sections on the Dashboard (pie charts, cost basis) and the Notes section on the History page now animate smoothly open and closed instead of snapping instantly
 - Doubling Time milestone cards on the History page appear with a staggered cascade effect; the in-progress milestone's progress bar fills in from left to right on load
 - All new animations automatically disable for users who have enabled "Reduce Motion" in their system accessibility settings
-
 - The subcategory dropdown in the Add / Edit Asset form now includes a **"Create new subcategory"** option at the bottom of the list — no need to find the separate "+" button in the header; the option appears naturally while browsing existing categories
-
-## 🔧 Improvements
-
 - Add / Edit Asset form is now fully usable on mobile and tablet — all two-column field rows (Ticker/Name, Type/Asset Class, Currency/Quantity, Coupon rate/frequency, Issue/Maturity dates, Average Cost/Tax Rate) now stack to a single column on phones and expand to two columns on wider screens
 - The step-up coupon rate schedule (BTP Valore style) now displays as two rows on phones — year range on the first row, rate and delete button on the second — instead of four cramped columns that overflowed the screen
 - The multi-broker PMC calculator rows now use a two-column layout for the quantity and price inputs at all screen sizes, with the delete button kept inline — inputs are comfortably sized even on small phones
@@ -115,3 +106,6 @@
 - The "Create new subcategory" action in the asset form is now integrated directly into the subcategory dropdown — the standalone "+" button in the field header has been removed
 - Cashflow tracking page summary cards (Total Income, Total Expenses, Net Balance, Income/Expense Ratio) now scale their font size on mobile — large amounts with 6 or more digits no longer overflow their cards on small screens
 - All filters in the Cashflow tracking section (Month, Type, Category, Subcategory, Reset) now expand to fill the full screen width on mobile — previously they only took their minimum width, leaving visible gaps. The "Month" selector and "Mese corrente" button are now paired side-by-side in one row at all screen sizes
+- "Subcategory" is now spelled consistently across all forms, dialogs, tables, and toast messages throughout the app — previously it appeared as three different variants depending on where you looked
+- The "Save Changes" button in the Add / Edit Asset dialog is now consistent with all other forms — previously it was labeled "Update" while every other dialog already used "Save Changes"
+- The sidebar, header, and bottom navigation bar now correctly adapt to light and dark mode — these components previously used fixed colors regardless of the active theme

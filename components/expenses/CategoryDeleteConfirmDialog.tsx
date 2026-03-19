@@ -265,7 +265,7 @@ export function CategoryDeleteConfirmDialog({
     }
   };
 
-  const isDeleting = subCategoryToDelete ? 'sotto-categoria' : 'categoria';
+  const isDeleting = subCategoryToDelete ? 'sottocategoria' : 'categoria';
   const nameToDelete = subCategoryToDelete
     ? subCategoryToDelete.name
     : categoryToDelete.name;
@@ -284,9 +284,9 @@ export function CategoryDeleteConfirmDialog({
           <DialogDescription className="text-base">
             {subCategoryToDelete ? (
               <>
-                La sotto-categoria <strong>&quot;{nameToDelete}&quot;</strong> è utilizzata da{' '}
+                La sottocategoria <strong>&quot;{nameToDelete}&quot;</strong> è utilizzata da{' '}
                 <strong>{expenseCount}</strong> {expenseCount === 1 ? 'spesa' : 'spese'}.
-                {' '}Seleziona una nuova categoria e sotto-categoria per riassegnare queste spese.
+                {' '}Seleziona una nuova categoria e sottocategoria per riassegnare queste spese.
               </>
             ) : (
               <>
@@ -385,17 +385,17 @@ export function CategoryDeleteConfirmDialog({
           {selectedCategoryId && filteredSubCategories.length > 0 && (
             <div className="space-y-2">
               <Label htmlFor="new-subcategory">
-                Nuova Sotto-categoria (opzionale)
+                Nuova Sottocategoria (opzionale)
               </Label>
               <Select
                 value={selectedSubCategoryId}
                 onValueChange={setSelectedSubCategoryId}
               >
                 <SelectTrigger id="new-subcategory">
-                  <SelectValue placeholder="Nessuna sotto-categoria" />
+                  <SelectValue placeholder="Nessuna sottocategoria" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">Nessuna sotto-categoria</SelectItem>
+                  <SelectItem value="__none__">Nessuna sottocategoria</SelectItem>
                   {filteredSubCategories.map((subCategory) => (
                     <SelectItem key={subCategory.id} value={subCategory.id}>
                       {subCategory.name}

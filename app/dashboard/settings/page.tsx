@@ -804,7 +804,7 @@ export default function SettingsPage() {
 
             if (validationError) {
               toast.error(
-                `Sotto-categoria "${subTarget.name}" in ${assetClassLabels[assetClass]}: ${validationError}`
+                `Sottocategoria "${subTarget.name}" in ${assetClassLabels[assetClass]}: ${validationError}`
               );
               return;
             }
@@ -1691,7 +1691,7 @@ export default function SettingsPage() {
                             <div className="flex items-center gap-3">
                               <div className="flex-1">
                                 <Input
-                                  placeholder="Nome sotto-categoria"
+                                  placeholder="Nome sottocategoria"
                                   value={target.name}
                                   onChange={(e) =>
                                     handleSubTargetChange(

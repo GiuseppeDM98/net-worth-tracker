@@ -335,7 +335,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
 
   const handleAddSubCategory = async () => {
     if (!newSubCategoryName.trim()) {
-      toast.error('Inserisci un nome per la sotto-categoria');
+      toast.error('Il nome della sottocategoria è obbligatorio');
       return;
     }
 
@@ -349,7 +349,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
 
     // Check if subcategory already exists
     if (category.subCategories.some(sub => sub.name.toLowerCase() === newSubCategoryName.trim().toLowerCase())) {
-      toast.error('Questa sotto-categoria esiste già');
+      toast.error('Questa sottocategoria esiste già');
       return;
     }
 
@@ -359,10 +359,10 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
       await loadCategories(); // Reload to get the updated category with new subcategory
       setNewSubCategoryName('');
       setShowSubCategoryInput(false);
-      toast.success('Sotto-categoria aggiunta con successo');
+      toast.success('Sottocategoria aggiunta con successo');
     } catch (error) {
       console.error('Error adding subcategory:', error);
-      toast.error('Errore nell\'aggiunta della sotto-categoria');
+      toast.error('Errore nell\'aggiunta della sottocategoria');
     } finally {
       setAddingSubCategory(false);
     }
@@ -685,10 +685,10 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
             )}
           </div>
 
-          {/* Sotto-categoria (se categoria selezionata) */}
+          {/* Sottocategoria (se categoria selezionata) */}
           {selectedCategoryId && (
             <div className="space-y-2">
-              <Label htmlFor="subCategoryId">Sotto-categoria (opzionale)</Label>
+              <Label htmlFor="subCategoryId">Sottocategoria (opzionale)</Label>
               {availableSubCategories.length > 0 && (
                 <div className="flex items-center gap-2">
                   <div className="flex-1">
@@ -700,9 +700,9 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
                       }))}
                       value={watch('subCategoryId') || ''}
                       onValueChange={(value) => setValue('subCategoryId', value || undefined)}
-                      placeholder="Seleziona sotto-categoria"
-                      searchPlaceholder="Cerca sotto-categoria..."
-                      emptyMessage="Nessuna sotto-categoria disponibile"
+                      placeholder="Seleziona sottocategoria"
+                      searchPlaceholder="Cerca sottocategoria..."
+                      emptyMessage="Nessuna sottocategoria disponibile"
                       showBadge={false}
                     />
                   </div>
@@ -711,20 +711,20 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
                     variant="outline"
                     size="icon"
                     onClick={() => setShowSubCategoryInput(true)}
-                    title="Aggiungi nuova sotto-categoria"
+                    title="Aggiungi nuova sottocategoria"
                   >
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
               )}
 
-              {/* Input per aggiungere nuova sotto-categoria */}
+              {/* Input per aggiungere nuova sottocategoria */}
               {(showSubCategoryInput || availableSubCategories.length === 0) && (
                 <div className="space-y-2 p-3 bg-muted rounded-md">
-                  <p className="text-sm font-medium">Aggiungi sotto-categoria</p>
+                  <p className="text-sm font-medium">Aggiungi sottocategoria</p>
                   <div className="flex items-center gap-2">
                     <Input
-                      placeholder="Nome sotto-categoria"
+                      placeholder="Nome sottocategoria"
                       value={newSubCategoryName}
                       onChange={(e) => setNewSubCategoryName(e.target.value)}
                       onKeyPress={(e) => {
@@ -1153,7 +1153,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
                       </p>
                     )}
                     <p className="text-xs text-muted-foreground">
-                      Es. 10 per il 10 di ogni mese
+                      Es: il 10 di ogni mese
                     </p>
                   </div>
                 </div>

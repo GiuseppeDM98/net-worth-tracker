@@ -402,7 +402,7 @@ export default function AllocationPage() {
     if (Object.keys(specificAssets).length === 0) {
       return (
         <div className="flex h-32 items-center justify-center text-gray-500 text-sm">
-          Nessun specific asset configurato per questa sotto-categoria.
+          Nessun specific asset configurato per questa sottocategoria.
         </div>
       );
     }
@@ -495,7 +495,7 @@ export default function AllocationPage() {
           <CardContent>
             {Object.keys(specificAssets).length === 0 ? (
               <div className="flex h-32 items-center justify-center text-gray-500">
-                Nessun specific asset configurato per questa sotto-categoria.
+                Nessun specific asset configurato per questa sottocategoria.
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -579,7 +579,7 @@ export default function AllocationPage() {
               • I valori correnti sono sempre 0 e le azioni sono sempre COMPRA
             </li>
             <li>
-              • Le percentuali target sono relative alla sotto-categoria {drillDown.subCategory}
+              • Le percentuali target sono relative alla sottocategoria {drillDown.subCategory}
             </li>
           </ul>
         </div>

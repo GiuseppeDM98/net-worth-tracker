@@ -370,7 +370,7 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
               <TableHead className="w-[100px]">Data</TableHead>
               <TableHead className="w-[120px]">Tipo</TableHead>
               <TableHead>Categoria</TableHead>
-              <TableHead>Sotto-categoria</TableHead>
+              <TableHead>Sottocategoria</TableHead>
               <TableHead className="text-right w-[120px]">
                 <button
                   onClick={handleSortByAmount}

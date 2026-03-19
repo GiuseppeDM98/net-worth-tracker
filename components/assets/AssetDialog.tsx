@@ -539,7 +539,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
 
     // Validate that sub-category is provided if enabled for the asset class
     if (isSubCategoryEnabled() && !data.subCategory) {
-      toast.error('La sotto-categoria è obbligatoria per questa classe di asset');
+      toast.error('La sottocategoria è obbligatoria per questa classe di asset');
       return;
     }
 
@@ -913,7 +913,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
           {isSubCategoryEnabled() && (
             <div className="space-y-2">
               <Label htmlFor="subCategory">
-                Sotto-categoria
+                Sottocategoria
                 {isSubCategoryEnabled() && availableSubCategories().length > 0 && ' *'}
               </Label>
 
@@ -964,7 +964,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                   }}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Seleziona sotto-categoria" />
+                    <SelectValue placeholder="Seleziona sottocategoria" />
                   </SelectTrigger>
                   <SelectContent>
                     {availableSubCategories().map((cat) => (
@@ -975,7 +975,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                     {availableSubCategories().length > 0 && <SelectSeparator />}
                     <SelectItem value="__create_new__" className="text-blue-600 dark:text-blue-400">
                       <Plus className="h-3.5 w-3.5" />
-                      Crea nuova sotto-categoria
+                      Crea nuova sottocategoria
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -1796,7 +1796,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
               Annulla
             </Button>
             <Button type="submit" disabled={isSubmitting || fetchingPrice}>
-              {fetchingPrice ? 'Recupero prezzo...' : isSubmitting ? 'Salvataggio...' : asset ? 'Aggiorna' : 'Crea'}
+              {fetchingPrice ? 'Recupero prezzo...' : isSubmitting ? 'Salvataggio...' : asset ? 'Salva Modifiche' : 'Crea'}
             </Button>
           </div>
         </form>

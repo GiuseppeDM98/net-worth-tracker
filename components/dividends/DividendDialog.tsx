@@ -380,7 +380,7 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
               <p className="text-sm text-red-500">{errors.sharesHeld.message}</p>
             )}
             <p className="text-xs text-muted-foreground">
-              Pre-compilato dalla quantità dell'asset
+              Precompilato con la quantità attuale dell'asset
             </p>
           </div>
 

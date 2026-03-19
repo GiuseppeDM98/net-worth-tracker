@@ -82,7 +82,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   return (
     <div
       className={cn(
-        'flex h-full w-64 flex-col bg-gray-900 text-white transition-transform duration-300 ease-in-out',
+        'flex h-full w-64 flex-col bg-sidebar text-sidebar-foreground transition-transform duration-300 ease-in-out',
         // Desktop (≥desktop): sempre relativo, sempre visibile
         'desktop:relative desktop:translate-x-0',
         // Mobile landscape SOLO (< desktop + landscape): fixed, slide in/out
@@ -99,7 +99,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       </div>
 
       {/* Mobile header */}
-      <div className="flex desktop:hidden h-16 items-center px-6 border-b border-gray-800">
+      <div className="flex desktop:hidden h-16 items-center px-6 border-b border-sidebar-border">
         <h1 className="text-xl font-bold">Portfolio Tracker</h1>
       </div>
 
@@ -114,8 +114,8 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
               className={cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-gray-800 text-white'
-                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
               )}
             >
               <item.icon className="h-5 w-5" />

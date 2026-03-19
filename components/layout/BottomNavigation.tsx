@@ -55,7 +55,7 @@ export function BottomNavigation() {
           Custom Tailwind modifiers combine screen size and orientation:
           - max-desktop:portrait: = @media (max-width: 1439px) and (orientation: portrait)
           - max-desktop:landscape:hidden = hide on landscape even if < 1440px */}
-      <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-gray-200 desktop:hidden max-desktop:portrait:flex max-desktop:landscape:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-30 bg-background border-t border-border desktop:hidden max-desktop:portrait:flex max-desktop:landscape:hidden">
         <div className="flex items-center justify-around w-full h-16">
           {primaryNavigation.map((item) => {
             const isActive = pathname === item.href;
@@ -67,7 +67,7 @@ export function BottomNavigation() {
                   'flex flex-col items-center justify-center flex-1 h-full gap-1 text-xs transition-colors',
                   isActive
                     ? 'text-blue-600 bg-blue-50'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                 )}
               >
                 <item.icon className="h-6 w-6" />
@@ -79,7 +79,7 @@ export function BottomNavigation() {
           {/* Menu Button */}
           <button
             onClick={() => setDrawerOpen(true)}
-            className="flex flex-col items-center justify-center flex-1 h-full gap-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors"
+            className="flex flex-col items-center justify-center flex-1 h-full gap-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <Menu className="h-6 w-6" />
             <span className="font-medium">Menu</span>

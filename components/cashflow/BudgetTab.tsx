@@ -1511,7 +1511,7 @@ export function BudgetTab({
                     <ProgressCell ratio={detailComp.budgetUsedRatio} inverted={detailIsIncome} />
                   </div>
                   <p className="text-xs text-center text-muted-foreground">
-                    Analisi storica mensile disponibile su desktop
+                    Disponibile solo su desktop
                   </p>
                 </div>
               </>

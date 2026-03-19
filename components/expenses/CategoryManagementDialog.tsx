@@ -184,13 +184,13 @@ export function CategoryManagementDialog({
 
   const handleAddSubCategory = () => {
     if (!newSubCategoryName.trim()) {
-      toast.error('Inserisci un nome per la sotto-categoria');
+      toast.error('Inserisci un nome per la sottocategoria');
       return;
     }
 
     // Check if subcategory already exists
     if (subCategories.some(sub => sub.name.toLowerCase() === newSubCategoryName.trim().toLowerCase())) {
-      toast.error('Questa sotto-categoria esiste già');
+      toast.error('Questa sottocategoria esiste già');
       return;
     }
 
@@ -201,7 +201,7 @@ export function CategoryManagementDialog({
 
     setSubCategories([...subCategories, newSubCategory]);
     setNewSubCategoryName('');
-    toast.success('Sotto-categoria aggiunta');
+    toast.success('Sottocategoria aggiunta');
   };
 
   const handleRemoveSubCategory = async (subCategoryId: string) => {
@@ -229,7 +229,7 @@ export function CategoryManagementDialog({
 
     // No expenses or new category, proceed with removal
     setSubCategories(subCategories.filter(sub => sub.id !== subCategoryId));
-    toast.success('Sotto-categoria rimossa');
+    toast.success('Sottocategoria rimossa');
   };
 
   const handleConfirmSubCategoryDelete = async (
@@ -253,7 +253,7 @@ export function CategoryManagementDialog({
         // Remove the subcategory from the local state
         setSubCategories(subCategories.filter(sub => sub.id !== subCategoryToDelete.id));
 
-        toast.success(`Sotto-categoria "${subCategoryToDelete.name}" eliminata. Le spese rimarranno nella categoria senza sotto-categoria.`);
+        toast.success(`Sottocategoria "${subCategoryToDelete.name}" eliminata. Le spese rimarranno nella categoria senza sottocategoria.`);
 
         // Close the dialog
         setDeleteSubCategoryDialogOpen(false);
@@ -274,7 +274,7 @@ export function CategoryManagementDialog({
       // Remove the subcategory from the local state
       setSubCategories(subCategories.filter(sub => sub.id !== subCategoryToDelete.id));
 
-      toast.success('Spese riassegnate e sotto-categoria rimossa con successo');
+      toast.success('Spese riassegnate e sottocategoria rimossa con successo');
 
       // Close the dialog
       setDeleteSubCategoryDialogOpen(false);
@@ -296,7 +296,7 @@ export function CategoryManagementDialog({
 
       if (expenseCount === 0) {
         const subCat = subCategories.find(sub => sub.id === subCategoryId);
-        toast.warning(`La sotto-categoria "${subCat?.name}" non ha transazioni da spostare`);
+        toast.warning(`La sottocategoria "${subCat?.name}" non ha transazioni da spostare`);
         return;
       }
 
@@ -536,10 +536,10 @@ export function CategoryManagementDialog({
                 </div>
               )}
 
-              {/* Input per aggiungere nuova sotto-categoria */}
+              {/* Input per aggiungere nuova sottocategoria */}
               <div className="flex items-center gap-2">
                 <Input
-                  placeholder="Nome sotto-categoria"
+                  placeholder="Nome sottocategoria"
                   value={newSubCategoryName}
                   onChange={(e) => setNewSubCategoryName(e.target.value)}
                   onKeyPress={(e) => {
@@ -559,7 +559,7 @@ export function CategoryManagementDialog({
                 </Button>
               </div>
               <p className="text-sm text-muted-foreground">
-                Premi Invio o clicca + per aggiungere una sotto-categoria
+                Premi Invio o clicca + per aggiungere una sottocategoria
               </p>
             </div>
           </div>

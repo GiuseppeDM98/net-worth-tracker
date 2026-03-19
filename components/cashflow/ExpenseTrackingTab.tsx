@@ -854,11 +854,11 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
 
                 {/* Subcategory Filter with Search */}
                 <div className="flex flex-col gap-2 desktop:min-w-[150px]">
-                  <Label htmlFor="subcategory-combobox">Sotto-categoria</Label>
+                  <Label htmlFor="subcategory-combobox">Sottocategoria</Label>
                   <div className="relative">
                     <Input
                       id="subcategory-combobox"
-                      placeholder={selectedCategoryId === 'all' ? 'Seleziona prima una categoria' : 'Cerca sotto-categoria...'}
+                      placeholder={selectedCategoryId === 'all' ? 'Seleziona prima una categoria' : 'Cerca sottocategoria...'}
                       value={searchQuerySubCategory}
                       onChange={(e) => {
                         setSearchQuerySubCategory(e.target.value);
@@ -914,7 +914,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                         type="button"
                         onClick={handleClearSubCategory}
                         className="ml-1 hover:bg-gray-200 rounded-full p-0.5 transition-colors"
-                        aria-label="Rimuovi filtro sotto-categoria"
+                        aria-label="Rimuovi filtro sottocategoria"
                       >
                         <X className="h-3 w-3 text-gray-600" />
                       </button>

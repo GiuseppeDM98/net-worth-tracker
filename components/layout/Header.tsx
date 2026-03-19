@@ -50,7 +50,7 @@ export function Header() {
   };
 
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-white px-6">
+    <header className="flex h-16 items-center justify-between border-b bg-background px-6">
       <div className="flex items-center gap-4">
         {/* User name display with fallback chain:
             1. displayName (set via Firebase profile)
@@ -59,7 +59,7 @@ export function Header() {
 
             displayName can be empty even when authenticated because Firebase
             doesn't require it during email/password sign-up. */}
-        <h2 className="text-lg font-semibold text-gray-900">
+        <h2 className="text-lg font-semibold text-foreground">
           Benvenuto, {user?.displayName || user?.email || 'Utente'}
         </h2>
       </div>
