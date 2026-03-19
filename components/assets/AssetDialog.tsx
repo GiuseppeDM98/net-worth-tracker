@@ -1097,16 +1097,17 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                   const hasSubCategories = subCategoriesForAssetClass.length > 0;
 
                   return (
-                    // flex-wrap: on mobile with subcategories, percentage+button wrap to second line
-                    // rather than causing horizontal overflow
-                    <div key={index} className="flex flex-wrap gap-2 items-start">
-                      <div className="flex-1 min-w-[130px]">
+                    // Each entry: asset class + % + delete on row 1; subcategory (full width) on row 2 if present.
+                    // Two-call pattern for onValueChange was a stale-closure bug — batch both fields in one setComposition.
+                    <div key={index} className="space-y-2">
+                      <div className="grid grid-cols-[1fr_5rem_auto] gap-2 items-center">
                         <Select
                           value={comp.assetClass}
                           onValueChange={(value) => {
-                            updateCompositionEntry(index, 'assetClass', value as AssetClass);
-                            // Reset subCategory when asset class changes
-                            updateCompositionEntry(index, 'subCategory', undefined);
+                            // Single setComposition call to avoid stale-closure overwrite
+                            const updated = [...composition];
+                            updated[index] = { ...updated[index], assetClass: value as AssetClass, subCategory: undefined };
+                            setComposition(updated);
                           }}
                         >
                           <SelectTrigger>
@@ -1120,29 +1121,6 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                             ))}
                           </SelectContent>
                         </Select>
-                      </div>
-                      {hasSubCategories && (
-                        <div className="flex-1 min-w-[130px]">
-                          <Select
-                            value={comp.subCategory || ''}
-                            onValueChange={(value) =>
-                              updateCompositionEntry(index, 'subCategory', value || undefined)
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Sottocategoria" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {subCategoriesForAssetClass.map((cat) => (
-                                <SelectItem key={cat} value={cat}>
-                                  {cat}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-                      <div className="w-20 shrink-0">
                         <Input
                           type="number"
                           step="0.01"
@@ -1158,16 +1136,35 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                             )
                           }
                         />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="shrink-0"
+                          onClick={() => removeCompositionEntry(index)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="shrink-0"
-                        onClick={() => removeCompositionEntry(index)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                      {hasSubCategories && (
+                        <Select
+                          value={comp.subCategory || ''}
+                          onValueChange={(value) =>
+                            updateCompositionEntry(index, 'subCategory', value || undefined)
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sottocategoria" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {subCategoriesForAssetClass.map((cat) => (
+                              <SelectItem key={cat} value={cat}>
+                                {cat}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
                     </div>
                   );
                 })}
