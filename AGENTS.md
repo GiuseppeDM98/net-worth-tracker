@@ -237,8 +237,18 @@ For dialogs with long forms or variable-length content, keep header and footer a
 ### Nullish `??` vs Falsy `||` for Snapshot Fallbacks
 **Symptom**: Asset value history shows "0,00€". **Fix**: Use `||` when `0` is semantically invalid (e.g. `totalValue || (price * qty)` in `assetPriceHistoryUtils.ts`).
 
-### Recharts Legend Color with Cell Overrides
-**Symptom**: `<Legend>` shows black square for a bar using `<Cell>` for conditional coloring. **Fix**: Always set `fill` on `<Bar>` to the default color — `<Cell>` overrides individual bars but `<Legend>` reads `<Bar>` directly.
+### Recharts Legend and Tooltip Color with Cell Overrides
+**Symptom**: `<Legend>` shows black square, or `<Tooltip>` shows wrong color, for a bar using `<Cell>` for conditional coloring. **Fix**: Always set `fill` on `<Bar>` to the default color — `<Cell>` overrides individual bars but `<Legend>` and `<Tooltip>` both read `<Bar fill>` directly, not from `<Cell>`.
+
+### Recharts Tooltip `itemStyle` Color Override
+**Symptom**: All tooltip items render in the same neutral text color instead of matching their series color (line stroke / bar fill). **Fix**: Do not set `color` inside `itemStyle` — Recharts automatically colors each item's text with its series color. Only set `fontSize` and `padding` if needed:
+```tsx
+// ✅ Correct — series color applied automatically per item
+itemStyle={{ fontSize: '14px', padding: '2px 0' }}
+
+// ❌ Wrong — overrides per-series color for all items
+itemStyle={{ fontSize: '14px', padding: '2px 0', color: 'var(--card-foreground)' }}
+```
 
 ### Recharts ResponsiveContainer Inside Hidden Radix Tab
 **Symptom**: Console warning `The width(-1) and height(-1)`. **Fix**: Use explicit pixel height: `<ResponsiveContainer width="100%" height={300}>`. Never `height="100%"` inside inactive tabs.

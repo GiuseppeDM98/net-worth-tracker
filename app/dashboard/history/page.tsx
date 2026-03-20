@@ -625,7 +625,6 @@ export default function HistoryPage() {
                   itemStyle={{
                     fontSize: isMobile ? '14px' : '16px',
                     padding: '2px 0',
-                    color: 'var(--card-foreground)',
                   }}
                   cursor={{ stroke: '#3B82F6', strokeWidth: 1, strokeDasharray: '5 5' }}
                 />
@@ -859,7 +858,6 @@ export default function HistoryPage() {
                     itemStyle={{
                       fontSize: isMobile ? '14px' : '16px',
                       padding: '2px 0',
-                      color: 'var(--card-foreground)',
                     }}
                     cursor={{ fill: 'rgba(255,255,255,0.06)' }}
                   />
@@ -959,7 +957,6 @@ export default function HistoryPage() {
                     itemStyle={{
                       fontSize: isMobile ? '14px' : '16px',
                       padding: '2px 0',
-                      color: 'var(--card-foreground)',
                     }}
                     cursor={{ fill: 'rgba(255,255,255,0.06)' }}
                   />
@@ -1090,7 +1087,6 @@ export default function HistoryPage() {
                     itemStyle={{
                       fontSize: isMobile ? '14px' : '16px',
                       padding: '2px 0',
-                      color: 'var(--card-foreground)',
                     }}
                     cursor={{ fill: 'rgba(255,255,255,0.06)' }}
                   />
@@ -1151,7 +1147,6 @@ export default function HistoryPage() {
                     itemStyle={{
                       fontSize: isMobile ? '14px' : '16px',
                       padding: '2px 0',
-                      color: 'var(--card-foreground)',
                     }}
                     cursor={{ fill: 'rgba(255,255,255,0.06)' }}
                   />
@@ -1250,7 +1245,6 @@ export default function HistoryPage() {
                   itemStyle={{
                     fontSize: isMobile ? '14px' : '16px',
                     padding: '2px 0',
-                    color: 'var(--card-foreground)',
                   }}
                   cursor={{ fill: 'rgba(255,255,255,0.06)' }}
                 />
@@ -1262,9 +1256,11 @@ export default function HistoryPage() {
                   iconSize={isMobile ? 8 : 10}
                   fontSize={isMobile ? 11 : 12}
                 />
+                {/* fill="#10B981" sets legend/tooltip color; Cell overrides each bar's actual color */}
                 <Bar
                   dataKey={showYoYPercentage ? 'variationPercentage' : 'variation'}
                   name="Variazione"
+                  fill="#10B981"
                   isAnimationActive={false}
                 >
                   {yoyVariationData.map((entry, index) => (
@@ -1373,7 +1369,6 @@ export default function HistoryPage() {
                     itemStyle={{
                       fontSize: isMobile ? '14px' : '16px',
                       padding: '2px 0',
-                      color: 'var(--card-foreground)',
                     }}
                     cursor={{ fill: 'rgba(255,255,255,0.06)' }}
                   />
@@ -1447,7 +1442,6 @@ export default function HistoryPage() {
                     itemStyle={{
                       fontSize: isMobile ? '14px' : '16px',
                       padding: '2px 0',
-                      color: 'var(--card-foreground)',
                     }}
                     cursor={{ fill: 'rgba(255,255,255,0.06)' }}
                   />
