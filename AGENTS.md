@@ -179,6 +179,9 @@ return (
 );
 ```
 
+- **Simple loading state (no skeleton)**: Use `<Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />` inside a height placeholder (`h-64`) to prevent layout shift. Never use `<div className="text-gray-500">Caricamento...</div>` — it is invisible in dark mode and provides no visual feedback.
+- **`Loader2` vs `RefreshCw`**: `Loader2 animate-spin` = initial mount loading (data not yet arrived). `RefreshCw animate-spin` = user-triggered active refresh (cashflow, filters). Never interchange them — they have different semantic meaning.
+
 ### Framer Motion Animation Patterns
 - **Shared variants**: `lib/utils/motionVariants.ts` — never define variants inline
 - **Stagger + conditional elements**: use explicit `transition={{ delay: index * 0.1 }}` per card — parent stagger counts ALL children including conditional slots
@@ -304,4 +307,4 @@ When an icon switches between TrendingUp/TrendingDown (or similar) based on a va
 </Alert>
 ```
 
-**Last updated**: 2026-03-20 (session 07: sticky dialog pattern, overflow-y-auto/absolute gotcha, Vitest cache fix)
+**Last updated**: 2026-03-20 (session 08: Loader2 vs RefreshCw loading state rule)

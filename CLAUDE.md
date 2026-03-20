@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio, framer-motion
-- Ultima implementazione: **Dialog UX Polish** — Sticky header/footer in `AssetDialog`, `ExpenseDialog`, `CategoryDeleteConfirmDialog` (`flex flex-col p-0`, `shrink-0`, `overflow-y-auto` sul body). Dark mode fix `ExpenseCard` (colori gray + importi `dark:text-red-400`/`dark:text-green-400`). Fix `CategoryDeleteConfirmDialog`: dropdown dark, dialog `max-w-lg`, pulsanti verticali full-width, rimosso `overflow-y-auto` dal body (clippava dropdown assolute). (2026-03-20)
-- Precedente: **Typography & Emoji Cleanup** — Sostituiti 6 emoji con icone Lucide in `FireCalculatorTab`; rimossa emoji `💡` inline in `CurrentYearTab`. (2026-03-20)
+- Ultima implementazione: **Loading States Consistency** — Sostituito `<div className="text-gray-500">Caricamento...</div>` con `<Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />` in `GoalBasedInvestingTab`, `FireCalculatorTab`, `MonteCarloTab`, `app/dashboard/page.tsx` (3 istanze). `DividendStats` già su `DividendStatsSkeleton`. (2026-03-20)
+- Precedente: **Dialog UX Polish** — Sticky header/footer in `AssetDialog`, `ExpenseDialog`, `CategoryDeleteConfirmDialog`. Dark mode fix `ExpenseCard`. Fix `CategoryDeleteConfirmDialog`: dropdown dark, pulsanti verticali full-width. (2026-03-20)
 
 ## Architecture Snapshot
 - App Router con pagine protette sotto `app/dashboard/*`.

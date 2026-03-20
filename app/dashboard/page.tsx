@@ -42,7 +42,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Wallet, TrendingUp, PieChart, DollarSign, Camera, TrendingDown, Receipt, ChevronDown } from 'lucide-react';
+import { Wallet, TrendingUp, PieChart, DollarSign, Camera, TrendingDown, Receipt, ChevronDown, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useSnapshots, useCreateSnapshot } from '@/lib/hooks/useSnapshots';
@@ -370,7 +370,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="text-gray-500 dark:text-gray-400">Caricamento...</div>
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -645,7 +645,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {loadingExpenses ? (
-              <div className="text-sm text-muted-foreground">Caricamento...</div>
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             ) : expenseStats ? (
               <>
                 <div className="text-2xl font-bold text-green-600">
@@ -675,7 +675,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {loadingExpenses ? (
-              <div className="text-sm text-muted-foreground">Caricamento...</div>
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             ) : expenseStats ? (
               <>
                 <div className="text-2xl font-bold text-red-600">

@@ -60,7 +60,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { TrendingUp, TrendingDown, Calendar, DollarSign, Percent, Clock, BarChart3, Target, Info, AlertTriangle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Calendar, DollarSign, Percent, Clock, BarChart3, Target, Info, AlertTriangle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   LineChart,
@@ -173,7 +173,7 @@ export function FireCalculatorTab() {
   if (isLoadingSettings || isLoadingAssets || (currentNetWorth > 0 && isLoadingFIRE)) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="text-gray-500 dark:text-gray-400">Caricamento...</div>
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }

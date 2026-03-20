@@ -131,3 +131,4 @@
 - Login and registration pages now fully match the app's dark mode design — the background uses the same dark gray as the main dashboard, cards are properly styled with dark borders and backgrounds, and text colors are consistent with the rest of the interface
 - Login and registration pages now display the app's logo above the sign-in form, along with the "Portfolio Tracker" title — bringing these pages in line with the visual identity of the rest of the app
 - Links on the Login and Registration pages now use the app's emerald brand color instead of blue, consistent with the rest of the interface
+- Loading indicators on the Dashboard, FIRE Calculator, Monte Carlo, and Goal-Based Investing pages now show an animated spinner instead of a static "Caricamento..." text — the spinner is visible and clearly communicates the loading state in both light and dark mode
