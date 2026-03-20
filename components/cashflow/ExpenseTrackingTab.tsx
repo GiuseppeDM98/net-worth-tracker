@@ -78,7 +78,6 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   const queryClient = useQueryClient();
   const currentYear = new Date().getFullYear();
   const currentMonth = String(new Date().getMonth() + 1); // 1-based month (1-12)
-  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
@@ -209,14 +208,9 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   // Check if any filter is active
   const hasActiveFilters = selectedMonth !== 'all' || selectedType !== 'all' || selectedCategoryId !== 'all' || selectedSubCategoryId !== 'all';
 
-  // Filter expenses based on selectedYear and selectedMonth (in-memory filtering)
-  useEffect(() => {
-    if (!allExpenses.length) {
-      setExpenses([]);
-      return;
-    }
-
-    const filtered = allExpenses.filter(expense => {
+  // Derive year+month slice from allExpenses synchronously — no extra render on filter change.
+  const expenses = useMemo(() => {
+    return allExpenses.filter(expense => {
       const date = expense.date instanceof Date ? expense.date : expense.date.toDate();
       const expenseYear = date.getFullYear();
       const expenseMonth = date.getMonth() + 1; // 1-based
@@ -226,8 +220,6 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
 
       return true;
     });
-
-    setExpenses(filtered);
   }, [allExpenses, selectedYear, selectedMonth]);
 
   /**

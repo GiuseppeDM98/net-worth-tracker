@@ -12,7 +12,8 @@
  */
 'use client';
 
-import { useEffect, useState} from 'react';
+import { useEffect, useState } from 'react';
+import { DividendStatsSkeleton } from './DividendStatsSkeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -193,15 +194,10 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-gray-500">Caricamento statistiche...</div>
-      </div>
-    );
-  }
-
+  // Skeleton on first load (no data yet): mirrors real layout to avoid height jump.
+  // On subsequent filter changes the section stays visible (dimmed) while refetching.
   if (!stats) {
+    if (loading) return <DividendStatsSkeleton />;
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="text-gray-500">Nessuna statistica disponibile</div>
@@ -210,7 +206,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
   }
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 transition-opacity duration-200 ${loading ? 'opacity-50 pointer-events-none' : ''}`}>
       {/* Metric Cards Row 1: Period Stats */}
       <div className="grid gap-4 grid-cols-1 desktop:grid-cols-3">
         <Card>

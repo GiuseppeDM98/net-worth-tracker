@@ -25,6 +25,7 @@
  */
 
 import { useState, useMemo, useEffect } from 'react';
+import { formatCurrency } from '@/lib/utils/formatters';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
@@ -72,13 +73,6 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
   const [sortBy, setSortBy] = useState<'asc' | 'desc' | null>(null);
 
   // ========== Formatting Utilities ==========
-
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('it-IT', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(Math.abs(amount));
-  };
 
   const formatDate = (date: Date | string | Timestamp): string => {
     const dateObj = date instanceof Date ? date : (date instanceof Timestamp ? date.toDate() : new Date(date));
@@ -428,7 +422,7 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
                   ) : (
                     <TrendingDown className="h-4 w-4" />
                   )}
-                  <span>{formatCurrency(expense.amount)}</span>
+                  <span>{formatCurrency(Math.abs(expense.amount))}</span>
                 </div>
               </TableCell>
               <TableCell className="text-sm text-muted-foreground max-w-[200px]">

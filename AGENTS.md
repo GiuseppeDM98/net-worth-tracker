@@ -142,6 +142,29 @@ Only use `useEffect` for side effects (API calls, subscriptions, DOM mutations).
 - All metric functions that annualize **must use `calculateMonthsDifference(periodEnd, periodStart)`** — NOT `snapshots.length - 1`
 - Each chart function handles baseline exclusion independently (heatmap: `i=1`; chart: `.slice(1)`; underwater: `continue at i===0`)
 
+### Skeleton Loading Pattern
+Build skeleton screens that mirror the real layout to avoid layout shift and provide visual continuity:
+- **File convention**: `ComponentSkeleton.tsx` alongside the real component
+- **Primitive**: `SkeletonBar` with `motion-safe:animate-pulse motion-reduce:opacity-40` + `animationDelay` style for stagger wave
+- **Stagger**: left-to-right wave via per-element `delayMs`; later sections start after earlier ones (e.g. 0ms, 100ms, 200ms… 800ms)
+- **Dynamic heights**: use a plain `<div style={{ height }}` with the pulse classes instead of routing through `SkeletonBar` — Tailwind needs static class names, can't interpolate pixel values
+- **Two-phase loading** (outer Firestore fetch + inner API fetch): reuse the SAME skeleton component for both so the two loading states fuse into one continuous animation — no visible join
+- **Stale-while-revalidate** on filter changes: gate the full-page skeleton on `!data` (first load only); on subsequent fetches keep old data visible with `opacity-50 pointer-events-none transition-opacity duration-200`
+
+```tsx
+// First load only → skeleton
+if (!stats) {
+  if (loading) return <MyComponentSkeleton />;
+  return <EmptyState />;
+}
+// Filter refetch → dim existing content
+return (
+  <div className={loading ? 'opacity-50 pointer-events-none transition-opacity duration-200' : ''}>
+    {/* real content */}
+  </div>
+);
+```
+
 ### Framer Motion Animation Patterns
 - **Shared variants**: `lib/utils/motionVariants.ts` — never define variants inline
 - **Stagger + conditional elements**: use explicit `transition={{ delay: index * 0.1 }}` per card — parent stagger counts ALL children including conditional slots
@@ -217,4 +240,4 @@ When an icon switches between TrendingUp/TrendingDown (or similar) based on a va
 }
 ```
 
-**Last updated**: 2026-03-20 (session 03: motion-safe pattern, next-themes theme vs resolvedTheme)
+**Last updated**: 2026-03-20 (session 04: skeleton loading pattern + stale-while-revalidate)

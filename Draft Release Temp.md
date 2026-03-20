@@ -36,6 +36,9 @@
 
 ## 🔧 Improvements
 
+- The Dividends & Coupons tab now shows a skeleton loading screen when first opened — the placeholder mirrors the exact layout of the real page (metric cards, charts, tables) so the page feels faster and content appears without layout jumps
+- Changing asset or date filters on the Dividends page no longer blanks out the charts and tables while recalculating — existing data stays visible (slightly dimmed) while the updated statistics load in the background
+
 - Metric card entrance animations on the Performance page now respect the system's "Reduce Motion" accessibility preference — slide-in and fade-in effects are skipped for users who have enabled reduced motion in their OS settings
 
 - When editing an asset's quantity, the form now shows a contextual reminder if the quantity increases ("did you invest new capital? record a cashflow income entry") or decreases ("did you sell this asset? record a cashflow expense entry") — helps keep performance metrics (TWR, CAGR) accurate by ensuring capital flows are properly tracked. The reminder does not appear for cash assets or when the quantity is unchanged
