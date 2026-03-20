@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio, framer-motion
-- Ultima implementazione: **History Tooltip Colors** — Rimosso `color: 'var(--card-foreground)'` da `itemStyle` in tutti gli 8 `<Tooltip>` di `app/dashboard/history/page.tsx`; aggiunto `fill="#10B981"` alla `<Bar>` del grafico YoY (mancante). Ora ogni serie mostra il proprio colore nel tooltip. (2026-03-20)
+- Ultima implementazione: **Tooltip Colors Fix** — History page: rimosso `color` da `itemStyle` in 8 tooltip + `fill` alla `<Bar>` YoY. Overview: custom tooltip in `components/ui/pie-chart.tsx` che legge `entry.payload.color` (PieChart non propaga il colore delle `<Cell>` automaticamente). (2026-03-20)
 - Precedente: **Loading States Consistency** — Sostituito `<div className="text-gray-500">Caricamento...</div>` con `<Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />` in `GoalBasedInvestingTab`, `FireCalculatorTab`, `MonteCarloTab`, `app/dashboard/page.tsx` (3 istanze). (2026-03-20)
 
 ## Architecture Snapshot

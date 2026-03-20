@@ -240,15 +240,34 @@ For dialogs with long forms or variable-length content, keep header and footer a
 ### Recharts Legend and Tooltip Color with Cell Overrides
 **Symptom**: `<Legend>` shows black square, or `<Tooltip>` shows wrong color, for a bar using `<Cell>` for conditional coloring. **Fix**: Always set `fill` on `<Bar>` to the default color — `<Cell>` overrides individual bars but `<Legend>` and `<Tooltip>` both read `<Bar fill>` directly, not from `<Cell>`.
 
-### Recharts Tooltip `itemStyle` Color Override
-**Symptom**: All tooltip items render in the same neutral text color instead of matching their series color (line stroke / bar fill). **Fix**: Do not set `color` inside `itemStyle` — Recharts automatically colors each item's text with its series color. Only set `fontSize` and `padding` if needed:
-```tsx
-// ✅ Correct — series color applied automatically per item
-itemStyle={{ fontSize: '14px', padding: '2px 0' }}
+### Recharts Tooltip Color — Three Distinct Cases
+Tooltip item coloring works differently per chart type:
 
-// ❌ Wrong — overrides per-series color for all items
+**Line / Area / Bar**: Recharts auto-colors each tooltip item text with the series `stroke`/`fill`. Do NOT set `color` in `itemStyle` or `contentStyle` — it will cascade and override the per-series colors:
+```tsx
+// ✅ Correct
+itemStyle={{ fontSize: '14px', padding: '2px 0' }}
+// ❌ Wrong — overrides all item colors
 itemStyle={{ fontSize: '14px', padding: '2px 0', color: 'var(--card-foreground)' }}
 ```
+
+**PieChart with `<Cell>`**: Recharts does NOT auto-color tooltip items from `<Cell fill>`. Use a custom tooltip that reads `entry.payload.color` explicitly:
+```tsx
+<Tooltip
+  content={({ active, payload }) => {
+    if (!active || !payload?.length) return null;
+    const entry = payload[0];
+    const color = (entry.payload as any)?.color ?? entry.color;
+    return (
+      <div style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '4px', padding: '8px 12px', fontSize: '14px' }}>
+        <span style={{ color }}>{entry.name} : {formatCurrency(entry.value as number)}</span>
+      </div>
+    );
+  }}
+/>
+```
+
+**contentStyle `color` cascades**: Setting `color` on `contentStyle` propagates via CSS to all child text — same override problem as `itemStyle.color`. Only set `backgroundColor`, `border`, `borderRadius` in `contentStyle`.
 
 ### Recharts ResponsiveContainer Inside Hidden Radix Tab
 **Symptom**: Console warning `The width(-1) and height(-1)`. **Fix**: Use explicit pixel height: `<ResponsiveContainer width="100%" height={300}>`. Never `height="100%"` inside inactive tabs.

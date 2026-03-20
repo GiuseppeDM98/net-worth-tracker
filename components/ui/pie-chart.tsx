@@ -51,13 +51,26 @@ export function PieChart({ data }: PieChartProps) {
             <Cell key={`cell-${index}`} fill={entry.color} />
           ))}
         </Pie>
+        {/*
+          PieChart tooltips don't auto-color item text from <Cell fill> like Line/Area/Bar do.
+          A custom tooltip is needed to explicitly read the color from the hovered slice payload.
+        */}
         <Tooltip
-          formatter={(value: number) => formatCurrency(value)}
-          contentStyle={{
-            backgroundColor: 'var(--card)',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            color: 'var(--card-foreground)',
+          content={({ active, payload }) => {
+            if (!active || !payload || !payload.length) return null;
+            const entry = payload[0];
+            const color = (entry.payload as any)?.color ?? entry.color;
+            return (
+              <div style={{
+                backgroundColor: 'var(--card)',
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+                padding: '8px 12px',
+                fontSize: '14px',
+              }}>
+                <span style={{ color }}>{entry.name} : {formatCurrency(entry.value as number)}</span>
+              </div>
+            );
           }}
         />
         <Legend
