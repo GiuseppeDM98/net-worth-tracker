@@ -87,38 +87,52 @@ export default function RegisterPage() {
     }
   };
 
+  const branding = (
+    <div className="text-center space-y-2">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/favicon/favicon-48x48.png" alt="Portfolio Tracker" className="w-12 h-12 mx-auto" />
+      <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Portfolio Tracker</h1>
+      <p className="text-sm text-gray-500 dark:text-gray-400">Gestisci il tuo patrimonio</p>
+    </div>
+  );
+
   // If registrations are completely disabled, show a different UI
   if (areRegistrationsDisabled) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-950 dark:to-gray-900 p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold">Registrazione Disabilitata</CardTitle>
-            <CardDescription>
-              Le registrazioni sono attualmente chiuse.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-gray-600 mb-4">
-              Se hai già un account, puoi accedere usando le tue credenziali.
-            </p>
-            <Link href="/login">
-              <Button className="w-full">
-                Vai alla pagina di accesso
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950 p-4">
+        <div className="w-full max-w-md space-y-6">
+          {branding}
+          <Card className="w-full border-gray-200 dark:border-gray-800 dark:bg-gray-900 shadow-sm">
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100">Registrazione Disabilitata</CardTitle>
+              <CardDescription className="text-gray-500 dark:text-gray-400">
+                Le registrazioni sono attualmente chiuse.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                Se hai già un account, puoi accedere usando le tue credenziali.
+              </p>
+              <Link href="/login">
+                <Button className="w-full">
+                  Vai alla pagina di accesso
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-950 dark:to-gray-900 p-4">
-      <Card className="w-full max-w-md">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950 p-4">
+      <div className="w-full max-w-md space-y-6">
+        {branding}
+      <Card className="w-full border-gray-200 dark:border-gray-800 dark:bg-gray-900 shadow-sm">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">Registrati</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100">Registrati</CardTitle>
+          <CardDescription className="text-gray-500 dark:text-gray-400">
             Crea un nuovo account per iniziare a tracciare il tuo portfolio
           </CardDescription>
         </CardHeader>
@@ -236,14 +250,15 @@ export default function RegisterPage() {
             Registrati con Google
           </Button>
 
-          <div className="mt-4 text-center text-sm">
+          <div className="mt-4 text-center text-sm text-gray-600 dark:text-gray-400">
             Hai già un account?{' '}
-            <Link href="/login" className="text-blue-600 dark:text-blue-400 hover:underline">
+            <Link href="/login" className="text-emerald-600 dark:text-emerald-400 hover:underline font-medium">
               Accedi
             </Link>
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

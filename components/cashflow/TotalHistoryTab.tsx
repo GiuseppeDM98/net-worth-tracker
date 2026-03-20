@@ -68,6 +68,37 @@ const ITALIAN_MONTHS = [
   'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
 ];
 
+// Custom tooltip: dark-mode-aware background via Tailwind tokens, series colors preserved.
+const ChartTooltip = ({
+  active,
+  payload,
+  label,
+  formatter,
+}: {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; color?: string; fill?: string; payload?: { fill?: string } }>;
+  label?: string | number;
+  formatter?: (value: number) => string;
+}) => {
+  if (!active || !payload || !payload.length) return null;
+  const fmt = formatter ?? formatCurrency;
+  return (
+    <div className="rounded-md border border-border bg-popover px-3 py-2 shadow-md text-sm min-w-[140px]">
+      {label !== undefined && (
+        <p className="font-medium text-popover-foreground mb-1">{label}</p>
+      )}
+      {payload.map((entry, index) => {
+        const color = entry.color || entry.fill || entry.payload?.fill || 'var(--popover-foreground)';
+        return (
+          <p key={index} className="tabular-nums" style={{ color }}>
+            {entry.name} : {fmt(entry.value)}
+          </p>
+        );
+      })}
+    </div>
+  );
+};
+
 type DrillDownLevel = 'category' | 'subcategory' | 'expenseList';
 type ChartType = 'expenses' | 'income';
 
@@ -1100,14 +1131,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                                   />
                                 ))}
                               </Pie>
-                              <Tooltip
-                                formatter={(value: number) => formatCurrency(value)}
-                                contentStyle={{
-                                  backgroundColor: 'white',
-                                  border: '1px solid #ccc',
-                                  borderRadius: '4px',
-                                }}
-                              />
+                              <Tooltip content={<ChartTooltip />} />
                               <Legend
                                 layout={isMobile ? 'horizontal' : 'vertical'}
                                 align={isMobile ? 'center' : 'right'}
@@ -1152,14 +1176,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                                   />
                                 ))}
                               </Pie>
-                              <Tooltip
-                                formatter={(value: number) => formatCurrency(value)}
-                                contentStyle={{
-                                  backgroundColor: 'white',
-                                  border: '1px solid #ccc',
-                                  borderRadius: '4px',
-                                }}
-                              />
+                              <Tooltip content={<ChartTooltip />} />
                               <Legend
                                 layout={isMobile ? 'horizontal' : 'vertical'}
                                 align={isMobile ? 'center' : 'right'}
@@ -1290,14 +1307,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                                 <Cell key={`cell-${index}`} fill={entry.color} />
                               ))}
                             </Pie>
-                            <Tooltip
-                              formatter={(value: number) => formatCurrency(value)}
-                              contentStyle={{
-                                backgroundColor: 'white',
-                                border: '1px solid #ccc',
-                                borderRadius: '4px',
-                              }}
-                            />
+                            <Tooltip content={<ChartTooltip />} />
                             <Legend
                               layout={isMobile ? 'horizontal' : 'vertical'}
                               align={isMobile ? 'center' : 'right'}
@@ -1367,14 +1377,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                                   />
                                 ))}
                               </Pie>
-                              <Tooltip
-                                formatter={(value: number) => formatCurrency(value)}
-                                contentStyle={{
-                                  backgroundColor: 'white',
-                                  border: '1px solid #ccc',
-                                  borderRadius: '4px',
-                                }}
-                              />
+                              <Tooltip content={<ChartTooltip />} />
                               <Legend
                                 layout={isMobile ? 'horizontal' : 'vertical'}
                                 align={isMobile ? 'center' : 'right'}
@@ -1414,14 +1417,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                                   />
                                 ))}
                               </Pie>
-                              <Tooltip
-                                formatter={(value: number) => formatCurrency(value)}
-                                contentStyle={{
-                                  backgroundColor: 'white',
-                                  border: '1px solid #ccc',
-                                  borderRadius: '4px',
-                                }}
-                              />
+                              <Tooltip content={<ChartTooltip />} />
                               <Legend
                                 layout={isMobile ? 'horizontal' : 'vertical'}
                                 align={isMobile ? 'center' : 'right'}
@@ -1570,14 +1566,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                       domain={[-100, 100]}
                       allowDataOverflow
                     />
-                  <Tooltip
-                    formatter={(value: number) => `${value.toFixed(2)}%`}
-                    contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px',
-                    }}
-                  />
+                  <Tooltip content={<ChartTooltip formatter={(v) => `${v.toFixed(2)}%`} />} />
                   <Legend />
                   <ReferenceLine y={0} stroke="#6b7280" strokeDasharray="4 4" />
                   <Line type="monotone" dataKey="Entrate %" stroke="#10b981" strokeWidth={2} name="Entrate %" dot={!isMobile} />
@@ -1589,14 +1578,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" tick={axisTickProps} {...xAxisProps} />
                     <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
-                    <Tooltip
-                      formatter={(value: number) => formatCurrency(value)}
-                      contentStyle={{
-                        backgroundColor: 'white',
-                        border: '1px solid #ccc',
-                        borderRadius: '4px',
-                      }}
-                    />
+                    <Tooltip content={<ChartTooltip />} />
                     <Legend />
                     <Line type="monotone" dataKey="Entrate" stroke="#10b981" strokeWidth={2} dot={!isMobile} />
                     <Line type="monotone" dataKey="Spese" stroke="#ef4444" strokeWidth={2} dot={!isMobile} />
@@ -1634,14 +1616,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                       domain={[-100, 100]}
                       allowDataOverflow
                     />
-                  <Tooltip
-                    formatter={(value: number) => `${value.toFixed(2)}%`}
-                    contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px',
-                    }}
-                  />
+                  <Tooltip content={<ChartTooltip formatter={(v) => `${v.toFixed(2)}%`} />} />
                   <Legend />
                   <ReferenceLine y={0} stroke="#6b7280" strokeDasharray="4 4" />
                   <Line type="monotone" dataKey="Entrate %" stroke="#10b981" strokeWidth={2} name="Entrate %" dot={!isMobile} />
@@ -1653,14 +1628,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="year" tick={axisTickProps} {...xAxisProps} />
                     <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
-                    <Tooltip
-                      formatter={(value: number) => formatCurrency(value)}
-                      contentStyle={{
-                        backgroundColor: 'white',
-                        border: '1px solid #ccc',
-                        borderRadius: '4px',
-                      }}
-                    />
+                    <Tooltip content={<ChartTooltip />} />
                     <Legend />
                     <Line type="monotone" dataKey="Entrate" stroke="#10b981" strokeWidth={2} dot={!isMobile} />
                     <Line type="monotone" dataKey="Spese" stroke="#ef4444" strokeWidth={2} dot={!isMobile} />
@@ -1687,14 +1655,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                     tickFormatter={(value) => value.toFixed(2)}
                     domain={[0, 'auto']}
                   />
-                  <Tooltip
-                    formatter={(value: number) => value.toFixed(2)}
-                    contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px',
-                    }}
-                  />
+                  <Tooltip content={<ChartTooltip formatter={(v) => v.toFixed(2)} />} />
                   <Legend content={renderLegendContent(isMobile ? 3 : undefined)} />
                   {/* Colored zones */}
                   <ReferenceArea y1={1.2} y2={5} fill="#10b981" fillOpacity={0.1} />
@@ -1758,14 +1719,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" tick={axisTickProps} {...xAxisProps} />
                   <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
-                  <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
-                    contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px',
-                    }}
-                  />
+                  <Tooltip content={<ChartTooltip />} />
                   <Legend content={renderLegendContent(isMobile ? 3 : undefined)} />
                   <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.fixed} stroke="#3b82f6" strokeWidth={2} dot={!isMobile} />
                   <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.variable} stroke="#8b5cf6" strokeWidth={2} dot={!isMobile} />
@@ -1788,14 +1742,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="year" tick={axisTickProps} {...xAxisProps} />
                   <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
-                  <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
-                    contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px',
-                    }}
-                  />
+                  <Tooltip content={<ChartTooltip />} />
                   <Legend content={renderLegendContent(isMobile ? 3 : undefined)} />
                   <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.fixed} stroke="#3b82f6" strokeWidth={2} dot={!isMobile} />
                   <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.variable} stroke="#8b5cf6" strokeWidth={2} dot={!isMobile} />
@@ -1829,14 +1776,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" tick={axisTickProps} {...xAxisProps} />
                   <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
-                  <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
-                    contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px',
-                    }}
-                  />
+                  <Tooltip content={<ChartTooltip />} />
                   <Legend content={renderLegendContent(isMobile ? 3 : undefined)} />
                   {monthlyExpensesByCategory.categories.filter(cat => cat !== 'Altro').map((category, index) => (
                     <Line
@@ -1865,14 +1805,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="year" tick={axisTickProps} {...xAxisProps} />
                   <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
-                  <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
-                    contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px',
-                    }}
-                  />
+                  <Tooltip content={<ChartTooltip />} />
                   <Legend />
                   {yearlyExpensesByCategory.categories.filter(cat => cat !== 'Altro').map((category, index) => (
                     <Line
@@ -1912,14 +1845,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" tick={axisTickProps} {...xAxisProps} />
                   <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
-                  <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
-                    contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px',
-                    }}
-                  />
+                  <Tooltip content={<ChartTooltip />} />
                   <Legend />
                   {monthlyIncomeByCategory.categories.filter(cat => cat !== 'Altro').map((category, index) => (
                     <Line
@@ -1948,14 +1874,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="year" tick={axisTickProps} {...xAxisProps} />
                   <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
-                  <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
-                    contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px',
-                    }}
-                  />
+                  <Tooltip content={<ChartTooltip />} />
                   <Legend />
                   {yearlyIncomeByCategory.categories.filter(cat => cat !== 'Altro').map((category, index) => (
                     <Line

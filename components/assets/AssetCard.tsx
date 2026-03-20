@@ -99,22 +99,22 @@ export function AssetCard({
     ? 'text-green-600'
     : isNegative
     ? 'text-red-600'
-    : 'text-gray-600';
+    : 'text-gray-600 dark:text-gray-400';
 
   return (
-    <Card className={isManualPrice ? 'bg-amber-50' : ''}>
+    <Card className={isManualPrice ? 'bg-amber-50 dark:bg-amber-950/20' : ''}>
       <CardContent className="p-4">
         {/* Header: Nome + Badge Classe */}
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1">
-            <h3 className="font-semibold text-base text-gray-900">
+            <h3 className="font-semibold text-base text-gray-900 dark:text-gray-100">
               {asset.name}
             </h3>
             {asset.ticker && (
-              <p className="text-sm text-gray-500 mt-0.5">{asset.ticker}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{asset.ticker}</p>
             )}
             {asset.quantity === 0 && (
-              <Badge variant="outline" className="mt-1 text-xs text-gray-500 bg-gray-100">
+              <Badge variant="outline" className="mt-1 text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 dark:text-gray-400 dark:border-gray-600">
                 Azzerato
               </Badge>
             )}
@@ -132,11 +132,11 @@ export function AssetCard({
         </div>
 
         {/* Valore Totale e G/P (prominenti) */}
-        <div className="mb-3 p-3 bg-gray-50 rounded-lg">
+        <div className="mb-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
           <div className="flex justify-between items-center mb-2">
             <div>
-              <p className="text-xs text-gray-500">Valore Totale</p>
-              <p className="text-lg font-bold text-gray-900">
+              <p className="text-xs text-gray-500 dark:text-gray-400">Valore Totale</p>
+              <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
                 {asset.assetClass === 'realestate' &&
                 asset.outstandingDebt &&
                 asset.outstandingDebt > 0 ? (
@@ -145,7 +145,7 @@ export function AssetCard({
                       <TooltipTrigger asChild>
                         <span className="flex items-center gap-1 cursor-help">
                           {formatCurrency(value)}
-                          <Info className="h-3 w-3 text-gray-400" />
+                          <Info className="h-3 w-3 text-gray-400 dark:text-gray-500" />
                         </span>
                       </TooltipTrigger>
                       <TooltipContent>
@@ -175,7 +175,7 @@ export function AssetCard({
             </div>
             {hasGainLoss && (
               <div className="text-right">
-                <p className="text-xs text-gray-500">G/P</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">G/P</p>
                 <div className={`font-semibold ${gainLossColor}`}>
                   <div className="text-base">
                     {isPositive ? '+' : ''}
@@ -189,8 +189,8 @@ export function AssetCard({
               </div>
             )}
           </div>
-          <div className="pt-2 border-t border-gray-200">
-            <p className="text-xs text-gray-500">Peso in %</p>
+          <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+            <p className="text-xs text-gray-500 dark:text-gray-400">Peso in %</p>
             <p className="text-sm font-semibold text-blue-600">
               {totalValue > 0 ? `${((value / totalValue) * 100).toFixed(2)}%` : '-'}
             </p>
@@ -200,24 +200,24 @@ export function AssetCard({
         {/* Dati base (sempre visibili) */}
         <div className="grid grid-cols-2 gap-2 text-sm mb-3">
           <div>
-            <span className="text-gray-500">Tipo:</span>{' '}
+            <span className="text-gray-500 dark:text-gray-400">Tipo:</span>{' '}
             <span className="font-medium">{formatAssetName(asset.type)}</span>
           </div>
           <div>
-            <span className="text-gray-500">Quantità:</span>{' '}
+            <span className="text-gray-500 dark:text-gray-400">Quantità:</span>{' '}
             <span className="font-medium">
               {formatNumber(asset.quantity, 2)}
             </span>
           </div>
           <div>
-            <span className="text-gray-500">Prezzo:</span>{' '}
+            <span className="text-gray-500 dark:text-gray-400">Prezzo:</span>{' '}
             <span className="font-medium">
               {formatCurrency(asset.currentPrice, asset.currency, 4)}
             </span>
           </div>
           {asset.averageCost && (
             <div>
-              <span className="text-gray-500">PMC:</span>{' '}
+              <span className="text-gray-500 dark:text-gray-400">PMC:</span>{' '}
               <span className="font-medium">
                 {formatCurrency(asset.averageCost, asset.currency, 4)}
               </span>
@@ -227,10 +227,10 @@ export function AssetCard({
 
         {/* Dettagli collassabili */}
         {showDetails && (
-          <div className="grid grid-cols-2 gap-2 text-sm mb-3 pt-2 border-t">
+          <div className="grid grid-cols-2 gap-2 text-sm mb-3 pt-2 border-t dark:border-gray-700">
             {asset.totalExpenseRatio && (
               <div>
-                <span className="text-gray-500">TER:</span>{' '}
+                <span className="text-gray-500 dark:text-gray-400">TER:</span>{' '}
                 <span className="font-medium text-purple-600">
                   {asset.totalExpenseRatio.toFixed(2)}%
                 </span>
@@ -238,18 +238,18 @@ export function AssetCard({
             )}
             {asset.taxRate !== undefined && asset.taxRate >= 0 && (
               <div>
-                <span className="text-gray-500">Aliquota:</span>{' '}
+                <span className="text-gray-500 dark:text-gray-400">Aliquota:</span>{' '}
                 <span className="font-medium">{asset.taxRate}%</span>
               </div>
             )}
             {asset.subCategory && (
               <div className="col-span-2">
-                <span className="text-gray-500">Sottocategoria:</span>{' '}
+                <span className="text-gray-500 dark:text-gray-400">Sottocategoria:</span>{' '}
                 <span className="font-medium">{asset.subCategory}</span>
               </div>
             )}
             <div className="col-span-2">
-              <span className="text-gray-500">Ultimo Agg.:</span>{' '}
+              <span className="text-gray-500 dark:text-gray-400">Ultimo Agg.:</span>{' '}
               <span className="font-medium">
                 {format(lastUpdate, 'dd/MM/yyyy HH:mm', { locale: it })}
               </span>

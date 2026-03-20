@@ -140,7 +140,8 @@ export function SearchableCombobox({
           disabled={disabled}
         />
         {isFocused && isDropdownOpen && !disabled && (
-          <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg max-h-60 overflow-auto">
+          // Use bg-popover + border-border to match the shadcn Select dropdown appearance
+          <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-60 overflow-auto text-popover-foreground">
             {filteredOptions.length === 0 ? (
               <div className="p-3 text-sm text-muted-foreground text-center">
                 {emptyMessage}
@@ -151,8 +152,8 @@ export function SearchableCombobox({
                   key={option.value}
                   type="button"
                   className={cn(
-                    'w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-left',
-                    value === option.value && 'bg-gray-100 dark:bg-gray-700'
+                    'w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer text-left',
+                    value === option.value && 'bg-accent text-accent-foreground'
                   )}
                   onClick={() => handleSelect(option.value)}
                 >
@@ -173,7 +174,7 @@ export function SearchableCombobox({
         )}
       </div>
       {showBadge && selectedOption && value !== '' && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
+        <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-md border border-border">
           {selectedOption.color && (
             <div
               className="w-3 h-3 rounded-full border border-gray-300"
@@ -185,10 +186,10 @@ export function SearchableCombobox({
             <button
               type="button"
               onClick={handleClear}
-              className="ml-auto hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full p-0.5 transition-colors"
+              className="ml-auto hover:bg-accent rounded-full p-0.5 transition-colors"
               aria-label="Rimuovi selezione"
             >
-              <X className="h-3 w-3 text-gray-600 dark:text-gray-400" />
+              <X className="h-3 w-3 text-muted-foreground" />
             </button>
           )}
         </div>

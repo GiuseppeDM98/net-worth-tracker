@@ -43,10 +43,11 @@ interface AssetClassHistoryTableProps {
 }
 
 // CSS classes for MoM color-coded cells (same palette as AssetPriceHistoryTable)
+// Dark variants use low-opacity overlays to avoid harsh contrast on dark backgrounds
 const colorClasses = {
-  green: 'bg-green-50 text-green-700 font-medium',
-  red: 'bg-red-50 text-red-700 font-medium',
-  neutral: 'bg-gray-50 text-gray-700',
+  green: 'bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 font-medium',
+  red: 'bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 font-medium',
+  neutral: 'bg-gray-50 dark:bg-gray-800/60 text-gray-700 dark:text-gray-300',
 };
 
 // Renders a percentage value with sign and color, or a dash if undefined
@@ -59,7 +60,7 @@ function PercentCell({ value }: { value: number | undefined }) {
           'text-base',
           value > 0 && 'text-green-600',
           value < 0 && 'text-red-600',
-          value === 0 && 'text-gray-600'
+          value === 0 && 'text-gray-600 dark:text-gray-400'
         )}
       >
         {value > 0 ? '+' : ''}
@@ -88,10 +89,10 @@ export function AssetClassHistoryTable({
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
             Asset Class {filterYear ?? 'Storico'}
           </h2>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             Totale mensile per classe di asset con variazioni month-over-month
           </p>
         </div>
@@ -104,7 +105,7 @@ export function AssetClassHistoryTable({
       {/* Table container */}
       <div className="overflow-x-auto max-h-[600px] border rounded-lg text-xs sm:text-sm">
         {rows.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+          <div className="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-400">
             <p className="text-lg font-semibold">Nessun dato storico disponibile</p>
             <p className="text-sm mt-2">
               Crea uno snapshot mensile per iniziare a tracciare le asset class.
@@ -112,10 +113,10 @@ export function AssetClassHistoryTable({
           </div>
         ) : (
           <Table>
-            <TableHeader className="sticky top-0 bg-white z-20">
+            <TableHeader className="sticky top-0 bg-white dark:bg-gray-900 z-20">
               <TableRow>
                 {/* Sticky first column */}
-                <TableHead className="sticky left-0 bg-white z-10 min-w-[130px] sm:min-w-[180px] border-r">
+                <TableHead className="sticky left-0 bg-white dark:bg-gray-900 z-10 min-w-[130px] sm:min-w-[180px] border-r">
                   Asset Class
                 </TableHead>
                 {/* Month columns */}
@@ -126,19 +127,19 @@ export function AssetClassHistoryTable({
                 ))}
                 {/* Mese Prec. % — only for year filter */}
                 {filterYear !== undefined && (
-                  <TableHead className="text-right min-w-[70px] sm:min-w-[100px] bg-amber-50 border-l-2 border-amber-300">
+                  <TableHead className="text-right min-w-[70px] sm:min-w-[100px] bg-amber-50 dark:bg-amber-950/20 border-l-2 border-amber-300 dark:border-amber-800">
                     Mese Prec. %
                   </TableHead>
                 )}
                 {/* YTD — only for year filter */}
                 {filterYear !== undefined && (
-                  <TableHead className="text-right min-w-[70px] sm:min-w-[100px] bg-blue-50 border-l-2 border-blue-300">
+                  <TableHead className="text-right min-w-[70px] sm:min-w-[100px] bg-blue-50 dark:bg-blue-950/20 border-l-2 border-blue-300 dark:border-blue-800">
                     YTD %
                   </TableHead>
                 )}
                 {/* From Start % — only for date filter */}
                 {filterStartDate !== undefined && (
-                  <TableHead className="text-right min-w-[70px] sm:min-w-[100px] bg-purple-50 border-l-2 border-purple-300">
+                  <TableHead className="text-right min-w-[70px] sm:min-w-[100px] bg-purple-50 dark:bg-purple-950/20 border-l-2 border-purple-300 dark:border-purple-800">
                     From Start %
                   </TableHead>
                 )}
@@ -149,7 +150,7 @@ export function AssetClassHistoryTable({
               {rows.map((row) => (
                 <TableRow key={row.assetClass}>
                   {/* Asset class label with color badge */}
-                  <TableCell className="sticky left-0 bg-white z-10 border-r">
+                  <TableCell className="sticky left-0 bg-white dark:bg-gray-900 z-10 border-r">
                     <div className="flex items-center gap-2">
                       {/* Color swatch matching the chart palette */}
                       <div
@@ -196,21 +197,21 @@ export function AssetClassHistoryTable({
 
                   {/* Mese Prec. % */}
                   {filterYear !== undefined && (
-                    <TableCell className="text-right min-w-[70px] sm:min-w-[100px] bg-amber-50 border-l-2 border-amber-300">
+                    <TableCell className="text-right min-w-[70px] sm:min-w-[100px] bg-amber-50 dark:bg-amber-950/20 border-l-2 border-amber-300 dark:border-amber-800">
                       <PercentCell value={row.lastMonthChange} />
                     </TableCell>
                   )}
 
                   {/* YTD % */}
                   {filterYear !== undefined && (
-                    <TableCell className="text-right min-w-[70px] sm:min-w-[100px] bg-blue-50 border-l-2 border-blue-300">
+                    <TableCell className="text-right min-w-[70px] sm:min-w-[100px] bg-blue-50 dark:bg-blue-950/20 border-l-2 border-blue-300 dark:border-blue-800">
                       <PercentCell value={row.ytd} />
                     </TableCell>
                   )}
 
                   {/* From Start % */}
                   {filterStartDate !== undefined && (
-                    <TableCell className="text-right min-w-[70px] sm:min-w-[100px] bg-purple-50 border-l-2 border-purple-300">
+                    <TableCell className="text-right min-w-[70px] sm:min-w-[100px] bg-purple-50 dark:bg-purple-950/20 border-l-2 border-purple-300 dark:border-purple-800">
                       <PercentCell value={row.fromStart} />
                     </TableCell>
                   )}
@@ -248,17 +249,17 @@ export function AssetClassHistoryTable({
                   })}
 
                   {filterYear !== undefined && (
-                    <TableCell className="text-right min-w-[100px] bg-muted border-l-2 border-amber-300">
+                    <TableCell className="text-right min-w-[100px] bg-muted border-l-2 border-amber-300 dark:border-amber-800">
                       <PercentCell value={totalRow.lastMonthChange} />
                     </TableCell>
                   )}
                   {filterYear !== undefined && (
-                    <TableCell className="text-right min-w-[100px] bg-muted border-l-2 border-blue-300">
+                    <TableCell className="text-right min-w-[100px] bg-muted border-l-2 border-blue-300 dark:border-blue-800">
                       <PercentCell value={totalRow.ytd} />
                     </TableCell>
                   )}
                   {filterStartDate !== undefined && (
-                    <TableCell className="text-right min-w-[100px] bg-muted border-l-2 border-purple-300">
+                    <TableCell className="text-right min-w-[100px] bg-muted border-l-2 border-purple-300 dark:border-purple-800">
                       <PercentCell value={totalRow.fromStart} />
                     </TableCell>
                   )}

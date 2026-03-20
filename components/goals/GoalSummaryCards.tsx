@@ -31,7 +31,7 @@ export function GoalSummaryCards({
                 className="w-3 h-3 rounded-full shrink-0"
                 style={{ backgroundColor: progress.goalColor }}
               />
-              <span className="text-sm font-medium text-gray-700 truncate">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
                 {progress.goalName}
               </span>
             </div>
@@ -39,7 +39,7 @@ export function GoalSummaryCards({
             {/* Progress bar (only if target is set) */}
             {progress.progressPercentage != null ? (
               <>
-                <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-2">
                   <div
                     className="h-2 rounded-full transition-all duration-300"
                     style={{
@@ -49,19 +49,19 @@ export function GoalSummaryCards({
                   />
                 </div>
                 <div className="flex items-baseline justify-between">
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
                     {formatCurrency(progress.currentValue)}
                   </span>
-                  <span className="text-xs font-medium text-gray-700">
+                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
                     {progress.progressPercentage.toFixed(1)}%
                   </span>
                 </div>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                   Target: {formatCurrency(progress.targetAmount!)}
                 </p>
               </>
             ) : (
-              <p className="text-lg font-semibold text-gray-700">
+              <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">
                 {formatCurrency(progress.currentValue)}
               </p>
             )}
@@ -73,12 +73,12 @@ export function GoalSummaryCards({
       <Card className="border-dashed">
         <CardContent className="p-4">
           <div className="flex items-center gap-2 mb-3">
-            <div className="w-3 h-3 rounded-full bg-gray-300 shrink-0" />
-            <span className="text-sm font-medium text-gray-500">
+            <div className="w-3 h-3 rounded-full bg-gray-300 dark:bg-gray-600 shrink-0" />
+            <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
               Non Assegnato
             </span>
           </div>
-          <p className="text-lg font-semibold text-gray-600">
+          <p className="text-lg font-semibold text-gray-600 dark:text-gray-400">
             {formatCurrency(unassignedValue)}
           </p>
         </CardContent>

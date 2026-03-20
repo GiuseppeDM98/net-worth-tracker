@@ -23,6 +23,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useTheme } from 'next-themes';
 import { ResponsiveSankey } from '@nivo/sankey';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
@@ -720,6 +721,9 @@ export function CashflowSankeyChart({
   isMobile,
   title
 }: CashflowSankeyChartProps) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+
   // Drill-down state: tracks selected item for drill-down view
   // mode: 'type' for Type→Categories, 'category' for Category→Subcategories, 'transactions' for transaction list
   const [selectedCategory, setSelectedCategory] = useState<{
@@ -1084,15 +1088,15 @@ export function CashflowSankeyChart({
             nodeBorderWidth={chartConfig.nodeBorderWidth}
             nodeBorderColor={{ from: 'color', modifiers: [['darker', 0.8]] }}
             nodeBorderRadius={3}
-            linkOpacity={0.4}
-            linkHoverOpacity={0.6}
+            linkOpacity={isDark ? 0.65 : 0.4}
+            linkHoverOpacity={isDark ? 0.85 : 0.6}
             linkContract={3}
             enableLinkGradient={chartConfig.enableLinkGradient}
             label={(node: any) => node.label || node.id}
             labelPosition={chartConfig.labelPosition}
             labelPadding={chartConfig.labelOffset}
             labelOrientation="horizontal"
-            labelTextColor={{ from: 'color', modifiers: [['darker', 2]] }}
+            labelTextColor={isDark ? { from: 'color', modifiers: [['brighter', 1.5]] } : { from: 'color', modifiers: [['darker', 2]] }}
             // Click handler for drill-down
             onClick={(node: any) => {
               // Only handle node clicks, not link clicks
@@ -1101,42 +1105,33 @@ export function CashflowSankeyChart({
               }
             }}
             // Custom tooltip to match existing chart tooltip style
-            nodeTooltip={({ node }) => {
-              return (
-                <div
-                  style={{
-                    backgroundColor: 'white',
-                    border: '1px solid #ccc',
-                    borderRadius: '4px',
-                    padding: '8px 12px',
-                    fontSize: '14px',
-                  }}
-                >
-                  {/* Display label if available (subcategory nodes use label), fallback to id */}
-                  <strong>{node.label || node.id}</strong>
-                  <br />
-                  {formatCurrencyForSankey(node.value || 0)}
-                  <br />
-                  <span style={{ fontSize: '12px', color: '#666' }}>
-                    {totalAmount > 0
-                      ? ((node.value || 0) / totalAmount * 100).toFixed(1)
-                      : '0.0'}%
-                  </span>
-                  {!selectedCategory && node.id !== 'Budget' && node.id !== 'Risparmi' && (
-                    <>
-                      <br />
-                      <span style={{ fontSize: '11px', color: '#999', fontStyle: 'italic' }}>
-                        Click per dettagli
-                      </span>
-                    </>
-                  )}
-                </div>
-              );
-            }}
+            nodeTooltip={({ node }) => (
+              <div className="rounded-md border border-border bg-popover px-3 py-2 shadow-md text-sm text-popover-foreground">
+                <strong>{node.label || node.id}</strong>
+                <br />
+                {formatCurrencyForSankey(node.value || 0)}
+                <br />
+                <span className="text-xs text-muted-foreground">
+                  {totalAmount > 0
+                    ? ((node.value || 0) / totalAmount * 100).toFixed(1)
+                    : '0.0'}%
+                </span>
+                {!selectedCategory && node.id !== 'Budget' && node.id !== 'Risparmi' && (
+                  <>
+                    <br />
+                    <span className="text-xs text-muted-foreground italic">
+                      Click per dettagli
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
             theme={{
               tooltip: {
                 container: {
-                  background: 'white',
+                  background: 'var(--popover)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--popover-foreground)',
                   fontSize: '14px',
                 },
               },

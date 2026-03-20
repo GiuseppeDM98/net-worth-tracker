@@ -651,14 +651,14 @@ export function BudgetTab({
                         <TableCell className="text-right tabular-nums font-semibold text-sm">
                           {formatCurrency(c.currentYearTotal)}
                         </TableCell>
-                        <TableCell className="text-right tabular-nums text-gray-500 text-sm">
+                        <TableCell className="text-right tabular-nums text-gray-500 dark:text-gray-400 text-sm">
                           {c.previousYearTotal > 0 ? formatCurrency(c.previousYearTotal) : '—'}
                         </TableCell>
                         <TableCell className="text-right">
                           <DeltaBadge value={c.currentYearTotal} reference={c.previousYearTotal} inverted={isIncome} />
                         </TableCell>
                         {hasHistory && (
-                          <TableCell className="text-right tabular-nums text-gray-500 text-sm">
+                          <TableCell className="text-right tabular-nums text-gray-500 dark:text-gray-400 text-sm">
                             {c.historicalAverage > 0 ? formatCurrency(c.historicalAverage) : '—'}
                           </TableCell>
                         )}
@@ -685,7 +685,7 @@ export function BudgetTab({
                     }`}
                     onClick={() => setSelectedItemKey(prev => prev === SUBTOTAL_KEY(sectionType) ? null : SUBTOTAL_KEY(sectionType))}
                   >
-                    <TableCell className="pl-6 text-xs font-medium text-gray-500">
+                    <TableCell className="pl-6 text-xs font-medium text-gray-500 dark:text-gray-400">
                       <span className="flex items-center gap-1">
                         {selectedItemKey === SUBTOTAL_KEY(sectionType)
                           ? <ChevronDown className="h-3 w-3 text-blue-500 shrink-0" />
@@ -699,7 +699,7 @@ export function BudgetTab({
                     <TableCell className="text-right tabular-nums text-xs font-medium">
                       {formatCurrency(secCurrentYear)}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-xs text-gray-500">
+                    <TableCell className="text-right tabular-nums text-xs text-gray-500 dark:text-gray-400">
                       {secPrevYear > 0 ? formatCurrency(secPrevYear) : '—'}
                     </TableCell>
                     <TableCell className="text-right">
@@ -708,7 +708,7 @@ export function BudgetTab({
                       )}
                     </TableCell>
                     {hasHistory && (
-                      <TableCell className="text-right tabular-nums text-xs text-gray-500">
+                      <TableCell className="text-right tabular-nums text-xs text-gray-500 dark:text-gray-400">
                         {secHistAvg > 0 ? formatCurrency(secHistAvg) : '—'}
                       </TableCell>
                     )}
@@ -918,7 +918,7 @@ export function BudgetTab({
                       {/* Small marker so the current year stands out in a long list */}
                       {isCurrentYear && <span className="ml-1 text-blue-500">◂</span>}
                     </td>
-                    <td className="pr-3 py-1.5 text-right tabular-nums text-gray-500 whitespace-nowrap hidden sm:table-cell">
+                    <td className="pr-3 py-1.5 text-right tabular-nums text-gray-500 dark:text-gray-400 whitespace-nowrap hidden sm:table-cell">
                       {budgetAnnual > 0 ? formatCurrency(budgetAnnual) : '—'}
                     </td>
                     {monthly.map((v, i) => {
@@ -1026,7 +1026,7 @@ export function BudgetTab({
                           <td className="pr-2 py-1.5 tabular-nums whitespace-nowrap sticky left-0 z-10 bg-inherit">
                             {year}{isCurrentYear && <span className="ml-1 text-blue-500">◂</span>}
                           </td>
-                          <td className="pr-3 py-1.5 text-right tabular-nums text-gray-500 whitespace-nowrap hidden sm:table-cell">
+                          <td className="pr-3 py-1.5 text-right tabular-nums text-gray-500 dark:text-gray-400 whitespace-nowrap hidden sm:table-cell">
                             {secBudgetAnnual > 0 ? formatCurrency(secBudgetAnnual) : '—'}
                           </td>
                           {monthly.map((v, i) => {
@@ -1541,14 +1541,14 @@ export function BudgetTab({
             <Target className="h-5 w-5 text-blue-500" />
             Budget
           </h2>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
             Confronta la spesa effettiva con il budget, l&apos;anno precedente e la media storica
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           {!isEditing && (
-            <Button variant="outline" size="sm" onClick={handleStartEditing} className="flex items-center gap-1.5">
+            <Button variant="outline" size="sm" onClick={handleStartEditing} className="flex items-center gap-1.5 dark:border-gray-600 dark:text-gray-200">
               <Pencil className="h-3.5 w-3.5" />
               Modifica
             </Button>

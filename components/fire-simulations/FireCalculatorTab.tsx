@@ -60,7 +60,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { TrendingUp, Calendar, DollarSign, Percent, Clock } from 'lucide-react';
+import { TrendingUp, TrendingDown, Calendar, DollarSign, Percent, Clock, BarChart3, Target, Info, AlertTriangle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   LineChart,
@@ -173,7 +173,7 @@ export function FireCalculatorTab() {
   if (isLoadingSettings || isLoadingAssets || (currentNetWorth > 0 && isLoadingFIRE)) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="text-gray-500">Caricamento...</div>
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -205,7 +205,7 @@ export function FireCalculatorTab() {
                 onChange={(e) => setTempWithdrawalRate(e.target.value)}
                 className="mt-1"
               />
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Tipicamente 4% secondo la regola del 4% (Trinity Study)
               </p>
             </div>
@@ -221,20 +221,20 @@ export function FireCalculatorTab() {
                 className="mt-1"
                 placeholder="Es. 25000"
               />
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Spese annuali che prevedi di avere in FIRE (opzionale)
               </p>
             </div>
           </div>
 
           {/* Include Primary Residence Setting */}
-          <div className="space-y-2 rounded-lg border p-4 mb-4">
+          <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-4 mb-4">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label htmlFor="includePrimaryResidence">
                   Includi Casa di Abitazione nel Calcolo FIRE
                 </Label>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                   Se attivo, gli immobili marcati come &quot;casa di abitazione&quot; saranno inclusi nel patrimonio FIRE.
                   Se disattivo, verranno esclusi (metodologia FIRE standard che considera solo asset generatori di reddito).
                 </p>
@@ -250,7 +250,7 @@ export function FireCalculatorTab() {
           <Button
             onClick={handleSaveSettings}
             disabled={mutation.isPending}
-            className="w-full desktop:w-auto"
+            className="w-full desktop:w-auto dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
           >
             {mutation.isPending ? 'Salvataggio...' : 'Salva Impostazioni'}
           </Button>
@@ -262,8 +262,8 @@ export function FireCalculatorTab() {
         <>
           {/* Section Title: Current Metrics */}
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">📊 Metriche Attuali</h2>
-            <p className="text-sm text-gray-600 mb-4">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2"><BarChart3 className="h-5 w-5 text-blue-500" />Metriche Attuali</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               Basate sulle tue spese reali dell'anno corrente
             </p>
           </div>
@@ -281,7 +281,7 @@ export function FireCalculatorTab() {
                 <div className="text-3xl font-bold text-blue-600">
                   {formatCurrency(fireMetrics.fireNumber)}
                 </div>
-                <p className="mt-2 text-sm text-gray-600">
+                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
                   Patrimonio necessario per raggiungere la FI con spese annuali di {formatCurrency(fireMetrics.annualExpenses)}
                 </p>
               </CardContent>
@@ -299,7 +299,7 @@ export function FireCalculatorTab() {
                   {formatPercentage(fireMetrics.progressToFI)}
                 </div>
                 <div className="mt-3">
-                  <div className="h-4 w-full overflow-hidden rounded-full bg-gray-200">
+                  <div className="h-4 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
                     <div
                       className="h-full bg-gradient-to-r from-green-400 to-green-600 transition-all"
                       style={{
@@ -307,7 +307,7 @@ export function FireCalculatorTab() {
                       }}
                     />
                   </div>
-                  <p className="mt-2 text-sm text-gray-600">
+                  <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
                     {fireMetrics.progressToFI >= 100
                       ? '🎉 Hai raggiunto la Financial Independence!'
                       : `Ancora ${formatCurrency(fireMetrics.fireNumber - fireMetrics.currentNetWorth)} da accumulare`
@@ -322,51 +322,51 @@ export function FireCalculatorTab() {
           {plannedFireMetrics && fireMetrics && (
             <>
               <div className="mt-8">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">🎯 Metriche Previste</h2>
-                <p className="text-sm text-gray-600 mb-4">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2"><Target className="h-5 w-5 text-purple-500" />Metriche Previste</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                   Basate sulle spese annuali previste che hai impostato ({formatCurrency(plannedFireMetrics.plannedAnnualExpenses)})
                 </p>
               </div>
 
               <div className="grid gap-6 desktop:grid-cols-2">
-                <Card className="border-purple-200 bg-purple-50">
+                <Card className="border-purple-200 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-800">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg">
-                      <TrendingUp className="h-5 w-5 text-purple-600" />
+                      <TrendingUp className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                       FIRE Number Previsto
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-purple-700">
+                    <div className="text-3xl font-bold text-purple-700 dark:text-purple-300">
                       {formatCurrency(plannedFireMetrics.plannedFireNumber)}
                     </div>
-                    <p className="mt-2 text-sm text-purple-900">
+                    <p className="mt-2 text-sm text-purple-900 dark:text-purple-200">
                       Patrimonio target basato sulle spese previste di {formatCurrency(plannedFireMetrics.plannedAnnualExpenses)}
                     </p>
                     {fireMetrics.fireNumber !== plannedFireMetrics.plannedFireNumber && (
-                      <p className="mt-2 text-xs text-purple-700 font-semibold">
+                      <p className="mt-2 text-xs text-purple-700 dark:text-purple-300 font-semibold flex items-center gap-1">
                         {plannedFireMetrics.plannedFireNumber < fireMetrics.fireNumber
-                          ? `📉 ${formatCurrency(fireMetrics.fireNumber - plannedFireMetrics.plannedFireNumber)} in meno rispetto all'attuale`
-                          : `📈 ${formatCurrency(plannedFireMetrics.plannedFireNumber - fireMetrics.fireNumber)} in più rispetto all'attuale`
+                          ? <><TrendingDown className="h-3.5 w-3.5 inline shrink-0" />{formatCurrency(fireMetrics.fireNumber - plannedFireMetrics.plannedFireNumber)} in meno rispetto all&apos;attuale</>
+                          : <><TrendingUp className="h-3.5 w-3.5 inline shrink-0" />{formatCurrency(plannedFireMetrics.plannedFireNumber - fireMetrics.fireNumber)} in più rispetto all&apos;attuale</>
                         }
                       </p>
                     )}
                   </CardContent>
                 </Card>
 
-                <Card className="border-purple-200 bg-purple-50">
+                <Card className="border-purple-200 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-800">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg">
-                      <Percent className="h-5 w-5 text-purple-600" />
+                      <Percent className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                       Progresso verso FI Previsto
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-purple-700">
+                    <div className="text-3xl font-bold text-purple-700 dark:text-purple-300">
                       {formatPercentage(plannedFireMetrics.plannedProgressToFI)}
                     </div>
                     <div className="mt-3">
-                      <div className="h-4 w-full overflow-hidden rounded-full bg-purple-200">
+                      <div className="h-4 w-full overflow-hidden rounded-full bg-purple-200 dark:bg-purple-900/40">
                         <div
                           className="h-full bg-gradient-to-r from-purple-400 to-purple-600 transition-all"
                           style={{
@@ -374,7 +374,7 @@ export function FireCalculatorTab() {
                           }}
                         />
                       </div>
-                      <p className="mt-2 text-sm text-purple-900">
+                      <p className="mt-2 text-sm text-purple-900 dark:text-purple-200">
                         {plannedFireMetrics.plannedProgressToFI >= 100
                           ? '🎉 Hai raggiunto il target previsto!'
                           : `Ancora ${formatCurrency(plannedFireMetrics.plannedFireNumber - fireMetrics.currentNetWorth)} da accumulare per il target previsto`
@@ -400,7 +400,7 @@ export function FireCalculatorTab() {
                 <div className="text-2xl font-bold text-purple-600">
                   {formatCurrency(fireMetrics.annualAllowance)}
                 </div>
-                <p className="mt-2 text-sm text-gray-600">
+                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
                   Quanto potresti prelevare all'anno con il WR attuale
                 </p>
               </CardContent>
@@ -417,7 +417,7 @@ export function FireCalculatorTab() {
                 <div className="text-2xl font-bold text-indigo-600">
                   {formatCurrency(fireMetrics.monthlyAllowance)}
                 </div>
-                <p className="mt-2 text-sm text-gray-600">
+                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
                   Reddito mensile passivo potenziale
                 </p>
               </CardContent>
@@ -434,7 +434,7 @@ export function FireCalculatorTab() {
                 <div className="text-2xl font-bold text-teal-600">
                   {formatCurrency(fireMetrics.dailyAllowance)}
                 </div>
-                <p className="mt-2 text-sm text-gray-600">
+                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
                   Budget giornaliero sostenibile
                 </p>
               </CardContent>
@@ -454,12 +454,13 @@ export function FireCalculatorTab() {
                 <div className="text-3xl font-bold text-orange-600">
                   {formatPercentage(fireMetrics.currentWR)}
                 </div>
-                <p className="mt-2 text-sm text-gray-600">
+                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
                   Rapporto tra spese annuali e patrimonio attuale
                 </p>
                 {fireMetrics.currentWR > withdrawalRate && (
-                  <p className="mt-2 text-sm text-red-600 font-semibold">
-                    ⚠️ Superiore al Safe Withdrawal Rate ({withdrawalRate}%)
+                  <p className="mt-2 text-sm text-red-600 font-semibold flex items-center gap-1">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                    Superiore al Safe Withdrawal Rate ({withdrawalRate}%)
                   </p>
                 )}
               </CardContent>
@@ -476,7 +477,7 @@ export function FireCalculatorTab() {
                 <div className="text-3xl font-bold text-cyan-600">
                   {fireMetrics.yearsOfExpenses.toFixed(1)} anni
                 </div>
-                <p className="mt-2 text-sm text-gray-600">
+                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
                   Per quanti anni il tuo patrimonio coprirebbe le spese attuali
                 </p>
               </CardContent>
@@ -492,7 +493,7 @@ export function FireCalculatorTab() {
         </CardHeader>
         <CardContent>
           {chartData.length === 0 ? (
-            <div className="flex h-64 items-center justify-center text-gray-500">
+            <div className="flex h-64 items-center justify-center text-gray-500 dark:text-gray-400">
               Nessuno storico disponibile. Gli snapshot mensili verranno creati automaticamente.
             </div>
           ) : (
@@ -507,7 +508,8 @@ export function FireCalculatorTab() {
                 />
                 <Tooltip
                   formatter={(value: number) => formatCurrency(value)}
-                  labelStyle={{ color: '#000' }}
+                  contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', color: 'var(--card-foreground)' }}
+                  labelStyle={{ color: 'var(--foreground)' }}
                 />
                 <Legend />
                 <Line
@@ -554,10 +556,10 @@ export function FireCalculatorTab() {
       )}
 
       {/* Info Box */}
-      <Card className="border-blue-200 bg-blue-50">
+      <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800">
         <CardContent className="pt-6">
-          <h3 className="font-semibold text-blue-900 mb-2">ℹ️ Come funziona il FIRE?</h3>
-          <div className="text-sm text-blue-800 space-y-2">
+          <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2"><Info className="h-4 w-4 shrink-0" />Come funziona il FIRE?</h3>
+          <div className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
             <p>
               <strong>FIRE Number:</strong> È il patrimonio target calcolato come: Spese Annuali ÷ Safe Withdrawal Rate.
               Con un WR del 4%, devi accumulare 25 volte le tue spese annuali.

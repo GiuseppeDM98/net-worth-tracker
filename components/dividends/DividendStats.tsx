@@ -12,7 +12,8 @@
  */
 'use client';
 
-import { useEffect, useState} from 'react';
+import { useEffect, useState } from 'react';
+import { DividendStatsSkeleton } from './DividendStatsSkeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -35,6 +36,36 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { toast } from 'sonner';
+
+// Custom tooltip that uses Tailwind dark-mode tokens for background/border,
+// while preserving per-series colors via entry.color.
+const ChartTooltip = ({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; color?: string; fill?: string; payload?: { fill?: string } }>;
+  label?: string | number;
+}) => {
+  if (!active || !payload || !payload.length) return null;
+  return (
+    <div className="rounded-md border border-border bg-popover px-3 py-2 shadow-md text-sm min-w-[140px]">
+      {label !== undefined && (
+        <p className="font-medium text-popover-foreground mb-1">{label}</p>
+      )}
+      {payload.map((entry, index) => {
+        // Bar/Line: entry.color; PieChart: entry.payload.fill or entry.fill
+        const color = entry.color || entry.fill || entry.payload?.fill || 'var(--popover-foreground)';
+        return (
+          <p key={index} className="tabular-nums" style={{ color }}>
+            {entry.name} : {formatCurrency(entry.value)}
+          </p>
+        );
+      })}
+    </div>
+  );
+};
 
 interface DividendStatsProps {
   startDate?: Date;
@@ -163,15 +194,10 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-gray-500">Caricamento statistiche...</div>
-      </div>
-    );
-  }
-
+  // Skeleton on first load (no data yet): mirrors real layout to avoid height jump.
+  // On subsequent filter changes the section stays visible (dimmed) while refetching.
   if (!stats) {
+    if (loading) return <DividendStatsSkeleton />;
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="text-gray-500">Nessuna statistica disponibile</div>
@@ -180,7 +206,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
   }
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 transition-opacity duration-200 ${loading ? 'opacity-50 pointer-events-none' : ''}`}>
       {/* Metric Cards Row 1: Period Stats */}
       <div className="grid gap-4 grid-cols-1 desktop:grid-cols-3">
         <Card>
@@ -284,10 +310,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip
-                      formatter={(value: number) => formatCurrency(value)}
-                      labelStyle={{ color: '#000' }}
-                    />
+                    <Tooltip content={<ChartTooltip />} />
                     <Legend iconSize={10} wrapperStyle={{ fontSize: '11px' }} />
                   </PieChart>
                 </ResponsiveContainer>
@@ -312,10 +335,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="year" />
                   <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
-                  <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
-                    labelStyle={{ color: '#000' }}
-                  />
+                  <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--muted)' }} />
                   <Legend />
                   <Bar dataKey="totalGross" fill="#10B981" name="Lordo" isAnimationActive={false} />
                   <Bar dataKey="totalTax" fill="#EF4444" name="Tasse" isAnimationActive={false} />
@@ -343,10 +363,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis tickFormatter={(value) => formatCurrency(value).replace(/,00$/, '')} />
-                <Tooltip
-                  formatter={(value: number) => formatCurrency(value)}
-                  labelStyle={{ color: '#000' }}
-                />
+                <Tooltip content={<ChartTooltip />} />
                 <Legend />
                 <Line
                   type="monotone"

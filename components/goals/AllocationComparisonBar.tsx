@@ -44,8 +44,8 @@ function AllocationBar({
 
   return (
     <div className="space-y-1">
-      <span className="text-xs text-gray-500">{label}</span>
-      <div className="flex h-5 w-full rounded-full overflow-hidden bg-gray-100">
+      <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>
+      <div className="flex h-5 w-full rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800">
         {entries.map(([cls, pct]) => (
           <div
             key={cls}
@@ -87,7 +87,7 @@ export function AllocationComparisonBar({
 
   return (
     <div className="space-y-2">
-      <p className="text-xs font-medium text-gray-600">Confronto Allocazione</p>
+      <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Confronto Allocazione</p>
 
       {hasActual && (
         <AllocationBar label="Effettiva" allocation={actualAllocation} />
@@ -105,7 +105,7 @@ export function AllocationComparisonBar({
               className="w-2.5 h-2.5 rounded-sm"
               style={{ backgroundColor: ASSET_CLASS_COLORS[cls] }}
             />
-            <span className="text-[10px] text-gray-500">
+            <span className="text-[10px] text-gray-500 dark:text-gray-400">
               {ASSET_CLASS_LABELS[cls]}
             </span>
           </div>

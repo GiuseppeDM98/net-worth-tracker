@@ -37,6 +37,9 @@ For architecture and status, see [CLAUDE.md](CLAUDE.md).
 - Use semantic tokens: `bg-background`, `text-foreground`, `border-border` for chrome; `bg-sidebar`, `text-sidebar-foreground`, `bg-sidebar-accent`, `border-sidebar-border` for sidebar
 - `bg-white` / `bg-gray-900` / `text-gray-900` in layout = bug — they break the opposite color mode
 - Gain/loss colors (`text-green-600`, `text-red-600`) are intentionally hardcoded — they are domain-semantic, not theme-structural
+- **Auth pages (login/register) background**: use `bg-gray-50 dark:bg-gray-950` — same as the dashboard main content area (`dark:bg-gray-950`). Do NOT use gradient variants (`bg-gradient-to-br from-blue-50 ... dark:from-gray-950`): they produce an inconsistent dark appearance.
+- **Card dark mode on auth pages**: explicitly add `dark:bg-gray-900 dark:border-gray-800` to the `<Card>` — same as dashboard panels. shadcn `CardTitle`/`CardDescription` may also need explicit `dark:text-gray-100`/`dark:text-gray-400` when used outside the normal theme context.
+- **`bg-background` in shadcn separators** (e.g. "Oppure" divider): correct as-is — it is a CSS variable that already handles both modes. Do not replace.
 
 ---
 
@@ -45,6 +48,20 @@ For architecture and status, see [CLAUDE.md](CLAUDE.md).
 ### React Query & Lazy-Loading
 - Invalidate all related caches after mutations (direct + indirect dependencies)
 - Never remove from `mountedTabs` once added to preserve tab state
+
+### next/dynamic for Named Exports
+`next/dynamic` requires a default export. For named exports, unwrap with `.then`:
+```tsx
+import type { MyDialogProps } from '@/components/MyDialog';
+
+const MyDialog = dynamic<MyDialogProps>(
+  () => import('@/components/MyDialog').then(m => ({ default: m.MyDialog })),
+  { ssr: false }
+);
+```
+- **`ssr: false`**: required for components that use client-only hooks (useState, SSE, streaming) — otherwise Next.js attempts server rendering and throws a hydration error.
+- **Type parameter**: without `dynamic<Props>()`, TypeScript infers `{}` for props, losing type safety. Export the props interface from the source file to import it as a type.
+- **When to use**: dialogs and heavy panels that import large libraries (react-markdown, remark-gfm, etc.) and are only opened on demand — keeps them out of the initial page bundle.
 
 ### Date Range Queries (Firestore)
 End date must include full day: `new Date(year, month, 0, 23, 59, 59, 999)`
@@ -139,12 +156,67 @@ Only use `useEffect` for side effects (API calls, subscriptions, DOM mutations).
 - All metric functions that annualize **must use `calculateMonthsDifference(periodEnd, periodStart)`** — NOT `snapshots.length - 1`
 - Each chart function handles baseline exclusion independently (heatmap: `i=1`; chart: `.slice(1)`; underwater: `continue at i===0`)
 
+### Skeleton Loading Pattern
+Build skeleton screens that mirror the real layout to avoid layout shift and provide visual continuity:
+- **File convention**: `ComponentSkeleton.tsx` alongside the real component
+- **Primitive**: `SkeletonBar` with `motion-safe:animate-pulse motion-reduce:opacity-40` + `animationDelay` style for stagger wave
+- **Stagger**: left-to-right wave via per-element `delayMs`; later sections start after earlier ones (e.g. 0ms, 100ms, 200ms… 800ms)
+- **Dynamic heights**: use a plain `<div style={{ height }}` with the pulse classes instead of routing through `SkeletonBar` — Tailwind needs static class names, can't interpolate pixel values
+- **Two-phase loading** (outer Firestore fetch + inner API fetch): reuse the SAME skeleton component for both so the two loading states fuse into one continuous animation — no visible join
+- **Stale-while-revalidate** on filter changes: gate the full-page skeleton on `!data` (first load only); on subsequent fetches keep old data visible with `opacity-50 pointer-events-none transition-opacity duration-200`
+
+```tsx
+// First load only → skeleton
+if (!stats) {
+  if (loading) return <MyComponentSkeleton />;
+  return <EmptyState />;
+}
+// Filter refetch → dim existing content
+return (
+  <div className={loading ? 'opacity-50 pointer-events-none transition-opacity duration-200' : ''}>
+    {/* real content */}
+  </div>
+);
+```
+
+- **Simple loading state (no skeleton)**: Use `<Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />` inside a height placeholder (`h-64`) to prevent layout shift. Never use `<div className="text-gray-500">Caricamento...</div>` — it is invisible in dark mode and provides no visual feedback.
+- **`Loader2` vs `RefreshCw`**: `Loader2 animate-spin` = initial mount loading (data not yet arrived). `RefreshCw animate-spin` = user-triggered active refresh (cashflow, filters). Never interchange them — they have different semantic meaning.
+
 ### Framer Motion Animation Patterns
 - **Shared variants**: `lib/utils/motionVariants.ts` — never define variants inline
 - **Stagger + conditional elements**: use explicit `transition={{ delay: index * 0.1 }}` per card — parent stagger counts ALL children including conditional slots
 - **`motion.tr`**: wrapping shadcn `<TableRow>` with `motion()` breaks table structure. Use `motion.tr` directly
 - **`AnimatePresence initial={false}`** on collapsibles that start open — avoids exit animation on mount
 - **Easing**: always `[0.25, 1, 0.5, 1]` (ease-out-quart). Never bounce or elastic.
+
+### CSS `animate-in` + prefers-reduced-motion
+- Framer Motion respects reduced-motion automatically via `MotionConfig` in `MotionProvider.tsx`.
+- **CSS `animate-in` classes** (tw-animate-css) must be guarded manually.
+- **Server components** (no `'use client'`): use `motion-safe:animate-in` Tailwind variant — no JS, no hydration issues. Pattern already used in `PerformancePageSkeleton` (`motion-safe:animate-pulse`) and `MetricSection` (`motion-safe:animate-in`).
+- **Client components only**: `window.matchMedia('(prefers-reduced-motion: reduce)').matches` + `useState/useEffect` works but causes a post-hydration flash on first render. Prefer `motion-safe:` when possible.
+- The `animationDelay` style prop is harmless when no animation classes are active — no need to conditionally omit it.
+
+### next-themes: `theme` vs `resolvedTheme`
+- `resolvedTheme` always resolves to `"light"` or `"dark"` — never returns `"system"`. Safe for rendering decisions (pick icon, pick color).
+- `theme` preserves the actual stored value: `"light"`, `"dark"`, or `"system"`. Required for cycle logic or detecting "follow OS" state.
+- **3-state cycle pattern** (`light → dark → system → light`): use `theme` as the discriminator, call `setTheme('system')` to re-enable OS following. See `Header.tsx`.
+- **Testing system-follow**: DevTools "Emulate prefers-color-scheme" only works when `localStorage.getItem('theme')` is `null` or `"system"`. If a user has manually toggled, localStorage wins. Reset with `localStorage.removeItem('theme')` + reload.
+
+### Sticky Dialog Layout Pattern
+For dialogs with long forms or variable-length content, keep header and footer always visible:
+```tsx
+<DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0">
+  <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">...</DialogHeader>
+  <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+    {/* scrollable body */}
+  </div>
+  <div className="px-6 pb-6 pt-4 border-t shrink-0 flex justify-end gap-2">
+    {/* sticky footer */}
+  </div>
+</DialogContent>
+```
+- When a `<form>` wraps the whole content (ExpenseDialog, AssetDialog): make it `flex flex-col flex-1 min-h-0`, put the scrollable div and footer inside the form — submit button stays inside `<form>` and works correctly.
+- **Exception**: dialogs containing `position: absolute` dropdowns (e.g. CategoryDeleteConfirmDialog) must NOT have `overflow-y-auto` on the body — see error below.
 
 ---
 
@@ -188,7 +260,51 @@ Use `invisible` when a placeholder must hold its position in a grid/flex row (e.
 ### `overflow-x-visible` Suppresses Horizontal Scroll
 **Fix**: Use `overflow-x-auto` always on wide table wrappers — never remove it at a breakpoint.
 
+### `overflow-y-auto` Clips Absolute-Positioned Children
+**Symptom**: A custom `position: absolute` dropdown inside a `overflow-y-auto` container gets cut off at the container boundary — items below the fold are invisible even if the dialog has room.
+**Fix**: Remove `overflow-y-auto` from the container when it holds absolute overlays (custom dropdowns, tooltips). Short confirmation dialogs don't need scroll — use `flex-1` without overflow. For longer forms, switch the custom dropdown to a Radix `<Select>` (portal-based, renders above all overflow contexts).
+
+### Vitest Cache Corruption on Windows
+**Symptom**: All test suites fail with "No test suite found in file" — zero tests collected — even though the files are unchanged and previously passed.
+**Fix**: `npx vitest run --clearCache` then re-run. The `.experimental-vitest-cache` on Windows can get stale after file renames or path-case changes. Not related to code changes.
+
 ### Auto-Generated Dividend Idempotency
 Use deterministic Firestore doc ID for `isAutoGenerated=true` dividends: `{assetId}_{YYYY-MM-DD}_{dividendType}`. Makes cron writes idempotent.
 
-**Last updated**: 2026-03-19 (session: /polish + /optimize audit — useMemo antipattern, formatter duplication rule)
+### Sign-Dependent Icon Null-State Fallback
+When an icon switches between TrendingUp/TrendingDown (or similar) based on a value's sign, always define an explicit fallback for the `null`/no-data case. Default to the "neutral positive" variant (e.g. `TrendingUp` green) — showing a red downward arrow when there is simply no data yet is a false negative signal that confuses users.
+```tsx
+// Pattern: null → positive default, value < 0 → negative variant
+{value && value < 0
+  ? <TrendingDown className="h-4 w-4 text-red-500" />
+  : <TrendingUp className="h-4 w-4 text-green-500" />
+}
+```
+
+### Emoji in UI Elements
+**Rule**: Never use Unicode emoji as icons in headings (`h2`, `h3`), badges, or UI hint cards. Emoji render with vendor-specific glyphs — different shape, color, and size on Windows, Android, and iOS. Always use Lucide icons instead.
+- Emoji in narrative/celebratory **text strings** (e.g. `"🎉 Hai raggiunto la FI!"`) are acceptable.
+- Map: `📊`→`BarChart3`, `🎯`→`Target`, `ℹ️`→`Info`, `⚠️`→`AlertTriangle`, `📉`→`TrendingDown`, `📈`→`TrendingUp`, `💡`→`Info` or `Lightbulb`
+
+### shadcn `<Alert>` Icon Slot
+**Gotcha**: The first icon passed as a **direct child of `<Alert>`** (outside `<AlertDescription>`) is automatically positioned as the leading icon by shadcn's Alert component. Adding a second icon inside `<AlertDescription>` causes double rendering.
+```tsx
+// ✅ Correct — one icon as direct child of Alert, text in AlertDescription
+<Alert>
+  <Info className="h-4 w-4" />
+  <AlertDescription>Text here</AlertDescription>
+</Alert>
+
+// ❌ Wrong — double icon
+<Alert>
+  <Info className="h-4 w-4" />
+  <AlertDescription>
+    <div className="flex gap-2">
+      <Info className="h-4 w-4" />  {/* duplicate! */}
+      Text here
+    </div>
+  </AlertDescription>
+</Alert>
+```
+
+**Last updated**: 2026-03-20 (session 08: Loader2 vs RefreshCw loading state rule)

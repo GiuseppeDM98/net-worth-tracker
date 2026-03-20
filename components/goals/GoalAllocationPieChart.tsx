@@ -79,10 +79,12 @@ export function GoalAllocationPieChart({
                   '',
                 ]}
                 labelFormatter={(label: string) => label}
+                contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', color: 'var(--card-foreground)' }}
+                labelStyle={{ color: 'var(--foreground)' }}
               />
               <Legend
                 formatter={(value: string) => (
-                  <span className="text-sm text-gray-700">{value}</span>
+                  <span className="text-sm text-gray-700 dark:text-gray-300">{value}</span>
                 )}
               />
             </PieChart>

@@ -54,9 +54,10 @@ export function PieChart({ data }: PieChartProps) {
         <Tooltip
           formatter={(value: number) => formatCurrency(value)}
           contentStyle={{
-            backgroundColor: 'white',
-            border: '1px solid #ccc',
+            backgroundColor: 'var(--card)',
+            border: '1px solid var(--border)',
             borderRadius: '4px',
+            color: 'var(--card-foreground)',
           }}
         />
         <Legend
@@ -89,7 +90,7 @@ export function PieChart({ data }: PieChartProps) {
                       flexShrink: 0,
                     }}
                   />
-                  <span style={{ color: '#374151' }}>
+                  <span className="text-gray-700 dark:text-gray-300">
                     {entry.name} ({entry.percentage.toFixed(1)}%)
                   </span>
                 </div>

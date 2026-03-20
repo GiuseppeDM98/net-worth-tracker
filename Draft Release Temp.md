@@ -1,5 +1,7 @@
 ## ✨ New Features
 
+- The theme toggle in the header now cycles through three states — **Light**, **Dark**, and **System** (follows OS preference) — using Sun, Moon, and Monitor icons respectively. Switching to System removes the manual override and re-syncs the app with the operating system's light/dark setting
+
 - Added **Budget** tab to Cashflow page with automatic budget tracking for all expense categories
 - Budget items auto-generated from your categories (Fixed Expenses, Variable, Debt, Income) — no manual setup required
 - Annual view: compare current year spending vs budget, previous year, and historical average with color-coded progress bars
@@ -19,6 +21,11 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed expense cards in dark mode on mobile and tablet: the date, amount box background, category labels, and notes were displayed with light-gray colors that were barely readable against a dark background — all text and backgrounds now correctly adapt to the active theme
+- Fixed income and expense amounts on mobile cards appearing in a harsh bright red/green in dark mode — amounts now use softer red/green tones that are easier to read against a dark background
+
+- Fixed the Monthly Change and Yearly Change (YTD) cards on the Dashboard always showing a green upward arrow regardless of the portfolio direction — the icon is now a red downward arrow when the value is negative, and a green upward arrow when positive
+
 - Fixed the monthly returns heatmap on the Performance page overflowing its container on iPad Mini and similar ~744px-wide devices: the compact color-only view (green/red cells, no numbers) now correctly appears on all devices below 1440px wide — previously the full table with month names and percentages was incorrectly triggered at 640px, causing it to overflow without a scrollbar
 
 - Fixed duplicate upcoming dividends appearing in the dividend table after the daily cron job ran: equity dividends (e.g. NEXI, FBK, ENI) could appear twice with identical data if Vercel retried or double-fired the cron endpoint. Auto-generated dividends now use a deterministic ID so concurrent writes are idempotent
@@ -31,6 +38,16 @@
 - Fixed date filters on the Dividends page: setting only a start date (without an end date) now correctly filters the summary cards and charts. Previously, a single date bound was silently ignored
 
 ## 🔧 Improvements
+
+- The "Add / Edit Asset", "New / Edit Expense", and "Delete Category" dialogs now keep their title and action buttons always visible while you scroll — the header is pinned at the top and the Save / Confirm button is pinned at the bottom, so you never need to scroll to the very end of a long form just to submit it
+- The "Delete Category" confirmation dialog is now wider, uses stacked full-width buttons, and the category list dropdown is fully visible when open — previously the dropdown was clipped and the buttons overflowed the screen on mobile
+
+- Section headers and hint cards in the FIRE Calculator and Cashflow (Current Year) pages now use consistent Lucide icons instead of emoji — icons render identically across Windows, Android, and iOS
+
+- The Dividends & Coupons tab now shows a skeleton loading screen when first opened — the placeholder mirrors the exact layout of the real page (metric cards, charts, tables) so the page feels faster and content appears without layout jumps
+- Changing asset or date filters on the Dividends page no longer blanks out the charts and tables while recalculating — existing data stays visible (slightly dimmed) while the updated statistics load in the background
+
+- Metric card entrance animations on the Performance page now respect the system's "Reduce Motion" accessibility preference — slide-in and fade-in effects are skipped for users who have enabled reduced motion in their OS settings
 
 - When editing an asset's quantity, the form now shows a contextual reminder if the quantity increases ("did you invest new capital? record a cashflow income entry") or decreases ("did you sell this asset? record a cashflow expense entry") — helps keep performance metrics (TWR, CAGR) accurate by ensuring capital flows are properly tracked. The reminder does not appear for cash assets or when the quantity is unchanged
 
@@ -109,3 +126,9 @@
 - "Subcategory" is now spelled consistently across all forms, dialogs, tables, and toast messages throughout the app — previously it appeared as three different variants depending on where you looked
 - The "Save Changes" button in the Add / Edit Asset dialog is now consistent with all other forms — previously it was labeled "Update" while every other dialog already used "Save Changes"
 - The sidebar, header, and bottom navigation bar now correctly adapt to light and dark mode — these components previously used fixed colors regardless of the active theme
+- Settings page (all four tabs: Allocation, Preferences, Expenses, Dividends) now fully supports dark mode — page header, formula cards, subcategory rows, the Notes card at the bottom, and all buttons are correctly styled in both light and dark themes
+- The on/off toggle (Switch) throughout the app is now visually distinct in dark mode — the "on" state was previously near-white and almost indistinguishable from the background
+- Login and registration pages now fully match the app's dark mode design — the background uses the same dark gray as the main dashboard, cards are properly styled with dark borders and backgrounds, and text colors are consistent with the rest of the interface
+- Login and registration pages now display the app's logo above the sign-in form, along with the "Portfolio Tracker" title — bringing these pages in line with the visual identity of the rest of the app
+- Links on the Login and Registration pages now use the app's emerald brand color instead of blue, consistent with the rest of the interface
+- Loading indicators on the Dashboard, FIRE Calculator, Monte Carlo, and Goal-Based Investing pages now show an animated spinner instead of a static "Caricamento..." text — the spinner is visible and clearly communicates the loading state in both light and dark mode

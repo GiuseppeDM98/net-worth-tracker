@@ -102,7 +102,7 @@ export function AssetAssignmentDialog({
         <div className="space-y-4 py-2">
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
             <Input
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -114,7 +114,7 @@ export function AssetAssignmentDialog({
           {/* Asset list */}
           <div className="border rounded-lg max-h-[250px] overflow-y-auto divide-y">
             {filteredAssets.length === 0 ? (
-              <p className="text-sm text-gray-500 p-4 text-center">
+              <p className="text-sm text-gray-500 dark:text-gray-400 p-4 text-center">
                 Nessun asset trovato
               </p>
             ) : (
@@ -142,19 +142,19 @@ export function AssetAssignmentDialog({
                         setPercentage('');
                       }
                     }}
-                    className={`w-full text-left px-3 py-2.5 hover:bg-gray-50 transition-colors ${
-                      isSelected ? 'bg-blue-50 border-l-2 border-blue-500' : ''
+                    className={`w-full text-left px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${
+                      isSelected ? 'bg-blue-50 border-l-2 border-blue-500 dark:bg-blue-950/20 dark:border-blue-500' : ''
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-gray-900">
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                           {asset.name}
                         </p>
-                        <p className="text-xs text-gray-500">{asset.ticker}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{asset.ticker}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm text-gray-700">
+                        <p className="text-sm text-gray-700 dark:text-gray-300">
                           {formatCurrency(value)}
                         </p>
                         <p
@@ -183,13 +183,13 @@ export function AssetAssignmentDialog({
 
           {/* Percentage input (visible when asset selected) */}
           {selectedAsset && (
-            <div className="space-y-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-sm font-medium text-blue-900">
+            <div className="space-y-2 p-3 bg-blue-50 rounded-lg border border-blue-200 dark:bg-blue-950/20 dark:border-blue-800">
+              <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
                 {selectedAsset.name} ({selectedAsset.ticker})
               </p>
               <div className="flex items-center gap-3">
                 <div className="flex-1 space-y-1">
-                  <Label htmlFor="assignPct" className="text-xs text-blue-700">
+                  <Label htmlFor="assignPct" className="text-xs text-blue-700 dark:text-blue-300">
                     Percentuale da assegnare
                   </Label>
                   <div className="flex items-center gap-2">
@@ -202,15 +202,15 @@ export function AssetAssignmentDialog({
                       value={percentage}
                       onChange={(e) => setPercentage(e.target.value)}
                       placeholder={`Max ${(available + (existingAssignment?.percentage || 0)).toFixed(0)}%`}
-                      className="bg-white"
+                      className="bg-white dark:bg-gray-800"
                     />
-                    <span className="text-sm text-blue-700">%</span>
+                    <span className="text-sm text-blue-700 dark:text-blue-300">%</span>
                   </div>
                 </div>
                 {percentage && (
                   <div className="text-right">
-                    <p className="text-xs text-blue-600">Equivale a</p>
-                    <p className="text-sm font-semibold text-blue-900">
+                    <p className="text-xs text-blue-600 dark:text-blue-400">Equivale a</p>
+                    <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
                       {formatCurrency(
                         (calculateAssetValue(selectedAsset) *
                           (parseFloat(percentage) || 0)) /

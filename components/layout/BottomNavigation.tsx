@@ -66,7 +66,7 @@ export function BottomNavigation() {
                 className={cn(
                   'flex flex-col items-center justify-center flex-1 h-full gap-1 text-xs transition-colors',
                   isActive
-                    ? 'text-blue-600 bg-blue-50'
+                    ? 'text-blue-600 bg-blue-50 dark:bg-blue-950/20'
                     : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                 )}
               >

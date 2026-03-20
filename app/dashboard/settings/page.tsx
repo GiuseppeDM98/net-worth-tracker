@@ -1148,7 +1148,7 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="text-gray-500">Caricamento...</div>
+        <div className="text-muted-foreground">Caricamento...</div>
       </div>
     );
   }
@@ -1160,20 +1160,20 @@ export default function SettingsPage() {
     <div className="space-y-4 sm:space-y-6 max-desktop:portrait:pb-20">
       <div className="flex flex-col gap-3 landscape:flex-row landscape:items-center landscape:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Impostazioni</h1>
-          <p className="mt-2 text-gray-600">
+          <h1 className="text-3xl font-bold text-foreground">Impostazioni</h1>
+          <p className="mt-2 text-muted-foreground">
             Configura i tuoi target di allocazione del portafoglio
           </p>
         </div>
         <div className="flex flex-col landscape:flex-row gap-2 w-full landscape:w-auto">
           {/* Reset is only meaningful for allocation targets */}
           {activeTab === 'allocazione' && (
-            <Button variant="outline" onClick={handleReset} className="w-full landscape:w-auto">
+            <Button variant="outline" onClick={handleReset} className="w-full landscape:w-auto dark:border-gray-600 dark:text-gray-200">
               <RotateCcw className="mr-2 h-4 w-4" />
               Ripristina Default
             </Button>
           )}
-          <Button onClick={handleSave} disabled={saving} className="w-full landscape:w-auto">
+          <Button onClick={handleSave} disabled={saving} className="w-full landscape:w-auto dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
             <Save className="mr-2 h-4 w-4" />
             {saving ? 'Salvataggio...' : 'Salva'}
           </Button>
@@ -1323,7 +1323,7 @@ export default function SettingsPage() {
                     onChange={(e) => setStampDutyRate(parseFloat(e.target.value) || 0)}
                     placeholder="es. 0.20"
                   />
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-muted-foreground">
                     Aliquota annuale imposta di bollo (es. 0.20 per 0.20%). Si applica a tutti gli asset, tranne quelli marcati come esenti nel dialog di modifica asset.
                   </p>
                 </div>
@@ -1347,7 +1347,7 @@ export default function SettingsPage() {
                       Configura le sottocategorie di Liquidità nella sezione &quot;Target Allocazione Asset Class&quot; per abilitare questa opzione.
                     </p>
                   )}
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-muted-foreground">
                     Per i conti correnti l&apos;imposta si applica solo se il valore supera €5.000
                   </p>
                 </div>
@@ -1487,7 +1487,7 @@ export default function SettingsPage() {
                   placeholder="Es: 3.5"
                 />
                 {/* Inline hint so the source is visible next to the input */}
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted-foreground">
                   Recupera il valore attuale da{' '}
                   <a
                     href="https://www.investing.com/rates-bonds/italy-10-year-bond-yield"
@@ -1524,12 +1524,12 @@ export default function SettingsPage() {
             </div>
 
             {autoCalculate && userAge !== undefined && riskFreeRate !== undefined && (
-              <div className="rounded-lg bg-blue-50 p-4">
-                <p className="text-sm text-blue-900">
+              <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 p-4">
+                <p className="text-sm text-blue-900 dark:text-blue-200">
                   <strong>Formula applicata:</strong> 125 - {userAge} - ({riskFreeRate} × 5) ={' '}
                   <strong>{calculateEquityPercentage(userAge, riskFreeRate).toFixed(2)}% Azioni</strong>
                 </p>
-                <p className="mt-1 text-sm text-blue-800">
+                <p className="mt-1 text-sm text-blue-800 dark:text-blue-300">
                   La percentuale di Obbligazioni sarà calcolata come: 100% - (somma delle altre asset class)
                 </p>
               </div>
@@ -1601,9 +1601,9 @@ export default function SettingsPage() {
                         }
                       }}
                       disabled={isAutoCalculated}
-                      className={isAutoCalculated ? 'bg-gray-100' : ''}
+                      className={isAutoCalculated ? 'bg-gray-100 dark:bg-muted' : ''}
                     />
-                    <span className="text-sm text-gray-600">
+                    <span className="text-sm text-muted-foreground">
                       {isCash && cashUseFixedAmount ? '€' : '%'}
                     </span>
                   </div>
@@ -1686,7 +1686,7 @@ export default function SettingsPage() {
                         const isValidSpecificTotal = Math.abs(specificAssetTotal - 100) < 0.01;
 
                         return (
-                          <div key={originalIndex} className="space-y-3 border rounded-lg p-2 sm:p-3 bg-gray-50">
+                          <div key={originalIndex} className="space-y-3 border rounded-lg p-2 sm:p-3 bg-muted/40 dark:bg-muted/20">
                             {/* Main subcategory row */}
                             <div className="flex items-center gap-3">
                               <div className="flex-1">
@@ -1726,7 +1726,7 @@ export default function SettingsPage() {
                                     )
                                   }
                                 />
-                                <span className="text-sm text-gray-600">%</span>
+                                <span className="text-sm text-muted-foreground">%</span>
                               </div>
                               <Button
                                 variant="ghost"
@@ -1739,7 +1739,7 @@ export default function SettingsPage() {
 
                             {/* Specific Assets Section */}
                             {target.name && (
-                              <div className="ml-3 sm:ml-6 space-y-3 border-l-2 border-blue-200 pl-2 sm:pl-4">
+                              <div className="ml-3 sm:ml-6 space-y-3 border-l-2 border-blue-200 dark:border-blue-800 pl-2 sm:pl-4">
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2">
                                     <Switch
@@ -1783,7 +1783,7 @@ export default function SettingsPage() {
                                       )}
                                       {target.expanded ? 'Nascondi' : 'Mostra'} specific assets
                                       {target.specificAssets && target.specificAssets.length > 0 && (
-                                        <span className="ml-2 text-gray-500">
+                                        <span className="ml-2 text-muted-foreground">
                                           ({target.specificAssets.length})
                                         </span>
                                       )}
@@ -1824,7 +1824,7 @@ export default function SettingsPage() {
                                                 )
                                               }
                                             />
-                                            <span className="text-xs text-gray-600">%</span>
+                                            <span className="text-xs text-muted-foreground">%</span>
                                             <Button
                                               variant="ghost"
                                               size="sm"
@@ -1865,7 +1865,7 @@ export default function SettingsPage() {
                     Aggiungi Sotto-Categoria
                   </Button>
 
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-muted-foreground">
                     Le percentuali delle sotto-categorie sono relative al totale
                     della classe asset {assetClassLabels[assetClass]} (
                     {formatPercentage(state.targetPercentage)})
@@ -1877,9 +1877,9 @@ export default function SettingsPage() {
         );
       })}
 
-      <div className="rounded-lg bg-blue-50 p-4">
-        <h3 className="font-semibold text-blue-900">Note</h3>
-        <ul className="mt-2 space-y-1 text-sm text-blue-800">
+      <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 p-4">
+        <h3 className="font-semibold text-blue-900 dark:text-blue-200">Note</h3>
+        <ul className="mt-2 space-y-1 text-sm text-blue-800 dark:text-blue-300">
           <li>
             • Il totale delle allocazioni delle asset class deve essere
             esattamente 100%
@@ -1922,7 +1922,7 @@ export default function SettingsPage() {
               <Receipt className="h-5 w-5" />
               <CardTitle>Impostazioni Tracciamento Spese</CardTitle>
             </div>
-            <Button onClick={handleAddExpenseCategory} size="sm" className="w-full sm:w-auto">
+            <Button onClick={handleAddExpenseCategory} size="sm" className="w-full sm:w-auto dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
               <Plus className="mr-2 h-4 w-4" />
               Nuova Categoria
             </Button>
@@ -1938,7 +1938,7 @@ export default function SettingsPage() {
                 const categories = getCategoriesByType(type);
                 return (
                   <div key={type} className="space-y-3">
-                    <h3 className="font-semibold text-sm text-gray-700 border-b pb-2">
+                    <h3 className="font-semibold text-sm text-foreground border-b pb-2">
                       {EXPENSE_TYPE_LABELS[type]}
                     </h3>
                     {categories.length === 0 ? (
@@ -1954,7 +1954,7 @@ export default function SettingsPage() {
                           >
                             <div className="flex items-center gap-3">
                               <div
-                                className="w-3 h-3 rounded-full border border-gray-300"
+                                className="w-3 h-3 rounded-full border border-gray-300 dark:border-gray-600"
                                 style={{ backgroundColor: category.color || '#3b82f6' }}
                               />
                               <div>
@@ -2102,7 +2102,7 @@ export default function SettingsPage() {
             <Button
               onClick={handleSaveDividendSettings}
               disabled={saving}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
             >
               <Save className="h-4 w-4" />
               {saving ? 'Salvataggio...' : 'Salva Impostazioni'}
@@ -2112,7 +2112,7 @@ export default function SettingsPage() {
               onClick={handleSyncDividends}
               disabled={syncingDividends || !dividendIncomeCategoryId}
               variant="outline"
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 dark:border-gray-600 dark:text-gray-200"
             >
               <Coins className="h-4 w-4" />
               {syncingDividends ? 'Sincronizzazione...' : 'Sincronizza Dividendi Esistenti'}
@@ -2147,10 +2147,10 @@ export default function SettingsPage() {
             </div>
 
             <div className="space-y-3">
-              <h3 className="font-semibold text-sm text-gray-900">
+              <h3 className="font-semibold text-sm text-foreground">
                 Generazione Snapshot di Test
               </h3>
-              <p className="text-sm text-gray-700">
+              <p className="text-sm text-muted-foreground">
                 Genera snapshot mensili fittizi per testare grafici e statistiche.
                 Gli snapshot verranno salvati nella stessa collection Firebase degli snapshot reali.
               </p>
@@ -2165,10 +2165,10 @@ export default function SettingsPage() {
             </div>
 
             <div className="space-y-3 border-t border-orange-200 pt-4">
-              <h3 className="font-semibold text-sm text-gray-900">
+              <h3 className="font-semibold text-sm text-foreground">
                 Eliminazione Dati di Test
               </h3>
-              <p className="text-sm text-gray-700">
+              <p className="text-sm text-muted-foreground">
                 Elimina tutti i dati dummy (snapshot, spese e categorie) in un&apos;unica operazione.
                 Questa azione è irreversibile.
               </p>

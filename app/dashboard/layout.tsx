@@ -49,7 +49,7 @@ export default function DashboardLayout({
         {/* Main content */}
         <div className="flex flex-1 flex-col overflow-hidden">
           {/* Mobile hamburger menu - solo landscape */}
-          <div className="flex items-center gap-4 bg-white px-4 py-3 desktop:hidden max-desktop:portrait:hidden max-desktop:landscape:flex border-b">
+          <div className="flex items-center gap-4 bg-white dark:bg-gray-900 px-4 py-3 desktop:hidden max-desktop:portrait:hidden max-desktop:landscape:flex border-b">
             <Button
               variant="ghost"
               size="sm"
@@ -62,7 +62,7 @@ export default function DashboardLayout({
           </div>
 
           <Header />
-          <main className="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-6 desktop:pb-6 max-desktop:portrait:pb-20 max-desktop:landscape:pb-6">
+          <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-950 p-4 md:p-6 desktop:pb-6 max-desktop:portrait:pb-20 max-desktop:landscape:pb-6">
             {children}
           </main>
         </div>

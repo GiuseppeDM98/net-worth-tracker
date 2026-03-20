@@ -57,11 +57,11 @@ export function AllocationCard({
   const getActionBadgeColor = (action: 'COMPRA' | 'VENDI' | 'OK') => {
     switch (action) {
       case 'COMPRA':
-        return 'bg-orange-100 text-orange-700 border-orange-300';
+        return 'bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-800';
       case 'VENDI':
-        return 'bg-red-100 text-red-700 border-red-300';
+        return 'bg-red-100 text-red-700 border-red-300 dark:bg-red-950/40 dark:text-red-400 dark:border-red-800';
       case 'OK':
-        return 'bg-green-100 text-green-700 border-green-300';
+        return 'bg-green-100 text-green-700 border-green-300 dark:bg-green-950/40 dark:text-green-400 dark:border-green-800';
     }
   };
 
@@ -69,11 +69,11 @@ export function AllocationCard({
   const getDifferenceBannerColor = (action: 'COMPRA' | 'VENDI' | 'OK') => {
     switch (action) {
       case 'COMPRA':
-        return 'bg-orange-50 border-orange-200';
+        return 'bg-orange-50 border-orange-200 dark:bg-orange-950/20 dark:border-orange-800';
       case 'VENDI':
-        return 'bg-red-50 border-red-200';
+        return 'bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800';
       case 'OK':
-        return 'bg-green-50 border-green-200';
+        return 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800';
     }
   };
 
@@ -90,7 +90,7 @@ export function AllocationCard({
         {/* Header: Name + Action Badge */}
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-base text-gray-900 truncate" title={name}>
+            <h3 className="font-semibold text-base text-gray-900 dark:text-gray-100 truncate" title={name}>
               {name}
             </h3>
           </div>
@@ -119,25 +119,25 @@ export function AllocationCard({
         </div>
 
         {/* Values Section (2 columns: Attuale | Target) */}
-        <div className="grid grid-cols-2 gap-3 mb-3 p-3 bg-gray-50 rounded-lg">
+        <div className="grid grid-cols-2 gap-3 mb-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
           {/* Attuale */}
           <div>
-            <p className="text-xs text-gray-500 mb-1">Attuale</p>
-            <p className="text-sm font-bold text-gray-900">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Attuale</p>
+            <p className="text-sm font-bold text-gray-900 dark:text-gray-100">
               {formatCurrency(data.currentValue)}
             </p>
-            <p className="text-xs text-gray-600">
+            <p className="text-xs text-gray-600 dark:text-gray-400">
               {formatPercentage(data.currentPercentage)}
             </p>
           </div>
 
           {/* Target */}
           <div>
-            <p className="text-xs text-gray-500 mb-1">Target</p>
-            <p className="text-sm font-bold text-gray-900">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Target</p>
+            <p className="text-sm font-bold text-gray-900 dark:text-gray-100">
               {formatCurrency(data.targetValue)}
             </p>
-            <p className="text-xs text-gray-600">
+            <p className="text-xs text-gray-600 dark:text-gray-400">
               {formatPercentage(data.targetPercentage)}
             </p>
           </div>
@@ -151,15 +151,15 @@ export function AllocationCard({
           )}
         >
           <div className="flex-1">
-            <p className="text-xs text-gray-600 mb-0.5">Differenza</p>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mb-0.5">Differenza</p>
             <p className="text-sm font-bold">
               <span className={cn(
-                data.difference > 0 ? 'text-red-700' : data.difference < 0 ? 'text-orange-700' : 'text-green-700'
+                data.difference > 0 ? 'text-red-700 dark:text-red-400' : data.difference < 0 ? 'text-orange-700 dark:text-orange-400' : 'text-green-700 dark:text-green-400'
               )}>
                 {data.differenceValue > 0 ? '+' : ''}
                 {formatCurrency(data.differenceValue)}
               </span>
-              <span className="text-gray-600 ml-2">
+              <span className="text-gray-600 dark:text-gray-400 ml-2">
                 ({data.difference > 0 ? '+' : ''}
                 {formatPercentage(data.difference)})
               </span>

@@ -157,26 +157,26 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
 
         <div className="space-y-6">
           {/* Asset Info */}
-          <div className="rounded-lg border bg-gray-50 p-4">
+          <div className="rounded-lg border bg-gray-50 dark:bg-gray-800 p-4">
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="text-gray-600">Ticker:</span>{' '}
+                <span className="text-gray-600 dark:text-gray-400">Ticker:</span>{' '}
                 <span className="font-medium">{asset.ticker}</span>
               </div>
               <div>
-                <span className="text-gray-600">Quantità posseduta:</span>{' '}
+                <span className="text-gray-600 dark:text-gray-400">Quantità posseduta:</span>{' '}
                 <span className="font-medium">{formatNumber(asset.quantity, 4)}</span>
               </div>
               <div>
-                <span className="text-gray-600">Prezzo corrente:</span>{' '}
+                <span className="text-gray-600 dark:text-gray-400">Prezzo corrente:</span>{' '}
                 <span className="font-medium">{formatCurrency(asset.currentPrice, asset.currency, 4)}</span>
               </div>
               <div>
-                <span className="text-gray-600">PMC:</span>{' '}
+                <span className="text-gray-600 dark:text-gray-400">PMC:</span>{' '}
                 <span className="font-medium">{formatCurrency(asset.averageCost || 0, asset.currency, 4)}</span>
               </div>
               <div>
-                <span className="text-gray-600">Aliquota fiscale:</span>{' '}
+                <span className="text-gray-600 dark:text-gray-400">Aliquota fiscale:</span>{' '}
                 <span className="font-medium">{asset.taxRate || 0}%</span>
               </div>
             </div>
@@ -189,7 +189,7 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
               <Button
                 type="button"
                 variant={inputMode === 'quantity' ? 'default' : 'outline'}
-                className="flex-1"
+                className={`flex-1 ${inputMode === 'quantity' ? 'dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600' : 'dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800'}`}
                 onClick={() => setInputMode('quantity')}
               >
                 Per Quantità
@@ -197,7 +197,7 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
               <Button
                 type="button"
                 variant={inputMode === 'targetValue' ? 'default' : 'outline'}
-                className="flex-1"
+                className={`flex-1 ${inputMode === 'targetValue' ? 'dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600' : 'dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800'}`}
                 onClick={() => setInputMode('targetValue')}
               >
                 Per Valore Target
@@ -247,44 +247,44 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
 
           {/* Results */}
           {hasInput && (
-            <div className="space-y-4 rounded-lg border-2 border-blue-200 bg-blue-50 p-4">
-              <h3 className="font-semibold text-lg text-blue-900">Riepilogo Calcolo</h3>
+            <div className="space-y-4 rounded-lg border-2 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20 p-4">
+              <h3 className="font-semibold text-lg text-blue-900 dark:text-blue-200">Riepilogo Calcolo</h3>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <p className="text-sm text-gray-600">Quantità da vendere</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Quantità da vendere</p>
                   <p className="text-lg font-semibold">
                     {formatNumber(results.quantity, 4)}
                   </p>
                 </div>
 
                 <div className="space-y-1">
-                  <p className="text-sm text-gray-600">Prezzo per unità</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Prezzo per unità</p>
                   <p className="text-lg font-semibold">
                     {formatCurrency(results.currentPrice)}
                   </p>
                 </div>
 
                 <div className="space-y-1">
-                  <p className="text-sm text-gray-600">Prezzo medio di carico (PMC)</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Prezzo medio di carico (PMC)</p>
                   <p className="text-lg font-semibold">
                     {formatCurrency(results.averageCost, asset.currency, 4)}
                   </p>
                 </div>
 
                 <div className="space-y-1">
-                  <p className="text-sm text-gray-600">Valore lordo vendita</p>
-                  <p className="text-lg font-semibold text-blue-700">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Valore lordo vendita</p>
+                  <p className="text-lg font-semibold text-blue-700 dark:text-blue-400">
                     {formatCurrency(results.saleValue)}
                   </p>
                 </div>
               </div>
 
-              <hr className="border-gray-300" />
+              <hr className="border-gray-300 dark:border-gray-700" />
 
               <div className="space-y-3">
                 <div className="space-y-1">
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
                     {results.isGain ? 'Plusvalenza' : results.isLoss ? 'Minusvalenza' : 'Nessun guadagno/perdita'}
                   </p>
                   <p
@@ -305,23 +305,23 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
                 </div>
 
                 <div className="space-y-1">
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
                     Tasse dovute ({results.taxRate}%)
                   </p>
                   <p className="text-xl font-bold text-orange-600">
                     {formatCurrency(results.taxes)}
                   </p>
                   {results.isLoss && (
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
                       Nessuna tassa dovuta in caso di minusvalenza
                     </p>
                   )}
                 </div>
 
-                <hr className="border-gray-300" />
+                <hr className="border-gray-300 dark:border-gray-700" />
 
-                <div className="space-y-1 rounded-lg bg-white p-3">
-                  <p className="text-sm text-gray-600 font-medium">
+                <div className="space-y-1 rounded-lg bg-white dark:bg-gray-800 p-3">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">
                     Ricavo netto (dopo tasse)
                   </p>
                   <p className="text-2xl font-bold text-green-700">
@@ -332,7 +332,7 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
 
               {/* Additional Info */}
               {inputMode === 'targetValue' && hasInput && (
-                <div className="rounded-lg bg-blue-100 p-3 text-sm text-blue-800">
+                <div className="rounded-lg bg-blue-100 dark:bg-blue-950/30 p-3 text-sm text-blue-800 dark:text-blue-300">
                   <p className="font-medium">💡 Informazione utile:</p>
                   <p>
                     Per ottenere {formatCurrency(parseFloat(targetValueInput))} di ricavo netto dopo le tasse,
@@ -348,7 +348,7 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
               )}
 
               {results.isLoss && (
-                <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
+                <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-3 text-sm text-amber-800 dark:text-amber-300">
                   <p className="font-medium">⚠️ Nota sulla minusvalenza:</p>
                   <p>
                     Questa vendita genererebbe una minusvalenza di {formatCurrency(Math.abs(results.gainLoss))}.
@@ -361,14 +361,14 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
           )}
 
           {!hasInput && (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
               Inserisci una quantità o un valore target per vedere il calcolo
             </div>
           )}
 
           {/* Actions */}
           <div className="flex justify-end gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={onClose} className="dark:border-gray-600 dark:text-gray-200">
               Chiudi
             </Button>
           </div>

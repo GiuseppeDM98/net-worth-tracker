@@ -25,6 +25,7 @@
  */
 
 import { useState, useMemo, useEffect } from 'react';
+import { formatCurrency } from '@/lib/utils/formatters';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
@@ -72,13 +73,6 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
   const [sortBy, setSortBy] = useState<'asc' | 'desc' | null>(null);
 
   // ========== Formatting Utilities ==========
-
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('it-IT', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(Math.abs(amount));
-  };
 
   const formatDate = (date: Date | string | Timestamp): string => {
     const dateObj = date instanceof Date ? date : (date instanceof Timestamp ? date.toDate() : new Date(date));
@@ -237,15 +231,15 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
   const getTypeBadgeColor = (type: ExpenseType): string => {
     switch (type) {
       case 'income':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-950/40 dark:text-green-400 dark:border-green-800';
       case 'fixed':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
+        return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800';
       case 'variable':
-        return 'bg-purple-100 text-purple-800 border-purple-200';
+        return 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-800';
       case 'debt':
-        return 'bg-orange-100 text-orange-800 border-orange-200';
+        return 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-800';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700';
     }
   };
 
@@ -428,7 +422,7 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
                   ) : (
                     <TrendingDown className="h-4 w-4" />
                   )}
-                  <span>{formatCurrency(expense.amount)}</span>
+                  <span>{formatCurrency(Math.abs(expense.amount))}</span>
                 </div>
               </TableCell>
               <TableCell className="text-sm text-muted-foreground max-w-[200px]">

@@ -11,7 +11,7 @@
  */
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Dividend, DividendType } from '@/types/dividend';
 import { Asset } from '@/types/assets';
@@ -19,6 +19,7 @@ import { DividendDialog } from './DividendDialog';
 import { DividendTable } from './DividendTable';
 import { DividendCalendar } from './DividendCalendar';
 import { DividendStats } from './DividendStats';
+import { DividendStatsSkeleton } from './DividendStatsSkeleton';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -53,7 +54,6 @@ interface DividendTrackingTabProps {
 
 export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: DividendTrackingTabProps) {
   const { user } = useAuth();
-  const [filteredDividends, setFilteredDividends] = useState<Dividend[]>([]);
   const [scraping, setScraping] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedDividend, setSelectedDividend] = useState<Dividend | null>(null);
@@ -67,12 +67,8 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
   // View mode (table or calendar)
   const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table');
 
-  // Apply filters whenever dividends or filter values change
-  useEffect(() => {
-    applyFilters();
-  }, [dividends, assetFilter, typeFilter, startDate, endDate]);
-
-  const applyFilters = () => {
+  // Derive filtered list synchronously — no extra render on filter change.
+  const filteredDividends = useMemo(() => {
     let filtered = [...dividends];
 
     // Filter by asset
@@ -94,8 +90,8 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
       filtered = filtered.filter((d) => toDate(d.paymentDate) <= endDate);
     }
 
-    setFilteredDividends(filtered);
-  };
+    return filtered;
+  }, [dividends, assetFilter, typeFilter, startDate, endDate]);
 
   const handleCreate = () => {
     setSelectedDividend(null);
@@ -274,12 +270,10 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
     setEndDate(endOfDay);
   };
 
+  // Use the same skeleton as DividendStats so the outer fetch (dividends/assets)
+  // and the inner fetch (stats API) share a continuous visual — no flash between the two.
   if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-gray-500">Caricamento...</div>
-      </div>
-    );
+    return <DividendStatsSkeleton />;
   }
 
   return (
@@ -287,7 +281,7 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
       {/* Action Buttons Row */}
       <div className="space-y-2">
         <div className="flex flex-col desktop:flex-row desktop:flex-wrap desktop:items-center gap-2">
-          <Button onClick={handleCreate}>
+          <Button onClick={handleCreate} className="dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
             <Plus className="h-4 w-4 mr-2" />
             Aggiungi Dividendo
           </Button>
@@ -425,14 +419,14 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
         <Button
           variant={viewMode === 'table' ? 'default' : 'ghost'}
           onClick={() => setViewMode('table')}
-          className="rounded-b-none"
+          className={`rounded-b-none ${viewMode === 'table' ? 'dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600' : ''}`}
         >
           Tabella
         </Button>
         <Button
           variant={viewMode === 'calendar' ? 'default' : 'ghost'}
           onClick={() => setViewMode('calendar')}
-          className="rounded-b-none"
+          className={`rounded-b-none ${viewMode === 'calendar' ? 'dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600' : ''}`}
         >
           Calendario
         </Button>

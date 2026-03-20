@@ -42,7 +42,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Wallet, TrendingUp, PieChart, DollarSign, Camera, TrendingDown, Receipt, ChevronDown } from 'lucide-react';
+import { Wallet, TrendingUp, PieChart, DollarSign, Camera, TrendingDown, Receipt, ChevronDown, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useSnapshots, useCreateSnapshot } from '@/lib/hooks/useSnapshots';
@@ -338,7 +338,6 @@ export default function DashboardPage() {
       // Hall of Fame can be manually recalculated from Hall of Fame page if needed.
       try {
         await updateHallOfFame(user.uid);
-        console.log('Hall of Fame updated successfully');
       } catch (error) {
         console.error('Error updating Hall of Fame:', error);
         // Don't show error to user - Hall of Fame update is non-critical
@@ -371,7 +370,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="text-gray-500">Caricamento...</div>
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -387,8 +386,8 @@ export default function DashboardPage() {
       {/* Header stacks vertically on portrait mobile to prevent title/button overflow */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Dashboard</h1>
-          <p className="mt-1 text-gray-600 sm:mt-2">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 sm:text-3xl">Dashboard</h1>
+          <p className="mt-1 text-gray-600 dark:text-gray-400 sm:mt-2">
             Panoramica del tuo portafoglio di investimenti
           </p>
         </div>
@@ -396,7 +395,7 @@ export default function DashboardPage() {
           onClick={handleCreateSnapshot}
           disabled={creatingSnapshot || portfolioMetrics.assetCount === 0}
           variant="default"
-          className="w-full sm:w-auto"
+          className="w-full sm:w-auto dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
         >
           <Camera className="mr-2 h-4 w-4" />
           {creatingSnapshot ? 'Creazione...' : 'Crea Snapshot'}
@@ -411,7 +410,7 @@ export default function DashboardPage() {
         className="grid gap-6 md:grid-cols-2 landscape:md:grid-cols-3 desktop:grid-cols-3"
       >
         <motion.div variants={cardItem}>
-          <Card>
+          <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Patrimonio Totale Lordo</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -426,7 +425,7 @@ export default function DashboardPage() {
         </motion.div>
 
         <motion.div variants={cardItem}>
-          <Card>
+          <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Patrimonio Liquido Lordo</CardTitle>
               <Wallet className="h-4 w-4 text-muted-foreground" />
@@ -438,7 +437,7 @@ export default function DashboardPage() {
         </motion.div>
 
         <motion.div variants={cardItem}>
-          <Card>
+          <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Numero Assets</CardTitle>
               <PieChart className="h-4 w-4 text-muted-foreground" />
@@ -564,7 +563,10 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Variazione Mensile</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            {variations.monthly && variations.monthly.value < 0
+              ? <TrendingDown className="h-4 w-4 text-red-500" />
+              : <TrendingUp className="h-4 w-4 text-green-500" />
+            }
           </CardHeader>
           <CardContent>
             {variations.monthly ? (
@@ -596,7 +598,10 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Variazione Annuale (YTD)</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            {variations.yearly && variations.yearly.value < 0
+              ? <TrendingDown className="h-4 w-4 text-red-500" />
+              : <TrendingUp className="h-4 w-4 text-green-500" />
+            }
           </CardHeader>
           <CardContent>
             {variations.yearly ? (
@@ -640,7 +645,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {loadingExpenses ? (
-              <div className="text-sm text-muted-foreground">Caricamento...</div>
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             ) : expenseStats ? (
               <>
                 <div className="text-2xl font-bold text-green-600">
@@ -670,7 +675,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {loadingExpenses ? (
-              <div className="text-sm text-muted-foreground">Caricamento...</div>
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             ) : expenseStats ? (
               <>
                 <div className="text-2xl font-bold text-red-600">
@@ -706,7 +711,7 @@ export default function DashboardPage() {
         >
           {hasTERTracking && (
             <motion.div variants={cardItem}>
-            <Card>
+            <Card className="h-full">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">TER Portfolio</CardTitle>
                 <Receipt className="h-4 w-4 text-muted-foreground" />
@@ -724,7 +729,7 @@ export default function DashboardPage() {
           )}
 
           <motion.div variants={cardItem} className={!hasTERTracking ? 'md:col-span-2' : ''}>
-          <Card>
+          <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Costo Annuale Portfolio</CardTitle>
               <TrendingDown className="h-4 w-4 text-muted-foreground" />

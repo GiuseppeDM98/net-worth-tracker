@@ -40,7 +40,7 @@ import { TimePeriod } from '@/types/performance';
  * 5. User reads analysis with metrics panel visible on the left
  */
 
-interface AIAnalysisDialogProps {
+export interface AIAnalysisDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   metrics: any; // PerformanceMetrics
