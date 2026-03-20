@@ -60,7 +60,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { TrendingUp, Calendar, DollarSign, Percent, Clock } from 'lucide-react';
+import { TrendingUp, TrendingDown, Calendar, DollarSign, Percent, Clock, BarChart3, Target, Info, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   LineChart,
@@ -262,7 +262,7 @@ export function FireCalculatorTab() {
         <>
           {/* Section Title: Current Metrics */}
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">📊 Metriche Attuali</h2>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2"><BarChart3 className="h-5 w-5 text-blue-500" />Metriche Attuali</h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               Basate sulle tue spese reali dell'anno corrente
             </p>
@@ -322,7 +322,7 @@ export function FireCalculatorTab() {
           {plannedFireMetrics && fireMetrics && (
             <>
               <div className="mt-8">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">🎯 Metriche Previste</h2>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2"><Target className="h-5 w-5 text-purple-500" />Metriche Previste</h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                   Basate sulle spese annuali previste che hai impostato ({formatCurrency(plannedFireMetrics.plannedAnnualExpenses)})
                 </p>
@@ -344,10 +344,10 @@ export function FireCalculatorTab() {
                       Patrimonio target basato sulle spese previste di {formatCurrency(plannedFireMetrics.plannedAnnualExpenses)}
                     </p>
                     {fireMetrics.fireNumber !== plannedFireMetrics.plannedFireNumber && (
-                      <p className="mt-2 text-xs text-purple-700 dark:text-purple-300 font-semibold">
+                      <p className="mt-2 text-xs text-purple-700 dark:text-purple-300 font-semibold flex items-center gap-1">
                         {plannedFireMetrics.plannedFireNumber < fireMetrics.fireNumber
-                          ? `📉 ${formatCurrency(fireMetrics.fireNumber - plannedFireMetrics.plannedFireNumber)} in meno rispetto all'attuale`
-                          : `📈 ${formatCurrency(plannedFireMetrics.plannedFireNumber - fireMetrics.fireNumber)} in più rispetto all'attuale`
+                          ? <><TrendingDown className="h-3.5 w-3.5 inline shrink-0" />{formatCurrency(fireMetrics.fireNumber - plannedFireMetrics.plannedFireNumber)} in meno rispetto all&apos;attuale</>
+                          : <><TrendingUp className="h-3.5 w-3.5 inline shrink-0" />{formatCurrency(plannedFireMetrics.plannedFireNumber - fireMetrics.fireNumber)} in più rispetto all&apos;attuale</>
                         }
                       </p>
                     )}
@@ -458,8 +458,9 @@ export function FireCalculatorTab() {
                   Rapporto tra spese annuali e patrimonio attuale
                 </p>
                 {fireMetrics.currentWR > withdrawalRate && (
-                  <p className="mt-2 text-sm text-red-600 font-semibold">
-                    ⚠️ Superiore al Safe Withdrawal Rate ({withdrawalRate}%)
+                  <p className="mt-2 text-sm text-red-600 font-semibold flex items-center gap-1">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                    Superiore al Safe Withdrawal Rate ({withdrawalRate}%)
                   </p>
                 )}
               </CardContent>
@@ -557,7 +558,7 @@ export function FireCalculatorTab() {
       {/* Info Box */}
       <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800">
         <CardContent className="pt-6">
-          <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">ℹ️ Come funziona il FIRE?</h3>
+          <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2"><Info className="h-4 w-4 shrink-0" />Come funziona il FIRE?</h3>
           <div className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
             <p>
               <strong>FIRE Number:</strong> È il patrimonio target calcolato come: Spese Annuali ÷ Safe Withdrawal Rate.

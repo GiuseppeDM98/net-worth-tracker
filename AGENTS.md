@@ -254,4 +254,30 @@ When an icon switches between TrendingUp/TrendingDown (or similar) based on a va
 }
 ```
 
-**Last updated**: 2026-03-20 (session 04: skeleton loading pattern + stale-while-revalidate)
+### Emoji in UI Elements
+**Rule**: Never use Unicode emoji as icons in headings (`h2`, `h3`), badges, or UI hint cards. Emoji render with vendor-specific glyphs — different shape, color, and size on Windows, Android, and iOS. Always use Lucide icons instead.
+- Emoji in narrative/celebratory **text strings** (e.g. `"🎉 Hai raggiunto la FI!"`) are acceptable.
+- Map: `📊`→`BarChart3`, `🎯`→`Target`, `ℹ️`→`Info`, `⚠️`→`AlertTriangle`, `📉`→`TrendingDown`, `📈`→`TrendingUp`, `💡`→`Info` or `Lightbulb`
+
+### shadcn `<Alert>` Icon Slot
+**Gotcha**: The first icon passed as a **direct child of `<Alert>`** (outside `<AlertDescription>`) is automatically positioned as the leading icon by shadcn's Alert component. Adding a second icon inside `<AlertDescription>` causes double rendering.
+```tsx
+// ✅ Correct — one icon as direct child of Alert, text in AlertDescription
+<Alert>
+  <Info className="h-4 w-4" />
+  <AlertDescription>Text here</AlertDescription>
+</Alert>
+
+// ❌ Wrong — double icon
+<Alert>
+  <Info className="h-4 w-4" />
+  <AlertDescription>
+    <div className="flex gap-2">
+      <Info className="h-4 w-4" />  {/* duplicate! */}
+      Text here
+    </div>
+  </AlertDescription>
+</Alert>
+```
+
+**Last updated**: 2026-03-20 (session 06: emoji → Lucide icons, shadcn Alert icon slot gotcha)

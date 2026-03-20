@@ -775,7 +775,7 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
           <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
           <AlertDescription className="flex items-start justify-between gap-4">
             <span className="text-blue-900 dark:text-blue-100">
-              💡 <strong>Suggerimento:</strong> Usa il filtro mese per analizzare Sankey, Spese e Entrate di un periodo specifico. Clicca sulle fette dei grafici &quot;Spese per Categoria&quot; e &quot;Entrate per Categoria&quot; per esplorare le sottocategorie nel dettaglio.
+              <strong>Suggerimento:</strong> Usa il filtro mese per analizzare Sankey, Spese e Entrate di un periodo specifico. Clicca sulle fette dei grafici &quot;Spese per Categoria&quot; e &quot;Entrate per Categoria&quot; per esplorare le sottocategorie nel dettaglio.
             </span>
             <Button
               variant="ghost"

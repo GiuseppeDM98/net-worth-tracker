@@ -36,6 +36,8 @@
 
 ## 🔧 Improvements
 
+- Section headers and hint cards in the FIRE Calculator and Cashflow (Current Year) pages now use consistent Lucide icons instead of emoji — icons render identically across Windows, Android, and iOS
+
 - The Dividends & Coupons tab now shows a skeleton loading screen when first opened — the placeholder mirrors the exact layout of the real page (metric cards, charts, tables) so the page feels faster and content appears without layout jumps
 - Changing asset or date filters on the Dividends page no longer blanks out the charts and tables while recalculating — existing data stays visible (slightly dimmed) while the updated statistics load in the background
 
