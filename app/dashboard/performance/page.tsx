@@ -26,8 +26,16 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts';
+import dynamic from 'next/dynamic';
 import { CustomDateRangeDialog } from '@/components/performance/CustomDateRangeDialog';
-import { AIAnalysisDialog } from '@/components/performance/AIAnalysisDialog';
+import type { AIAnalysisDialogProps } from '@/components/performance/AIAnalysisDialog';
+
+// Lazy-load AIAnalysisDialog to keep react-markdown and remark-gfm (~60KB gzipped)
+// out of the initial Performance page bundle — loaded only on first "Analisi AI" click.
+const AIAnalysisDialog = dynamic<AIAnalysisDialogProps>(
+  () => import('@/components/performance/AIAnalysisDialog').then(m => ({ default: m.AIAnalysisDialog })),
+  { ssr: false }
+);
 import { MetricCard } from '@/components/performance/MetricCard';
 import { MetricSection } from '@/components/performance/MetricSection';
 import { PerformanceTooltip } from '@/components/performance/PerformanceTooltip';

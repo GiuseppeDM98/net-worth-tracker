@@ -49,6 +49,20 @@ For architecture and status, see [CLAUDE.md](CLAUDE.md).
 - Invalidate all related caches after mutations (direct + indirect dependencies)
 - Never remove from `mountedTabs` once added to preserve tab state
 
+### next/dynamic for Named Exports
+`next/dynamic` requires a default export. For named exports, unwrap with `.then`:
+```tsx
+import type { MyDialogProps } from '@/components/MyDialog';
+
+const MyDialog = dynamic<MyDialogProps>(
+  () => import('@/components/MyDialog').then(m => ({ default: m.MyDialog })),
+  { ssr: false }
+);
+```
+- **`ssr: false`**: required for components that use client-only hooks (useState, SSE, streaming) — otherwise Next.js attempts server rendering and throws a hydration error.
+- **Type parameter**: without `dynamic<Props>()`, TypeScript infers `{}` for props, losing type safety. Export the props interface from the source file to import it as a type.
+- **When to use**: dialogs and heavy panels that import large libraries (react-markdown, remark-gfm, etc.) and are only opened on demand — keeps them out of the initial page bundle.
+
 ### Date Range Queries (Firestore)
 End date must include full day: `new Date(year, month, 0, 23, 59, 59, 999)`
 
