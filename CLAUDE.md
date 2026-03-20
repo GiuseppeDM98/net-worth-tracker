@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio, framer-motion
-- Ultima implementazione: **Login & Register dark mode polish** — background `bg-gray-50 dark:bg-gray-950` allineato al dashboard; card con `dark:bg-gray-900 dark:border-gray-800`; branding con favicon reale (`/favicon/favicon-48x48.png`) sopra la card; link emerald brand color; fix `text-gray-600` senza variante dark nel branch "registrazione disabilitata". (2026-03-19)
-- Precedente: **Dashboard polish** — variation cards mostrano `TrendingDown` rossa per negativi e `TrendingUp` verde per positivi; rimosso console.log da `createSnapshot`. (2026-03-19)
+- Ultima implementazione: **Header theme toggle 3 stati** — ciclo `light→dark→system→light` con icone Sun/Moon/Monitor; `theme` (non `resolvedTheme`) per preservare lo stato "system"; tooltip stato corrente. (2026-03-20)
+- Precedente: **Performance Component Polish** — `motion-safe:` prefix su classi `animate-in` in MetricSection.tsx (reduced-motion su server component senza `'use client'`); JSDoc breakpoint comments aggiornati. (2026-03-20)
 
 ## Architecture Snapshot
 - App Router con pagine protette sotto `app/dashboard/*`.
@@ -71,4 +71,4 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`, `components/pdf/PDFExportDialog.tsx`, `lib/utils/pdfTimeFilters.ts`, `lib/utils/pdfGenerator.tsx`
 - Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`, `borsaItalianaBondScraper.test.ts`, `goalService.test.ts`, `couponUtils.test.ts`
 
-**Last updated**: 2026-03-19 (session 03: login/register dark mode + branding polish)
+**Last updated**: 2026-03-20 (session 03: performance reduced-motion + 3-state theme toggle)

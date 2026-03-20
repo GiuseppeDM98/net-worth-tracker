@@ -149,6 +149,19 @@ Only use `useEffect` for side effects (API calls, subscriptions, DOM mutations).
 - **`AnimatePresence initial={false}`** on collapsibles that start open — avoids exit animation on mount
 - **Easing**: always `[0.25, 1, 0.5, 1]` (ease-out-quart). Never bounce or elastic.
 
+### CSS `animate-in` + prefers-reduced-motion
+- Framer Motion respects reduced-motion automatically via `MotionConfig` in `MotionProvider.tsx`.
+- **CSS `animate-in` classes** (tw-animate-css) must be guarded manually.
+- **Server components** (no `'use client'`): use `motion-safe:animate-in` Tailwind variant — no JS, no hydration issues. Pattern already used in `PerformancePageSkeleton` (`motion-safe:animate-pulse`) and `MetricSection` (`motion-safe:animate-in`).
+- **Client components only**: `window.matchMedia('(prefers-reduced-motion: reduce)').matches` + `useState/useEffect` works but causes a post-hydration flash on first render. Prefer `motion-safe:` when possible.
+- The `animationDelay` style prop is harmless when no animation classes are active — no need to conditionally omit it.
+
+### next-themes: `theme` vs `resolvedTheme`
+- `resolvedTheme` always resolves to `"light"` or `"dark"` — never returns `"system"`. Safe for rendering decisions (pick icon, pick color).
+- `theme` preserves the actual stored value: `"light"`, `"dark"`, or `"system"`. Required for cycle logic or detecting "follow OS" state.
+- **3-state cycle pattern** (`light → dark → system → light`): use `theme` as the discriminator, call `setTheme('system')` to re-enable OS following. See `Header.tsx`.
+- **Testing system-follow**: DevTools "Emulate prefers-color-scheme" only works when `localStorage.getItem('theme')` is `null` or `"system"`. If a user has manually toggled, localStorage wins. Reset with `localStorage.removeItem('theme')` + reload.
+
 ---
 
 ## Common Errors to Avoid
@@ -204,4 +217,4 @@ When an icon switches between TrendingUp/TrendingDown (or similar) based on a va
 }
 ```
 
-**Last updated**: 2026-03-19 (session 03: auth page dark mode tokens + Card dark mode pattern)
+**Last updated**: 2026-03-20 (session 03: motion-safe pattern, next-themes theme vs resolvedTheme)

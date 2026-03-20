@@ -59,7 +59,7 @@ function MetricCardSkeleton({ delayMs = 0 }: { delayMs?: number }) {
 
 /**
  * Reproduces a MetricSection: slide-in title bar + responsive card grid.
- * Grid matches the real layout: 1 col → md:2 col → lg:4 col.
+ * Grid matches the real layout: 1 col → sm:2 col → desktop:4 col.
  *
  * @param cardCount  - number of card skeletons to render (matches real section)
  * @param baseDelay  - section-level offset so later sections start after earlier ones

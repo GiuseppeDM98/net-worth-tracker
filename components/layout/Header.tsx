@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, User, Sun, Moon } from 'lucide-react';
+import { LogOut, User, Sun, Moon, Monitor } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
@@ -29,7 +29,21 @@ import { toast } from 'sonner';
 export function Header() {
   const { user, signOut } = useAuth();
   const router = useRouter();
-  const { resolvedTheme, setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
+
+  // Cycle through explicit states so the user can always get back to "follow system".
+  // `theme` (not `resolvedTheme`) preserves the "system" value between renders.
+  const cycleTheme = () => {
+    if (theme === 'light') setTheme('dark');
+    else if (theme === 'dark') setTheme('system');
+    else setTheme('light');
+  };
+
+  const ThemeIcon = theme === 'dark' ? Moon : theme === 'light' ? Sun : Monitor;
+  const themeLabel =
+    theme === 'dark' ? 'Scuro (clicca per: Sistema)' :
+    theme === 'light' ? 'Chiaro (clicca per: Scuro)' :
+    'Sistema (clicca per: Chiaro)';
 
   /**
    * Handles user logout with error handling and user feedback.
@@ -69,10 +83,11 @@ export function Header() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+          onClick={cycleTheme}
+          title={themeLabel}
           className="rounded-full"
         >
-          {resolvedTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          <ThemeIcon className="h-5 w-5" />
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

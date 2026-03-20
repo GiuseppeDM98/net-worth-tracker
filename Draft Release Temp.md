@@ -1,5 +1,7 @@
 ## ✨ New Features
 
+- The theme toggle in the header now cycles through three states — **Light**, **Dark**, and **System** (follows OS preference) — using Sun, Moon, and Monitor icons respectively. Switching to System removes the manual override and re-syncs the app with the operating system's light/dark setting
+
 - Added **Budget** tab to Cashflow page with automatic budget tracking for all expense categories
 - Budget items auto-generated from your categories (Fixed Expenses, Variable, Debt, Income) — no manual setup required
 - Annual view: compare current year spending vs budget, previous year, and historical average with color-coded progress bars
@@ -33,6 +35,8 @@
 - Fixed date filters on the Dividends page: setting only a start date (without an end date) now correctly filters the summary cards and charts. Previously, a single date bound was silently ignored
 
 ## 🔧 Improvements
+
+- Metric card entrance animations on the Performance page now respect the system's "Reduce Motion" accessibility preference — slide-in and fade-in effects are skipped for users who have enabled reduced motion in their OS settings
 
 - When editing an asset's quantity, the form now shows a contextual reminder if the quantity increases ("did you invest new capital? record a cashflow income entry") or decreases ("did you sell this asset? record a cashflow expense entry") — helps keep performance metrics (TWR, CAGR) accurate by ensuring capital flows are properly tracked. The reminder does not appear for cash assets or when the quantity is unchanged
 

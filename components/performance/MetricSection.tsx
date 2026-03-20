@@ -19,8 +19,8 @@ interface MetricSectionProps {
  *
  * Layout:
  * - Mobile: 1 column
- * - Tablet (md): 2 columns
- * - Desktop (lg): 4 columns
+ * - Tablet (sm, ≥640px): 2 columns
+ * - Desktop (≥1440px): 4 columns
  *
  * @param title - Category name (e.g., "Metriche di Rendimento")
  * @param description - Optional explanatory text below title
@@ -39,9 +39,9 @@ export function MetricSection({
 
   return (
     <div className={cn('mt-8', className)}>
-      {/* Section Header — slides in from left */}
+      {/* Section Header — slides in from left; skipped when reduced-motion is preferred */}
       <div
-        className="mb-4 animate-in fade-in-0 slide-in-from-left-4 duration-500 [animation-fill-mode:both]"
+        className="mb-4 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-left-4 duration-500 [animation-fill-mode:both]"
         style={{ animationDelay: `${sectionDelay}ms` }}
       >
         <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
@@ -59,7 +59,7 @@ export function MetricSection({
         {React.Children.map(children, (child, i) => (
           <div
             key={i}
-            className="animate-in fade-in-0 slide-in-from-bottom-4 duration-500 [animation-fill-mode:both] h-full"
+            className="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-4 duration-500 [animation-fill-mode:both] h-full"
             style={{ animationDelay: `${sectionDelay + 80 + i * 80}ms` }}
           >
             {child}
