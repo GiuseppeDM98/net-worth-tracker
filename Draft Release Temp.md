@@ -21,6 +21,9 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed expense cards in dark mode on mobile and tablet: the date, amount box background, category labels, and notes were displayed with light-gray colors that were barely readable against a dark background — all text and backgrounds now correctly adapt to the active theme
+- Fixed income and expense amounts on mobile cards appearing in a harsh bright red/green in dark mode — amounts now use softer red/green tones that are easier to read against a dark background
+
 - Fixed the Monthly Change and Yearly Change (YTD) cards on the Dashboard always showing a green upward arrow regardless of the portfolio direction — the icon is now a red downward arrow when the value is negative, and a green upward arrow when positive
 
 - Fixed the monthly returns heatmap on the Performance page overflowing its container on iPad Mini and similar ~744px-wide devices: the compact color-only view (green/red cells, no numbers) now correctly appears on all devices below 1440px wide — previously the full table with month names and percentages was incorrectly triggered at 640px, causing it to overflow without a scrollbar
@@ -35,6 +38,9 @@
 - Fixed date filters on the Dividends page: setting only a start date (without an end date) now correctly filters the summary cards and charts. Previously, a single date bound was silently ignored
 
 ## 🔧 Improvements
+
+- The "Add / Edit Asset", "New / Edit Expense", and "Delete Category" dialogs now keep their title and action buttons always visible while you scroll — the header is pinned at the top and the Save / Confirm button is pinned at the bottom, so you never need to scroll to the very end of a long form just to submit it
+- The "Delete Category" confirmation dialog is now wider, uses stacked full-width buttons, and the category list dropdown is fully visible when open — previously the dropdown was clipped and the buttons overflowed the screen on mobile
 
 - Section headers and hint cards in the FIRE Calculator and Cashflow (Current Year) pages now use consistent Lucide icons instead of emoji — icons render identically across Windows, Android, and iOS
 

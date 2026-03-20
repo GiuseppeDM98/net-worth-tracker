@@ -95,7 +95,7 @@ export function ExpenseCard({ expense, onEdit, onDelete }: ExpenseCardProps) {
         {/* Header: Data + Tipo Badge */}
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-2">
-            <p className="font-semibold text-base text-gray-900">
+            <p className="font-semibold text-base text-gray-900 dark:text-gray-100">
               {formatDate(expense.date)}
             </p>
             {expense.isRecurring && (
@@ -108,11 +108,11 @@ export function ExpenseCard({ expense, onEdit, onDelete }: ExpenseCardProps) {
         </div>
 
         {/* Importo (prominente) */}
-        <div className="mb-3 p-3 bg-gray-50 rounded-lg">
-          <p className="text-xs text-gray-500 mb-1">Importo</p>
+        <div className="mb-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Importo</p>
           <div
             className={`flex items-center gap-2 text-xl font-bold ${
-              expense.type === 'income' ? 'text-green-600' : 'text-red-600'
+              expense.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
             }`}
           >
             {expense.type === 'income' ? (
@@ -127,12 +127,12 @@ export function ExpenseCard({ expense, onEdit, onDelete }: ExpenseCardProps) {
         {/* Categoria e Sottocategoria (sempre visibili) */}
         <div className="grid grid-cols-2 gap-2 text-sm mb-3">
           <div>
-            <span className="text-gray-500">Categoria:</span>{' '}
+            <span className="text-gray-500 dark:text-gray-400">Categoria:</span>{' '}
             <span className="font-medium">{expense.categoryName}</span>
           </div>
           <div>
-            <span className="text-gray-500">Sotto-cat:</span>{' '}
-            <span className="font-medium text-gray-700">
+            <span className="text-gray-500 dark:text-gray-400">Sotto-cat:</span>{' '}
+            <span className="font-medium text-gray-700 dark:text-gray-300">
               {expense.subCategoryName || '-'}
             </span>
           </div>
@@ -143,8 +143,8 @@ export function ExpenseCard({ expense, onEdit, onDelete }: ExpenseCardProps) {
           <div className="text-sm mb-3 pt-2 border-t space-y-2">
             {expense.notes && (
               <div>
-                <span className="text-gray-500">Note:</span>{' '}
-                <span className="font-medium text-gray-700">{expense.notes}</span>
+                <span className="text-gray-500 dark:text-gray-400">Note:</span>{' '}
+                <span className="font-medium text-gray-700 dark:text-gray-300">{expense.notes}</span>
               </div>
             )}
             {expense.isInstallment && expense.installmentNumber && expense.installmentTotal && (

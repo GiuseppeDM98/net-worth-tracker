@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio, framer-motion
-- Ultima implementazione: **Typography & Emoji Cleanup** — Sostituiti 6 emoji con icone Lucide in `FireCalculatorTab` (`BarChart3`, `Target`, `TrendingDown`, `TrendingUp`, `AlertTriangle`, `Info`) e rimossa emoji `💡` inline in `CurrentYearTab` (già gestita dall'icon slot di shadcn `<Alert>`). (2026-03-20)
-- Precedente: **Bundle optimization** — `AIAnalysisDialog` → `next/dynamic` (`ssr: false`); `react-markdown` + `remark-gfm` (~60-80KB gzipped) esclusi dal bundle iniziale pagina Performance; `AIAnalysisDialogProps` esportata per type-safe `dynamic<Props>()`. (2026-03-20)
+- Ultima implementazione: **Dialog UX Polish** — Sticky header/footer in `AssetDialog`, `ExpenseDialog`, `CategoryDeleteConfirmDialog` (`flex flex-col p-0`, `shrink-0`, `overflow-y-auto` sul body). Dark mode fix `ExpenseCard` (colori gray + importi `dark:text-red-400`/`dark:text-green-400`). Fix `CategoryDeleteConfirmDialog`: dropdown dark, dialog `max-w-lg`, pulsanti verticali full-width, rimosso `overflow-y-auto` dal body (clippava dropdown assolute). (2026-03-20)
+- Precedente: **Typography & Emoji Cleanup** — Sostituiti 6 emoji con icone Lucide in `FireCalculatorTab`; rimossa emoji `💡` inline in `CurrentYearTab`. (2026-03-20)
 
 ## Architecture Snapshot
 - App Router con pagine protette sotto `app/dashboard/*`.
@@ -71,4 +71,4 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`, `components/pdf/PDFExportDialog.tsx`, `lib/utils/pdfTimeFilters.ts`, `lib/utils/pdfGenerator.tsx`
 - Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`, `borsaItalianaBondScraper.test.ts`, `goalService.test.ts`, `couponUtils.test.ts`
 
-**Last updated**: 2026-03-20 (session 06: typography & emoji cleanup)
+**Last updated**: 2026-03-20 (session 07: dialog UX polish + dark mode fixes)

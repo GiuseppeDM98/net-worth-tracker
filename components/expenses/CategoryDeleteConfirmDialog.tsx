@@ -274,9 +274,9 @@ export function CategoryDeleteConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0">
         {/* ========== Header Section ========== */}
-        <DialogHeader>
+        <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
           <div className="flex items-center gap-2 text-amber-600 mb-2">
             <AlertTriangle className="h-5 w-5" />
             <DialogTitle>Impossibile eliminare {isDeleting}</DialogTitle>
@@ -299,7 +299,7 @@ export function CategoryDeleteConfirmDialog({
         </DialogHeader>
 
         {/* ========== Reassignment Selection Section ========== */}
-        <div className="space-y-4 py-4">
+        <div className="flex-1 px-6 py-4 space-y-4">
           {/* Category Selection - Only show if multiple categories available */}
           {availableCategories.length > 1 && (
             <div className="space-y-2">
@@ -323,12 +323,12 @@ export function CategoryDeleteConfirmDialog({
                 {isDropdownOpen && (
                   <div
                     ref={dropdownRef}
-                    className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto"
+                    className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg max-h-60 overflow-auto"
                   >
                     {filteredCategories.length === 0 && searchQuery.trim() ? (
                       <button
                         type="button"
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer text-left"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer text-left"
                         onClick={handleCreateCategory}
                       >
                         <Plus className="h-4 w-4 text-primary flex-shrink-0" />
@@ -344,8 +344,8 @@ export function CategoryDeleteConfirmDialog({
                           key={category.id}
                           type="button"
                           className={cn(
-                            "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer text-left",
-                            selectedCategoryId === category.id && "bg-gray-100"
+                            "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer text-left",
+                            selectedCategoryId === category.id && "bg-gray-100 dark:bg-gray-800"
                           )}
                           onClick={() => handleSelectCategory(category.id)}
                         >
@@ -368,7 +368,7 @@ export function CategoryDeleteConfirmDialog({
 
               {/* Selected category display */}
               {selectedCategoryId && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
                   {selectedCategory?.color && (
                     <div
                       className="w-3 h-3 rounded-full"
@@ -424,33 +424,35 @@ export function CategoryDeleteConfirmDialog({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-wrap justify-end gap-2 pt-4 border-t">
+        <div className="px-6 pb-6 pt-4 border-t shrink-0 flex flex-col gap-2">
           <Button
             type="button"
-            variant="outline"
-            onClick={onClose}
-            disabled={isSubmitting}
+            variant="destructive"
+            onClick={handleConfirm}
+            disabled={!selectedCategoryId || isSubmitting || availableCategories.length === 0}
+            className="w-full"
           >
-            Annulla
+            {isSubmitting
+              ? 'Riassegnazione...'
+              : `Conferma ed Elimina`}
           </Button>
           <Button
             type="button"
             variant="outline"
             onClick={handleDeleteWithoutReassign}
             disabled={isSubmitting}
-            className="text-amber-600 hover:text-amber-700 border-amber-300 hover:bg-amber-50"
+            className="w-full text-amber-600 hover:text-amber-700 border-amber-300 hover:bg-amber-50"
           >
             Elimina senza riassegnare
           </Button>
           <Button
             type="button"
-            variant="destructive"
-            onClick={handleConfirm}
-            disabled={!selectedCategoryId || isSubmitting || availableCategories.length === 0}
+            variant="outline"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="w-full"
           >
-            {isSubmitting
-              ? 'Riassegnazione...'
-              : `Conferma ed Elimina`}
+            Annulla
           </Button>
         </div>
       </DialogContent>

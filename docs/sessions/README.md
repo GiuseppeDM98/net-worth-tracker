@@ -21,7 +21,7 @@ Audit completo avviato il 2026-03-19. Ogni file contiene la specifica tecnica e 
 | 04 | [session-04-filter-memo-optimization.md](session-04-filter-memo-optimization.md) | Ottimizzazione: `useEffect`→`useMemo` filtri | 🔴 Critico | 3 file |
 | 05 | [session-05-bundle-optimization.md](session-05-bundle-optimization.md) | Bundle: AIAnalysisDialog dynamic import | 🔴 Critico | 1 file |
 | 06 | [session-06-typography-emoji-cleanup.md](session-06-typography-emoji-cleanup.md) | Emoji → Lucide icons nei titoli di sezione | 🟡 Medio | 2 file |
-| 07 | [session-07-dialog-ux.md](session-07-dialog-ux.md) | Dialog UX: sticky header/footer + overflow | 🟡 Medio | 3 file |
+| 07 | ~~session-07-dialog-ux.md~~ ✅ | Dialog UX: sticky header/footer + overflow | ✅ Completata | 3 file + dark mode fix ExpenseCard + CategoryDeleteConfirmDialog |
 | 08 | [session-08-loading-states.md](session-08-loading-states.md) | Loading states: `text-gray-500` → `Loader2 animate-spin` | 🟡 Medio | 5 file |
 
 ---
