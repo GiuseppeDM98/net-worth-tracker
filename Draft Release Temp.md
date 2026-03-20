@@ -21,6 +21,8 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed chart tooltips on the History page: hovering over data points now shows each series label in its correct color (blue for Equities, red for Bonds, green for Liquidity, etc.) — previously all tooltip text appeared in the same neutral color regardless of the series
+
 - Fixed expense cards in dark mode on mobile and tablet: the date, amount box background, category labels, and notes were displayed with light-gray colors that were barely readable against a dark background — all text and backgrounds now correctly adapt to the active theme
 - Fixed income and expense amounts on mobile cards appearing in a harsh bright red/green in dark mode — amounts now use softer red/green tones that are easier to read against a dark background
 
