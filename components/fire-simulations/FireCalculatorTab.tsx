@@ -61,6 +61,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { TrendingUp, TrendingDown, Calendar, DollarSign, Percent, Clock, BarChart3, Target, Info, AlertTriangle, Loader2 } from 'lucide-react';
+import { FireCalculatorSkeleton } from '@/components/fire-simulations/FireCalculatorSkeleton';
 import { toast } from 'sonner';
 import {
   LineChart,
@@ -171,11 +172,7 @@ export function FireCalculatorTab() {
   };
 
   if (isLoadingSettings || isLoadingAssets || (currentNetWorth > 0 && isLoadingFIRE)) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <FireCalculatorSkeleton />;
   }
 
   return (

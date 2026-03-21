@@ -1,5 +1,8 @@
 ## ✨ New Features
 
+- Added smooth animated transitions between dashboard pages — navigating via the sidebar now plays a subtle fade-out then fade-in effect, making the app feel connected and polished rather than abrupt
+
+
 - The theme toggle in the header now cycles through three states — **Light**, **Dark**, and **System** (follows OS preference) — using Sun, Moon, and Monitor icons respectively. Switching to System removes the manual override and re-syncs the app with the operating system's light/dark setting
 
 - Added **Budget** tab to Cashflow page with automatic budget tracking for all expense categories
@@ -135,3 +138,5 @@
 - Login and registration pages now display the app's logo above the sign-in form, along with the "Portfolio Tracker" title — bringing these pages in line with the visual identity of the rest of the app
 - Links on the Login and Registration pages now use the app's emerald brand color instead of blue, consistent with the rest of the interface
 - Loading indicators on the Dashboard, FIRE Calculator, Monte Carlo, and Goal-Based Investing pages now show an animated spinner instead of a static "Caricamento..." text — the spinner is visible and clearly communicates the loading state in both light and dark mode
+- History page now shows a skeleton loading screen while data is being fetched — the placeholder mirrors the exact layout of the page (header, 8 chart sections, snapshot grid) so the transition from loading to loaded feels seamless instead of a sudden appearance
+- FIRE Calculator, Monte Carlo, and Goals tabs now show skeleton loading screens that mirror their real layouts while settings and portfolio data are being loaded

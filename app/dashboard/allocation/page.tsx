@@ -436,13 +436,7 @@ export default function AllocationPage() {
 
   // ========== LOADING & EMPTY STATES ==========
 
-  if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-gray-500">Caricamento...</div>
-      </div>
-    );
-  }
+  if (loading) return null;
 
   if (!allocation) {
     return (

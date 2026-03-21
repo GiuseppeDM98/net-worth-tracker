@@ -9,6 +9,7 @@ import {
   slideDown,
 } from '@/lib/utils/motionVariants';
 import { useAuth } from '@/contexts/AuthContext';
+import { HistoryPageSkeleton } from '@/components/history/HistoryPageSkeleton';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { getAllAssets, ASSET_CLASS_ORDER } from '@/lib/services/assetService';
 import { getUserSnapshots, updateSnapshotNote } from '@/lib/services/snapshotService';
@@ -509,11 +510,7 @@ export default function HistoryPage() {
   const renderCommodityLabel = renderAssetClassLabel('#92400E', -10);
 
   if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-muted-foreground">Caricamento...</div>
-      </div>
-    );
+    return <HistoryPageSkeleton />;
   }
 
   return (

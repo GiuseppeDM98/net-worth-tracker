@@ -181,6 +181,7 @@ return (
 
 - **Simple loading state (no skeleton)**: Use `<Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />` inside a height placeholder (`h-64`) to prevent layout shift. Never use `<div className="text-gray-500">Caricamento...</div>` — it is invisible in dark mode and provides no visual feedback.
 - **`Loader2` vs `RefreshCw`**: `Loader2 animate-spin` = initial mount loading (data not yet arrived). `RefreshCw animate-spin` = user-triggered active refresh (cashflow, filters). Never interchange them — they have different semantic meaning.
+- **Fast vs. slow page loading decision**: Pages that load in <200ms should `return null` while loading — a flash of skeleton is more jarring than a brief blank when the page transition already covers the gap. Only use skeletons for genuinely slow fetches (History: multiple Firestore queries + calculations). For borderline cases, use `useDelayedLoading(loading, 150)` from `lib/hooks/useDelayedLoading.ts` — shows the skeleton only after 150ms, avoiding the flash entirely on fast connections.
 
 ### Framer Motion Animation Patterns
 - **Shared variants**: `lib/utils/motionVariants.ts` — never define variants inline
@@ -188,6 +189,7 @@ return (
 - **`motion.tr`**: wrapping shadcn `<TableRow>` with `motion()` breaks table structure. Use `motion.tr` directly
 - **`AnimatePresence initial={false}`** on collapsibles that start open — avoids exit animation on mount
 - **Easing**: always `[0.25, 1, 0.5, 1]` (ease-out-quart). Never bounce or elastic.
+- **Page-level transitions**: `AnimatePresence mode="wait"` in `app/dashboard/layout.tsx`, keyed by `usePathname()`. The `exit` state on `pageVariants` only fires from this layout wrapper — individual pages don't need their own `AnimatePresence`. `mode="wait"` ensures the exiting page finishes before the entering page starts. Exit duration must be < entering duration (150ms vs 350ms) to feel snappy.
 
 ### CSS `animate-in` + prefers-reduced-motion
 - Framer Motion respects reduced-motion automatically via `MotionConfig` in `MotionProvider.tsx`.
@@ -315,6 +317,10 @@ When an icon switches between TrendingUp/TrendingDown (or similar) based on a va
 - Emoji in narrative/celebratory **text strings** (e.g. `"🎉 Hai raggiunto la FI!"`) are acceptable.
 - Map: `📊`→`BarChart3`, `🎯`→`Target`, `ℹ️`→`Info`, `⚠️`→`AlertTriangle`, `📉`→`TrendingDown`, `📈`→`TrendingUp`, `💡`→`Info` or `Lightbulb`
 
+### Radix Dialog/Sheet Without Description Warning
+**Symptom**: `Warning: Missing 'Description' or 'aria-describedby={undefined}' for {DialogContent}` in console when opening a Sheet or Dialog that has no description child.
+**Fix**: Add `aria-describedby={undefined}` to `DialogPrimitive.Content` in the component primitive — this explicitly signals "no description intentionally" and silences the warning without adding a hidden element. Applied in `components/ui/sheet.tsx`.
+
 ### shadcn `<Alert>` Icon Slot
 **Gotcha**: The first icon passed as a **direct child of `<Alert>`** (outside `<AlertDescription>`) is automatically positioned as the leading icon by shadcn's Alert component. Adding a second icon inside `<AlertDescription>` causes double rendering.
 ```tsx
@@ -336,4 +342,4 @@ When an icon switches between TrendingUp/TrendingDown (or similar) based on a va
 </Alert>
 ```
 
-**Last updated**: 2026-03-20 (session 08: Loader2 vs RefreshCw loading state rule)
+**Last updated**: 2026-03-21 (session 10: page transitions, skeleton loading decision, Radix aria fix)
