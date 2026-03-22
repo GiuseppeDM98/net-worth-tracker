@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio, framer-motion
-- Ultima implementazione: **Recharts Animations** — `animationDuration={600} animationEasing="ease-out"` su tutti i `<Bar>` e `<Pie>` (+ `animationBegin={0}`); `animationDuration={800}` su `<Line>` e `<Area>`; 13 file, 97 occorrenze. Aree decorative sovrapposte (bande percentili Monte Carlo) mantengono `isAnimationActive={false}` con commento inline. (2026-03-22)
-- Precedente: **Page Transitions & Skeleton Screens** — `AnimatePresence mode="wait"` in `app/dashboard/layout.tsx` con `key={pathname}`; variante `exit` aggiunta a `pageVariants` (opacity 0, y -8px, 150ms ease-in); `HistoryPageSkeleton`; skeleton per tab FIRE; `useDelayedLoading` hook in `lib/hooks/`. (2026-03-21)
+- Ultima implementazione: **Button Micro-interactions** — `hover:-translate-y-[1px]` + `active:scale-[0.97] active:translate-y-[1px]` + `duration-150` nella base class di `components/ui/button.tsx` (cva). Override `hover:translate-y-0` su `ghost`, `link`, `icon`, `icon-sm`, `icon-lg`. (2026-03-22)
+- Precedente: **Recharts Animations** — `animationDuration={600} animationEasing="ease-out"` su tutti i `<Bar>` e `<Pie>` (+ `animationBegin={0}`); `animationDuration={800}` su `<Line>` e `<Area>`; 13 file, 97 occorrenze. Aree decorative sovrapposte (bande percentili Monte Carlo) mantengono `isAnimationActive={false}` con commento inline. (2026-03-22)
 
 ## Architecture Snapshot
 - App Router con pagine protette sotto `app/dashboard/*`.
@@ -73,4 +73,4 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`, `components/pdf/PDFExportDialog.tsx`, `lib/utils/pdfTimeFilters.ts`, `lib/utils/pdfGenerator.tsx`
 - Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`, `borsaItalianaBondScraper.test.ts`, `goalService.test.ts`, `couponUtils.test.ts`
 
-**Last updated**: 2026-03-22 (session 11: Recharts chart animations)
+**Last updated**: 2026-03-22 (session 12: button micro-interactions)

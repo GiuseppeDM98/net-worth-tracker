@@ -201,6 +201,13 @@ Standard props across the entire codebase — never deviate:
 
 **Re-animation on filter/data changes**: intentional for explicit user actions (dropdown select, button toggle, drill-down click). Re-animation communicates the data changed. Do NOT set `isAnimationActive={false}` for this reason unless the trigger is genuinely real-time (slider, typing, polling).
 
+### Button Micro-interaction Pattern
+- **Base class** (`components/ui/button.tsx`): `hover:-translate-y-[1px] active:scale-[0.97] active:translate-y-[1px] duration-150` — lift on hover, press-down on active
+- **ghost / link variants**: add `hover:translate-y-0` to suppress the lift (no solid chrome, so lift feels wrong). Press (`active:scale`) still applies from base class
+- **icon / icon-sm / icon-lg sizes**: add `hover:translate-y-0` — icon buttons should not shift position (they sit inside toolbars and table rows where even 1px shift is visible noise)
+- **`disabled:pointer-events-none`** already in base class — no hover/active events reach disabled buttons, no extra guard needed
+- **Gotcha — `asChild` + Radix dropdown trigger**: if the button wraps a Radix DropdownMenuTrigger or PopoverTrigger and a parent has `overflow: hidden` or tight `z-index`, the `translate-y` on hover can clip the floating menu. Fix: pass `className="hover:translate-y-0"` inline as an override on that specific usage
+
 ### CSS `animate-in` + prefers-reduced-motion
 - Framer Motion respects reduced-motion automatically via `MotionConfig` in `MotionProvider.tsx`.
 - **CSS `animate-in` classes** (tw-animate-css) must be guarded manually.
@@ -352,4 +359,4 @@ When an icon switches between TrendingUp/TrendingDown (or similar) based on a va
 </Alert>
 ```
 
-**Last updated**: 2026-03-22 (session 11: Recharts animation patterns)
+**Last updated**: 2026-03-22 (session 12: button micro-interactions)
