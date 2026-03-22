@@ -191,6 +191,31 @@ return (
 - **Easing**: always `[0.25, 1, 0.5, 1]` (ease-out-quart). Never bounce or elastic.
 - **Page-level transitions**: `AnimatePresence mode="wait"` in `app/dashboard/layout.tsx`, keyed by `usePathname()`. The `exit` state on `pageVariants` only fires from this layout wrapper — individual pages don't need their own `AnimatePresence`. `mode="wait"` ensures the exiting page finishes before the entering page starts. Exit duration must be < entering duration (150ms vs 350ms) to feel snappy.
 
+**Two valid patterns for page mount animations — never mix them:**
+
+*Pattern A — staggerContainer (use when the page has a skeleton loading state):*
+```tsx
+// Root plain div (skeleton already handles loading→content transition)
+<div className="space-y-6 p-3 sm:p-6">
+  {/* non-animated sections (header, tabs, metric sections) */}
+  <motion.div variants={staggerContainer} initial="hidden" animate="visible">
+    <motion.div variants={cardItem}><Card /></motion.div>  {/* no initial/animate on children */}
+    <motion.div variants={cardItem}><Card /></motion.div>
+  </motion.div>
+</div>
+```
+Children inherit `hidden` state from the stagger parent — Framer Motion applies `opacity: 0` synchronously before the first paint, preventing the compound-opacity flash.
+
+*Pattern B — explicit delays (use for tab-child components with no skeleton transition):*
+```tsx
+<motion.div variants={pageVariants} initial="hidden" animate="visible" className="space-y-6">
+  <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ delay: 0 }}>…</motion.div>
+  <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ delay: 0.1 }}>…</motion.div>
+</motion.div>
+```
+
+**Compound-opacity flash (>30min debug, session 13):** Combining `pageVariants` root fade (`opacity 0→1` over 0.35s) with independent `initial="hidden" animate="visible"` on child cardItems causes `opacity_visual = opacity_parent × opacity_child` — chart cards appear to flash from nowhere while the page is mid-fade. Fix: use Pattern A (staggerContainer) instead. The flash happens because both opacities animate in parallel rather than the children inheriting state from the parent.
+
 ### Recharts Animation Patterns
 Standard props across the entire codebase — never deviate:
 - **`<Bar>` / `<Pie>`**: `animationDuration={600} animationEasing="ease-out"`
@@ -359,4 +384,4 @@ When an icon switches between TrendingUp/TrendingDown (or similar) based on a va
 </Alert>
 ```
 
-**Last updated**: 2026-03-22 (session 12: button micro-interactions)
+**Last updated**: 2026-03-22 (session 13: Framer Motion — performance & dividends, compound-opacity flash fix)
