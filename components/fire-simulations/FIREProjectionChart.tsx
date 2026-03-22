@@ -72,7 +72,8 @@ export function FIREProjectionChart({ yearlyData, bearYearsToFIRE, baseYearsToFI
           strokeWidth={2}
           name="Scenario Orso"
           dot={false}
-          isAnimationActive={false}
+          animationDuration={800}
+          animationEasing="ease-out"
         />
         <Line
           type="monotone"
@@ -81,7 +82,8 @@ export function FIREProjectionChart({ yearlyData, bearYearsToFIRE, baseYearsToFI
           strokeWidth={2}
           name="Scenario Base"
           dot={false}
-          isAnimationActive={false}
+          animationDuration={800}
+          animationEasing="ease-out"
         />
         <Line
           type="monotone"
@@ -90,7 +92,8 @@ export function FIREProjectionChart({ yearlyData, bearYearsToFIRE, baseYearsToFI
           strokeWidth={2}
           name="Scenario Toro"
           dot={false}
-          isAnimationActive={false}
+          animationDuration={800}
+          animationEasing="ease-out"
         />
         <Line
           type="monotone"
@@ -100,7 +103,8 @@ export function FIREProjectionChart({ yearlyData, bearYearsToFIRE, baseYearsToFI
           strokeDasharray="8 4"
           name="FIRE Nr. Orso"
           dot={false}
-          isAnimationActive={false}
+          animationDuration={800}
+          animationEasing="ease-out"
         />
         <Line
           type="monotone"
@@ -110,7 +114,8 @@ export function FIREProjectionChart({ yearlyData, bearYearsToFIRE, baseYearsToFI
           strokeDasharray="8 4"
           name="FIRE Nr. Base"
           dot={false}
-          isAnimationActive={false}
+          animationDuration={800}
+          animationEasing="ease-out"
         />
         <Line
           type="monotone"
@@ -120,7 +125,8 @@ export function FIREProjectionChart({ yearlyData, bearYearsToFIRE, baseYearsToFI
           strokeDasharray="8 4"
           name="FIRE Nr. Toro"
           dot={false}
-          isAnimationActive={false}
+          animationDuration={800}
+          animationEasing="ease-out"
         />
         {/* Vertical lines marking the year FIRE is reached per scenario */}
         {bullYearsToFIRE !== null && (

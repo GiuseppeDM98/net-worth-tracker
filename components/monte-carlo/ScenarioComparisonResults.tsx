@@ -163,18 +163,20 @@ export function ScenarioComparisonResults({
                 strokeDasharray="3 3"
               />
 
-              {/* p10-p90 bands for each scenario (semi-transparent) */}
-              <Area type="monotone" dataKey="bearP90" stroke="none" fill="#EF4444" fillOpacity={0.06} name="Orso p90" legendType="none" />
-              <Area type="monotone" dataKey="bearP10" stroke="none" fill="#EF4444" fillOpacity={0.06} name="Orso p10" legendType="none" />
-              <Area type="monotone" dataKey="baseP90" stroke="none" fill="#6366F1" fillOpacity={0.06} name="Base p90" legendType="none" />
-              <Area type="monotone" dataKey="baseP10" stroke="none" fill="#6366F1" fillOpacity={0.06} name="Base p10" legendType="none" />
-              <Area type="monotone" dataKey="bullP90" stroke="none" fill="#10B981" fillOpacity={0.06} name="Toro p90" legendType="none" />
-              <Area type="monotone" dataKey="bullP10" stroke="none" fill="#10B981" fillOpacity={0.06} name="Toro p10" legendType="none" />
+              {/* p10-p90 bands for each scenario (semi-transparent) — isAnimationActive={false}
+                  perché sono 6 aree decorative sovrapposte: animarle singolarmente causerebbe
+                  una sequenza visivamente caotica. Le linee mediane animano al loro posto. */}
+              <Area type="monotone" dataKey="bearP90" stroke="none" fill="#EF4444" fillOpacity={0.06} name="Orso p90" legendType="none" isAnimationActive={false} />
+              <Area type="monotone" dataKey="bearP10" stroke="none" fill="#EF4444" fillOpacity={0.06} name="Orso p10" legendType="none" isAnimationActive={false} />
+              <Area type="monotone" dataKey="baseP90" stroke="none" fill="#6366F1" fillOpacity={0.06} name="Base p90" legendType="none" isAnimationActive={false} />
+              <Area type="monotone" dataKey="baseP10" stroke="none" fill="#6366F1" fillOpacity={0.06} name="Base p10" legendType="none" isAnimationActive={false} />
+              <Area type="monotone" dataKey="bullP90" stroke="none" fill="#10B981" fillOpacity={0.06} name="Toro p90" legendType="none" isAnimationActive={false} />
+              <Area type="monotone" dataKey="bullP10" stroke="none" fill="#10B981" fillOpacity={0.06} name="Toro p10" legendType="none" isAnimationActive={false} />
 
               {/* Median lines */}
-              <Line type="monotone" dataKey="bearP50" stroke="#EF4444" strokeWidth={2.5} dot={false} name="Orso (mediana)" />
-              <Line type="monotone" dataKey="baseP50" stroke="#6366F1" strokeWidth={2.5} dot={false} name="Base (mediana)" />
-              <Line type="monotone" dataKey="bullP50" stroke="#10B981" strokeWidth={2.5} dot={false} name="Toro (mediana)" />
+              <Line type="monotone" dataKey="bearP50" stroke="#EF4444" strokeWidth={2.5} dot={false} name="Orso (mediana)" animationDuration={800} animationEasing="ease-out" />
+              <Line type="monotone" dataKey="baseP50" stroke="#6366F1" strokeWidth={2.5} dot={false} name="Base (mediana)" animationDuration={800} animationEasing="ease-out" />
+              <Line type="monotone" dataKey="bullP50" stroke="#10B981" strokeWidth={2.5} dot={false} name="Toro (mediana)" animationDuration={800} animationEasing="ease-out" />
             </LineChart>
           </ResponsiveContainer>
         </CardContent>
@@ -228,7 +230,7 @@ export function ScenarioComparisonResults({
                         return null;
                       }}
                     />
-                    <Bar dataKey="count" fill={s.color} radius={[2, 2, 0, 0]} />
+                    <Bar dataKey="count" fill={s.color} radius={[2, 2, 0, 0]} animationDuration={600} animationEasing="ease-out" />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>

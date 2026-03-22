@@ -94,6 +94,8 @@ export function UnderwaterDrawdownChart({ data, height = 400 }: UnderwaterDrawdo
           fill="#EF4444"
           fillOpacity={0.3}
           name="Drawdown"
+          animationDuration={800}
+          animationEasing="ease-out"
         />
       </AreaChart>
     </ResponsiveContainer>

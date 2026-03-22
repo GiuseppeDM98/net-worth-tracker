@@ -815,6 +815,8 @@ export default function PerformancePage() {
                     stroke="#8884d8"
                     fill="#8884d8"
                     name="Contributi"
+                    animationDuration={800}
+                    animationEasing="ease-out"
                   />
                   <Area
                     type="monotone"
@@ -823,6 +825,8 @@ export default function PerformancePage() {
                     stroke="#82ca9d"
                     fill="#82ca9d"
                     name="Investimenti"
+                    animationDuration={800}
+                    animationEasing="ease-out"
                   />
                   <Line
                     type="monotone"
@@ -831,6 +835,8 @@ export default function PerformancePage() {
                     strokeWidth={2}
                     name="Patrimonio Totale"
                     dot={false}
+                    animationDuration={800}
+                    animationEasing="ease-out"
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -875,6 +881,8 @@ export default function PerformancePage() {
                       strokeWidth={2}
                       name="CAGR 12M"
                       dot={false}
+                      animationDuration={800}
+                      animationEasing="ease-out"
                     />
                     <Line
                       type="monotone"
@@ -884,6 +892,8 @@ export default function PerformancePage() {
                       name={`Media Mobile ${rollingCagrMaWindowMonths}M`}
                       strokeDasharray="6 4"
                       dot={false}
+                      animationDuration={800}
+                      animationEasing="ease-out"
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -934,6 +944,8 @@ export default function PerformancePage() {
                     strokeWidth={2}
                     name="1. Sharpe 12M"
                     dot={false}
+                    animationDuration={800}
+                    animationEasing="ease-out"
                   />
                   <Line
                     type="monotone"
@@ -943,6 +955,8 @@ export default function PerformancePage() {
                     name={`2. Media Mobile ${rollingSharpeMaWindowMonths}M`}
                     strokeDasharray="6 4"
                     dot={false}
+                    animationDuration={800}
+                    animationEasing="ease-out"
                   />
                 </LineChart>
               </ResponsiveContainer>

@@ -516,7 +516,8 @@ export function FireCalculatorTab() {
                   strokeWidth={2}
                   name="Entrate Mensili"
                   dot={{ r: 4 }}
-                  isAnimationActive={false}
+                  animationDuration={800}
+                  animationEasing="ease-out"
                 />
                 <Line
                   type="monotone"
@@ -525,7 +526,8 @@ export function FireCalculatorTab() {
                   strokeWidth={2}
                   name="Uscite Mensili"
                   dot={{ r: 4 }}
-                  isAnimationActive={false}
+                  animationDuration={800}
+                  animationEasing="ease-out"
                 />
                 <Line
                   type="monotone"
@@ -534,7 +536,8 @@ export function FireCalculatorTab() {
                   strokeWidth={2}
                   name="Indennità Mensile"
                   dot={{ r: 4 }}
-                  isAnimationActive={false}
+                  animationDuration={800}
+                  animationEasing="ease-out"
                 />
               </LineChart>
             </ResponsiveContainer>

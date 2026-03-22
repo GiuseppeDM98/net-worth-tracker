@@ -191,6 +191,16 @@ return (
 - **Easing**: always `[0.25, 1, 0.5, 1]` (ease-out-quart). Never bounce or elastic.
 - **Page-level transitions**: `AnimatePresence mode="wait"` in `app/dashboard/layout.tsx`, keyed by `usePathname()`. The `exit` state on `pageVariants` only fires from this layout wrapper — individual pages don't need their own `AnimatePresence`. `mode="wait"` ensures the exiting page finishes before the entering page starts. Exit duration must be < entering duration (150ms vs 350ms) to feel snappy.
 
+### Recharts Animation Patterns
+Standard props across the entire codebase — never deviate:
+- **`<Bar>` / `<Pie>`**: `animationDuration={600} animationEasing="ease-out"`
+- **`<Line>` / `<Area>`**: `animationDuration={800} animationEasing="ease-out"`
+- **`<Pie>` also needs `animationBegin={0}`** — without it Recharts adds ~400ms default delay before starting, making pies feel sluggish vs bars and lines
+
+**Decorative band Areas** (overlapping semi-transparent fills used as background shading — e.g. percentile bands in Monte Carlo fan-charts and scenario comparison): keep `isAnimationActive={false}`. Animating 4–6 independent areas that visually stack produces a chaotic sequential fill-in. Animate only the foreground median `<Line>` on top. Always add an inline comment explaining why.
+
+**Re-animation on filter/data changes**: intentional for explicit user actions (dropdown select, button toggle, drill-down click). Re-animation communicates the data changed. Do NOT set `isAnimationActive={false}` for this reason unless the trigger is genuinely real-time (slider, typing, polling).
+
 ### CSS `animate-in` + prefers-reduced-motion
 - Framer Motion respects reduced-motion automatically via `MotionConfig` in `MotionProvider.tsx`.
 - **CSS `animate-in` classes** (tw-animate-css) must be guarded manually.
@@ -342,4 +352,4 @@ When an icon switches between TrendingUp/TrendingDown (or similar) based on a va
 </Alert>
 ```
 
-**Last updated**: 2026-03-21 (session 10: page transitions, skeleton loading decision, Radix aria fix)
+**Last updated**: 2026-03-22 (session 11: Recharts animation patterns)
