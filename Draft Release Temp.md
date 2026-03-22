@@ -142,5 +142,12 @@
 - FIRE Calculator, Monte Carlo, and Goals tabs now show skeleton loading screens that mirror their real layouts while settings and portfolio data are being loaded
 - All charts (bar charts, line charts, area charts, and pie charts) now animate smoothly on load — bars grow up from the baseline, lines draw in from left to right, pie slices fan out, and area fills expand into view. Every page with data visualization benefits: History, Performance, Cashflow, Dividends, FIRE, Monte Carlo, Goals, and the portfolio allocation pie
 - All buttons now respond to hover with a subtle lift effect and to click/tap with a gentle press-down animation — providing consistent tactile feedback throughout the app. Ghost buttons, link buttons, and icon buttons keep the press feedback only (no lift), matching the existing behavior of metric and ranking cards
+- Budget tab collapsible sections (Fixed Expenses, Variable, Debt, Income) now animate smoothly open and closed — expanding slides the rows down with a fade-in and collapsing slides them back up, instead of snapping instantly. The chevron indicator rotates to signal direction. Works on both desktop and mobile views
+- Budget tab: the section chevron now clearly indicates expanded (↑) vs collapsed (↓) state at a glance
+
+## 🐛 Bug Fixes
+
+- Fixed the Budget tab historical analysis panel ("Analisi Storica") sometimes requiring an extra scroll to become visible after clicking a category row — the page now always scrolls the panel into view at the top of the viewport after the animation completes
+- Fixed the "available on desktop only" hint in the mobile Budget item dialog: the message now clearly states that "L'analisi storica mensile" (monthly historical analysis) is what requires a larger screen, instead of the generic and confusing "Disponibile solo su desktop"
 - Performance page chart sections (portfolio evolution, rolling CAGR, rolling Sharpe, monthly heatmap, underwater drawdown, methodology) now animate in with a staggered cascade on load — each chart slides up and fades in sequentially instead of appearing all at once
 - The Dividends tab now animates in with a staggered cascade when first opened — action buttons, filters, statistics charts, and the dividend table each appear sequentially with a subtle slide-up effect

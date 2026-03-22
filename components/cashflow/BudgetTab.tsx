@@ -27,6 +27,8 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { slideDown } from '@/lib/utils/motionVariants';
 import { Expense, ExpenseCategory, ExpenseType } from '@/types/expenses';
 import { BudgetItem } from '@/types/budget';
 import { getBudgetConfig, saveBudgetConfig } from '@/lib/services/budgetService';
@@ -257,9 +259,9 @@ export function BudgetTab({
     const timeout = setTimeout(() => {
       document.getElementById('budget-deep-dive')?.scrollIntoView({
         behavior: 'smooth',
-        block: 'nearest',
+        block: 'start',
       });
-    }, 100);
+    }, 350);
     return () => clearTimeout(timeout);
   }, [selectedItemKey]);
 
@@ -541,7 +543,17 @@ export function BudgetTab({
 
     return (
       <div className="overflow-x-auto">
-        <Table>
+        <Table style={{ tableLayout: 'fixed' }}>
+          <colgroup>
+            <col />
+            <col style={{ width: '130px' }} />
+            <col style={{ width: '110px' }} />
+            <col style={{ width: '110px' }} />
+            <col style={{ width: '85px' }} />
+            {hasHistory && <col style={{ width: '110px' }} />}
+            {hasHistory && <col style={{ width: '85px' }} />}
+            <col style={{ width: '176px' }} />
+          </colgroup>
           <TableHeader>
             <TableRow>
               <TableHead>Voce</TableHead>
@@ -555,7 +567,7 @@ export function BudgetTab({
               {hasHistory && (
                 <TableHead className="text-right text-xs">vs Media</TableHead>
               )}
-              <TableHead className="min-w-[160px]">
+              <TableHead className="">
                 <TooltipProvider>
                   <UITooltip open={progressTooltipOpen} onOpenChange={setProgressTooltipOpen}>
                     <TooltipTrigger asChild>
@@ -595,7 +607,7 @@ export function BudgetTab({
 
               // Total columns: Voce + Budget/mese + currentYear + prevYear + vs prevYear
               //   + (Media storica + vs Media)? + Avanzamento
-              const totalCols = 5 + (hasHistory ? 2 : 0);
+              const totalCols = 6 + (hasHistory ? 2 : 0); // Voce + Budget + yr + prevYr + vs + (Media + vsMedia)? + Avanzamento
 
               return (
                 <React.Fragment key={sectionType}>
@@ -610,7 +622,7 @@ export function BudgetTab({
                       className="py-2 font-semibold text-sm text-gray-700 dark:text-gray-300"
                     >
                       <span className="flex items-center gap-2">
-                        <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
+                        <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${!isCollapsed ? 'rotate-180' : ''}`} />
                         {sectionLabel}
                         <span className="text-xs font-normal text-gray-400">
                           ({items.length} {items.length === 1 ? 'voce' : 'voci'})
@@ -619,111 +631,126 @@ export function BudgetTab({
                     </TableCell>
                   </TableRow>
 
-                  {/* Item rows — hidden when collapsed */}
-                  {!isCollapsed && items.map((item) => {
-                    const c = compMap.get(item.id);
-                    if (!c) return null;
-                    const itemKey = budgetItemKey(item);
-                    const isSelected = selectedItemKey === itemKey;
-                    return (
-                      <TableRow
-                        key={item.id}
-                        className={`pl-4 cursor-pointer transition-colors ${
-                          isSelected
-                            ? 'bg-blue-50/60 dark:bg-blue-950/20 hover:bg-blue-50/80 dark:hover:bg-blue-950/30'
-                            : 'hover:bg-muted/40'
-                        }`}
-                        onClick={() =>
-                          setSelectedItemKey((prev) => (prev === itemKey ? null : itemKey))
-                        }
-                      >
-                        <TableCell className="pl-6 text-sm">
-                          <span className="flex items-center gap-1">
-                            {isSelected
-                              ? <ChevronDown className="h-3 w-3 text-blue-500 shrink-0" />
-                              : <ChevronRight className="h-3 w-3 text-gray-300 dark:text-gray-600 shrink-0" />}
-                            {getItemLabel(item, categories)}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-sm">
-                          {formatCurrency(item.monthlyAmount * 12)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums font-semibold text-sm">
-                          {formatCurrency(c.currentYearTotal)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-gray-500 dark:text-gray-400 text-sm">
-                          {c.previousYearTotal > 0 ? formatCurrency(c.previousYearTotal) : '—'}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <DeltaBadge value={c.currentYearTotal} reference={c.previousYearTotal} inverted={isIncome} />
-                        </TableCell>
-                        {hasHistory && (
-                          <TableCell className="text-right tabular-nums text-gray-500 dark:text-gray-400 text-sm">
-                            {c.historicalAverage > 0 ? formatCurrency(c.historicalAverage) : '—'}
-                          </TableCell>
+                  {/* Animated container — items + subtotal in a nested table inside motion.div */}
+                  <tr key={`content-${sectionType}`}>
+                    <td colSpan={totalCols} className="p-0">
+                      <AnimatePresence>
+                        {!isCollapsed && (
+                          <motion.div
+                            variants={slideDown}
+                            initial="hidden"
+                            animate="visible"
+                            exit="hidden"
+                            style={{ overflow: 'hidden' }}
+                          >
+                            {/* Flex rows with widths matching the outer colgroup */}
+                            <div>
+                              {items.map((item) => {
+                                const c = compMap.get(item.id);
+                                if (!c) return null;
+                                const itemKey = budgetItemKey(item);
+                                const isSelected = selectedItemKey === itemKey;
+                                return (
+                                  <div
+                                    key={item.id}
+                                    className={`flex items-center border-b border-gray-100 dark:border-gray-800 cursor-pointer transition-colors ${
+                                      isSelected
+                                        ? 'bg-blue-50/60 dark:bg-blue-950/20 hover:bg-blue-50/80 dark:hover:bg-blue-950/30'
+                                        : 'hover:bg-muted/40'
+                                    }`}
+                                    onClick={() =>
+                                      setSelectedItemKey((prev) => (prev === itemKey ? null : itemKey))
+                                    }
+                                  >
+                                    <div className="flex-1 min-w-0 pl-6 pr-2 py-4 text-sm">
+                                      <span className="flex items-center gap-1">
+                                        {isSelected
+                                          ? <ChevronDown className="h-3 w-3 text-blue-500 shrink-0" />
+                                          : <ChevronRight className="h-3 w-3 text-gray-300 dark:text-gray-600 shrink-0" />}
+                                        {getItemLabel(item, categories)}
+                                      </span>
+                                    </div>
+                                    <div className="w-[130px] shrink-0 text-right tabular-nums text-sm px-4 py-4">
+                                      {formatCurrency(item.monthlyAmount * 12)}
+                                    </div>
+                                    <div className="w-[110px] shrink-0 text-right tabular-nums font-semibold text-sm px-4 py-4">
+                                      {formatCurrency(c.currentYearTotal)}
+                                    </div>
+                                    <div className="w-[110px] shrink-0 text-right tabular-nums text-gray-500 dark:text-gray-400 text-sm px-4 py-4">
+                                      {c.previousYearTotal > 0 ? formatCurrency(c.previousYearTotal) : '—'}
+                                    </div>
+                                    <div className="w-[85px] shrink-0 text-right px-4 py-4">
+                                      <DeltaBadge value={c.currentYearTotal} reference={c.previousYearTotal} inverted={isIncome} />
+                                    </div>
+                                    {hasHistory && (
+                                      <div className="w-[110px] shrink-0 text-right tabular-nums text-gray-500 dark:text-gray-400 text-sm px-4 py-4">
+                                        {c.historicalAverage > 0 ? formatCurrency(c.historicalAverage) : '—'}
+                                      </div>
+                                    )}
+                                    {hasHistory && (
+                                      <div className="w-[85px] shrink-0 text-right px-4 py-4">
+                                        <DeltaBadge value={c.currentYearTotal} reference={c.historicalAverage} inverted={isIncome} />
+                                      </div>
+                                    )}
+                                    <div className="w-[176px] shrink-0 px-4 py-4">
+                                      <ProgressCell ratio={c.budgetUsedRatio} inverted={isIncome} />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              {/* Section subtotal */}
+                              <div
+                                className={`flex items-center border-t border-gray-200 dark:border-gray-700 cursor-pointer select-none transition-colors ${
+                                  selectedItemKey === SUBTOTAL_KEY(sectionType)
+                                    ? 'bg-blue-50/60 dark:bg-blue-950/20 hover:bg-blue-50/80 dark:hover:bg-blue-950/30'
+                                    : 'bg-gray-50/60 dark:bg-gray-800/30 hover:bg-muted/40'
+                                }`}
+                                onClick={() => setSelectedItemKey(prev => prev === SUBTOTAL_KEY(sectionType) ? null : SUBTOTAL_KEY(sectionType))}
+                              >
+                                <div className="flex-1 min-w-0 pl-6 pr-2 py-4 text-xs font-medium text-gray-500 dark:text-gray-400">
+                                  <span className="flex items-center gap-1">
+                                    {selectedItemKey === SUBTOTAL_KEY(sectionType)
+                                      ? <ChevronDown className="h-3 w-3 text-blue-500 shrink-0" />
+                                      : <ChevronRight className="h-3 w-3 text-gray-300 dark:text-gray-600 shrink-0" />}
+                                    Subtotale {sectionLabel}
+                                  </span>
+                                </div>
+                                <div className="w-[130px] shrink-0 text-right tabular-nums text-xs font-medium px-4 py-4">
+                                  {formatCurrency(secBudgetMonthly * 12)}
+                                </div>
+                                <div className="w-[110px] shrink-0 text-right tabular-nums text-xs font-medium px-4 py-4">
+                                  {formatCurrency(secCurrentYear)}
+                                </div>
+                                <div className="w-[110px] shrink-0 text-right tabular-nums text-xs text-gray-500 dark:text-gray-400 px-4 py-4">
+                                  {secPrevYear > 0 ? formatCurrency(secPrevYear) : '—'}
+                                </div>
+                                <div className="w-[85px] shrink-0 text-right px-4 py-4">
+                                  {secPrevYear > 0 && secCurrentYear > 0 && (
+                                    <DeltaBadge value={secCurrentYear} reference={secPrevYear} inverted={isIncome} />
+                                  )}
+                                </div>
+                                {hasHistory && (
+                                  <div className="w-[110px] shrink-0 text-right tabular-nums text-xs text-gray-500 dark:text-gray-400 px-4 py-4">
+                                    {secHistAvg > 0 ? formatCurrency(secHistAvg) : '—'}
+                                  </div>
+                                )}
+                                {hasHistory && (
+                                  <div className="w-[85px] shrink-0 text-right px-4 py-4">
+                                    {secHistAvg > 0 && secCurrentYear > 0 && (
+                                      <DeltaBadge value={secCurrentYear} reference={secHistAvg} inverted={isIncome} />
+                                    )}
+                                  </div>
+                                )}
+                                <div className="w-[176px] shrink-0 px-4 py-4">
+                                  <ProgressCell ratio={secRatio} inverted={isIncome} />
+                                </div>
+                              </div>
+                            </div>
+                          </motion.div>
                         )}
-                        {hasHistory && (
-                          <TableCell className="text-right">
-                            <DeltaBadge value={c.currentYearTotal} reference={c.historicalAverage} inverted={isIncome} />
-                          </TableCell>
-                        )}
-                        <TableCell>
-                          <ProgressCell ratio={c.budgetUsedRatio} inverted={isIncome} />
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-
-                  {/* Section subtotal row — only shown when not collapsed */}
-                  {!isCollapsed && (
-                  <TableRow
-                    key={`subtotal-${sectionType}`}
-                    className={`border-t border-gray-200 dark:border-gray-700 cursor-pointer select-none transition-colors ${
-                      selectedItemKey === SUBTOTAL_KEY(sectionType)
-                        ? 'bg-blue-50/60 dark:bg-blue-950/20 hover:bg-blue-50/80 dark:hover:bg-blue-950/30'
-                        : 'bg-gray-50/60 dark:bg-gray-800/30 hover:bg-muted/40'
-                    }`}
-                    onClick={() => setSelectedItemKey(prev => prev === SUBTOTAL_KEY(sectionType) ? null : SUBTOTAL_KEY(sectionType))}
-                  >
-                    <TableCell className="pl-6 text-xs font-medium text-gray-500 dark:text-gray-400">
-                      <span className="flex items-center gap-1">
-                        {selectedItemKey === SUBTOTAL_KEY(sectionType)
-                          ? <ChevronDown className="h-3 w-3 text-blue-500 shrink-0" />
-                          : <ChevronRight className="h-3 w-3 text-gray-300 dark:text-gray-600 shrink-0" />}
-                        Subtotale {sectionLabel}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-xs font-medium">
-                      {formatCurrency(secBudgetMonthly * 12)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-xs font-medium">
-                      {formatCurrency(secCurrentYear)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-xs text-gray-500 dark:text-gray-400">
-                      {secPrevYear > 0 ? formatCurrency(secPrevYear) : '—'}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {secPrevYear > 0 && secCurrentYear > 0 && (
-                        <DeltaBadge value={secCurrentYear} reference={secPrevYear} inverted={isIncome} />
-                      )}
-                    </TableCell>
-                    {hasHistory && (
-                      <TableCell className="text-right tabular-nums text-xs text-gray-500 dark:text-gray-400">
-                        {secHistAvg > 0 ? formatCurrency(secHistAvg) : '—'}
-                      </TableCell>
-                    )}
-                    {hasHistory && (
-                      <TableCell className="text-right">
-                        {secHistAvg > 0 && secCurrentYear > 0 && (
-                          <DeltaBadge value={secCurrentYear} reference={secHistAvg} inverted={isIncome} />
-                        )}
-                      </TableCell>
-                    )}
-                    <TableCell>
-                      <ProgressCell ratio={secRatio} inverted={isIncome} />
-                    </TableCell>
-                  </TableRow>
-                  )}
+                      </AnimatePresence>
+                    </td>
+                  </tr>
                 </React.Fragment>
               );
             })}
@@ -910,7 +937,7 @@ export function BudgetTab({
                     className={`border-b border-blue-100 dark:border-blue-900/50 ${
                       isCurrentYear
                         ? 'bg-blue-100/60 dark:bg-blue-900/30 font-medium'
-                        : 'hover:bg-blue-50/30 dark:hover:bg-blue-950/20'
+                        : 'bg-white dark:bg-blue-950/5 hover:bg-blue-50/30 dark:hover:bg-blue-950/20'
                     }`}
                   >
                     <td className="pr-2 py-1.5 tabular-nums whitespace-nowrap sticky left-0 z-10 bg-inherit">
@@ -1350,60 +1377,70 @@ export function BudgetTab({
                   onClick={() => toggleSection(sectionType)}
                 >
                   <span className="font-semibold text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                    <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
+                    <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${!isCollapsed ? 'rotate-180' : ''}`} />
                     {sectionLabel}
                   </span>
                   <span className="text-xs text-muted-foreground">{items.length} {items.length === 1 ? 'voce' : 'voci'}</span>
                 </button>
 
-                {!isCollapsed && (
-                  <>
-                    {/* Item cards */}
-                    {items.map(item => {
-                      const c = compMap.get(item.id);
-                      if (!c) return null;
-                      return (
-                        <button
-                          key={item.id}
-                          className={`w-full text-left rounded-md border p-3 space-y-2 transition-colors hover:bg-muted/40 active:bg-muted/60 ${item.scope === 'subcategory' ? 'ml-3 border-l-2 border-l-gray-200 dark:border-l-gray-700' : ''}`}
-                          onClick={() => setMobileDetailItemId(item.id)}
-                        >
-                          <div className="flex items-center gap-1">
-                            <span className="flex-1 text-sm font-medium truncate">{getItemLabel(item, categories)}</span>
-                            <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
+                <AnimatePresence>
+                  {!isCollapsed && (
+                    <motion.div
+                      variants={slideDown}
+                      initial="hidden"
+                      animate="visible"
+                      exit="hidden"
+                      style={{ overflow: 'hidden' }}
+                    >
+                      <div className="space-y-2 pt-2">
+                        {/* Item cards */}
+                        {items.map(item => {
+                          const c = compMap.get(item.id);
+                          if (!c) return null;
+                          return (
+                            <button
+                              key={item.id}
+                              className={`w-full text-left rounded-md border p-3 space-y-2 transition-colors hover:bg-muted/40 active:bg-muted/60 ${item.scope === 'subcategory' ? 'ml-3 border-l-2 border-l-gray-200 dark:border-l-gray-700' : ''}`}
+                              onClick={() => setMobileDetailItemId(item.id)}
+                            >
+                              <div className="flex items-center gap-1">
+                                <span className="flex-1 text-sm font-medium truncate">{getItemLabel(item, categories)}</span>
+                                <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
+                              </div>
+                              <ProgressCell ratio={c.budgetUsedRatio} inverted={isIncome} />
+                              <div className="flex items-baseline justify-between text-xs">
+                                <span className="text-muted-foreground">
+                                  Budget: <span className="font-medium text-foreground">{formatCurrency(item.monthlyAmount * 12)}</span>
+                                </span>
+                                <span className="font-semibold text-sm">{formatCurrency(c.currentYearTotal)}</span>
+                              </div>
+                            </button>
+                          );
+                        })}
+
+                        {/* Section subtotal card */}
+                        <div className="w-full rounded-md border p-3 text-left space-y-2 bg-muted/30">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-muted-foreground">Subtotale {sectionLabel}</span>
                           </div>
-                          <ProgressCell ratio={c.budgetUsedRatio} inverted={isIncome} />
+                          <ProgressCell ratio={secRatio} inverted={isIncome} />
                           <div className="flex items-baseline justify-between text-xs">
                             <span className="text-muted-foreground">
-                              Budget: <span className="font-medium text-foreground">{formatCurrency(item.monthlyAmount * 12)}</span>
+                              Budget: <span className="font-medium text-foreground">{formatCurrency(secBudgetMonthly * 12)}</span>
                             </span>
-                            <span className="font-semibold text-sm">{formatCurrency(c.currentYearTotal)}</span>
+                            <span className="font-semibold">{formatCurrency(secCurrentYear)}</span>
                           </div>
-                        </button>
-                      );
-                    })}
-
-                    {/* Section subtotal card */}
-                    <div className="w-full rounded-md border p-3 text-left space-y-2 bg-muted/30">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-muted-foreground">Subtotale {sectionLabel}</span>
-                      </div>
-                      <ProgressCell ratio={secRatio} inverted={isIncome} />
-                      <div className="flex items-baseline justify-between text-xs">
-                        <span className="text-muted-foreground">
-                          Budget: <span className="font-medium text-foreground">{formatCurrency(secBudgetMonthly * 12)}</span>
-                        </span>
-                        <span className="font-semibold">{formatCurrency(secCurrentYear)}</span>
-                      </div>
-                      {secPrevYear > 0 && (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span>{currentYear - 1}: {formatCurrency(secPrevYear)}</span>
-                          <DeltaBadge value={secCurrentYear} reference={secPrevYear} inverted={isIncome} />
+                          {secPrevYear > 0 && (
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>{currentYear - 1}: {formatCurrency(secPrevYear)}</span>
+                              <DeltaBadge value={secCurrentYear} reference={secPrevYear} inverted={isIncome} />
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  </>
-                )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             );
           })}
@@ -1510,8 +1547,9 @@ export function BudgetTab({
                     <p className="text-xs text-muted-foreground">Avanzamento</p>
                     <ProgressCell ratio={detailComp.budgetUsedRatio} inverted={detailIsIncome} />
                   </div>
-                  <p className="text-xs text-center text-muted-foreground">
-                    Disponibile solo su desktop
+                  <p className="text-xs text-center text-muted-foreground flex items-center justify-center gap-1">
+                    <Info className="h-3 w-3 shrink-0" />
+                    L&apos;analisi storica mensile è disponibile solo su desktop
                   </p>
                 </div>
               </>

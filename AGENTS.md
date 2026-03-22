@@ -188,6 +188,34 @@ return (
 - **Stagger + conditional elements**: use explicit `transition={{ delay: index * 0.1 }}` per card — parent stagger counts ALL children including conditional slots
 - **`motion.tr`**: wrapping shadcn `<TableRow>` with `motion()` breaks table structure. Use `motion.tr` directly
 - **`AnimatePresence initial={false}`** on collapsibles that start open — avoids exit animation on mount
+
+**Table section collapse/expand animation (>30min debug, session 14):**
+HTML `<tr>` elements use `display: table-row` which does NOT support `height: 0 → auto` or `overflow: hidden`. You cannot animate table row groups with slideDown directly. Fix:
+```tsx
+// Wrap all section rows in a single <tr><td colSpan={totalCols} className="p-0"> container
+<tr>
+  <td colSpan={totalCols} className="p-0">
+    <AnimatePresence>
+      {!isCollapsed && (
+        <motion.div variants={slideDown} initial="hidden" animate="visible" exit="hidden" style={{ overflow: 'hidden' }}>
+          {/* flex rows with explicit widths matching the outer table colgroup */}
+          <div className="flex items-center ...">
+            <div className="flex-1 min-w-0 ...">name</div>
+            <div className="w-[130px] shrink-0 ...">value</div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  </td>
+</tr>
+```
+Outer `<Table>` needs `style={{ tableLayout: 'fixed' }}` + `<colgroup>` with explicit column widths. Flex rows inside `motion.div` use matching `w-[N] shrink-0` divs. This achieves pixel-perfect alignment between header and animated content.
+
+**`colSpan` must cover ALL columns:** If `totalCols` is off by even 1, the content `<td>` is narrower than expected. The missing column width is unavailable to flex-1, making the animated content overflow (clipped by `overflow: hidden`). Always count every `<TableHead>` cell to compute `totalCols`.
+
+**JSX comments inside `<colgroup>` cause hydration errors:** `{/* comment */}` inside `<colgroup>` is serialized as a whitespace text node, which is invalid HTML there. Remove all comments from inside `<colgroup>`.
+
+**Scroll to panel after slideDown:** Use `setTimeout(350)` (not 100ms) + `block: 'start'` — the 300ms enter animation must complete before scrollIntoView fires, otherwise the panel isn't fully visible yet.
 - **Easing**: always `[0.25, 1, 0.5, 1]` (ease-out-quart). Never bounce or elastic.
 - **Page-level transitions**: `AnimatePresence mode="wait"` in `app/dashboard/layout.tsx`, keyed by `usePathname()`. The `exit` state on `pageVariants` only fires from this layout wrapper — individual pages don't need their own `AnimatePresence`. `mode="wait"` ensures the exiting page finishes before the entering page starts. Exit duration must be < entering duration (150ms vs 350ms) to feel snappy.
 
@@ -384,4 +412,4 @@ When an icon switches between TrendingUp/TrendingDown (or similar) based on a va
 </Alert>
 ```
 
-**Last updated**: 2026-03-22 (session 13: Framer Motion — performance & dividends, compound-opacity flash fix)
+**Last updated**: 2026-03-22 (session 14: Budget Tab collapsible slideDown, table animation pattern, colSpan/colgroup gotchas)
