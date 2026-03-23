@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio, framer-motion
-- Ultima implementazione: **slideDown collapsibili Budget Tab** — `AnimatePresence` + `motion.div variants={slideDown}` su `AnnualTable` (desktop: `<tr><td colSpan>` + flex rows, `table-layout: fixed`, `<colgroup>`) e `MobileAnnualView` (div-based, diretto). Chevron `rotate-180` quando espanso. Fix `totalCols` off-by-1. Scroll panel: `block: 'start'` + 350ms. (2026-03-22)
-- Precedente: **Framer Motion su Performance e Dividendi** — `staggerContainer` + `cardItem` su 6 chart card di `performance/page.tsx`; `pageVariants` + `cardItem` con explicit delays su `DividendTrackingTab.tsx`. (2026-03-22)
+- Ultima implementazione: **Login race condition fix + Drawdown off-by-one fix + npm audit** — login/register usano `useEffect` su `user+authLoading` da `AuthContext` per il redirect (rimosso `router.push` immediato post-`signIn`). `calculateDrawdownDuration`/`calculateRecoveryTime`: rimosso `+1` errato, ora elapsed index-distance; `Math.max(0,...)` per Recovery Time. `npm audit fix`: risolte fast-xml-parser, flatted, next, undici (3 high + 1 moderate). (2026-03-23)
+- Precedente: **slideDown collapsibili Budget Tab** — `AnimatePresence` + `motion.div variants={slideDown}` su `AnnualTable` (desktop: `<tr><td colSpan>` + flex rows, `table-layout: fixed`, `<colgroup>`) e `MobileAnnualView`. Chevron `rotate-180`. Fix `totalCols` off-by-1. (2026-03-22)
 
 ## Architecture Snapshot
 - App Router con pagine protette sotto `app/dashboard/*`.
@@ -73,4 +73,4 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`, `components/pdf/PDFExportDialog.tsx`, `lib/utils/pdfTimeFilters.ts`, `lib/utils/pdfGenerator.tsx`
 - Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`, `borsaItalianaBondScraper.test.ts`, `goalService.test.ts`, `couponUtils.test.ts`
 
-**Last updated**: 2026-03-22 (session 14: slideDown animations on Budget Tab collapsible sections)
+**Last updated**: 2026-03-23 (session 15: login/register redirect race condition fix, drawdown duration off-by-one fix, npm audit)

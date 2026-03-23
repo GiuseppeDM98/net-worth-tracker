@@ -306,6 +306,9 @@ For dialogs with long forms or variable-length content, keep header and footer a
 ### Firebase Auth Registration Race Condition
 **Symptom**: PERMISSION_DENIED on first Firestore write after user creation. **Fix**: force `getIdToken(true)` + retry logic + Firestore rules using `docId` (not `resource.data`). **Files**: `authHelpers.ts`, `AuthContext.tsx`, `firestore.rules`
 
+### Firebase Auth Login Redirect Race Condition
+**Symptom**: Login (or registration) only works on the second click. **Root cause**: `router.push('/dashboard')` called immediately after `signIn()` resolves, but `onAuthStateChanged` callback is still awaiting an async Firestore `displayName` lookup — `ProtectedRoute` sees `user=null` and bounces back to `/login`. **Fix**: remove `router.push()` from form handlers; add a `useEffect` in login/register pages that watches `user + authLoading` from `AuthContext` and redirects only when `!authLoading && user`. The same pattern applies to Google OAuth (`signInWithGoogle`).
+
 ### Nullish `??` vs Falsy `||` for Snapshot Fallbacks
 **Symptom**: Asset value history shows "0,00€". **Fix**: Use `||` when `0` is semantically invalid (e.g. `totalValue || (price * qty)` in `assetPriceHistoryUtils.ts`).
 
@@ -412,4 +415,7 @@ When an icon switches between TrendingUp/TrendingDown (or similar) based on a va
 </Alert>
 ```
 
-**Last updated**: 2026-03-22 (session 14: Budget Tab collapsible slideDown, table animation pattern, colSpan/colgroup gotchas)
+### Drawdown Duration / Recovery Time Semantics
+Duration = months **elapsed** (index distance, not inclusive count). `Jan(idx 0) → Dec(idx 11)` = 11m, **not** 12m. Never add `+1` for "inclusive counting" — it was added incorrectly and produces values 1 month too high. Recovery Time = 0m when trough IS the current snapshot (portfolio just hit the bottom, recovery hasn't started). Use `Math.max(0, ...)` not `Math.max(1, ...)`.
+
+**Last updated**: 2026-03-23 (session 15: login/register redirect race condition, drawdown duration off-by-one, npm audit fixes)

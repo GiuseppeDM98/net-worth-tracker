@@ -24,6 +24,11 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed login requiring a second click to succeed after entering credentials — the app now correctly waits for authentication to complete before navigating to the dashboard
+- Fixed registration with email/password requiring a second attempt in some cases — same underlying fix as login
+- Fixed **Drawdown Duration** showing 1 month too many (e.g., "2m" when only 1 month had elapsed since the portfolio peak) — the metric now correctly shows elapsed months
+- Fixed **Recovery Time** showing "1m" when the portfolio was currently at the trough — it now correctly shows "0m" (recovery hasn't started yet)
+
 - Fixed chart tooltips on the History page: hovering over data points now shows each series label in its correct color (blue for Equities, red for Bonds, green for Liquidity, etc.) — previously all tooltip text appeared in the same neutral color regardless of the series
 - Fixed chart tooltips on the Dashboard pie charts (Asset Class, Asset, Liquidity): the hovered slice name now appears in its matching color — previously always shown in neutral white regardless of the slice
 
@@ -151,3 +156,7 @@
 - Fixed the "available on desktop only" hint in the mobile Budget item dialog: the message now clearly states that "L'analisi storica mensile" (monthly historical analysis) is what requires a larger screen, instead of the generic and confusing "Disponibile solo su desktop"
 - Performance page chart sections (portfolio evolution, rolling CAGR, rolling Sharpe, monthly heatmap, underwater drawdown, methodology) now animate in with a staggered cascade on load — each chart slides up and fades in sequentially instead of appearing all at once
 - The Dividends tab now animates in with a staggered cascade when first opened — action buttons, filters, statistics charts, and the dividend table each appear sequentially with a subtle slide-up effect
+
+## 🔒 Security
+
+- Updated Next.js, undici, fast-xml-parser, and flatted dependencies to patch 3 high-severity and 1 moderate-severity vulnerabilities

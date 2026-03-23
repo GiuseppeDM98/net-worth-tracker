@@ -404,7 +404,7 @@ export function calculateMaxDrawdown(
  *
  * @example
  * Portfolio drops 15% from Jan (index 0) to Apr (index 3), recovers to new peak on Dec (index 11)
- * Duration = 11 months (from Jan peak to Dec recovery)
+ * Duration = 11 months elapsed (Dec index 11 − Jan index 0 = 11)
  */
 export function calculateDrawdownDuration(
   snapshots: MonthlySnapshot[],
@@ -476,15 +476,16 @@ export function calculateDrawdownDuration(
     }
   }
 
-  // STEP 7: Calculate duration (inclusive of both peak and recovery months)
+  // STEP 7: Calculate duration as months elapsed from peak to recovery (or to present).
+  // We measure distance between indices, not inclusive count. Jan(0)→Dec(11) = 11 months.
   let duration: number;
 
   if (recoveryIndex === null) {
-    // Still in drawdown - calculate duration from peak to present (inclusive)
-    duration = (adjustedValues.length - 1) - maxDrawdownPeakIndex + 1;
+    // Still in drawdown — months elapsed from peak to the most recent snapshot
+    duration = (adjustedValues.length - 1) - maxDrawdownPeakIndex;
   } else {
-    // Recovered - calculate duration from peak to recovery (inclusive)
-    duration = recoveryIndex - maxDrawdownPeakIndex + 1;  // +1 for inclusive count
+    // Recovered — months elapsed from peak to recovery
+    duration = recoveryIndex - maxDrawdownPeakIndex;
   }
 
   // STEP 9: Extract peak and recovery dates for period label
@@ -503,7 +504,7 @@ export function calculateDrawdownDuration(
   );
 
   return {
-    duration: Math.max(1, duration),  // Duration in months (≥1)
+    duration: Math.max(0, duration),  // Duration in months (≥0)
     period                            // Range (e.g., "01/25 - 12/25" or "01/25 - Presente")
   };
 }
@@ -519,8 +520,8 @@ export function calculateDrawdownDuration(
  *
  * @example
  * Portfolio drops 15% from Jan (index 0) to Apr (index 3), recovers to peak on Dec (index 11)
- * Drawdown Duration = 11 months (Jan peak → Dec recovery)
- * Recovery Time = 8 months (Apr trough → Dec recovery)
+ * Drawdown Duration = 11 months elapsed (Dec idx 11 − Jan idx 0 = 11)
+ * Recovery Time = 8 months elapsed (Dec idx 11 − Apr idx 3 = 8)
  */
 export function calculateRecoveryTime(
   snapshots: MonthlySnapshot[],
@@ -592,16 +593,17 @@ export function calculateRecoveryTime(
     }
   }
 
-  // STEP 7: Calculate Recovery Time (from TROUGH to recovery, inclusive)
+  // STEP 7: Calculate Recovery Time as months elapsed from trough to recovery (or to present).
+  // KEY DIFFERENCE from Drawdown Duration: uses maxDrawdownTroughIndex, not maxDrawdownPeakIndex.
+  // A value of 0 means the portfolio is currently AT the trough (no recovery time elapsed yet).
   let recoveryTime: number;
 
   if (recoveryIndex === null) {
-    // Still in drawdown - calculate duration from trough to present (inclusive)
-    recoveryTime = (adjustedValues.length - 1) - maxDrawdownTroughIndex + 1;
+    // Still in drawdown — months elapsed from trough to the most recent snapshot
+    recoveryTime = (adjustedValues.length - 1) - maxDrawdownTroughIndex;
   } else {
-    // Recovered - calculate duration from TROUGH to recovery (inclusive)
-    // KEY DIFFERENCE: Drawdown Duration uses maxDrawdownPeakIndex, Recovery Time uses maxDrawdownTroughIndex
-    recoveryTime = recoveryIndex - maxDrawdownTroughIndex + 1;  // +1 for inclusive count
+    // Recovered — months elapsed from trough to recovery
+    recoveryTime = recoveryIndex - maxDrawdownTroughIndex;
   }
 
   // STEP 9: Extract trough and recovery dates for period label
@@ -620,7 +622,7 @@ export function calculateRecoveryTime(
   );
 
   return {
-    duration: Math.max(1, recoveryTime),  // Duration in months (≥1)
+    duration: Math.max(0, recoveryTime),  // Duration in months (≥0; 0 means currently at the trough)
     period                                // Range (e.g., "04/25 - 12/25" or "04/25 - Presente")
   };
 }
