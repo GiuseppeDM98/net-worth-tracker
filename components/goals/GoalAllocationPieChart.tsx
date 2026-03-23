@@ -68,6 +68,9 @@ export function GoalAllocationPieChart({
                 outerRadius={100}
                 paddingAngle={2}
                 dataKey="value"
+                animationBegin={0}
+                animationDuration={600}
+                animationEasing="ease-out"
               >
                 {chartData.map((entry, index) => (
                   <Cell key={index} fill={entry.color} />

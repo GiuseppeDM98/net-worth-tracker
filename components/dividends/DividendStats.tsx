@@ -304,7 +304,9 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                       cx="50%"
                       cy="45%"
                       outerRadius={75}
-                      isAnimationActive={false}
+                      animationBegin={0}
+                      animationDuration={600}
+                      animationEasing="ease-out"
                     >
                       {pieData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -337,9 +339,9 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                   <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                   <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--muted)' }} />
                   <Legend />
-                  <Bar dataKey="totalGross" fill="#10B981" name="Lordo" isAnimationActive={false} />
-                  <Bar dataKey="totalTax" fill="#EF4444" name="Tasse" isAnimationActive={false} />
-                  <Bar dataKey="totalNet" fill="#3B82F6" name="Netto" isAnimationActive={false} />
+                  <Bar dataKey="totalGross" fill="#10B981" name="Lordo" animationDuration={600} animationEasing="ease-out" />
+                  <Bar dataKey="totalTax" fill="#EF4444" name="Tasse" animationDuration={600} animationEasing="ease-out" />
+                  <Bar dataKey="totalNet" fill="#3B82F6" name="Netto" animationDuration={600} animationEasing="ease-out" />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -372,7 +374,8 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                   strokeWidth={2}
                   name="Dividendi Netti"
                   dot={{ r: 4 }}
-                  isAnimationActive={false}
+                  animationDuration={800}
+                  animationEasing="ease-out"
                 />
               </LineChart>
             </ResponsiveContainer>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -29,8 +29,16 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const { signUp, signInWithGoogle } = useAuth();
+  const { signUp, signInWithGoogle, user, loading: authLoading } = useAuth();
   const router = useRouter();
+
+  // Redirect to dashboard once AuthContext confirms the user is fully loaded.
+  // Same race condition fix as in login/page.tsx — see that file for the full explanation.
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.push('/dashboard');
+    }
+  }, [user, authLoading, router]);
 
   // Registration access control logic:
   // - If BOTH flags are disabled -> show "disabled" UI
@@ -58,10 +66,8 @@ export default function RegisterPage() {
     try {
       // Create user account
       await signUp(email, password, displayName);
+      // Redirect handled by the useEffect above once auth state is confirmed
       toast.success('Registrazione completata con successo!');
-
-      // Redirect to dashboard
-      router.push('/dashboard');
     } catch (error: any) {
       console.error('Registration error:', error);
       // Show user-friendly error message. Firebase errors are already localized.
@@ -77,8 +83,8 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await signInWithGoogle();
+      // Redirect handled by the useEffect above once auth state is confirmed
       toast.success('Registrazione completata con successo!');
-      router.push('/dashboard');
     } catch (error: any) {
       console.error('Google sign-in error:', error);
       toast.error(error.message || 'Errore durante la registrazione con Google');

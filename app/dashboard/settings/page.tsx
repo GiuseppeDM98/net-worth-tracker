@@ -1145,13 +1145,7 @@ export default function SettingsPage() {
     );
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-muted-foreground">Caricamento...</div>
-      </div>
-    );
-  }
+  if (loading) return null;
 
   const total = calculateTotal();
   const isValidTotal = Math.abs(total - 100) < 0.01;

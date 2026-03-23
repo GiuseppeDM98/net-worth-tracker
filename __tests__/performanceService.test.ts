@@ -254,8 +254,8 @@ describe('calculateDrawdownDuration', () => {
     ]
     const result = calculateDrawdownDuration(snapshots, [])
     expect(result.duration).not.toBeNull()
-    // Duration: from peak (index 0) to recovery (index 3) = 4 months inclusive
-    expect(result.duration).toBe(4)
+    // Duration: months elapsed from peak (idx 0) to recovery (idx 3) = 3 - 0 = 3
+    expect(result.duration).toBe(3)
   })
 
   it('should show "Presente" when still in drawdown', () => {
@@ -286,8 +286,8 @@ describe('calculateRecoveryTime', () => {
     ]
     const result = calculateRecoveryTime(snapshots, [])
     expect(result.duration).not.toBeNull()
-    // Recovery time: from trough (index 1) to recovery (index 3) = 3 months inclusive
-    expect(result.duration).toBe(3)
+    // Recovery time: months elapsed from trough (idx 1) to recovery (idx 3) = 3 - 1 = 2
+    expect(result.duration).toBe(2)
   })
 
   it('should be shorter than drawdown duration', () => {

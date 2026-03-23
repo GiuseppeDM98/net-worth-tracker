@@ -933,6 +933,9 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                                 dataKey="value"
                                 onClick={(data: any) => handleCategoryClick(data, 'expenses')}
                                 cursor="pointer"
+                                animationBegin={0}
+                                animationDuration={600}
+                                animationEasing="ease-out"
                               >
                                 {expensesByCategoryData.map((entry, index) => (
                                   <Cell
@@ -978,6 +981,9 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                                 dataKey="value"
                                 onClick={(data: any) => handleSubcategoryClick(data)}
                                 cursor="pointer"
+                                animationBegin={0}
+                                animationDuration={600}
+                                animationEasing="ease-out"
                               >
                                 {currentSubcategoriesData.map((entry, index) => (
                                   <Cell
@@ -1119,6 +1125,9 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                                 outerRadius={pieOuterRadius}
                                 fill="#8884d8"
                                 dataKey="value"
+                                animationBegin={0}
+                                animationDuration={600}
+                                animationEasing="ease-out"
                               >
                                 {expensesByTypeFilteredData.map((entry, index) => (
                                   <Cell key={`cell-${index}`} fill={entry.color} />
@@ -1188,6 +1197,9 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                                 dataKey="value"
                                 onClick={(data: any) => handleCategoryClick(data, 'income')}
                                 cursor="pointer"
+                                animationBegin={0}
+                                animationDuration={600}
+                                animationEasing="ease-out"
                               >
                                 {incomeByCategoryData.map((entry, index) => (
                                   <Cell
@@ -1228,6 +1240,9 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                                 dataKey="value"
                                 onClick={(data: any) => handleSubcategoryClick(data)}
                                 cursor="pointer"
+                                animationBegin={0}
+                                animationDuration={600}
+                                animationEasing="ease-out"
                               >
                                 {currentSubcategoriesData.map((entry, index) => (
                                   <Cell
@@ -1375,6 +1390,9 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                     outerRadius={pieOuterRadius}
                     fill="#8884d8"
                     dataKey="value"
+                    animationBegin={0}
+                    animationDuration={600}
+                    animationEasing="ease-out"
                   >
                     {expensesByTypeData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
@@ -1422,9 +1440,9 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                     <Tooltip content={<ChartTooltip formatter={(v) => `${v.toFixed(2)}%`} />} />
                     <Legend />
                     <ReferenceLine y={0} stroke="#6b7280" strokeDasharray="4 4" />
-                    <Line type="monotone" dataKey="Entrate %" stroke="#10b981" strokeWidth={2} name="Entrate %" />
-                    <Line type="monotone" dataKey="Spese %" stroke="#ef4444" strokeWidth={2} name="Spese %" />
-                    <Line type="monotone" dataKey="Saving Rate %" stroke="#3b82f6" strokeWidth={2} name="Saving Rate %" />
+                    <Line type="monotone" dataKey="Entrate %" stroke="#10b981" strokeWidth={2} name="Entrate %" animationDuration={800} animationEasing="ease-out" />
+                    <Line type="monotone" dataKey="Spese %" stroke="#ef4444" strokeWidth={2} name="Spese %" animationDuration={800} animationEasing="ease-out" />
+                    <Line type="monotone" dataKey="Saving Rate %" stroke="#3b82f6" strokeWidth={2} name="Saving Rate %" animationDuration={800} animationEasing="ease-out" />
                   </LineChart>
                 ) : (
                   <LineChart data={monthlyTrendData}>
@@ -1433,9 +1451,9 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                     <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                     <Tooltip content={<ChartTooltip />} />
                     <Legend />
-                    <Line type="monotone" dataKey="Entrate" stroke="#10b981" strokeWidth={2} />
-                    <Line type="monotone" dataKey="Spese" stroke="#ef4444" strokeWidth={2} />
-                    <Line type="monotone" dataKey="Netto" stroke="#3b82f6" strokeWidth={2} />
+                    <Line type="monotone" dataKey="Entrate" stroke="#10b981" strokeWidth={2} animationDuration={800} animationEasing="ease-out" />
+                    <Line type="monotone" dataKey="Spese" stroke="#ef4444" strokeWidth={2} animationDuration={800} animationEasing="ease-out" />
+                    <Line type="monotone" dataKey="Netto" stroke="#3b82f6" strokeWidth={2} animationDuration={800} animationEasing="ease-out" />
                   </LineChart>
                 )}
               </ResponsiveContainer>
@@ -1457,9 +1475,9 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                   <YAxis tickFormatter={(value) => `€${value.toLocaleString('it-IT')}`} />
                   <Tooltip content={<ChartTooltip />} />
                   <Legend />
-                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.fixed} stroke="#3b82f6" strokeWidth={2} />
-                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.variable} stroke="#8b5cf6" strokeWidth={2} />
-                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.debt} stroke="#f59e0b" strokeWidth={2} />
+                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.fixed} stroke="#3b82f6" strokeWidth={2} animationDuration={800} animationEasing="ease-out" />
+                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.variable} stroke="#8b5cf6" strokeWidth={2} animationDuration={800} animationEasing="ease-out" />
+                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.debt} stroke="#f59e0b" strokeWidth={2} animationDuration={800} animationEasing="ease-out" />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
@@ -1487,6 +1505,8 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                       dataKey={category}
                       stroke={COLORS[index % COLORS.length]}
                       strokeWidth={2}
+                      animationDuration={800}
+                      animationEasing="ease-out"
                     />
                   ))}
                 </LineChart>
@@ -1516,6 +1536,8 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                       dataKey={category}
                       stroke={COLORS[index % COLORS.length]}
                       strokeWidth={2}
+                      animationDuration={800}
+                      animationEasing="ease-out"
                     />
                   ))}
                 </LineChart>

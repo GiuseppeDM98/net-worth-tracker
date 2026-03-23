@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -18,8 +18,20 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const { signIn, signInWithGoogle } = useAuth();
+  const { signIn, signInWithGoogle, user, loading: authLoading } = useAuth();
   const router = useRouter();
+
+  // Redirect to dashboard once AuthContext confirms the user is fully loaded.
+  // Why not router.push() immediately after signIn()? signInWithEmailAndPassword
+  // resolves before onAuthStateChanged finishes its async Firestore lookup for
+  // displayName. During that gap AuthContext.user is still null, so ProtectedRoute
+  // would redirect back to /login. Watching authLoading + user ensures we only
+  // navigate after the full auth state is ready.
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.push('/dashboard');
+    }
+  }, [user, authLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,10 +40,9 @@ export default function LoginPage() {
     try {
       // Authenticate user with email/password
       await signIn(email, password);
+      // Show success toast immediately — the useEffect above handles the redirect
+      // once AuthContext.user is set (after onAuthStateChanged completes)
       toast.success('Accesso effettuato con successo!');
-
-      // Redirect to dashboard
-      router.push('/dashboard');
     } catch (error: any) {
       console.error('Login error:', error);
       // Show user-friendly error message. Firebase errors are already localized.
@@ -47,8 +58,8 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await signInWithGoogle();
+      // Redirect handled by the useEffect above once auth state is confirmed
       toast.success('Accesso effettuato con successo!');
-      router.push('/dashboard');
     } catch (error: any) {
       console.error('Google sign-in error:', error);
       toast.error(error.message || 'Errore durante l\'accesso con Google');

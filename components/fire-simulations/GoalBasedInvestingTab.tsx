@@ -32,6 +32,7 @@ import { GoalBasedInvestingData, InvestmentGoal, GoalAssetAssignment } from '@/t
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Settings, Plus, Target, AlertTriangle, Loader2 } from 'lucide-react';
+import { GoalsSkeleton } from '@/components/fire-simulations/GoalsSkeleton';
 import { toast } from 'sonner';
 import { GoalSummaryCards } from '@/components/goals/GoalSummaryCards';
 import { GoalAllocationPieChart } from '@/components/goals/GoalAllocationPieChart';
@@ -194,11 +195,7 @@ export function GoalBasedInvestingTab() {
   // ==================== Loading State ====================
 
   if (loadingSettings || loadingAssets || loadingGoals) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <GoalsSkeleton />;
   }
 
   // ==================== Feature Disabled State ====================

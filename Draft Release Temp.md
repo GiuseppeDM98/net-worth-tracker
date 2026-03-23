@@ -1,5 +1,8 @@
 ## ✨ New Features
 
+- Added smooth animated transitions between dashboard pages — navigating via the sidebar now plays a subtle fade-out then fade-in effect, making the app feel connected and polished rather than abrupt
+
+
 - The theme toggle in the header now cycles through three states — **Light**, **Dark**, and **System** (follows OS preference) — using Sun, Moon, and Monitor icons respectively. Switching to System removes the manual override and re-syncs the app with the operating system's light/dark setting
 
 - Added **Budget** tab to Cashflow page with automatic budget tracking for all expense categories
@@ -20,6 +23,11 @@
 - Risk-free rate field now shows an inline link to retrieve the current BTP 10Y value directly below the input
 
 ## 🐛 Bug Fixes
+
+- Fixed login requiring a second click to succeed after entering credentials — the app now correctly waits for authentication to complete before navigating to the dashboard
+- Fixed registration with email/password requiring a second attempt in some cases — same underlying fix as login
+- Fixed **Drawdown Duration** showing 1 month too many (e.g., "2m" when only 1 month had elapsed since the portfolio peak) — the metric now correctly shows elapsed months
+- Fixed **Recovery Time** showing "1m" when the portfolio was currently at the trough — it now correctly shows "0m" (recovery hasn't started yet)
 
 - Fixed chart tooltips on the History page: hovering over data points now shows each series label in its correct color (blue for Equities, red for Bonds, green for Liquidity, etc.) — previously all tooltip text appeared in the same neutral color regardless of the series
 - Fixed chart tooltips on the Dashboard pie charts (Asset Class, Asset, Liquidity): the hovered slice name now appears in its matching color — previously always shown in neutral white regardless of the slice
@@ -135,3 +143,20 @@
 - Login and registration pages now display the app's logo above the sign-in form, along with the "Portfolio Tracker" title — bringing these pages in line with the visual identity of the rest of the app
 - Links on the Login and Registration pages now use the app's emerald brand color instead of blue, consistent with the rest of the interface
 - Loading indicators on the Dashboard, FIRE Calculator, Monte Carlo, and Goal-Based Investing pages now show an animated spinner instead of a static "Caricamento..." text — the spinner is visible and clearly communicates the loading state in both light and dark mode
+- History page now shows a skeleton loading screen while data is being fetched — the placeholder mirrors the exact layout of the page (header, 8 chart sections, snapshot grid) so the transition from loading to loaded feels seamless instead of a sudden appearance
+- FIRE Calculator, Monte Carlo, and Goals tabs now show skeleton loading screens that mirror their real layouts while settings and portfolio data are being loaded
+- All charts (bar charts, line charts, area charts, and pie charts) now animate smoothly on load — bars grow up from the baseline, lines draw in from left to right, pie slices fan out, and area fills expand into view. Every page with data visualization benefits: History, Performance, Cashflow, Dividends, FIRE, Monte Carlo, Goals, and the portfolio allocation pie
+- All buttons now respond to hover with a subtle lift effect and to click/tap with a gentle press-down animation — providing consistent tactile feedback throughout the app. Ghost buttons, link buttons, and icon buttons keep the press feedback only (no lift), matching the existing behavior of metric and ranking cards
+- Budget tab collapsible sections (Fixed Expenses, Variable, Debt, Income) now animate smoothly open and closed — expanding slides the rows down with a fade-in and collapsing slides them back up, instead of snapping instantly. The chevron indicator rotates to signal direction. Works on both desktop and mobile views
+- Budget tab: the section chevron now clearly indicates expanded (↑) vs collapsed (↓) state at a glance
+
+## 🐛 Bug Fixes
+
+- Fixed the Budget tab historical analysis panel ("Analisi Storica") sometimes requiring an extra scroll to become visible after clicking a category row — the page now always scrolls the panel into view at the top of the viewport after the animation completes
+- Fixed the "available on desktop only" hint in the mobile Budget item dialog: the message now clearly states that "L'analisi storica mensile" (monthly historical analysis) is what requires a larger screen, instead of the generic and confusing "Disponibile solo su desktop"
+- Performance page chart sections (portfolio evolution, rolling CAGR, rolling Sharpe, monthly heatmap, underwater drawdown, methodology) now animate in with a staggered cascade on load — each chart slides up and fades in sequentially instead of appearing all at once
+- The Dividends tab now animates in with a staggered cascade when first opened — action buttons, filters, statistics charts, and the dividend table each appear sequentially with a subtle slide-up effect
+
+## 🔒 Security
+
+- Updated Next.js, undici, fast-xml-parser, and flatted dependencies to patch 3 high-severity and 1 moderate-severity vulnerabilities

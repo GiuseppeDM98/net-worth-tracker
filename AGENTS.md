@@ -181,13 +181,85 @@ return (
 
 - **Simple loading state (no skeleton)**: Use `<Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />` inside a height placeholder (`h-64`) to prevent layout shift. Never use `<div className="text-gray-500">Caricamento...</div>` — it is invisible in dark mode and provides no visual feedback.
 - **`Loader2` vs `RefreshCw`**: `Loader2 animate-spin` = initial mount loading (data not yet arrived). `RefreshCw animate-spin` = user-triggered active refresh (cashflow, filters). Never interchange them — they have different semantic meaning.
+- **Fast vs. slow page loading decision**: Pages that load in <200ms should `return null` while loading — a flash of skeleton is more jarring than a brief blank when the page transition already covers the gap. Only use skeletons for genuinely slow fetches (History: multiple Firestore queries + calculations). For borderline cases, use `useDelayedLoading(loading, 150)` from `lib/hooks/useDelayedLoading.ts` — shows the skeleton only after 150ms, avoiding the flash entirely on fast connections.
 
 ### Framer Motion Animation Patterns
 - **Shared variants**: `lib/utils/motionVariants.ts` — never define variants inline
 - **Stagger + conditional elements**: use explicit `transition={{ delay: index * 0.1 }}` per card — parent stagger counts ALL children including conditional slots
 - **`motion.tr`**: wrapping shadcn `<TableRow>` with `motion()` breaks table structure. Use `motion.tr` directly
 - **`AnimatePresence initial={false}`** on collapsibles that start open — avoids exit animation on mount
+
+**Table section collapse/expand animation (>30min debug, session 14):**
+HTML `<tr>` elements use `display: table-row` which does NOT support `height: 0 → auto` or `overflow: hidden`. You cannot animate table row groups with slideDown directly. Fix:
+```tsx
+// Wrap all section rows in a single <tr><td colSpan={totalCols} className="p-0"> container
+<tr>
+  <td colSpan={totalCols} className="p-0">
+    <AnimatePresence>
+      {!isCollapsed && (
+        <motion.div variants={slideDown} initial="hidden" animate="visible" exit="hidden" style={{ overflow: 'hidden' }}>
+          {/* flex rows with explicit widths matching the outer table colgroup */}
+          <div className="flex items-center ...">
+            <div className="flex-1 min-w-0 ...">name</div>
+            <div className="w-[130px] shrink-0 ...">value</div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  </td>
+</tr>
+```
+Outer `<Table>` needs `style={{ tableLayout: 'fixed' }}` + `<colgroup>` with explicit column widths. Flex rows inside `motion.div` use matching `w-[N] shrink-0` divs. This achieves pixel-perfect alignment between header and animated content.
+
+**`colSpan` must cover ALL columns:** If `totalCols` is off by even 1, the content `<td>` is narrower than expected. The missing column width is unavailable to flex-1, making the animated content overflow (clipped by `overflow: hidden`). Always count every `<TableHead>` cell to compute `totalCols`.
+
+**JSX comments inside `<colgroup>` cause hydration errors:** `{/* comment */}` inside `<colgroup>` is serialized as a whitespace text node, which is invalid HTML there. Remove all comments from inside `<colgroup>`.
+
+**Scroll to panel after slideDown:** Use `setTimeout(350)` (not 100ms) + `block: 'start'` — the 300ms enter animation must complete before scrollIntoView fires, otherwise the panel isn't fully visible yet.
 - **Easing**: always `[0.25, 1, 0.5, 1]` (ease-out-quart). Never bounce or elastic.
+- **Page-level transitions**: `AnimatePresence mode="wait"` in `app/dashboard/layout.tsx`, keyed by `usePathname()`. The `exit` state on `pageVariants` only fires from this layout wrapper — individual pages don't need their own `AnimatePresence`. `mode="wait"` ensures the exiting page finishes before the entering page starts. Exit duration must be < entering duration (150ms vs 350ms) to feel snappy.
+
+**Two valid patterns for page mount animations — never mix them:**
+
+*Pattern A — staggerContainer (use when the page has a skeleton loading state):*
+```tsx
+// Root plain div (skeleton already handles loading→content transition)
+<div className="space-y-6 p-3 sm:p-6">
+  {/* non-animated sections (header, tabs, metric sections) */}
+  <motion.div variants={staggerContainer} initial="hidden" animate="visible">
+    <motion.div variants={cardItem}><Card /></motion.div>  {/* no initial/animate on children */}
+    <motion.div variants={cardItem}><Card /></motion.div>
+  </motion.div>
+</div>
+```
+Children inherit `hidden` state from the stagger parent — Framer Motion applies `opacity: 0` synchronously before the first paint, preventing the compound-opacity flash.
+
+*Pattern B — explicit delays (use for tab-child components with no skeleton transition):*
+```tsx
+<motion.div variants={pageVariants} initial="hidden" animate="visible" className="space-y-6">
+  <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ delay: 0 }}>…</motion.div>
+  <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ delay: 0.1 }}>…</motion.div>
+</motion.div>
+```
+
+**Compound-opacity flash (>30min debug, session 13):** Combining `pageVariants` root fade (`opacity 0→1` over 0.35s) with independent `initial="hidden" animate="visible"` on child cardItems causes `opacity_visual = opacity_parent × opacity_child` — chart cards appear to flash from nowhere while the page is mid-fade. Fix: use Pattern A (staggerContainer) instead. The flash happens because both opacities animate in parallel rather than the children inheriting state from the parent.
+
+### Recharts Animation Patterns
+Standard props across the entire codebase — never deviate:
+- **`<Bar>` / `<Pie>`**: `animationDuration={600} animationEasing="ease-out"`
+- **`<Line>` / `<Area>`**: `animationDuration={800} animationEasing="ease-out"`
+- **`<Pie>` also needs `animationBegin={0}`** — without it Recharts adds ~400ms default delay before starting, making pies feel sluggish vs bars and lines
+
+**Decorative band Areas** (overlapping semi-transparent fills used as background shading — e.g. percentile bands in Monte Carlo fan-charts and scenario comparison): keep `isAnimationActive={false}`. Animating 4–6 independent areas that visually stack produces a chaotic sequential fill-in. Animate only the foreground median `<Line>` on top. Always add an inline comment explaining why.
+
+**Re-animation on filter/data changes**: intentional for explicit user actions (dropdown select, button toggle, drill-down click). Re-animation communicates the data changed. Do NOT set `isAnimationActive={false}` for this reason unless the trigger is genuinely real-time (slider, typing, polling).
+
+### Button Micro-interaction Pattern
+- **Base class** (`components/ui/button.tsx`): `hover:-translate-y-[1px] active:scale-[0.97] active:translate-y-[1px] duration-150` — lift on hover, press-down on active
+- **ghost / link variants**: add `hover:translate-y-0` to suppress the lift (no solid chrome, so lift feels wrong). Press (`active:scale`) still applies from base class
+- **icon / icon-sm / icon-lg sizes**: add `hover:translate-y-0` — icon buttons should not shift position (they sit inside toolbars and table rows where even 1px shift is visible noise)
+- **`disabled:pointer-events-none`** already in base class — no hover/active events reach disabled buttons, no extra guard needed
+- **Gotcha — `asChild` + Radix dropdown trigger**: if the button wraps a Radix DropdownMenuTrigger or PopoverTrigger and a parent has `overflow: hidden` or tight `z-index`, the `translate-y` on hover can clip the floating menu. Fix: pass `className="hover:translate-y-0"` inline as an override on that specific usage
 
 ### CSS `animate-in` + prefers-reduced-motion
 - Framer Motion respects reduced-motion automatically via `MotionConfig` in `MotionProvider.tsx`.
@@ -233,6 +305,9 @@ For dialogs with long forms or variable-length content, keep header and footer a
 
 ### Firebase Auth Registration Race Condition
 **Symptom**: PERMISSION_DENIED on first Firestore write after user creation. **Fix**: force `getIdToken(true)` + retry logic + Firestore rules using `docId` (not `resource.data`). **Files**: `authHelpers.ts`, `AuthContext.tsx`, `firestore.rules`
+
+### Firebase Auth Login Redirect Race Condition
+**Symptom**: Login (or registration) only works on the second click. **Root cause**: `router.push('/dashboard')` called immediately after `signIn()` resolves, but `onAuthStateChanged` callback is still awaiting an async Firestore `displayName` lookup — `ProtectedRoute` sees `user=null` and bounces back to `/login`. **Fix**: remove `router.push()` from form handlers; add a `useEffect` in login/register pages that watches `user + authLoading` from `AuthContext` and redirects only when `!authLoading && user`. The same pattern applies to Google OAuth (`signInWithGoogle`).
 
 ### Nullish `??` vs Falsy `||` for Snapshot Fallbacks
 **Symptom**: Asset value history shows "0,00€". **Fix**: Use `||` when `0` is semantically invalid (e.g. `totalValue || (price * qty)` in `assetPriceHistoryUtils.ts`).
@@ -315,6 +390,10 @@ When an icon switches between TrendingUp/TrendingDown (or similar) based on a va
 - Emoji in narrative/celebratory **text strings** (e.g. `"🎉 Hai raggiunto la FI!"`) are acceptable.
 - Map: `📊`→`BarChart3`, `🎯`→`Target`, `ℹ️`→`Info`, `⚠️`→`AlertTriangle`, `📉`→`TrendingDown`, `📈`→`TrendingUp`, `💡`→`Info` or `Lightbulb`
 
+### Radix Dialog/Sheet Without Description Warning
+**Symptom**: `Warning: Missing 'Description' or 'aria-describedby={undefined}' for {DialogContent}` in console when opening a Sheet or Dialog that has no description child.
+**Fix**: Add `aria-describedby={undefined}` to `DialogPrimitive.Content` in the component primitive — this explicitly signals "no description intentionally" and silences the warning without adding a hidden element. Applied in `components/ui/sheet.tsx`.
+
 ### shadcn `<Alert>` Icon Slot
 **Gotcha**: The first icon passed as a **direct child of `<Alert>`** (outside `<AlertDescription>`) is automatically positioned as the leading icon by shadcn's Alert component. Adding a second icon inside `<AlertDescription>` causes double rendering.
 ```tsx
@@ -336,4 +415,7 @@ When an icon switches between TrendingUp/TrendingDown (or similar) based on a va
 </Alert>
 ```
 
-**Last updated**: 2026-03-20 (session 08: Loader2 vs RefreshCw loading state rule)
+### Drawdown Duration / Recovery Time Semantics
+Duration = months **elapsed** (index distance, not inclusive count). `Jan(idx 0) → Dec(idx 11)` = 11m, **not** 12m. Never add `+1` for "inclusive counting" — it was added incorrectly and produces values 1 month too high. Recovery Time = 0m when trough IS the current snapshot (portfolio just hit the bottom, recovery hasn't started). Use `Math.max(0, ...)` not `Math.max(1, ...)`.
+
+**Last updated**: 2026-03-23 (session 15: login/register redirect race condition, drawdown duration off-by-one, npm audit fixes)

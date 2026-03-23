@@ -32,6 +32,7 @@ import { formatCurrencyCompact } from '@/lib/services/chartService';
 import { MonteCarloParams, MonteCarloResults, MonteCarloScenarios } from '@/types/assets';
 import { toast } from 'sonner';
 import { Dices, Loader2 } from 'lucide-react';
+import { MonteCarloSkeleton } from '@/components/fire-simulations/MonteCarloSkeleton';
 import { SimulationChart } from '@/components/monte-carlo/SimulationChart';
 import { SuccessRateCard } from '@/components/monte-carlo/SuccessRateCard';
 import { ParametersForm } from '@/components/monte-carlo/ParametersForm';
@@ -271,11 +272,7 @@ export function MonteCarloTab() {
   // ========== Render ==========
 
   if (isLoadingAssets || isLoadingSettings) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <MonteCarloSkeleton />;
   }
 
   return (

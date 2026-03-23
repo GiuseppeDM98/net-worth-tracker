@@ -9,6 +9,7 @@ import {
   slideDown,
 } from '@/lib/utils/motionVariants';
 import { useAuth } from '@/contexts/AuthContext';
+import { HistoryPageSkeleton } from '@/components/history/HistoryPageSkeleton';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { getAllAssets, ASSET_CLASS_ORDER } from '@/lib/services/assetService';
 import { getUserSnapshots, updateSnapshotNote } from '@/lib/services/snapshotService';
@@ -509,11 +510,7 @@ export default function HistoryPage() {
   const renderCommodityLabel = renderAssetClassLabel('#92400E', -10);
 
   if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-muted-foreground">Caricamento...</div>
-      </div>
-    );
+    return <HistoryPageSkeleton />;
   }
 
   return (
@@ -654,7 +651,8 @@ export default function HistoryPage() {
                   name="Patrimonio Totale"
                   dot={({ key, ...props }: any) => <CustomChartDot key={key} {...props} isMobile={isMobile} />}
                   activeDot={{ r: 6 }}
-                  isAnimationActive={false}
+                  animationDuration={800}
+                  animationEasing="ease-out"
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -876,7 +874,8 @@ export default function HistoryPage() {
                     strokeWidth={2}
                     name="Azioni"
                     dot={{ r: 4 }}
-                    isAnimationActive={false}
+                    animationDuration={800}
+                    animationEasing="ease-out"
                     label={false}
                   />
                   <Line
@@ -886,7 +885,8 @@ export default function HistoryPage() {
                     strokeWidth={2}
                     name="Obbligazioni"
                     dot={{ r: 4 }}
-                    isAnimationActive={false}
+                    animationDuration={800}
+                    animationEasing="ease-out"
                     label={false}
                   />
                   <Line
@@ -896,7 +896,8 @@ export default function HistoryPage() {
                     strokeWidth={2}
                     name="Criptovalute"
                     dot={{ r: 4 }}
-                    isAnimationActive={false}
+                    animationDuration={800}
+                    animationEasing="ease-out"
                     label={false}
                   />
                   <Line
@@ -906,7 +907,8 @@ export default function HistoryPage() {
                     strokeWidth={2}
                     name="Immobili"
                     dot={{ r: 4 }}
-                    isAnimationActive={false}
+                    animationDuration={800}
+                    animationEasing="ease-out"
                     label={false}
                   />
                   <Line
@@ -916,7 +918,8 @@ export default function HistoryPage() {
                     strokeWidth={2}
                     name="Liquidità"
                     dot={{ r: 4 }}
-                    isAnimationActive={false}
+                    animationDuration={800}
+                    animationEasing="ease-out"
                     label={false}
                   />
                   <Line
@@ -926,7 +929,8 @@ export default function HistoryPage() {
                     strokeWidth={2}
                     name="Materie Prime"
                     dot={{ r: 4 }}
-                    isAnimationActive={false}
+                    animationDuration={800}
+                    animationEasing="ease-out"
                     label={false}
                   />
                 </LineChart>
@@ -975,7 +979,8 @@ export default function HistoryPage() {
                     fill="#3B82F6"
                     fillOpacity={0.8}
                     name="Azioni"
-                    isAnimationActive={false}
+                    animationDuration={800}
+                    animationEasing="ease-out"
                     label={false}
                   />
                   <Area
@@ -985,7 +990,8 @@ export default function HistoryPage() {
                     fill="#EF4444"
                     fillOpacity={0.8}
                     name="Obbligazioni"
-                    isAnimationActive={false}
+                    animationDuration={800}
+                    animationEasing="ease-out"
                     label={false}
                   />
                   <Area
@@ -995,7 +1001,8 @@ export default function HistoryPage() {
                     fill="#F59E0B"
                     fillOpacity={0.8}
                     name="Criptovalute"
-                    isAnimationActive={false}
+                    animationDuration={800}
+                    animationEasing="ease-out"
                     label={false}
                   />
                   <Area
@@ -1005,7 +1012,8 @@ export default function HistoryPage() {
                     fill="#10B981"
                     fillOpacity={0.8}
                     name="Immobili"
-                    isAnimationActive={false}
+                    animationDuration={800}
+                    animationEasing="ease-out"
                     label={false}
                   />
                   <Area
@@ -1015,7 +1023,8 @@ export default function HistoryPage() {
                     fill="#6B7280"
                     fillOpacity={0.8}
                     name="Liquidità"
-                    isAnimationActive={false}
+                    animationDuration={800}
+                    animationEasing="ease-out"
                     label={false}
                   />
                   <Area
@@ -1025,7 +1034,8 @@ export default function HistoryPage() {
                     fill="#92400E"
                     fillOpacity={0.8}
                     name="Materie Prime"
-                    isAnimationActive={false}
+                    animationDuration={800}
+                    animationEasing="ease-out"
                     label={false}
                   />
                 </AreaChart>
@@ -1105,7 +1115,8 @@ export default function HistoryPage() {
                     strokeWidth={2}
                     name="Liquido"
                     dot={{ r: 4 }}
-                    isAnimationActive={false}
+                    animationDuration={800}
+                    animationEasing="ease-out"
                     label={false}
                   />
                   <Line
@@ -1115,7 +1126,8 @@ export default function HistoryPage() {
                     strokeWidth={2}
                     name="Illiquido"
                     dot={{ r: 4 }}
-                    isAnimationActive={false}
+                    animationDuration={800}
+                    animationEasing="ease-out"
                     label={false}
                   />
                 </LineChart>
@@ -1165,7 +1177,8 @@ export default function HistoryPage() {
                     fill="#10B981"
                     fillOpacity={0.6}
                     name="Liquido"
-                    isAnimationActive={false}
+                    animationDuration={800}
+                    animationEasing="ease-out"
                     label={false}
                   />
                   <Area
@@ -1175,7 +1188,8 @@ export default function HistoryPage() {
                     fill="#F59E0B"
                     fillOpacity={0.6}
                     name="Illiquido"
-                    isAnimationActive={false}
+                    animationDuration={800}
+                    animationEasing="ease-out"
                     label={false}
                   />
                 </AreaChart>
@@ -1261,7 +1275,8 @@ export default function HistoryPage() {
                   dataKey={showYoYPercentage ? 'variationPercentage' : 'variation'}
                   name="Variazione"
                   fill="#10B981"
-                  isAnimationActive={false}
+                  animationDuration={600}
+                  animationEasing="ease-out"
                 >
                   {yoyVariationData.map((entry, index) => (
                     <Cell
@@ -1385,7 +1400,8 @@ export default function HistoryPage() {
                     name="Risparmio Netto"
                     fill="#10B981"
                     stackId="a"
-                    isAnimationActive={false}
+                    animationDuration={600}
+                    animationEasing="ease-out"
                   />
                   {/* fill="#3B82F6" sets the legend color; Cell overrides each bar's actual color */}
                   <Bar
@@ -1393,7 +1409,8 @@ export default function HistoryPage() {
                     name="Crescita Investimenti"
                     fill="#3B82F6"
                     stackId="a"
-                    isAnimationActive={false}
+                    animationDuration={600}
+                    animationEasing="ease-out"
                   >
                     {savingsVsInvestmentData.map((entry, index) => (
                       <Cell
@@ -1458,7 +1475,8 @@ export default function HistoryPage() {
                     name="Risparmio Netto"
                     fill="#10B981"
                     stackId="a"
-                    isAnimationActive={false}
+                    animationDuration={600}
+                    animationEasing="ease-out"
                   />
                   {/* fill="#3B82F6" sets the legend color; Cell overrides each bar's actual color */}
                   <Bar
@@ -1466,7 +1484,8 @@ export default function HistoryPage() {
                     name="Crescita Investimenti"
                     fill="#3B82F6"
                     stackId="a"
-                    isAnimationActive={false}
+                    animationDuration={600}
+                    animationEasing="ease-out"
                   >
                     {savingsVsInvestmentDataMonthly.map((entry, index) => (
                       <Cell

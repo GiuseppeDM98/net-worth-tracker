@@ -247,18 +247,7 @@ export default function HallOfFamePage() {
     setNoteEditDialogOpen(true); // Open edit dialog
   };
 
-  if (loading) {
-    return (
-      <div className="p-8">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
-            <p className="text-muted-foreground">Caricamento Hall of Fame...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return null;
 
   if (!data) {
     return (

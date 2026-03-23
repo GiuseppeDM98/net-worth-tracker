@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { staggerContainer, cardItem } from '@/lib/utils/motionVariants';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { getAllPerformanceData, calculatePerformanceForPeriod, preparePerformanceChartData, getSnapshotsForPeriod, prepareMonthlyReturnsHeatmap, prepareUnderwaterDrawdownData } from '@/lib/services/performanceService';
@@ -793,7 +795,13 @@ export default function PerformancePage() {
 
         </div>{/* end key={selectedPeriod} animation wrapper */}
 
+        {/* Chart cards — stagger container propagates hidden→visible to children,
+             preventing the compound-opacity flash caused by having both a page-level
+             fade and independent initial="hidden" on every card simultaneously. */}
+        <motion.div variants={staggerContainer} initial="hidden" animate="visible">
+
         {/* Net Worth Evolution Chart */}
+        <motion.div variants={cardItem}>
         <Card className="mt-6">
           <CardHeader>
             <CardTitle>Evoluzione Patrimonio</CardTitle>
@@ -815,6 +823,8 @@ export default function PerformancePage() {
                     stroke="#8884d8"
                     fill="#8884d8"
                     name="Contributi"
+                    animationDuration={800}
+                    animationEasing="ease-out"
                   />
                   <Area
                     type="monotone"
@@ -823,6 +833,8 @@ export default function PerformancePage() {
                     stroke="#82ca9d"
                     fill="#82ca9d"
                     name="Investimenti"
+                    animationDuration={800}
+                    animationEasing="ease-out"
                   />
                   <Line
                     type="monotone"
@@ -831,14 +843,18 @@ export default function PerformancePage() {
                     strokeWidth={2}
                     name="Patrimonio Totale"
                     dot={false}
+                    animationDuration={800}
+                    animationEasing="ease-out"
                   />
                 </AreaChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
+        </motion.div>
 
         {/* Rolling CAGR Chart */}
         {rollingCagrData.length > 0 && (
+          <motion.div variants={cardItem}>
           <Card className="mt-6">
             <CardHeader>
               <CardTitle>CAGR Rolling 12 Mesi</CardTitle>
@@ -875,6 +891,8 @@ export default function PerformancePage() {
                       strokeWidth={2}
                       name="CAGR 12M"
                       dot={false}
+                      animationDuration={800}
+                      animationEasing="ease-out"
                     />
                     <Line
                       type="monotone"
@@ -884,15 +902,19 @@ export default function PerformancePage() {
                       name={`Media Mobile ${rollingCagrMaWindowMonths}M`}
                       strokeDasharray="6 4"
                       dot={false}
+                      animationDuration={800}
+                      animationEasing="ease-out"
                     />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
+          </motion.div>
           )}
 
         {/* Rolling Sharpe Ratio Chart */}
         {rollingSharpeData.length > 0 && (
+          <motion.div variants={cardItem}>
           <Card className="mt-6">
             <CardHeader>
               <CardTitle>Sharpe Ratio Rolling 12 Mesi</CardTitle>
@@ -934,6 +956,8 @@ export default function PerformancePage() {
                     strokeWidth={2}
                     name="1. Sharpe 12M"
                     dot={false}
+                    animationDuration={800}
+                    animationEasing="ease-out"
                   />
                   <Line
                     type="monotone"
@@ -943,14 +967,18 @@ export default function PerformancePage() {
                     name={`2. Media Mobile ${rollingSharpeMaWindowMonths}M`}
                     strokeDasharray="6 4"
                     dot={false}
+                    animationDuration={800}
+                    animationEasing="ease-out"
                   />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
+          </motion.div>
         )}
 
         {/* Monthly Returns Heatmap */}
+        <motion.div variants={cardItem}>
         <Card className="mt-6">
           <CardHeader>
             <CardTitle>Heatmap Rendimenti Mensili</CardTitle>
@@ -962,8 +990,10 @@ export default function PerformancePage() {
             <MonthlyReturnsHeatmap data={heatmapData} />
           </CardContent>
         </Card>
+        </motion.div>
 
         {/* Underwater Drawdown Chart */}
+        <motion.div variants={cardItem}>
         <Card className="mt-6">
           <CardHeader>
             <CardTitle>Grafico Underwater (Drawdown)</CardTitle>
@@ -975,8 +1005,10 @@ export default function PerformancePage() {
             <UnderwaterDrawdownChart data={underwaterData} height={getChartHeight()} />
           </CardContent>
         </Card>
+        </motion.div>
 
         {/* Methodology Section */}
+        <motion.div variants={cardItem}>
         <Card className="mt-6">
           <CardHeader>
             <CardTitle>Note Metodologiche</CardTitle>
@@ -1281,6 +1313,9 @@ export default function PerformancePage() {
             </div>
           </CardContent>
         </Card>
+        </motion.div>
+
+        </motion.div>{/* end staggerContainer */}
       </Tabs>
 
       {/* Custom Date Range Dialog */}

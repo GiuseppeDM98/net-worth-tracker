@@ -24,6 +24,11 @@ export const pageVariants: Variants = {
     opacity: 1,
     transition: { duration: 0.35, ease: easeOutQuart },
   },
+  exit: {
+    opacity: 0,
+    y: -8,
+    transition: { duration: 0.15, ease: "easeIn" },
+  },
 };
 
 /** Stagger container for card grids (80ms between children) */

@@ -12,6 +12,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
+import { pageVariants, cardItem } from '@/lib/utils/motionVariants';
 import { useAuth } from '@/contexts/AuthContext';
 import { Dividend, DividendType } from '@/types/dividend';
 import { Asset } from '@/types/assets';
@@ -277,9 +279,9 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
   }
 
   return (
-    <div className="space-y-6">
+    <motion.div variants={pageVariants} initial="hidden" animate="visible" className="space-y-6">
       {/* Action Buttons Row */}
-      <div className="space-y-2">
+      <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0 }} className="space-y-2">
         <div className="flex flex-col desktop:flex-row desktop:flex-wrap desktop:items-center gap-2">
           <Button onClick={handleCreate} className="dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
             <Plus className="h-4 w-4 mr-2" />
@@ -312,10 +314,10 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
           💡 I dividendi recenti vengono scaricati automaticamente ogni giorno.
           Usa "Scarica Tutti" solo per importare dividendi storici o forzare un refresh.
         </p>
-      </div>
+      </motion.div>
 
       {/* Filters Row — positioned at top so they affect both charts and table */}
-      <div className="rounded-md border p-4 bg-muted/50">
+      <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.1 }} className="rounded-md border p-4 bg-muted/50">
         <h3 className="font-semibold mb-4">Filtri</h3>
         <div className="grid gap-4 desktop:grid-cols-4">
           {/* Asset Filter */}
@@ -405,16 +407,19 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
             </Button>
           </div>
         )}
-      </div>
+      </motion.div>
 
       {/* Stats Component — receives active filters so charts reflect current selection */}
+      <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.2 }}>
       <DividendStats
         startDate={startDate}
         endDate={endDate}
         assetId={assetFilter !== '__all__' ? assetFilter : undefined}
       />
+      </motion.div>
 
       {/* View Mode Toggle */}
+      <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.3 }}>
       <div className="flex gap-2 border-b border-border">
         <Button
           variant={viewMode === 'table' ? 'default' : 'ghost'}
@@ -472,6 +477,8 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
         />
       )}
 
+      </motion.div>
+
       {/* Dividend Dialog */}
       <DividendDialog
         open={dialogOpen}
@@ -479,6 +486,6 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
         dividend={selectedDividend}
         onSuccess={handleDialogSuccess}
       />
-    </div>
+    </motion.div>
   );
 }

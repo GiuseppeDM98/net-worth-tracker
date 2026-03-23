@@ -139,6 +139,9 @@ export function SimulationChart({ data, retirementYears }: SimulationChartProps)
 
                 Fill opacity varies (0.1-0.15) to create visual depth when areas overlap.
                 Lower percentiles render later to ensure they appear on top in the stack. */}
+            {/* Percentile band areas — isAnimationActive={false} perché sono 4 aree decorative
+                sovrapposte: animarle individualmente causerebbe una sequenza visiva caotica.
+                La linea mediana anima in modo pulito al loro posto. */}
             <Area
               type="monotone"
               dataKey="p90"
@@ -146,6 +149,7 @@ export function SimulationChart({ data, retirementYears }: SimulationChartProps)
               fill="#10b981"
               fillOpacity={0.1}
               name="90° percentile"
+              isAnimationActive={false}
             />
             <Area
               type="monotone"
@@ -154,6 +158,7 @@ export function SimulationChart({ data, retirementYears }: SimulationChartProps)
               fill="#10b981"
               fillOpacity={0.15}
               name="75° percentile"
+              isAnimationActive={false}
             />
             <Area
               type="monotone"
@@ -162,6 +167,7 @@ export function SimulationChart({ data, retirementYears }: SimulationChartProps)
               fill="#f97316"
               fillOpacity={0.15}
               name="25° percentile"
+              isAnimationActive={false}
             />
             <Area
               type="monotone"
@@ -170,6 +176,7 @@ export function SimulationChart({ data, retirementYears }: SimulationChartProps)
               fill="#ef4444"
               fillOpacity={0.1}
               name="10° percentile"
+              isAnimationActive={false}
             />
 
             {/* Median line */}
@@ -180,6 +187,8 @@ export function SimulationChart({ data, retirementYears }: SimulationChartProps)
               strokeWidth={3}
               dot={false}
               name="Mediana (50° percentile)"
+              animationDuration={800}
+              animationEasing="ease-out"
             />
           </LineChart>
         </ResponsiveContainer>

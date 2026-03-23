@@ -1122,6 +1122,9 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                                 dataKey="value"
                                 onClick={(data: any) => handleCategoryClick(data, 'expenses')}
                                 cursor="pointer"
+                                animationBegin={0}
+                                animationDuration={600}
+                                animationEasing="ease-out"
                               >
                                 {expensesByCategoryData.map((entry, index) => (
                                   <Cell
@@ -1167,6 +1170,9 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                                 dataKey="value"
                                 onClick={(data: any) => handleSubcategoryClick(data)}
                                 cursor="pointer"
+                                animationBegin={0}
+                                animationDuration={600}
+                                animationEasing="ease-out"
                               >
                                 {currentSubcategoriesData.map((entry, index) => (
                                   <Cell
@@ -1302,6 +1308,9 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                               outerRadius={pieOuterRadius}
                               fill="#8884d8"
                               dataKey="value"
+                              animationBegin={0}
+                              animationDuration={600}
+                              animationEasing="ease-out"
                             >
                               {expensesByTypeData.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={entry.color} />
@@ -1368,6 +1377,9 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                                 dataKey="value"
                                 onClick={(data: any) => handleCategoryClick(data, 'income')}
                                 cursor="pointer"
+                                animationBegin={0}
+                                animationDuration={600}
+                                animationEasing="ease-out"
                               >
                                 {incomeByCategoryData.map((entry, index) => (
                                   <Cell
@@ -1408,6 +1420,9 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                                 dataKey="value"
                                 onClick={(data: any) => handleSubcategoryClick(data)}
                                 cursor="pointer"
+                                animationBegin={0}
+                                animationDuration={600}
+                                animationEasing="ease-out"
                               >
                                 {currentSubcategoriesData.map((entry, index) => (
                                   <Cell
@@ -1569,9 +1584,9 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                   <Tooltip content={<ChartTooltip formatter={(v) => `${v.toFixed(2)}%`} />} />
                   <Legend />
                   <ReferenceLine y={0} stroke="#6b7280" strokeDasharray="4 4" />
-                  <Line type="monotone" dataKey="Entrate %" stroke="#10b981" strokeWidth={2} name="Entrate %" dot={!isMobile} />
-                  <Line type="monotone" dataKey="Spese %" stroke="#ef4444" strokeWidth={2} name="Spese %" dot={!isMobile} />
-                  <Line type="monotone" dataKey="Saving Rate %" stroke="#3b82f6" strokeWidth={2} name="Saving Rate %" dot={!isMobile} />
+                  <Line type="monotone" dataKey="Entrate %" stroke="#10b981" strokeWidth={2} name="Entrate %" dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
+                  <Line type="monotone" dataKey="Spese %" stroke="#ef4444" strokeWidth={2} name="Spese %" dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
+                  <Line type="monotone" dataKey="Saving Rate %" stroke="#3b82f6" strokeWidth={2} name="Saving Rate %" dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
                 </LineChart>
                 ) : (
                   <LineChart data={monthlyTrendChartData}>
@@ -1580,9 +1595,9 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                     <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                     <Tooltip content={<ChartTooltip />} />
                     <Legend />
-                    <Line type="monotone" dataKey="Entrate" stroke="#10b981" strokeWidth={2} dot={!isMobile} />
-                    <Line type="monotone" dataKey="Spese" stroke="#ef4444" strokeWidth={2} dot={!isMobile} />
-                    <Line type="monotone" dataKey="Netto" stroke="#3b82f6" strokeWidth={2} dot={!isMobile} />
+                    <Line type="monotone" dataKey="Entrate" stroke="#10b981" strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
+                    <Line type="monotone" dataKey="Spese" stroke="#ef4444" strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
+                    <Line type="monotone" dataKey="Netto" stroke="#3b82f6" strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
                   </LineChart>
                 )}
               </ResponsiveContainer>
@@ -1619,9 +1634,9 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                   <Tooltip content={<ChartTooltip formatter={(v) => `${v.toFixed(2)}%`} />} />
                   <Legend />
                   <ReferenceLine y={0} stroke="#6b7280" strokeDasharray="4 4" />
-                  <Line type="monotone" dataKey="Entrate %" stroke="#10b981" strokeWidth={2} name="Entrate %" dot={!isMobile} />
-                  <Line type="monotone" dataKey="Spese %" stroke="#ef4444" strokeWidth={2} name="Spese %" dot={!isMobile} />
-                  <Line type="monotone" dataKey="Saving Rate %" stroke="#3b82f6" strokeWidth={2} name="Saving Rate %" dot={!isMobile} />
+                  <Line type="monotone" dataKey="Entrate %" stroke="#10b981" strokeWidth={2} name="Entrate %" dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
+                  <Line type="monotone" dataKey="Spese %" stroke="#ef4444" strokeWidth={2} name="Spese %" dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
+                  <Line type="monotone" dataKey="Saving Rate %" stroke="#3b82f6" strokeWidth={2} name="Saving Rate %" dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
                 </LineChart>
                 ) : (
                   <LineChart data={yearlyTrendData}>
@@ -1630,9 +1645,9 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                     <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                     <Tooltip content={<ChartTooltip />} />
                     <Legend />
-                    <Line type="monotone" dataKey="Entrate" stroke="#10b981" strokeWidth={2} dot={!isMobile} />
-                    <Line type="monotone" dataKey="Spese" stroke="#ef4444" strokeWidth={2} dot={!isMobile} />
-                    <Line type="monotone" dataKey="Netto" stroke="#3b82f6" strokeWidth={2} dot={!isMobile} />
+                    <Line type="monotone" dataKey="Entrate" stroke="#10b981" strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
+                    <Line type="monotone" dataKey="Spese" stroke="#ef4444" strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
+                    <Line type="monotone" dataKey="Netto" stroke="#3b82f6" strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
                   </LineChart>
                 )}
               </ResponsiveContainer>
@@ -1675,6 +1690,8 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                     strokeWidth={3}
                     name="Rapporto"
                     dot={{ r: 5 }}
+                    animationDuration={800}
+                    animationEasing="ease-out"
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -1721,9 +1738,9 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                   <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                   <Tooltip content={<ChartTooltip />} />
                   <Legend content={renderLegendContent(isMobile ? 3 : undefined)} />
-                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.fixed} stroke="#3b82f6" strokeWidth={2} dot={!isMobile} />
-                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.variable} stroke="#8b5cf6" strokeWidth={2} dot={!isMobile} />
-                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.debt} stroke="#f59e0b" strokeWidth={2} dot={!isMobile} />
+                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.fixed} stroke="#3b82f6" strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
+                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.variable} stroke="#8b5cf6" strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
+                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.debt} stroke="#f59e0b" strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
@@ -1744,9 +1761,9 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                   <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                   <Tooltip content={<ChartTooltip />} />
                   <Legend content={renderLegendContent(isMobile ? 3 : undefined)} />
-                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.fixed} stroke="#3b82f6" strokeWidth={2} dot={!isMobile} />
-                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.variable} stroke="#8b5cf6" strokeWidth={2} dot={!isMobile} />
-                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.debt} stroke="#f59e0b" strokeWidth={2} dot={!isMobile} />
+                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.fixed} stroke="#3b82f6" strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
+                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.variable} stroke="#8b5cf6" strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
+                  <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.debt} stroke="#f59e0b" strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
@@ -1785,6 +1802,8 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                       dataKey={category}
                       stroke={COLORS[index % COLORS.length]}
                       strokeWidth={2}
+                      animationDuration={800}
+                      animationEasing="ease-out"
                     />
                   ))}
                 </LineChart>
@@ -1814,6 +1833,8 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                       dataKey={category}
                       stroke={COLORS[index % COLORS.length]}
                       strokeWidth={2}
+                      animationDuration={800}
+                      animationEasing="ease-out"
                     />
                   ))}
                 </LineChart>
@@ -1854,6 +1875,8 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                       dataKey={category}
                       stroke={COLORS[index % COLORS.length]}
                       strokeWidth={2}
+                      animationDuration={800}
+                      animationEasing="ease-out"
                     />
                   ))}
                 </LineChart>
@@ -1883,6 +1906,8 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                       dataKey={category}
                       stroke={COLORS[index % COLORS.length]}
                       strokeWidth={2}
+                      animationDuration={800}
+                      animationEasing="ease-out"
                     />
                   ))}
                 </LineChart>

@@ -46,6 +46,9 @@ export function PieChart({ data }: PieChartProps) {
           outerRadius={chartConfig.outerRadius}
           fill="#8884d8"
           dataKey="value"
+          animationBegin={0}
+          animationDuration={600}
+          animationEasing="ease-out"
         >
           {sortedData.map((entry, index) => (
             <Cell key={`cell-${index}`} fill={entry.color} />

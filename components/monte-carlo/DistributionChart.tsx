@@ -95,7 +95,7 @@ export function DistributionChart({ data, retirementYears }: DistributionChartPr
               stroke="#9CA3AF"
             />
             <Tooltip cursor={{ fill: 'rgba(128, 128, 128, 0.1)' }} content={<CustomTooltip />} />
-            <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} animationDuration={600} animationEasing="ease-out" />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>
