@@ -3,57 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { HelpCircle } from 'lucide-react';
 import { formatCurrency, formatPercentage } from '@/lib/services/chartService';
 import { cn } from '@/lib/utils';
-
-/**
- * Animates a numeric value from 0 to the target over ~700ms using ease-out-quart.
- * Re-triggers whenever target changes (e.g. period switch).
- * Respects prefers-reduced-motion.
- */
-function useCountUp(target: number | null, startDelay = 60): number | null {
-  const [current, setCurrent] = useState<number | null>(null);
-  const rafRef = useRef<number | undefined>(undefined);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  useEffect(() => {
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    if (timerRef.current) clearTimeout(timerRef.current);
-
-    if (target === null) {
-      setCurrent(null);
-      return;
-    }
-
-    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setCurrent(target);
-      return;
-    }
-
-    const duration = 700;
-    let startTime: number | null = null;
-
-    timerRef.current = setTimeout(() => {
-      const tick = (now: number) => {
-        if (startTime === null) startTime = now;
-        const elapsed = now - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        // ease-out-quart: fast start, smooth deceleration
-        const eased = 1 - Math.pow(1 - progress, 4);
-        setCurrent(progress >= 1 ? target : target * eased);
-        if (progress < 1) {
-          rafRef.current = requestAnimationFrame(tick);
-        }
-      };
-      rafRef.current = requestAnimationFrame(tick);
-    }, startDelay);
-
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [target]);
-
-  return current;
-}
+import { useCountUp } from '@/lib/utils/useCountUp';
 
 interface MetricCardProps {
   title: string;

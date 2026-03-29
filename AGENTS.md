@@ -244,6 +244,21 @@ Children inherit `hidden` state from the stagger parent — Framer Motion applie
 
 **Compound-opacity flash (>30min debug, session 13):** Combining `pageVariants` root fade (`opacity 0→1` over 0.35s) with independent `initial="hidden" animate="visible"` on child cardItems causes `opacity_visual = opacity_parent × opacity_child` — chart cards appear to flash from nowhere while the page is mid-fade. Fix: use Pattern A (staggerContainer) instead. The flash happens because both opacities animate in parallel rather than the children inheriting state from the parent.
 
+### `useCountUp` Hook — Shared Utility
+`lib/utils/useCountUp.ts` exports `useCountUp(target, options?)` with:
+- Default behavior (`once: false`): re-triggers on every target change — used in `MetricCard` for period switching on Performance page
+- `once: true`: fires only the first time a **non-zero** value arrives; ignores subsequent changes — used for Dashboard KPIs that should animate once on mount, not on data refreshes
+
+**Zero-target trap**: hooks are called unconditionally, including during loading when `assets=[]` → all metrics = 0. If `once: true` were to mark `hasAnimated=true` at target=0, the animation would never fire on real data. Fix: `target === 0` sets `current` directly without marking animated; only a completed animation on a non-zero value marks `hasAnimated=true`.
+
+```ts
+// Mount-only animation (Dashboard KPIs)
+const animated = useCountUp(value, { once: true });
+
+// Re-triggers on period change (MetricCard in Performance)
+const animated = useCountUp(value); // once: false default
+```
+
 ### Recharts Animation Patterns
 Standard props across the entire codebase — never deviate:
 - **`<Bar>` / `<Pie>`**: `animationDuration={600} animationEasing="ease-out"`
@@ -418,4 +433,4 @@ When an icon switches between TrendingUp/TrendingDown (or similar) based on a va
 ### Drawdown Duration / Recovery Time Semantics
 Duration = months **elapsed** (index distance, not inclusive count). `Jan(idx 0) → Dec(idx 11)` = 11m, **not** 12m. Never add `+1` for "inclusive counting" — it was added incorrectly and produces values 1 month too high. Recovery Time = 0m when trough IS the current snapshot (portfolio just hit the bottom, recovery hasn't started). Use `Math.max(0, ...)` not `Math.max(1, ...)`.
 
-**Last updated**: 2026-03-29 (session 16: no new patterns — design context setup only)
+**Last updated**: 2026-03-29 (session 17: useCountUp shared hook with once option)

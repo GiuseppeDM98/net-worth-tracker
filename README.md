@@ -29,6 +29,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Monthly returns heatmap and underwater drawdown chart
 - Rolling performance charts
 - Animated metric cards: values count up on load and on period switch; staggered entrance cascade per section
+- Dashboard KPI cards (Total Portfolio, Liquid, Net Worth, Unrealized Gains, Taxes) animate their values on page load — numbers count up from zero once on mount
 - All major pages (Dashboard, Hall of Fame, History, Performance, Dividends) animate on load with staggered card entrances and smooth expand/collapse transitions; respects system "Reduce Motion" preference
 - All charts animate on load: bars grow up from baseline, lines draw in left to right, area fills expand, pie slices fan out — covers every page with data visualization (History, Performance, Cashflow, Dividends, FIRE, Monte Carlo, Goals)
 - AI-powered analysis using Claude with Extended Thinking and web search

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useCountUp } from '@/lib/utils/useCountUp';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   pageVariants,
@@ -357,6 +358,15 @@ export default function DashboardPage() {
   // Calculate derived values for display
   const liquidNetTotal = portfolioMetrics.liquidNetWorth - portfolioMetrics.liquidEstimatedTaxes;
 
+  // Animated KPI values — fire once on first meaningful (non-zero) data load, never re-trigger.
+  // Hooks must be called unconditionally (before any early return).
+  const animatedTotalValue = useCountUp(portfolioMetrics.totalValue, { once: true });
+  const animatedLiquidNetWorth = useCountUp(portfolioMetrics.liquidNetWorth, { once: true });
+  const animatedNetTotal = useCountUp(portfolioMetrics.netTotal, { once: true });
+  const animatedLiquidNetTotal = useCountUp(liquidNetTotal, { once: true });
+  const animatedUnrealizedGains = useCountUp(portfolioMetrics.unrealizedGains, { once: true });
+  const animatedEstimatedTaxes = useCountUp(portfolioMetrics.estimatedTaxes, { once: true });
+
   // Only show cost basis cards if user is actually tracking cost basis on any asset.
   // Prevents empty cards saying "€0.00 gains" for users not using this feature.
   // Keeps dashboard clean and relevant to user's tracking preferences.
@@ -416,7 +426,7 @@ export default function DashboardPage() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(portfolioMetrics.totalValue)}</div>
+              <div className="text-2xl font-bold">{formatCurrency(animatedTotalValue ?? portfolioMetrics.totalValue)}</div>
               <p className="text-xs text-muted-foreground">
                 {portfolioMetrics.assetCount === 0 ? 'Aggiungi assets per iniziare' : `${portfolioMetrics.assetCount} asset${portfolioMetrics.assetCount !== 1 ? 's' : ''}`}
               </p>
@@ -431,7 +441,7 @@ export default function DashboardPage() {
               <Wallet className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(portfolioMetrics.liquidNetWorth)}</div>
+              <div className="text-2xl font-bold">{formatCurrency(animatedLiquidNetWorth ?? portfolioMetrics.liquidNetWorth)}</div>
             </CardContent>
           </Card>
         </motion.div>
@@ -478,7 +488,7 @@ export default function DashboardPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold text-blue-600">
-                      {formatCurrency(portfolioMetrics.netTotal)}
+                      {formatCurrency(animatedNetTotal ?? portfolioMetrics.netTotal)}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Dopo tasse stimate
@@ -495,7 +505,7 @@ export default function DashboardPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold text-blue-600">
-                      {formatCurrency(liquidNetTotal)}
+                      {formatCurrency(animatedLiquidNetTotal ?? liquidNetTotal)}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Liquidità dopo tasse stimate
@@ -522,7 +532,7 @@ export default function DashboardPage() {
                     <div className={`text-2xl font-bold ${
                       portfolioMetrics.unrealizedGains >= 0 ? 'text-green-600' : 'text-red-600'
                     }`}>
-                      {portfolioMetrics.unrealizedGains >= 0 ? '+' : ''}{formatCurrency(portfolioMetrics.unrealizedGains)}
+                      {portfolioMetrics.unrealizedGains >= 0 ? '+' : ''}{formatCurrency(animatedUnrealizedGains ?? portfolioMetrics.unrealizedGains)}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Guadagno/perdita rispetto al costo medio
@@ -539,7 +549,7 @@ export default function DashboardPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold text-orange-600">
-                      {formatCurrency(portfolioMetrics.estimatedTaxes)}
+                      {formatCurrency(animatedEstimatedTaxes ?? portfolioMetrics.estimatedTaxes)}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Imposte su plusvalenze non realizzate

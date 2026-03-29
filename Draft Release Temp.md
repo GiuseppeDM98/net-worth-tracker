@@ -149,6 +149,7 @@
 - All buttons now respond to hover with a subtle lift effect and to click/tap with a gentle press-down animation — providing consistent tactile feedback throughout the app. Ghost buttons, link buttons, and icon buttons keep the press feedback only (no lift), matching the existing behavior of metric and ranking cards
 - Budget tab collapsible sections (Fixed Expenses, Variable, Debt, Income) now animate smoothly open and closed — expanding slides the rows down with a fade-in and collapsing slides them back up, instead of snapping instantly. The chevron indicator rotates to signal direction. Works on both desktop and mobile views
 - Budget tab: the section chevron now clearly indicates expanded (↑) vs collapsed (↓) state at a glance
+- Dashboard KPI cards now animate their values on load — Total Portfolio, Liquid Portfolio, Net Total (after taxes), Liquid Net Total, Unrealized Gains, and Estimated Taxes all count up smoothly from zero when the page first opens. The animation plays once on mount and does not re-trigger on background data refreshes
 
 ## 🐛 Bug Fixes
 
