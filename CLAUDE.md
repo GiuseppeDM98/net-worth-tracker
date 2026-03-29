@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio, framer-motion
-- Ultima implementazione: **Login race condition fix + Drawdown off-by-one fix + npm audit** — login/register usano `useEffect` su `user+authLoading` da `AuthContext` per il redirect (rimosso `router.push` immediato post-`signIn`). `calculateDrawdownDuration`/`calculateRecoveryTime`: rimosso `+1` errato, ora elapsed index-distance; `Math.max(0,...)` per Recovery Time. `npm audit fix`: risolte fast-xml-parser, flatted, next, undici (3 high + 1 moderate). (2026-03-23)
-- Precedente: **slideDown collapsibili Budget Tab** — `AnimatePresence` + `motion.div variants={slideDown}` su `AnnualTable` (desktop: `<tr><td colSpan>` + flex rows, `table-layout: fixed`, `<colgroup>`) e `MobileAnnualView`. Chevron `rotate-180`. Fix `totalCols` off-by-1. (2026-03-22)
+- Ultima implementazione: **Design Context setup** — creato `.impeccable.md` con personalità brand (Elegante·Sofisticato·Personale), riferimenti (Linear/Vercel), direzione (Overdrive) e 5 principi guida per le skill impeccable. (2026-03-29)
+- Precedente: **Login race condition fix + Drawdown off-by-one fix + npm audit** — login/register usano `useEffect` su `user+authLoading` da `AuthContext` per il redirect (rimosso `router.push` immediato post-`signIn`). `calculateDrawdownDuration`/`calculateRecoveryTime`: rimosso `+1` errato, ora elapsed index-distance; `Math.max(0,...)` per Recovery Time. `npm audit fix`: risolte fast-xml-parser, flatted, next, undici (3 high + 1 moderate). (2026-03-23)
 
 ## Architecture Snapshot
 - App Router con pagine protette sotto `app/dashboard/*`.
@@ -73,4 +73,24 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`, `components/pdf/PDFExportDialog.tsx`, `lib/utils/pdfTimeFilters.ts`, `lib/utils/pdfGenerator.tsx`
 - Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`, `borsaItalianaBondScraper.test.ts`, `goalService.test.ts`, `couponUtils.test.ts`
 
-**Last updated**: 2026-03-23 (session 15: login/register redirect race condition fix, drawdown duration off-by-one fix, npm audit)
+**Last updated**: 2026-03-29 (session 16: teach-impeccable — design context established in .impeccable.md)
+
+## Design Context
+
+### Users
+Investitori italiani attenti e autonomi che gestiscono in proprio il proprio patrimonio (azioni, ETF, BTP, crypto, immobili, conti correnti). Usano l'app regolarmente per monitorare performance, dividendi e progresso verso FIRE. **Job to be done**: "Capire in pochi secondi com'è messa la mia situazione finanziaria e sentire che sto andando nella giusta direzione."
+
+### Brand Personality
+**Elegante · Sofisticato · Personale** — un cruscotto privato di qualità, come un wealth manager digitale su misura. La sofisticazione si esprime nella cura per i dettagli, non nella complessità.
+
+### Aesthetic Direction
+**Riferimento**: Linear / Vercel — tipografia forte, dark mode eccellente, geometria pulita, microinterazioni fluide, zero decoro superfluo.
+**Direzione**: Overdrive — implementazioni tecnicamente ambiziose (fisica spring, scroll-driven reveals, counter animati, transizioni memorabili).
+**Anti-riferimenti**: Bloomberg terminal (troppo freddo), fintech colorato alla Revolut (troppo leggero), Material Design (troppo generico).
+
+### Design Principles
+1. **Dati prima, decorazione mai** — ogni elemento visivo guadagna il suo spazio comunicando informazione.
+2. **Movimento con intenzione** — le animazioni rivelano struttura, non distraggono. Fisica naturale (spring, ease-out-quart). Rispettare sempre `prefers-reduced-motion`.
+3. **La densità è una feature** — non semplificare fino a banalizzare. Rendere la complessità leggibile, non nasconderla.
+4. **Fiducia attraverso la precisione** — font monospaziato per valori, allineamento decimale, consistenza nei formati. L'utente deve sentire che può fidarsi dei numeri.
+5. **Personalità nei dettagli** — i momenti di piacere vengono dai dettagli: counter animati, grafici che si disegnano in modo inaspettato, stati vuoti che raccontano qualcosa.

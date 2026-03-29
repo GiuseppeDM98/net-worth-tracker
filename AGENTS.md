@@ -418,4 +418,4 @@ When an icon switches between TrendingUp/TrendingDown (or similar) based on a va
 ### Drawdown Duration / Recovery Time Semantics
 Duration = months **elapsed** (index distance, not inclusive count). `Jan(idx 0) → Dec(idx 11)` = 11m, **not** 12m. Never add `+1` for "inclusive counting" — it was added incorrectly and produces values 1 month too high. Recovery Time = 0m when trough IS the current snapshot (portfolio just hit the bottom, recovery hasn't started). Use `Math.max(0, ...)` not `Math.max(1, ...)`.
 
-**Last updated**: 2026-03-23 (session 15: login/register redirect race condition, drawdown duration off-by-one, npm audit fixes)
+**Last updated**: 2026-03-29 (session 16: no new patterns — design context setup only)
