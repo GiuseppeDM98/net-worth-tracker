@@ -1,8 +1,10 @@
+import { useEffect } from 'react';
 import { DoublingMilestone } from '@/types/assets';
 import { formatCurrency } from '@/lib/services/chartService';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { fastStaggerContainer, listItem } from '@/lib/utils/motionVariants';
+import { hasCelebrated, markCelebrated, shouldReduceMotion } from '@/lib/utils/celebrationUtils';
 
 interface DoublingMilestoneTimelineProps {
   milestones: DoublingMilestone[];
@@ -35,6 +37,49 @@ export function DoublingMilestoneTimeline({
   if (currentInProgress) {
     allMilestones.push(currentInProgress);
   }
+
+  // Celebrate each newly-seen completed milestone once.
+  // Delay by 800ms so the stagger list animation finishes before confetti fires.
+  // Canvas-confetti is loaded lazily to keep it out of the main bundle.
+  useEffect(() => {
+    if (shouldReduceMotion()) return;
+
+    const completedMilestones = milestones.filter((m) => m.isComplete);
+    if (completedMilestones.length === 0) return;
+
+    // Build the list of milestones that still need a celebration this session
+    const uncelebrated = completedMilestones.filter((m) => {
+      const key = `milestone_${m.milestoneType}_${m.milestoneNumber}`;
+      return !hasCelebrated(key);
+    });
+
+    if (uncelebrated.length === 0) return;
+
+    const timer = setTimeout(async () => {
+      // Dynamic import keeps canvas-confetti out of the initial page bundle
+      const confetti = (await import('canvas-confetti')).default;
+
+      for (const milestone of uncelebrated) {
+        const key = `milestone_${milestone.milestoneType}_${milestone.milestoneNumber}`;
+        confetti({
+          colors: ['#10B981', '#F59E0B', '#ffffff', '#6EE7B7'],
+          particleCount: 60,
+          spread: 70,
+          origin: { y: 0.6 },
+          gravity: 1.2,
+          scalar: 0.8,
+        });
+        // Mark before the animation resolves — we don't want to retry if the
+        // tab is closed mid-animation
+        markCelebrated(key);
+      }
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [milestones]);
+  // Re-runs when milestones changes (initial load delivers [] then real data).
+  // hasCelebrated + markCelebrated ensure each milestone fires exactly once,
+  // even if milestones reference changes on subsequent re-renders.
 
   // Guide comment: Empty state handling
   // Show encouraging message when no milestones exist yet

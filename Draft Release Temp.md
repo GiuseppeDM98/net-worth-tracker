@@ -1,5 +1,7 @@
 ## ✨ New Features
 
+- Added confetti celebration when a doubling milestone is reached on the History page — each completed milestone triggers a one-time burst of emerald and amber confetti the first time it is seen. The celebration is stored in the browser so it never repeats. Automatically skipped for users who have enabled "Reduce Motion" in system accessibility settings
+
 - Added smooth animated transitions between dashboard pages — navigating via the sidebar now plays a subtle fade-out then fade-in effect, making the app feel connected and polished rather than abrupt
 
 

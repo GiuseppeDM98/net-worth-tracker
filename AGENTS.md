@@ -251,6 +251,15 @@ Children inherit `hidden` state from the stagger parent — Framer Motion applie
 
 **Zero-target trap**: hooks are called unconditionally, including during loading when `assets=[]` → all metrics = 0. If `once: true` were to mark `hasAnimated=true` at target=0, the animation would never fire on real data. Fix: `target === 0` sets `current` directly without marking animated; only a completed animation on a non-zero value marks `hasAnimated=true`.
 
+**Same trap in useEffect deps `[]`**: A `useEffect` with empty deps runs once on mount — but if the component mounts with empty/loading data, the effect exits early and never re-fires when real data arrives (re-render ≠ re-mount). Fix: include the data array in deps. Guards like `hasCelebrated` / `markCelebrated` prevent double-firing on subsequent renders. Pattern used in `DoublingMilestoneTimeline` confetti: `useEffect(() => { ... }, [milestones])`.
+
+### One-Time Celebrations (localStorage idempotency)
+`lib/utils/celebrationUtils.ts` — utilities for "fire once per browser" effects:
+- `hasCelebrated(key)` / `markCelebrated(key)` — localStorage with `celebrated_` prefix
+- `shouldReduceMotion()` — wraps `window.matchMedia('(prefers-reduced-motion: reduce)')`
+- Use with `canvas-confetti` (lazy import via `import('canvas-confetti')` inside the effect — keeps it out of the main bundle)
+- Reset for testing: `Object.keys(localStorage).filter(k => k.startsWith('celebrated_')).forEach(k => localStorage.removeItem(k))`
+
 ```ts
 // Mount-only animation (Dashboard KPIs)
 const animated = useCountUp(value, { once: true });
