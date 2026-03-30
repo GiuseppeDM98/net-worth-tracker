@@ -529,6 +529,95 @@ export function prepareSavingsVsInvestmentDataMonthly(
 }
 
 /**
+ * Prepare monthly data for all available years in chronological order.
+ *
+ * Same logic as prepareSavingsVsInvestmentDataMonthly but covers every snapshot
+ * across all years — useful for a continuous multi-year timeline view.
+ * Period label includes the year ("Gen 2023") to disambiguate months across years.
+ *
+ * @param snapshots - Monthly snapshots with net worth data
+ * @param expenses - All expense records (income and expenses)
+ * @returns Array of monthly data sorted chronologically across all years
+ */
+export function prepareSavingsVsInvestmentDataAllMonths(
+  snapshots: MonthlySnapshot[],
+  expenses: Expense[]
+): {
+  period: string;
+  month: number;
+  year: number;
+  netSavings: number;
+  investmentGrowth: number;
+  netWorthGrowth: number;
+}[] {
+  if (snapshots.length === 0) return [];
+
+  // Build a lookup map keyed by "year-month" for O(1) access
+  const snapshotMap = new Map<string, MonthlySnapshot>();
+  snapshots.forEach((s) => snapshotMap.set(`${s.year}-${s.month}`, s));
+
+  // Group expenses by year-month using Italy timezone
+  const expensesByMonth = new Map<string, { income: number; expenses: number }>();
+  expenses.forEach((expense) => {
+    const ey = getItalyYear(expense.date);
+    const em = getItalyMonth(expense.date);
+    const key = `${ey}-${em}`;
+    const current = expensesByMonth.get(key) || { income: 0, expenses: 0 };
+
+    // Income is positive, expenses are stored as negative values
+    if (expense.type === 'income') {
+      current.income += expense.amount;
+    } else {
+      current.expenses += expense.amount; // Already negative
+    }
+
+    expensesByMonth.set(key, current);
+  });
+
+  // Sort all snapshots chronologically and iterate
+  const sorted = [...snapshots].sort((a, b) =>
+    a.year !== b.year ? a.year - b.year : a.month - b.month
+  );
+
+  const result: {
+    period: string;
+    month: number;
+    year: number;
+    netSavings: number;
+    investmentGrowth: number;
+    netWorthGrowth: number;
+  }[] = [];
+
+  for (const currentSnapshot of sorted) {
+    const { year, month } = currentSnapshot;
+
+    // Previous month baseline: December of prior year when month is January
+    const prevYear = month === 1 ? year - 1 : year;
+    const prevMonth = month === 1 ? 12 : month - 1;
+    const prevSnapshot = snapshotMap.get(`${prevYear}-${prevMonth}`);
+    if (!prevSnapshot) continue;
+
+    const netWorthGrowth = currentSnapshot.totalNetWorth - prevSnapshot.totalNetWorth;
+
+    const expenseData = expensesByMonth.get(`${year}-${month}`);
+    // Default to 0 when no transactions exist — entire change is market-driven
+    const netSavings = expenseData ? expenseData.income + expenseData.expenses : 0;
+    const investmentGrowth = netWorthGrowth - netSavings;
+
+    result.push({
+      period: `${MONTH_NAMES_IT[month - 1]} ${year}`,
+      month,
+      year,
+      netSavings,
+      investmentGrowth,
+      netWorthGrowth,
+    });
+  }
+
+  return result;
+}
+
+/**
  * Doubling Time Calculation Functions
  *
  * These functions calculate how long it takes for net worth to double over time.

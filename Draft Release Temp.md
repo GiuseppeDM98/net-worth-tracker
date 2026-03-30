@@ -1,5 +1,11 @@
 ## ✨ New Features
 
+- Added **Labor Income KPI cards** to the Dashboard Overview — four new metric cards appear when you configure labor income categories in Settings: "Earned from Work" (cumulative income from selected categories), "Saved from Work" (income minus all expenses), "Investment Growth (Gross)" (market returns isolated from savings contributions), and "Investment Growth (Net)" (after estimated capital gains taxes). All figures are filtered from your configured cashflow history start year. The cards only appear when labor income categories are configured — no clutter if you don't use this feature
+
+- Added **"All years" option** to the monthly Savings vs Investment Growth chart on the History page — select "Tutti" from the year dropdown to see a continuous month-by-month timeline spanning your entire history, instead of one year at a time. Labels include the year ("Gen 2023", "Feb 2023") for easy orientation
+
+- Added **Labor Income category selector** to Settings (Preferences tab) — pick which income categories represent your work earnings (salary, freelance, etc.) using toggle buttons. These are used to power the new Dashboard KPI cards above
+
 - Added a celebratory banner to the FIRE Calculator that appears when your net worth meets or exceeds your FIRE Number — includes a one-time confetti burst on first view and a permanent dismiss button. Automatically skipped for users with "Reduce Motion" enabled in system accessibility settings
 
 - Added confetti celebration when a doubling milestone is reached on the History page — each completed milestone triggers a one-time burst of emerald and amber confetti the first time it is seen. The celebration is stored in the browser so it never repeats. Automatically skipped for users who have enabled "Reduce Motion" in system accessibility settings

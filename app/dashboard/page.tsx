@@ -43,11 +43,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Wallet, TrendingUp, PieChart, DollarSign, Camera, TrendingDown, Receipt, ChevronDown, Loader2 } from 'lucide-react';
+import { Wallet, TrendingUp, PieChart, DollarSign, Camera, TrendingDown, Receipt, ChevronDown, Loader2, Briefcase, PiggyBank } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useSnapshots, useCreateSnapshot } from '@/lib/hooks/useSnapshots';
 import { useExpenseStats } from '@/lib/hooks/useExpenseStats';
+import { useAllExpenses } from '@/lib/hooks/useAllExpenses';
+import { getItalyYear } from '@/lib/utils/dateHelpers';
 
 /**
  * MAIN DASHBOARD PAGE
@@ -228,6 +230,69 @@ export default function DashboardPage() {
     return { monthly: monthlyVariation, yearly: yearlyVariation };
   }, [snapshots, portfolioMetrics.totalValue]);
 
+  // Load all expenses only when labor income categories are configured — avoids unnecessary fetches
+  const hasLaborIncomeConfig = (portfolioSettings?.laborIncomeCategoryIds?.length ?? 0) > 0;
+  const { data: allExpenses = [] } = useAllExpenses(user?.uid, hasLaborIncomeConfig);
+
+  /**
+   * Aggregate lifetime metrics splitting work income from investment returns.
+   *
+   * Requires laborIncomeCategoryIds to be configured in Settings.
+   * All figures are filtered from cashflowHistoryStartYear onwards to align with
+   * the same cutoff used in TotalHistoryTab charts.
+   *
+   * - totalLaborIncome: sum of income transactions in the selected labor categories
+   * - totalSavedFromWork: labor income minus all expenses (net savings)
+   * - totalInvestmentGrowthGross: net worth delta minus total net savings (market returns)
+   * - totalInvestmentGrowthNet: gross minus current estimated taxes on unrealized portfolio gains
+   */
+  const laborIncomeMetrics = useMemo(() => {
+    if (!hasLaborIncomeConfig || allExpenses.length === 0) return null;
+
+    const startYear = portfolioSettings?.cashflowHistoryStartYear ?? 2025;
+    const categoryIds = new Set(portfolioSettings!.laborIncomeCategoryIds!);
+
+    const filtered = allExpenses.filter((e) => getItalyYear(e.date) >= startYear);
+
+    const totalLaborIncome = filtered
+      .filter((e) => e.type === 'income' && categoryIds.has(e.categoryId))
+      .reduce((sum, e) => sum + e.amount, 0);
+
+    // Expenses are stored as negative values — summing gives negative total
+    const totalExpensesSum = filtered
+      .filter((e) => e.type !== 'income')
+      .reduce((sum, e) => sum + e.amount, 0);
+
+    const totalSavedFromWork = totalLaborIncome + totalExpensesSum;
+
+    // Net worth delta from startYear: first snapshot on or after startYear vs latest
+    const relevantSnapshots = snapshots
+      .filter((s) => s.year >= startYear)
+      .sort((a, b) => (a.year !== b.year ? a.year - b.year : a.month - b.month));
+
+    let totalInvestmentGrowthGross = 0;
+    if (relevantSnapshots.length >= 2) {
+      const netWorthDelta =
+        relevantSnapshots.at(-1)!.totalNetWorth - relevantSnapshots[0].totalNetWorth;
+      const allIncomeSum = filtered
+        .filter((e) => e.type === 'income')
+        .reduce((sum, e) => sum + e.amount, 0);
+      const allNetSavings = allIncomeSum + totalExpensesSum;
+      totalInvestmentGrowthGross = netWorthDelta - allNetSavings;
+    }
+
+    const totalInvestmentGrowthNet =
+      totalInvestmentGrowthGross - portfolioMetrics.estimatedTaxes;
+
+    return {
+      totalLaborIncome,
+      totalSavedFromWork,
+      totalInvestmentGrowthGross,
+      totalInvestmentGrowthNet,
+      startYear,
+    };
+  }, [allExpenses, snapshots, portfolioSettings, hasLaborIncomeConfig, portfolioMetrics.estimatedTaxes]);
+
   // Memoize chart data
   const chartData = useMemo(() => {
     const assetClassData = prepareAssetClassDistributionData(assets);
@@ -366,6 +431,10 @@ export default function DashboardPage() {
   const animatedLiquidNetTotal = useCountUp(liquidNetTotal, { once: true });
   const animatedUnrealizedGains = useCountUp(portfolioMetrics.unrealizedGains, { once: true });
   const animatedEstimatedTaxes = useCountUp(portfolioMetrics.estimatedTaxes, { once: true });
+  const animatedLaborIncome = useCountUp(laborIncomeMetrics?.totalLaborIncome ?? 0, { once: true });
+  const animatedSavedFromWork = useCountUp(laborIncomeMetrics?.totalSavedFromWork ?? 0, { once: true });
+  const animatedInvestmentGross = useCountUp(laborIncomeMetrics?.totalInvestmentGrowthGross ?? 0, { once: true });
+  const animatedInvestmentNet = useCountUp(laborIncomeMetrics?.totalInvestmentGrowthNet ?? 0, { once: true });
 
   // Only show cost basis cards if user is actually tracking cost basis on any asset.
   // Prevents empty cards saying "€0.00 gains" for users not using this feature.
@@ -707,6 +776,87 @@ export default function DashboardPage() {
         </Card>
         </motion.div>
       </motion.div>
+
+      {/* Labor Income & Investment KPI Cards — shown only when laborIncomeCategoryIds is configured in Settings */}
+      <AnimatePresence>
+        {laborIncomeMetrics && (
+          <motion.div
+            variants={staggerContainer}
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
+            className="grid gap-6 md:grid-cols-2 desktop:grid-cols-4"
+          >
+            {/* Total earned from work */}
+            <motion.div variants={cardItem}>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Guadagnato da Lavoro</CardTitle>
+                  <Briefcase className="h-4 w-4 text-blue-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-blue-600">
+                    {formatCurrency(animatedLaborIncome ?? 0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear}</p>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Net savings from work (labor income minus all expenses) */}
+            <motion.div variants={cardItem}>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Risparmiato da Lavoro</CardTitle>
+                  <PiggyBank className={`h-4 w-4 ${laborIncomeMetrics.totalSavedFromWork >= 0 ? 'text-green-500' : 'text-red-500'}`} />
+                </CardHeader>
+                <CardContent>
+                  <div className={`text-2xl font-bold ${laborIncomeMetrics.totalSavedFromWork >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {laborIncomeMetrics.totalSavedFromWork >= 0 ? '+' : ''}{formatCurrency(animatedSavedFromWork ?? 0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear}</p>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Gross investment returns (net worth delta minus net savings) */}
+            <motion.div variants={cardItem}>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Crescita Investimenti (Lordo)</CardTitle>
+                  {laborIncomeMetrics.totalInvestmentGrowthGross >= 0
+                    ? <TrendingUp className="h-4 w-4 text-green-500" />
+                    : <TrendingDown className="h-4 w-4 text-red-500" />}
+                </CardHeader>
+                <CardContent>
+                  <div className={`text-2xl font-bold ${laborIncomeMetrics.totalInvestmentGrowthGross >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {laborIncomeMetrics.totalInvestmentGrowthGross >= 0 ? '+' : ''}{formatCurrency(animatedInvestmentGross ?? 0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear}</p>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Net investment returns after estimated capital gains taxes */}
+            <motion.div variants={cardItem}>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Crescita Investimenti (Netto)</CardTitle>
+                  {laborIncomeMetrics.totalInvestmentGrowthNet >= 0
+                    ? <TrendingUp className="h-4 w-4 text-green-500" />
+                    : <TrendingDown className="h-4 w-4 text-red-500" />}
+                </CardHeader>
+                <CardContent>
+                  <div className={`text-2xl font-bold ${laborIncomeMetrics.totalInvestmentGrowthNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {laborIncomeMetrics.totalInvestmentGrowthNet >= 0 ? '+' : ''}{formatCurrency(animatedInvestmentNet ?? 0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear} · al netto tasse stimate</p>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Cost cards — shown if any asset has TER tracking or stamp duty is enabled */}
       <AnimatePresence>
