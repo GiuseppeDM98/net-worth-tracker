@@ -301,6 +301,28 @@ For custom animated SVG icons (e.g. toast icons), use `<style>` JSX with `@keyfr
 ```
 Circle circumference formula: `2πr` — for r=7 → ~44px (dasharray value). Use `forwards` fill-mode so the end state persists. Each icon file uses unique CSS class names (`.check-circle`, `.error-circle`, `.warning-triangle`) to avoid keyframe collisions when multiple icons render simultaneously.
 
+### EmptyState Component Pattern
+`components/ui/EmptyState.tsx` — reusable empty state with floating icon animation. Also exports 5 SVG icons: `SeedlingIcon`, `CalendarEmptyIcon`, `FilterEmptyIcon`, `TrophyEmptyIcon`, `ChartEmptyIcon`.
+
+**Usage**:
+```tsx
+import { EmptyState, CalendarEmptyIcon } from '@/components/ui/EmptyState';
+
+<EmptyState
+  icon={<CalendarEmptyIcon />}
+  title="Nessun dividendo previsto"
+  description="Naviga a un altro mese o aggiungi dividendi."
+  className="h-64"  // pass className to constrain height inside a chart card
+/>
+```
+
+**Rules**:
+- Float animation via `motion-safe:animate-[float_3s_ease-in-out_infinite]` — `<style>` JSX inline (no globals.css dependency)
+- For small dropdowns (SearchableCombobox): use a compact inline version (icon + text row), not full EmptyState — the dropdown is too small for py-8 padding
+- Do NOT add EmptyState where a CTA button already exists (e.g. "Aggiungi il tuo primo asset")
+- `currentColor` + `text-muted-foreground/50` on the icon wrapper = correct visual weight (lighter than title)
+- If you need a new icon type, add it to `EmptyState.tsx` — do not create a separate file
+
 ### CSS `animate-in` + prefers-reduced-motion
 - Framer Motion respects reduced-motion automatically via `MotionConfig` in `MotionProvider.tsx`.
 - **CSS `animate-in` classes** (tw-animate-css) must be guarded manually.

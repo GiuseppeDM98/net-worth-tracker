@@ -54,6 +54,8 @@
 
 ## 🔧 Improvements
 
+- Empty states across the app now show a small animated icon instead of a plain grey text message — the icon gently floats up and down to add life to otherwise static moments. Affected areas: Doubling Milestone Timeline (no milestones yet), Dividend Calendar (month with no dividends), "Dividends by Asset / by Year / Monthly Income" charts, Asset Price History table, Asset Class History table, and any search dropdown with no matching results. The animation automatically stops for users who have enabled "Reduce Motion" in system accessibility settings
+
 - Toast notifications for success, error, and warning actions now have animated icons — the circle draws in, then the checkmark, X, or exclamation mark appears. The full animation completes in under 500ms and is automatically skipped for users who have enabled "Reduce Motion" in their OS accessibility settings
 
 - The "Add / Edit Asset", "New / Edit Expense", and "Delete Category" dialogs now keep their title and action buttons always visible while you scroll — the header is pinned at the top and the Save / Confirm button is pinned at the bottom, so you never need to scroll to the very end of a long form just to submit it

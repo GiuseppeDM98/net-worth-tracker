@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { fastStaggerContainer, listItem } from '@/lib/utils/motionVariants';
 import { hasCelebrated, markCelebrated, shouldReduceMotion } from '@/lib/utils/celebrationUtils';
+import { EmptyState, SeedlingIcon } from '@/components/ui/EmptyState';
 
 interface DoublingMilestoneTimelineProps {
   milestones: DoublingMilestone[];
@@ -85,9 +86,11 @@ export function DoublingMilestoneTimeline({
   // Show encouraging message when no milestones exist yet
   if (allMilestones.length === 0) {
     return (
-      <div className="text-center py-8 text-muted-foreground">
-        Nessuna milestone ancora completata. Continua a costruire il tuo patrimonio!
-      </div>
+      <EmptyState
+        icon={<SeedlingIcon />}
+        title="Nessuna milestone ancora completata"
+        description="Continua a costruire il tuo patrimonio!"
+      />
     );
   }
 
