@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio, framer-motion
-- Ultima implementazione: **FIRE Reached Banner** — `FireReachedBanner` in `components/fire-simulations/FireReachedBanner.tsx`; appare sopra il form quando `currentNetWorth >= fireMetrics.fireNumber && fireNumber > 0`; confetti one-shot via `celebrationUtils` (`celebrated_fire_reached_{userId}`); dismiss permanente (`fire_reached_dismissed_{userId}`); `slideDown` + `AnimatePresence`; guard `fireMetrics && user` per evitare false positive durante il loading. (2026-03-30)
-- Precedente: **Milestone confetti** — `canvas-confetti` (lazy import) + `localStorage` per celebrare ogni milestone di raddoppio completata una sola volta per browser; `lib/utils/celebrationUtils.ts` con `hasCelebrated`, `markCelebrated`, `shouldReduceMotion`. (2026-03-29)
+- Ultima implementazione: **Animated Toast Icons** — `AnimatedCheckIcon` / `AnimatedErrorIcon` / `AnimatedWarningIcon` in `components/ui/`; SVG draw via `stroke-dashoffset` + `<style>` JSX; cerchio 300ms + mark/X/triangle 200ms delay 250ms; guard `prefers-reduced-motion`; `currentColor` per light/dark; `sonner.tsx` aggiornato. Fix `aria-describedby={undefined}` su `ExpenseDialog`. (2026-03-30)
+- Precedente: **FIRE Reached Banner** — `FireReachedBanner` in `components/fire-simulations/FireReachedBanner.tsx`; appare sopra il form quando `currentNetWorth >= fireMetrics.fireNumber && fireNumber > 0`; confetti one-shot + dismiss permanente; `slideDown` + `AnimatePresence`. (2026-03-30)
 
 ## Architecture Snapshot
 - App Router con pagine protette sotto `app/dashboard/*`.
@@ -66,6 +66,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Bond Scraping: `lib/services/borsaItalianaBondScraperService.ts`, `lib/helpers/priceUpdater.ts`, `app/api/prices/bond-quote/route.ts`
 - Bond Coupons: `lib/utils/couponUtils.ts`, `app/api/cron/daily-dividend-processing/route.ts`
 - Animation: `lib/utils/motionVariants.ts`, `lib/utils/useCountUp.ts`, `components/providers/MotionProvider.tsx`
+- Toast icons: `components/ui/AnimatedCheckIcon.tsx`, `AnimatedErrorIcon.tsx`, `AnimatedWarningIcon.tsx`, `sonner.tsx`
 - Skeletons: `components/history/HistoryPageSkeleton.tsx`, `components/fire-simulations/FireCalculatorSkeleton.tsx`, `MonteCarloSkeleton.tsx`, `GoalsSkeleton.tsx`, `components/allocation/AllocationPageSkeleton.tsx`, `components/hall-of-fame/HallOfFameSkeleton.tsx`, `components/settings/SettingsPageSkeleton.tsx`
 - Utils: `lib/utils/dateHelpers.ts`, `formatters.ts`, `assetPriceHistoryUtils.ts`, `assetClassHistoryUtils.ts`
 - Hooks: `lib/hooks/useDelayedLoading.ts` (mostra skeleton solo dopo soglia ms, evita flash su pagine veloci)
@@ -73,7 +74,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`, `components/pdf/PDFExportDialog.tsx`, `lib/utils/pdfTimeFilters.ts`, `lib/utils/pdfGenerator.tsx`
 - Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`, `borsaItalianaBondScraper.test.ts`, `goalService.test.ts`, `couponUtils.test.ts`
 
-**Last updated**: 2026-03-30 (session 18: FIRE reached banner with confetti and permanent dismiss)
+**Last updated**: 2026-03-30 (session 19: animated toast icons + aria fix on ExpenseDialog)
 
 ## Design Context
 

@@ -54,6 +54,8 @@
 
 ## 🔧 Improvements
 
+- Toast notifications for success, error, and warning actions now have animated icons — the circle draws in, then the checkmark, X, or exclamation mark appears. The full animation completes in under 500ms and is automatically skipped for users who have enabled "Reduce Motion" in their OS accessibility settings
+
 - The "Add / Edit Asset", "New / Edit Expense", and "Delete Category" dialogs now keep their title and action buttons always visible while you scroll — the header is pinned at the top and the Save / Confirm button is pinned at the bottom, so you never need to scroll to the very end of a long form just to submit it
 - The "Delete Category" confirmation dialog is now wider, uses stacked full-width buttons, and the category list dropdown is fully visible when open — previously the dropdown was clipped and the buttons overflowed the screen on mobile
 

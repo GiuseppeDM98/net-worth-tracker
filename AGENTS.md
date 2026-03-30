@@ -285,6 +285,22 @@ Standard props across the entire codebase — never deviate:
 - **`disabled:pointer-events-none`** already in base class — no hover/active events reach disabled buttons, no extra guard needed
 - **Gotcha — `asChild` + Radix dropdown trigger**: if the button wraps a Radix DropdownMenuTrigger or PopoverTrigger and a parent has `overflow: hidden` or tight `z-index`, the `translate-y` on hover can clip the floating menu. Fix: pass `className="hover:translate-y-0"` inline as an override on that specific usage
 
+### SVG Draw Animation (stroke-dashoffset)
+For custom animated SVG icons (e.g. toast icons), use `<style>` JSX with `@keyframes` and wrap the animation declarations inside `@media (prefers-reduced-motion: no-preference)` — elements are fully visible without the media query guard, so reduced-motion users see a static icon by default:
+```tsx
+<style>{`
+  @keyframes circle-draw {
+    from { stroke-dashoffset: 44; }
+    to   { stroke-dashoffset: 0;  }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .circle { stroke-dasharray: 44; stroke-dashoffset: 44; animation: circle-draw 300ms ease-out forwards; }
+    .tick   { opacity: 0; animation: tick-appear 200ms ease-out 250ms forwards; }
+  }
+`}</style>
+```
+Circle circumference formula: `2πr` — for r=7 → ~44px (dasharray value). Use `forwards` fill-mode so the end state persists. Each icon file uses unique CSS class names (`.check-circle`, `.error-circle`, `.warning-triangle`) to avoid keyframe collisions when multiple icons render simultaneously.
+
 ### CSS `animate-in` + prefers-reduced-motion
 - Framer Motion respects reduced-motion automatically via `MotionConfig` in `MotionProvider.tsx`.
 - **CSS `animate-in` classes** (tw-animate-css) must be guarded manually.
@@ -416,7 +432,8 @@ When an icon switches between TrendingUp/TrendingDown (or similar) based on a va
 
 ### Radix Dialog/Sheet Without Description Warning
 **Symptom**: `Warning: Missing 'Description' or 'aria-describedby={undefined}' for {DialogContent}` in console when opening a Sheet or Dialog that has no description child.
-**Fix**: Add `aria-describedby={undefined}` to `DialogPrimitive.Content` in the component primitive — this explicitly signals "no description intentionally" and silences the warning without adding a hidden element. Applied in `components/ui/sheet.tsx`.
+**Fix (primitive level)**: Add `aria-describedby={undefined}` to `DialogPrimitive.Content` in the component primitive — silences the warning globally. Applied in `components/ui/sheet.tsx`.
+**Fix (usage level)**: If a specific `<DialogContent>` in a page/component generates the warning, add `aria-describedby={undefined}` directly on that usage. Applied in `components/expenses/ExpenseDialog.tsx`.
 
 ### shadcn `<Alert>` Icon Slot
 **Gotcha**: The first icon passed as a **direct child of `<Alert>`** (outside `<AlertDescription>`) is automatically positioned as the leading icon by shadcn's Alert component. Adding a second icon inside `<AlertDescription>` causes double rendering.
@@ -442,4 +459,4 @@ When an icon switches between TrendingUp/TrendingDown (or similar) based on a va
 ### Drawdown Duration / Recovery Time Semantics
 Duration = months **elapsed** (index distance, not inclusive count). `Jan(idx 0) → Dec(idx 11)` = 11m, **not** 12m. Never add `+1` for "inclusive counting" — it was added incorrectly and produces values 1 month too high. Recovery Time = 0m when trough IS the current snapshot (portfolio just hit the bottom, recovery hasn't started). Use `Math.max(0, ...)` not `Math.max(1, ...)`.
 
-**Last updated**: 2026-03-30 (session 18: FIRE reached banner)
+**Last updated**: 2026-03-30 (session 19: animated toast icons)
