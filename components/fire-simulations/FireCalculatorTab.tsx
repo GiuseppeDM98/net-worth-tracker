@@ -75,6 +75,7 @@ import {
 } from 'recharts';
 import { Settings } from '@/types/settings';
 import { FIREProjectionSection } from './FIREProjectionSection';
+import { FireReachedBanner } from './FireReachedBanner';
 
 export function FireCalculatorTab() {
   const { user } = useAuth();
@@ -177,6 +178,19 @@ export function FireCalculatorTab() {
 
   return (
     <div className="space-y-6">
+      {/* FIRE Reached Banner — shown above the form when net worth meets the FIRE number.
+          Guards: fireMetrics must be loaded (not undefined) and fireNumber > 0 to avoid
+          false positives while data is still being fetched. */}
+      {fireMetrics && user && (
+        <FireReachedBanner
+          currentNetWorth={currentNetWorth}
+          fireNumber={fireMetrics.fireNumber}
+          userId={user.uid}
+          currentNetWorthFormatted={formatCurrency(currentNetWorth)}
+          fireNumberFormatted={formatCurrency(fireMetrics.fireNumber)}
+        />
+      )}
+
       {/* Settings Input */}
       <Card>
         <CardHeader>

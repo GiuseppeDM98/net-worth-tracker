@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio, framer-motion
-- Ultima implementazione: **Milestone confetti** — `canvas-confetti` (lazy import) + `localStorage` per celebrare ogni milestone di raddoppio completata una sola volta per browser; `lib/utils/celebrationUtils.ts` con `hasCelebrated`, `markCelebrated`, `shouldReduceMotion`. Fix bug: deps `[milestones]` invece di `[]` per evitare il "zero-target trap" (mount con dati vuoti). (2026-03-29)
-- Precedente: **Dashboard KPI count-up animation** — `useCountUp` estratto da `MetricCard` in `lib/utils/useCountUp.ts` con opzione `once: true`; applicato ai 6 KPI principali. (2026-03-29)
+- Ultima implementazione: **FIRE Reached Banner** — `FireReachedBanner` in `components/fire-simulations/FireReachedBanner.tsx`; appare sopra il form quando `currentNetWorth >= fireMetrics.fireNumber && fireNumber > 0`; confetti one-shot via `celebrationUtils` (`celebrated_fire_reached_{userId}`); dismiss permanente (`fire_reached_dismissed_{userId}`); `slideDown` + `AnimatePresence`; guard `fireMetrics && user` per evitare false positive durante il loading. (2026-03-30)
+- Precedente: **Milestone confetti** — `canvas-confetti` (lazy import) + `localStorage` per celebrare ogni milestone di raddoppio completata una sola volta per browser; `lib/utils/celebrationUtils.ts` con `hasCelebrated`, `markCelebrated`, `shouldReduceMotion`. (2026-03-29)
 
 ## Architecture Snapshot
 - App Router con pagine protette sotto `app/dashboard/*`.
@@ -55,7 +55,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Budget: `types/budget.ts`, `lib/services/budgetService.ts`, `__tests__/budgetService.test.ts`
 - Dividends: `components/dividends/DividendTrackingTab.tsx`, `DividendTable.tsx`, `DividendCalendar.tsx`, `DividendStats.tsx`, `DividendStatsSkeleton.tsx`
 - Hall of Fame: `app/dashboard/hall-of-fame/page.tsx`, `lib/services/hallOfFameService.ts`
-- FIRE: `components/fire-simulations/FireCalculatorTab.tsx`, `FIREProjectionSection.tsx`, `FIREProjectionChart.tsx`, `FIREProjectionTable.tsx`, `lib/services/fireService.ts`
+- FIRE: `components/fire-simulations/FireCalculatorTab.tsx`, `FireReachedBanner.tsx`, `FIREProjectionSection.tsx`, `FIREProjectionChart.tsx`, `FIREProjectionTable.tsx`, `lib/services/fireService.ts`
 - Monte Carlo: `components/fire-simulations/MonteCarloTab.tsx`, `lib/services/monteCarloService.ts`
 - Goals: `types/goals.ts`, `lib/services/goalService.ts`, `components/fire-simulations/GoalBasedInvestingTab.tsx`, `components/goals/*`
 - Asset types: `types/assets.ts` (MonteCarloParams, MonteCarloScenarios, DoublingMilestone, etc.)
@@ -73,7 +73,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`, `components/pdf/PDFExportDialog.tsx`, `lib/utils/pdfTimeFilters.ts`, `lib/utils/pdfGenerator.tsx`
 - Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`, `borsaItalianaBondScraper.test.ts`, `goalService.test.ts`, `couponUtils.test.ts`
 
-**Last updated**: 2026-03-29 (session 17: dashboard KPI count-up animations via shared useCountUp hook)
+**Last updated**: 2026-03-30 (session 18: FIRE reached banner with confetti and permanent dismiss)
 
 ## Design Context
 

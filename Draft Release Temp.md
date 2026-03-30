@@ -1,5 +1,7 @@
 ## ✨ New Features
 
+- Added a celebratory banner to the FIRE Calculator that appears when your net worth meets or exceeds your FIRE Number — includes a one-time confetti burst on first view and a permanent dismiss button. Automatically skipped for users with "Reduce Motion" enabled in system accessibility settings
+
 - Added confetti celebration when a doubling milestone is reached on the History page — each completed milestone triggers a one-time burst of emerald and amber confetti the first time it is seen. The celebration is stored in the browser so it never repeats. Automatically skipped for users who have enabled "Reduce Motion" in system accessibility settings
 
 - Added smooth animated transitions between dashboard pages — navigating via the sidebar now plays a subtle fade-out then fade-in effect, making the app feel connected and polished rather than abrupt
@@ -163,3 +165,4 @@
 ## 🔒 Security
 
 - Updated Next.js, undici, fast-xml-parser, and flatted dependencies to patch 3 high-severity and 1 moderate-severity vulnerabilities
+- Fixed 3 additional vulnerabilities (node-forge high severity, picomatch high severity, brace-expansion moderate) via dependency updates
