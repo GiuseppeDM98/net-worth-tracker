@@ -177,6 +177,8 @@
 - Performance page chart sections (portfolio evolution, rolling CAGR, rolling Sharpe, monthly heatmap, underwater drawdown, methodology) now animate in with a staggered cascade on load — each chart slides up and fades in sequentially instead of appearing all at once
 - The Dividends tab now animates in with a staggered cascade when first opened — action buttons, filters, statistics charts, and the dividend table each appear sequentially with a subtle slide-up effect
 
+- Fixed all annual year-over-year calculations incorrectly using January as the starting baseline — they now correctly use December of the previous year, so January's performance is no longer silently excluded from annual figures. Affected metrics: "Variazione Annuale" card on the Dashboard, the YoY Variation bar chart on the History page, the annual Savings vs Investment Growth chart, the Investment Growth cards on the Dashboard (when labor income categories are configured), Hall of Fame yearly rankings, and the YoY section in PDF exports
+
 ## 🔒 Security
 
 - Updated Next.js, undici, fast-xml-parser, and flatted dependencies to patch 3 high-severity and 1 moderate-severity vulnerabilities

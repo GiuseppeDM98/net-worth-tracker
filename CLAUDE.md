@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio, framer-motion
-- Ultima implementazione: **FIRE Calculator liquid/illiquid breakdown** — (2026-03-31, session 22). Allowance card (Annuale/Mensile/Giornaliera) e "Anni di Spesa" ora mostrano split liquido vs illiquido con barra proporzionale visiva. `getAnnualExpenses` ora usa ultimo anno completato (non anno corrente parziale). Nuove funzioni `calculateLiquidFIRENetWorth` / `calculateIlliquidFIRENetWorth` in `assetService.ts`; `FIREMetrics` esteso con 6 nuovi campi; `calculateFIREMetrics` re-eseguita client-side dopo `getFIREData` per arricchimento sincrono.
-- Precedente: **Labor Income KPI cards + All-months savings chart** — (2026-03-30, session 21). Dashboard: 4 nuove card condizionali attive solo se `laborIncomeCategoryIds` configurato; History: grafico "Risparmio vs Crescita" opzione "Tutti" per timeline continua multi-anno.
+- Ultima implementazione: **YoY baseline bug fix** — (2026-03-31, session 23). Tutti i calcoli di variazione annuale ora usano Dicembre(anno-1) come baseline invece del primo snapshot dell'anno corrente (Gennaio). Fix in 6 file: `snapshotService.ts` (card "Variazione Annuale"), `chartService.ts` (grafici YoY e Risparmio vs Crescita), `pdfDataService.ts` (export PDF), `hallOfFameService.ts` + `.server.ts` (record annuali), `dashboard/page.tsx` (card Crescita Investimenti).
+- Precedente: **FIRE Calculator liquid/illiquid breakdown** — (2026-03-31, session 22). Allowance card e "Anni di Spesa" con split liquido/illiquido; `calculateLiquidFIRENetWorth` / `calculateIlliquidFIRENetWorth` in `assetService.ts`.
 
 ## Architecture Snapshot
 - App Router con pagine protette sotto `app/dashboard/*`.
@@ -75,7 +75,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`, `components/pdf/PDFExportDialog.tsx`, `lib/utils/pdfTimeFilters.ts`, `lib/utils/pdfGenerator.tsx`
 - Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`, `borsaItalianaBondScraper.test.ts`, `goalService.test.ts`, `couponUtils.test.ts`
 
-**Last updated**: 2026-03-31 (session 22: FIRE Calculator liquid/illiquid breakdown)
+**Last updated**: 2026-03-31 (session 23: YoY baseline bug fix)
 
 ## Design Context
 

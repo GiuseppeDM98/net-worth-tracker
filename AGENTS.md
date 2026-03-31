@@ -170,6 +170,29 @@ Only use `useEffect` for side effects (API calls, subscriptions, DOM mutations).
 - All metric functions that annualize **must use `calculateMonthsDifference(periodEnd, periodStart)`** — NOT `snapshots.length - 1`
 - Each chart function handles baseline exclusion independently (heatmap: `i=1`; chart: `.slice(1)`; underwater: `continue at i===0`)
 
+### Annual YoY Baseline Pattern
+For any annual delta (YoY charts, annual cards, yearly rankings), the baseline must be **December of the previous year**, not the first snapshot of the current year. Monthly snapshots are created at month-end, so January's snapshot already includes January's performance — using it as a start baseline silently drops that month from the annual figure.
+
+```ts
+// Correct pattern — used in: snapshotService, chartService, pdfDataService, hallOfFameService, dashboard
+const baseline =
+  snapshots.find(s => s.year === year - 1 && s.month === 12) ??
+  snapshots.find(s => s.year === year); // fallback: first year of data has no prior December
+```
+
+When grouping by year (Map or Record), resolve the previous-year group first:
+```ts
+const prevYearSnapshots = snapshotsByYear.get(year - 1);
+const decPrevYear = prevYearSnapshots
+  ? [...prevYearSnapshots].sort((a, b) => a.month - b.month).at(-1)
+  : undefined;
+const startSnapshot = decPrevYear ?? yearSnapshots[0];
+```
+
+**Files that implement this**: `snapshotService.ts` (`calculateYearlyChange`), `chartService.ts` (`prepareYoYVariationData`, `prepareSavingsVsInvestmentData`), `pdfDataService.ts` (`calculateYoYComparison`), `hallOfFameService.ts` + `.server.ts` (yearly records loop), `dashboard/page.tsx` (`laborIncomeMetrics`).
+
+**Monthly heatmap is NOT affected** — it shows month-over-month returns (each cell = `NW_month / NW_prevMonth - 1`), so the baseline is always the immediately preceding month.
+
 ### Skeleton Loading Pattern
 Build skeleton screens that mirror the real layout to avoid layout shift and provide visual continuity:
 - **File convention**: `ComponentSkeleton.tsx` alongside the real component
@@ -425,4 +448,4 @@ When an icon switches between TrendingUp/TrendingDown (or similar) based on a va
 ### Drawdown Duration / Recovery Time Semantics
 Duration = months **elapsed** (index distance, not inclusive count). `Jan(idx 0) → Dec(idx 11)` = 11m, **not** 12m. Never add `+1` for "inclusive counting" — it was added incorrectly and produces values 1 month too high. Recovery Time = 0m when trough IS the current snapshot (portfolio just hit the bottom, recovery hasn't started). Use `Math.max(0, ...)` not `Math.max(1, ...)`.
 
-**Last updated**: 2026-03-30 (session 21: all-months savings chart + labor income KPI cards)
+**Last updated**: 2026-03-31 (session 23: YoY baseline bug fix)

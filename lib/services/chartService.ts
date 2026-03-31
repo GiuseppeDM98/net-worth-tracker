@@ -281,8 +281,11 @@ export function formatCurrencyCompact(value: number): string {
 }
 
 /**
- * Prepare data for YoY (Year over Year) variation chart
- * Compares first snapshot of each year with last snapshot of the same year
+ * Prepare data for YoY (Year over Year) variation chart.
+ *
+ * Uses December of the previous year as the starting baseline for each year so
+ * that January is included in the annual delta (contiguous periods, no month lost).
+ * Falls back to the first snapshot of the year itself when no prior December exists.
  */
 export function prepareYoYVariationData(snapshots: MonthlySnapshot[]): {
   year: string;
@@ -317,13 +320,20 @@ export function prepareYoYVariationData(snapshots: MonthlySnapshot[]): {
   Array.from(snapshotsByYear.entries())
     .sort((a, b) => a[0] - b[0]) // Sort by year
     .forEach(([year, yearSnapshots]) => {
-      // Sort snapshots by month to get first and last
+      // Sort snapshots by month to get last snapshot of this year
       yearSnapshots.sort((a, b) => a.month - b.month);
 
-      const firstSnapshot = yearSnapshots[0];
       const lastSnapshot = yearSnapshots[yearSnapshots.length - 1];
 
-      const startValue = firstSnapshot.totalNetWorth;
+      // Use December of previous year as baseline so January is included in the delta.
+      // Falls back to first snapshot of this year when prior December doesn't exist.
+      const prevYearSnapshots = snapshotsByYear.get(year - 1);
+      const decPrevYear = prevYearSnapshots
+        ? [...prevYearSnapshots].sort((a, b) => a.month - b.month).at(-1)
+        : undefined;
+      const startSnapshot = decPrevYear ?? yearSnapshots[0];
+
+      const startValue = startSnapshot.totalNetWorth;
       const endValue = lastSnapshot.totalNetWorth;
       const variation = endValue - startValue;
       const variationPercentage = startValue > 0 ? (variation / startValue) * 100 : 0;
@@ -348,8 +358,9 @@ export function prepareYoYVariationData(snapshots: MonthlySnapshot[]): {
  * - Net Worth Growth = End NW - Start NW (total portfolio change)
  * - Investment Growth = Net Worth Growth - Net Savings (market performance)
  *
- * This separates wealth growth from disciplined saving (user control)
- * vs market performance (external factors).
+ * Uses December of the previous year as the starting baseline so that January's
+ * net worth change is included in the annual totals (contiguous periods, no month lost).
+ * Falls back to the first snapshot of the year itself when no prior December exists.
  *
  * @param snapshots - Monthly snapshots with net worth data
  * @param expenses - All expense records (income and expenses)
@@ -405,21 +416,29 @@ export function prepareSavingsVsInvestmentData(
   Array.from(snapshotsByYear.entries())
     .sort((a, b) => a[0] - b[0]) // Sort by year ascending
     .forEach(([year, yearSnapshots]) => {
-      // Skip years with less than 2 snapshots (can't calculate YoY growth)
-      if (yearSnapshots.length < 2) return;
+      // Skip years with no snapshots (can't determine end value)
+      if (yearSnapshots.length < 1) return;
 
       // Skip years with no expense data (can't calculate net savings)
       if (!expensesByYear.has(year)) return;
 
-      // Sort snapshots by month to get first and last
+      // Sort snapshots by month to get the last (end) snapshot of this year
       yearSnapshots.sort((a, b) => a.month - b.month);
 
-      const firstSnapshot = yearSnapshots[0];
       const lastSnapshot = yearSnapshots[yearSnapshots.length - 1];
+
+      // Use December of previous year as baseline so January is included in the delta.
+      // Falls back to first snapshot of this year when prior December doesn't exist.
+      const prevYearSnapshots = snapshotsByYear.get(year - 1);
+      const decPrevYear = prevYearSnapshots
+        ? [...prevYearSnapshots].sort((a, b) => a.month - b.month).at(-1)
+        : undefined;
+      const startSnapshot = decPrevYear ?? yearSnapshots[0];
+
       const expenseData = expensesByYear.get(year)!;
 
       // Calculate Net Worth Growth (end - start)
-      const netWorthGrowth = lastSnapshot.totalNetWorth - firstSnapshot.totalNetWorth;
+      const netWorthGrowth = lastSnapshot.totalNetWorth - startSnapshot.totalNetWorth;
 
       // Calculate Net Savings (income + expenses, expenses already negative)
       const netSavings = expenseData.income + expenseData.expenses;

@@ -265,15 +265,20 @@ export default function DashboardPage() {
 
     const totalSavedFromWork = totalLaborIncome + totalExpensesSum;
 
-    // Net worth delta from startYear: first snapshot on or after startYear vs latest
+    // Net worth delta from startYear: use December of (startYear-1) as baseline
+    // so that the full startYear is included. Falls back to first snapshot of
+    // startYear when prior December doesn't exist.
     const relevantSnapshots = snapshots
       .filter((s) => s.year >= startYear)
       .sort((a, b) => (a.year !== b.year ? a.year - b.year : a.month - b.month));
 
     let totalInvestmentGrowthGross = 0;
-    if (relevantSnapshots.length >= 2) {
+    if (relevantSnapshots.length >= 1) {
+      const baselineSnapshot =
+        snapshots.find((s) => s.year === startYear - 1 && s.month === 12) ??
+        relevantSnapshots[0];
       const netWorthDelta =
-        relevantSnapshots.at(-1)!.totalNetWorth - relevantSnapshots[0].totalNetWorth;
+        relevantSnapshots.at(-1)!.totalNetWorth - baselineSnapshot.totalNetWorth;
       const allIncomeSum = filtered
         .filter((e) => e.type === 'income')
         .reduce((sum, e) => sum + e.amount, 0);

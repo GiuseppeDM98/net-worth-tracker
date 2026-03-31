@@ -340,7 +340,12 @@ export function prepareHistoryData(snapshots: MonthlySnapshot[]): HistoryData {
 }
 
 /**
- * Calculate year-over-year comparison from snapshots
+ * Calculate year-over-year comparison from snapshots.
+ *
+ * Uses December of the previous year as the starting baseline for each year
+ * so that January's performance is included in the annual delta (contiguous
+ * periods, no month lost). Falls back to first snapshot of the year itself
+ * when no prior December exists.
  */
 function calculateYoYComparison(snapshots: MonthlySnapshot[]): YoYDataPoint[] {
   const yearlyData: Record<number, MonthlySnapshot[]> = {};
@@ -357,8 +362,18 @@ function calculateYoYComparison(snapshots: MonthlySnapshot[]): YoYDataPoint[] {
 
   years.forEach(year => {
     const yearSnapshots = yearlyData[year].sort((a, b) => a.month - b.month);
-    const startValue = yearSnapshots[0].totalNetWorth;
     const endValue = yearSnapshots[yearSnapshots.length - 1].totalNetWorth;
+
+    // Use December of previous year as baseline so January is included in the delta.
+    // Falls back to first snapshot of this year when prior December doesn't exist.
+    const prevYearSnapshots = yearlyData[year - 1];
+    const decPrevYear = prevYearSnapshots
+      ? [...prevYearSnapshots].sort((a, b) => a.month - b.month).at(-1)
+      : undefined;
+    const startValue = decPrevYear
+      ? decPrevYear.totalNetWorth
+      : yearSnapshots[0].totalNetWorth;
+
     const growth = endValue - startValue;
     const growthPercent = startValue > 0 ? (growth / startValue) * 100 : 0;
 

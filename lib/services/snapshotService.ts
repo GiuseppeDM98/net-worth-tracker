@@ -240,14 +240,16 @@ export function calculateMonthlyChange(
 }
 
 /**
- * Calculate year-to-date (YTD) change in net worth
+ * Calculate annual change in net worth.
  *
- * Compares current net worth with the first snapshot of the current year
- * to show portfolio performance since January 1st.
+ * Uses December of the previous year as baseline so that January's performance
+ * is included in the annual delta (contiguous periods, no month lost).
+ * Falls back to the first available snapshot of the current year when
+ * December of the previous year doesn't exist (e.g. first year of data).
  *
  * @param currentNetWorth - Current total net worth
  * @param snapshots - Array of all snapshots (sorted chronologically)
- * @returns Object with absolute value change and percentage change, or null if no snapshots for current year
+ * @returns Object with absolute value change and percentage change, or null if no baseline found
  */
 export function calculateYearlyChange(
   currentNetWorth: number,
@@ -262,15 +264,19 @@ export function calculateYearlyChange(
 
   const currentYear = new Date().getFullYear();
 
-  // Find the first snapshot of the current year (earliest month in current year)
-  const firstSnapshotOfYear = snapshots.find(s => s.year === currentYear);
+  // Use December of previous year as baseline so that January's performance
+  // is included in the annual delta. Falls back to first snapshot of current
+  // year when prior December doesn't exist (first year of data).
+  const baseline =
+    snapshots.find(s => s.year === currentYear - 1 && s.month === 12) ??
+    snapshots.find(s => s.year === currentYear);
 
-  if (!firstSnapshotOfYear || firstSnapshotOfYear.totalNetWorth === 0) {
+  if (!baseline || baseline.totalNetWorth === 0) {
     return null;
   }
 
-  const value = currentNetWorth - firstSnapshotOfYear.totalNetWorth;
-  const percentage = (value / firstSnapshotOfYear.totalNetWorth) * 100;
+  const value = currentNetWorth - baseline.totalNetWorth;
+  const percentage = (value / baseline.totalNetWorth) * 100;
 
   return { value, percentage };
 }
