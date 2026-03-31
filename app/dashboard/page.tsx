@@ -816,6 +816,63 @@ export default function DashboardPage() {
         </motion.div>
       </motion.div>
 
+      {/* Cost cards — shown if any asset has TER tracking or stamp duty is enabled */}
+      <AnimatePresence>
+        {(hasTERTracking || hasStampDuty) && (
+        <motion.div
+          key="cost-cards"
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          className="grid gap-6 md:grid-cols-2"
+        >
+          {hasTERTracking && (
+            <motion.div variants={cardItem}>
+            <Card className="h-full">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">TER Portfolio</CardTitle>
+                <Receipt className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-purple-600">
+                  {portfolioMetrics.portfolioTER.toFixed(2)}%
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Total Expense Ratio medio ponderato
+                </p>
+              </CardContent>
+            </Card>
+            </motion.div>
+          )}
+
+          <motion.div variants={cardItem} className={!hasTERTracking ? 'md:col-span-2' : ''}>
+          <Card className="h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Costo Annuale Portfolio</CardTitle>
+              <TrendingDown className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600">
+                {formatCurrency(portfolioMetrics.annualPortfolioCost + portfolioMetrics.annualStampDuty)}
+              </div>
+              {hasTERTracking && hasStampDuty ? (
+                <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                  <div>TER: {formatCurrency(portfolioMetrics.annualPortfolioCost)}</div>
+                  <div>Bollo: {formatCurrency(portfolioMetrics.annualStampDuty)}</div>
+                </div>
+              ) : hasTERTracking ? (
+                <p className="text-xs text-muted-foreground">Costi di gestione annuali stimati</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">Imposta di bollo annuale stimata</p>
+              )}
+            </CardContent>
+          </Card>
+          </motion.div>
+        </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Labor Income & Investment KPI Cards — shown only when laborIncomeCategoryIds is configured in Settings */}
       <AnimatePresence>
         {laborIncomeMetrics && (
@@ -927,63 +984,6 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Cost cards — shown if any asset has TER tracking or stamp duty is enabled */}
-      <AnimatePresence>
-        {(hasTERTracking || hasStampDuty) && (
-        <motion.div
-          key="cost-cards"
-          variants={staggerContainer}
-          initial="hidden"
-          animate="visible"
-          exit="exit"
-          className="grid gap-6 md:grid-cols-2"
-        >
-          {hasTERTracking && (
-            <motion.div variants={cardItem}>
-            <Card className="h-full">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">TER Portfolio</CardTitle>
-                <Receipt className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-purple-600">
-                  {portfolioMetrics.portfolioTER.toFixed(2)}%
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Total Expense Ratio medio ponderato
-                </p>
-              </CardContent>
-            </Card>
-            </motion.div>
-          )}
-
-          <motion.div variants={cardItem} className={!hasTERTracking ? 'md:col-span-2' : ''}>
-          <Card className="h-full">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Costo Annuale Portfolio</CardTitle>
-              <TrendingDown className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">
-                {formatCurrency(portfolioMetrics.annualPortfolioCost + portfolioMetrics.annualStampDuty)}
-              </div>
-              {hasTERTracking && hasStampDuty ? (
-                <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
-                  <div>TER: {formatCurrency(portfolioMetrics.annualPortfolioCost)}</div>
-                  <div>Bollo: {formatCurrency(portfolioMetrics.annualStampDuty)}</div>
-                </div>
-              ) : hasTERTracking ? (
-                <p className="text-xs text-muted-foreground">Costi di gestione annuali stimati</p>
-              ) : (
-                <p className="text-xs text-muted-foreground">Imposta di bollo annuale stimata</p>
-              )}
-            </CardContent>
-          </Card>
-          </motion.div>
-        </motion.div>
         )}
       </AnimatePresence>
 
