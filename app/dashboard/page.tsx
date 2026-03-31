@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useCountUp } from '@/lib/utils/useCountUp';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -45,7 +45,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Wallet, TrendingUp, PieChart, DollarSign, Camera, TrendingDown, Receipt, ChevronDown, Loader2, Briefcase, PiggyBank } from 'lucide-react';
+import { Wallet, TrendingUp, PieChart, DollarSign, Camera, TrendingDown, Receipt, ChevronDown, Loader2, Briefcase, PiggyBank, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useSnapshots, useCreateSnapshot } from '@/lib/hooks/useSnapshots';
@@ -104,6 +104,8 @@ export default function DashboardPage() {
 
   const [creatingSnapshot, setCreatingSnapshot] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showLaborChartTooltip, setShowLaborChartTooltip] = useState(false);
+  const laborChartTooltipRef = useRef<HTMLDivElement>(null);
   const [existingSnapshot, setExistingSnapshot] = useState<MonthlySnapshot | null>(null);
   const [portfolioSettings, setPortfolioSettings] = useState<AssetAllocationSettings | null>(null);
 
@@ -125,6 +127,21 @@ export default function DashboardPage() {
       getSettings(user.uid).then(setPortfolioSettings).catch(() => {});
     }
   }, [user]);
+
+  // Close the labor chart tooltip when clicking outside its container
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (laborChartTooltipRef.current && !laborChartTooltipRef.current.contains(event.target as Node)) {
+        setShowLaborChartTooltip(false);
+      }
+    };
+    if (showLaborChartTooltip) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showLaborChartTooltip]);
 
   /**
    * Calculate all portfolio metrics once per render cycle.
@@ -885,8 +902,25 @@ export default function DashboardPage() {
         {laborIncomeMetrics && laborMetricsChartData.length > 0 && (
           <motion.div variants={cardItem} initial="hidden" animate="visible">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle>Evoluzione Mensile: Lavoro &amp; Investimenti</CardTitle>
+                {/* Tooltip explains why savings + investment growth may not equal month-over-month net worth change */}
+                <div className="relative" ref={laborChartTooltipRef}>
+                  <button
+                    type="button"
+                    className="cursor-help hover:text-foreground transition-colors"
+                    onClick={() => setShowLaborChartTooltip(!showLaborChartTooltip)}
+                  >
+                    <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                  {showLaborChartTooltip && (
+                    <div className="absolute right-0 top-6 z-50 w-72 max-w-[calc(100vw-2rem)] rounded-md border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95">
+                      <p className="font-medium mb-1">Perché i valori potrebbero non coincidere con la variazione mensile del patrimonio?</p>
+                      <p>Il <strong>Risparmiato da Lavoro</strong> è calcolato come le entrate nelle categorie flaggate come &ldquo;reddito da lavoro&rdquo; nelle Impostazioni, meno tutte le spese del mese.</p>
+                      <p className="mt-1.5">Se hai fonti di entrata non incluse tra le categorie di reddito da lavoro (es. dividendi, affitti), non vengono conteggiate nel risparmio — generando una discrepanza normale rispetto alla variazione effettiva del patrimonio.</p>
+                    </div>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 <LaborMetricsChart data={laborMetricsChartData} isMobile={isMobile} />

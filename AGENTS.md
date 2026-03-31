@@ -463,4 +463,38 @@ When an icon switches between TrendingUp/TrendingDown (or similar) based on a va
 ### Drawdown Duration / Recovery Time Semantics
 Duration = months **elapsed** (index distance, not inclusive count). `Jan(idx 0) → Dec(idx 11)` = 11m, **not** 12m. Never add `+1` for "inclusive counting" — it was added incorrectly and produces values 1 month too high. Recovery Time = 0m when trough IS the current snapshot (portfolio just hit the bottom, recovery hasn't started). Use `Math.max(0, ...)` not `Math.max(1, ...)`.
 
-**Last updated**: 2026-03-31 (session 23: YoY baseline bug fix)
+### Custom Tooltip Pattern (Help Icon on Card Header)
+**Do NOT use the Radix `<Tooltip>` component** (`@/components/ui/tooltip`) for help-icon tooltips in page-level components — it silently fails to render in some contexts (e.g. the dashboard page).
+
+Use the **custom pattern** from `MetricCard.tsx` instead:
+```tsx
+const [showTooltip, setShowTooltip] = useState(false);
+const tooltipRef = useRef<HTMLDivElement>(null);
+
+useEffect(() => {
+  const handleClickOutside = (e: MouseEvent) => {
+    if (tooltipRef.current && !tooltipRef.current.contains(e.target as Node))
+      setShowTooltip(false);
+  };
+  if (showTooltip) document.addEventListener('mousedown', handleClickOutside);
+  return () => document.removeEventListener('mousedown', handleClickOutside);
+}, [showTooltip]);
+
+// JSX:
+<div className="relative" ref={tooltipRef}>
+  <button type="button" className="cursor-help hover:text-foreground transition-colors"
+    onClick={() => setShowTooltip(!showTooltip)}>
+    <HelpCircle className="h-4 w-4 text-muted-foreground" />
+  </button>
+  {showTooltip && (
+    <div className="absolute right-0 top-6 z-50 w-64 max-w-[calc(100vw-2rem)] rounded-md border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95">
+      <p>Tooltip text here.</p>
+    </div>
+  )}
+</div>
+```
+- Card header layout when adding the icon: `flex flex-row items-center justify-between space-y-0 pb-2` (same as `MetricCard`)
+- Width: `w-64` for short text, `w-72` for multi-paragraph explanations
+- Reference implementations: `MetricCard.tsx`, `app/dashboard/page.tsx` (LaborMetricsChart card)
+
+**Last updated**: 2026-03-31 (session 25: custom tooltip pattern for card headers)

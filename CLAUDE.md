@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio, framer-motion
-- Ultima implementazione: **Dashboard labor metrics chart + FIRE card details** — (2026-03-31, session 24). Grafico mensile "Evoluzione Mensile: Lavoro & Investimenti" sotto le 4 KPI card in Dashboard; card FIRE Number, FIRE Number Previsto e Current WR mostrano formula `spese / WR%`; `fireNetWorth` salvato in ogni snapshot; grafico FIRE usa `fireNetWorth` per la linea indennità mensile.
-- Precedente: **YoY baseline bug fix** — (2026-03-31, session 23). Fix in 6 file: `snapshotService.ts`, `chartService.ts`, `pdfDataService.ts`, `hallOfFameService.ts` + `.server.ts`, `dashboard/page.tsx`.
+- Ultima implementazione: **Tooltip informativo grafico Dashboard** — (2026-03-31, session 25). Icona `HelpCircle` nel `CardHeader` del grafico "Evoluzione Mensile: Lavoro & Investimenti" spiega la possibile discrepanza tra risparmio+crescita investimenti e variazione MoM del patrimonio. Pattern custom (non Radix Tooltip).
+- Precedente: **Dashboard labor metrics chart + FIRE card details** — (2026-03-31, session 24). Grafico mensile "Evoluzione Mensile: Lavoro & Investimenti" sotto le 4 KPI card in Dashboard; card FIRE Number, FIRE Number Previsto e Current WR mostrano formula `spese / WR%`; `fireNetWorth` salvato in ogni snapshot; grafico FIRE usa `fireNetWorth` per la linea indennità mensile.
 
 ## Architecture Snapshot
 - App Router con pagine protette sotto `app/dashboard/*`.
