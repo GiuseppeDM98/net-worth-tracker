@@ -51,9 +51,10 @@ import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { useAuth } from '@/contexts/AuthContext';
-import { getAllAssets, calculateTotalValue, calculateFIRENetWorth } from '@/lib/services/assetService';
+import { getAllAssets, calculateTotalValue, calculateFIRENetWorth, calculateLiquidFIRENetWorth, calculateIlliquidFIRENetWorth } from '@/lib/services/assetService';
+import { getItalyYear } from '@/lib/utils/dateHelpers';
 import { getSettings, setSettings, getDefaultTargets } from '@/lib/services/assetAllocationService';
-import { getFIREData, calculatePlannedFIREMetrics } from '@/lib/services/fireService';
+import { getFIREData, calculatePlannedFIREMetrics, calculateFIREMetrics } from '@/lib/services/fireService';
 import { formatCurrency, formatCurrencyCompact, formatPercentage } from '@/lib/services/chartService';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -106,6 +107,8 @@ export function FireCalculatorTab() {
   const withdrawalRate = settings?.withdrawalRate ?? 4.0;
   const plannedAnnualExpenses = settings?.plannedAnnualExpenses ?? null;
   const currentNetWorth = assets ? calculateFIRENetWorth(assets, includePrimaryResidence) : 0;
+  const liquidNetWorth = assets ? calculateLiquidFIRENetWorth(assets, includePrimaryResidence) : 0;
+  const illiquidNetWorth = assets ? calculateIlliquidFIRENetWorth(assets, includePrimaryResidence) : 0;
 
   // Fetch FIRE data, dependent on assets and settings
   const { data: fireData, isLoading: isLoadingFIRE } = useQuery({
@@ -115,7 +118,11 @@ export function FireCalculatorTab() {
     staleTime: 300000, // 5 minutes
   });
 
-  const fireMetrics = fireData?.metrics;
+  // Re-run pure metrics calculation with liquid/illiquid breakdown.
+  // getFIREData fetches async data (expenses, chart); we enrich metrics client-side after receiving annualExpenses.
+  const fireMetrics = fireData?.metrics
+    ? calculateFIREMetrics(currentNetWorth, fireData.metrics.annualExpenses, withdrawalRate, liquidNetWorth, illiquidNetWorth)
+    : null;
   const chartData = fireData?.chartData ?? [];
 
   // Calculate planned metrics, dependent on fireData and settings
@@ -398,7 +405,7 @@ export function FireCalculatorTab() {
             </>
           )}
 
-          {/* Row 2: Allowances */}
+          {/* Row 2: Allowances — how much you can spend per year/month/day at the safe withdrawal rate */}
           <div className="grid gap-6 sm:grid-cols-3">
             <Card>
               <CardHeader>
@@ -408,12 +415,31 @@ export function FireCalculatorTab() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-purple-600">
+                <div className="font-mono text-2xl font-bold tabular-nums text-purple-600">
                   {formatCurrency(fireMetrics.annualAllowance)}
                 </div>
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                  Quanto potresti prelevare all'anno con il WR attuale
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Patrimonio FIRE × {withdrawalRate}% — quanto puoi prelevare ogni anno senza intaccare il capitale nel lungo periodo
                 </p>
+                {/* Proportion bar: liquid (green) vs illiquid (amber) share of total allowance */}
+                {fireMetrics.annualAllowance > 0 && (
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-amber-200 dark:bg-amber-900/50">
+                    <div
+                      className="h-full rounded-full bg-green-500 dark:bg-green-400 transition-all"
+                      style={{ width: `${(fireMetrics.liquidAnnualAllowance / fireMetrics.annualAllowance) * 100}%` }}
+                    />
+                  </div>
+                )}
+                <div className="mt-2 flex flex-col gap-2 border-t pt-3 text-xs text-gray-500 dark:text-gray-400">
+                  <div className="flex justify-between">
+                    <span>Di cui liquidi</span>
+                    <span className="font-mono font-medium tabular-nums text-green-600 dark:text-green-400">{formatCurrency(fireMetrics.liquidAnnualAllowance)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Di cui illiquidi</span>
+                    <span className="font-mono font-medium tabular-nums text-amber-600 dark:text-amber-400">{formatCurrency(fireMetrics.illiquidAnnualAllowance)}</span>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
@@ -425,12 +451,30 @@ export function FireCalculatorTab() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-indigo-600">
+                <div className="font-mono text-2xl font-bold tabular-nums text-indigo-600">
                   {formatCurrency(fireMetrics.monthlyAllowance)}
                 </div>
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                  Reddito mensile passivo potenziale
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Indennità annuale ÷ 12 — reddito mensile passivo sostenibile
                 </p>
+                {fireMetrics.annualAllowance > 0 && (
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-amber-200 dark:bg-amber-900/50">
+                    <div
+                      className="h-full rounded-full bg-green-500 dark:bg-green-400 transition-all"
+                      style={{ width: `${(fireMetrics.liquidAnnualAllowance / fireMetrics.annualAllowance) * 100}%` }}
+                    />
+                  </div>
+                )}
+                <div className="mt-2 flex flex-col gap-2 border-t pt-3 text-xs text-gray-500 dark:text-gray-400">
+                  <div className="flex justify-between">
+                    <span>Di cui liquidi</span>
+                    <span className="font-mono font-medium tabular-nums text-green-600 dark:text-green-400">{formatCurrency(fireMetrics.liquidAnnualAllowance / 12)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Di cui illiquidi</span>
+                    <span className="font-mono font-medium tabular-nums text-amber-600 dark:text-amber-400">{formatCurrency(fireMetrics.illiquidAnnualAllowance / 12)}</span>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
@@ -442,12 +486,30 @@ export function FireCalculatorTab() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-teal-600">
+                <div className="font-mono text-2xl font-bold tabular-nums text-teal-600">
                   {formatCurrency(fireMetrics.dailyAllowance)}
                 </div>
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                  Budget giornaliero sostenibile
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Indennità annuale ÷ 365 — budget giornaliero sostenibile
                 </p>
+                {fireMetrics.annualAllowance > 0 && (
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-amber-200 dark:bg-amber-900/50">
+                    <div
+                      className="h-full rounded-full bg-green-500 dark:bg-green-400 transition-all"
+                      style={{ width: `${(fireMetrics.liquidAnnualAllowance / fireMetrics.annualAllowance) * 100}%` }}
+                    />
+                  </div>
+                )}
+                <div className="mt-2 flex flex-col gap-2 border-t pt-3 text-xs text-gray-500 dark:text-gray-400">
+                  <div className="flex justify-between">
+                    <span>Di cui liquidi</span>
+                    <span className="font-mono font-medium tabular-nums text-green-600 dark:text-green-400">{formatCurrency(fireMetrics.liquidAnnualAllowance / 365)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Di cui illiquidi</span>
+                    <span className="font-mono font-medium tabular-nums text-amber-600 dark:text-amber-400">{formatCurrency(fireMetrics.illiquidAnnualAllowance / 365)}</span>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -462,7 +524,7 @@ export function FireCalculatorTab() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-orange-600">
+                <div className="font-mono text-3xl font-bold tabular-nums text-orange-600">
                   {formatPercentage(fireMetrics.currentWR)}
                 </div>
                 <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
@@ -485,12 +547,47 @@ export function FireCalculatorTab() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-cyan-600">
-                  {fireMetrics.yearsOfExpenses.toFixed(1)} anni
+                {/* Primary: liquid years — most actionable since no asset sales are needed */}
+                <div className="flex items-baseline gap-2">
+                  <span className="font-mono text-3xl font-bold tabular-nums text-cyan-600">
+                    {fireMetrics.liquidYearsOfExpenses > 0 ? fireMetrics.liquidYearsOfExpenses.toFixed(1) : '—'}
+                  </span>
+                  {fireMetrics.liquidYearsOfExpenses > 0 && (
+                    <span className="text-base font-medium text-cyan-600">anni</span>
+                  )}
+                  <span className="ml-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/40 dark:text-green-300">
+                    liquido
+                  </span>
                 </div>
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                  Per quanti anni il tuo patrimonio coprirebbe le spese attuali
+                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                  Anni di spesa coperti senza dover vendere immobili o asset illiquidi
                 </p>
+                {fireMetrics.annualExpenses > 0 && (
+                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                    Spese annuali {formatCurrency(fireMetrics.annualExpenses)} — recuperate dall&apos;anno {getItalyYear() - 1}
+                  </p>
+                )}
+                {/* Proportion bar: liquid (cyan) vs illiquid (amber) years */}
+                {fireMetrics.yearsOfExpenses > 0 && (
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-amber-200 dark:bg-amber-900/50">
+                    <div
+                      className="h-full rounded-full bg-cyan-500 dark:bg-cyan-400 transition-all"
+                      style={{ width: `${Math.min((fireMetrics.liquidYearsOfExpenses / fireMetrics.yearsOfExpenses) * 100, 100)}%` }}
+                    />
+                  </div>
+                )}
+                <div className="mt-2 flex flex-col gap-2 border-t pt-3 text-xs text-gray-500 dark:text-gray-400">
+                  <div className="flex justify-between">
+                    <span>Patrimonio totale FIRE</span>
+                    <span className="font-mono font-medium tabular-nums">{fireMetrics.yearsOfExpenses.toFixed(1)} anni</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Solo illiquidi</span>
+                    <span className="font-mono font-medium tabular-nums text-amber-600 dark:text-amber-400">
+                      {fireMetrics.illiquidYearsOfExpenses > 0 ? `${fireMetrics.illiquidYearsOfExpenses.toFixed(1)} anni` : '—'}
+                    </span>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>

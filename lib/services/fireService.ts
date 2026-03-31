@@ -17,6 +17,14 @@ export interface FIREMetrics {
   dailyAllowance: number; // Daily withdrawal allowance (annualAllowance / 365)
   currentWR: number; // Current withdrawal rate
   yearsOfExpenses: number; // Years of expenses covered by current net worth
+
+  // Liquid/illiquid breakdown (0 when not provided)
+  liquidNetWorth: number;
+  illiquidNetWorth: number;
+  liquidAnnualAllowance: number;
+  illiquidAnnualAllowance: number;
+  liquidYearsOfExpenses: number; // Years covered by liquid assets only (most actionable — no asset sales needed)
+  illiquidYearsOfExpenses: number; // Years covered by illiquid assets only
 }
 
 export interface PlannedFIREMetrics {
@@ -40,14 +48,19 @@ export interface MonthlyFIREData {
 }
 
 /**
- * Calculate annual expenses for current year (January 1st to December 31st)
+ * Calculate annual expenses for the last fully completed year.
+ *
+ * Why last year instead of current year? Using the current year mid-period (e.g., March)
+ * gives only 3 months of data, which dramatically understates annual spending and makes
+ * FIRE metrics like "years of expenses" misleading. The last full year is the most
+ * representative baseline for planning purposes.
  */
 export async function getAnnualExpenses(userId: string): Promise<number> {
   try {
     const now = new Date();
-    const currentYear = now.getFullYear();
-    const startDate = new Date(currentYear, 0, 1); // January 1st
-    const endDate = new Date(currentYear, 11, 31, 23, 59, 59, 999); // December 31st
+    const lastYear = now.getFullYear() - 1;
+    const startDate = new Date(lastYear, 0, 1); // January 1st of last year
+    const endDate = new Date(lastYear, 11, 31, 23, 59, 59, 999); // December 31st of last year
 
     const expenses = await getExpensesByDateRange(userId, startDate, endDate);
     return calculateTotalExpenses(expenses);
@@ -81,7 +94,9 @@ export async function getAnnualIncome(userId: string): Promise<number> {
 export function calculateFIREMetrics(
   currentNetWorth: number,
   annualExpenses: number,
-  withdrawalRate: number
+  withdrawalRate: number,
+  liquidNetWorth: number = 0,
+  illiquidNetWorth: number = 0
 ): FIREMetrics {
   // FIRE Number = Annual Expenses / Withdrawal Rate (as decimal)
   const wrDecimal = withdrawalRate / 100;
@@ -106,6 +121,13 @@ export function calculateFIREMetrics(
   const currentWRDecimal = currentWR / 100;
   const yearsOfExpenses = currentWRDecimal > 0 ? 1 / currentWRDecimal : 0;
 
+  // Liquid/illiquid breakdown allowances and runway
+  const liquidAnnualAllowance = liquidNetWorth * wrDecimal;
+  const illiquidAnnualAllowance = illiquidNetWorth * wrDecimal;
+  // yearsOfExpenses = netWorth / annualExpenses (equivalent to 1 / currentWR, simplified)
+  const liquidYearsOfExpenses = liquidNetWorth > 0 && annualExpenses > 0 ? liquidNetWorth / annualExpenses : 0;
+  const illiquidYearsOfExpenses = illiquidNetWorth > 0 && annualExpenses > 0 ? illiquidNetWorth / annualExpenses : 0;
+
   return {
     currentNetWorth,
     annualExpenses,
@@ -117,6 +139,12 @@ export function calculateFIREMetrics(
     dailyAllowance,
     currentWR,
     yearsOfExpenses,
+    liquidNetWorth,
+    illiquidNetWorth,
+    liquidAnnualAllowance,
+    illiquidAnnualAllowance,
+    liquidYearsOfExpenses,
+    illiquidYearsOfExpenses,
   };
 }
 

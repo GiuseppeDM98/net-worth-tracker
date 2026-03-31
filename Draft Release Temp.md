@@ -1,5 +1,10 @@
 ## ✨ New Features
 
+- **FIRE Calculator**: Allowance cards (Annual, Monthly, Daily) now show a liquid vs illiquid breakdown — a proportional bar visualises the split at a glance, with exact amounts in green (liquid) and amber (illiquid) below the main figure
+- **FIRE Calculator**: "Years of Expenses" now shows how many years your **liquid assets alone** cover at current spending — the most actionable figure, since it requires no selling of real estate or illiquid holdings. Total FIRE years and illiquid-only years are shown as secondary context
+- **FIRE Calculator**: Annual expenses now sourced from the last fully completed year instead of the current partial year — producing a more accurate and representative baseline for all FIRE metrics
+- **FIRE Calculator**: Allowance card subtitles now explain the formula (`Portfolio × X%`) so the calculation is immediately understandable
+
 - Added **Labor Income KPI cards** to the Dashboard Overview — four new metric cards appear when you configure labor income categories in Settings: "Earned from Work" (cumulative income from selected categories), "Saved from Work" (income minus all expenses), "Investment Growth (Gross)" (market returns isolated from savings contributions), and "Investment Growth (Net)" (after estimated capital gains taxes). All figures are filtered from your configured cashflow history start year. The cards only appear when labor income categories are configured — no clutter if you don't use this feature
 
 - Added **"All years" option** to the monthly Savings vs Investment Growth chart on the History page — select "Tutti" from the year dropdown to see a continuous month-by-month timeline spanning your entire history, instead of one year at a time. Labels include the year ("Gen 2023", "Feb 2023") for easy orientation

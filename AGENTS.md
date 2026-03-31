@@ -107,6 +107,20 @@ ALL fields in settings types must be handled in THREE places: type definition, `
 - Prefer per-asset opt-in/opt-out flags over hardcoded category exclusions
 - Add to: `Asset` + `AssetFormData` types, Zod schema, reset defaults, edit-mode prefill, save payload, AssetDialog toggle
 
+### FIRE Metrics Enrichment Pattern
+When `getFIREData` (async) returns, re-run `calculateFIREMetrics` (pure, synchronous) client-side with additional derived values instead of threading extra params through the Firebase call:
+```ts
+// getFIREData fetches expenses + chart; enrich metrics client-side after it resolves
+const fireMetrics = fireData?.metrics
+  ? calculateFIREMetrics(currentNetWorth, fireData.metrics.annualExpenses, withdrawalRate, liquidNetWorth, illiquidNetWorth)
+  : null;
+```
+This avoids changing async service signatures whenever the component needs new breakdowns.
+
+**FIRE annual expenses**: `getAnnualExpenses` uses last completed year (`now.getFullYear() - 1`), NOT current year. Using current year mid-period (e.g. March) gives only 3 months of data, understating annual spend and making yearsOfExpenses misleading.
+
+**Liquid/Illiquid FIRE split**: `calculateLiquidFIRENetWorth` / `calculateIlliquidFIRENetWorth` in `assetService.ts` combine the liquidity filter with primary-residence exclusion. Invariant: `liquid + illiquid === calculateFIRENetWorth` for any `(assets, includePrimaryResidence)`.
+
 ### Dashboard Settings Loading
 - Dashboard loads `AssetAllocationSettings` via `useEffect` + `useState` (NOT React Query)
 - Pattern: `getSettings(user.uid).then(setPortfolioSettings).catch(() => {})`
@@ -190,59 +204,20 @@ return (
 - **`AnimatePresence initial={false}`** on collapsibles that start open — avoids exit animation on mount
 
 **Table section collapse/expand animation (>30min debug, session 14):**
-HTML `<tr>` elements use `display: table-row` which does NOT support `height: 0 → auto` or `overflow: hidden`. You cannot animate table row groups with slideDown directly. Fix:
-```tsx
-// Wrap all section rows in a single <tr><td colSpan={totalCols} className="p-0"> container
-<tr>
-  <td colSpan={totalCols} className="p-0">
-    <AnimatePresence>
-      {!isCollapsed && (
-        <motion.div variants={slideDown} initial="hidden" animate="visible" exit="hidden" style={{ overflow: 'hidden' }}>
-          {/* flex rows with explicit widths matching the outer table colgroup */}
-          <div className="flex items-center ...">
-            <div className="flex-1 min-w-0 ...">name</div>
-            <div className="w-[130px] shrink-0 ...">value</div>
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  </td>
-</tr>
-```
-Outer `<Table>` needs `style={{ tableLayout: 'fixed' }}` + `<colgroup>` with explicit column widths. Flex rows inside `motion.div` use matching `w-[N] shrink-0` divs. This achieves pixel-perfect alignment between header and animated content.
-
-**`colSpan` must cover ALL columns:** If `totalCols` is off by even 1, the content `<td>` is narrower than expected. The missing column width is unavailable to flex-1, making the animated content overflow (clipped by `overflow: hidden`). Always count every `<TableHead>` cell to compute `totalCols`.
-
-**JSX comments inside `<colgroup>` cause hydration errors:** `{/* comment */}` inside `<colgroup>` is serialized as a whitespace text node, which is invalid HTML there. Remove all comments from inside `<colgroup>`.
-
-**Scroll to panel after slideDown:** Use `setTimeout(350)` (not 100ms) + `block: 'start'` — the 300ms enter animation must complete before scrollIntoView fires, otherwise the panel isn't fully visible yet.
+`<tr>` uses `display: table-row` — does NOT support `height: 0→auto` or `overflow: hidden`. Fix: wrap all section rows in `<tr><td colSpan={totalCols} className="p-0">` and put a `<motion.div variants={slideDown}>` inside. Outer `<Table>` needs `tableLayout: 'fixed'` + `<colgroup>`. Flex rows inside `motion.div` use matching `w-[N] shrink-0` divs for alignment.
+- `colSpan` must cover ALL columns — off by 1 causes flex-1 overflow clipped by `overflow: hidden`
+- No JSX comments inside `<colgroup>` — whitespace text node = invalid HTML = hydration error
+- Scroll to panel: `setTimeout(350)` + `block: 'start'` — wait for 300ms animation to complete
 - **Easing**: always `[0.25, 1, 0.5, 1]` (ease-out-quart). Never bounce or elastic.
 - **Page-level transitions**: `AnimatePresence mode="wait"` in `app/dashboard/layout.tsx`, keyed by `usePathname()`. The `exit` state on `pageVariants` only fires from this layout wrapper — individual pages don't need their own `AnimatePresence`. `mode="wait"` ensures the exiting page finishes before the entering page starts. Exit duration must be < entering duration (150ms vs 350ms) to feel snappy.
 
 **Two valid patterns for page mount animations — never mix them:**
 
-*Pattern A — staggerContainer (use when the page has a skeleton loading state):*
-```tsx
-// Root plain div (skeleton already handles loading→content transition)
-<div className="space-y-6 p-3 sm:p-6">
-  {/* non-animated sections (header, tabs, metric sections) */}
-  <motion.div variants={staggerContainer} initial="hidden" animate="visible">
-    <motion.div variants={cardItem}><Card /></motion.div>  {/* no initial/animate on children */}
-    <motion.div variants={cardItem}><Card /></motion.div>
-  </motion.div>
-</div>
-```
-Children inherit `hidden` state from the stagger parent — Framer Motion applies `opacity: 0` synchronously before the first paint, preventing the compound-opacity flash.
+*Pattern A — staggerContainer (page has skeleton):* Root `<div>` (no animation), children wrapped in `<motion.div variants={staggerContainer}>` + `<motion.div variants={cardItem}>`. Children inherit `hidden` from parent — prevents compound-opacity flash.
 
-*Pattern B — explicit delays (use for tab-child components with no skeleton transition):*
-```tsx
-<motion.div variants={pageVariants} initial="hidden" animate="visible" className="space-y-6">
-  <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ delay: 0 }}>…</motion.div>
-  <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ delay: 0.1 }}>…</motion.div>
-</motion.div>
-```
+*Pattern B — explicit delays (tab-child, no skeleton):* Root `<motion.div variants={pageVariants}>`, each card has own `initial="hidden" animate="visible" transition={{ delay: N }}`.
 
-**Compound-opacity flash (>30min debug, session 13):** Combining `pageVariants` root fade (`opacity 0→1` over 0.35s) with independent `initial="hidden" animate="visible"` on child cardItems causes `opacity_visual = opacity_parent × opacity_child` — chart cards appear to flash from nowhere while the page is mid-fade. Fix: use Pattern A (staggerContainer) instead. The flash happens because both opacities animate in parallel rather than the children inheriting state from the parent.
+**Compound-opacity flash (>30min debug, session 13):** `pageVariants` root fade + independent child `cardItem` animations → `opacity_visual = parent × child` → cards flash from nowhere mid-fade. Fix: Pattern A.
 
 ### `useCountUp` Hook — Shared Utility
 `lib/utils/useCountUp.ts` exports `useCountUp(target, options?)` with:
@@ -286,20 +261,16 @@ Standard props across the entire codebase — never deviate:
 - **Gotcha — `asChild` + Radix dropdown trigger**: if the button wraps a Radix DropdownMenuTrigger or PopoverTrigger and a parent has `overflow: hidden` or tight `z-index`, the `translate-y` on hover can clip the floating menu. Fix: pass `className="hover:translate-y-0"` inline as an override on that specific usage
 
 ### SVG Draw Animation (stroke-dashoffset)
-For custom animated SVG icons (e.g. toast icons), use `<style>` JSX with `@keyframes` and wrap the animation declarations inside `@media (prefers-reduced-motion: no-preference)` — elements are fully visible without the media query guard, so reduced-motion users see a static icon by default:
+Wrap `@keyframes` inside `@media (prefers-reduced-motion: no-preference)` — elements are fully visible by default, animation only applies when motion is allowed:
 ```tsx
 <style>{`
-  @keyframes circle-draw {
-    from { stroke-dashoffset: 44; }
-    to   { stroke-dashoffset: 0;  }
-  }
   @media (prefers-reduced-motion: no-preference) {
     .circle { stroke-dasharray: 44; stroke-dashoffset: 44; animation: circle-draw 300ms ease-out forwards; }
     .tick   { opacity: 0; animation: tick-appear 200ms ease-out 250ms forwards; }
   }
 `}</style>
 ```
-Circle circumference formula: `2πr` — for r=7 → ~44px (dasharray value). Use `forwards` fill-mode so the end state persists. Each icon file uses unique CSS class names (`.check-circle`, `.error-circle`, `.warning-triangle`) to avoid keyframe collisions when multiple icons render simultaneously.
+Circle circumference: `2πr` — r=7 → ~44px. Use unique class names per icon file to avoid keyframe collisions.
 
 ### EmptyState Component Pattern
 `components/ui/EmptyState.tsx` — reusable empty state with floating icon animation. Also exports 5 SVG icons: `SeedlingIcon`, `CalendarEmptyIcon`, `FilterEmptyIcon`, `TrophyEmptyIcon`, `ChartEmptyIcon`.
@@ -337,20 +308,15 @@ import { EmptyState, CalendarEmptyIcon } from '@/components/ui/EmptyState';
 - **Testing system-follow**: DevTools "Emulate prefers-color-scheme" only works when `localStorage.getItem('theme')` is `null` or `"system"`. If a user has manually toggled, localStorage wins. Reset with `localStorage.removeItem('theme')` + reload.
 
 ### Sticky Dialog Layout Pattern
-For dialogs with long forms or variable-length content, keep header and footer always visible:
 ```tsx
 <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0">
   <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">...</DialogHeader>
-  <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-    {/* scrollable body */}
-  </div>
-  <div className="px-6 pb-6 pt-4 border-t shrink-0 flex justify-end gap-2">
-    {/* sticky footer */}
-  </div>
+  <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">{/* scrollable body */}</div>
+  <div className="px-6 pb-6 pt-4 border-t shrink-0 flex justify-end gap-2">{/* sticky footer */}</div>
 </DialogContent>
 ```
-- When a `<form>` wraps the whole content (ExpenseDialog, AssetDialog): make it `flex flex-col flex-1 min-h-0`, put the scrollable div and footer inside the form — submit button stays inside `<form>` and works correctly.
-- **Exception**: dialogs containing `position: absolute` dropdowns (e.g. CategoryDeleteConfirmDialog) must NOT have `overflow-y-auto` on the body — see error below.
+- `<form>` wrapping whole content: make it `flex flex-col flex-1 min-h-0`, put scroll div + footer inside form.
+- **Exception**: dialogs with `position: absolute` dropdowns must NOT have `overflow-y-auto` on body.
 
 ---
 
@@ -378,33 +344,11 @@ For dialogs with long forms or variable-length content, keep header and footer a
 **Symptom**: `<Legend>` shows black square, or `<Tooltip>` shows wrong color, for a bar using `<Cell>` for conditional coloring. **Fix**: Always set `fill` on `<Bar>` to the default color — `<Cell>` overrides individual bars but `<Legend>` and `<Tooltip>` both read `<Bar fill>` directly, not from `<Cell>`.
 
 ### Recharts Tooltip Color — Three Distinct Cases
-Tooltip item coloring works differently per chart type:
+**Line / Area / Bar**: auto-colored from series `stroke`/`fill`. Do NOT set `color` in `itemStyle` or `contentStyle` — it cascades and overrides per-series colors. Only set `backgroundColor`, `border`, `borderRadius` in `contentStyle`.
 
-**Line / Area / Bar**: Recharts auto-colors each tooltip item text with the series `stroke`/`fill`. Do NOT set `color` in `itemStyle` or `contentStyle` — it will cascade and override the per-series colors:
-```tsx
-// ✅ Correct
-itemStyle={{ fontSize: '14px', padding: '2px 0' }}
-// ❌ Wrong — overrides all item colors
-itemStyle={{ fontSize: '14px', padding: '2px 0', color: 'var(--card-foreground)' }}
-```
+**PieChart with `<Cell>`**: does NOT auto-color from `<Cell fill>`. Use a custom tooltip reading `entry.payload.color` explicitly. Also set `fill` on `<Bar>` for `<Legend>` — `<Cell>` overrides individual bars but Legend reads `<Bar fill>` directly.
 
-**PieChart with `<Cell>`**: Recharts does NOT auto-color tooltip items from `<Cell fill>`. Use a custom tooltip that reads `entry.payload.color` explicitly:
-```tsx
-<Tooltip
-  content={({ active, payload }) => {
-    if (!active || !payload?.length) return null;
-    const entry = payload[0];
-    const color = (entry.payload as any)?.color ?? entry.color;
-    return (
-      <div style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '4px', padding: '8px 12px', fontSize: '14px' }}>
-        <span style={{ color }}>{entry.name} : {formatCurrency(entry.value as number)}</span>
-      </div>
-    );
-  }}
-/>
-```
-
-**contentStyle `color` cascades**: Setting `color` on `contentStyle` propagates via CSS to all child text — same override problem as `itemStyle.color`. Only set `backgroundColor`, `border`, `borderRadius` in `contentStyle`.
+**contentStyle `color` cascades**: propagates to all child text. Never set it.
 
 ### Recharts ResponsiveContainer Inside Hidden Radix Tab
 **Symptom**: Console warning `The width(-1) and height(-1)`. **Fix**: Use explicit pixel height: `<ResponsiveContainer width="100%" height={300}>`. Never `height="100%"` inside inactive tabs.
