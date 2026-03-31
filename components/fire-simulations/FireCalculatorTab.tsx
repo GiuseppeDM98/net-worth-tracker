@@ -112,8 +112,8 @@ export function FireCalculatorTab() {
 
   // Fetch FIRE data, dependent on assets and settings
   const { data: fireData, isLoading: isLoadingFIRE } = useQuery({
-    queryKey: ['fireData', user?.uid, currentNetWorth, withdrawalRate],
-    queryFn: () => getFIREData(user!.uid, currentNetWorth, withdrawalRate),
+    queryKey: ['fireData', user?.uid, currentNetWorth, withdrawalRate, includePrimaryResidence],
+    queryFn: () => getFIREData(user!.uid, currentNetWorth, withdrawalRate, includePrimaryResidence),
     enabled: !!user && !!assets && currentNetWorth > 0,
     staleTime: 300000, // 5 minutes
   });
@@ -299,8 +299,11 @@ export function FireCalculatorTab() {
                 <div className="text-3xl font-bold text-blue-600">
                   {formatCurrency(fireMetrics.fireNumber)}
                 </div>
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                  Patrimonio necessario per raggiungere la FI con spese annuali di {formatCurrency(fireMetrics.annualExpenses)}
+                <p className="mt-2 font-mono text-sm text-gray-500 dark:text-gray-400 tabular-nums">
+                  {formatCurrency(fireMetrics.annualExpenses)} / {withdrawalRate}%
+                </p>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Spese annuali ({getItalyYear() - 1}) su Safe Withdrawal Rate
                 </p>
               </CardContent>
             </Card>
@@ -358,8 +361,11 @@ export function FireCalculatorTab() {
                     <div className="text-3xl font-bold text-purple-700 dark:text-purple-300">
                       {formatCurrency(plannedFireMetrics.plannedFireNumber)}
                     </div>
-                    <p className="mt-2 text-sm text-purple-900 dark:text-purple-200">
-                      Patrimonio target basato sulle spese previste di {formatCurrency(plannedFireMetrics.plannedAnnualExpenses)}
+                    <p className="mt-2 font-mono text-sm text-purple-700 dark:text-purple-300 tabular-nums">
+                      {formatCurrency(plannedFireMetrics.plannedAnnualExpenses)} / {withdrawalRate}%
+                    </p>
+                    <p className="mt-1 text-xs text-purple-700 dark:text-purple-400">
+                      Spese previste su Safe Withdrawal Rate
                     </p>
                     {fireMetrics.fireNumber !== plannedFireMetrics.plannedFireNumber && (
                       <p className="mt-2 text-xs text-purple-700 dark:text-purple-300 font-semibold flex items-center gap-1">
@@ -527,8 +533,12 @@ export function FireCalculatorTab() {
                 <div className="font-mono text-3xl font-bold tabular-nums text-orange-600">
                   {formatPercentage(fireMetrics.currentWR)}
                 </div>
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                  Rapporto tra spese annuali e patrimonio attuale
+                {/* Formula breakdown: makes clear which two numbers drive the percentage */}
+                <p className="mt-2 font-mono text-sm text-gray-500 dark:text-gray-400 tabular-nums">
+                  {formatCurrency(fireMetrics.annualExpenses)} / {formatCurrency(currentNetWorth)}
+                </p>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Spese annuali ({getItalyYear() - 1}) su patrimonio attuale
                 </p>
                 {fireMetrics.currentWR > withdrawalRate && (
                   <p className="mt-2 text-sm text-red-600 font-semibold flex items-center gap-1">

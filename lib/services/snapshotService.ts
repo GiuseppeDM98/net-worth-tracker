@@ -31,6 +31,7 @@ import {
   calculateTotalValue,
   calculateLiquidNetWorth,
   calculateIlliquidNetWorth,
+  calculateFIRENetWorth,
 } from './assetService';
 import { calculateCurrentAllocation } from './assetAllocationService';
 import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
@@ -63,6 +64,10 @@ export async function createSnapshot(
     const totalNetWorth = calculateTotalValue(assets);
     const liquidNetWorth = calculateLiquidNetWorth(assets);
     const illiquidNetWorth = calculateIlliquidNetWorth(assets);
+    // Always exclude primary residence from FIRE net worth — the flag on the asset
+    // is the source of truth. Stored as a separate field so the chart can use it
+    // going forward without re-deriving it from a potentially stale asset list.
+    const fireNetWorth = calculateFIRENetWorth(assets, false);
     const allocation = calculateCurrentAllocation(assets);
 
     // Convert allocation values (absolute EUR amounts) to percentages
@@ -100,6 +105,7 @@ export async function createSnapshot(
       totalNetWorth,
       liquidNetWorth,
       illiquidNetWorth,
+      fireNetWorth,
       byAssetClass: allocation.byAssetClass,
       byAsset,
       assetAllocation,

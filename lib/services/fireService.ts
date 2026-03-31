@@ -196,7 +196,8 @@ async function getMonthlyExpenses(userId: string, year: number, month: number): 
 export async function prepareFIREChartData(
   userId: string,
   snapshots: MonthlySnapshot[],
-  withdrawalRate: number
+  withdrawalRate: number,
+  includePrimaryResidence: boolean = false
 ): Promise<MonthlyFIREData[]> {
   try {
     const wrDecimal = withdrawalRate / 100;
@@ -212,8 +213,14 @@ export async function prepareFIREChartData(
     for (const snapshot of sortedSnapshots) {
       const { income, expenses } = await getMonthlyExpenses(userId, snapshot.year, snapshot.month);
 
-      // Calculate monthly allowance based on snapshot net worth
-      const monthlyAllowance = (snapshot.totalNetWorth * wrDecimal) / 12;
+      // Mirror the same logic used in FireCalculatorTab for currentNetWorth:
+      // - includePrimaryResidence=true  → use totalNetWorth (house included)
+      // - includePrimaryResidence=false → use fireNetWorth (house excluded) when available,
+      //   fall back to totalNetWorth for snapshots created before this field was added.
+      const netWorthForAllowance = includePrimaryResidence
+        ? snapshot.totalNetWorth
+        : (snapshot.fireNetWorth ?? snapshot.totalNetWorth);
+      const monthlyAllowance = (netWorthForAllowance * wrDecimal) / 12;
 
       const monthLabel = `${snapshot.month.toString().padStart(2, '0')}/${snapshot.year}`;
 
@@ -241,7 +248,8 @@ export async function prepareFIREChartData(
 export async function getFIREData(
   userId: string,
   currentNetWorth: number,
-  withdrawalRate: number
+  withdrawalRate: number,
+  includePrimaryResidence: boolean = false
 ): Promise<{
   metrics: FIREMetrics;
   chartData: MonthlyFIREData[];
@@ -257,7 +265,7 @@ export async function getFIREData(
     const snapshots = await getUserSnapshots(userId);
 
     // Prepare chart data
-    const chartData = await prepareFIREChartData(userId, snapshots, withdrawalRate);
+    const chartData = await prepareFIREChartData(userId, snapshots, withdrawalRate, includePrimaryResidence);
 
     return {
       metrics,

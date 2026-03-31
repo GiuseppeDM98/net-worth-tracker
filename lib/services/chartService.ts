@@ -1007,3 +1007,105 @@ export function prepareDoublingTimeData(
     currentDoublingInProgress: currentInProgress,
   };
 }
+
+/**
+ * Builds a month-by-month time series of labor income, savings from work, and gross
+ * investment growth — the same three figures shown in the dashboard KPI cards, but
+ * decomposed per calendar month rather than as lifetime aggregates.
+ *
+ * Algorithm mirrors prepareSavingsVsInvestmentDataAllMonths with two additions:
+ * 1. Labor income is isolated by filtering against laborCategoryIds.
+ * 2. Results are clamped to months on or after startYear (matching the KPI card scope).
+ *
+ * Months without a prior-month baseline snapshot are skipped to avoid manufactured zeros.
+ *
+ * @param snapshots   All monthly snapshots for the user.
+ * @param expenses    All expense/income transactions, sign-convention: income positive, expenses negative.
+ * @param laborCategoryIds  IDs of income categories counted as labor income (from Settings).
+ * @param startYear   First year to include, matching cashflowHistoryStartYear.
+ */
+export function prepareMonthlyLaborMetricsData(
+  snapshots: MonthlySnapshot[],
+  expenses: Expense[],
+  laborCategoryIds: string[],
+  startYear: number
+): {
+  period: string;
+  month: number;
+  year: number;
+  laborIncome: number;
+  savedFromWork: number;
+  investmentGrowth: number;
+}[] {
+  if (snapshots.length === 0) return [];
+
+  const laborCategorySet = new Set(laborCategoryIds);
+
+  // Build snapshot lookup keyed by "year-month" for O(1) access
+  const snapshotMap = new Map<string, MonthlySnapshot>();
+  snapshots.forEach((s) => snapshotMap.set(`${s.year}-${s.month}`, s));
+
+  // Bucket expenses by month: labor income, total income, total expenses (negative)
+  const expensesByMonth = new Map<string, { laborIncome: number; allIncome: number; allExpenses: number }>();
+  expenses.forEach((expense) => {
+    const ey = getItalyYear(expense.date);
+    const em = getItalyMonth(expense.date);
+    const key = `${ey}-${em}`;
+    const current = expensesByMonth.get(key) ?? { laborIncome: 0, allIncome: 0, allExpenses: 0 };
+
+    if (expense.type === 'income') {
+      current.allIncome += expense.amount;
+      if (laborCategorySet.has(expense.categoryId)) {
+        current.laborIncome += expense.amount;
+      }
+    } else {
+      current.allExpenses += expense.amount; // already negative
+    }
+
+    expensesByMonth.set(key, current);
+  });
+
+  const sorted = [...snapshots]
+    .filter((s) => s.year >= startYear)
+    .sort((a, b) => (a.year !== b.year ? a.year - b.year : a.month - b.month));
+
+  const result: {
+    period: string;
+    month: number;
+    year: number;
+    laborIncome: number;
+    savedFromWork: number;
+    investmentGrowth: number;
+  }[] = [];
+
+  for (const current of sorted) {
+    const { year, month } = current;
+
+    // December of prior year is the baseline for January; otherwise the previous month
+    const prevYear = month === 1 ? year - 1 : year;
+    const prevMonth = month === 1 ? 12 : month - 1;
+    const prev = snapshotMap.get(`${prevYear}-${prevMonth}`);
+    if (!prev) continue;
+
+    const netWorthGrowth = current.totalNetWorth - prev.totalNetWorth;
+    const data = expensesByMonth.get(`${year}-${month}`);
+
+    // When no transactions exist for the month, attribute all NW change to market
+    const laborIncome = data?.laborIncome ?? 0;
+    const allIncome = data?.allIncome ?? 0;
+    const allExpenses = data?.allExpenses ?? 0;
+    const savedFromWork = laborIncome + allExpenses;
+    const investmentGrowth = netWorthGrowth - (allIncome + allExpenses);
+
+    result.push({
+      period: `${MONTH_NAMES_IT[month - 1]} ${year}`,
+      month,
+      year,
+      laborIncome,
+      savedFromWork,
+      investmentGrowth,
+    });
+  }
+
+  return result;
+}

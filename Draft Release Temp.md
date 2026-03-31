@@ -5,6 +5,8 @@
 - **FIRE Calculator**: Annual expenses now sourced from the last fully completed year instead of the current partial year — producing a more accurate and representative baseline for all FIRE metrics
 - **FIRE Calculator**: Allowance card subtitles now explain the formula (`Portfolio × X%`) so the calculation is immediately understandable
 
+- Added **Monthly Labor & Investments Evolution chart** to the Dashboard — appears below the four Labor Income KPI cards when labor income categories are configured. Three lines show how Earned from Work, Saved from Work, and Gross Investment Growth evolved month by month from your configured history start year. Colors match the KPI card icons (blue / green / amber). The chart is responsive: compact on mobile, full height on desktop
+
 - Added **Labor Income KPI cards** to the Dashboard Overview — four new metric cards appear when you configure labor income categories in Settings: "Earned from Work" (cumulative income from selected categories), "Saved from Work" (income minus all expenses), "Investment Growth (Gross)" (market returns isolated from savings contributions), and "Investment Growth (Net)" (after estimated capital gains taxes). All figures are filtered from your configured cashflow history start year. The cards only appear when labor income categories are configured — no clutter if you don't use this feature
 
 - Added **"All years" option** to the monthly Savings vs Investment Growth chart on the History page — select "Tutti" from the year dropdown to see a continuous month-by-month timeline spanning your entire history, instead of one year at a time. Labels include the year ("Gen 2023", "Feb 2023") for easy orientation
@@ -178,6 +180,8 @@
 - The Dividends tab now animates in with a staggered cascade when first opened — action buttons, filters, statistics charts, and the dividend table each appear sequentially with a subtle slide-up effect
 
 - Fixed all annual year-over-year calculations incorrectly using January as the starting baseline — they now correctly use December of the previous year, so January's performance is no longer silently excluded from annual figures. Affected metrics: "Variazione Annuale" card on the Dashboard, the YoY Variation bar chart on the History page, the annual Savings vs Investment Growth chart, the Investment Growth cards on the Dashboard (when labor income categories are configured), Hall of Fame yearly rankings, and the YoY section in PDF exports
+- Fixed the "Monthly Allowance" line in the FIRE Calculator's historical chart not matching the Allowance card value — the chart now correctly excludes the primary residence from the net worth used to compute each month's allowance, consistent with the card. Historical data points before this fix are unaffected (they used total net worth as a fallback)
+- Fixed the Current Withdrawal Rate, FIRE Number, and Planned FIRE Number cards not showing which inputs drive the displayed percentage or target — each card now shows the underlying formula (e.g. `€38.400 / 4%`) so the calculation is immediately verifiable
 
 ## 🔒 Security
 

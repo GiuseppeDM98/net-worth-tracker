@@ -216,6 +216,9 @@ export interface MonthlySnapshot {
   totalNetWorth: number;
   liquidNetWorth: number;
   illiquidNetWorth: number; // New field to track illiquid assets separately
+  // FIRE-adjusted net worth excludes the primary residence (isPrimaryResidence flag).
+  // Optional for backwards compatibility — absent on snapshots created before this field was added.
+  fireNetWorth?: number;
   byAssetClass: {
     [assetClass: string]: number;
   };

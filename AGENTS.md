@@ -107,6 +107,21 @@ ALL fields in settings types must be handled in THREE places: type definition, `
 - Prefer per-asset opt-in/opt-out flags over hardcoded category exclusions
 - Add to: `Asset` + `AssetFormData` types, Zod schema, reset defaults, edit-mode prefill, save payload, AssetDialog toggle
 
+### Snapshot Document — Two Build Sites
+`MonthlySnapshot` documents are built in TWO independent places. Any new field must be added to BOTH:
+1. `lib/services/snapshotService.ts` — `createSnapshot()` — used by automated/client paths
+2. `app/api/portfolio/snapshot/route.ts` — `POST /api/portfolio/snapshot` — used by the dashboard "Create Snapshot" button and the monthly cron job (which calls this route internally)
+
+`app/api/portfolio/snapshot/manual/route.ts` receives data from the caller (historical imports) — it has no asset list to compute from, so new calculated fields cannot be added there.
+
+### FIRE Chart — includePrimaryResidence Must Flow Through
+`getFIREData(userId, currentNetWorth, withdrawalRate, includePrimaryResidence)` passes the flag to `prepareFIREChartData` so the monthly allowance line uses the same NW basis as the card metrics. **Two requirements**:
+1. The flag must be in the React Query `queryKey`: `['fireData', userId, currentNetWorth, withdrawalRate, includePrimaryResidence]` — otherwise toggling the flag doesn't invalidate the cache and the chart stales
+2. The flag must be forwarded in the `queryFn` call
+
+### MonthlySnapshot `fireNetWorth` Field
+`fireNetWorth?: number` on `MonthlySnapshot` — NW excluding the primary-residence asset (`isPrimaryResidence: true` flag). Saved at snapshot creation time via `calculateFIRENetWorth(assets, false)`. Optional (absent on snapshots created before this field was added). Used by `prepareFIREChartData` for the monthly allowance line: `snapshot.fireNetWorth ?? snapshot.totalNetWorth`. Historical snapshots without the field fall back to `totalNetWorth` silently.
+
 ### FIRE Metrics Enrichment Pattern
 When `getFIREData` (async) returns, re-run `calculateFIREMetrics` (pure, synchronous) client-side with additional derived values instead of threading extra params through the Firebase call:
 ```ts
@@ -145,7 +160,7 @@ This avoids changing async service signatures whenever the component needs new b
 - **Stamp Duty**: `calculateStampDuty(assets, rate, checkingAccountSubCategory?)` in `assetService.ts`
 
 ### Formatter Utility Duplication
-**Gotcha**: `formatCurrency` exists in BOTH `lib/utils/formatters.ts` AND `lib/services/chartService.ts`. Update both when modifying. Never redefine `formatCurrency` inline in a component — always import from `lib/utils/formatters`.
+**Gotcha**: `formatCurrency` AND `formatCurrencyCompact` exist in BOTH `lib/utils/formatters.ts` AND `lib/services/chartService.ts`. Update both when modifying. Never redefine either inline in a component — always import from the appropriate source. **Notably**: `formatCurrencyCompact` is NOT exported from `lib/utils/formatters.ts` — only from `lib/services/chartService.ts`. Import accordingly in chart components.
 
 ### Derived State — Use `useMemo`, Not `useEffect + setState`
 **Antipattern**: Using `useEffect` to compute filtered/derived lists and store them in a separate `useState`:

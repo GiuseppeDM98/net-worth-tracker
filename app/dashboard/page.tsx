@@ -29,7 +29,9 @@ import {
   formatCurrency,
   prepareAssetClassDistributionData,
   prepareAssetDistributionData,
+  prepareMonthlyLaborMetricsData,
 } from '@/lib/services/chartService';
+import LaborMetricsChart from '@/components/dashboard/LaborMetricsChart';
 import { calculateMonthlyChange, calculateYearlyChange } from '@/lib/services/snapshotService';
 import { updateHallOfFame } from '@/lib/services/hallOfFameService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -49,6 +51,7 @@ import { useAssets } from '@/lib/hooks/useAssets';
 import { useSnapshots, useCreateSnapshot } from '@/lib/hooks/useSnapshots';
 import { useExpenseStats } from '@/lib/hooks/useExpenseStats';
 import { useAllExpenses } from '@/lib/hooks/useAllExpenses';
+import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { getItalyYear } from '@/lib/utils/dateHelpers';
 
 /**
@@ -229,6 +232,8 @@ export default function DashboardPage() {
 
     return { monthly: monthlyVariation, yearly: yearlyVariation };
   }, [snapshots, portfolioMetrics.totalValue]);
+
+  const isMobile = useMediaQuery('(max-width: 1439px)');
 
   // Load all expenses only when labor income categories are configured — avoids unnecessary fetches
   const hasLaborIncomeConfig = (portfolioSettings?.laborIncomeCategoryIds?.length ?? 0) > 0;
@@ -440,6 +445,18 @@ export default function DashboardPage() {
   const animatedSavedFromWork = useCountUp(laborIncomeMetrics?.totalSavedFromWork ?? 0, { once: true });
   const animatedInvestmentGross = useCountUp(laborIncomeMetrics?.totalInvestmentGrowthGross ?? 0, { once: true });
   const animatedInvestmentNet = useCountUp(laborIncomeMetrics?.totalInvestmentGrowthNet ?? 0, { once: true });
+
+  // Monthly breakdown of the same metrics shown in the 4 KPI cards above.
+  // Requires the same conditions: labor categories configured and expenses loaded.
+  const laborMetricsChartData = useMemo(() => {
+    if (!laborIncomeMetrics || allExpenses.length === 0) return [];
+    return prepareMonthlyLaborMetricsData(
+      snapshots,
+      allExpenses,
+      portfolioSettings!.laborIncomeCategoryIds!,
+      laborIncomeMetrics.startYear
+    );
+  }, [laborIncomeMetrics, allExpenses, snapshots, portfolioSettings]);
 
   // Only show cost basis cards if user is actually tracking cost basis on any asset.
   // Prevents empty cards saying "€0.00 gains" for users not using this feature.
@@ -859,6 +876,22 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Monthly labor metrics chart — companion to the 4 KPI cards above */}
+      <AnimatePresence>
+        {laborIncomeMetrics && laborMetricsChartData.length > 0 && (
+          <motion.div variants={cardItem} initial="hidden" animate="visible">
+            <Card>
+              <CardHeader>
+                <CardTitle>Evoluzione Mensile: Lavoro &amp; Investimenti</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <LaborMetricsChart data={laborMetricsChartData} isMobile={isMobile} />
+              </CardContent>
+            </Card>
           </motion.div>
         )}
       </AnimatePresence>
