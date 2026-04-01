@@ -579,9 +579,9 @@ export default function PerformancePage() {
             variant="outline"
             onClick={() => setShowAIAnalysisDialog(true)}
             disabled={!metrics || metrics.hasInsufficientData}
-            className="group gap-2 transition-all duration-300 hover:border-purple-400 hover:text-purple-600 hover:shadow-[0_0_14px_rgba(139,92,246,0.35)] dark:hover:text-purple-400 dark:hover:border-purple-500"
+            className="group gap-2 transition-[border-color,color,box-shadow] duration-200 hover:border-purple-400 hover:text-purple-600 hover:shadow-[0_0_14px_rgba(139,92,246,0.35)] dark:hover:text-purple-400 dark:hover:border-purple-500"
           >
-            <Sparkles className="h-4 w-4 transition-transform duration-500 group-hover:rotate-12 group-hover:scale-110" />
+            <Sparkles className="h-4 w-4 transition-transform duration-200 group-hover:rotate-12 group-hover:scale-110" />
             Analizza con AI
           </Button>
           <Button onClick={loadPerformanceData} className="dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">

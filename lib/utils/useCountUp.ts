@@ -34,7 +34,12 @@ export function useCountUp(
     // When `once` is true, skip any re-trigger after the first meaningful animation.
     // "Meaningful" = target is non-zero (target=0 during loading is ignored so that
     // the animation fires when real data arrives, not during the empty-assets phase).
-    if (once && hasAnimatedRef.current) return;
+    if (once && hasAnimatedRef.current) {
+      // Already animated once — update value silently without re-animating.
+      // Handles cases like snapshot overwrite where underlying data changes after mount.
+      setCurrent(target);
+      return;
+    }
 
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -57,7 +62,7 @@ export function useCountUp(
       return;
     }
 
-    const duration = 700;
+    const duration = 500;
     let startTime: number | null = null;
 
     timerRef.current = setTimeout(() => {

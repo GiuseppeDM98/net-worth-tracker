@@ -204,7 +204,7 @@ const decPrevYear = prevYearSnapshots
 const startSnapshot = decPrevYear ?? yearSnapshots[0];
 ```
 
-**Files that implement this**: `snapshotService.ts` (`calculateYearlyChange`), `chartService.ts` (`prepareYoYVariationData`, `prepareSavingsVsInvestmentData`), `pdfDataService.ts` (`calculateYoYComparison`), `hallOfFameService.ts` + `.server.ts` (yearly records loop), `dashboard/page.tsx` (`laborIncomeMetrics`).
+**Files that implement this**: `snapshotService.ts` (`calculateYearlyChange`), `chartService.ts` (`prepareYoYVariationData`, `prepareSavingsVsInvestmentData`), `pdfDataService.ts` (`calculateYoYComparison`), `hallOfFameService.ts` + `.server.ts` (yearly records loop), `history/page.tsx` (`laborIncomeMetrics`).
 
 **Monthly heatmap is NOT affected** — it shows month-over-month returns (each cell = `NW_month / NW_prevMonth - 1`), so the baseline is always the immediately preceding month.
 
@@ -260,9 +260,11 @@ return (
 ### `useCountUp` Hook — Shared Utility
 `lib/utils/useCountUp.ts` exports `useCountUp(target, options?)` with:
 - Default behavior (`once: false`): re-triggers on every target change — used in `MetricCard` for period switching on Performance page
-- `once: true`: fires only the first time a **non-zero** value arrives; ignores subsequent changes — used for Dashboard KPIs that should animate once on mount, not on data refreshes
+- `once: true`: animates only the first time a **non-zero** value arrives; subsequent target changes update the displayed value immediately (no re-animation) — used for Dashboard KPIs that animate once on mount but still stay in sync after data refreshes (e.g. snapshot overwrite updating asset prices)
 
 **Zero-target trap**: hooks are called unconditionally, including during loading when `assets=[]` → all metrics = 0. If `once: true` were to mark `hasAnimated=true` at target=0, the animation would never fire on real data. Fix: `target === 0` sets `current` directly without marking animated; only a completed animation on a non-zero value marks `hasAnimated=true`.
+
+**Frozen value after data refresh (gotcha)**: with `once: true`, if the early return fires without calling `setCurrent`, the displayed value freezes at the old number even when the underlying data changes (e.g. snapshot overwrite). Fix: replace `return` with `setCurrent(target); return;` — value updates silently, no re-animation.
 
 **Same trap in useEffect deps `[]`**: A `useEffect` with empty deps runs once on mount — but if the component mounts with empty/loading data, the effect exits early and never re-fires when real data arrives (re-render ≠ re-mount). Fix: include the data array in deps. Guards like `hasCelebrated` / `markCelebrated` prevent double-firing on subsequent renders. Pattern used in `DoublingMilestoneTimeline` confetti: `useEffect(() => { ... }, [milestones])`.
 
@@ -307,6 +309,19 @@ Standard props across the entire codebase — never deviate:
 **Decorative band Areas** (overlapping semi-transparent fills used as background shading — e.g. percentile bands in Monte Carlo fan-charts and scenario comparison): keep `isAnimationActive={false}`. Animating 4–6 independent areas that visually stack produces a chaotic sequential fill-in. Animate only the foreground median `<Line>` on top. Always add an inline comment explaining why.
 
 **Re-animation on filter/data changes**: intentional for explicit user actions (dropdown select, button toggle, drill-down click). Re-animation communicates the data changed. Do NOT set `isAnimationActive={false}` for this reason unless the trigger is genuinely real-time (slider, typing, polling).
+
+### CSS Transition Performance
+- **Never use `transition-all`** on interactive elements — it animates ALL CSS properties including layout-affecting ones (width, height, padding), forcing full composite on every hover. Use specific properties instead:
+  - Buttons with color/shadow effects: `transition-[border-color,color,box-shadow]`
+  - Transform-only: `transition-transform`
+  - Multiple visual props: `transition-[color,background-color,border-color,box-shadow]`
+- **Duration**: 200ms for hover interactions (felt as immediate); 300ms+ starts to feel sluggish on tight controls
+- **Icon animations alongside button hover**: keep at 200ms to match button — a 500ms icon rotate inside a 200ms button transition creates a disconnect
+
+### Dashboard Data Isolation
+The Overview/Dashboard page must load fast. Do NOT add `useAllExpenses` or similar unbounded Firestore queries there. Even with React Query `staleTime`, the useMemo cascade (data processing + re-renders + countUp hooks) runs on every mount and competes with RAF animation frames — causing visible jank.
+
+**Rule**: If a feature needs `getAllExpenses` (full history), it belongs in History or Cashflow — pages that already fetch it. The dashboard loads only: `useAssets`, `useSnapshots`, `useExpenseStats`.
 
 ### Button Micro-interaction Pattern
 - **Base class** (`components/ui/button.tsx`): `hover:-translate-y-[1px] active:scale-[0.97] active:translate-y-[1px] duration-150` — lift on hover, press-down on active

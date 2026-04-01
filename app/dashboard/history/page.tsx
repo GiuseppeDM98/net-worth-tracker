@@ -11,12 +11,13 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { HistoryPageSkeleton } from '@/components/history/HistoryPageSkeleton';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
-import { getAllAssets, ASSET_CLASS_ORDER } from '@/lib/services/assetService';
+import { getAllAssets, ASSET_CLASS_ORDER, calculateTotalEstimatedTaxes } from '@/lib/services/assetService';
 import { getUserSnapshots, updateSnapshotNote } from '@/lib/services/snapshotService';
 import {
   getTargets,
   compareAllocations,
   getDefaultTargets,
+  getSettings,
 } from '@/lib/services/assetAllocationService';
 import { getAllExpenses } from '@/lib/services/expenseService';
 import {
@@ -27,10 +28,12 @@ import {
   prepareSavingsVsInvestmentDataMonthly,
   prepareSavingsVsInvestmentDataAllMonths,
   prepareDoublingTimeData,
+  prepareMonthlyLaborMetricsData,
   formatCurrency,
   formatCurrencyCompact,
   formatPercentage,
 } from '@/lib/services/chartService';
+import LaborMetricsChart from '@/components/dashboard/LaborMetricsChart';
 import {
   Select,
   SelectContent,
@@ -38,13 +41,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Asset, MonthlySnapshot, AssetAllocationTarget, DoublingMode } from '@/types/assets';
+import { Asset, MonthlySnapshot, AssetAllocationTarget, DoublingMode, AssetAllocationSettings } from '@/types/assets';
 import { DoublingTimeSummaryCards } from '@/components/history/DoublingTimeSummaryCards';
 import { DoublingMilestoneTimeline } from '@/components/history/DoublingMilestoneTimeline';
 import { Expense } from '@/types/expenses';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, Plus, MessageSquare } from 'lucide-react';
+import { Download, Plus, MessageSquare, Briefcase, PiggyBank, TrendingUp, TrendingDown } from 'lucide-react';
+import { getItalyYear } from '@/lib/utils/dateHelpers';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { CreateManualSnapshotModal } from '@/components/CreateManualSnapshotModal';
@@ -117,6 +121,7 @@ export default function HistoryPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [targets, setTargets] = useState<AssetAllocationTarget | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [portfolioSettings, setPortfolioSettings] = useState<AssetAllocationSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAssetClassPercentage, setShowAssetClassPercentage] = useState(false);
   const [showLiquidityPercentage, setShowLiquidityPercentage] = useState(false);
@@ -172,17 +177,19 @@ export default function HistoryPage() {
 
     try {
       setLoading(true);
-      const [snapshotsData, assetsData, targetsData, expensesData] = await Promise.all([
+      const [snapshotsData, assetsData, targetsData, expensesData, settingsData] = await Promise.all([
         getUserSnapshots(user.uid),
         getAllAssets(user.uid),
         getTargets(user.uid),
         getAllExpenses(user.uid),
+        getSettings(user.uid),
       ]);
 
       setSnapshots(snapshotsData);
       setAssets(assetsData);
       setTargets(targetsData || getDefaultTargets());
       setExpenses(expensesData);
+      setPortfolioSettings(settingsData);
     } catch (error) {
       console.error('Error loading history data:', error);
       toast.error('Errore nel caricamento dello storico');
@@ -283,6 +290,59 @@ export default function HistoryPage() {
     [snapshots]
   );
   const doublingTimeSummary = prepareDoublingTimeData(snapshots, doublingMode);
+
+  // Aggregate lifetime labor/investment metrics for the 4 KPI cards.
+  // Mirrors the same calculation from the dashboard, using assets already loaded here
+  // to derive estimated taxes (avoids a separate Firestore call).
+  const laborIncomeMetrics = useMemo(() => {
+    const categoryIds = portfolioSettings?.laborIncomeCategoryIds;
+    if (!categoryIds || categoryIds.length === 0 || expenses.length === 0) return null;
+
+    const startYear = portfolioSettings?.cashflowHistoryStartYear ?? 2025;
+    const categorySet = new Set(categoryIds);
+    const filtered = expenses.filter((e) => getItalyYear(e.date) >= startYear);
+
+    const totalLaborIncome = filtered
+      .filter((e) => e.type === 'income' && categorySet.has(e.categoryId))
+      .reduce((sum, e) => sum + e.amount, 0);
+
+    const totalExpensesSum = filtered
+      .filter((e) => e.type !== 'income')
+      .reduce((sum, e) => sum + e.amount, 0);
+
+    const totalSavedFromWork = totalLaborIncome + totalExpensesSum;
+
+    const relevantSnapshots = snapshots
+      .filter((s) => s.year >= startYear)
+      .sort((a, b) => (a.year !== b.year ? a.year - b.year : a.month - b.month));
+
+    let totalInvestmentGrowthGross = 0;
+    if (relevantSnapshots.length >= 1) {
+      const baselineSnapshot =
+        snapshots.find((s) => s.year === startYear - 1 && s.month === 12) ??
+        relevantSnapshots[0];
+      const netWorthDelta =
+        relevantSnapshots.at(-1)!.totalNetWorth - baselineSnapshot.totalNetWorth;
+      const allIncomeSum = filtered
+        .filter((e) => e.type === 'income')
+        .reduce((sum, e) => sum + e.amount, 0);
+      totalInvestmentGrowthGross = netWorthDelta - (allIncomeSum + totalExpensesSum);
+    }
+
+    // Use current assets to estimate capital gains taxes (same logic as dashboard)
+    const estimatedTaxes = calculateTotalEstimatedTaxes(assets);
+    const totalInvestmentGrowthNet = totalInvestmentGrowthGross - estimatedTaxes;
+
+    return { totalLaborIncome, totalSavedFromWork, totalInvestmentGrowthGross, totalInvestmentGrowthNet, startYear };
+  }, [expenses, snapshots, portfolioSettings, assets]);
+
+  // Monthly labor vs investment breakdown — only when labor categories are configured in Settings
+  const laborMetricsChartData = useMemo(() => {
+    const categoryIds = portfolioSettings?.laborIncomeCategoryIds;
+    if (!categoryIds || categoryIds.length === 0 || expenses.length === 0) return [];
+    const startYear = portfolioSettings?.cashflowHistoryStartYear ?? 2025;
+    return prepareMonthlyLaborMetricsData(snapshots, expenses, categoryIds, startYear);
+  }, [snapshots, expenses, portfolioSettings]);
 
   // Calculate percentage split of liquid vs illiquid for each snapshot.
   // This enables the chart toggle between € values and % distribution.
@@ -1516,6 +1576,86 @@ export default function HistoryPage() {
         </CardContent>
       </Card>
       </motion.div>
+
+      {/* Labor Income & Investment section — only visible when laborIncomeCategoryIds is configured in Settings */}
+      {laborIncomeMetrics && (
+        <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.45 }}>
+          <Card>
+            <CardHeader>
+              <CardTitle>Lavoro &amp; Investimenti</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Risparmiato da Lavoro = entrate categorie &ldquo;reddito da lavoro&rdquo; meno tutte le spese.
+                Eventuali entrate non incluse (dividendi, affitti) non vengono conteggiate nel risparmio.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* 4 KPI cards */}
+              <div className="grid gap-4 grid-cols-2 desktop:grid-cols-4">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Guadagnato da Lavoro</CardTitle>
+                    <Briefcase className="h-4 w-4 text-blue-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-lg desktop:text-2xl font-bold text-blue-600">
+                      {formatCurrency(laborIncomeMetrics.totalLaborIncome)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear}</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Risparmiato da Lavoro</CardTitle>
+                    <PiggyBank className={`h-4 w-4 ${laborIncomeMetrics.totalSavedFromWork >= 0 ? 'text-green-500' : 'text-red-500'}`} />
+                  </CardHeader>
+                  <CardContent>
+                    <div className={`text-lg desktop:text-2xl font-bold ${laborIncomeMetrics.totalSavedFromWork >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {laborIncomeMetrics.totalSavedFromWork >= 0 ? '+' : ''}{formatCurrency(laborIncomeMetrics.totalSavedFromWork)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear}</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Crescita Investimenti (Lordo)</CardTitle>
+                    {laborIncomeMetrics.totalInvestmentGrowthGross >= 0
+                      ? <TrendingUp className="h-4 w-4 text-green-500" />
+                      : <TrendingDown className="h-4 w-4 text-red-500" />}
+                  </CardHeader>
+                  <CardContent>
+                    <div className={`text-lg desktop:text-2xl font-bold ${laborIncomeMetrics.totalInvestmentGrowthGross >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {laborIncomeMetrics.totalInvestmentGrowthGross >= 0 ? '+' : ''}{formatCurrency(laborIncomeMetrics.totalInvestmentGrowthGross)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear}</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Crescita Investimenti (Netto)</CardTitle>
+                    {laborIncomeMetrics.totalInvestmentGrowthNet >= 0
+                      ? <TrendingUp className="h-4 w-4 text-green-500" />
+                      : <TrendingDown className="h-4 w-4 text-red-500" />}
+                  </CardHeader>
+                  <CardContent>
+                    <div className={`text-lg desktop:text-2xl font-bold ${laborIncomeMetrics.totalInvestmentGrowthNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {laborIncomeMetrics.totalInvestmentGrowthNet >= 0 ? '+' : ''}{formatCurrency(laborIncomeMetrics.totalInvestmentGrowthNet)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear} · al netto tasse stimate</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Monthly breakdown chart */}
+              {laborMetricsChartData.length > 0 && (
+                <LaborMetricsChart data={laborMetricsChartData} isMobile={isMobile} />
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Doubling Time Analysis */}
       <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.5 }}>

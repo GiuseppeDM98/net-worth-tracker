@@ -9,9 +9,7 @@
 - **FIRE Calculator**: Annual expenses now sourced from the last fully completed year instead of the current partial year — producing a more accurate and representative baseline for all FIRE metrics
 - **FIRE Calculator**: Allowance card subtitles now explain the formula (`Portfolio × X%`) so the calculation is immediately understandable
 
-- Added **Monthly Labor & Investments Evolution chart** to the Dashboard — appears below the four Labor Income KPI cards when labor income categories are configured. Three lines show how Earned from Work, Saved from Work, and Gross Investment Growth evolved month by month from your configured history start year. Colors match the KPI card icons (blue / green / amber). The chart is responsive: compact on mobile, full height on desktop
-
-- Added **Labor Income KPI cards** to the Dashboard Overview — four new metric cards appear when you configure labor income categories in Settings: "Earned from Work" (cumulative income from selected categories), "Saved from Work" (income minus all expenses), "Investment Growth (Gross)" (market returns isolated from savings contributions), and "Investment Growth (Net)" (after estimated capital gains taxes). All figures are filtered from your configured cashflow history start year. The cards only appear when labor income categories are configured — no clutter if you don't use this feature
+- Added a **Labor & Investments section** to the History page — a dedicated card groups four lifetime KPI metrics (Earned from Work, Saved from Work, Investment Growth Gross and Net) with a month-by-month chart showing how each evolved over time. The section appears between "Savings vs Investment Growth" and "Doubling Time" when labor income categories are configured in Settings. The explanation of why "Saved from Work" may not match net worth changes is shown as a subtitle beneath the card title
 
 - Added **"All years" option** to the monthly Savings vs Investment Growth chart on the History page — select "Tutti" from the year dropdown to see a continuous month-by-month timeline spanning your entire history, instead of one year at a time. Labels include the year ("Gen 2023", "Feb 2023") for easy orientation
 
@@ -70,8 +68,6 @@
 - Fixed date filters on the Dividends page: setting only a start date (without an end date) now correctly filters the summary cards and charts. Previously, a single date bound was silently ignored
 
 ## 🔧 Improvements
-
-- Added an info tooltip to the "Monthly Labor & Investments Evolution" chart on the Dashboard — click the help icon (ⓘ) in the card header to learn why "Saved from Work" plus "Investment Growth" may not match the month-over-month net worth change. The tooltip explains that savings are calculated from labor income categories configured in Settings, so income sources not flagged there (dividends, rent, etc.) are intentionally excluded
 
 - Empty states across the app now show a small animated icon instead of a plain grey text message — the icon gently floats up and down to add life to otherwise static moments. Affected areas: Doubling Milestone Timeline (no milestones yet), Dividend Calendar (month with no dividends), "Dividends by Asset / by Year / Monthly Income" charts, Asset Price History table, Asset Class History table, and any search dropdown with no matching results. The animation automatically stops for users who have enabled "Reduce Motion" in system accessibility settings
 
@@ -179,6 +175,12 @@
 - Dashboard KPI cards now animate their values on load — Total Portfolio, Liquid Portfolio, Net Total (after taxes), Liquid Net Total, Unrealized Gains, and Estimated Taxes all count up smoothly from zero when the page first opens. The animation plays once on mount and does not re-trigger on background data refreshes
 
 ## 🐛 Bug Fixes
+
+- Fixed Dashboard KPI card values not updating after creating a snapshot that overwrites the current month — values now reflect the refreshed asset prices immediately after the snapshot completes, without requiring a page reload
+
+- Fixed Dashboard KPI cards animating sluggishly on load — the count-up animation is now noticeably snappier (reduced from 700ms to 500ms), especially visible when multiple cards animate simultaneously
+
+- Fixed the "Analizza con AI" button on the Performance page responding slowly to hover — the border glow and sparkle icon rotation now feel instant
 
 - Fixed the Budget tab historical analysis panel ("Analisi Storica") sometimes requiring an extra scroll to become visible after clicking a category row — the page now always scrolls the panel into view at the top of the viewport after the animation completes
 - Fixed the "available on desktop only" hint in the mobile Budget item dialog: the message now clearly states that "L'analisi storica mensile" (monthly historical analysis) is what requires a larger screen, instead of the generic and confusing "Disponibile solo su desktop"
