@@ -95,6 +95,13 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Use full-page skeletons only on truly slow pages; otherwise prefer delayed or null loading
 - `Loader2` is for initial loading, `RefreshCw` is for user-triggered refresh
 
+### Visual Hierarchy Patterns
+- Hero KPI: use `border-l-4 border-l-primary` + `text-3xl desktop:text-4xl tabular-nums` on the single most important card per page (e.g. Patrimonio Totale Lordo on Dashboard, first chart on History)
+- Primary MetricCards (`isPrimary`): value renders at `text-3xl`; secondary cards at `text-2xl`. Use `isPrimary` sparingly — max 2 per MetricSection cluster
+- Section headers in `MetricSection`: left-border accent (`w-[3px] bg-primary opacity-70`) replaces emoji prefixes. Do not use emoji in section titles
+- Page header zone: eyebrow label (`text-xs uppercase tracking-widest text-muted-foreground`) above the `h1` + `border-b border-border` below the full header row separates editorial zone from data grid
+- Action hierarchy: one `variant="default"` CTA per page; utility actions (refresh, CSV export, insert snapshot) use `variant="ghost"` or `variant="outline" size="sm"`
+
 ### Motion and Charts
 - Shared variants live in `lib/utils/motionVariants.ts`
 - Do not wrap shadcn `TableRow` with `motion()`; use `motion.tr`
@@ -161,3 +168,8 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 ### Sign-Dependent Icons
 - For nullable metrics, define an explicit no-data fallback icon state
 - Default to the neutral/positive visual, not a red negative indicator
+
+### next/font Preload
+- `next/font` with default `preload: true` emits a `<link rel="preload">` on every page using the root layout
+- If a font is only used on a few pages (e.g. `Geist_Mono` via `font-mono` on FIRE and Hall of Fame), add `preload: false` to suppress the browser warning: *"preloaded using link preload but not used within a few seconds"*
+- Revert to default if the font is later added to layout-level or globally shared components

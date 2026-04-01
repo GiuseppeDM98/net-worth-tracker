@@ -599,46 +599,57 @@ export default function HistoryPage() {
       animate="visible"
       className="space-y-6 max-desktop:portrait:pb-20"
     >
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex-1">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">Storico</h1>
-          <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-400">
-            Analizza l'evoluzione del tuo patrimonio (lordo) nel tempo
-          </p>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-          <Button
-            variant="outline"
-            onClick={() => setShowManualSnapshotModal(true)}
-            className="w-full sm:w-auto"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            <span className="hidden sm:inline">Inserisci Snapshot Passato</span>
-            <span className="sm:hidden">Snapshot Passato</span>
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleExportCSV}
-            disabled={snapshots.length === 0}
-            className="w-full sm:w-auto"
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Esporta CSV
-          </Button>
-          <ExportPDFButton
-            snapshots={snapshots}
-            assets={assets}
-            allocationTargets={targets || getDefaultTargets()}
-          />
+      {/* Page header — eyebrow label + title establish editorial entry point.
+          PDF export is the primary persistent action; CSV and snapshot insertion
+          are utility actions demoted to outline/ghost so the primary CTA is clear. */}
+      <div className="pb-4 border-b border-border">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex-1">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Patrimonio</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">Storico</h1>
+            <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-400">
+              Analizza l'evoluzione del tuo patrimonio (lordo) nel tempo
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto sm:items-center">
+            {/* PDF export is the primary download action */}
+            <ExportPDFButton
+              snapshots={snapshots}
+              assets={assets}
+              allocationTargets={targets || getDefaultTargets()}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportCSV}
+              disabled={snapshots.length === 0}
+              className="w-full sm:w-auto"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Esporta CSV
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowManualSnapshotModal(true)}
+              className="w-full sm:w-auto text-muted-foreground hover:text-foreground"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Snapshot Passato</span>
+              <span className="sm:hidden">Snapshot Passato</span>
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Net Worth History Chart */}
+      {/* Net Worth History Chart — first chart on the page gets hero treatment:
+          left-accent border and a slightly larger title signal this is the primary
+          data story. All other charts follow at standard weight. */}
       <motion.div variants={cardItem} initial="hidden" animate="visible">
-      <Card>
+      <Card className="border-l-4 border-l-primary">
         <CardHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="text-lg sm:text-xl">Evoluzione Patrimonio Netto</CardTitle>
+            <CardTitle className="text-xl sm:text-2xl">Evoluzione Patrimonio Netto</CardTitle>
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               {/* Toggle Visualizza Note */}
               <Button

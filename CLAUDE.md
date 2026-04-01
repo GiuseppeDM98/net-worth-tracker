@@ -5,9 +5,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-01, session 30): **UI language & taxonomy consistency**. Aligned the full interface to Italian as the dominant language. Navigation renamed: Overview→Panoramica, Assets→Patrimonio, Allocation→Allocazione, Performance→Rendimenti, History→Storico, Settings→Impostazioni. Performance page retitled "Rendimenti del Portafoglio"; metrics renamed: Recovery Time→Tempo di Recupero, Current Yield Lordo/Netto→Rendimento Corrente Lordo/Netto. FIRE tab renamed: FIRE Calculator→Calcolatore FIRE. Login/Register microcopy updated. Intentional English terms kept: Hall of Fame, FIRE e Simulazioni, Cashflow, TWR, IRR, Sharpe Ratio, YOC, Max Drawdown.
-- Previous implementation (2026-04-01, session 29): **History Labor & Investments month counters**. Added two new cards to the History page that count positive and negative months inside `Lavoro & Investimenti`, based on total monthly net worth growth. The monthly labor metrics dataset now exposes `netWorthGrowth`, and the repo-wide TypeScript check passes after aligning stale budget test fixtures with the current `BudgetItem` type.
-- Previous implementation (2026-04-01, session 28): **Performance fixes + Labor section moved to History**. Fixed `useCountUp` with `once: true`, tightened hover transitions, moved `Lavoro & Investimenti` from Overview to History, and removed the unbounded expense query from Dashboard.
+- Latest implementation (2026-04-01, session 31): **Visual hierarchy & layout orchestration**. Dashboard hero KPI card (Patrimonio Totale Lordo) is now full-width with `border-l-primary` accent and larger typography (`text-3xl/4xl`); secondary KPIs in 2-col below. Performance `MetricCard` with `isPrimary` renders value at `text-3xl`. `MetricSection` headers have a left-border accent; emoji prefixes removed from all section titles. All three main pages (Dashboard, Rendimenti, Storico) have an eyebrow breadcrumb label, `border-b` header separator, and demoted utility actions. `Geist_Mono` font set to `preload: false` to suppress browser preload warning on pages that don't use `font-mono`.
+- Previous implementation (2026-04-01, session 30): **UI language & taxonomy consistency**. Aligned the full interface to Italian. Navigation: Overview→Panoramica, Assets→Patrimonio, Allocation→Allocazione, Performance→Rendimenti, History→Storico, Settings→Impostazioni. Performance page retitled "Rendimenti del Portafoglio"; Recovery Time→Tempo di Recupero, Current Yield→Rendimento Corrente. FIRE Calculator→Calcolatore FIRE. Intentional English kept: Hall of Fame, FIRE e Simulazioni, Cashflow, TWR, IRR, Sharpe Ratio, YOC, Max Drawdown.
+- Previous implementation (2026-04-01, session 29): **History Labor & Investments month counters**. Two new cards count positive and negative months in `Lavoro & Investimenti` based on `netWorthGrowth`. Budget test fixtures aligned to current `BudgetItem` type.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -59,7 +59,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Dividends: `components/dividends/*`
 - Settings: `app/dashboard/settings/page.tsx`, `lib/services/assetAllocationService.ts`
 
-**Last updated**: 2026-04-01 (session 30)
+**Last updated**: 2026-04-01 (session 31)
 
 ## Design Context
 

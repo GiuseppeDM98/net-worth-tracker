@@ -412,73 +412,84 @@ export default function DashboardPage() {
       animate="visible"
       className="space-y-6 max-desktop:portrait:pb-20"
     >
-      {/* Header stacks vertically on portrait mobile to prevent title/button overflow */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 sm:text-3xl">{greeting.label}</h1>
-          <p className="mt-1 text-gray-600 dark:text-gray-400 sm:mt-2">
-            {greeting.subtitle}
-          </p>
+      {/* Header — greeting text anchors the page; "Crea Snapshot" is the only primary
+          action on this view so it gets full emphasis. A bottom border separates the
+          editorial header zone from the data grid that follows. */}
+      <div className="pb-4 border-b border-border">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Panoramica</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 sm:text-3xl">{greeting.label}</h1>
+            <p className="mt-1 text-gray-600 dark:text-gray-400 sm:mt-2">
+              {greeting.subtitle}
+            </p>
+          </div>
+          <Button
+            onClick={handleCreateSnapshot}
+            disabled={creatingSnapshot || portfolioMetrics.assetCount === 0}
+            variant="default"
+            className="w-full sm:w-auto dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+          >
+            <Camera className="mr-2 h-4 w-4" />
+            {creatingSnapshot ? 'Creazione...' : 'Crea Snapshot'}
+          </Button>
         </div>
-        <Button
-          onClick={handleCreateSnapshot}
-          disabled={creatingSnapshot || portfolioMetrics.assetCount === 0}
-          variant="default"
-          className="w-full sm:w-auto dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
-        >
-          <Camera className="mr-2 h-4 w-4" />
-          {creatingSnapshot ? 'Creazione...' : 'Crea Snapshot'}
-        </Button>
       </div>
 
-      {/* 3-col at desktop (1440px+); landscape phones get 3-col at md (768px+) */}
-      <motion.div
-        variants={staggerContainer}
-        initial="hidden"
-        animate="visible"
-        className="grid gap-6 md:grid-cols-2 landscape:md:grid-cols-3 desktop:grid-cols-3"
-      >
+      {/* Hero KPI row — Patrimonio Totale Lordo is the single most important number
+          on the dashboard. Full-width, larger type, left-accent border communicate
+          primary status without adding decoration. The two secondary KPIs follow
+          in a 2-col row, visually subordinate by smaller font and narrower cards. */}
+      <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-4">
+
+        {/* Hero card — full-width, dominant number */}
         <motion.div variants={cardItem}>
-          <Card className="h-full">
+          <Card className="border-l-4 border-l-primary">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Patrimonio Totale Lordo</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Patrimonio Totale Lordo</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(animatedTotalValue ?? portfolioMetrics.totalValue)}</div>
-              <p className="text-xs text-muted-foreground">
+              <div className="text-3xl font-bold desktop:text-4xl tabular-nums">
+                {formatCurrency(animatedTotalValue ?? portfolioMetrics.totalValue)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
                 {portfolioMetrics.assetCount === 0 ? 'Aggiungi assets per iniziare' : `${portfolioMetrics.assetCount} asset${portfolioMetrics.assetCount !== 1 ? 's' : ''}`}
               </p>
             </CardContent>
           </Card>
         </motion.div>
 
-        <motion.div variants={cardItem}>
-          <Card className="h-full">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Patrimonio Liquido Lordo</CardTitle>
-              <Wallet className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(animatedLiquidNetWorth ?? portfolioMetrics.liquidNetWorth)}</div>
-            </CardContent>
-          </Card>
-        </motion.div>
+        {/* Secondary KPI row — 2-col at sm+; these contextualize the hero number */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <motion.div variants={cardItem}>
+            <Card className="h-full">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Patrimonio Liquido Lordo</CardTitle>
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold tabular-nums">{formatCurrency(animatedLiquidNetWorth ?? portfolioMetrics.liquidNetWorth)}</div>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-        <motion.div variants={cardItem}>
-          <Card className="h-full">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Numero Assets</CardTitle>
-              <PieChart className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{portfolioMetrics.assetCount}</div>
-              <p className="text-xs text-muted-foreground">
-                {portfolioMetrics.assetCount === 0 ? 'Nessun asset presente' : 'Asset in portafoglio'}
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
+          <motion.div variants={cardItem}>
+            <Card className="h-full">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Numero Assets</CardTitle>
+                <PieChart className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{portfolioMetrics.assetCount}</div>
+                <p className="text-xs text-muted-foreground">
+                  {portfolioMetrics.assetCount === 0 ? 'Nessun asset presente' : 'Asset in portafoglio'}
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+
       </motion.div>
 
       {/* Cost Basis Cards - only show if any asset has cost basis tracking */}

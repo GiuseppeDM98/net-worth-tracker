@@ -563,31 +563,37 @@ export default function PerformancePage() {
 
   return (
     <div className="space-y-6 p-3 sm:p-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Rendimenti del Portafoglio</h1>
-          <p className="text-muted-foreground mt-1">
-            Analisi dei rendimenti e metriche di rischio-rendimento
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2 sm:justify-end">
-          <Button variant="outline" onClick={() => setShowCustomDateDialog(true)} title="Periodo Personalizzato">
-            {isMobile ? <CalendarDays className="h-4 w-4" /> : 'Periodo Personalizzato'}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setShowAIAnalysisDialog(true)}
-            disabled={!metrics || metrics.hasInsufficientData}
-            className="group gap-2 transition-[border-color,color,box-shadow] duration-200 hover:border-purple-400 hover:text-purple-600 hover:shadow-[0_0_14px_rgba(139,92,246,0.35)] dark:hover:text-purple-400 dark:hover:border-purple-500"
-          >
-            <Sparkles className="h-4 w-4 transition-transform duration-200 group-hover:rotate-12 group-hover:scale-110" />
-            Analizza con AI
-          </Button>
-          <Button onClick={loadPerformanceData} className="dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Aggiorna
-          </Button>
+      {/* Page header — primary title gets full typographic weight; actions are grouped
+          right and sized to not compete. "Aggiorna" is a utility action so it sits
+          as outline to de-emphasise it relative to the AI analysis CTA. */}
+      <div className="pb-4 border-b border-border">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Portafoglio</p>
+            <h1 className="text-3xl font-bold tracking-tight">Rendimenti del Portafoglio</h1>
+            <p className="text-muted-foreground mt-1">
+              Analisi dei rendimenti e metriche di rischio-rendimento
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 sm:justify-end">
+            <Button variant="outline" size="sm" onClick={() => setShowCustomDateDialog(true)} title="Periodo Personalizzato">
+              {isMobile ? <CalendarDays className="h-4 w-4" /> : 'Periodo Personalizzato'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAIAnalysisDialog(true)}
+              disabled={!metrics || metrics.hasInsufficientData}
+              className="group gap-2 transition-[border-color,color,box-shadow] duration-200 hover:border-purple-400 hover:text-purple-600 hover:shadow-[0_0_14px_rgba(139,92,246,0.35)] dark:hover:text-purple-400 dark:hover:border-purple-500"
+            >
+              <Sparkles className="h-4 w-4 transition-transform duration-200 group-hover:rotate-12 group-hover:scale-110" />
+              Analizza con AI
+            </Button>
+            <Button variant="ghost" size="sm" onClick={loadPerformanceData} className="text-muted-foreground hover:text-foreground">
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Aggiorna
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -631,7 +637,7 @@ export default function PerformancePage() {
 
         {/* === METRICHE DI RENDIMENTO === */}
         <MetricSection
-          title="📈 Metriche di Rendimento"
+          title="Metriche di Rendimento"
           description="Misurano quanto il tuo portafoglio è cresciuto nel tempo"
           sectionIndex={0}
         >
@@ -669,7 +675,7 @@ export default function PerformancePage() {
 
         {/* === METRICHE DI RISCHIO === */}
         <MetricSection
-          title="⚠️ Metriche di Rischio"
+          title="Metriche di Rischio"
           description="Valutano la volatilità e i potenziali ribassi del portafoglio"
           sectionIndex={1}
         >
@@ -715,7 +721,7 @@ export default function PerformancePage() {
 
         {/* === METRICHE DI CONTESTO === */}
         <MetricSection
-          title="📊 Metriche di Contesto"
+          title="Metriche di Contesto"
           description="Informazioni sul periodo e sui flussi di capitale"
           sectionIndex={2}
         >
@@ -738,7 +744,7 @@ export default function PerformancePage() {
         {/* === METRICHE DIVIDENDI (conditional) === */}
         {(metrics.yocGross !== null || metrics.yocNet !== null || metrics.currentYield !== null || metrics.currentYieldNet !== null) && (
           <MetricSection
-            title="💰 Metriche da Proventi Finanziari"
+            title="Metriche da Proventi Finanziari"
             description="Rendimento da dividendi e cedole rispetto al costo di acquisto e al valore corrente"
             sectionIndex={3}
           >

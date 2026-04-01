@@ -152,7 +152,9 @@ export function MetricCard({
         )}
       </CardHeader>
       <CardContent>
-        <div className={cn('text-2xl font-bold tabular-nums', getValueColor(value))}>
+        {/* isPrimary cards use a larger value to visually dominate the section
+            and signal to the eye which metrics deserve attention first. */}
+        <div className={cn('font-bold tabular-nums', isPrimary ? 'text-3xl' : 'text-2xl', getValueColor(value))}>
           {formatValue(animatedValue)}
         </div>
         {subtitle && (

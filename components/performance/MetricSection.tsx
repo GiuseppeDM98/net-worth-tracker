@@ -39,16 +39,21 @@ export function MetricSection({
 
   return (
     <div className={cn('mt-8', className)}>
-      {/* Section Header — slides in from left; skipped when reduced-motion is preferred */}
+      {/* Section Header — slides in from left; skipped when reduced-motion is preferred.
+          Left-border accent creates visual hierarchy between section tiers without
+          introducing decorative noise — relies on layout contrast, not color alone. */}
       <div
         className="mb-4 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-left-4 duration-500 [animation-fill-mode:both]"
         style={{ animationDelay: `${sectionDelay}ms` }}
       >
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-          {title}
-        </h2>
+        <div className="flex items-center gap-3">
+          <div className="w-[3px] h-5 rounded-full bg-primary opacity-70 shrink-0" />
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+            {title}
+          </h2>
+        </div>
         {description && (
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400 pl-[15px]">
             {description}
           </p>
         )}
