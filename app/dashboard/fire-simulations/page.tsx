@@ -26,7 +26,7 @@ import { GoalBasedInvestingTab } from '@/components/fire-simulations/GoalBasedIn
 type TabValue = 'fire' | 'montecarlo' | 'goals';
 
 const TAB_LABELS: Record<TabValue, string> = {
-  fire: 'FIRE Calculator',
+  fire: 'Calcolatore FIRE',
   montecarlo: 'Monte Carlo',
   goals: 'Obiettivi',
 };
@@ -59,7 +59,7 @@ export default function FireSimulationsPage() {
               <SelectItem value="fire">
                 <span className="flex items-center gap-2">
                   <Flame className="h-4 w-4 text-orange-500" />
-                  FIRE Calculator
+                  Calcolatore FIRE
                 </span>
               </SelectItem>
               <SelectItem value="montecarlo">
@@ -83,7 +83,7 @@ export default function FireSimulationsPage() {
           <TabsList className="grid w-full max-w-lg grid-cols-3">
             <TabsTrigger value="fire" className="flex items-center gap-2">
               <Flame className="h-4 w-4" />
-              FIRE Calculator
+              Calcolatore FIRE
             </TabsTrigger>
             <TabsTrigger value="montecarlo" className="flex items-center gap-2">
               <Dices className="h-4 w-4" />

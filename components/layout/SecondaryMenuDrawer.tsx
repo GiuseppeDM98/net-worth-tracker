@@ -7,18 +7,20 @@ import { cn } from '@/lib/utils';
 
 // WARNING: If you add/remove navigation items here, also update:
 // - Sidebar.tsx (9 total items including these 6 secondary routes)
-// - BottomNavigation.tsx (3 primary routes: Overview, Assets, Cashflow)
+// - BottomNavigation.tsx (3 primary routes: Panoramica, Patrimonio, Cashflow)
 //
-// Secondary routes (drawer menu): Allocation, Performance, History, Hall of Fame, FIRE, Settings
+// Secondary routes (drawer menu): Allocazione, Rendimenti, Storico, Hall of Fame, FIRE, Impostazioni
 // These are less frequently accessed pages compared to the 3 primary bottom nav routes.
 // All 6 routes also appear in Sidebar for desktop/landscape users.
 const secondaryNavigation = [
-  { name: 'Allocation', href: '/dashboard/allocation', icon: PieChart },
-  { name: 'Performance', href: '/dashboard/performance', icon: TrendingUp },
-  { name: 'History', href: '/dashboard/history', icon: History },
+  { name: 'Allocazione', href: '/dashboard/allocation', icon: PieChart },
+  { name: 'Rendimenti', href: '/dashboard/performance', icon: TrendingUp },
+  { name: 'Storico', href: '/dashboard/history', icon: History },
+  // Hall of Fame: kept in English as an intentional premium brand choice
   { name: 'Hall of Fame', href: '/dashboard/hall-of-fame', icon: Trophy },
+  // FIRE: acronym (Financial Independence, Retire Early) — intentional hybrid
   { name: 'FIRE e Simulazioni', href: '/dashboard/fire-simulations', icon: Flame },
-  { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+  { name: 'Impostazioni', href: '/dashboard/settings', icon: Settings },
 ];
 
 interface SecondaryMenuDrawerProps {

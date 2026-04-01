@@ -509,7 +509,7 @@ export default function PerformancePage() {
       <div className="space-y-6 p-3 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Performance Portafoglio</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Rendimenti del Portafoglio</h1>
             <p className="text-muted-foreground mt-1">
               Analisi dei rendimenti e metriche di rischio-rendimento
             </p>
@@ -566,7 +566,7 @@ export default function PerformancePage() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Performance Portafoglio</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Rendimenti del Portafoglio</h1>
           <p className="text-muted-foreground mt-1">
             Analisi dei rendimenti e metriche di rischio-rendimento
           </p>
@@ -704,7 +704,7 @@ export default function PerformancePage() {
             tooltip="Misura il tempo (in mesi) necessario per recuperare completamente dalla perdita più grande (Max Drawdown). Esempio: se il portafoglio perde il 15% a gennaio e recupera a dicembre, la durata è 11 mesi. Questo indicatore misura la resilienza del portafoglio: durate brevi indicano rapido recupero, durate lunghe segnalano lenta ripresa. Calcolo aggiustato per flussi di cassa per isolare la performance degli investimenti. Se il portafoglio è ancora in drawdown, mostra la durata dall'ultimo picco."
           />
           <MetricCard
-            title="Recovery Time"
+            title="Tempo di Recupero"
             value={metrics.recoveryTime}
             subtitle={metrics.recoveryPeriod}
             format="months"
@@ -747,7 +747,7 @@ export default function PerformancePage() {
               value={metrics.yocGross}
               format="percentage"
               description={`Dividendi: ${formatCurrency(metrics.yocDividendsGross)} | Cost Basis: ${formatCurrency(metrics.yocCostBasis)} | Asset: ${metrics.yocAssetCount}`}
-              tooltip="Yield on Cost (YOC) Lordo misura il rendimento da dividendi lordi rispetto al costo originale di acquisto (cost basis). Formula: (Dividendi Annualizzati / Cost Basis) × 100. Esempio: Se hai comprato 100 azioni a €50 (cost basis €5.000) e ricevi €300/anno di dividendi lordi, YOC = 6%. A differenza del dividend yield corrente (dividendi/prezzo attuale), YOC mostra quanto rende il tuo investimento iniziale. YOC > Yield Corrente indica crescita dei dividendi nel tempo. Valori alti (>5-7%) indicano un buon ritorno sull'investimento originale."
+              tooltip="Yield on Cost (YOC) Lordo misura il rendimento da dividendi lordi rispetto al costo originale di acquisto (cost basis). Formula: (Dividendi Annualizzati / Cost Basis) × 100. Esempio: Se hai comprato 100 azioni a €50 (cost basis €5.000) e ricevi €300/anno di dividendi lordi, YOC = 6%. A differenza del rendimento corrente (dividendi/prezzo attuale), YOC mostra quanto rende il tuo investimento iniziale. YOC > Rendimento Corrente indica crescita dei dividendi nel tempo. Valori alti (>5-7%) indicano un buon ritorno sull'investimento originale."
             />
             <MetricCard
               title="YOC Netto"
@@ -757,11 +757,11 @@ export default function PerformancePage() {
               tooltip="Yield on Cost (YOC) Netto misura il rendimento da dividendi netti (dopo tasse) rispetto al costo originale di acquisto. Formula: (Dividendi Netti Annualizzati / Cost Basis) × 100. Questa metrica mostra quanto effettivamente guadagni (al netto delle ritenute fiscali) rispetto al tuo investimento iniziale. Più realistica dello YOC Lordo perché considera l'impatto fiscale. Utile per valutare il rendimento effettivo del portafoglio nel tempo. La differenza tra YOC Lordo e Netto dipende dalle aliquote fiscali applicate (es. 26% in Italia per dividendi azionari)."
             />
             <MetricCard
-              title="Current Yield Lordo"
+              title="Rendimento Corrente Lordo"
               value={metrics.currentYield}
               format="percentage"
               description={`Dividendi: ${formatCurrency(metrics.currentYieldDividends)} | Valore Portafoglio: ${formatCurrency(metrics.currentYieldPortfolioValue)} | Asset: ${metrics.currentYieldAssetCount}`}
-              tooltip={`Current Yield Lordo misura il rendimento da dividendi lordi basato sul valore di mercato ATTUALE del portafoglio. Formula: (Dividendi Lordi Annualizzati / Valore Corrente Portafoglio) × 100. A differenza dello YOC (che usa il costo originale), il Current Yield mostra quanto renderebbe il portafoglio se lo acquistassi oggi ai prezzi correnti.${
+              tooltip={`Rendimento Corrente Lordo misura il rendimento da dividendi lordi basato sul valore di mercato ATTUALE del portafoglio. Formula: (Dividendi Lordi Annualizzati / Valore Corrente Portafoglio) × 100. A differenza dello YOC (che usa il costo originale), il Rendimento Corrente mostra quanto renderebbe il portafoglio se lo acquistassi oggi ai prezzi correnti.${
                 metrics.yocGross !== null
                   ? `\n\nConfronto con YOC Lordo (${metrics.yocGross.toFixed(2)}%): ${
                       metrics.currentYield !== null && metrics.currentYield > metrics.yocGross
@@ -774,11 +774,11 @@ export default function PerformancePage() {
               }`}
             />
             <MetricCard
-              title="Current Yield Netto"
+              title="Rendimento Corrente Netto"
               value={metrics.currentYieldNet}
               format="percentage"
               description={`Dividendi: ${formatCurrency(metrics.currentYieldDividendsNet)} | Valore Portafoglio: ${formatCurrency(metrics.currentYieldPortfolioValue)} | Asset: ${metrics.currentYieldAssetCount}`}
-              tooltip={`Current Yield Netto misura il rendimento da dividendi netti (dopo tasse) basato sul valore di mercato ATTUALE del portafoglio. Formula: (Dividendi Netti Annualizzati / Valore Corrente Portafoglio) × 100. Questa è la metrica più realistica perché considera sia il prezzo corrente che l'impatto fiscale sui dividendi. Mostra quanto effettivamente guadagneresti acquistando il portafoglio oggi ai prezzi correnti.${
+              tooltip={`Rendimento Corrente Netto misura il rendimento da dividendi netti (dopo tasse) basato sul valore di mercato ATTUALE del portafoglio. Formula: (Dividendi Netti Annualizzati / Valore Corrente Portafoglio) × 100. Questa è la metrica più realistica perché considera sia il prezzo corrente che l'impatto fiscale sui dividendi. Mostra quanto effettivamente guadagneresti acquistando il portafoglio oggi ai prezzi correnti.${
                 metrics.yocNet !== null
                   ? `\n\nConfronto con YOC Netto (${metrics.yocNet.toFixed(2)}%): ${
                       metrics.currentYieldNet !== null && metrics.currentYieldNet > metrics.yocNet

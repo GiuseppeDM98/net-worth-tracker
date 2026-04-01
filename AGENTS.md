@@ -11,6 +11,8 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - All user-facing text in Italian, all code comments in English only
 - Use `formatCurrency()` for EUR and `formatDate()` for `DD/MM/YYYY`
 - Use `Sottocategoria` (no hyphen)
+- **Navigation taxonomy (established in session 30):** Panoramica, Patrimonio, Allocazione, Rendimenti, Storico, Impostazioni. The following are kept in English intentionally: `Hall of Fame` (premium brand name), `FIRE e Simulazioni` (acronym), `Cashflow` (established financial term in Italian). Do not translate these back.
+- **Performance metric names:** `Time-Weighted Return`, `Money-Weighted Return (IRR)`, `Sharpe Ratio`, `YOC`, `Max Drawdown` are kept as international standard terms. `Recovery Time` → `Tempo di Recupero`, `Current Yield` → `Rendimento Corrente`.
 
 ### Firebase Dates and Timezone
 - Use `toDate()` from `dateHelpers.ts`

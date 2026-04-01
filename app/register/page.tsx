@@ -139,7 +139,7 @@ export default function RegisterPage() {
         <CardHeader className="space-y-1">
           <CardTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100">Registrati</CardTitle>
           <CardDescription className="text-gray-500 dark:text-gray-400">
-            Crea un nuovo account per iniziare a tracciare il tuo portfolio
+            Crea un nuovo account per iniziare a tracciare il tuo patrimonio
           </CardDescription>
         </CardHeader>
         <CardContent>

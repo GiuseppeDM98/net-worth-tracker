@@ -83,7 +83,7 @@ export default function LoginPage() {
         <CardHeader className="space-y-1">
           <CardTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100">Accedi</CardTitle>
           <CardDescription className="text-gray-500 dark:text-gray-400">
-            Inserisci le tue credenziali per accedere al tuo portfolio
+            Inserisci le tue credenziali per accedere al tuo patrimonio
           </CardDescription>
         </CardHeader>
         <CardContent>

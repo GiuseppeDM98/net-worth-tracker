@@ -5,9 +5,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-01, session 29): **History Labor & Investments month counters**. Added two new cards to the History page that count positive and negative months inside `Lavoro & Investimenti`, based on total monthly net worth growth. The monthly labor metrics dataset now exposes `netWorthGrowth`, and the repo-wide TypeScript check passes after aligning stale budget test fixtures with the current `BudgetItem` type.
+- Latest implementation (2026-04-01, session 30): **UI language & taxonomy consistency**. Aligned the full interface to Italian as the dominant language. Navigation renamed: Overview→Panoramica, Assets→Patrimonio, Allocation→Allocazione, Performance→Rendimenti, History→Storico, Settings→Impostazioni. Performance page retitled "Rendimenti del Portafoglio"; metrics renamed: Recovery Time→Tempo di Recupero, Current Yield Lordo/Netto→Rendimento Corrente Lordo/Netto. FIRE tab renamed: FIRE Calculator→Calcolatore FIRE. Login/Register microcopy updated. Intentional English terms kept: Hall of Fame, FIRE e Simulazioni, Cashflow, TWR, IRR, Sharpe Ratio, YOC, Max Drawdown.
+- Previous implementation (2026-04-01, session 29): **History Labor & Investments month counters**. Added two new cards to the History page that count positive and negative months inside `Lavoro & Investimenti`, based on total monthly net worth growth. The monthly labor metrics dataset now exposes `netWorthGrowth`, and the repo-wide TypeScript check passes after aligning stale budget test fixtures with the current `BudgetItem` type.
 - Previous implementation (2026-04-01, session 28): **Performance fixes + Labor section moved to History**. Fixed `useCountUp` with `once: true`, tightened hover transitions, moved `Lavoro & Investimenti` from Overview to History, and removed the unbounded expense query from Dashboard.
-- Previous implementation (2026-04-01, session 27): **Contextual dashboard greeting** based on Europe/Rome time and user first name.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -59,7 +59,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Dividends: `components/dividends/*`
 - Settings: `app/dashboard/settings/page.tsx`, `lib/services/assetAllocationService.ts`
 
-**Last updated**: 2026-04-01 (session 29)
+**Last updated**: 2026-04-01 (session 30)
 
 ## Design Context
 

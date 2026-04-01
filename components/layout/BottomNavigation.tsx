@@ -10,11 +10,12 @@ import { SecondaryMenuDrawer } from './SecondaryMenuDrawer';
 // WARNING: If you add/remove navigation items here, also update:
 // - Sidebar.tsx (9 total items including these 3 primary routes)
 // - SecondaryMenuDrawer.tsx (6 secondary items)
-// Primary routes (bottom nav): Overview, Assets, Cashflow
+// Primary routes (bottom nav): Panoramica, Patrimonio, Cashflow
 // These were chosen as the most frequently accessed pages for quick mobile access.
 const primaryNavigation = [
-  { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Assets', href: '/dashboard/assets', icon: Wallet },
+  { name: 'Panoramica', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Patrimonio', href: '/dashboard/assets', icon: Wallet },
+  // Cashflow: established financial term used as-is in Italian finance
   { name: 'Cashflow', href: '/dashboard/cashflow', icon: Receipt },
 ];
 
