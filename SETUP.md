@@ -1,6 +1,6 @@
 # Setup Guide - Portfolio Tracker
 
-This guide will walk you through setting up the Portfolio Tracker application from scratch, including Firebase configuration, Vercel deployment, and available alternatives.
+This guide will walk you through setting up the Portfolio Tracker web app from scratch, using the `net-worth-tracker` repository as the codebase source, including Firebase configuration, Vercel deployment, and available alternatives.
 
 ## Table of Contents
 
@@ -23,6 +23,7 @@ Before you begin, ensure you have:
 - A **Google account** (for Firebase)
 - A **Vercel account** (free tier available at [vercel.com](https://vercel.com))
 - **Git** installed on your machine
+- **Firebase CLI** installed globally (recommended for deploying Firestore rules from the versioned repo file): `npm install -g firebase-tools`
 
 ---
 
@@ -58,69 +59,29 @@ Firebase provides the backend infrastructure (database, authentication) for this
 
 ### Step 4: Configure Firestore Security Rules
 
-1. In Firestore Database, go to the **Rules** tab
-2. Replace the default rules with the following:
+Do not manually copy a rules snippet from this guide. The authoritative rules live in the versioned repo file [firestore.rules](./firestore.rules), and they must stay aligned with the collections currently used by the app.
 
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
+1. Log in with the Firebase CLI:
 
-    // Users can only read/write their own user document
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-
-    // Assets belong to users
-    match /assets/{assetId} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-    }
-
-    // Asset allocation targets belong to users
-    match /assetAllocationTargets/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-
-    // Expenses belong to users
-    match /expenses/{expenseId} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-    }
-
-    // Expense categories belong to users
-    match /expenseCategories/{categoryId} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-    }
-
-    // Monthly snapshots belong to users
-    match /monthlySnapshots/{snapshotId} {
-      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create, update: if request.auth != null && request.auth.uid == request.resource.data.userId;
-      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
-    }
-
-    // Hall of Fame - personal rankings belong to users
-    match /hall-of-fame/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow create, update: if request.auth != null &&
-                              request.auth.uid == userId &&
-                              request.resource.data.userId == userId;
-      allow delete: if request.auth != null && request.auth.uid == userId;
-    }
-
-    // Price history readable by all authenticated users
-    // Only backend can write (via Admin SDK)
-    match /priceHistory/{document} {
-      allow read: if request.auth != null;
-      allow write: if false;
-    }
-  }
-}
+```bash
+firebase login
 ```
 
-3. Click **"Publish"** to save the rules
+2. Link the repo to your Firebase project:
+
+```bash
+firebase use --add
+```
+
+3. Deploy the rules directly from the repo root:
+
+```bash
+firebase deploy --only firestore:rules
+```
+
+4. Verify in Firebase Console → **Firestore Database** → **Rules** that the published rules match [firestore.rules](./firestore.rules)
+
+If you prefer using the Firebase Console UI, copy the contents of [firestore.rules](./firestore.rules) exactly as-is.
 
 ### Step 5: Get Firebase Configuration
 
@@ -210,6 +171,7 @@ NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS=false
 - `FIREBASE_SERVICE_ACCOUNT_KEY`: Paste the entire content of the downloaded JSON file
 - `CRON_SECRET`: Generate a random string (e.g., use `openssl rand -hex 32`)
 - `NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS`: Set to `true` to enable dummy data generation in Settings page (for development, testing, or demo purposes). **Warning**: Test data is saved to the same Firebase collections as real data. You can delete all dummy data using the "Elimina Tutti i Dati Dummy" button in Settings. See [README.md](./README.md) for full feature documentation. **Recommended**: Keep `false` in production environments.
+- `ANTHROPIC_API_KEY` (optional): Enables AI-powered performance analysis. If omitted, the rest of the app still works normally.
 
 **For detailed Firebase Admin SDK configuration on Vercel, see [VERCEL_SETUP.md](./VERCEL_SETUP.md)**
 
@@ -275,22 +237,27 @@ Vercel Cron Jobs are configured in `vercel.json` file in the project root.
 
 #### Understanding the Cron Configuration
 
-The `vercel.json` file contains:
+The current `vercel.json` file contains:
 
 ```json
 {
   "crons": [
     {
       "path": "/api/cron/monthly-snapshot",
-      "schedule": "0 19 * * *"
+      "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/cron/daily-dividend-processing",
+      "schedule": "0 18 * * *"
     }
   ]
 }
 ```
 
 **What this does**:
-- `path`: The API endpoint to call (creates monthly portfolio snapshots)
-- `schedule`: When to run (cron syntax format)
+- `/api/cron/monthly-snapshot`: Creates or updates monthly portfolio snapshots for all users
+- `/api/cron/daily-dividend-processing`: Scrapes recent dividends, creates matching cashflow entries when payment dates are reached, and schedules next bond coupons
+- `schedule`: When to run (cron syntax format, UTC)
 
 #### Cron Schedule Format
 
@@ -299,21 +266,26 @@ The schedule uses standard cron syntax: `minute hour day month dayOfWeek`
 | Field | Values | Example |
 |-------|--------|---------|
 | minute | 0-59 | `0` = at the start of the hour |
-| hour | 0-23 (UTC) | `19` = 19:00 UTC (20:00 CET, 21:00 CEST) |
+| hour | 0-23 (UTC) | `18` = 18:00 UTC (19:00 CET, 20:00 CEST) |
 | day | 1-31 | `28-31` = days 28 through 31 |
 | month | 1-12 or * | `*` = every month |
 | dayOfWeek | 0-6 or * | `*` = every day of week |
 
 #### Common Schedule Examples
 
-**Current default** (`0 19 * * *`):
-- Runs **every day** at 19:00 UTC
-- Good for testing, but creates daily snapshots
+**Current repo default** (`0 18 * * *`):
+- Runs **every day** at 18:00 UTC
+- Applies to both configured cron jobs
+- This is convenient during active development, but the snapshot job runs daily
 
-**Recommended for production** (`0 19 28-31 * *`):
-- Runs only on days **28-31** of each month at 19:00 UTC
+**Recommended for production snapshot schedule** (`0 18 28-31 * *`):
+- Runs only on days **28-31** of each month at 18:00 UTC
 - Covers all month lengths (Feb=28/29, Apr/Jun/Sep/Nov=30, others=31)
 - Creates true monthly snapshots at month-end
+
+**Suggested production split**:
+- `/api/cron/monthly-snapshot`: `0 18 28-31 * *`
+- `/api/cron/daily-dividend-processing`: keep daily, for example `0 18 * * *`
 
 **Custom time examples**:
 - `0 22 28-31 * *` - 22:00 UTC (23:00 CET, 00:00 CEST)
@@ -323,7 +295,7 @@ The schedule uses standard cron syntax: `minute hour day month dayOfWeek`
 **Timezone note**:
 - All times are in **UTC**
 - Italy is UTC+1 (winter) or UTC+2 (summer)
-- 19:00 UTC = 20:00 CET (winter) or 21:00 CEST (summer)
+- 18:00 UTC = 19:00 CET (winter) or 20:00 CEST (summer)
 
 #### How to Modify the Cron Schedule
 
@@ -333,10 +305,14 @@ The schedule uses standard cron syntax: `minute hour day month dayOfWeek`
      "crons": [
        {
          "path": "/api/cron/monthly-snapshot",
-         "schedule": "0 19 28-31 * *"
-       }
-     ]
-   }
+        "schedule": "0 18 28-31 * *"
+      },
+      {
+        "path": "/api/cron/daily-dividend-processing",
+        "schedule": "0 18 * * *"
+      }
+    ]
+  }
    ```
 
 2. **Commit and push** to GitHub:
@@ -363,12 +339,18 @@ The schedule uses standard cron syntax: `minute hour day month dayOfWeek`
 **Manual test** (useful after configuration changes):
 
 ```bash
-curl "https://your-app.vercel.app/api/cron/monthly-snapshot?secret=YOUR_CRON_SECRET"
+curl -H "Authorization: Bearer YOUR_CRON_SECRET" "https://your-app.vercel.app/api/cron/monthly-snapshot"
 ```
 
 Replace:
 - `your-app.vercel.app` with your actual Vercel URL
 - `YOUR_CRON_SECRET` with the value from your environment variables
+
+For the dividends job:
+
+```bash
+curl -H "Authorization: Bearer YOUR_CRON_SECRET" "https://your-app.vercel.app/api/cron/daily-dividend-processing"
+```
 
 **Expected response**:
 ```json
@@ -390,11 +372,17 @@ Replace:
 
 When triggered, the endpoint (`/app/api/cron/monthly-snapshot/route.ts`):
 
-1. Updates all asset prices from Yahoo Finance
-2. Calculates current portfolio metrics
-3. Creates a snapshot document in Firestore
-4. Updates Hall of Fame rankings
-5. Returns success/failure status
+1. Reads all users from Firestore
+2. Calls the portfolio snapshot API for each user
+3. Updates Hall of Fame rankings after successful snapshot creation
+4. Returns a summary of successes and errors
+
+The dividend processing endpoint (`/app/api/cron/daily-dividend-processing/route.ts`) runs separately and:
+
+1. Scrapes recent dividend announcements for supported assets
+2. Creates dividend entries when needed
+3. Creates linked cashflow entries when payment dates are reached
+4. Schedules the next bond coupon automatically
 
 **Note**: The implementation is in `/app/api/cron/monthly-snapshot/route.ts` if you need to customize the logic.
 
@@ -458,7 +446,7 @@ If you want to use a different provider, here are some alternatives:
 
 ⚠️ **Important**: The current codebase is designed for Yahoo Finance. Switching to an alternative provider requires:
 
-1. **Replacing the service layer**: Modify `src/services/yahooFinanceService.ts`
+1. **Replacing the service layer**: Modify `lib/services/yahooFinanceService.ts`
 2. **Updating API routes**: Modify `/api/prices/quote` and `/api/prices/update`
 3. **Handling rate limits**: Implement queuing or caching
 4. **Testing ticker formats**: Different providers may use different symbols
@@ -595,7 +583,7 @@ Consider alternatives only if:
 2. Verify `CRON_SECRET` environment variable is set
 3. Check cron schedule syntax in `vercel.json`
 4. View function logs for errors
-5. Test endpoint manually: `curl https://your-app.vercel.app/api/cron/monthly-snapshot?secret=YOUR_CRON_SECRET`
+5. Test endpoint manually: `curl -H "Authorization: Bearer YOUR_CRON_SECRET" https://your-app.vercel.app/api/cron/monthly-snapshot`
 
 #### 4. **Price updates failing**
 
@@ -669,7 +657,7 @@ After completing the setup:
 2. **Set allocation targets**: Go to "Impostazioni" and configure your target allocation
 3. **Add expenses**: Track your income and expenses in "Tracciamento Spese"
 4. **Create first snapshot**: Manually create a snapshot or wait for the monthly cron job
-5. **Monitor FIRE progress**: Visit the "FIRE" page to track your financial independence journey
+5. **Monitor FIRE progress**: Visit the "FIRE e Simulazioni" page to track your financial independence journey
 
 For detailed feature documentation, see the main [README.md](./README.md).
 

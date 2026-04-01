@@ -87,6 +87,17 @@ CRON_SECRET=your_secure_random_string
 NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
 ```
 
+## Cron Authentication Note
+
+The cron endpoints in this project expect the secret in the `Authorization` header, not as a query parameter.
+
+Manual examples:
+
+```bash
+curl -H "Authorization: Bearer YOUR_CRON_SECRET" "https://your-app.vercel.app/api/cron/monthly-snapshot"
+curl -H "Authorization: Bearer YOUR_CRON_SECRET" "https://your-app.vercel.app/api/cron/daily-dividend-processing"
+```
+
 ## Troubleshooting
 
 ### Error persists after redeploy
