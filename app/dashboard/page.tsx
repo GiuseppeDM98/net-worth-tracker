@@ -53,7 +53,8 @@ import { useExpenseStats } from '@/lib/hooks/useExpenseStats';
 import { useAllExpenses } from '@/lib/hooks/useAllExpenses';
 import { SavingsRateBadge } from '@/components/ui/SavingsRateBadge';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
-import { getItalyYear } from '@/lib/utils/dateHelpers';
+import { getItalyDate, getItalyYear } from '@/lib/utils/dateHelpers';
+import { getGreeting } from '@/lib/utils/getGreeting';
 
 /**
  * MAIN DASHBOARD PAGE
@@ -92,6 +93,18 @@ import { getItalyYear } from '@/lib/utils/dateHelpers';
 
 export default function DashboardPage() {
   const { user } = useAuth();
+
+  // Calculated once at mount — no need to re-evaluate on every render.
+  // Hour extracted in Europe/Rome timezone so the greeting is always contextually correct.
+  const greeting = useMemo(() => {
+    const italyHour = getItalyDate(new Date()).getHours();
+    const result = getGreeting(italyHour);
+    const firstName = user?.displayName?.split(' ')[0];
+    const label = firstName && firstName.length <= 20
+      ? `${result.greeting}, ${firstName}`
+      : result.greeting;
+    return { label, subtitle: result.subtitle };
+  }, [user?.displayName]);
 
   // React Query provides automatic caching, deduplication, and background refetching.
   // All three queries run in parallel, reducing total loading time from ~600ms to ~200ms.
@@ -505,9 +518,9 @@ export default function DashboardPage() {
       {/* Header stacks vertically on portrait mobile to prevent title/button overflow */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 sm:text-3xl">Dashboard</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 sm:text-3xl">{greeting.label}</h1>
           <p className="mt-1 text-gray-600 dark:text-gray-400 sm:mt-2">
-            Panoramica del tuo portafoglio di investimenti
+            {greeting.subtitle}
           </p>
         </div>
         <Button

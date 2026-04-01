@@ -1,5 +1,7 @@
 ## ✨ New Features
 
+- The Dashboard now greets you by name based on the time of day — "Buongiorno, Giuseppe" in the morning, "Buon pomeriggio" in the afternoon, "Buonasera" in the evening, and "Buonanotte" late at night. The subtitle also adapts ("Ecco il tuo patrimonio di stamattina", "Riepilogo della giornata", etc.) so the opening screen always feels contextually relevant, not generic
+
 - Added a **savings rate celebration badge** on the Dashboard — a small green notification appears in the bottom-left corner the first time you open the dashboard each browser session when last month's savings rate exceeded 30%. It auto-dismisses after 3 seconds. Automatically skipped for users with "Reduce Motion" enabled in system accessibility settings
 
 - **FIRE Calculator**: Allowance cards (Annual, Monthly, Daily) now show a liquid vs illiquid breakdown — a proportional bar visualises the split at a glance, with exact amounts in green (liquid) and amber (illiquid) below the main figure

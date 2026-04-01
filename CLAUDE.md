@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio, framer-motion
-- Ultima implementazione: **Savings Rate Celebration Badge** — (2026-04-01, session 26). Badge celebrativo `fixed bottom-4 left-4` in `components/ui/SavingsRateBadge.tsx`: appare una sola volta per sessione browser quando il savings rate del mese precedente supera il 30%. Framer Motion spring, auto-dismiss 3s, guard `prefers-reduced-motion`. Dati da `expenseStats.previousMonth` (già caricato in dashboard). Flag persistenza via `sessionStorage` (sopravvive ai page reload, si azzera alla chiusura della tab).
-- Precedente: **Tooltip informativo grafico Dashboard** — (2026-03-31, session 25). Icona `HelpCircle` nel `CardHeader` del grafico "Evoluzione Mensile: Lavoro & Investimenti" spiega la possibile discrepanza tra risparmio+crescita investimenti e variazione MoM del patrimonio. Pattern custom (non Radix Tooltip).
+- Ultima implementazione: **Saluto contestuale Dashboard** — (2026-04-01, session 27). Titolo statico "Dashboard" sostituito con saluto dinamico basato sull'ora in Europe/Rome (`lib/utils/getGreeting.ts`). Quattro fasce: Buongiorno (5–11), Buon pomeriggio (12–17), Buonasera (18–21), Buonanotte (22–4). Sottotitolo contestuale. Nome utente da `user.displayName` (primo nome, ≤ 20 char). Calcolato al mount via `useMemo`. 17 unit test in `__tests__/getGreeting.test.ts`.
+- Precedente: **Savings Rate Celebration Badge** — (2026-04-01, session 26). Badge celebrativo `fixed bottom-4 left-4` in `components/ui/SavingsRateBadge.tsx`: appare una sola volta per sessione browser quando il savings rate del mese precedente supera il 30%. Framer Motion spring, auto-dismiss 3s, guard `prefers-reduced-motion`. Dati da `expenseStats.previousMonth` (già caricato in dashboard). Flag persistenza via `sessionStorage` (sopravvive ai page reload, si azzera alla chiusura della tab).
 
 ## Architecture Snapshot
 - App Router con pagine protette sotto `app/dashboard/*`.
@@ -72,13 +72,13 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Toast icons: `components/ui/AnimatedCheckIcon.tsx`, `AnimatedErrorIcon.tsx`, `AnimatedWarningIcon.tsx`, `sonner.tsx`
 - Empty state: `components/ui/EmptyState.tsx` (EmptyState + SeedlingIcon, CalendarEmptyIcon, FilterEmptyIcon, TrophyEmptyIcon, ChartEmptyIcon)
 - Skeletons: `components/history/HistoryPageSkeleton.tsx`, `components/fire-simulations/FireCalculatorSkeleton.tsx`, `MonteCarloSkeleton.tsx`, `GoalsSkeleton.tsx`, `components/allocation/AllocationPageSkeleton.tsx`, `components/hall-of-fame/HallOfFameSkeleton.tsx`, `components/settings/SettingsPageSkeleton.tsx`
-- Utils: `lib/utils/dateHelpers.ts`, `formatters.ts`, `assetPriceHistoryUtils.ts`, `assetClassHistoryUtils.ts`
+- Utils: `lib/utils/dateHelpers.ts`, `formatters.ts`, `assetPriceHistoryUtils.ts`, `assetClassHistoryUtils.ts`, `getGreeting.ts`
 - Hooks: `lib/hooks/useDelayedLoading.ts` (mostra skeleton solo dopo soglia ms, evita flash su pagine veloci), `lib/hooks/useAllExpenses.ts` (carica tutte le spese con React Query, abilitato condizionalmente)
 - Auth: `lib/utils/authHelpers.ts`, `contexts/AuthContext.tsx`
 - PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`, `components/pdf/PDFExportDialog.tsx`, `lib/utils/pdfTimeFilters.ts`, `lib/utils/pdfGenerator.tsx`
 - Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`, `borsaItalianaBondScraper.test.ts`, `goalService.test.ts`, `couponUtils.test.ts`
 
-**Last updated**: 2026-04-01 (session 26: savings rate celebration badge on dashboard)
+**Last updated**: 2026-04-01 (session 27: contextual dashboard greeting based on time of day)
 
 ## Design Context
 
