@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { Timestamp } from 'firebase-admin/firestore';
+import {
+  assertSameUser,
+  getApiAuthErrorResponse,
+  requireFirebaseAuth,
+} from '@/lib/server/apiAuth';
 
 /**
  * DELETE /api/assets/[assetId]
@@ -46,18 +51,13 @@ export async function DELETE(
   { params }: { params: Promise<{ assetId: string }> }
 ) {
   try {
+    const decodedToken = await requireFirebaseAuth(request);
     const { assetId } = await params;
 
     // Get userId from request body
     const body = await request.json();
     const { userId } = body;
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'User ID is required' },
-        { status: 400 }
-      );
-    }
+    assertSameUser(decodedToken, userId);
 
     // Verify asset exists and belongs to user
     const assetDoc = await adminDb.collection('assets').doc(assetId).get();
@@ -140,6 +140,11 @@ export async function DELETE(
       deletedFutureDividends: dividendsSnapshot.size,
     });
   } catch (error) {
+    const authErrorResponse = getApiAuthErrorResponse(error);
+    if (authErrorResponse) {
+      return authErrorResponse;
+    }
+
     console.error('Error deleting asset:', error);
     return NextResponse.json(
       { error: 'Failed to delete asset', details: (error as Error).message },

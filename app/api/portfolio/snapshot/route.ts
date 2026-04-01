@@ -11,6 +11,11 @@ import {
 } from '@/lib/services/assetService';
 import { calculateCurrentAllocation } from '@/lib/services/assetAllocationService';
 import { updateUserAssetPrices } from '@/lib/helpers/priceUpdater';
+import {
+  assertSameUser,
+  getApiAuthErrorResponse,
+  requireFirebaseAuth,
+} from '@/lib/server/apiAuth';
 
 const SNAPSHOTS_COLLECTION = 'monthly-snapshots';
 
@@ -67,10 +72,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!userId) {
+    // Scheduled snapshots are authenticated with a shared secret because there is
+    // no end-user Firebase session involved. All interactive callers must present
+    // a Firebase ID token that matches the requested userId.
+    if (!cronSecret) {
+      const decodedToken = await requireFirebaseAuth(request);
+      assertSameUser(decodedToken, userId);
+    } else if (!userId) {
       return NextResponse.json(
         { error: 'User ID is required' },
-        { status: 401 }
+        { status: 400 }
       );
     }
 
@@ -228,6 +239,11 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    const authErrorResponse = getApiAuthErrorResponse(error);
+    if (authErrorResponse) {
+      return authErrorResponse;
+    }
+
     console.error('Error creating snapshot:', error);
     return NextResponse.json(
       {

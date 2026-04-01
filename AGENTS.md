@@ -74,6 +74,13 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Every new settings field must be handled in three places: type definition, `getSettings()`, `setSettings()`
 - `setSettings()` has two write branches; update both
 
+### Private API Authorization
+- Any App Router API route that uses Firebase Admin SDK must authenticate server-side; Firestore rules do not protect Admin SDK calls
+- Private routes must verify the Firebase ID token and bind the request to `decodedToken.uid`, not just a client-supplied `userId`
+- For record-level mutations on Admin SDK routes, enforce ownership after loading the document (e.g. `dividend.userId`, `asset.userId`)
+- Client-side calls to private API routes should use `authenticatedFetch()` so `Authorization: Bearer <idToken>` is sent consistently
+- Scheduled server-to-server flows are the exception: cron routes authenticate with `CRON_SECRET`, and `/api/portfolio/snapshot` must continue to accept `cronSecret` for internal cron orchestration
+
 ### Asset and FIRE Rules
 - `quantity = 0` is valid and marks sold assets in history logic
 - Cash asset balance lives in `quantity`, not via price updates
@@ -134,12 +141,14 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 ### Commands
 - `npm test -- <file>` or `npx vitest run <file>` for targeted tests
 - `npx tsc --noEmit` for repo-wide TypeScript checking without generating build output
+- For private API auth regressions, run `npx vitest run __tests__/apiAuthRoutes.test.ts`
 
 ### Test Patterns
 - Use local `new Date(year, monthIndex, day)` in tests, not ISO strings
 - Use `toBeCloseTo()` for floats
 - Use fake timers when testing helpers that depend on the current date
 - Keep test fixtures aligned with current required types, especially `BudgetItem.order`
+- For private route auth tests, prefer route-handler unit tests with mocked `adminAuth.verifyIdToken` and Admin SDK service calls over heavier browser/E2E coverage
 
 ---
 
@@ -152,6 +161,10 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 ### Settings Persistence Bugs
 - Symptom: toggles save but reset after reload
 - Fix: update both `getSettings()` and both branches of `setSettings()`
+
+### Admin SDK Auth Gaps
+- Symptom: private API route accepts `userId`/resource IDs from the client and works without a verified Firebase ID token
+- Fix: require server-side token verification plus `decodedToken.uid` matching or explicit resource ownership checks; Admin SDK bypasses Firestore rules
 
 ### Radix Select Empty String
 - Symptom: runtime error from `SelectItem`

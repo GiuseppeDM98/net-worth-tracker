@@ -37,6 +37,7 @@ import { useDeleteAsset } from '@/lib/hooks/useAssets';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { getAssetClassColor } from '@/lib/constants/colors';
+import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -112,7 +113,7 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
 
     try {
       setUpdating(true);
-      const response = await fetch('/api/prices/update', {
+      const response = await authenticatedFetch('/api/prices/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.uid }),

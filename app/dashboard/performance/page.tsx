@@ -46,6 +46,7 @@ import { PerformanceTooltip } from '@/components/performance/PerformanceTooltip'
 import { MonthlyReturnsHeatmap } from '@/components/performance/MonthlyReturnsHeatmap';
 import { UnderwaterDrawdownChart } from '@/components/performance/UnderwaterDrawdownChart';
 import { PerformancePageSkeleton } from '@/components/performance/PerformancePageSkeleton';
+import { authenticatedFetch } from '@/lib/utils/authFetch';
 
 /**
  * PERFORMANCE PAGE ARCHITECTURE
@@ -170,8 +171,8 @@ export default function PerformancePage() {
 
           // Fetch YOC and Current Yield in parallel for each period
           const [yocResponse, currentYieldResponse] = await Promise.all([
-            fetch(`/api/performance/yoc?${params.toString()}`),
-            fetch(`/api/performance/current-yield?${params.toString()}`),
+            authenticatedFetch(`/api/performance/yoc?${params.toString()}`),
+            authenticatedFetch(`/api/performance/current-yield?${params.toString()}`),
           ]);
 
           const yocData = yocResponse.ok
@@ -277,8 +278,8 @@ export default function PerformancePage() {
 
           // Fetch YOC and Current Yield in parallel
           const [yocResponse, currentYieldResponse] = await Promise.all([
-            fetch(`/api/performance/yoc?${params.toString()}`),
-            fetch(`/api/performance/current-yield?${params.toString()}`),
+            authenticatedFetch(`/api/performance/yoc?${params.toString()}`),
+            authenticatedFetch(`/api/performance/current-yield?${params.toString()}`),
           ]);
 
           if (yocResponse.ok) {

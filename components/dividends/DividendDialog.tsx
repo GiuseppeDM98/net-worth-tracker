@@ -18,6 +18,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
+import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { Dividend, DividendFormData, DividendType } from '@/types/dividend';
 import { Asset } from '@/types/assets';
 import { getAllAssets } from '@/lib/services/assetService';
@@ -258,7 +259,7 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
         ? { updates: dividendData } // PUT usa "updates"
         : { userId: user.uid, dividendData }; // POST usa wrapper
 
-      const response = await fetch(endpoint, {
+      const response = await authenticatedFetch(endpoint, {
         method,
         headers: {
           'Content-Type': 'application/json',

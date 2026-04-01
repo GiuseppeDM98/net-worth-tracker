@@ -11,6 +11,11 @@ import {
 import { getCategoryById } from '@/lib/services/expenseCategoryService';
 import { getSettings } from '@/lib/services/assetAllocationService';
 import { DividendFormData } from '@/types/dividend';
+import {
+  assertResourceOwner,
+  getApiAuthErrorResponse,
+  requireFirebaseAuth,
+} from '@/lib/server/apiAuth';
 
 /**
  * PUT /api/dividends/[dividendId]
@@ -42,6 +47,7 @@ export async function PUT(
   { params }: { params: Promise<{ dividendId: string }> }
 ) {
   try {
+    const decodedToken = await requireFirebaseAuth(request);
     const { dividendId } = await params;
     const body = await request.json();
     const { updates } = body as { updates: Partial<DividendFormData> };
@@ -62,6 +68,8 @@ export async function PUT(
         { status: 404 }
       );
     }
+
+    assertResourceOwner(decodedToken, existingDividend.userId);
 
     // Update dividend
     await updateDividend(dividendId, updates);
@@ -108,6 +116,11 @@ export async function PUT(
       message: 'Dividend updated successfully',
     });
   } catch (error) {
+    const authErrorResponse = getApiAuthErrorResponse(error);
+    if (authErrorResponse) {
+      return authErrorResponse;
+    }
+
     console.error('Error updating dividend:', error);
     return NextResponse.json(
       { error: 'Failed to update dividend', details: (error as Error).message },
@@ -141,6 +154,7 @@ export async function DELETE(
   { params }: { params: Promise<{ dividendId: string }> }
 ) {
   try {
+    const decodedToken = await requireFirebaseAuth(request);
     const { dividendId } = await params;
 
     // Get dividend to check for linked expense
@@ -152,6 +166,8 @@ export async function DELETE(
         { status: 404 }
       );
     }
+
+    assertResourceOwner(decodedToken, dividend.userId);
 
     // If dividend has linked expense, delete it first
     if (dividend.expenseId) {
@@ -171,6 +187,11 @@ export async function DELETE(
       message: 'Dividend deleted successfully',
     });
   } catch (error) {
+    const authErrorResponse = getApiAuthErrorResponse(error);
+    if (authErrorResponse) {
+      return authErrorResponse;
+    }
+
     console.error('Error deleting dividend:', error);
     return NextResponse.json(
       { error: 'Failed to delete dividend', details: (error as Error).message },

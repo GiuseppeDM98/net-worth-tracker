@@ -15,6 +15,7 @@ import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { pageVariants, cardItem } from '@/lib/utils/motionVariants';
 import { useAuth } from '@/contexts/AuthContext';
+import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { Dividend, DividendType } from '@/types/dividend';
 import { Asset } from '@/types/assets';
 import { DividendDialog } from './DividendDialog';
@@ -138,7 +139,7 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
 
       for (const asset of assetsWithIsin) {
         try {
-          const response = await fetch('/api/dividends/scrape', {
+          const response = await authenticatedFetch('/api/dividends/scrape', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

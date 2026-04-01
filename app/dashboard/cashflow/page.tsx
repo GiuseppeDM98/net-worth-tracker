@@ -38,6 +38,7 @@ import { useExpenses, useExpenseCategories } from '@/lib/hooks/useExpenses';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { getAllAssets } from '@/lib/services/assetService';
 import { getSettings } from '@/lib/services/assetAllocationService';
+import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { toast } from 'sonner';
 
 export default function CashflowPage() {
@@ -70,7 +71,7 @@ export default function CashflowPage() {
 
       // Fetch only dividends and assets (expenses/categories handled by React Query)
       const [dividendsData, assetsData] = await Promise.all([
-        fetch(`/api/dividends?userId=${user.uid}`)
+        authenticatedFetch(`/api/dividends?userId=${user.uid}`)
           .then(r => r.json())
           .then(d => d.dividends || []),
         getAllAssets(user.uid),

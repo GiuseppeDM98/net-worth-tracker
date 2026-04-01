@@ -37,6 +37,7 @@ import {
   listItem,
 } from '@/lib/utils/motionVariants';
 import { useAuth } from '@/contexts/AuthContext';
+import { authenticatedFetch } from '@/lib/utils/authFetch';
 import {
   HallOfFameData,
   MonthlyRecord,
@@ -100,7 +101,7 @@ export default function HallOfFamePage() {
 
     try {
       setRecalculating(true);
-      const response = await fetch('/api/hall-of-fame/recalculate', {
+      const response = await authenticatedFetch('/api/hall-of-fame/recalculate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

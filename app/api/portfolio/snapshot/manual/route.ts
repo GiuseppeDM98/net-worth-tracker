@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { Timestamp } from 'firebase-admin/firestore';
 import { updateHallOfFame } from '@/lib/services/hallOfFameService.server';
+import {
+  assertSameUser,
+  getApiAuthErrorResponse,
+  requireFirebaseAuth,
+} from '@/lib/server/apiAuth';
 
 /**
  * POST /api/portfolio/snapshot/manual
@@ -52,6 +57,7 @@ import { updateHallOfFame } from '@/lib/services/hallOfFameService.server';
  */
 export async function POST(request: NextRequest) {
   try {
+    const decodedToken = await requireFirebaseAuth(request);
     const body = await request.json();
     const {
       userId,
@@ -69,9 +75,7 @@ export async function POST(request: NextRequest) {
     //
     // Manual snapshots require all data upfront (no automatic calculation)
     // Validation order: Basic fields → Numeric fields → Object fields → Ranges
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
-    }
+    assertSameUser(decodedToken, userId);
 
     if (!year || !month) {
       return NextResponse.json(
@@ -198,6 +202,11 @@ export async function POST(request: NextRequest) {
       message: 'Manual snapshot created successfully',
     });
   } catch (error) {
+    const authErrorResponse = getApiAuthErrorResponse(error);
+    if (authErrorResponse) {
+      return authErrorResponse;
+    }
+
     console.error('Error creating manual snapshot:', error);
     return NextResponse.json(
       { error: 'Failed to create manual snapshot' },

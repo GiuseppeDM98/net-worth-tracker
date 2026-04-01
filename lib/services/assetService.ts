@@ -14,6 +14,7 @@ import {
   orderBy
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
+import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { Asset, AssetFormData } from '@/types/assets';
 
 const ASSETS_COLLECTION = 'assets';
@@ -298,7 +299,7 @@ export async function updateCashAssetBalance(assetId: string, signedDelta: numbe
  */
 export async function deleteAsset(assetId: string, userId: string): Promise<void> {
   try {
-    const response = await fetch(`/api/assets/${assetId}`, {
+    const response = await authenticatedFetch(`/api/assets/${assetId}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',

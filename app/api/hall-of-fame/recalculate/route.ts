@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { updateHallOfFame } from '@/lib/services/hallOfFameService.server';
+import {
+  assertSameUser,
+  getApiAuthErrorResponse,
+  requireFirebaseAuth,
+} from '@/lib/server/apiAuth';
 
 /**
  * POST /api/hall-of-fame/recalculate
@@ -28,13 +33,11 @@ import { updateHallOfFame } from '@/lib/services/hallOfFameService.server';
  */
 export async function POST(request: NextRequest) {
   try {
+    const decodedToken = await requireFirebaseAuth(request);
     const body = await request.json();
     const { userId } = body;
 
-    // Validate required fields
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
-    }
+    assertSameUser(decodedToken, userId);
 
     // Recalculate Hall of Fame
     await updateHallOfFame(userId);
@@ -44,6 +47,11 @@ export async function POST(request: NextRequest) {
       message: 'Hall of Fame recalculated successfully',
     });
   } catch (error) {
+    const authErrorResponse = getApiAuthErrorResponse(error);
+    if (authErrorResponse) {
+      return authErrorResponse;
+    }
+
     console.error('Error recalculating Hall of Fame:', error);
     return NextResponse.json(
       { error: 'Failed to recalculate Hall of Fame' },

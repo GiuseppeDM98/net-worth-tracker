@@ -4,6 +4,11 @@ import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { formatTimePeriodLabel } from '@/lib/utils/formatters';
 import { TimePeriod } from '@/types/performance';
+import {
+  assertSameUser,
+  getApiAuthErrorResponse,
+  requireFirebaseAuth,
+} from '@/lib/server/apiAuth';
 
 /**
  * API Route for AI-powered performance analysis using Anthropic Claude
@@ -38,6 +43,7 @@ const anthropic = new Anthropic({
 
 export async function POST(request: NextRequest) {
   try {
+    const decodedToken = await requireFirebaseAuth(request);
     // Verify API key is configured
     if (!process.env.ANTHROPIC_API_KEY) {
       console.error('[API /ai/analyze-performance] ANTHROPIC_API_KEY not configured');
@@ -50,6 +56,8 @@ export async function POST(request: NextRequest) {
     // Parse request body
     const body = await request.json();
     const { userId, metrics, timePeriod } = body;
+
+    assertSameUser(decodedToken, userId);
 
     // Validate required parameters
     if (!userId || !metrics || !timePeriod) {
@@ -178,6 +186,11 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    const authErrorResponse = getApiAuthErrorResponse(error);
+    if (authErrorResponse) {
+      return authErrorResponse;
+    }
+
     console.error('[API /ai/analyze-performance] Error:', error);
     return NextResponse.json(
       {

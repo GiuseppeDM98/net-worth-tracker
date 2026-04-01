@@ -5,8 +5,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-01, session 32): **Progressive disclosure on Performance page**. Note Metodologiche (307 lines) now collapse by default via `Collapsible`; one-time guide strip orients first-time readers; badge "Avanzato" on TWR, IRR, Sharpe, YOC metrics; 5 chart `CardDescription`s extended to 2 lines (what + how-to-read). `MetricCard` gains optional `badge` prop.
-- Previous implementation (2026-04-01, session 31): **Visual hierarchy & layout orchestration**. Dashboard hero KPI card full-width with `border-l-primary` accent and `text-3xl/4xl`; `MetricSection` headers have left-border accent; emoji prefixes removed. All three main pages have eyebrow breadcrumb label, `border-b` header separator, demoted utility actions. `Geist_Mono` font set to `preload: false`.
+- Latest implementation (2026-04-01, session 33): **Private API authorization hardening**. Private App Router routes that use Firebase Admin SDK now verify Firebase ID tokens server-side, enforce user/resource ownership, and accept `Authorization: Bearer <idToken>` from the client via a shared `authenticatedFetch()` wrapper. The monthly snapshot cron flow remains compatible through `cronSecret`, and targeted Vitest coverage now guards the auth regression cases.
+- Previous implementation (2026-04-01, session 32): **Progressive disclosure on Performance page**. Note Metodologiche now collapse by default via `Collapsible`; one-time guide strip orients first-time readers; badge "Avanzato" on TWR, IRR, Sharpe, YOC metrics; chart descriptions now explain what to read directly under each title.
+- Previous implementation (2026-04-01, session 31): **Visual hierarchy & layout orchestration**. Dashboard hero KPI card full-width with `border-l-primary` accent and `text-3xl/4xl`; `MetricSection` headers have left-border accent; emoji prefixes removed. Main analytics pages have eyebrow breadcrumb labels, `border-b` header separators, and de-emphasised utility actions.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -18,6 +19,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Key Features (Active)
 - Portfolio tracking across equities, bonds, crypto, real estate, commodities, and cash
 - Automatic price updates via Yahoo Finance and Borsa Italiana bond support
+- Private API actions now require verified Firebase auth server-side, while scheduled maintenance flows continue to authenticate with `CRON_SECRET`
 - Cashflow tracking with categories, filters, Sankey drill-down, budget management, and linked cash-account updates
 - History page with net worth evolution, asset class breakdown, liquidity, YoY variation, savings vs investment growth, `Lavoro & Investimenti`, doubling analysis, and allocation comparison
 - `Lavoro & Investimenti` in History now includes:
@@ -36,7 +38,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - `npm test -- <file>`
   - `npx vitest run <file>`
   - `npx tsc --noEmit`
-- Current repo includes targeted tests for pure utilities and services, including `__tests__/chartService.test.ts`
+- Current repo includes targeted tests for pure utilities/services plus private API auth regression coverage in `__tests__/apiAuthRoutes.test.ts`
 
 ## Data & Integrations
 - Firestore client + admin
@@ -58,7 +60,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Dividends: `components/dividends/*`
 - Settings: `app/dashboard/settings/page.tsx`, `lib/services/assetAllocationService.ts`
 
-**Last updated**: 2026-04-01 (session 32)
+**Last updated**: 2026-04-01 (session 33)
 
 ## Design Context
 

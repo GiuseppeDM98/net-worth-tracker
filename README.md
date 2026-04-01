@@ -126,6 +126,12 @@ Copy `.env.local.example` to `.env.local` and fill in your values:
 
 See [`.env.local.example`](.env.local.example) for detailed comments on each variable.
 
+### Security Notes
+
+- `NEXT_PUBLIC_FIREBASE_*` values are client configuration, not server secrets. They are expected to be visible in the browser bundle.
+- Keep `FIREBASE_ADMIN_*`, `FIREBASE_SERVICE_ACCOUNT_KEY`, `CRON_SECRET`, and `ANTHROPIC_API_KEY` server-only.
+- Private App Router API routes are expected to verify Firebase ID tokens server-side. Scheduled cron flows authenticate separately with `CRON_SECRET`.
+
 ## Architecture
 
 ```

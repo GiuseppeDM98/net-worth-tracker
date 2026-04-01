@@ -11,6 +11,11 @@ import { scrapeDividendsByIsin } from '@/lib/services/borsaItalianaScraperServic
 import { createExpenseFromDividend } from '@/lib/services/dividendIncomeService';
 import { DividendFormData } from '@/types/dividend';
 import { isDateOnOrAfter, toDate } from '@/lib/utils/dateHelpers';
+import {
+  assertSameUser,
+  getApiAuthErrorResponse,
+  requireFirebaseAuth,
+} from '@/lib/server/apiAuth';
 
 /**
  * POST /api/dividends/scrape
@@ -19,11 +24,14 @@ import { isDateOnOrAfter, toDate } from '@/lib/utils/dateHelpers';
  */
 export async function POST(request: NextRequest) {
   try {
+    const decodedToken = await requireFirebaseAuth(request);
     const body = await request.json();
     const { userId, assetId } = body as {
       userId: string;
       assetId: string;
     };
+
+    assertSameUser(decodedToken, userId);
 
     // Validate required fields
     if (!userId || !assetId) {
@@ -216,6 +224,11 @@ export async function POST(request: NextRequest) {
       createdIds,
     });
   } catch (error) {
+    const authErrorResponse = getApiAuthErrorResponse(error);
+    if (authErrorResponse) {
+      return authErrorResponse;
+    }
+
     console.error('Error scraping dividends:', error);
     return NextResponse.json(
       { error: 'Failed to scrape dividends', details: (error as Error).message },

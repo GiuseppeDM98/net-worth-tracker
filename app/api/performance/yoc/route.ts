@@ -3,6 +3,11 @@ import { getAllDividends } from '@/lib/services/dividendService';
 import { calculateYocMetrics } from '@/lib/services/performanceService';
 import { adminDb } from '@/lib/firebase/admin';
 import { Asset } from '@/types/assets';
+import {
+  assertSameUser,
+  getApiAuthErrorResponse,
+  requireFirebaseAuth,
+} from '@/lib/server/apiAuth';
 
 /**
  * Fetch all assets for a user using Firebase Admin SDK (server-side only)
@@ -49,6 +54,7 @@ async function getUserAssetsAdmin(userId: string): Promise<Asset[]> {
  */
 export async function GET(request: NextRequest) {
   try {
+    const decodedToken = await requireFirebaseAuth(request);
     const searchParams = request.nextUrl.searchParams;
     const userId = searchParams.get('userId');
     const startDateStr = searchParams.get('startDate');
@@ -56,9 +62,12 @@ export async function GET(request: NextRequest) {
     const numberOfMonthsStr = searchParams.get('numberOfMonths');
 
     // Validate required parameters
-    if (!userId || !startDateStr || !dividendEndDateStr || !numberOfMonthsStr) {
+    assertSameUser(decodedToken, userId);
+    const authenticatedUserId = userId as string;
+
+    if (!startDateStr || !dividendEndDateStr || !numberOfMonthsStr) {
       return NextResponse.json(
-        { error: 'Missing required parameters: userId, startDate, dividendEndDate, numberOfMonths' },
+        { error: 'Missing required parameters: startDate, dividendEndDate, numberOfMonths' },
         { status: 400 }
       );
     }
@@ -77,8 +86,8 @@ export async function GET(request: NextRequest) {
 
     // Fetch dividends and assets server-side using Firebase Admin SDK
     const [allDividends, allAssets] = await Promise.all([
-      getAllDividends(userId),
-      getUserAssetsAdmin(userId),
+      getAllDividends(authenticatedUserId),
+      getUserAssetsAdmin(authenticatedUserId),
     ]);
 
     // Calculate YOC metrics
@@ -92,6 +101,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(yocMetrics);
   } catch (error) {
+    const authErrorResponse = getApiAuthErrorResponse(error);
+    if (authErrorResponse) {
+      return authErrorResponse;
+    }
+
     console.error('[API /performance/yoc] Error calculating YOC:', error);
     return NextResponse.json(
       { error: 'Failed to calculate YOC metrics' },

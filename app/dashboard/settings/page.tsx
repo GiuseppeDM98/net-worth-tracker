@@ -31,6 +31,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { authenticatedFetch } from '@/lib/utils/authFetch';
 import {
   getSettings,
   setSettings,
@@ -660,7 +661,7 @@ export default function SettingsPage() {
       }
 
       // Fetch all dividends for this user
-      const response = await fetch(`/api/dividends?userId=${user.uid}`);
+      const response = await authenticatedFetch(`/api/dividends?userId=${user.uid}`);
       if (!response.ok) {
         throw new Error('Errore nel caricamento dei dividendi');
       }
@@ -668,7 +669,7 @@ export default function SettingsPage() {
       const dividends = data.dividends || [];
 
       // Sync dividends via API
-      const syncResponse = await fetch('/api/dividends/sync-expenses', {
+      const syncResponse = await authenticatedFetch('/api/dividends/sync-expenses', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -22,3 +22,9 @@
 ## 🐛 Bug Fixes
 
 - Fixed a browser console warning on every page load: the Geist Mono font was being preloaded on all pages despite only being used on the FIRE and Hall of Fame pages
+
+## 🔒 Security
+
+- Improved authorization checks for private account actions across snapshots, dividends, performance metrics, price updates, Hall of Fame recalculation, and AI analysis
+- Added stricter ownership validation for sensitive portfolio actions so requests must match the signed-in Firebase user before data is read or changed
+- Preserved scheduled maintenance flows while hardening private API access, so automated snapshot and dividend jobs continue to run normally
