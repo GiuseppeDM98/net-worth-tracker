@@ -316,4 +316,4 @@ See [LICENSE.md](LICENSE.md) for the full license text.
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=GiuseppeDM98/net-worth-tracker&type=Date)](https://star-history.com/#GiuseppeDM98/net-worth-tracker&Date)
+[![Star History Chart](https://api.star-history.com/image?repos=GiuseppeDM98/net-worth-tracker&type=date&legend=top-left)](https://www.star-history.com/?repos=GiuseppeDM98%2Fnet-worth-tracker&type=date&legend=top-left)
