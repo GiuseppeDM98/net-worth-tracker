@@ -273,6 +273,23 @@ return (
 - Use with `canvas-confetti` (lazy import via `import('canvas-confetti')` inside the effect — keeps it out of the main bundle)
 - Reset for testing: `Object.keys(localStorage).filter(k => k.startsWith('celebrated_')).forEach(k => localStorage.removeItem(k))`
 
+### One-Time Session Notifications (sessionStorage vs useRef)
+For notifications that should fire **once per browser session** (survive page reload, reset on tab close):
+- **Use `sessionStorage`**, NOT `useRef` — `useRef` resets on page reload, making it impossible to suppress the notification after reload
+- Pair with an internal `useRef` guard against React Strict Mode double-effect:
+```tsx
+const triggered = useRef(false);
+useEffect(() => {
+  if (sessionStorage.getItem(SESSION_KEY)) return;
+  if (triggered.current) return;
+  triggered.current = true;
+  sessionStorage.setItem(SESSION_KEY, '1');
+  // show notification
+}, [deps]);
+```
+- Reset for testing: DevTools → Application → Session Storage → delete the key
+- Reference: `components/ui/SavingsRateBadge.tsx`
+
 ```ts
 // Mount-only animation (Dashboard KPIs)
 const animated = useCountUp(value, { once: true });
@@ -497,4 +514,4 @@ useEffect(() => {
 - Width: `w-64` for short text, `w-72` for multi-paragraph explanations
 - Reference implementations: `MetricCard.tsx`, `app/dashboard/page.tsx` (LaborMetricsChart card)
 
-**Last updated**: 2026-03-31 (session 25: custom tooltip pattern for card headers)
+**Last updated**: 2026-04-01 (session 26: sessionStorage vs useRef for once-per-session notifications)

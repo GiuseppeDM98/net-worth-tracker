@@ -1,5 +1,7 @@
 ## ✨ New Features
 
+- Added a **savings rate celebration badge** on the Dashboard — a small green notification appears in the bottom-left corner the first time you open the dashboard each browser session when last month's savings rate exceeded 30%. It auto-dismisses after 3 seconds. Automatically skipped for users with "Reduce Motion" enabled in system accessibility settings
+
 - **FIRE Calculator**: Allowance cards (Annual, Monthly, Daily) now show a liquid vs illiquid breakdown — a proportional bar visualises the split at a glance, with exact amounts in green (liquid) and amber (illiquid) below the main figure
 - **FIRE Calculator**: "Years of Expenses" now shows how many years your **liquid assets alone** cover at current spending — the most actionable figure, since it requires no selling of real estate or illiquid holdings. Total FIRE years and illiquid-only years are shown as secondary context
 - **FIRE Calculator**: Annual expenses now sourced from the last fully completed year instead of the current partial year — producing a more accurate and representative baseline for all FIRE metrics

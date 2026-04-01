@@ -51,6 +51,7 @@ import { useAssets } from '@/lib/hooks/useAssets';
 import { useSnapshots, useCreateSnapshot } from '@/lib/hooks/useSnapshots';
 import { useExpenseStats } from '@/lib/hooks/useExpenseStats';
 import { useAllExpenses } from '@/lib/hooks/useAllExpenses';
+import { SavingsRateBadge } from '@/components/ui/SavingsRateBadge';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { getItalyYear } from '@/lib/utils/dateHelpers';
 
@@ -1094,6 +1095,14 @@ export default function DashboardPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Savings rate celebration badge — shown once per session when last month > threshold */}
+      {expenseStats && (
+        <SavingsRateBadge
+          previousMonthIncome={expenseStats.previousMonth.income}
+          previousMonthExpenses={expenseStats.previousMonth.expenses}
+        />
+      )}
     </motion.div>
   );
 }
