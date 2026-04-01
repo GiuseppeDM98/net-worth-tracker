@@ -13,7 +13,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, TrendingUp, Info, Sparkles, CalendarDays } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
+import { RefreshCw, TrendingUp, Info, Sparkles, CalendarDays, ChevronDown, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency, formatPercentage, formatCurrencyCompact } from '@/lib/services/chartService';
 import {
@@ -84,6 +86,11 @@ export default function PerformancePage() {
   const [showCustomDateDialog, setShowCustomDateDialog] = useState(false);
   const [showAIAnalysisDialog, setShowAIAnalysisDialog] = useState(false);
   const [cachedSnapshots, setCachedSnapshots] = useState<MonthlySnapshot[]>([]);
+  const [isMethodologyOpen, setIsMethodologyOpen] = useState(false);
+
+  // Guide strip shown once per user; localStorage flag persists across sessions.
+  const STRIP_STORAGE_KEY = 'perf_guide_dismissed';
+  const [showGuideStrip, setShowGuideStrip] = useState(false);
 
   // Responsive breakpoints
   const isMobile = useMediaQuery('(max-width: 767px)');
@@ -94,6 +101,16 @@ export default function PerformancePage() {
       loadPerformanceData();
     }
   }, [user]);
+
+  // Init guide strip after mount — localStorage is not available during SSR
+  useEffect(() => {
+    if (!localStorage.getItem(STRIP_STORAGE_KEY)) setShowGuideStrip(true);
+  }, []);
+
+  const dismissGuideStrip = () => {
+    localStorage.setItem(STRIP_STORAGE_KEY, '1');
+    setShowGuideStrip(false);
+  };
 
   /**
    * Load all performance data and cache snapshots for period switching.
@@ -626,6 +643,30 @@ export default function PerformancePage() {
           </TabsList>
         )}
 
+        {/* Guide strip — shown once per user until dismissed. Orients first-time
+            readers without interrupting the data flow for returning users. */}
+        {showGuideStrip && (
+          <div className="mt-4 flex items-start gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-top-2 duration-300">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            <div className="flex-1 space-y-0.5">
+              <p className="font-medium text-foreground">Come leggere questa pagina</p>
+              <p className="text-muted-foreground">
+                Le metriche sono organizzate in 4 sezioni: Rendimento, Rischio, Contesto e Proventi Finanziari.
+                Passa il cursore sull&apos;icona <span className="font-medium">?</span> su ogni scheda per la definizione completa.
+                Per formule e metodologia, espandi <span className="font-medium">Note Metodologiche</span> in fondo alla pagina.
+              </p>
+            </div>
+            <button
+              type="button"
+              aria-label="Chiudi guida"
+              onClick={dismissGuideStrip}
+              className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
         {/* WARNING: If you change metric tooltips or formulas here, also update:
              - Methodology section at bottom of this file (lines ~595-716)
              - performanceService.ts calculation functions
@@ -663,6 +704,7 @@ export default function PerformancePage() {
             description="Rendimento time-weighted (annualizzato)"
             tooltip="Metrica raccomandata per valutare la performance. Elimina l'effetto del timing dei contributi/prelievi, mostrando la vera capacità di generare rendimento. Ideale per confrontare con benchmark o altri portafogli. Calcolo: rendimenti mensili collegati geometricamente e annualizzati."
             isPrimary
+            badge="Avanzato"
           />
           <MetricCard
             title="Money-Weighted Return (IRR)"
@@ -670,6 +712,7 @@ export default function PerformancePage() {
             format="percentage"
             description="Tasso interno di rendimento"
             tooltip="Rendimento personale dell'investitore che tiene conto di QUANDO hai investito o prelevato denaro. Se investi molto prima di una crescita = IRR alto. Se investi prima di un calo = IRR basso. Usa questa metrica per capire quanto hai guadagnato TU con le TUE decisioni di timing."
+            badge="Avanzato"
           />
         </MetricSection>
 
@@ -692,6 +735,7 @@ export default function PerformancePage() {
             format="number"
             description="Rendimento aggiustato per il rischio"
             tooltip={`Misura quanto rendimento extra si ottiene per ogni unità di rischio assunto. Formula: (TWR - Tasso Risk-Free ${formatPercentage(metrics.riskFreeRate)}) / Volatilità. Interpretazione: <1 = scarso, 1-2 = buono, 2-3 = molto buono, >3 = eccellente.`}
+            badge="Avanzato"
           />
           <MetricCard
             title="Max Drawdown"
@@ -754,6 +798,7 @@ export default function PerformancePage() {
               format="percentage"
               description={`Dividendi: ${formatCurrency(metrics.yocDividendsGross)} | Cost Basis: ${formatCurrency(metrics.yocCostBasis)} | Asset: ${metrics.yocAssetCount}`}
               tooltip="Yield on Cost (YOC) Lordo misura il rendimento da dividendi lordi rispetto al costo originale di acquisto (cost basis). Formula: (Dividendi Annualizzati / Cost Basis) × 100. Esempio: Se hai comprato 100 azioni a €50 (cost basis €5.000) e ricevi €300/anno di dividendi lordi, YOC = 6%. A differenza del rendimento corrente (dividendi/prezzo attuale), YOC mostra quanto rende il tuo investimento iniziale. YOC > Rendimento Corrente indica crescita dei dividendi nel tempo. Valori alti (>5-7%) indicano un buon ritorno sull'investimento originale."
+              badge="Avanzato"
             />
             <MetricCard
               title="YOC Netto"
@@ -761,6 +806,7 @@ export default function PerformancePage() {
               format="percentage"
               description={`Dividendi: ${formatCurrency(metrics.yocDividendsNet)} | Cost Basis: ${formatCurrency(metrics.yocCostBasis)} | Asset: ${metrics.yocAssetCount}`}
               tooltip="Yield on Cost (YOC) Netto misura il rendimento da dividendi netti (dopo tasse) rispetto al costo originale di acquisto. Formula: (Dividendi Netti Annualizzati / Cost Basis) × 100. Questa metrica mostra quanto effettivamente guadagni (al netto delle ritenute fiscali) rispetto al tuo investimento iniziale. Più realistica dello YOC Lordo perché considera l'impatto fiscale. Utile per valutare il rendimento effettivo del portafoglio nel tempo. La differenza tra YOC Lordo e Netto dipende dalle aliquote fiscali applicate (es. 26% in Italia per dividendi azionari)."
+              badge="Avanzato"
             />
             <MetricCard
               title="Rendimento Corrente Lordo"
@@ -811,7 +857,10 @@ export default function PerformancePage() {
         <Card className="mt-6">
           <CardHeader>
             <CardTitle>Evoluzione Patrimonio</CardTitle>
-            <CardDescription>Patrimonio vs Contributi Cumulativi</CardDescription>
+            <CardDescription>
+              Area blu = capitale versato, area verde = rendimento generato, linea arancione = patrimonio totale.
+              Se l&apos;area verde cresce, gli investimenti stanno performando positivamente.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={getChartHeight()}>
@@ -865,7 +914,8 @@ export default function PerformancePage() {
             <CardHeader>
               <CardTitle>CAGR Rolling 12 Mesi</CardTitle>
               <CardDescription>
-                Evoluzione del rendimento annualizzato su finestra mobile
+                Ogni punto mostra il CAGR degli ultimi 12 mesi; linea tratteggiata = media mobile a 3M.
+                Una linea in salita segnala performance in miglioramento nel periodo recente.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -925,7 +975,8 @@ export default function PerformancePage() {
             <CardHeader>
               <CardTitle>Sharpe Ratio Rolling 12 Mesi</CardTitle>
               <CardDescription>
-                Evoluzione del rapporto rischio-rendimento su finestra mobile
+                Rapporto rischio-rendimento su finestra mobile di 12 mesi (&gt;1 buono, &gt;2 eccellente).
+                Ampie oscillazioni indicano volatilità elevata nel periodo.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -989,7 +1040,8 @@ export default function PerformancePage() {
           <CardHeader>
             <CardTitle>Heatmap Rendimenti Mensili</CardTitle>
             <CardDescription>
-              Andamento mensile dei rendimenti per anno (aggiustato per flussi di cassa)
+              Verde = mese positivo, rosso = negativo; l&apos;intensità cresce con l&apos;ampiezza (±5% soglia).
+              Utile per identificare mesi storicamente forti o deboli del portafoglio.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -1004,7 +1056,8 @@ export default function PerformancePage() {
           <CardHeader>
             <CardTitle>Grafico Underwater (Drawdown)</CardTitle>
             <CardDescription>
-              Distanza percentuale dal massimo storico del portafoglio
+              L&apos;area rossa mostra quanto il portafoglio è sotto il suo massimo storico in quel momento.
+              Quando tocca 0% è stato raggiunto un nuovo massimo; si collega a Durata Drawdown e Tempo di Recupero.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -1013,12 +1066,27 @@ export default function PerformancePage() {
         </Card>
         </motion.div>
 
-        {/* Methodology Section */}
+        {/* Methodology Section — collapsed by default so it does not dominate
+            the primary reading path. All content is preserved; acts as a reference
+            document that power users open on demand. */}
         <motion.div variants={cardItem}>
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Note Metodologiche</CardTitle>
-          </CardHeader>
+        <Collapsible open={isMethodologyOpen} onOpenChange={setIsMethodologyOpen} className="mt-6">
+        <Card>
+          <CollapsibleTrigger asChild>
+            <CardHeader className="cursor-pointer select-none hover:bg-muted/40 transition-colors rounded-t-lg">
+              <div className="flex items-center justify-between">
+                <CardTitle>Note Metodologiche</CardTitle>
+                <ChevronDown
+                  className={cn(
+                    'h-5 w-5 text-muted-foreground transition-transform duration-200',
+                    isMethodologyOpen && 'rotate-180'
+                  )}
+                />
+              </div>
+              <CardDescription>Formule, grafici e definizioni di tutte le 15 metriche</CardDescription>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-200">
           <CardContent className="space-y-4 text-sm">
             <div>
               <h4 className="font-semibold mb-1">Organizzazione delle Metriche</h4>
@@ -1318,7 +1386,9 @@ export default function PerformancePage() {
               </p>
             </div>
           </CardContent>
+          </CollapsibleContent>
         </Card>
+        </Collapsible>
         </motion.div>
 
         </motion.div>{/* end staggerContainer */}

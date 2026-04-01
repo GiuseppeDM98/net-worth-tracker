@@ -112,8 +112,16 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Decorative stacked background areas should keep `isAnimationActive={false}`
 
 ### One-Time UI Effects
-- Use `localStorage` helpers for once-ever celebrations
+- Use `localStorage` helpers for once-ever UI (guide strips, celebrations)
 - Use `sessionStorage` plus an internal `useRef` guard for once-per-session notifications
+- localStorage key convention for guide strips: `{page}_guide_dismissed` (e.g. `perf_guide_dismissed`)
+- Init localStorage reads inside `useEffect(() => {}, [])` — not during render — to avoid hydration mismatch on `'use client'` pages
+
+### Progressive Disclosure on Data-Dense Pages
+- Collapsible methodology/reference blocks: use `Collapsible` (shadcn, from `@/components/ui/collapsible`) with `open` state defaulting to `false`; wrap the trigger around `CardHeader` via `asChild` for a large click target
+- `cn` is NOT auto-imported in page files — add `import { cn } from '@/lib/utils'` explicitly when using conditional class logic in pages (it is already available in all component files)
+- Badge chips for complexity signals: `badge?: string` prop on `MetricCard` renders a `Badge variant="outline"` below the title; requires `CardHeader` to be `items-start` (not `items-center`) because the left column has variable height
+- One-time guide strips: position them outside the `key={selectedPeriod}` (or equivalent period/tab reset div) so they don't replay their entrance animation on every period switch
 
 ### Dialog Layout
 - Prefer sticky header + sticky footer dialog layout for long forms
