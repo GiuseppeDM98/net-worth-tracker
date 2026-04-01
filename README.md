@@ -57,7 +57,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Net worth evolution, asset class breakdown, and liquidity charts
 - Year-over-Year variation analysis
 - Savings vs Investment Growth comparison (annual and monthly views)
-- **Labor & Investments section**: four lifetime KPI cards (Earned from Work, Saved from Work, Investment Growth Gross/Net) plus a monthly breakdown chart — visible when labor income categories are configured in Settings
+- **Labor & Investments section**: lifetime KPI cards for Earned from Work, Saved from Work, Investment Growth Gross/Net, plus counters for positive and negative months based on total monthly net worth growth, and a monthly breakdown chart — visible when labor income categories are configured in Settings
 - Doubling time analysis with geometric calculations and fixed thresholds
 
 ### FIRE Planning

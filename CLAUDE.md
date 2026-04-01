@@ -1,101 +1,80 @@
 # CLAUDE.md - Net Worth Tracker (Lean)
 
 ## Project Overview
-Net Worth Tracker is a Next.js app for Italian investors to track net worth, assets, cashflow, dividends, performance metrics, and historical snapshots with Firebase.
+Net Worth Tracker is a Next.js app for Italian investors to track net worth, assets, cashflow, dividends, performance metrics, and long-term planning with Firebase.
 
 ## Current Status
-- Versione stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, date-fns-tz, @nivo/sankey, @anthropic-ai/sdk, cheerio, framer-motion
-- Ultima implementazione: **Performance bug fixes + Labor section spostata in History** — (2026-04-01, session 28). Fix `useCountUp` con `once: true` che congelava i valori dopo snapshot overwrite. Ridotto `duration` 700→500ms. Fix `transition-all` su AI button → `transition-[border-color,color,box-shadow]`. Sezione "Lavoro & Investimenti" (4 KPI card + grafico mensile) spostata dall'Overview alla pagina History — rimossa `useAllExpenses` dalla dashboard (era causa del lag: query Firestore unbounded ad ogni mount).
-- Precedente: **Saluto contestuale Dashboard** — (2026-04-01, session 27). Titolo statico "Dashboard" sostituito con saluto dinamico basato sull'ora in Europe/Rome (`lib/utils/getGreeting.ts`). Quattro fasce: Buongiorno (5–11), Buon pomeriggio (12–17), Buonasera (18–21), Buonanotte (22–4). Sottotitolo contestuale. Nome utente da `user.displayName` (primo nome, ≤ 20 char). Calcolato al mount via `useMemo`. 17 unit test in `__tests__/getGreeting.test.ts`.
+- Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
+- Latest implementation (2026-04-01, session 29): **History Labor & Investments month counters**. Added two new cards to the History page that count positive and negative months inside `Lavoro & Investimenti`, based on total monthly net worth growth. The monthly labor metrics dataset now exposes `netWorthGrowth`, and the repo-wide TypeScript check passes after aligning stale budget test fixtures with the current `BudgetItem` type.
+- Previous implementation (2026-04-01, session 28): **Performance fixes + Labor section moved to History**. Fixed `useCountUp` with `once: true`, tightened hover transitions, moved `Lavoro & Investimenti` from Overview to History, and removed the unbounded expense query from Dashboard.
+- Previous implementation (2026-04-01, session 27): **Contextual dashboard greeting** based on Europe/Rome time and user first name.
 
 ## Architecture Snapshot
-- App Router con pagine protette sotto `app/dashboard/*`.
-- Service layer in `lib/services/*` (Firestore client/admin, scraping, metriche).
-- Utility in `lib/utils/*` (formatters, date helpers, asset history).
-- React Query per caching e invalidazioni post-mutation.
-- Timezone: Europe/Rome via `lib/utils/dateHelpers.ts` helpers (`getItalyDate`, `getItalyMonth`, `getItalyYear`, `getItalyMonthYear`)
+- App Router with protected pages under `app/dashboard/*`
+- Service layer in `lib/services/*`
+- Shared utilities in `lib/utils/*`
+- React Query for caching and invalidation
+- Italy timezone helpers in `lib/utils/dateHelpers.ts`
 
 ## Key Features (Active)
-- Portfolio multi-asset con aggiornamento prezzi Yahoo Finance (prezzo e average cost a 4 decimali). **Calcolatore PMC multi-broker** in `AssetDialog`: pulsante "Calcola PMC" nella sezione Cost Basis → pannello inline con righe qty/prezzo per broker → PMC ponderato live → "Usa" popola il campo. Asset con quantità zero supportati: badge "Azzerato" in tabella, esclusi dal conteggio overview, marcati "Venduto" nello storico. Bond con ISIN: scraping automatico prezzi da Borsa Italiana con fallback Yahoo Finance. **Bond coupon scheduling**: cedole auto-generate da `BondDetails` (tasso, frequenza, emissione, scadenza, valore nominale). **Step-up coupon**: `CouponRateTier[]` con fasce annuali di tasso (es. BTP Valore). **Premio finale**: `finalPremiumRate` genera dividend `finalPremium` su scadenza. **Tax hint 12.5%** per Titoli di Stato italiani. **Convenzione Borsa Italiana**: `currentPrice` e `averageCost` sempre in EUR; input utente in quotazione BI (per 100€ nominale) → convertito con `biPrice × (nominalValue/100)`; edit-mode mostra il valore back-convertito; `isBondPctMode` (ISIN + nominalValue > 1) controlla label/conversione/preview. **Costo Annuale Portfolio**: TER medio ponderato + imposta di bollo configurabile (aliquota %, esenzione per-asset, soglia >€5.000 per conti correnti).
-- **Budget Tab (Cashflow)**: auto-init items da tutte le categorie spesa/entrata; vista annuale con Budget/anno vs anno corrente/precedente/media storica e progress bar; deep dive storico (Analisi Storica): click su qualsiasi riga → pannello Anno×Gen…Dic con highlight min/max mese; “Totale Spese” mostra anche 3 mini-tabelle per tipo (Fisse/Variabili/Debiti). Chiavi aggregate: `__subtotal_{type}__`, `__total_expenses__`, `__total_income__`. Sezioni collassabili; riordino items; add subcategory inline; colori invertiti per Entrate; guida contestuale. Firestore: `budgets/{userId}` doc singolo. 18 unit test. **Mobile**: `MobileAnnualView` (< 1440px) — card per item tappabile (intera card apre detail dialog con Budget/anno, Anno Corrente, Anno Prec., Media, Progress); sezioni collassabili; Analisi Storica solo su desktop (`hidden desktop:block`) con hint “disponibile su desktop” nel dialog.
-- Cashflow con categorie, filtri, Sankey 5-layer, drill-down 4 livelli, Analisi Periodo con filtri anno+mese. Bulk move transazioni tra categorie (cross-type, da Settings). **Cambio tipo categoria**: il tipo (`fixed`/`variable`/`debt`/`income`) è ora modificabile dopo la creazione; batch update su tutte le transazioni associate con inversione automatica dei segni se si attraversa il confine income ↔ spesa. **Linked cash account**: ogni transazione può essere collegata a un asset cash; il saldo (quantity) viene aggiornato automaticamente su create/edit/delete. **Conti di default** configurabili in Settings (separati per spese e entrate). **Anno inizio storico**: `cashflowHistoryStartYear` in Settings filtra i dati del tab Storico Totale (esclude import bulk pre-data); default 2025. **Categorie reddito da lavoro**: `laborIncomeCategoryIds` in Settings Preferenze — multi-select delle categorie income usate per la sezione **Lavoro & Investimenti** nella pagina History (`components/dashboard/LaborMetricsChart.tsx`, `prepareMonthlyLaborMetricsData()` in `chartService.ts`).
-- **Savings Rate Badge** (`components/ui/SavingsRateBadge.tsx`): badge celebrativo `fixed bottom-4 left-4` nella Dashboard. Appare una volta per sessione browser quando savings rate mese precedente ≥ 30% (`SAVINGS_RATE_BADGE_THRESHOLD`). Dati da `expenseStats.previousMonth` (già caricato). Framer Motion spring, auto-dismiss 3s. Guard: `prefers-reduced-motion`, giorno < 5 (dati parziali), `sessionStorage` flag (sopravvive page reload, si azzera alla chiusura della tab).
-- Snapshot mensili automatici + storico e CSV export.
-- **Pagina Assets — 3 macro-tab** (Gestione / Anno Corrente / Storico), ciascuno con sub-tab **Prezzi** / **Valori** / **Asset Class**. Lazy loading sui macro-tab. Tab Prezzi e Valori: aggregazione per nome e badge "Venduto"; colonne riepilogative Mese Prec. % (ambra), YTD % (blu, anno corrente), From Start % (viola, storico). Tab **Asset Class**: totali mensili EUR per classe (Azioni, Obbligazioni, Crypto, Immobili, Liquidità, Materie Prime) con stesse colonne sommario; dati da `snapshot.byAssetClass`. Logica in `assetPriceHistoryUtils.ts` e `assetClassHistoryUtils.ts`. **Mobile**: Radix Select per navigazione sezioni (< 1440px), card view sotto 1440px, tabelle storiche compatte (`text-xs sm:text-sm`, `min-w-` ridotti), banner "si consiglia desktop" su Anno Corrente e Storico.
-- History page: Net Worth evolution, Asset Class breakdown, Liquidity, YoY variation, Savings vs Investment Growth (toggle Annuale/Mensile; vista mensile ha selettore anno + opzione **"Tutti"** per timeline continua multi-anno tramite `prepareSavingsVsInvestmentDataAllMonths`), **Lavoro & Investimenti** (4 KPI card aggregate + grafico mensile `LaborMetricsChart` — visibile solo se `laborIncomeCategoryIds` configurato; usa dati già caricati in `loadData`, zero query extra), Doubling Time Analysis (geometrico + soglie fisse, summary cards adattivi alla modalità), Current vs Target allocation. **Animazioni Framer Motion**: page fade-in, chart card cascade con delay esplicito, `AnimatePresence` + `slideDown` per Note, stagger snapshot grid, milestone card stagger + progress bar animata. **Skeleton screen**: `HistoryPageSkeleton` (header + 8 chart card + snapshot grid) al posto del testo "Caricamento...". **Recharts animations**: tutte le Line, Area, Bar animate al caricamento (800ms ease-out). **Milestone confetti**: `DoublingMilestoneTimeline` celebra ogni milestone completata con burst confetti una sola volta per browser (canvas-confetti lazy, localStorage, prefers-reduced-motion guard).
-- Performance metrics (ROI, CAGR, TWR, IRR, Sharpe, drawdown suite, YOC, Current Yield) con heatmap, underwater chart, rolling charts. Organizzate in 4 categorie (Rendimento, Rischio, Contesto, **Proventi Finanziari** — include dividendi e cedole). **Animazioni**: `useCountUp` (da `lib/utils/useCountUp.ts`) anima i valori al caricamento e cambio periodo (ease-out-quart, 500ms, rispetta `prefers-reduced-motion`); `MetricSection` con stagger cascade (80ms/card, 120ms/sezione); skeleton screen al posto dello spinner; hover lift sulle card; **chart card cascade** via `staggerContainer` + `cardItem` (Pattern A — nessun `pageVariants` sul root, evita compound-opacity flash). **Mobile**: selettore periodo a `<Select>` dropdown su mobile (< 768px), header stackato, heatmap a colori puri su tutti i device sotto 1440px (lettera singola per mese, sticky Anno) — breakpoint `desktop:` per evitare overflow su iPad Mini reale (744px CSS).
-- Dividendi multi-currency con conversione EUR, scraping Borsa Italiana, calendario mensile con drill-down. Filtro asset include equity + bond (cedole); filtri posizionati in cima alla pagina e propagati anche ai grafici (DividendStats riceve assetId). Vendita bond (quantity=0): cedole future eliminate, nessuna voce €0 creata. **Rendimento Totale per Asset**: tabella con plusvalenza non realizzata % + dividendi storici netti % = rendimento totale %; `dividendReturnPercentage` = somma di `(div.netAmountEur / (div.quantity × div.costPerShare))` per ogni dividendo pagato; fallback a `asset.averageCost` per record legacy; può superare 100%; calcolo in `/api/dividends/stats/route.ts`. **Crescita Dividendi per Azione**: DPS lordo annuale per asset con YoY% e CAGR%; solo equity; mediana portafoglio in header; interfacce `AssetDividendGrowth`, `DividendGrowthData` in `types/dividend.ts`. **Skeleton + stale-while-revalidate**: `DividendStatsSkeleton` al primo caricamento (replica layout reale per evitare layout shift); sui cambi filtro i dati restano visibili con `opacity-50` durante il refetch API. **Animazioni**: `pageVariants` + `cardItem` con explicit delays (Pattern B — tab figlio, nessun skeleton-to-content) su `DividendTrackingTab.tsx`. **Mobile**: pie chart "Dividendi per Asset" limitata a top 7 + "Altri" con legenda compatta; DPS Growth card per asset tappabile → Dialog anni in verticale; Total Return card view mobile (`desktop:hidden`); filtri full-width (`desktop:grid-cols-4`, `w-full` su SelectTrigger).
-- Hall of Fame con ranking mensili/annuali e sistema note dedicato multi-sezione. **Animazioni Framer Motion**: stagger ranking grid, stagger liste mobile, stagger righe tabella desktop. **Mobile**: card view touch-friendly su tutti i dispositivi < 1440px (tablet incluso); grids e switch card/tabella allineati al breakpoint `desktop:` standard del progetto.
-- FIRE calculator con esclusione casa abitazione, Proiezione Scenari Bear/Base/Bull con inflazione, FIRE Number per-scenario, stop risparmi al raggiungimento FIRE. **Liquid/Illiquid breakdown**: allowance card (Annuale/Mensile/Giornaliera) mostrano split con barra proporzionale verde/ambra; "Anni di Spesa" usa patrimonio liquido come valore principale (anni senza vendere asset illiquidi); spese annuali recuperate dall'ultimo anno completato. **Card formula detail**: FIRE Number, FIRE Number Previsto e Current WR mostrano la formula in font mono (`spese / WR%` o `spese / NW`) per chiarire il calcolo. **`fireNetWorth` in snapshot**: ogni snapshot salva `fireNetWorth` (NW esclusa casa abitazione) — il grafico "Evoluzione Storica" usa questo campo per la linea indennità mensile, allineandola alla card. Il toggle `includePrimaryResidence` è nel React Query key di `fireData`. **Mobile**: Radix Select per navigazione tab (< 1440px), `max-desktop:portrait:pb-20`, grids `desktop:grid-cols-X`, chart height responsivo via `useMediaQuery` (280px mobile / 400px desktop), `FIREProjectionChart` accetta props `height`/`marginLeft`, `FIREProjectionTable` card view mobile (`desktop:hidden`).
-- Monte Carlo simulations con 4 asset class (Equity, Bonds, Immobili, Materie Prime) e parametri editabili. Confronto Scenari Bear/Base/Bull. Auto-fill allocazione da portafoglio reale. **Mobile**: bottoni "Usa Patrimonio" stack verticale su mobile, tabella percentili con card view (`desktop:hidden`), `ScenarioParameterCards` header flex-col su mobile.
-- **Goal-Based Investing**: allocazione mentale di porzioni del portafoglio a obiettivi finanziari. Toggle in Settings. Assegnazione asset per percentuale. Confronto allocazione effettiva vs consigliata per obiettivo. **Goal-Driven Allocation**: deriva i target come media pesata delle `recommendedAllocation` degli obiettivi. **Mobile**: `GoalSummaryCards` griglia `grid-cols-2 desktop:grid-cols-4` (era scroll orizzontale); `GoalAllocationPieChart` usa `height={300}` esplicita su `ResponsiveContainer` (evita warning Recharts `-1` con Radix tabs nascosti).
-- PDF Export con 8 sezioni configurabili, selezione anno/mese custom per export annuali e mensili. Sezioni auto-disabilitate per periodi passati.
-- **AI Performance Analysis**: Claude Sonnet 4.6 con SSE streaming, Extended Thinking, native web search (`web_search_20250305` — no Tavily). Prompt include `startNetWorth`/`endNetWorth` per decomposizione crescita organica vs apporti e analisi divergenza TWR/MWR. Dialog a due colonne: pannello metriche (Rendimento/Rischio/Contesto/Dividendi) + testo analisi; responsive mobile (metriche sopra in griglia 2-col).
+- Portfolio tracking across equities, bonds, crypto, real estate, commodities, and cash
+- Automatic price updates via Yahoo Finance and Borsa Italiana bond support
+- Cashflow tracking with categories, filters, Sankey drill-down, budget management, and linked cash-account updates
+- History page with net worth evolution, asset class breakdown, liquidity, YoY variation, savings vs investment growth, `Lavoro & Investimenti`, doubling analysis, and allocation comparison
+- `Lavoro & Investimenti` in History now includes:
+  - lifetime KPI cards for labor income, saved from work, gross investment growth, and net investment growth
+  - positive-month and negative-month counters based on monthly `netWorthGrowth`
+  - monthly chart from `prepareMonthlyLaborMetricsData()`
+- Performance page with ROI, CAGR, TWR, IRR, Sharpe, drawdown metrics, YOC, current yield, rolling charts, and monthly returns heatmap
+- Dividends and coupons tracking with EUR conversion, calendar, total return per asset, and DPS growth
+- FIRE planning with primary residence toggle, liquid vs illiquid split, and scenario projections
+- Monte Carlo simulations and goal-based investing
+- PDF export and AI-powered performance analysis
 
 ## Testing
-- **Framework**: Vitest (`npm test`, `npm run test:watch`)
-- **218 unit test** across 9 files in `__tests__/` covering formatters, dateHelpers, fireService, performanceService, borsaItalianaBondScraper, goalService, couponUtils, budgetUtils, snapshot-id-format
-- **Scope**: Pure functions only (no Firebase mocking). Services need `vi.mock()` on Firebase-dependent imports.
-- **Config**: `vitest.config.ts` with `@/` path alias
+- Framework: Vitest
+- Useful commands:
+  - `npm test -- <file>`
+  - `npx vitest run <file>`
+  - `npx tsc --noEmit`
+- Current repo includes targeted tests for pure utilities and services, including `__tests__/chartService.test.ts`
 
 ## Data & Integrations
-- Firestore (client + admin) con merge updates.
-- Yahoo Finance (yahoo-finance2 v3.13.x) per prezzi. Borsa Italiana scraping per dividendi e bond MOT. Frankfurter API per valute (cache 24h).
-- Anthropic native web search per AI analysis (no Tavily).
+- Firestore client + admin
+- Yahoo Finance for prices
+- Borsa Italiana scraping for Italian bonds and dividend data
+- Frankfurter API for FX conversion
+- Anthropic for AI analysis
 
 ## Known Issues (Active)
-- Conversione valuta dipende da Frankfurter API (fallback su cache).
+- FX conversion depends on Frankfurter API availability, with cache fallback
 
 ## Key Files
-- History: `app/dashboard/history/page.tsx`, `components/history/DoublingTimeSummaryCards.tsx`, `DoublingMilestoneTimeline.tsx`
+- History: `app/dashboard/history/page.tsx`
+- History components: `components/dashboard/LaborMetricsChart.tsx`, `components/history/*`
 - Chart service: `lib/services/chartService.ts`
-- Performance: `app/dashboard/performance/page.tsx`, `lib/services/performanceService.ts`, `types/performance.ts`
-- Performance API: `app/api/performance/yoc/route.ts`, `app/api/performance/current-yield/route.ts`
-- Performance UI: `components/performance/MonthlyReturnsHeatmap.tsx`, `UnderwaterDrawdownChart.tsx`, `MetricSection.tsx`
-- Cashflow: `components/cashflow/TotalHistoryTab.tsx`, `CurrentYearTab.tsx`, `CashflowSankeyChart.tsx`, `BudgetTab.tsx`
-- Budget: `types/budget.ts`, `lib/services/budgetService.ts`, `__tests__/budgetService.test.ts`
-- Dividends: `components/dividends/DividendTrackingTab.tsx`, `DividendTable.tsx`, `DividendCalendar.tsx`, `DividendStats.tsx`, `DividendStatsSkeleton.tsx`
-- Hall of Fame: `app/dashboard/hall-of-fame/page.tsx`, `lib/services/hallOfFameService.ts`
-- FIRE: `components/fire-simulations/FireCalculatorTab.tsx`, `FireReachedBanner.tsx`, `FIREProjectionSection.tsx`, `FIREProjectionChart.tsx`, `FIREProjectionTable.tsx`, `lib/services/fireService.ts`
-- Labor metrics chart: `components/dashboard/LaborMetricsChart.tsx` (usato da History page)
-- Savings rate badge: `components/ui/SavingsRateBadge.tsx`
-- Monte Carlo: `components/fire-simulations/MonteCarloTab.tsx`, `lib/services/monteCarloService.ts`
-- Goals: `types/goals.ts`, `lib/services/goalService.ts`, `components/fire-simulations/GoalBasedInvestingTab.tsx`, `components/goals/*`
-- Asset types: `types/assets.ts` (MonteCarloParams, MonteCarloScenarios, DoublingMilestone, etc.)
-- Allocation: `app/dashboard/allocation/page.tsx`, `lib/services/assetAllocationService.ts`
-- Settings: `lib/services/assetAllocationService.ts`, `app/dashboard/settings/page.tsx`
-- Category Move: `components/expenses/CategoryMoveDialog.tsx`, `CategoryManagementDialog.tsx`, `CategoryDeleteConfirmDialog.tsx`
-- AI Analysis: `app/api/ai/analyze-performance/route.ts`, `components/performance/AIAnalysisDialog.tsx`
-- Bond Scraping: `lib/services/borsaItalianaBondScraperService.ts`, `lib/helpers/priceUpdater.ts`, `app/api/prices/bond-quote/route.ts`
-- Bond Coupons: `lib/utils/couponUtils.ts`, `app/api/cron/daily-dividend-processing/route.ts`
-- Animation: `lib/utils/motionVariants.ts`, `lib/utils/useCountUp.ts`, `components/providers/MotionProvider.tsx`
-- Toast icons: `components/ui/AnimatedCheckIcon.tsx`, `AnimatedErrorIcon.tsx`, `AnimatedWarningIcon.tsx`, `sonner.tsx`
-- Empty state: `components/ui/EmptyState.tsx` (EmptyState + SeedlingIcon, CalendarEmptyIcon, FilterEmptyIcon, TrophyEmptyIcon, ChartEmptyIcon)
-- Skeletons: `components/history/HistoryPageSkeleton.tsx`, `components/fire-simulations/FireCalculatorSkeleton.tsx`, `MonteCarloSkeleton.tsx`, `GoalsSkeleton.tsx`, `components/allocation/AllocationPageSkeleton.tsx`, `components/hall-of-fame/HallOfFameSkeleton.tsx`, `components/settings/SettingsPageSkeleton.tsx`
-- Utils: `lib/utils/dateHelpers.ts`, `formatters.ts`, `assetPriceHistoryUtils.ts`, `assetClassHistoryUtils.ts`, `getGreeting.ts`
-- Hooks: `lib/hooks/useDelayedLoading.ts` (mostra skeleton solo dopo soglia ms, evita flash su pagine veloci)
-- Auth: `lib/utils/authHelpers.ts`, `contexts/AuthContext.tsx`
-- PDF: `types/pdf.ts`, `lib/services/pdfDataService.ts`, `components/pdf/PDFDocument.tsx`, `components/pdf/PDFExportDialog.tsx`, `lib/utils/pdfTimeFilters.ts`, `lib/utils/pdfGenerator.tsx`
-- Tests: `vitest.config.ts`, `__tests__/formatters.test.ts`, `dateHelpers.test.ts`, `fireService.test.ts`, `performanceService.test.ts`, `borsaItalianaBondScraper.test.ts`, `goalService.test.ts`, `couponUtils.test.ts`
+- Performance: `app/dashboard/performance/page.tsx`, `lib/services/performanceService.ts`
+- Cashflow and budget: `components/cashflow/*`, `lib/utils/budgetUtils.ts`, `types/budget.ts`
+- FIRE: `components/fire-simulations/*`, `lib/services/fireService.ts`
+- Dividends: `components/dividends/*`
+- Settings: `app/dashboard/settings/page.tsx`, `lib/services/assetAllocationService.ts`
 
-**Last updated**: 2026-04-01 (session 28: performance fixes, Labor section moved to History)
+**Last updated**: 2026-04-01 (session 29)
 
 ## Design Context
 
 ### Users
-Investitori italiani attenti e autonomi che gestiscono in proprio il proprio patrimonio (azioni, ETF, BTP, crypto, immobili, conti correnti). Usano l'app regolarmente per monitorare performance, dividendi e progresso verso FIRE. **Job to be done**: "Capire in pochi secondi com'è messa la mia situazione finanziaria e sentire che sto andando nella giusta direzione."
+Italian self-directed investors who want to understand their financial position quickly and confidently.
 
 ### Brand Personality
-**Elegante · Sofisticato · Personale** — un cruscotto privato di qualità, come un wealth manager digitale su misura. La sofisticazione si esprime nella cura per i dettagli, non nella complessità.
+Elegant, sophisticated, personal.
 
 ### Aesthetic Direction
-**Riferimento**: Linear / Vercel — tipografia forte, dark mode eccellente, geometria pulita, microinterazioni fluide, zero decoro superfluo.
-**Direzione**: Overdrive — implementazioni tecnicamente ambiziose (fisica spring, scroll-driven reveals, counter animati, transizioni memorabili).
-**Anti-riferimenti**: Bloomberg terminal (troppo freddo), fintech colorato alla Revolut (troppo leggero), Material Design (troppo generico).
+Linear / Vercel inspired clarity with polished motion, dense but readable data presentation, and strong dark mode quality.
 
 ### Design Principles
-1. **Dati prima, decorazione mai** — ogni elemento visivo guadagna il suo spazio comunicando informazione.
-2. **Movimento con intenzione** — le animazioni rivelano struttura, non distraggono. Fisica naturale (spring, ease-out-quart). Rispettare sempre `prefers-reduced-motion`.
-3. **La densità è una feature** — non semplificare fino a banalizzare. Rendere la complessità leggibile, non nasconderla.
-4. **Fiducia attraverso la precisione** — font monospaziato per valori, allineamento decimale, consistenza nei formati. L'utente deve sentire che può fidarsi dei numeri.
-5. **Personalità nei dettagli** — i momenti di piacere vengono dai dettagli: counter animati, grafici che si disegnano in modo inaspettato, stati vuoti che raccontano qualcosa.
+1. Data first, decoration second
+2. Motion with purpose
+3. Density is a feature
+4. Precision builds trust
+5. Personality lives in the details

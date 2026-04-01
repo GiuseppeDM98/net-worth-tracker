@@ -344,6 +344,17 @@ export default function HistoryPage() {
     return prepareMonthlyLaborMetricsData(snapshots, expenses, categoryIds, startYear);
   }, [snapshots, expenses, portfolioSettings]);
 
+  const laborMonthCounts = useMemo(() => {
+    return laborMetricsChartData.reduce(
+      (counts, month) => {
+        if (month.netWorthGrowth > 0) counts.positiveMonths += 1;
+        if (month.netWorthGrowth < 0) counts.negativeMonths += 1;
+        return counts;
+      },
+      { positiveMonths: 0, negativeMonths: 0 }
+    );
+  }, [laborMetricsChartData]);
+
   // Calculate percentage split of liquid vs illiquid for each snapshot.
   // This enables the chart toggle between € values and % distribution.
   // Percentages are pre-calculated here rather than in chart render
@@ -1590,7 +1601,7 @@ export default function HistoryPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               {/* 4 KPI cards */}
-              <div className="grid gap-4 grid-cols-2 desktop:grid-cols-4">
+              <div className="grid gap-4 grid-cols-2 desktop:grid-cols-3">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Guadagnato da Lavoro</CardTitle>
@@ -1644,6 +1655,32 @@ export default function HistoryPage() {
                       {laborIncomeMetrics.totalInvestmentGrowthNet >= 0 ? '+' : ''}{formatCurrency(laborIncomeMetrics.totalInvestmentGrowthNet)}
                     </div>
                     <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear} · al netto tasse stimate</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Mesi in Positivo</CardTitle>
+                    <TrendingUp className="h-4 w-4 text-green-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-lg desktop:text-2xl font-bold text-green-600">
+                      {laborMonthCounts.positiveMonths}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear} · patrimonio in crescita</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Mesi in Negativo</CardTitle>
+                    <TrendingDown className="h-4 w-4 text-red-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-lg desktop:text-2xl font-bold text-red-600">
+                      {laborMonthCounts.negativeMonths}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear} · patrimonio in calo</p>
                   </CardContent>
                 </Card>
               </div>

@@ -1036,6 +1036,7 @@ export function prepareMonthlyLaborMetricsData(
   laborIncome: number;
   savedFromWork: number;
   investmentGrowth: number;
+  netWorthGrowth: number;
 }[] {
   if (snapshots.length === 0) return [];
 
@@ -1076,6 +1077,7 @@ export function prepareMonthlyLaborMetricsData(
     laborIncome: number;
     savedFromWork: number;
     investmentGrowth: number;
+    netWorthGrowth: number;
   }[] = [];
 
   for (const current of sorted) {
@@ -1104,6 +1106,7 @@ export function prepareMonthlyLaborMetricsData(
       laborIncome,
       savedFromWork,
       investmentGrowth,
+      netWorthGrowth,
     });
   }
 

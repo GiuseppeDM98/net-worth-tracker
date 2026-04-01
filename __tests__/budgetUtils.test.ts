@@ -30,12 +30,12 @@ function makeExpense(overrides: Partial<Expense> & { amount: number; date: Date 
     type: 'fixed',
     categoryId: 'cat1',
     categoryName: 'Affitto',
+    ...overrides,
     amount: overrides.amount,
     currency: 'EUR',
     date: overrides.date as unknown as import('firebase/firestore').Timestamp,
     createdAt: overrides.date as unknown as import('firebase/firestore').Timestamp,
     updatedAt: overrides.date as unknown as import('firebase/firestore').Timestamp,
-    ...overrides,
   } as Expense;
 }
 
@@ -99,7 +99,7 @@ describe('getActualForItem — type scope', () => {
   });
 
   it('never matches income expenses', () => {
-    const incomeItem: BudgetItem = { id: 'x', scope: 'type', expenseType: 'fixed', monthlyAmount: 100 };
+    const incomeItem: BudgetItem = { id: 'x', scope: 'type', expenseType: 'fixed', monthlyAmount: 100, order: 0 };
     const incomeOnly: Expense[] = [
       makeExpense({ type: 'income', categoryId: 'cat3', amount: 5000, date: new Date(2025, 0, 1) }),
     ];
@@ -116,7 +116,7 @@ describe('getActualForItem — category scope', () => {
 
   it('excludes other categories', () => {
     // cat2 only has 200 in 2025
-    const otherCat: BudgetItem = { id: 'x', scope: 'category', categoryId: 'cat2', monthlyAmount: 0 };
+    const otherCat: BudgetItem = { id: 'x', scope: 'category', categoryId: 'cat2', monthlyAmount: 0, order: 0 };
     expect(getActualForItem(otherCat, EXPENSES, 2025)).toBeCloseTo(200);
   });
 });
@@ -176,6 +176,7 @@ describe('getDefaultMonthlyAmount', () => {
     const partialItem: Omit<BudgetItem, 'id' | 'monthlyAmount'> = {
       scope: 'type',
       expenseType: 'fixed',
+      order: 0,
     };
     const result = getDefaultMonthlyAmount(partialItem, EXPENSES, 2024);
     expect(result).toBeCloseTo(950 / 12, 1);
@@ -188,6 +189,7 @@ describe('getDefaultMonthlyAmount', () => {
     const partialItem: Omit<BudgetItem, 'id' | 'monthlyAmount'> = {
       scope: 'category',
       categoryId: 'cat2', // cat2 only has 200 in 2025 (March)
+      order: 0,
     };
     const result = getDefaultMonthlyAmount(partialItem, EXPENSES, 2024);
     expect(result).toBeCloseTo(200 / 12, 1);
@@ -197,6 +199,7 @@ describe('getDefaultMonthlyAmount', () => {
     const partialItem: Omit<BudgetItem, 'id' | 'monthlyAmount'> = {
       scope: 'category',
       categoryId: 'cat_unknown',
+      order: 0,
     };
     expect(getDefaultMonthlyAmount(partialItem, EXPENSES, 2024)).toBe(0);
   });
@@ -205,6 +208,7 @@ describe('getDefaultMonthlyAmount', () => {
     const partialItem: Omit<BudgetItem, 'id' | 'monthlyAmount'> = {
       scope: 'type',
       expenseType: 'fixed',
+      order: 0,
     };
     expect(getDefaultMonthlyAmount(partialItem, EXPENSES, 2026)).toBe(0);
   });

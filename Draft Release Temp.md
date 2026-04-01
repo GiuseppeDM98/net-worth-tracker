@@ -11,6 +11,8 @@
 
 - Added a **Labor & Investments section** to the History page — a dedicated card groups four lifetime KPI metrics (Earned from Work, Saved from Work, Investment Growth Gross and Net) with a month-by-month chart showing how each evolved over time. The section appears between "Savings vs Investment Growth" and "Doubling Time" when labor income categories are configured in Settings. The explanation of why "Saved from Work" may not match net worth changes is shown as a subtitle beneath the card title
 
+- Added **positive and negative month counters** to the History page's Labor & Investments section — you can now immediately see how many months increased your total net worth and how many reduced it, without scanning the full monthly chart
+
 - Added **"All years" option** to the monthly Savings vs Investment Growth chart on the History page — select "Tutti" from the year dropdown to see a continuous month-by-month timeline spanning your entire history, instead of one year at a time. Labels include the year ("Gen 2023", "Feb 2023") for easy orientation
 
 - Added **Labor Income category selector** to Settings (Preferences tab) — pick which income categories represent your work earnings (salary, freelance, etc.) using toggle buttons. These are used to power the new Dashboard KPI cards above

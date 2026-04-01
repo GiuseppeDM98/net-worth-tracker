@@ -1,532 +1,161 @@
 # AI Agent Guidelines - Net Worth Tracker (Lean)
 
 Project-specific conventions and recurring pitfalls for Net Worth Tracker.
-For architecture and status, see [CLAUDE.md](CLAUDE.md).
+For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 
 ---
 
 ## Critical Conventions
 
 ### Italian Localization
-- All user-facing text in Italian, **all code comments in English only**
-- Use `formatCurrency()` for EUR (e.g. €1.234,56), `formatDate()` for DD/MM/YYYY
-- **Compound words**: use "Sottocategoria" (no hyphen) — not "Sotto-categoria" or "sub-category"
+- All user-facing text in Italian, all code comments in English only
+- Use `formatCurrency()` for EUR and `formatDate()` for `DD/MM/YYYY`
+- Use `Sottocategoria` (no hyphen)
 
-### Firebase Date Handling & Timezone
-- Use `toDate()` from `dateHelpers.ts` (handles Timestamps, ISO strings, null)
-- **Month/year extraction**: Use `getItalyMonth()`, `getItalyYear()`, `getItalyMonthYear()` (NOT `Date.getMonth()`)
-- **Why**: Server (UTC) and client (browser) produce same results
+### Firebase Dates and Timezone
+- Use `toDate()` from `dateHelpers.ts`
+- For month/year extraction use `getItalyMonth()`, `getItalyYear()`, `getItalyMonthYear()`
+- Never use `Date.getMonth()` / `Date.getFullYear()` for domain grouping
 
-### Custom Tailwind Breakpoint
-- Use `desktop:` (1440px) instead of `lg:` (1024px), defined in `app/globals.css`
-- Below 1440px = mobile/tablet — includes iPad Mini landscape (1024px)
-- Built-in orientation variants: `portrait:`, `landscape:`
-- **Never use `lg:`** — it's 1024px, which is the wrong threshold
-- Bottom nav padding on portrait: `max-desktop:portrait:pb-20` on page root wrappers
-- Mobile header (title + buttons): `flex flex-col gap-3 landscape:flex-row landscape:items-center landscape:justify-between` — buttons `w-full landscape:w-auto`
-- **Dialog-internal breakpoints**: dialogs never reach `desktop:` (1440px). Use `sm:` (640px) for 2-column grids inside dialogs.
-- **Filter sections on mobile**: `flex flex-wrap` does NOT expand items to fill rows. Fix: `grid grid-cols-1 gap-3 desktop:flex desktop:flex-wrap desktop:items-end desktop:gap-4`
-- **Quick-action button paired with a filter**: merge in a single grid item as a flex row — `<div class="flex gap-2"><div class="flex-1 min-w-0">…Select…</div><Button class="shrink-0">…</Button></div>`
-- **Currency value font in card grids**: `text-2xl` overflows on mobile for 6+ digit amounts. Use `text-lg desktop:text-2xl`
-- **Card header with long title + action controls**: `flex flex-col gap-2 desktop:flex-row desktop:items-center desktop:justify-between`
-- **Structural overflow tables** (13+ columns): use `hidden desktop:block` wrapper + contextual "disponibile su desktop" hint in mobile UI (e.g. inside detail dialog)
-- **Data-dense table pages**: may use `isTablet = useMediaQuery('(min-width: 768px) and (max-width: 1023px)')` to switch to cards below 1024px
+### Tailwind Breakpoint
+- Use `desktop:` (1440px), never `lg:`
+- Dialog-internal responsive layouts use `sm:`
+- Bottom page wrappers on portrait mobile should use `max-desktop:portrait:pb-20`
+- Currency values in compact KPI grids should use `text-lg desktop:text-2xl`
 
-### Layout Shell Design Tokens
-- **Never hardcode colors in layout components** (Header, Sidebar, BottomNavigation, SecondaryMenuDrawer)
-- Use semantic tokens: `bg-background`, `text-foreground`, `border-border` for chrome; `bg-sidebar`, `text-sidebar-foreground`, `bg-sidebar-accent`, `border-sidebar-border` for sidebar
-- `bg-white` / `bg-gray-900` / `text-gray-900` in layout = bug — they break the opposite color mode
-- Gain/loss colors (`text-green-600`, `text-red-600`) are intentionally hardcoded — they are domain-semantic, not theme-structural
-- **Auth pages (login/register) background**: use `bg-gray-50 dark:bg-gray-950` — same as the dashboard main content area (`dark:bg-gray-950`). Do NOT use gradient variants (`bg-gradient-to-br from-blue-50 ... dark:from-gray-950`): they produce an inconsistent dark appearance.
-- **Card dark mode on auth pages**: explicitly add `dark:bg-gray-900 dark:border-gray-800` to the `<Card>` — same as dashboard panels. shadcn `CardTitle`/`CardDescription` may also need explicit `dark:text-gray-100`/`dark:text-gray-400` when used outside the normal theme context.
-- **`bg-background` in shadcn separators** (e.g. "Oppure" divider): correct as-is — it is a CSS variable that already handles both modes. Do not replace.
+### Layout Tokens
+- Never hardcode structural layout colors in shell components
+- Use semantic tokens like `bg-background`, `text-foreground`, `border-border`
+- Hardcoded green/red for gains and losses is allowed
 
 ---
 
 ## Key Patterns
 
-### React Query & Lazy-Loading
-- Invalidate all related caches after mutations (direct + indirect dependencies)
-- Never remove from `mountedTabs` once added to preserve tab state
+### React Query and Derived State
+- Invalidate all related caches after mutations
+- Never remove tabs from `mountedTabs`
+- Use `useMemo` for derived state; do not use `useEffect + setState` for computed values
 
-### next/dynamic for Named Exports
-`next/dynamic` requires a default export. For named exports, unwrap with `.then`:
-```tsx
-import type { MyDialogProps } from '@/components/MyDialog';
+### Dynamic Imports
+- `next/dynamic` with named exports must unwrap via `.then(m => ({ default: m.Named }))`
+- Use `ssr: false` for client-only dialogs and panels
+- Pass the props type parameter to preserve type safety
 
-const MyDialog = dynamic<MyDialogProps>(
-  () => import('@/components/MyDialog').then(m => ({ default: m.MyDialog })),
-  { ssr: false }
-);
-```
-- **`ssr: false`**: required for components that use client-only hooks (useState, SSE, streaming) — otherwise Next.js attempts server rendering and throws a hydration error.
-- **Type parameter**: without `dynamic<Props>()`, TypeScript infers `{}` for props, losing type safety. Export the props interface from the source file to import it as a type.
-- **When to use**: dialogs and heavy panels that import large libraries (react-markdown, remark-gfm, etc.) and are only opened on demand — keeps them out of the initial page bundle.
+### Expense Sign Convention
+- Income is stored positive
+- Expenses are stored negative
+- Net savings is `sum(income) + sum(expenses)`
+- When moving records across income/expense boundaries, flip the sign
 
-### Date Range Queries (Firestore)
-End date must include full day: `new Date(year, month, 0, 23, 59, 59, 999)`
+### History and Snapshot Baselines
+- End date for Firestore month queries must include the full last day
+- Annual deltas use December of the previous year as baseline, not January of the same year
+- Monthly heatmaps remain month-over-month and always use the immediately previous month
+- `MonthlySnapshot` fields built in `createSnapshot()` must also be added to `POST /api/portfolio/snapshot`
 
-### Expense Amount Sign Convention
-- **Income**: POSITIVE, **Expenses**: NEGATIVE in database
-- **Net Savings**: `sum(income) + sum(expenses)` (NOT subtraction)
-- **Cross-type move**: When moving expenses between income ↔ expense types, flip the amount sign. Helper `needsSignFlip()` in `expenseService.ts`
-- **Category type change**: `updateExpensesType(categoryId, oldType, newType, userId)` batch-updates `type` + flips signs if crossing income ↔ expense boundary
+### History: Savings vs Labor vs Performance
+- `prepareSavingsVsInvestmentData*()` decomposes monthly/annual net worth growth into `netSavings` and `investmentGrowth`
+- `prepareMonthlyLaborMetricsData()` is the single source for the History `Lavoro & Investimenti` section
+- For History month counts, use `netWorthGrowth`, not `investmentGrowth`
+- Zero-change months (`netWorthGrowth === 0`) are excluded from positive/negative month counters
+- Performance heatmap is similar visually but semantically different: it isolates investment returns after cash flows
 
-### Cashflow Tab Pattern (Parallel Siblings)
-- CurrentYearTab and TotalHistoryTab are parallel siblings with independent state
-- **Prefer replicating patterns inline** over extracting shared components
-- Pie chart drill-down: 3-level state machine (category → subcategory → expenseList) with `DrillDownState` type
-- Always reset drill-down state when filters change to prevent stale data
-- Blue-bordered card pattern for filtered sections: `border-blue-200 bg-blue-50/50 dark:bg-blue-950/10 dark:border-blue-800`
+### Budget
+- `autoInitBudgetItems` merges saved amounts with live categories on every mount
+- `expenseMatchesItem` matches by category/subcategory ID regardless of income/expense type
+- Amounts are stored monthly; annual views multiply by 12
+- Aggregate keys: `__subtotal_{type}__`, `__total_expenses__`, `__total_income__`
+- `BudgetItem.order` is required, including in tests and helper fixtures
 
-### Budget Tab Pattern
-- **Auto-init**: `autoInitBudgetItems` merges saved amounts with live categories on every mount
-- **Scope matching**: `expenseMatchesItem` matches by category/subcategory ID regardless of income/expense type
-- **Income section**: `DeltaBadge` and `ProgressCell` accept `inverted?: boolean`
-- **Firestore**: single doc `budgets/{userId}`, full replacement on save
-- **Amount storage**: `monthlyAmount` stored as monthly; annual view multiplies ×12
-- **Deep dive**: click any row → `CategoryDeepDive` panel (`hidden desktop:block`); mobile shows contextual hint in detail dialog
-- **Aggregate keys**: `__subtotal_{type}__`, `__total_expenses__`, `__total_income__` — collision-free with real `budgetItemKey` values
+### Settings Synchronization
+- Every new settings field must be handled in three places: type definition, `getSettings()`, `setSettings()`
+- `setSettings()` has two write branches; update both
 
-### Radix UI Select Values
-- **Empty string NOT allowed** as `SelectItem` value (runtime error)
-- Sentinels: `__all__`, `__none__` for unselected; `__create_new__` for inline creation flows
-- **`SelectTrigger` is `w-full` by default** in this project — don't add `w-full` manually
-- **Mobile tab-to-Select pattern**: replace cramped `<TabsList>` with `<Select>` on `max-desktop:`, keep TabsList on `hidden desktop:block`. Both call the same state setter.
+### Asset and FIRE Rules
+- `quantity = 0` is valid and marks sold assets in history logic
+- Cash asset balance lives in `quantity`, not via price updates
+- Borsa Italiana bond prices are `% of par`; store converted EUR values
+- FIRE annual expenses must use the last completed year
+- `includePrimaryResidence` must flow through both React Query key and query function
 
-### Sankey Diagram Multi-Layer Pattern
-- 4-layer structure: Income → Budget → Types → Categories + Savings (5th optional: Subcategories)
-- Use `"Category__Subcategory"` format (double underscore) for collision-free IDs
-- When filtering nodes, ALWAYS filter corresponding links too (prevents "missing: [NodeName]" errors)
-
-### Settings Service Synchronization
-ALL fields in settings types must be handled in THREE places: type definition, `getSettings()`, `setSettings()`.
-**Gotcha**: `setSettings()` has TWO write branches (with targets → `setDoc` without merge, without targets → `setDoc` with merge). New fields must be added to BOTH branches.
-
-### Per-Asset Boolean Flags Pattern
-- Prefer per-asset opt-in/opt-out flags over hardcoded category exclusions
-- Add to: `Asset` + `AssetFormData` types, Zod schema, reset defaults, edit-mode prefill, save payload, AssetDialog toggle
-
-### Snapshot Document — Two Build Sites
-`MonthlySnapshot` documents are built in TWO independent places. Any new field must be added to BOTH:
-1. `lib/services/snapshotService.ts` — `createSnapshot()` — used by automated/client paths
-2. `app/api/portfolio/snapshot/route.ts` — `POST /api/portfolio/snapshot` — used by the dashboard "Create Snapshot" button and the monthly cron job (which calls this route internally)
-
-`app/api/portfolio/snapshot/manual/route.ts` receives data from the caller (historical imports) — it has no asset list to compute from, so new calculated fields cannot be added there.
-
-### FIRE Chart — includePrimaryResidence Must Flow Through
-`getFIREData(userId, currentNetWorth, withdrawalRate, includePrimaryResidence)` passes the flag to `prepareFIREChartData` so the monthly allowance line uses the same NW basis as the card metrics. **Two requirements**:
-1. The flag must be in the React Query `queryKey`: `['fireData', userId, currentNetWorth, withdrawalRate, includePrimaryResidence]` — otherwise toggling the flag doesn't invalidate the cache and the chart stales
-2. The flag must be forwarded in the `queryFn` call
-
-### MonthlySnapshot `fireNetWorth` Field
-`fireNetWorth?: number` on `MonthlySnapshot` — NW excluding the primary-residence asset (`isPrimaryResidence: true` flag). Saved at snapshot creation time via `calculateFIRENetWorth(assets, false)`. Optional (absent on snapshots created before this field was added). Used by `prepareFIREChartData` for the monthly allowance line: `snapshot.fireNetWorth ?? snapshot.totalNetWorth`. Historical snapshots without the field fall back to `totalNetWorth` silently.
-
-### FIRE Metrics Enrichment Pattern
-When `getFIREData` (async) returns, re-run `calculateFIREMetrics` (pure, synchronous) client-side with additional derived values instead of threading extra params through the Firebase call:
-```ts
-// getFIREData fetches expenses + chart; enrich metrics client-side after it resolves
-const fireMetrics = fireData?.metrics
-  ? calculateFIREMetrics(currentNetWorth, fireData.metrics.annualExpenses, withdrawalRate, liquidNetWorth, illiquidNetWorth)
-  : null;
-```
-This avoids changing async service signatures whenever the component needs new breakdowns.
-
-**FIRE annual expenses**: `getAnnualExpenses` uses last completed year (`now.getFullYear() - 1`), NOT current year. Using current year mid-period (e.g. March) gives only 3 months of data, understating annual spend and making yearsOfExpenses misleading.
-
-**Liquid/Illiquid FIRE split**: `calculateLiquidFIRENetWorth` / `calculateIlliquidFIRENetWorth` in `assetService.ts` combine the liquidity filter with primary-residence exclusion. Invariant: `liquid + illiquid === calculateFIRENetWorth` for any `(assets, includePrimaryResidence)`.
-
-### Dashboard Settings Loading
-- Dashboard loads `AssetAllocationSettings` via `useEffect` + `useState` (NOT React Query)
-- Pattern: `getSettings(user.uid).then(setPortfolioSettings).catch(() => {})`
-
-### Firestore Patterns
-- **Nested object deletion**: `merge: true` does RECURSIVE merge — cannot delete nested keys by omitting them. Fix: GET + `setDoc()` WITHOUT `merge: true`
-- **No `undefined` values**: `setDoc()` throws on `undefined`. Build the document object manually, only including fields with a value
-- **User-managed data**: When updating docs with calculated + user-managed fields: GET existing → preserve user fields
-
-### YOC / Current Yield Calculation
-- Annualization: < 12 months scale up, >= 12 months average
-- YOC uses `averageCost` (cost basis), Current Yield uses `currentPrice` (market value)
-- Filter dividends by `paymentDate` (not `exDate`); use API route (server-only service)
-- **Historical YOC (v3)**: numerator = actual `grossAmountEur`; denominator = `maxDivQty × effectiveCostPerShare` (gross-weighted average of `div.costPerShare`; fallback to `asset.averageCost` for legacy records)
-- `div.costPerShare` set server-side at dividend creation — never from user input
-
-### Asset Patterns
-- **Zero-Quantity Assets**: `quantity = 0` valid; `isDeleted: asset.quantity === 0` in `assetPriceHistoryUtils.ts`
-- **Cash Asset Balance**: `quantity` IS the balance. Update via `updateDoc({ quantity })`, NOT via `updateAssetPrice`
-- **Bond Price Convention**: Borsa Italiana returns prices as % of par. Stored value = `biPrice × (nominalValue/100)`. Apply in 4 places: `priceUpdater.ts`, AssetDialog Path 1 (manual), Path 2 (auto), averageCost
-- **Bond Coupon Phase 3**: use `getFollowingCouponDate(paidDate, frequency, maturityDate)` — never `getNextCouponDate` (uses local "today", unsafe in UTC cron)
-- **Stamp Duty**: `calculateStampDuty(assets, rate, checkingAccountSubCategory?)` in `assetService.ts`
-
-### Formatter Utility Duplication
-**Gotcha**: `formatCurrency` AND `formatCurrencyCompact` exist in BOTH `lib/utils/formatters.ts` AND `lib/services/chartService.ts`. Update both when modifying. Never redefine either inline in a component — always import from the appropriate source. **Notably**: `formatCurrencyCompact` is NOT exported from `lib/utils/formatters.ts` — only from `lib/services/chartService.ts`. Import accordingly in chart components.
-
-### Derived State — Use `useMemo`, Not `useEffect + setState`
-**Antipattern**: Using `useEffect` to compute filtered/derived lists and store them in a separate `useState`:
-```tsx
-// ❌ Wrong — causes an extra render on every filter change
-const [filtered, setFiltered] = useState(items);
-useEffect(() => {
-  setFiltered(items.filter(...));
-}, [items, filter]);
-
-// ✅ Correct — synchronous, no extra render
-const filtered = useMemo(() => items.filter(...), [items, filter]);
-```
-Only use `useEffect` for side effects (API calls, subscriptions, DOM mutations). Computed/derived values from existing state are always `useMemo`.
-
-### Performance Metrics & Capital Flows
-- TWR/CAGR/ROI use cashflow expense records as the sole source of contributions/withdrawals
-- `AssetDialog` shows contextual amber hint when `quantity` changes (non-cash assets only)
-
-### Performance Period Baseline Pattern
-- `getSnapshotsForPeriod` includes 1 extra month before the period as **baseline** for YTD/1Y/3Y/5Y
-- All metric functions that annualize **must use `calculateMonthsDifference(periodEnd, periodStart)`** — NOT `snapshots.length - 1`
-- Each chart function handles baseline exclusion independently (heatmap: `i=1`; chart: `.slice(1)`; underwater: `continue at i===0`)
-
-### Annual YoY Baseline Pattern
-For any annual delta (YoY charts, annual cards, yearly rankings), the baseline must be **December of the previous year**, not the first snapshot of the current year. Monthly snapshots are created at month-end, so January's snapshot already includes January's performance — using it as a start baseline silently drops that month from the annual figure.
-
-```ts
-// Correct pattern — used in: snapshotService, chartService, pdfDataService, hallOfFameService, dashboard
-const baseline =
-  snapshots.find(s => s.year === year - 1 && s.month === 12) ??
-  snapshots.find(s => s.year === year); // fallback: first year of data has no prior December
-```
-
-When grouping by year (Map or Record), resolve the previous-year group first:
-```ts
-const prevYearSnapshots = snapshotsByYear.get(year - 1);
-const decPrevYear = prevYearSnapshots
-  ? [...prevYearSnapshots].sort((a, b) => a.month - b.month).at(-1)
-  : undefined;
-const startSnapshot = decPrevYear ?? yearSnapshots[0];
-```
-
-**Files that implement this**: `snapshotService.ts` (`calculateYearlyChange`), `chartService.ts` (`prepareYoYVariationData`, `prepareSavingsVsInvestmentData`), `pdfDataService.ts` (`calculateYoYComparison`), `hallOfFameService.ts` + `.server.ts` (yearly records loop), `history/page.tsx` (`laborIncomeMetrics`).
-
-**Monthly heatmap is NOT affected** — it shows month-over-month returns (each cell = `NW_month / NW_prevMonth - 1`), so the baseline is always the immediately preceding month.
-
-### Skeleton Loading Pattern
-Build skeleton screens that mirror the real layout to avoid layout shift and provide visual continuity:
-- **File convention**: `ComponentSkeleton.tsx` alongside the real component
-- **Primitive**: `SkeletonBar` with `motion-safe:animate-pulse motion-reduce:opacity-40` + `animationDelay` style for stagger wave
-- **Stagger**: left-to-right wave via per-element `delayMs`; later sections start after earlier ones (e.g. 0ms, 100ms, 200ms… 800ms)
-- **Dynamic heights**: use a plain `<div style={{ height }}` with the pulse classes instead of routing through `SkeletonBar` — Tailwind needs static class names, can't interpolate pixel values
-- **Two-phase loading** (outer Firestore fetch + inner API fetch): reuse the SAME skeleton component for both so the two loading states fuse into one continuous animation — no visible join
-- **Stale-while-revalidate** on filter changes: gate the full-page skeleton on `!data` (first load only); on subsequent fetches keep old data visible with `opacity-50 pointer-events-none transition-opacity duration-200`
-
-```tsx
-// First load only → skeleton
-if (!stats) {
-  if (loading) return <MyComponentSkeleton />;
-  return <EmptyState />;
-}
-// Filter refetch → dim existing content
-return (
-  <div className={loading ? 'opacity-50 pointer-events-none transition-opacity duration-200' : ''}>
-    {/* real content */}
-  </div>
-);
-```
-
-- **Simple loading state (no skeleton)**: Use `<Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />` inside a height placeholder (`h-64`) to prevent layout shift. Never use `<div className="text-gray-500">Caricamento...</div>` — it is invisible in dark mode and provides no visual feedback.
-- **`Loader2` vs `RefreshCw`**: `Loader2 animate-spin` = initial mount loading (data not yet arrived). `RefreshCw animate-spin` = user-triggered active refresh (cashflow, filters). Never interchange them — they have different semantic meaning.
-- **Fast vs. slow page loading decision**: Pages that load in <200ms should `return null` while loading — a flash of skeleton is more jarring than a brief blank when the page transition already covers the gap. Only use skeletons for genuinely slow fetches (History: multiple Firestore queries + calculations). For borderline cases, use `useDelayedLoading(loading, 150)` from `lib/hooks/useDelayedLoading.ts` — shows the skeleton only after 150ms, avoiding the flash entirely on fast connections.
-
-### Framer Motion Animation Patterns
-- **Shared variants**: `lib/utils/motionVariants.ts` — never define variants inline
-- **Stagger + conditional elements**: use explicit `transition={{ delay: index * 0.1 }}` per card — parent stagger counts ALL children including conditional slots
-- **`motion.tr`**: wrapping shadcn `<TableRow>` with `motion()` breaks table structure. Use `motion.tr` directly
-- **`AnimatePresence initial={false}`** on collapsibles that start open — avoids exit animation on mount
-
-**Table section collapse/expand animation (>30min debug, session 14):**
-`<tr>` uses `display: table-row` — does NOT support `height: 0→auto` or `overflow: hidden`. Fix: wrap all section rows in `<tr><td colSpan={totalCols} className="p-0">` and put a `<motion.div variants={slideDown}>` inside. Outer `<Table>` needs `tableLayout: 'fixed'` + `<colgroup>`. Flex rows inside `motion.div` use matching `w-[N] shrink-0` divs for alignment.
-- `colSpan` must cover ALL columns — off by 1 causes flex-1 overflow clipped by `overflow: hidden`
-- No JSX comments inside `<colgroup>` — whitespace text node = invalid HTML = hydration error
-- Scroll to panel: `setTimeout(350)` + `block: 'start'` — wait for 300ms animation to complete
-- **Easing**: always `[0.25, 1, 0.5, 1]` (ease-out-quart). Never bounce or elastic.
-- **Page-level transitions**: `AnimatePresence mode="wait"` in `app/dashboard/layout.tsx`, keyed by `usePathname()`. The `exit` state on `pageVariants` only fires from this layout wrapper — individual pages don't need their own `AnimatePresence`. `mode="wait"` ensures the exiting page finishes before the entering page starts. Exit duration must be < entering duration (150ms vs 350ms) to feel snappy.
-
-**Two valid patterns for page mount animations — never mix them:**
-
-*Pattern A — staggerContainer (page has skeleton):* Root `<div>` (no animation), children wrapped in `<motion.div variants={staggerContainer}>` + `<motion.div variants={cardItem}>`. Children inherit `hidden` from parent — prevents compound-opacity flash.
-
-*Pattern B — explicit delays (tab-child, no skeleton):* Root `<motion.div variants={pageVariants}>`, each card has own `initial="hidden" animate="visible" transition={{ delay: N }}`.
-
-**Compound-opacity flash (>30min debug, session 13):** `pageVariants` root fade + independent child `cardItem` animations → `opacity_visual = parent × child` → cards flash from nowhere mid-fade. Fix: Pattern A.
-
-### `useCountUp` Hook — Shared Utility
-`lib/utils/useCountUp.ts` exports `useCountUp(target, options?)` with:
-- Default behavior (`once: false`): re-triggers on every target change — used in `MetricCard` for period switching on Performance page
-- `once: true`: animates only the first time a **non-zero** value arrives; subsequent target changes update the displayed value immediately (no re-animation) — used for Dashboard KPIs that animate once on mount but still stay in sync after data refreshes (e.g. snapshot overwrite updating asset prices)
-
-**Zero-target trap**: hooks are called unconditionally, including during loading when `assets=[]` → all metrics = 0. If `once: true` were to mark `hasAnimated=true` at target=0, the animation would never fire on real data. Fix: `target === 0` sets `current` directly without marking animated; only a completed animation on a non-zero value marks `hasAnimated=true`.
-
-**Frozen value after data refresh (gotcha)**: with `once: true`, if the early return fires without calling `setCurrent`, the displayed value freezes at the old number even when the underlying data changes (e.g. snapshot overwrite). Fix: replace `return` with `setCurrent(target); return;` — value updates silently, no re-animation.
-
-**Same trap in useEffect deps `[]`**: A `useEffect` with empty deps runs once on mount — but if the component mounts with empty/loading data, the effect exits early and never re-fires when real data arrives (re-render ≠ re-mount). Fix: include the data array in deps. Guards like `hasCelebrated` / `markCelebrated` prevent double-firing on subsequent renders. Pattern used in `DoublingMilestoneTimeline` confetti: `useEffect(() => { ... }, [milestones])`.
-
-### One-Time Celebrations (localStorage idempotency)
-`lib/utils/celebrationUtils.ts` — utilities for "fire once per browser" effects:
-- `hasCelebrated(key)` / `markCelebrated(key)` — localStorage with `celebrated_` prefix
-- `shouldReduceMotion()` — wraps `window.matchMedia('(prefers-reduced-motion: reduce)')`
-- Use with `canvas-confetti` (lazy import via `import('canvas-confetti')` inside the effect — keeps it out of the main bundle)
-- Reset for testing: `Object.keys(localStorage).filter(k => k.startsWith('celebrated_')).forEach(k => localStorage.removeItem(k))`
-
-### One-Time Session Notifications (sessionStorage vs useRef)
-For notifications that should fire **once per browser session** (survive page reload, reset on tab close):
-- **Use `sessionStorage`**, NOT `useRef` — `useRef` resets on page reload, making it impossible to suppress the notification after reload
-- Pair with an internal `useRef` guard against React Strict Mode double-effect:
-```tsx
-const triggered = useRef(false);
-useEffect(() => {
-  if (sessionStorage.getItem(SESSION_KEY)) return;
-  if (triggered.current) return;
-  triggered.current = true;
-  sessionStorage.setItem(SESSION_KEY, '1');
-  // show notification
-}, [deps]);
-```
-- Reset for testing: DevTools → Application → Session Storage → delete the key
-- Reference: `components/ui/SavingsRateBadge.tsx`
-
-```ts
-// Mount-only animation (Dashboard KPIs)
-const animated = useCountUp(value, { once: true });
-
-// Re-triggers on period change (MetricCard in Performance)
-const animated = useCountUp(value); // once: false default
-```
-
-### Recharts Animation Patterns
-Standard props across the entire codebase — never deviate:
-- **`<Bar>` / `<Pie>`**: `animationDuration={600} animationEasing="ease-out"`
-- **`<Line>` / `<Area>`**: `animationDuration={800} animationEasing="ease-out"`
-- **`<Pie>` also needs `animationBegin={0}`** — without it Recharts adds ~400ms default delay before starting, making pies feel sluggish vs bars and lines
-
-**Decorative band Areas** (overlapping semi-transparent fills used as background shading — e.g. percentile bands in Monte Carlo fan-charts and scenario comparison): keep `isAnimationActive={false}`. Animating 4–6 independent areas that visually stack produces a chaotic sequential fill-in. Animate only the foreground median `<Line>` on top. Always add an inline comment explaining why.
-
-**Re-animation on filter/data changes**: intentional for explicit user actions (dropdown select, button toggle, drill-down click). Re-animation communicates the data changed. Do NOT set `isAnimationActive={false}` for this reason unless the trigger is genuinely real-time (slider, typing, polling).
-
-### CSS Transition Performance
-- **Never use `transition-all`** on interactive elements — it animates ALL CSS properties including layout-affecting ones (width, height, padding), forcing full composite on every hover. Use specific properties instead:
-  - Buttons with color/shadow effects: `transition-[border-color,color,box-shadow]`
-  - Transform-only: `transition-transform`
-  - Multiple visual props: `transition-[color,background-color,border-color,box-shadow]`
-- **Duration**: 200ms for hover interactions (felt as immediate); 300ms+ starts to feel sluggish on tight controls
-- **Icon animations alongside button hover**: keep at 200ms to match button — a 500ms icon rotate inside a 200ms button transition creates a disconnect
+### Formatter Duplication
+- `formatCurrency` and `formatCurrencyCompact` exist in both `lib/utils/formatters.ts` and `lib/services/chartService.ts`
+- Update both when changing formatting behavior
 
 ### Dashboard Data Isolation
-The Overview/Dashboard page must load fast. Do NOT add `useAllExpenses` or similar unbounded Firestore queries there. Even with React Query `staleTime`, the useMemo cascade (data processing + re-renders + countUp hooks) runs on every mount and competes with RAF animation frames — causing visible jank.
+- Do not add `useAllExpenses` or other full-history queries to Overview/Dashboard
+- Full-history expense analysis belongs in History or Cashflow
 
-**Rule**: If a feature needs `getAllExpenses` (full history), it belongs in History or Cashflow — pages that already fetch it. The dashboard loads only: `useAssets`, `useSnapshots`, `useExpenseStats`.
+### Loading and Skeletons
+- Skeletons should mirror the final layout
+- Reuse the same skeleton across chained loading states
+- Use full-page skeletons only on truly slow pages; otherwise prefer delayed or null loading
+- `Loader2` is for initial loading, `RefreshCw` is for user-triggered refresh
 
-### Button Micro-interaction Pattern
-- **Base class** (`components/ui/button.tsx`): `hover:-translate-y-[1px] active:scale-[0.97] active:translate-y-[1px] duration-150` — lift on hover, press-down on active
-- **ghost / link variants**: add `hover:translate-y-0` to suppress the lift (no solid chrome, so lift feels wrong). Press (`active:scale`) still applies from base class
-- **icon / icon-sm / icon-lg sizes**: add `hover:translate-y-0` — icon buttons should not shift position (they sit inside toolbars and table rows where even 1px shift is visible noise)
-- **`disabled:pointer-events-none`** already in base class — no hover/active events reach disabled buttons, no extra guard needed
-- **Gotcha — `asChild` + Radix dropdown trigger**: if the button wraps a Radix DropdownMenuTrigger or PopoverTrigger and a parent has `overflow: hidden` or tight `z-index`, the `translate-y` on hover can clip the floating menu. Fix: pass `className="hover:translate-y-0"` inline as an override on that specific usage
+### Motion and Charts
+- Shared variants live in `lib/utils/motionVariants.ts`
+- Do not wrap shadcn `TableRow` with `motion()`; use `motion.tr`
+- Recharts defaults:
+  - `Bar` / `Pie`: `animationDuration={600}` + `animationEasing="ease-out"`
+  - `Line` / `Area`: `animationDuration={800}` + `animationEasing="ease-out"`
+  - `Pie` also needs `animationBegin={0}`
+- Decorative stacked background areas should keep `isAnimationActive={false}`
 
-### SVG Draw Animation (stroke-dashoffset)
-Wrap `@keyframes` inside `@media (prefers-reduced-motion: no-preference)` — elements are fully visible by default, animation only applies when motion is allowed:
-```tsx
-<style>{`
-  @media (prefers-reduced-motion: no-preference) {
-    .circle { stroke-dasharray: 44; stroke-dashoffset: 44; animation: circle-draw 300ms ease-out forwards; }
-    .tick   { opacity: 0; animation: tick-appear 200ms ease-out 250ms forwards; }
-  }
-`}</style>
-```
-Circle circumference: `2πr` — r=7 → ~44px. Use unique class names per icon file to avoid keyframe collisions.
+### One-Time UI Effects
+- Use `localStorage` helpers for once-ever celebrations
+- Use `sessionStorage` plus an internal `useRef` guard for once-per-session notifications
 
-### EmptyState Component Pattern
-`components/ui/EmptyState.tsx` — reusable empty state with floating icon animation. Also exports 5 SVG icons: `SeedlingIcon`, `CalendarEmptyIcon`, `FilterEmptyIcon`, `TrophyEmptyIcon`, `ChartEmptyIcon`.
+### Dialog Layout
+- Prefer sticky header + sticky footer dialog layout for long forms
+- Do not use `overflow-y-auto` on dialog bodies that contain absolute-positioned custom dropdowns
 
-**Usage**:
-```tsx
-import { EmptyState, CalendarEmptyIcon } from '@/components/ui/EmptyState';
+---
 
-<EmptyState
-  icon={<CalendarEmptyIcon />}
-  title="Nessun dividendo previsto"
-  description="Naviga a un altro mese o aggiungi dividendi."
-  className="h-64"  // pass className to constrain height inside a chart card
-/>
-```
+## Testing and Workflow
 
-**Rules**:
-- Float animation via `motion-safe:animate-[float_3s_ease-in-out_infinite]` — `<style>` JSX inline (no globals.css dependency)
-- For small dropdowns (SearchableCombobox): use a compact inline version (icon + text row), not full EmptyState — the dropdown is too small for py-8 padding
-- Do NOT add EmptyState where a CTA button already exists (e.g. "Aggiungi il tuo primo asset")
-- `currentColor` + `text-muted-foreground/50` on the icon wrapper = correct visual weight (lighter than title)
-- If you need a new icon type, add it to `EmptyState.tsx` — do not create a separate file
+### Commands
+- `npm test -- <file>` or `npx vitest run <file>` for targeted tests
+- `npx tsc --noEmit` for repo-wide TypeScript checking without generating build output
 
-### CSS `animate-in` + prefers-reduced-motion
-- Framer Motion respects reduced-motion automatically via `MotionConfig` in `MotionProvider.tsx`.
-- **CSS `animate-in` classes** (tw-animate-css) must be guarded manually.
-- **Server components** (no `'use client'`): use `motion-safe:animate-in` Tailwind variant — no JS, no hydration issues. Pattern already used in `PerformancePageSkeleton` (`motion-safe:animate-pulse`) and `MetricSection` (`motion-safe:animate-in`).
-- **Client components only**: `window.matchMedia('(prefers-reduced-motion: reduce)').matches` + `useState/useEffect` works but causes a post-hydration flash on first render. Prefer `motion-safe:` when possible.
-- The `animationDelay` style prop is harmless when no animation classes are active — no need to conditionally omit it.
-
-### next-themes: `theme` vs `resolvedTheme`
-- `resolvedTheme` always resolves to `"light"` or `"dark"` — never returns `"system"`. Safe for rendering decisions (pick icon, pick color).
-- `theme` preserves the actual stored value: `"light"`, `"dark"`, or `"system"`. Required for cycle logic or detecting "follow OS" state.
-- **3-state cycle pattern** (`light → dark → system → light`): use `theme` as the discriminator, call `setTheme('system')` to re-enable OS following. See `Header.tsx`.
-- **Testing system-follow**: DevTools "Emulate prefers-color-scheme" only works when `localStorage.getItem('theme')` is `null` or `"system"`. If a user has manually toggled, localStorage wins. Reset with `localStorage.removeItem('theme')` + reload.
-
-### Sticky Dialog Layout Pattern
-```tsx
-<DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0">
-  <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">...</DialogHeader>
-  <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">{/* scrollable body */}</div>
-  <div className="px-6 pb-6 pt-4 border-t shrink-0 flex justify-end gap-2">{/* sticky footer */}</div>
-</DialogContent>
-```
-- `<form>` wrapping whole content: make it `flex flex-col flex-1 min-h-0`, put scroll div + footer inside form.
-- **Exception**: dialogs with `position: absolute` dropdowns must NOT have `overflow-y-auto` on body.
+### Test Patterns
+- Use local `new Date(year, monthIndex, day)` in tests, not ISO strings
+- Use `toBeCloseTo()` for floats
+- Use fake timers when testing helpers that depend on the current date
+- Keep test fixtures aligned with current required types, especially `BudgetItem.order`
 
 ---
 
 ## Common Errors to Avoid
 
 ### Timezone Boundary Bugs
-**Symptom**: Entries in wrong month near midnight. **Fix**: Use `getItalyMonthYear()` (NOT `Date.getMonth()`)
+- Symptom: entries appear in the wrong month near midnight
+- Fix: group with Italy timezone helpers, never native `Date.getMonth()`
 
-### Settings Persistence Bug
-**Symptom**: UI toggles save but reset after reload. **Fix**: Update BOTH `getSettings()` and `setSettings()` (three-place rule + two write branches).
+### Settings Persistence Bugs
+- Symptom: toggles save but reset after reload
+- Fix: update both `getSettings()` and both branches of `setSettings()`
 
-### Radix Dialog Auto-Trigger Bug
-**Symptom**: Callback doesn't fire when mounted with `open={true}`. **Fix**: Use `useEffect(() => { ... }, [open])`
+### Radix Select Empty String
+- Symptom: runtime error from `SelectItem`
+- Fix: use sentinels like `__all__`, `__none__`, `__create_new__`
 
-### Firebase Auth Registration Race Condition
-**Symptom**: PERMISSION_DENIED on first Firestore write after user creation. **Fix**: force `getIdToken(true)` + retry logic + Firestore rules using `docId` (not `resource.data`). **Files**: `authHelpers.ts`, `AuthContext.tsx`, `firestore.rules`
+### Recharts Legend and Tooltip Mismatch
+- `Legend` reads `<Bar fill>`, not `<Cell>`
+- Always set `fill` on `<Bar>` even when per-bar colors are overridden by `<Cell>`
+- Do not set text `color` globally in tooltip style for line/area/bar charts
 
-### Firebase Auth Login Redirect Race Condition
-**Symptom**: Login (or registration) only works on the second click. **Root cause**: `router.push('/dashboard')` called immediately after `signIn()` resolves, but `onAuthStateChanged` callback is still awaiting an async Firestore `displayName` lookup — `ProtectedRoute` sees `user=null` and bounces back to `/login`. **Fix**: remove `router.push()` from form handlers; add a `useEffect` in login/register pages that watches `user + authLoading` from `AuthContext` and redirects only when `!authLoading && user`. The same pattern applies to Google OAuth (`signInWithGoogle`).
+### ResponsiveContainer in Hidden Tabs
+- Symptom: `width(-1)` / `height(-1)` warnings
+- Fix: use explicit pixel heights, not `height="100%"`
 
-### Nullish `??` vs Falsy `||` for Snapshot Fallbacks
-**Symptom**: Asset value history shows "0,00€". **Fix**: Use `||` when `0` is semantically invalid (e.g. `totalValue || (price * qty)` in `assetPriceHistoryUtils.ts`).
+### Overflow Traps
+- `overflow-x-visible` disables useful table scrolling; use `overflow-x-auto`
+- `overflow-y-auto` clips absolute overlays such as custom dropdowns
 
-### Recharts Legend and Tooltip Color with Cell Overrides
-**Symptom**: `<Legend>` shows black square, or `<Tooltip>` shows wrong color, for a bar using `<Cell>` for conditional coloring. **Fix**: Always set `fill` on `<Bar>` to the default color — `<Cell>` overrides individual bars but `<Legend>` and `<Tooltip>` both read `<Bar fill>` directly, not from `<Cell>`.
+### Nullish vs Falsy Fallbacks
+- When `0` is semantically invalid for a snapshot-derived display value, prefer `||` over `??`
 
-### Recharts Tooltip Color — Three Distinct Cases
-**Line / Area / Bar**: auto-colored from series `stroke`/`fill`. Do NOT set `color` in `itemStyle` or `contentStyle` — it cascades and overrides per-series colors. Only set `backgroundColor`, `border`, `borderRadius` in `contentStyle`.
-
-**PieChart with `<Cell>`**: does NOT auto-color from `<Cell fill>`. Use a custom tooltip reading `entry.payload.color` explicitly. Also set `fill` on `<Bar>` for `<Legend>` — `<Cell>` overrides individual bars but Legend reads `<Bar fill>` directly.
-
-**contentStyle `color` cascades**: propagates to all child text. Never set it.
-
-### Recharts ResponsiveContainer Inside Hidden Radix Tab
-**Symptom**: Console warning `The width(-1) and height(-1)`. **Fix**: Use explicit pixel height: `<ResponsiveContainer width="100%" height={300}>`. Never `height="100%"` inside inactive tabs.
-
-### Recharts Legend Overlapping X-Axis Labels
-**Fix**: Add `margin={{ bottom: 20 }}` to the chart root element on every chart with `<Legend />`.
-
-### Unit Testing Patterns
-- **Local Date constructor**: `new Date(year, month, day)` not ISO string (ISO parses as UTC, shifts in CET)
-- **Float assertions**: `toBeCloseTo(expected, precision)` not `toBe`
-- **Fake timers**: `vi.useFakeTimers()` + `vi.setSystemTime()` in `beforeEach`; `vi.useRealTimers()` in `afterEach`
-
-### Controlled Numeric Inputs — Use String State
-**Symptom**: `NaN` or `0` when user clears an `<input type="number">`. **Fix**: Store as `string`; convert to `number` only when computing results.
-
-### `invisible` vs `hidden` for Layout-Preserving Removal
-Use `invisible` when a placeholder must hold its position in a grid/flex row (e.g. X button on first PMC calculator row).
-
-### `overflow-x-visible` Suppresses Horizontal Scroll
-**Fix**: Use `overflow-x-auto` always on wide table wrappers — never remove it at a breakpoint.
-
-### `overflow-y-auto` Clips Absolute-Positioned Children
-**Symptom**: A custom `position: absolute` dropdown inside a `overflow-y-auto` container gets cut off at the container boundary — items below the fold are invisible even if the dialog has room.
-**Fix**: Remove `overflow-y-auto` from the container when it holds absolute overlays (custom dropdowns, tooltips). Short confirmation dialogs don't need scroll — use `flex-1` without overflow. For longer forms, switch the custom dropdown to a Radix `<Select>` (portal-based, renders above all overflow contexts).
-
-### Vitest Cache Corruption on Windows
-**Symptom**: All test suites fail with "No test suite found in file" — zero tests collected — even though the files are unchanged and previously passed.
-**Fix**: `npx vitest run --clearCache` then re-run. The `.experimental-vitest-cache` on Windows can get stale after file renames or path-case changes. Not related to code changes.
-
-### Auto-Generated Dividend Idempotency
-Use deterministic Firestore doc ID for `isAutoGenerated=true` dividends: `{assetId}_{YYYY-MM-DD}_{dividendType}`. Makes cron writes idempotent.
-
-### Sign-Dependent Icon Null-State Fallback
-When an icon switches between TrendingUp/TrendingDown (or similar) based on a value's sign, always define an explicit fallback for the `null`/no-data case. Default to the "neutral positive" variant (e.g. `TrendingUp` green) — showing a red downward arrow when there is simply no data yet is a false negative signal that confuses users.
-```tsx
-// Pattern: null → positive default, value < 0 → negative variant
-{value && value < 0
-  ? <TrendingDown className="h-4 w-4 text-red-500" />
-  : <TrendingUp className="h-4 w-4 text-green-500" />
-}
-```
-
-### Emoji in UI Elements
-**Rule**: Never use Unicode emoji as icons in headings (`h2`, `h3`), badges, or UI hint cards. Emoji render with vendor-specific glyphs — different shape, color, and size on Windows, Android, and iOS. Always use Lucide icons instead.
-- Emoji in narrative/celebratory **text strings** (e.g. `"🎉 Hai raggiunto la FI!"`) are acceptable.
-- Map: `📊`→`BarChart3`, `🎯`→`Target`, `ℹ️`→`Info`, `⚠️`→`AlertTriangle`, `📉`→`TrendingDown`, `📈`→`TrendingUp`, `💡`→`Info` or `Lightbulb`
-
-### Radix Dialog/Sheet Without Description Warning
-**Symptom**: `Warning: Missing 'Description' or 'aria-describedby={undefined}' for {DialogContent}` in console when opening a Sheet or Dialog that has no description child.
-**Fix (primitive level)**: Add `aria-describedby={undefined}` to `DialogPrimitive.Content` in the component primitive — silences the warning globally. Applied in `components/ui/sheet.tsx`.
-**Fix (usage level)**: If a specific `<DialogContent>` in a page/component generates the warning, add `aria-describedby={undefined}` directly on that usage. Applied in `components/expenses/ExpenseDialog.tsx`.
-
-### shadcn `<Alert>` Icon Slot
-**Gotcha**: The first icon passed as a **direct child of `<Alert>`** (outside `<AlertDescription>`) is automatically positioned as the leading icon by shadcn's Alert component. Adding a second icon inside `<AlertDescription>` causes double rendering.
-```tsx
-// ✅ Correct — one icon as direct child of Alert, text in AlertDescription
-<Alert>
-  <Info className="h-4 w-4" />
-  <AlertDescription>Text here</AlertDescription>
-</Alert>
-
-// ❌ Wrong — double icon
-<Alert>
-  <Info className="h-4 w-4" />
-  <AlertDescription>
-    <div className="flex gap-2">
-      <Info className="h-4 w-4" />  {/* duplicate! */}
-      Text here
-    </div>
-  </AlertDescription>
-</Alert>
-```
-
-### Drawdown Duration / Recovery Time Semantics
-Duration = months **elapsed** (index distance, not inclusive count). `Jan(idx 0) → Dec(idx 11)` = 11m, **not** 12m. Never add `+1` for "inclusive counting" — it was added incorrectly and produces values 1 month too high. Recovery Time = 0m when trough IS the current snapshot (portfolio just hit the bottom, recovery hasn't started). Use `Math.max(0, ...)` not `Math.max(1, ...)`.
-
-### Custom Tooltip Pattern (Help Icon on Card Header)
-**Do NOT use the Radix `<Tooltip>` component** (`@/components/ui/tooltip`) for help-icon tooltips in page-level components — it silently fails to render in some contexts (e.g. the dashboard page).
-
-Use the **custom pattern** from `MetricCard.tsx` instead:
-```tsx
-const [showTooltip, setShowTooltip] = useState(false);
-const tooltipRef = useRef<HTMLDivElement>(null);
-
-useEffect(() => {
-  const handleClickOutside = (e: MouseEvent) => {
-    if (tooltipRef.current && !tooltipRef.current.contains(e.target as Node))
-      setShowTooltip(false);
-  };
-  if (showTooltip) document.addEventListener('mousedown', handleClickOutside);
-  return () => document.removeEventListener('mousedown', handleClickOutside);
-}, [showTooltip]);
-
-// JSX:
-<div className="relative" ref={tooltipRef}>
-  <button type="button" className="cursor-help hover:text-foreground transition-colors"
-    onClick={() => setShowTooltip(!showTooltip)}>
-    <HelpCircle className="h-4 w-4 text-muted-foreground" />
-  </button>
-  {showTooltip && (
-    <div className="absolute right-0 top-6 z-50 w-64 max-w-[calc(100vw-2rem)] rounded-md border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95">
-      <p>Tooltip text here.</p>
-    </div>
-  )}
-</div>
-```
-- Card header layout when adding the icon: `flex flex-row items-center justify-between space-y-0 pb-2` (same as `MetricCard`)
-- Width: `w-64` for short text, `w-72` for multi-paragraph explanations
-- Reference implementations: `MetricCard.tsx`, `app/dashboard/page.tsx` (LaborMetricsChart card)
-
-**Last updated**: 2026-04-01 (session 26: sessionStorage vs useRef for once-per-session notifications)
+### Sign-Dependent Icons
+- For nullable metrics, define an explicit no-data fallback icon state
+- Default to the neutral/positive visual, not a red negative indicator
