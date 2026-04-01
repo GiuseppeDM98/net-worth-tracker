@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCountUp } from '@/lib/utils/useCountUp';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   pageVariants,
@@ -28,7 +29,9 @@ import {
   formatCurrency,
   prepareAssetClassDistributionData,
   prepareAssetDistributionData,
+  prepareMonthlyLaborMetricsData,
 } from '@/lib/services/chartService';
+import LaborMetricsChart from '@/components/dashboard/LaborMetricsChart';
 import { calculateMonthlyChange, calculateYearlyChange } from '@/lib/services/snapshotService';
 import { updateHallOfFame } from '@/lib/services/hallOfFameService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,11 +45,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Wallet, TrendingUp, PieChart, DollarSign, Camera, TrendingDown, Receipt, ChevronDown, Loader2 } from 'lucide-react';
+import { Wallet, TrendingUp, PieChart, DollarSign, Camera, TrendingDown, Receipt, ChevronDown, Loader2, Briefcase, PiggyBank, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useSnapshots, useCreateSnapshot } from '@/lib/hooks/useSnapshots';
 import { useExpenseStats } from '@/lib/hooks/useExpenseStats';
+import { useAllExpenses } from '@/lib/hooks/useAllExpenses';
+import { SavingsRateBadge } from '@/components/ui/SavingsRateBadge';
+import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
+import { getItalyDate, getItalyYear } from '@/lib/utils/dateHelpers';
+import { getGreeting } from '@/lib/utils/getGreeting';
 
 /**
  * MAIN DASHBOARD PAGE
@@ -86,6 +94,18 @@ import { useExpenseStats } from '@/lib/hooks/useExpenseStats';
 export default function DashboardPage() {
   const { user } = useAuth();
 
+  // Calculated once at mount — no need to re-evaluate on every render.
+  // Hour extracted in Europe/Rome timezone so the greeting is always contextually correct.
+  const greeting = useMemo(() => {
+    const italyHour = getItalyDate(new Date()).getHours();
+    const result = getGreeting(italyHour);
+    const firstName = user?.displayName?.split(' ')[0];
+    const label = firstName && firstName.length <= 20
+      ? `${result.greeting}, ${firstName}`
+      : result.greeting;
+    return { label, subtitle: result.subtitle };
+  }, [user?.displayName]);
+
   // React Query provides automatic caching, deduplication, and background refetching.
   // All three queries run in parallel, reducing total loading time from ~600ms to ~200ms.
   // Data persists across page navigations via query cache, improving perceived performance.
@@ -98,6 +118,8 @@ export default function DashboardPage() {
 
   const [creatingSnapshot, setCreatingSnapshot] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showLaborChartTooltip, setShowLaborChartTooltip] = useState(false);
+  const laborChartTooltipRef = useRef<HTMLDivElement>(null);
   const [existingSnapshot, setExistingSnapshot] = useState<MonthlySnapshot | null>(null);
   const [portfolioSettings, setPortfolioSettings] = useState<AssetAllocationSettings | null>(null);
 
@@ -119,6 +141,21 @@ export default function DashboardPage() {
       getSettings(user.uid).then(setPortfolioSettings).catch(() => {});
     }
   }, [user]);
+
+  // Close the labor chart tooltip when clicking outside its container
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (laborChartTooltipRef.current && !laborChartTooltipRef.current.contains(event.target as Node)) {
+        setShowLaborChartTooltip(false);
+      }
+    };
+    if (showLaborChartTooltip) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showLaborChartTooltip]);
 
   /**
    * Calculate all portfolio metrics once per render cycle.
@@ -226,6 +263,76 @@ export default function DashboardPage() {
 
     return { monthly: monthlyVariation, yearly: yearlyVariation };
   }, [snapshots, portfolioMetrics.totalValue]);
+
+  const isMobile = useMediaQuery('(max-width: 1439px)');
+
+  // Load all expenses only when labor income categories are configured — avoids unnecessary fetches
+  const hasLaborIncomeConfig = (portfolioSettings?.laborIncomeCategoryIds?.length ?? 0) > 0;
+  const { data: allExpenses = [] } = useAllExpenses(user?.uid, hasLaborIncomeConfig);
+
+  /**
+   * Aggregate lifetime metrics splitting work income from investment returns.
+   *
+   * Requires laborIncomeCategoryIds to be configured in Settings.
+   * All figures are filtered from cashflowHistoryStartYear onwards to align with
+   * the same cutoff used in TotalHistoryTab charts.
+   *
+   * - totalLaborIncome: sum of income transactions in the selected labor categories
+   * - totalSavedFromWork: labor income minus all expenses (net savings)
+   * - totalInvestmentGrowthGross: net worth delta minus total net savings (market returns)
+   * - totalInvestmentGrowthNet: gross minus current estimated taxes on unrealized portfolio gains
+   */
+  const laborIncomeMetrics = useMemo(() => {
+    if (!hasLaborIncomeConfig || allExpenses.length === 0) return null;
+
+    const startYear = portfolioSettings?.cashflowHistoryStartYear ?? 2025;
+    const categoryIds = new Set(portfolioSettings!.laborIncomeCategoryIds!);
+
+    const filtered = allExpenses.filter((e) => getItalyYear(e.date) >= startYear);
+
+    const totalLaborIncome = filtered
+      .filter((e) => e.type === 'income' && categoryIds.has(e.categoryId))
+      .reduce((sum, e) => sum + e.amount, 0);
+
+    // Expenses are stored as negative values — summing gives negative total
+    const totalExpensesSum = filtered
+      .filter((e) => e.type !== 'income')
+      .reduce((sum, e) => sum + e.amount, 0);
+
+    const totalSavedFromWork = totalLaborIncome + totalExpensesSum;
+
+    // Net worth delta from startYear: use December of (startYear-1) as baseline
+    // so that the full startYear is included. Falls back to first snapshot of
+    // startYear when prior December doesn't exist.
+    const relevantSnapshots = snapshots
+      .filter((s) => s.year >= startYear)
+      .sort((a, b) => (a.year !== b.year ? a.year - b.year : a.month - b.month));
+
+    let totalInvestmentGrowthGross = 0;
+    if (relevantSnapshots.length >= 1) {
+      const baselineSnapshot =
+        snapshots.find((s) => s.year === startYear - 1 && s.month === 12) ??
+        relevantSnapshots[0];
+      const netWorthDelta =
+        relevantSnapshots.at(-1)!.totalNetWorth - baselineSnapshot.totalNetWorth;
+      const allIncomeSum = filtered
+        .filter((e) => e.type === 'income')
+        .reduce((sum, e) => sum + e.amount, 0);
+      const allNetSavings = allIncomeSum + totalExpensesSum;
+      totalInvestmentGrowthGross = netWorthDelta - allNetSavings;
+    }
+
+    const totalInvestmentGrowthNet =
+      totalInvestmentGrowthGross - portfolioMetrics.estimatedTaxes;
+
+    return {
+      totalLaborIncome,
+      totalSavedFromWork,
+      totalInvestmentGrowthGross,
+      totalInvestmentGrowthNet,
+      startYear,
+    };
+  }, [allExpenses, snapshots, portfolioSettings, hasLaborIncomeConfig, portfolioMetrics.estimatedTaxes]);
 
   // Memoize chart data
   const chartData = useMemo(() => {
@@ -357,6 +464,31 @@ export default function DashboardPage() {
   // Calculate derived values for display
   const liquidNetTotal = portfolioMetrics.liquidNetWorth - portfolioMetrics.liquidEstimatedTaxes;
 
+  // Animated KPI values — fire once on first meaningful (non-zero) data load, never re-trigger.
+  // Hooks must be called unconditionally (before any early return).
+  const animatedTotalValue = useCountUp(portfolioMetrics.totalValue, { once: true });
+  const animatedLiquidNetWorth = useCountUp(portfolioMetrics.liquidNetWorth, { once: true });
+  const animatedNetTotal = useCountUp(portfolioMetrics.netTotal, { once: true });
+  const animatedLiquidNetTotal = useCountUp(liquidNetTotal, { once: true });
+  const animatedUnrealizedGains = useCountUp(portfolioMetrics.unrealizedGains, { once: true });
+  const animatedEstimatedTaxes = useCountUp(portfolioMetrics.estimatedTaxes, { once: true });
+  const animatedLaborIncome = useCountUp(laborIncomeMetrics?.totalLaborIncome ?? 0, { once: true });
+  const animatedSavedFromWork = useCountUp(laborIncomeMetrics?.totalSavedFromWork ?? 0, { once: true });
+  const animatedInvestmentGross = useCountUp(laborIncomeMetrics?.totalInvestmentGrowthGross ?? 0, { once: true });
+  const animatedInvestmentNet = useCountUp(laborIncomeMetrics?.totalInvestmentGrowthNet ?? 0, { once: true });
+
+  // Monthly breakdown of the same metrics shown in the 4 KPI cards above.
+  // Requires the same conditions: labor categories configured and expenses loaded.
+  const laborMetricsChartData = useMemo(() => {
+    if (!laborIncomeMetrics || allExpenses.length === 0) return [];
+    return prepareMonthlyLaborMetricsData(
+      snapshots,
+      allExpenses,
+      portfolioSettings!.laborIncomeCategoryIds!,
+      laborIncomeMetrics.startYear
+    );
+  }, [laborIncomeMetrics, allExpenses, snapshots, portfolioSettings]);
+
   // Only show cost basis cards if user is actually tracking cost basis on any asset.
   // Prevents empty cards saying "€0.00 gains" for users not using this feature.
   // Keeps dashboard clean and relevant to user's tracking preferences.
@@ -386,9 +518,9 @@ export default function DashboardPage() {
       {/* Header stacks vertically on portrait mobile to prevent title/button overflow */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 sm:text-3xl">Dashboard</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 sm:text-3xl">{greeting.label}</h1>
           <p className="mt-1 text-gray-600 dark:text-gray-400 sm:mt-2">
-            Panoramica del tuo portafoglio di investimenti
+            {greeting.subtitle}
           </p>
         </div>
         <Button
@@ -416,7 +548,7 @@ export default function DashboardPage() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(portfolioMetrics.totalValue)}</div>
+              <div className="text-2xl font-bold">{formatCurrency(animatedTotalValue ?? portfolioMetrics.totalValue)}</div>
               <p className="text-xs text-muted-foreground">
                 {portfolioMetrics.assetCount === 0 ? 'Aggiungi assets per iniziare' : `${portfolioMetrics.assetCount} asset${portfolioMetrics.assetCount !== 1 ? 's' : ''}`}
               </p>
@@ -431,7 +563,7 @@ export default function DashboardPage() {
               <Wallet className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(portfolioMetrics.liquidNetWorth)}</div>
+              <div className="text-2xl font-bold">{formatCurrency(animatedLiquidNetWorth ?? portfolioMetrics.liquidNetWorth)}</div>
             </CardContent>
           </Card>
         </motion.div>
@@ -478,7 +610,7 @@ export default function DashboardPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold text-blue-600">
-                      {formatCurrency(portfolioMetrics.netTotal)}
+                      {formatCurrency(animatedNetTotal ?? portfolioMetrics.netTotal)}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Dopo tasse stimate
@@ -495,7 +627,7 @@ export default function DashboardPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold text-blue-600">
-                      {formatCurrency(liquidNetTotal)}
+                      {formatCurrency(animatedLiquidNetTotal ?? liquidNetTotal)}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Liquidità dopo tasse stimate
@@ -522,7 +654,7 @@ export default function DashboardPage() {
                     <div className={`text-2xl font-bold ${
                       portfolioMetrics.unrealizedGains >= 0 ? 'text-green-600' : 'text-red-600'
                     }`}>
-                      {portfolioMetrics.unrealizedGains >= 0 ? '+' : ''}{formatCurrency(portfolioMetrics.unrealizedGains)}
+                      {portfolioMetrics.unrealizedGains >= 0 ? '+' : ''}{formatCurrency(animatedUnrealizedGains ?? portfolioMetrics.unrealizedGains)}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Guadagno/perdita rispetto al costo medio
@@ -539,7 +671,7 @@ export default function DashboardPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold text-orange-600">
-                      {formatCurrency(portfolioMetrics.estimatedTaxes)}
+                      {formatCurrency(animatedEstimatedTaxes ?? portfolioMetrics.estimatedTaxes)}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Imposte su plusvalenze non realizzate
@@ -755,6 +887,120 @@ export default function DashboardPage() {
         )}
       </AnimatePresence>
 
+      {/* Labor Income & Investment KPI Cards — shown only when laborIncomeCategoryIds is configured in Settings */}
+      <AnimatePresence>
+        {laborIncomeMetrics && (
+          <motion.div
+            variants={staggerContainer}
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
+            className="grid gap-6 md:grid-cols-2 desktop:grid-cols-4"
+          >
+            {/* Total earned from work */}
+            <motion.div variants={cardItem}>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Guadagnato da Lavoro</CardTitle>
+                  <Briefcase className="h-4 w-4 text-blue-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-blue-600">
+                    {formatCurrency(animatedLaborIncome ?? 0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear}</p>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Net savings from work (labor income minus all expenses) */}
+            <motion.div variants={cardItem}>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Risparmiato da Lavoro</CardTitle>
+                  <PiggyBank className={`h-4 w-4 ${laborIncomeMetrics.totalSavedFromWork >= 0 ? 'text-green-500' : 'text-red-500'}`} />
+                </CardHeader>
+                <CardContent>
+                  <div className={`text-2xl font-bold ${laborIncomeMetrics.totalSavedFromWork >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {laborIncomeMetrics.totalSavedFromWork >= 0 ? '+' : ''}{formatCurrency(animatedSavedFromWork ?? 0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear}</p>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Gross investment returns (net worth delta minus net savings) */}
+            <motion.div variants={cardItem}>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Crescita Investimenti (Lordo)</CardTitle>
+                  {laborIncomeMetrics.totalInvestmentGrowthGross >= 0
+                    ? <TrendingUp className="h-4 w-4 text-green-500" />
+                    : <TrendingDown className="h-4 w-4 text-red-500" />}
+                </CardHeader>
+                <CardContent>
+                  <div className={`text-2xl font-bold ${laborIncomeMetrics.totalInvestmentGrowthGross >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {laborIncomeMetrics.totalInvestmentGrowthGross >= 0 ? '+' : ''}{formatCurrency(animatedInvestmentGross ?? 0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear}</p>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Net investment returns after estimated capital gains taxes */}
+            <motion.div variants={cardItem}>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Crescita Investimenti (Netto)</CardTitle>
+                  {laborIncomeMetrics.totalInvestmentGrowthNet >= 0
+                    ? <TrendingUp className="h-4 w-4 text-green-500" />
+                    : <TrendingDown className="h-4 w-4 text-red-500" />}
+                </CardHeader>
+                <CardContent>
+                  <div className={`text-2xl font-bold ${laborIncomeMetrics.totalInvestmentGrowthNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {laborIncomeMetrics.totalInvestmentGrowthNet >= 0 ? '+' : ''}{formatCurrency(animatedInvestmentNet ?? 0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear} · al netto tasse stimate</p>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Monthly labor metrics chart — companion to the 4 KPI cards above */}
+      <AnimatePresence>
+        {laborIncomeMetrics && laborMetricsChartData.length > 0 && (
+          <motion.div variants={cardItem} initial="hidden" animate="visible">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle>Evoluzione Mensile: Lavoro &amp; Investimenti</CardTitle>
+                {/* Tooltip explains why savings + investment growth may not equal month-over-month net worth change */}
+                <div className="relative" ref={laborChartTooltipRef}>
+                  <button
+                    type="button"
+                    className="cursor-help hover:text-foreground transition-colors"
+                    onClick={() => setShowLaborChartTooltip(!showLaborChartTooltip)}
+                  >
+                    <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                  {showLaborChartTooltip && (
+                    <div className="absolute right-0 top-6 z-50 w-72 max-w-[calc(100vw-2rem)] rounded-md border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95">
+                      <p className="font-medium mb-1">Perché i valori potrebbero non coincidere con la variazione mensile del patrimonio?</p>
+                      <p>Il <strong>Risparmiato da Lavoro</strong> è calcolato come le entrate nelle categorie flaggate come &ldquo;reddito da lavoro&rdquo; nelle Impostazioni, meno tutte le spese del mese.</p>
+                      <p className="mt-1.5">Se hai fonti di entrata non incluse tra le categorie di reddito da lavoro (es. dividendi, affitti), non vengono conteggiate nel risparmio — generando una discrepanza normale rispetto alla variazione effettiva del patrimonio.</p>
+                    </div>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                <LaborMetricsChart data={laborMetricsChartData} isMobile={isMobile} />
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Pie charts — collapsible on mobile to reduce scroll length (~1050px on portrait) */}
       <div className="space-y-6">
         <Card>
@@ -862,6 +1108,14 @@ export default function DashboardPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Savings rate celebration badge — shown once per session when last month > threshold */}
+      {expenseStats && (
+        <SavingsRateBadge
+          previousMonthIncome={expenseStats.previousMonth.income}
+          previousMonthExpenses={expenseStats.previousMonth.expenses}
+        />
+      )}
     </motion.div>
   );
 }

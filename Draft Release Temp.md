@@ -1,5 +1,26 @@
 ## ✨ New Features
 
+- The Dashboard now greets you by name based on the time of day — "Buongiorno, Giuseppe" in the morning, "Buon pomeriggio" in the afternoon, "Buonasera" in the evening, and "Buonanotte" late at night. The subtitle also adapts ("Ecco il tuo patrimonio di stamattina", "Riepilogo della giornata", etc.) so the opening screen always feels contextually relevant, not generic
+
+- Added a **savings rate celebration badge** on the Dashboard — a small green notification appears in the bottom-left corner the first time you open the dashboard each browser session when last month's savings rate exceeded 30%. It auto-dismisses after 3 seconds. Automatically skipped for users with "Reduce Motion" enabled in system accessibility settings
+
+- **FIRE Calculator**: Allowance cards (Annual, Monthly, Daily) now show a liquid vs illiquid breakdown — a proportional bar visualises the split at a glance, with exact amounts in green (liquid) and amber (illiquid) below the main figure
+- **FIRE Calculator**: "Years of Expenses" now shows how many years your **liquid assets alone** cover at current spending — the most actionable figure, since it requires no selling of real estate or illiquid holdings. Total FIRE years and illiquid-only years are shown as secondary context
+- **FIRE Calculator**: Annual expenses now sourced from the last fully completed year instead of the current partial year — producing a more accurate and representative baseline for all FIRE metrics
+- **FIRE Calculator**: Allowance card subtitles now explain the formula (`Portfolio × X%`) so the calculation is immediately understandable
+
+- Added **Monthly Labor & Investments Evolution chart** to the Dashboard — appears below the four Labor Income KPI cards when labor income categories are configured. Three lines show how Earned from Work, Saved from Work, and Gross Investment Growth evolved month by month from your configured history start year. Colors match the KPI card icons (blue / green / amber). The chart is responsive: compact on mobile, full height on desktop
+
+- Added **Labor Income KPI cards** to the Dashboard Overview — four new metric cards appear when you configure labor income categories in Settings: "Earned from Work" (cumulative income from selected categories), "Saved from Work" (income minus all expenses), "Investment Growth (Gross)" (market returns isolated from savings contributions), and "Investment Growth (Net)" (after estimated capital gains taxes). All figures are filtered from your configured cashflow history start year. The cards only appear when labor income categories are configured — no clutter if you don't use this feature
+
+- Added **"All years" option** to the monthly Savings vs Investment Growth chart on the History page — select "Tutti" from the year dropdown to see a continuous month-by-month timeline spanning your entire history, instead of one year at a time. Labels include the year ("Gen 2023", "Feb 2023") for easy orientation
+
+- Added **Labor Income category selector** to Settings (Preferences tab) — pick which income categories represent your work earnings (salary, freelance, etc.) using toggle buttons. These are used to power the new Dashboard KPI cards above
+
+- Added a celebratory banner to the FIRE Calculator that appears when your net worth meets or exceeds your FIRE Number — includes a one-time confetti burst on first view and a permanent dismiss button. Automatically skipped for users with "Reduce Motion" enabled in system accessibility settings
+
+- Added confetti celebration when a doubling milestone is reached on the History page — each completed milestone triggers a one-time burst of emerald and amber confetti the first time it is seen. The celebration is stored in the browser so it never repeats. Automatically skipped for users who have enabled "Reduce Motion" in system accessibility settings
+
 - Added smooth animated transitions between dashboard pages — navigating via the sidebar now plays a subtle fade-out then fade-in effect, making the app feel connected and polished rather than abrupt
 
 
@@ -49,6 +70,12 @@
 - Fixed date filters on the Dividends page: setting only a start date (without an end date) now correctly filters the summary cards and charts. Previously, a single date bound was silently ignored
 
 ## 🔧 Improvements
+
+- Added an info tooltip to the "Monthly Labor & Investments Evolution" chart on the Dashboard — click the help icon (ⓘ) in the card header to learn why "Saved from Work" plus "Investment Growth" may not match the month-over-month net worth change. The tooltip explains that savings are calculated from labor income categories configured in Settings, so income sources not flagged there (dividends, rent, etc.) are intentionally excluded
+
+- Empty states across the app now show a small animated icon instead of a plain grey text message — the icon gently floats up and down to add life to otherwise static moments. Affected areas: Doubling Milestone Timeline (no milestones yet), Dividend Calendar (month with no dividends), "Dividends by Asset / by Year / Monthly Income" charts, Asset Price History table, Asset Class History table, and any search dropdown with no matching results. The animation automatically stops for users who have enabled "Reduce Motion" in system accessibility settings
+
+- Toast notifications for success, error, and warning actions now have animated icons — the circle draws in, then the checkmark, X, or exclamation mark appears. The full animation completes in under 500ms and is automatically skipped for users who have enabled "Reduce Motion" in their OS accessibility settings
 
 - The "Add / Edit Asset", "New / Edit Expense", and "Delete Category" dialogs now keep their title and action buttons always visible while you scroll — the header is pinned at the top and the Save / Confirm button is pinned at the bottom, so you never need to scroll to the very end of a long form just to submit it
 - The "Delete Category" confirmation dialog is now wider, uses stacked full-width buttons, and the category list dropdown is fully visible when open — previously the dropdown was clipped and the buttons overflowed the screen on mobile
@@ -149,6 +176,7 @@
 - All buttons now respond to hover with a subtle lift effect and to click/tap with a gentle press-down animation — providing consistent tactile feedback throughout the app. Ghost buttons, link buttons, and icon buttons keep the press feedback only (no lift), matching the existing behavior of metric and ranking cards
 - Budget tab collapsible sections (Fixed Expenses, Variable, Debt, Income) now animate smoothly open and closed — expanding slides the rows down with a fade-in and collapsing slides them back up, instead of snapping instantly. The chevron indicator rotates to signal direction. Works on both desktop and mobile views
 - Budget tab: the section chevron now clearly indicates expanded (↑) vs collapsed (↓) state at a glance
+- Dashboard KPI cards now animate their values on load — Total Portfolio, Liquid Portfolio, Net Total (after taxes), Liquid Net Total, Unrealized Gains, and Estimated Taxes all count up smoothly from zero when the page first opens. The animation plays once on mount and does not re-trigger on background data refreshes
 
 ## 🐛 Bug Fixes
 
@@ -157,6 +185,11 @@
 - Performance page chart sections (portfolio evolution, rolling CAGR, rolling Sharpe, monthly heatmap, underwater drawdown, methodology) now animate in with a staggered cascade on load — each chart slides up and fades in sequentially instead of appearing all at once
 - The Dividends tab now animates in with a staggered cascade when first opened — action buttons, filters, statistics charts, and the dividend table each appear sequentially with a subtle slide-up effect
 
+- Fixed all annual year-over-year calculations incorrectly using January as the starting baseline — they now correctly use December of the previous year, so January's performance is no longer silently excluded from annual figures. Affected metrics: "Variazione Annuale" card on the Dashboard, the YoY Variation bar chart on the History page, the annual Savings vs Investment Growth chart, the Investment Growth cards on the Dashboard (when labor income categories are configured), Hall of Fame yearly rankings, and the YoY section in PDF exports
+- Fixed the "Monthly Allowance" line in the FIRE Calculator's historical chart not matching the Allowance card value — the chart now correctly excludes the primary residence from the net worth used to compute each month's allowance, consistent with the card. Historical data points before this fix are unaffected (they used total net worth as a fallback)
+- Fixed the Current Withdrawal Rate, FIRE Number, and Planned FIRE Number cards not showing which inputs drive the displayed percentage or target — each card now shows the underlying formula (e.g. `€38.400 / 4%`) so the calculation is immediately verifiable
+
 ## 🔒 Security
 
 - Updated Next.js, undici, fast-xml-parser, and flatted dependencies to patch 3 high-severity and 1 moderate-severity vulnerabilities
+- Fixed 3 additional vulnerabilities (node-forge high severity, picomatch high severity, brace-expansion moderate) via dependency updates

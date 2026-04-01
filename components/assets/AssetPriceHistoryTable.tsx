@@ -49,6 +49,7 @@ import {
 } from '@/components/ui/table';
 import { RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { EmptyState, ChartEmptyIcon } from '@/components/ui/EmptyState';
 
 interface AssetPriceHistoryTableProps {
   assets: Asset[];
@@ -108,13 +109,11 @@ export function AssetPriceHistoryTable({
       {/* Table Container - Horizontal Scroll */}
       <div className="overflow-x-auto max-h-[600px] border rounded-lg text-xs sm:text-sm">
         {assetRows.length === 0 ? (
-          /* Empty state */
-          <div className="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-400">
-            <p className="text-lg font-semibold">Nessun dato storico disponibile</p>
-            <p className="text-sm mt-2">
-              Crea uno snapshot mensile per iniziare a tracciare i prezzi.
-            </p>
-          </div>
+          <EmptyState
+            icon={<ChartEmptyIcon />}
+            title="Nessun dato storico disponibile"
+            description="Crea uno snapshot mensile per iniziare a tracciare i prezzi."
+          />
         ) : (
           <Table>
             <TableHeader className="sticky top-0 bg-white dark:bg-gray-900 z-20">

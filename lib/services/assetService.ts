@@ -435,6 +435,48 @@ export function calculateFIRENetWorth(assets: Asset[], includePrimaryResidence: 
 }
 
 /**
+ * Calculate liquid FIRE-eligible net worth.
+ *
+ * Combines the liquidity filter (same logic as calculateLiquidNetWorth) with
+ * the primary-residence exclusion (same logic as calculateFIRENetWorth).
+ *
+ * Invariant: calculateLiquidFIRENetWorth + calculateIlliquidFIRENetWorth === calculateFIRENetWorth
+ * for any given (assets, includePrimaryResidence) pair.
+ */
+export function calculateLiquidFIRENetWorth(assets: Asset[], includePrimaryResidence: boolean = false): number {
+  return assets
+    .filter(asset => {
+      if (!includePrimaryResidence && asset.assetClass === 'realestate' && asset.isPrimaryResidence === true) {
+        return false;
+      }
+      if (asset.isLiquid !== undefined) return asset.isLiquid === true;
+      return asset.assetClass !== 'realestate' && asset.subCategory !== 'Private Equity';
+    })
+    .reduce((total, asset) => total + calculateAssetValue(asset), 0);
+}
+
+/**
+ * Calculate illiquid FIRE-eligible net worth.
+ *
+ * Combines the illiquidity filter (same logic as calculateIlliquidNetWorth) with
+ * the primary-residence exclusion (same logic as calculateFIRENetWorth).
+ *
+ * Invariant: calculateLiquidFIRENetWorth + calculateIlliquidFIRENetWorth === calculateFIRENetWorth
+ * for any given (assets, includePrimaryResidence) pair.
+ */
+export function calculateIlliquidFIRENetWorth(assets: Asset[], includePrimaryResidence: boolean = false): number {
+  return assets
+    .filter(asset => {
+      if (!includePrimaryResidence && asset.assetClass === 'realestate' && asset.isPrimaryResidence === true) {
+        return false;
+      }
+      if (asset.isLiquid !== undefined) return asset.isLiquid === false;
+      return asset.assetClass === 'realestate' || asset.subCategory === 'Private Equity';
+    })
+    .reduce((total, asset) => total + calculateAssetValue(asset), 0);
+}
+
+/**
  * Calculate unrealized gains for a single asset
  *
  * Returns 0 if averageCost is not set because gains cannot be calculated

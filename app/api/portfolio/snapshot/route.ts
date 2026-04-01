@@ -7,6 +7,7 @@ import {
   calculateTotalValue,
   calculateLiquidNetWorth,
   calculateIlliquidNetWorth,
+  calculateFIRENetWorth,
 } from '@/lib/services/assetService';
 import { calculateCurrentAllocation } from '@/lib/services/assetAllocationService';
 import { updateUserAssetPrices } from '@/lib/helpers/priceUpdater';
@@ -134,6 +135,7 @@ export async function POST(request: NextRequest) {
     const totalNetWorth = calculateTotalValue(assets);
     const liquidNetWorth = calculateLiquidNetWorth(assets);
     const illiquidNetWorth = calculateIlliquidNetWorth(assets);
+    const fireNetWorth = calculateFIRENetWorth(assets, false);
     const allocation = calculateCurrentAllocation(assets);
 
     // Convert absolute allocation values to percentages for historical charts
@@ -183,6 +185,7 @@ export async function POST(request: NextRequest) {
       totalNetWorth,
       liquidNetWorth,
       illiquidNetWorth,
+      fireNetWorth,
       byAssetClass: allocation.byAssetClass,
       byAsset,
       assetAllocation,

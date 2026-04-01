@@ -167,6 +167,7 @@ export interface AssetAllocationSettings {
   stampDutyRate?: number; // Annual stamp duty rate as a percentage (e.g. 0.2 for 0.20%)
   checkingAccountSubCategory?: string; // Cash subcategory name representing checking accounts (conti correnti); stamp duty applies only if value > 5000€
   cashflowHistoryStartYear?: number; // Min year shown in TotalHistoryTab charts (excludes bulk-imported older data); defaults to 2025
+  laborIncomeCategoryIds?: string[]; // Category IDs of type 'income' representing labor/salary income; used for dashboard KPI cards
   targets: AssetAllocationTarget;
 }
 
@@ -215,6 +216,9 @@ export interface MonthlySnapshot {
   totalNetWorth: number;
   liquidNetWorth: number;
   illiquidNetWorth: number; // New field to track illiquid assets separately
+  // FIRE-adjusted net worth excludes the primary residence (isPrimaryResidence flag).
+  // Optional for backwards compatibility — absent on snapshots created before this field was added.
+  fireNetWorth?: number;
   byAssetClass: {
     [assetClass: string]: number;
   };

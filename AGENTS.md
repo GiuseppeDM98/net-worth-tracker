@@ -107,6 +107,35 @@ ALL fields in settings types must be handled in THREE places: type definition, `
 - Prefer per-asset opt-in/opt-out flags over hardcoded category exclusions
 - Add to: `Asset` + `AssetFormData` types, Zod schema, reset defaults, edit-mode prefill, save payload, AssetDialog toggle
 
+### Snapshot Document — Two Build Sites
+`MonthlySnapshot` documents are built in TWO independent places. Any new field must be added to BOTH:
+1. `lib/services/snapshotService.ts` — `createSnapshot()` — used by automated/client paths
+2. `app/api/portfolio/snapshot/route.ts` — `POST /api/portfolio/snapshot` — used by the dashboard "Create Snapshot" button and the monthly cron job (which calls this route internally)
+
+`app/api/portfolio/snapshot/manual/route.ts` receives data from the caller (historical imports) — it has no asset list to compute from, so new calculated fields cannot be added there.
+
+### FIRE Chart — includePrimaryResidence Must Flow Through
+`getFIREData(userId, currentNetWorth, withdrawalRate, includePrimaryResidence)` passes the flag to `prepareFIREChartData` so the monthly allowance line uses the same NW basis as the card metrics. **Two requirements**:
+1. The flag must be in the React Query `queryKey`: `['fireData', userId, currentNetWorth, withdrawalRate, includePrimaryResidence]` — otherwise toggling the flag doesn't invalidate the cache and the chart stales
+2. The flag must be forwarded in the `queryFn` call
+
+### MonthlySnapshot `fireNetWorth` Field
+`fireNetWorth?: number` on `MonthlySnapshot` — NW excluding the primary-residence asset (`isPrimaryResidence: true` flag). Saved at snapshot creation time via `calculateFIRENetWorth(assets, false)`. Optional (absent on snapshots created before this field was added). Used by `prepareFIREChartData` for the monthly allowance line: `snapshot.fireNetWorth ?? snapshot.totalNetWorth`. Historical snapshots without the field fall back to `totalNetWorth` silently.
+
+### FIRE Metrics Enrichment Pattern
+When `getFIREData` (async) returns, re-run `calculateFIREMetrics` (pure, synchronous) client-side with additional derived values instead of threading extra params through the Firebase call:
+```ts
+// getFIREData fetches expenses + chart; enrich metrics client-side after it resolves
+const fireMetrics = fireData?.metrics
+  ? calculateFIREMetrics(currentNetWorth, fireData.metrics.annualExpenses, withdrawalRate, liquidNetWorth, illiquidNetWorth)
+  : null;
+```
+This avoids changing async service signatures whenever the component needs new breakdowns.
+
+**FIRE annual expenses**: `getAnnualExpenses` uses last completed year (`now.getFullYear() - 1`), NOT current year. Using current year mid-period (e.g. March) gives only 3 months of data, understating annual spend and making yearsOfExpenses misleading.
+
+**Liquid/Illiquid FIRE split**: `calculateLiquidFIRENetWorth` / `calculateIlliquidFIRENetWorth` in `assetService.ts` combine the liquidity filter with primary-residence exclusion. Invariant: `liquid + illiquid === calculateFIRENetWorth` for any `(assets, includePrimaryResidence)`.
+
 ### Dashboard Settings Loading
 - Dashboard loads `AssetAllocationSettings` via `useEffect` + `useState` (NOT React Query)
 - Pattern: `getSettings(user.uid).then(setPortfolioSettings).catch(() => {})`
@@ -131,7 +160,7 @@ ALL fields in settings types must be handled in THREE places: type definition, `
 - **Stamp Duty**: `calculateStampDuty(assets, rate, checkingAccountSubCategory?)` in `assetService.ts`
 
 ### Formatter Utility Duplication
-**Gotcha**: `formatCurrency` exists in BOTH `lib/utils/formatters.ts` AND `lib/services/chartService.ts`. Update both when modifying. Never redefine `formatCurrency` inline in a component — always import from `lib/utils/formatters`.
+**Gotcha**: `formatCurrency` AND `formatCurrencyCompact` exist in BOTH `lib/utils/formatters.ts` AND `lib/services/chartService.ts`. Update both when modifying. Never redefine either inline in a component — always import from the appropriate source. **Notably**: `formatCurrencyCompact` is NOT exported from `lib/utils/formatters.ts` — only from `lib/services/chartService.ts`. Import accordingly in chart components.
 
 ### Derived State — Use `useMemo`, Not `useEffect + setState`
 **Antipattern**: Using `useEffect` to compute filtered/derived lists and store them in a separate `useState`:
@@ -155,6 +184,29 @@ Only use `useEffect` for side effects (API calls, subscriptions, DOM mutations).
 - `getSnapshotsForPeriod` includes 1 extra month before the period as **baseline** for YTD/1Y/3Y/5Y
 - All metric functions that annualize **must use `calculateMonthsDifference(periodEnd, periodStart)`** — NOT `snapshots.length - 1`
 - Each chart function handles baseline exclusion independently (heatmap: `i=1`; chart: `.slice(1)`; underwater: `continue at i===0`)
+
+### Annual YoY Baseline Pattern
+For any annual delta (YoY charts, annual cards, yearly rankings), the baseline must be **December of the previous year**, not the first snapshot of the current year. Monthly snapshots are created at month-end, so January's snapshot already includes January's performance — using it as a start baseline silently drops that month from the annual figure.
+
+```ts
+// Correct pattern — used in: snapshotService, chartService, pdfDataService, hallOfFameService, dashboard
+const baseline =
+  snapshots.find(s => s.year === year - 1 && s.month === 12) ??
+  snapshots.find(s => s.year === year); // fallback: first year of data has no prior December
+```
+
+When grouping by year (Map or Record), resolve the previous-year group first:
+```ts
+const prevYearSnapshots = snapshotsByYear.get(year - 1);
+const decPrevYear = prevYearSnapshots
+  ? [...prevYearSnapshots].sort((a, b) => a.month - b.month).at(-1)
+  : undefined;
+const startSnapshot = decPrevYear ?? yearSnapshots[0];
+```
+
+**Files that implement this**: `snapshotService.ts` (`calculateYearlyChange`), `chartService.ts` (`prepareYoYVariationData`, `prepareSavingsVsInvestmentData`), `pdfDataService.ts` (`calculateYoYComparison`), `hallOfFameService.ts` + `.server.ts` (yearly records loop), `dashboard/page.tsx` (`laborIncomeMetrics`).
+
+**Monthly heatmap is NOT affected** — it shows month-over-month returns (each cell = `NW_month / NW_prevMonth - 1`), so the baseline is always the immediately preceding month.
 
 ### Skeleton Loading Pattern
 Build skeleton screens that mirror the real layout to avoid layout shift and provide visual continuity:
@@ -190,59 +242,61 @@ return (
 - **`AnimatePresence initial={false}`** on collapsibles that start open — avoids exit animation on mount
 
 **Table section collapse/expand animation (>30min debug, session 14):**
-HTML `<tr>` elements use `display: table-row` which does NOT support `height: 0 → auto` or `overflow: hidden`. You cannot animate table row groups with slideDown directly. Fix:
-```tsx
-// Wrap all section rows in a single <tr><td colSpan={totalCols} className="p-0"> container
-<tr>
-  <td colSpan={totalCols} className="p-0">
-    <AnimatePresence>
-      {!isCollapsed && (
-        <motion.div variants={slideDown} initial="hidden" animate="visible" exit="hidden" style={{ overflow: 'hidden' }}>
-          {/* flex rows with explicit widths matching the outer table colgroup */}
-          <div className="flex items-center ...">
-            <div className="flex-1 min-w-0 ...">name</div>
-            <div className="w-[130px] shrink-0 ...">value</div>
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  </td>
-</tr>
-```
-Outer `<Table>` needs `style={{ tableLayout: 'fixed' }}` + `<colgroup>` with explicit column widths. Flex rows inside `motion.div` use matching `w-[N] shrink-0` divs. This achieves pixel-perfect alignment between header and animated content.
-
-**`colSpan` must cover ALL columns:** If `totalCols` is off by even 1, the content `<td>` is narrower than expected. The missing column width is unavailable to flex-1, making the animated content overflow (clipped by `overflow: hidden`). Always count every `<TableHead>` cell to compute `totalCols`.
-
-**JSX comments inside `<colgroup>` cause hydration errors:** `{/* comment */}` inside `<colgroup>` is serialized as a whitespace text node, which is invalid HTML there. Remove all comments from inside `<colgroup>`.
-
-**Scroll to panel after slideDown:** Use `setTimeout(350)` (not 100ms) + `block: 'start'` — the 300ms enter animation must complete before scrollIntoView fires, otherwise the panel isn't fully visible yet.
+`<tr>` uses `display: table-row` — does NOT support `height: 0→auto` or `overflow: hidden`. Fix: wrap all section rows in `<tr><td colSpan={totalCols} className="p-0">` and put a `<motion.div variants={slideDown}>` inside. Outer `<Table>` needs `tableLayout: 'fixed'` + `<colgroup>`. Flex rows inside `motion.div` use matching `w-[N] shrink-0` divs for alignment.
+- `colSpan` must cover ALL columns — off by 1 causes flex-1 overflow clipped by `overflow: hidden`
+- No JSX comments inside `<colgroup>` — whitespace text node = invalid HTML = hydration error
+- Scroll to panel: `setTimeout(350)` + `block: 'start'` — wait for 300ms animation to complete
 - **Easing**: always `[0.25, 1, 0.5, 1]` (ease-out-quart). Never bounce or elastic.
 - **Page-level transitions**: `AnimatePresence mode="wait"` in `app/dashboard/layout.tsx`, keyed by `usePathname()`. The `exit` state on `pageVariants` only fires from this layout wrapper — individual pages don't need their own `AnimatePresence`. `mode="wait"` ensures the exiting page finishes before the entering page starts. Exit duration must be < entering duration (150ms vs 350ms) to feel snappy.
 
 **Two valid patterns for page mount animations — never mix them:**
 
-*Pattern A — staggerContainer (use when the page has a skeleton loading state):*
-```tsx
-// Root plain div (skeleton already handles loading→content transition)
-<div className="space-y-6 p-3 sm:p-6">
-  {/* non-animated sections (header, tabs, metric sections) */}
-  <motion.div variants={staggerContainer} initial="hidden" animate="visible">
-    <motion.div variants={cardItem}><Card /></motion.div>  {/* no initial/animate on children */}
-    <motion.div variants={cardItem}><Card /></motion.div>
-  </motion.div>
-</div>
-```
-Children inherit `hidden` state from the stagger parent — Framer Motion applies `opacity: 0` synchronously before the first paint, preventing the compound-opacity flash.
+*Pattern A — staggerContainer (page has skeleton):* Root `<div>` (no animation), children wrapped in `<motion.div variants={staggerContainer}>` + `<motion.div variants={cardItem}>`. Children inherit `hidden` from parent — prevents compound-opacity flash.
 
-*Pattern B — explicit delays (use for tab-child components with no skeleton transition):*
-```tsx
-<motion.div variants={pageVariants} initial="hidden" animate="visible" className="space-y-6">
-  <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ delay: 0 }}>…</motion.div>
-  <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ delay: 0.1 }}>…</motion.div>
-</motion.div>
-```
+*Pattern B — explicit delays (tab-child, no skeleton):* Root `<motion.div variants={pageVariants}>`, each card has own `initial="hidden" animate="visible" transition={{ delay: N }}`.
 
-**Compound-opacity flash (>30min debug, session 13):** Combining `pageVariants` root fade (`opacity 0→1` over 0.35s) with independent `initial="hidden" animate="visible"` on child cardItems causes `opacity_visual = opacity_parent × opacity_child` — chart cards appear to flash from nowhere while the page is mid-fade. Fix: use Pattern A (staggerContainer) instead. The flash happens because both opacities animate in parallel rather than the children inheriting state from the parent.
+**Compound-opacity flash (>30min debug, session 13):** `pageVariants` root fade + independent child `cardItem` animations → `opacity_visual = parent × child` → cards flash from nowhere mid-fade. Fix: Pattern A.
+
+### `useCountUp` Hook — Shared Utility
+`lib/utils/useCountUp.ts` exports `useCountUp(target, options?)` with:
+- Default behavior (`once: false`): re-triggers on every target change — used in `MetricCard` for period switching on Performance page
+- `once: true`: fires only the first time a **non-zero** value arrives; ignores subsequent changes — used for Dashboard KPIs that should animate once on mount, not on data refreshes
+
+**Zero-target trap**: hooks are called unconditionally, including during loading when `assets=[]` → all metrics = 0. If `once: true` were to mark `hasAnimated=true` at target=0, the animation would never fire on real data. Fix: `target === 0` sets `current` directly without marking animated; only a completed animation on a non-zero value marks `hasAnimated=true`.
+
+**Same trap in useEffect deps `[]`**: A `useEffect` with empty deps runs once on mount — but if the component mounts with empty/loading data, the effect exits early and never re-fires when real data arrives (re-render ≠ re-mount). Fix: include the data array in deps. Guards like `hasCelebrated` / `markCelebrated` prevent double-firing on subsequent renders. Pattern used in `DoublingMilestoneTimeline` confetti: `useEffect(() => { ... }, [milestones])`.
+
+### One-Time Celebrations (localStorage idempotency)
+`lib/utils/celebrationUtils.ts` — utilities for "fire once per browser" effects:
+- `hasCelebrated(key)` / `markCelebrated(key)` — localStorage with `celebrated_` prefix
+- `shouldReduceMotion()` — wraps `window.matchMedia('(prefers-reduced-motion: reduce)')`
+- Use with `canvas-confetti` (lazy import via `import('canvas-confetti')` inside the effect — keeps it out of the main bundle)
+- Reset for testing: `Object.keys(localStorage).filter(k => k.startsWith('celebrated_')).forEach(k => localStorage.removeItem(k))`
+
+### One-Time Session Notifications (sessionStorage vs useRef)
+For notifications that should fire **once per browser session** (survive page reload, reset on tab close):
+- **Use `sessionStorage`**, NOT `useRef` — `useRef` resets on page reload, making it impossible to suppress the notification after reload
+- Pair with an internal `useRef` guard against React Strict Mode double-effect:
+```tsx
+const triggered = useRef(false);
+useEffect(() => {
+  if (sessionStorage.getItem(SESSION_KEY)) return;
+  if (triggered.current) return;
+  triggered.current = true;
+  sessionStorage.setItem(SESSION_KEY, '1');
+  // show notification
+}, [deps]);
+```
+- Reset for testing: DevTools → Application → Session Storage → delete the key
+- Reference: `components/ui/SavingsRateBadge.tsx`
+
+```ts
+// Mount-only animation (Dashboard KPIs)
+const animated = useCountUp(value, { once: true });
+
+// Re-triggers on period change (MetricCard in Performance)
+const animated = useCountUp(value); // once: false default
+```
 
 ### Recharts Animation Patterns
 Standard props across the entire codebase — never deviate:
@@ -261,6 +315,40 @@ Standard props across the entire codebase — never deviate:
 - **`disabled:pointer-events-none`** already in base class — no hover/active events reach disabled buttons, no extra guard needed
 - **Gotcha — `asChild` + Radix dropdown trigger**: if the button wraps a Radix DropdownMenuTrigger or PopoverTrigger and a parent has `overflow: hidden` or tight `z-index`, the `translate-y` on hover can clip the floating menu. Fix: pass `className="hover:translate-y-0"` inline as an override on that specific usage
 
+### SVG Draw Animation (stroke-dashoffset)
+Wrap `@keyframes` inside `@media (prefers-reduced-motion: no-preference)` — elements are fully visible by default, animation only applies when motion is allowed:
+```tsx
+<style>{`
+  @media (prefers-reduced-motion: no-preference) {
+    .circle { stroke-dasharray: 44; stroke-dashoffset: 44; animation: circle-draw 300ms ease-out forwards; }
+    .tick   { opacity: 0; animation: tick-appear 200ms ease-out 250ms forwards; }
+  }
+`}</style>
+```
+Circle circumference: `2πr` — r=7 → ~44px. Use unique class names per icon file to avoid keyframe collisions.
+
+### EmptyState Component Pattern
+`components/ui/EmptyState.tsx` — reusable empty state with floating icon animation. Also exports 5 SVG icons: `SeedlingIcon`, `CalendarEmptyIcon`, `FilterEmptyIcon`, `TrophyEmptyIcon`, `ChartEmptyIcon`.
+
+**Usage**:
+```tsx
+import { EmptyState, CalendarEmptyIcon } from '@/components/ui/EmptyState';
+
+<EmptyState
+  icon={<CalendarEmptyIcon />}
+  title="Nessun dividendo previsto"
+  description="Naviga a un altro mese o aggiungi dividendi."
+  className="h-64"  // pass className to constrain height inside a chart card
+/>
+```
+
+**Rules**:
+- Float animation via `motion-safe:animate-[float_3s_ease-in-out_infinite]` — `<style>` JSX inline (no globals.css dependency)
+- For small dropdowns (SearchableCombobox): use a compact inline version (icon + text row), not full EmptyState — the dropdown is too small for py-8 padding
+- Do NOT add EmptyState where a CTA button already exists (e.g. "Aggiungi il tuo primo asset")
+- `currentColor` + `text-muted-foreground/50` on the icon wrapper = correct visual weight (lighter than title)
+- If you need a new icon type, add it to `EmptyState.tsx` — do not create a separate file
+
 ### CSS `animate-in` + prefers-reduced-motion
 - Framer Motion respects reduced-motion automatically via `MotionConfig` in `MotionProvider.tsx`.
 - **CSS `animate-in` classes** (tw-animate-css) must be guarded manually.
@@ -275,20 +363,15 @@ Standard props across the entire codebase — never deviate:
 - **Testing system-follow**: DevTools "Emulate prefers-color-scheme" only works when `localStorage.getItem('theme')` is `null` or `"system"`. If a user has manually toggled, localStorage wins. Reset with `localStorage.removeItem('theme')` + reload.
 
 ### Sticky Dialog Layout Pattern
-For dialogs with long forms or variable-length content, keep header and footer always visible:
 ```tsx
 <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0">
   <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">...</DialogHeader>
-  <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-    {/* scrollable body */}
-  </div>
-  <div className="px-6 pb-6 pt-4 border-t shrink-0 flex justify-end gap-2">
-    {/* sticky footer */}
-  </div>
+  <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">{/* scrollable body */}</div>
+  <div className="px-6 pb-6 pt-4 border-t shrink-0 flex justify-end gap-2">{/* sticky footer */}</div>
 </DialogContent>
 ```
-- When a `<form>` wraps the whole content (ExpenseDialog, AssetDialog): make it `flex flex-col flex-1 min-h-0`, put the scrollable div and footer inside the form — submit button stays inside `<form>` and works correctly.
-- **Exception**: dialogs containing `position: absolute` dropdowns (e.g. CategoryDeleteConfirmDialog) must NOT have `overflow-y-auto` on the body — see error below.
+- `<form>` wrapping whole content: make it `flex flex-col flex-1 min-h-0`, put scroll div + footer inside form.
+- **Exception**: dialogs with `position: absolute` dropdowns must NOT have `overflow-y-auto` on body.
 
 ---
 
@@ -316,33 +399,11 @@ For dialogs with long forms or variable-length content, keep header and footer a
 **Symptom**: `<Legend>` shows black square, or `<Tooltip>` shows wrong color, for a bar using `<Cell>` for conditional coloring. **Fix**: Always set `fill` on `<Bar>` to the default color — `<Cell>` overrides individual bars but `<Legend>` and `<Tooltip>` both read `<Bar fill>` directly, not from `<Cell>`.
 
 ### Recharts Tooltip Color — Three Distinct Cases
-Tooltip item coloring works differently per chart type:
+**Line / Area / Bar**: auto-colored from series `stroke`/`fill`. Do NOT set `color` in `itemStyle` or `contentStyle` — it cascades and overrides per-series colors. Only set `backgroundColor`, `border`, `borderRadius` in `contentStyle`.
 
-**Line / Area / Bar**: Recharts auto-colors each tooltip item text with the series `stroke`/`fill`. Do NOT set `color` in `itemStyle` or `contentStyle` — it will cascade and override the per-series colors:
-```tsx
-// ✅ Correct
-itemStyle={{ fontSize: '14px', padding: '2px 0' }}
-// ❌ Wrong — overrides all item colors
-itemStyle={{ fontSize: '14px', padding: '2px 0', color: 'var(--card-foreground)' }}
-```
+**PieChart with `<Cell>`**: does NOT auto-color from `<Cell fill>`. Use a custom tooltip reading `entry.payload.color` explicitly. Also set `fill` on `<Bar>` for `<Legend>` — `<Cell>` overrides individual bars but Legend reads `<Bar fill>` directly.
 
-**PieChart with `<Cell>`**: Recharts does NOT auto-color tooltip items from `<Cell fill>`. Use a custom tooltip that reads `entry.payload.color` explicitly:
-```tsx
-<Tooltip
-  content={({ active, payload }) => {
-    if (!active || !payload?.length) return null;
-    const entry = payload[0];
-    const color = (entry.payload as any)?.color ?? entry.color;
-    return (
-      <div style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '4px', padding: '8px 12px', fontSize: '14px' }}>
-        <span style={{ color }}>{entry.name} : {formatCurrency(entry.value as number)}</span>
-      </div>
-    );
-  }}
-/>
-```
-
-**contentStyle `color` cascades**: Setting `color` on `contentStyle` propagates via CSS to all child text — same override problem as `itemStyle.color`. Only set `backgroundColor`, `border`, `borderRadius` in `contentStyle`.
+**contentStyle `color` cascades**: propagates to all child text. Never set it.
 
 ### Recharts ResponsiveContainer Inside Hidden Radix Tab
 **Symptom**: Console warning `The width(-1) and height(-1)`. **Fix**: Use explicit pixel height: `<ResponsiveContainer width="100%" height={300}>`. Never `height="100%"` inside inactive tabs.
@@ -392,7 +453,8 @@ When an icon switches between TrendingUp/TrendingDown (or similar) based on a va
 
 ### Radix Dialog/Sheet Without Description Warning
 **Symptom**: `Warning: Missing 'Description' or 'aria-describedby={undefined}' for {DialogContent}` in console when opening a Sheet or Dialog that has no description child.
-**Fix**: Add `aria-describedby={undefined}` to `DialogPrimitive.Content` in the component primitive — this explicitly signals "no description intentionally" and silences the warning without adding a hidden element. Applied in `components/ui/sheet.tsx`.
+**Fix (primitive level)**: Add `aria-describedby={undefined}` to `DialogPrimitive.Content` in the component primitive — silences the warning globally. Applied in `components/ui/sheet.tsx`.
+**Fix (usage level)**: If a specific `<DialogContent>` in a page/component generates the warning, add `aria-describedby={undefined}` directly on that usage. Applied in `components/expenses/ExpenseDialog.tsx`.
 
 ### shadcn `<Alert>` Icon Slot
 **Gotcha**: The first icon passed as a **direct child of `<Alert>`** (outside `<AlertDescription>`) is automatically positioned as the leading icon by shadcn's Alert component. Adding a second icon inside `<AlertDescription>` causes double rendering.
@@ -418,4 +480,38 @@ When an icon switches between TrendingUp/TrendingDown (or similar) based on a va
 ### Drawdown Duration / Recovery Time Semantics
 Duration = months **elapsed** (index distance, not inclusive count). `Jan(idx 0) → Dec(idx 11)` = 11m, **not** 12m. Never add `+1` for "inclusive counting" — it was added incorrectly and produces values 1 month too high. Recovery Time = 0m when trough IS the current snapshot (portfolio just hit the bottom, recovery hasn't started). Use `Math.max(0, ...)` not `Math.max(1, ...)`.
 
-**Last updated**: 2026-03-23 (session 15: login/register redirect race condition, drawdown duration off-by-one, npm audit fixes)
+### Custom Tooltip Pattern (Help Icon on Card Header)
+**Do NOT use the Radix `<Tooltip>` component** (`@/components/ui/tooltip`) for help-icon tooltips in page-level components — it silently fails to render in some contexts (e.g. the dashboard page).
+
+Use the **custom pattern** from `MetricCard.tsx` instead:
+```tsx
+const [showTooltip, setShowTooltip] = useState(false);
+const tooltipRef = useRef<HTMLDivElement>(null);
+
+useEffect(() => {
+  const handleClickOutside = (e: MouseEvent) => {
+    if (tooltipRef.current && !tooltipRef.current.contains(e.target as Node))
+      setShowTooltip(false);
+  };
+  if (showTooltip) document.addEventListener('mousedown', handleClickOutside);
+  return () => document.removeEventListener('mousedown', handleClickOutside);
+}, [showTooltip]);
+
+// JSX:
+<div className="relative" ref={tooltipRef}>
+  <button type="button" className="cursor-help hover:text-foreground transition-colors"
+    onClick={() => setShowTooltip(!showTooltip)}>
+    <HelpCircle className="h-4 w-4 text-muted-foreground" />
+  </button>
+  {showTooltip && (
+    <div className="absolute right-0 top-6 z-50 w-64 max-w-[calc(100vw-2rem)] rounded-md border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95">
+      <p>Tooltip text here.</p>
+    </div>
+  )}
+</div>
+```
+- Card header layout when adding the icon: `flex flex-row items-center justify-between space-y-0 pb-2` (same as `MetricCard`)
+- Width: `w-64` for short text, `w-72` for multi-paragraph explanations
+- Reference implementations: `MetricCard.tsx`, `app/dashboard/page.tsx` (LaborMetricsChart card)
+
+**Last updated**: 2026-04-01 (session 26: sessionStorage vs useRef for once-per-session notifications)

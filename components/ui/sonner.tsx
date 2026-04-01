@@ -9,14 +9,14 @@
  */
 
 import {
-  CircleCheckIcon,
   InfoIcon,
   Loader2Icon,
-  OctagonXIcon,
-  TriangleAlertIcon,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
+import { AnimatedCheckIcon } from "./AnimatedCheckIcon"
+import { AnimatedErrorIcon } from "./AnimatedErrorIcon"
+import { AnimatedWarningIcon } from "./AnimatedWarningIcon"
 
 /**
  * Themed toast notification component.
@@ -34,10 +34,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
       // Override default Sonner icons with Lucide icons to match the rest of the UI.
       // Each toast type gets a consistent icon style and size.
       icons={{
-        success: <CircleCheckIcon className="size-4" />,
+        success: <AnimatedCheckIcon className="size-4" />,
         info: <InfoIcon className="size-4" />,
-        warning: <TriangleAlertIcon className="size-4" />,
-        error: <OctagonXIcon className="size-4" />,
+        warning: <AnimatedWarningIcon className="size-4" />,
+        error: <AnimatedErrorIcon className="size-4" />,
         loading: <Loader2Icon className="size-4 animate-spin" />,
       }}
       // Map application theme CSS variables to Sonner's internal styling system.

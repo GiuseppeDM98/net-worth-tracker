@@ -18,6 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DollarSign, TrendingDown, Calendar, TrendingUp, ChevronRight } from 'lucide-react';
+import { EmptyState, CalendarEmptyIcon, ChartEmptyIcon } from '@/components/ui/EmptyState';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { formatCurrencyCompact } from '@/lib/services/chartService';
 import {
@@ -278,9 +279,11 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
           </CardHeader>
           <CardContent>
             {stats.byAsset.length === 0 ? (
-              <div className="flex h-64 items-center justify-center text-gray-500">
-                Nessun dato disponibile
-              </div>
+              <EmptyState
+                icon={<CalendarEmptyIcon />}
+                title="Nessun dato disponibile"
+                className="h-64"
+              />
             ) : (() => {
               // Limit to top 7 + group the rest as "Altri" to keep legend compact
               const pieData = stats.byAsset.length > 8
@@ -328,9 +331,11 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
           </CardHeader>
           <CardContent>
             {stats.byYear.length === 0 ? (
-              <div className="flex h-64 items-center justify-center text-gray-500">
-                Nessun dato disponibile
-              </div>
+              <EmptyState
+                icon={<ChartEmptyIcon />}
+                title="Nessun dato disponibile"
+                className="h-64"
+              />
             ) : (
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={stats.byYear}>
@@ -356,9 +361,11 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
         </CardHeader>
         <CardContent>
           {stats.byMonth.length === 0 ? (
-            <div className="flex h-64 items-center justify-center text-gray-500">
-              Nessun dato disponibile
-            </div>
+            <EmptyState
+              icon={<ChartEmptyIcon />}
+              title="Nessun dato disponibile"
+              className="h-64"
+            />
           ) : (
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={stats.byMonth}>

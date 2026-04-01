@@ -127,6 +127,7 @@ export default function SettingsPage() {
   const [stampDutyRate, setStampDutyRate] = useState<number>(0.2);
   const [checkingAccountSubCategory, setCheckingAccountSubCategory] = useState<string>('__none__');
   const [cashflowHistoryStartYear, setCashflowHistoryStartYear] = useState<number>(2025);
+  const [laborIncomeCategoryIds, setLaborIncomeCategoryIds] = useState<string[]>([]);
   const [assetClassStates, setAssetClassStates] = useState<
     Record<AssetClass, AssetClassState>
   >({} as Record<AssetClass, AssetClassState>);
@@ -309,6 +310,7 @@ export default function SettingsPage() {
         setStampDutyRate(settingsData.stampDutyRate ?? 0.2);
         setCheckingAccountSubCategory(settingsData.checkingAccountSubCategory || '__none__');
         setCashflowHistoryStartYear(settingsData.cashflowHistoryStartYear ?? 2025);
+        setLaborIncomeCategoryIds(settingsData.laborIncomeCategoryIds ?? []);
         // Load dividend settings
         setDividendIncomeCategoryId(settingsData.dividendIncomeCategoryId || '');
         setDividendIncomeSubCategoryId(settingsData.dividendIncomeSubCategoryId || '');
@@ -881,6 +883,7 @@ export default function SettingsPage() {
         stampDutyRate,
         checkingAccountSubCategory,
         cashflowHistoryStartYear,
+        laborIncomeCategoryIds,
       });
       toast.success('Impostazioni salvate con successo');
     } catch (error) {
@@ -1408,8 +1411,55 @@ export default function SettingsPage() {
               </div>
             )}
 
+            {/* Labor income categories — used by dashboard KPI cards to separate work income from investment gains */}
+            <div className="border-t pt-4 space-y-3">
+              <div className="space-y-1">
+                <Label className="text-sm font-medium">Reddito da Lavoro</Label>
+                <p className="text-sm text-muted-foreground">
+                  Seleziona le categorie di entrata che rappresentano il reddito da lavoro (stipendio, freelance, ecc.).
+                  Verranno usate per calcolare le card &quot;Guadagnato da Lavoro&quot; e &quot;Risparmiato da Lavoro&quot; nella Dashboard.
+                </p>
+              </div>
+              {getCategoriesByType('income').length === 0 ? (
+                <p className="text-sm text-muted-foreground italic">
+                  Nessuna categoria di tipo &quot;Entrate&quot; trovata. Creane una nella sezione Cashflow.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {getCategoriesByType('income').map((cat) => {
+                    const checked = laborIncomeCategoryIds.includes(cat.id);
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() =>
+                          setLaborIncomeCategoryIds(
+                            checked
+                              ? laborIncomeCategoryIds.filter((id) => id !== cat.id)
+                              : [...laborIncomeCategoryIds, cat.id]
+                          )
+                        }
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                          checked
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-background text-foreground border-border hover:bg-muted'
+                        }`}
+                      >
+                        {checked && (
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none">
+                            <path d="M2.5 7L5.5 10L11.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                        {cat.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             {/* Cashflow history start year — lets users exclude pre-import bulk data from trend charts */}
-            <div className={cashAssets.length > 0 ? 'border-t pt-4 space-y-2' : 'space-y-2'}>
+            <div className={cashAssets.length > 0 ? 'border-t pt-4 space-y-2' : 'border-t pt-4 space-y-2'}>
               <Label htmlFor="cashflowHistoryStartYear" className="text-sm font-medium">
                 Anno inizio storico cashflow
               </Label>

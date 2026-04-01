@@ -25,12 +25,12 @@ import {
   prepareYoYVariationData,
   prepareSavingsVsInvestmentData,
   prepareSavingsVsInvestmentDataMonthly,
+  prepareSavingsVsInvestmentDataAllMonths,
   prepareDoublingTimeData,
   formatCurrency,
   formatCurrencyCompact,
   formatPercentage,
 } from '@/lib/services/chartService';
-import { getItalyYear } from '@/lib/utils/dateHelpers';
 import {
   Select,
   SelectContent,
@@ -126,7 +126,8 @@ export default function HistoryPage() {
   const [snapshotSearchDialogOpen, setSnapshotSearchDialogOpen] = useState(false);
   const [doublingMode, setDoublingMode] = useState<DoublingMode>('geometric');
   const [savingsView, setSavingsView] = useState<'annual' | 'monthly'>('annual');
-  const [savingsSelectedYear, setSavingsSelectedYear] = useState<number>(getItalyYear(new Date()));
+  // 'all' shows all years as a continuous monthly timeline; a number filters to that year
+  const [savingsSelectedYear, setSavingsSelectedYear] = useState<number | 'all'>('all');
 
   // Responsive breakpoints
   const isMobile = useMediaQuery('(max-width: 767px)');
@@ -266,8 +267,15 @@ export default function HistoryPage() {
   const yoyVariationData = prepareYoYVariationData(snapshots);
   const savingsVsInvestmentData = prepareSavingsVsInvestmentData(snapshots, expenses);
   const savingsVsInvestmentDataMonthly = useMemo(
-    () => prepareSavingsVsInvestmentDataMonthly(snapshots, expenses, savingsSelectedYear),
+    () =>
+      typeof savingsSelectedYear === 'number'
+        ? prepareSavingsVsInvestmentDataMonthly(snapshots, expenses, savingsSelectedYear)
+        : [],
     [snapshots, expenses, savingsSelectedYear]
+  );
+  const savingsVsInvestmentDataAllMonths = useMemo(
+    () => prepareSavingsVsInvestmentDataAllMonths(snapshots, expenses),
+    [snapshots, expenses]
   );
   // Unique years from snapshots for the year selector, newest first
   const savingsAvailableYears = useMemo(
@@ -1329,12 +1337,13 @@ export default function HistoryPage() {
               {savingsView === 'monthly' && savingsAvailableYears.length > 0 && (
                 <Select
                   value={savingsSelectedYear.toString()}
-                  onValueChange={(v) => setSavingsSelectedYear(Number(v))}
+                  onValueChange={(v) => setSavingsSelectedYear(v === 'all' ? 'all' : Number(v))}
                 >
-                  <SelectTrigger className="w-24 h-8 text-xs sm:text-sm">
+                  <SelectTrigger className="w-28 h-8 text-xs sm:text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="all">Tutti</SelectItem>
                     {savingsAvailableYears.map((year) => (
                       <SelectItem key={year} value={year.toString()}>
                         {year}
@@ -1423,80 +1432,86 @@ export default function HistoryPage() {
               </ResponsiveContainer>
             )
           ) : (
-            // Monthly view
-            savingsVsInvestmentDataMonthly.length === 0 ? (
-              <div className="flex h-64 items-center justify-center text-gray-500 dark:text-gray-400">
-                Nessun dato per l&apos;anno selezionato.
-                Servono snapshot consecutivi e transazioni cashflow.
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-savings-vs-investment-monthly">
-                <BarChart data={savingsVsInvestmentDataMonthly} margin={getChartMargins()}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="period" />
-                  <YAxis
-                    width={getYAxisWidth()}
-                    tickFormatter={(value) => formatCurrencyCompact(value)}
-                  />
-                  <Tooltip
-                    formatter={(value: number, name: string) => [
-                      formatCurrency(value),
-                      name
-                    ]}
-                    contentStyle={{
-                      backgroundColor: 'var(--card)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '8px',
-                      padding: isMobile ? '8px' : '12px',
-                      fontSize: isMobile ? '14px' : '16px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                    }}
-                    labelStyle={{
-                      color: 'var(--foreground)',
-                      fontWeight: 600,
-                      marginBottom: '4px',
-                    }}
-                    itemStyle={{
-                      fontSize: isMobile ? '14px' : '16px',
-                      padding: '2px 0',
-                    }}
-                    cursor={{ fill: 'rgba(255,255,255,0.06)' }}
-                  />
-                  <Legend
-                    wrapperStyle={{
-                      display: isMobile ? 'none' : 'block',
-                      paddingTop: isMobile ? '0' : '20px'
-                    }}
-                    iconSize={isMobile ? 8 : 10}
-                    fontSize={isMobile ? 11 : 12}
-                  />
-                  <Bar
-                    dataKey="netSavings"
-                    name="Risparmio Netto"
-                    fill="#10B981"
-                    stackId="a"
-                    animationDuration={600}
-                    animationEasing="ease-out"
-                  />
-                  {/* fill="#3B82F6" sets the legend color; Cell overrides each bar's actual color */}
-                  <Bar
-                    dataKey="investmentGrowth"
-                    name="Crescita Investimenti"
-                    fill="#3B82F6"
-                    stackId="a"
-                    animationDuration={600}
-                    animationEasing="ease-out"
-                  >
-                    {savingsVsInvestmentDataMonthly.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={entry.investmentGrowth >= 0 ? '#3B82F6' : '#EF4444'}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )
+            // Monthly view — either all years combined or a single selected year
+            (() => {
+              const monthlyData =
+                savingsSelectedYear === 'all'
+                  ? savingsVsInvestmentDataAllMonths
+                  : savingsVsInvestmentDataMonthly;
+              return monthlyData.length === 0 ? (
+                <div className="flex h-64 items-center justify-center text-gray-500 dark:text-gray-400">
+                  Nessun dato per la selezione corrente.
+                  Servono snapshot consecutivi e transazioni cashflow.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-savings-vs-investment-monthly">
+                  <BarChart data={monthlyData} margin={getChartMargins()}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="period" tick={{ fontSize: savingsSelectedYear === 'all' ? 10 : 12 }} />
+                    <YAxis
+                      width={getYAxisWidth()}
+                      tickFormatter={(value) => formatCurrencyCompact(value)}
+                    />
+                    <Tooltip
+                      formatter={(value: number, name: string) => [
+                        formatCurrency(value),
+                        name
+                      ]}
+                      contentStyle={{
+                        backgroundColor: 'var(--card)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '8px',
+                        padding: isMobile ? '8px' : '12px',
+                        fontSize: isMobile ? '14px' : '16px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      }}
+                      labelStyle={{
+                        color: 'var(--foreground)',
+                        fontWeight: 600,
+                        marginBottom: '4px',
+                      }}
+                      itemStyle={{
+                        fontSize: isMobile ? '14px' : '16px',
+                        padding: '2px 0',
+                      }}
+                      cursor={{ fill: 'rgba(255,255,255,0.06)' }}
+                    />
+                    <Legend
+                      wrapperStyle={{
+                        display: isMobile ? 'none' : 'block',
+                        paddingTop: isMobile ? '0' : '20px'
+                      }}
+                      iconSize={isMobile ? 8 : 10}
+                      fontSize={isMobile ? 11 : 12}
+                    />
+                    <Bar
+                      dataKey="netSavings"
+                      name="Risparmio Netto"
+                      fill="#10B981"
+                      stackId="a"
+                      animationDuration={600}
+                      animationEasing="ease-out"
+                    />
+                    {/* fill="#3B82F6" sets the legend color; Cell overrides each bar's actual color */}
+                    <Bar
+                      dataKey="investmentGrowth"
+                      name="Crescita Investimenti"
+                      fill="#3B82F6"
+                      stackId="a"
+                      animationDuration={600}
+                      animationEasing="ease-out"
+                    >
+                      {monthlyData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={entry.investmentGrowth >= 0 ? '#3B82F6' : '#EF4444'}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              );
+            })()
           )}
         </CardContent>
       </Card>

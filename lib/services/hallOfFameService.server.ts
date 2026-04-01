@@ -151,11 +151,16 @@ function calculateYearlyRecords(
   for (const year of Array.from(years).sort((a, b) => a - b)) {
     const yearSnapshots = snapshotsByYear[year] ?? [];
     const sorted = [...yearSnapshots].sort((a, b) => a.month - b.month);
-    const hasNetWorthData = sorted.length >= 2;
-    const firstSnapshot = sorted[0];
     const lastSnapshot = sorted[sorted.length - 1];
-    const netWorthDiff = hasNetWorthData ? lastSnapshot.totalNetWorth - firstSnapshot.totalNetWorth : 0;
-    const startOfYearNetWorth = hasNetWorthData ? firstSnapshot.totalNetWorth : 0;
+
+    // Use December of previous year as baseline so January is included in the delta.
+    // Falls back to first snapshot of this year when prior December doesn't exist.
+    const prevSorted = [...(snapshotsByYear[year - 1] ?? [])].sort((a, b) => a.month - b.month);
+    const baselineSnapshot = prevSorted.at(-1) ?? sorted[0];
+
+    const hasNetWorthData = !!(lastSnapshot && baselineSnapshot);
+    const netWorthDiff = hasNetWorthData ? lastSnapshot.totalNetWorth - baselineSnapshot.totalNetWorth : 0;
+    const startOfYearNetWorth = baselineSnapshot?.totalNetWorth ?? 0;
     const yearExpenses = expensesByYear[year] ?? [];
     const totalIncome = calculateTotalIncome(yearExpenses);
     const totalExpenses = Math.abs(calculateTotalExpenses(yearExpenses));

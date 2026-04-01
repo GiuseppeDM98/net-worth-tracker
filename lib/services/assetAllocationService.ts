@@ -44,6 +44,7 @@ export async function getSettings(
       stampDutyRate: data.stampDutyRate,
       checkingAccountSubCategory: data.checkingAccountSubCategory,
       cashflowHistoryStartYear: data.cashflowHistoryStartYear,
+      laborIncomeCategoryIds: data.laborIncomeCategoryIds ?? [],
       targets: data.targets as AssetAllocationTarget,
     };
   } catch (error) {
@@ -143,6 +144,9 @@ export async function setSettings(
       if (settings.cashflowHistoryStartYear !== undefined) {
         docData.cashflowHistoryStartYear = settings.cashflowHistoryStartYear;
       }
+      if (settings.laborIncomeCategoryIds !== undefined) {
+        docData.laborIncomeCategoryIds = settings.laborIncomeCategoryIds;
+      }
 
       // Use setDoc WITHOUT merge to completely replace targets
       await setDoc(targetRef, docData);
@@ -203,6 +207,9 @@ export async function setSettings(
       }
       if (settings.cashflowHistoryStartYear !== undefined) {
         docData.cashflowHistoryStartYear = settings.cashflowHistoryStartYear;
+      }
+      if (settings.laborIncomeCategoryIds !== undefined) {
+        docData.laborIncomeCategoryIds = settings.laborIncomeCategoryIds;
       }
 
       // Use merge: true to preserve existing fields

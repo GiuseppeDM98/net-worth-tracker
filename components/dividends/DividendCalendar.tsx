@@ -29,6 +29,7 @@ import { DividendDetailsDialog } from './DividendDetailsDialog';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { getItalyMonth, getItalyYear, getItalyDate, getItalyMonthYear, toDate } from '@/lib/utils/dateHelpers';
+import { EmptyState, CalendarEmptyIcon } from '@/components/ui/EmptyState';
 
 // Italian month names (full)
 const ITALIAN_MONTHS = [
@@ -241,9 +242,10 @@ export function DividendCalendar({ dividends, onDateClick }: DividendCalendarPro
 
       {/* Empty state message */}
       {dividendsInCurrentMonth === 0 && (
-        <div className="text-center text-muted-foreground py-8 text-sm">
-          Nessun dividendo previsto per {ITALIAN_MONTHS[currentMonth - 1]} {currentYear}
-        </div>
+        <EmptyState
+          icon={<CalendarEmptyIcon />}
+          title={`Nessun dividendo previsto per ${ITALIAN_MONTHS[currentMonth - 1]} ${currentYear}`}
+        />
       )}
 
       {/* Dividend details dialog */}
