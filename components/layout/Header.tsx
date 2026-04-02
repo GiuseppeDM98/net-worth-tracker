@@ -11,17 +11,18 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { LogOut, User, Sun, Moon, Monitor } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
+import { getGreeting } from '@/lib/utils/getGreeting';
+import { getItalyDate } from '@/lib/utils/dateHelpers';
 
 /**
  * Top header bar displayed on all dashboard pages.
  *
  * Provides:
- * - User greeting with personalized name
- * - User profile dropdown menu
- * - Logout functionality
+ * - Theme toggle (light / dark / system)
+ * - User profile dropdown menu with logout
  *
  * Fixed height of 64px (h-16) to match BottomNavigation for consistent spacing.
  * Always visible on all screen sizes (desktop, tablet, mobile).
@@ -29,7 +30,18 @@ import { toast } from 'sonner';
 export function Header() {
   const { user, signOut } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const { theme, setTheme } = useTheme();
+
+  // Panoramica already shows a contextual greeting (Buongiorno/Buon pomeriggio/etc.) as h1.
+  // Hide the header greeting on that page to avoid duplication.
+  const showGreeting = pathname !== '/dashboard';
+
+  const greeting = getGreeting(getItalyDate(new Date()).getHours());
+  const firstName = user?.displayName?.split(' ')[0];
+  const greetingLabel = firstName && firstName.length <= 20
+    ? `${greeting.greeting}, ${firstName}`
+    : greeting.greeting;
 
   // Cycle through explicit states so the user can always get back to "follow system".
   // `theme` (not `resolvedTheme`) preserves the "system" value between renders.
@@ -67,17 +79,10 @@ export function Header() {
 
   return (
     <header className="flex h-16 items-center justify-between border-b bg-background px-6">
-      <div className="flex items-center gap-4">
-        {/* User name display with fallback chain:
-            1. displayName (set via Firebase profile)
-            2. email (always present for authenticated users)
-            3. 'Utente' (generic fallback if both are missing, though unlikely)
-
-            displayName can be empty even when authenticated because Firebase
-            doesn't require it during email/password sign-up. */}
-        <h2 className="text-lg font-semibold text-foreground">
-          Benvenuto, {user?.displayName || user?.email || 'Utente'}
-        </h2>
+      <div className="flex items-center">
+        {showGreeting && (
+          <span className="text-sm font-medium text-foreground">{greetingLabel}</span>
+        )}
       </div>
       <div className="flex items-center gap-4">
         <Button
