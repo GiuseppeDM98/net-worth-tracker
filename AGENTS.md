@@ -118,6 +118,13 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
   - `Pie` also needs `animationBegin={0}`
 - Decorative stacked background areas should keep `isAnimationActive={false}`
 
+### Mobile Navigation Structure
+- Bottom navigation (portrait mobile): 3 primary routes + "Altro" button (MoreHorizontal icon)
+- "Altro" button shows active state (blue, `text-blue-600 bg-blue-50 dark:bg-blue-950/20`) when current route is any secondary route — same treatment as primary tabs
+- `secondaryHrefs` array in `BottomNavigation.tsx` must stay in sync with `navigationGroups` hrefs in `SecondaryMenuDrawer.tsx`
+- Secondary drawer uses 3 semantic groups: Analisi (Allocazione, Rendimenti, Storico, Hall of Fame), Pianificazione (FIRE e Simulazioni), Preferenze (Impostazioni)
+- Eyebrow label style for group headers: `text-xs font-semibold uppercase tracking-wider text-muted-foreground/60`
+
 ### One-Time UI Effects
 - Use `localStorage` helpers for once-ever UI (guide strips, celebrations)
 - Use `sessionStorage` plus an internal `useRef` guard for once-per-session notifications
@@ -190,6 +197,17 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 ### Sign-Dependent Icons
 - For nullable metrics, define an explicit no-data fallback icon state
 - Default to the neutral/positive visual, not a red negative indicator
+
+### useMediaQuery — Mobile Re-render Trap
+- `useMediaQuery` initializes with the real `window.matchMedia(query).matches` value, not `false`
+- The classic `useState(false)` SSR-safe pattern would cause an extra re-render on mobile (false → true) that competes with `requestAnimationFrame` animation loops at mount time
+- Safe to read `window` directly because all callers are `'use client'` components rendered only after login
+- **Only revert to `useState(false)` if adding a hook call to a public SSR page**
+
+### Heavy Renders vs rAF Animations
+- On mobile, CPU budget is ~3–5x tighter. Multiple concurrent tasks at mount (re-renders, Recharts SVG, Framer Motion stagger, rAF loops) can exceed the 16ms/frame budget and cause visible animation jank
+- When a page uses `useCountUp` for mount-time KPI animations, avoid simultaneously rendering heavy components (Recharts charts, large lists) that aren't immediately visible
+- Pattern: start collapsible/below-fold Recharts components as collapsed on mobile, let users expand — use `isMobile` from `useMediaQuery` in the `useState` initializer for the expanded state
 
 ### next/font Preload
 - `next/font` with default `preload: true` emits a `<link rel="preload">` on every page using the root layout

@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Wallet, Receipt, Menu } from 'lucide-react';
+import { LayoutDashboard, Wallet, Receipt, MoreHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { SecondaryMenuDrawer } from './SecondaryMenuDrawer';
 
 // WARNING: If you add/remove navigation items here, also update:
 // - Sidebar.tsx (9 total items including these 3 primary routes)
-// - SecondaryMenuDrawer.tsx (6 secondary items)
+// - SecondaryMenuDrawer.tsx (6 secondary items in navigationGroups)
 // Primary routes (bottom nav): Panoramica, Patrimonio, Cashflow
 // These were chosen as the most frequently accessed pages for quick mobile access.
 const primaryNavigation = [
@@ -17,6 +17,17 @@ const primaryNavigation = [
   { name: 'Patrimonio', href: '/dashboard/assets', icon: Wallet },
   // Cashflow: established financial term used as-is in Italian finance
   { name: 'Cashflow', href: '/dashboard/cashflow', icon: Receipt },
+];
+
+// Secondary routes are in the drawer; when the user is on one, the Altro button
+// should reflect that so they always know where they are in the app.
+const secondaryHrefs = [
+  '/dashboard/allocation',
+  '/dashboard/performance',
+  '/dashboard/history',
+  '/dashboard/hall-of-fame',
+  '/dashboard/fire-simulations',
+  '/dashboard/settings',
 ];
 
 /**
@@ -29,8 +40,11 @@ const primaryNavigation = [
  *
  * Navigation structure:
  * - 3 primary routes: Overview, Assets, Cashflow (most frequently accessed)
- * - 1 menu button: Opens SecondaryMenuDrawer with 6 additional routes
+ * - 1 "Altro" button: Opens SecondaryMenuDrawer with 6 additional routes grouped
+ *   by information architecture (Analisi, Pianificazione, Preferenze)
  * - Total 9 routes accessible: 3 direct + 6 via drawer
+ * - "Altro" button shows active state when current route is any secondary route,
+ *   so users always have a visual cue of where they are in the app
  *
  * Why these 3 primary routes?
  * Overview: Dashboard landing page - users check this most frequently
@@ -49,6 +63,9 @@ const primaryNavigation = [
 export function BottomNavigation() {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const isAltroActive = secondaryHrefs.some(
+    (href) => pathname === href || pathname.startsWith(href + '/')
+  );
 
   return (
     <>
@@ -77,13 +94,20 @@ export function BottomNavigation() {
             );
           })}
 
-          {/* Menu Button */}
+          {/* Altro button: active when current route is any secondary (drawer) route.
+              MoreHorizontal (three dots) is the universal "more items" affordance;
+              Menu (hamburger) implies a top-level app menu which is semantically wrong here. */}
           <button
             onClick={() => setDrawerOpen(true)}
-            className="flex flex-col items-center justify-center flex-1 h-full gap-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className={cn(
+              'flex flex-col items-center justify-center flex-1 h-full gap-1 text-xs transition-colors',
+              isAltroActive
+                ? 'text-blue-600 bg-blue-50 dark:bg-blue-950/20'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+            )}
           >
-            <Menu className="h-6 w-6" />
-            <span className="font-medium">Menu</span>
+            <MoreHorizontal className="h-6 w-6" />
+            <span className="font-medium">Altro</span>
           </button>
         </div>
       </nav>

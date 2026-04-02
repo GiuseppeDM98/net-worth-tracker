@@ -118,10 +118,12 @@ export default function DashboardPage() {
   const [existingSnapshot, setExistingSnapshot] = useState<MonthlySnapshot | null>(null);
   const [portfolioSettings, setPortfolioSettings] = useState<AssetAllocationSettings | null>(null);
 
-  // All three pie charts start expanded; on mobile the user can collapse them individually
-  // to reduce scroll length (~1050px of charts on portrait mobile)
+  // On mobile, charts start collapsed to avoid rendering 3 heavy Recharts SVGs
+  // at mount time while countUp animations are running. User can expand individually.
+  // On desktop all three start expanded for immediate data visibility.
+  const isMobile = useMediaQuery('(max-width: 1439px)');
   const [expandedCharts, setExpandedCharts] = useState<Set<string>>(
-    new Set(['assetClass', 'asset', 'liquidity'])
+    () => isMobile ? new Set() : new Set(['assetClass', 'asset', 'liquidity'])
   );
   const toggleChart = (id: string) => {
     setExpandedCharts(prev => {
@@ -243,9 +245,6 @@ export default function DashboardPage() {
 
     return { monthly: monthlyVariation, yearly: yearlyVariation };
   }, [snapshots, portfolioMetrics.totalValue]);
-
-  const isMobile = useMediaQuery('(max-width: 1439px)');
-
 
   // Memoize chart data
   const chartData = useMemo(() => {

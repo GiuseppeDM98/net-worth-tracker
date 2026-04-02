@@ -7,6 +7,11 @@
 
 ## 🔧 Improvements
 
+- Mobile bottom navigation now shows an active highlight on the "Altro" button when you're in a secondary section (Rendimenti, Storico, Allocazione, etc.) — you always know where you are in the app
+- Renamed the mobile "Menu" button to "Altro" with a clearer icon, so it's immediately obvious there's more to explore
+- The mobile navigation drawer now groups sections by topic (Analisi, Pianificazione, Preferenze) instead of a flat unlabelled list — the app's structure is visible at a glance
+- On mobile, the three portfolio charts on the Overview page now start collapsed, making the page load faster and the most important numbers appear instantly without scrolling past charts
+
 - Improved the Settings page layout: the header now includes a section label and a cleaner visual separator, making the page feel less like a back-office form
 - Technical notes in the Allocation tab (Settings) are now collapsed by default — expand them only when needed instead of scrolling past them every time
 - Development tools in Settings are now clearly separated from the regular configuration options, so they're available when needed but don't clutter the product interface
