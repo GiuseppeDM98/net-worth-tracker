@@ -4,10 +4,11 @@ import { getFirestore } from 'firebase-admin/firestore';
 
 let adminApp: App;
 
-// Initialize Firebase Admin SDK
 if (getApps().length === 0) {
-  // Try to use service account JSON first (recommended for Vercel)
-  if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY && process.env.FIREBASE_SERVICE_ACCOUNT_KEY.trim().length > 0) {
+  // Emulator mode: FIRESTORE_EMULATOR_HOST is set by docker-compose, admin SDK auto-connects
+  if (process.env.FIRESTORE_EMULATOR_HOST) {
+    adminApp = initializeApp({ projectId: 'demo-net-worth-tracker' });
+  } else if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY && process.env.FIREBASE_SERVICE_ACCOUNT_KEY.trim().length > 0) {
     try {
       const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
       adminApp = initializeApp({

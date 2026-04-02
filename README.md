@@ -101,6 +101,27 @@ npm run dev
 
 > For the full setup guide including Firebase configuration and Firestore security rules, see [SETUP.md](SETUP.md).
 
+### Docker (no Firebase account needed)
+
+Run the entire app locally with Firebase Emulators — no external accounts or API keys required:
+
+```bash
+docker compose up -d
+```
+
+| Service | URL |
+|---------|-----|
+| App | http://localhost:3000 |
+| Firebase Emulator UI | http://localhost:4000 |
+
+Register an account through the app and start using it. Data persists across restarts via a Docker volume.
+
+Cron jobs (monthly snapshots, daily dividend processing) run automatically at 18:00 UTC, matching the production Vercel schedule.
+
+> **Note:** Google Sign-In is unavailable in local mode (email/password works). To enable AI-powered analysis, uncomment `ANTHROPIC_API_KEY` in `.env` and add your key.
+
+To stop: `docker compose down`
+
 ## Prerequisites
 
 - **Node.js** 18.x or higher

@@ -1,0 +1,55 @@
+services:
+  emulators:
+    build:
+      context: .
+      dockerfile: Dockerfile.emulators
+    ports:
+      - "4000:4000"
+      - "8080:8080"
+      - "9099:9099"
+    volumes:
+      - emulator-data:/app/emulator-data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:4000"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_USE_FIREBASE_EMULATOR=true
+        - NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-net-worth-tracker
+        - NEXT_PUBLIC_APP_URL=http://localhost:3000
+        - NEXT_PUBLIC_REGISTRATIONS_ENABLED=true
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - FIRESTORE_EMULATOR_HOST=emulators:8080
+      - FIREBASE_AUTH_EMULATOR_HOST=emulators:9099
+      - CRON_SECRET=local-dev-secret
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    depends_on:
+      emulators:
+        condition: service_healthy
+    restart: unless-stopped
+
+  cron:
+    image: alpine:3.21
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        echo '0 18 * * * wget -qO- --header="Authorization: Bearer local-dev-secret" http://app:3000/api/cron/monthly-snapshot' >> /etc/crontabs/root
+        echo '0 18 * * * wget -qO- --header="Authorization: Bearer local-dev-secret" http://app:3000/api/cron/daily-dividend-processing' >> /etc/crontabs/root
+        crond -f -l 2
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  emulator-data:

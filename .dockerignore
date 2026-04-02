@@ -1,0 +1,60 @@
+# dependencies
+node_modules
+npm-debug.log*
+
+# next.js
+.next
+out
+
+# production
+build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (passed at runtime, not baked into image)
+.env*
+
+# git
+.git
+.gitattributes
+.gitignore
+
+# IDE
+.idea
+.vscode
+
+# docs and meta
+docs
+*.md
+LICENSE.md
+
+# tests
+__tests__
+coverage
+vitest.config.ts
+
+# firebase secrets
+firebase-admin-key.json
+
+# scripts
+scripts
+
+# vercel
+.vercel
+vercel.json
+
+# github
+.github
+
+# docker
+Dockerfile
+Dockerfile.emulators
+docker-compose.yml
+.dockerignore

@@ -1,0 +1,14 @@
+FROM node:22-alpine
+
+RUN apk add --no-cache openjdk21-jre
+RUN npm install -g firebase-tools
+
+WORKDIR /app
+COPY firebase.docker.json firebase.json
+COPY .firebaserc .
+COPY firestore.rules .
+COPY firestore.indexes.json .
+
+EXPOSE 4000 8080 9099
+
+CMD ["firebase", "emulators:start", "--project", "demo-net-worth-tracker", "--only", "auth,firestore", "--export-on-exit=./emulator-data", "--import=./emulator-data"]
