@@ -54,6 +54,8 @@ import {
 } from '@/components/ui/select';
 import { Save, RotateCcw, Plus, Trash2, ChevronDown, ChevronUp, Edit, Receipt, FlaskConical, Coins, ArrowRightLeft, Settings, PieChart } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { ExpenseCategory, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
@@ -163,6 +165,9 @@ export default function SettingsPage() {
   const [dividendIncomeCategoryId, setDividendIncomeCategoryId] = useState<string>('');
   const [dividendIncomeSubCategoryId, setDividendIncomeSubCategoryId] = useState<string>('');
   const [syncingDividends, setSyncingDividends] = useState(false);
+
+  // Progressive disclosure: notes block in Allocazione tab
+  const [isNotesOpen, setIsNotesOpen] = useState(false);
 
   // Test snapshot modal state
   const [dummySnapshotModalOpen, setDummySnapshotModalOpen] = useState(false);
@@ -1156,11 +1161,13 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6 max-desktop:portrait:pb-20">
-      <div className="flex flex-col gap-3 landscape:flex-row landscape:items-center landscape:justify-between">
+      {/* Page header — editorial zone with eyebrow + border separator */}
+      <div className="flex flex-col gap-3 landscape:flex-row landscape:items-center landscape:justify-between border-b border-border pb-4">
         <div>
+          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Configurazione</p>
           <h1 className="text-3xl font-bold text-foreground">Impostazioni</h1>
-          <p className="mt-2 text-muted-foreground">
-            Configura i tuoi target di allocazione del portafoglio
+          <p className="mt-1 text-sm text-muted-foreground">
+            Target di allocazione, preferenze e flussi
           </p>
         </div>
         <div className="flex flex-col landscape:flex-row gap-2 w-full landscape:w-auto">
@@ -1355,7 +1362,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Cashflow Settings */}
+      {/* Cashflow Settings — default cash accounts, labor income categories, history start year */}
       <Card>
         <CardHeader>
           <CardTitle>Cashflow</CardTitle>
@@ -1484,6 +1491,60 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Development Features — clearly separated from user-facing settings, only shown in dev mode */}
+      {enableTestSnapshots && (
+        <div className="border-t border-border pt-6 space-y-4">
+          <div className="flex items-center gap-2">
+            <FlaskConical className="h-4 w-4 text-orange-500" />
+            <p className="text-xs uppercase tracking-widest text-orange-500">Strumenti di sviluppo</p>
+          </div>
+          <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950/10 dark:border-orange-900">
+            <CardContent className="p-4 sm:p-6 space-y-4">
+              <div className="rounded-lg bg-orange-100 dark:bg-orange-900/30 border border-orange-300 dark:border-orange-800 p-4">
+                <p className="text-sm text-orange-900 dark:text-orange-200 font-semibold">⚠️ Attenzione</p>
+                <p className="text-sm text-orange-800 dark:text-orange-300 mt-1">
+                  Questa sezione è visibile solo quando la variabile d&apos;ambiente{' '}
+                  <code className="bg-orange-200 dark:bg-orange-800 px-1 rounded">NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS</code>{' '}
+                  è impostata su <code className="bg-orange-200 dark:bg-orange-800 px-1 rounded">true</code>.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="font-semibold text-sm text-foreground">Generazione Snapshot di Test</h3>
+                <p className="text-sm text-muted-foreground">
+                  Genera snapshot mensili fittizi per testare grafici e statistiche.
+                  Gli snapshot verranno salvati nella stessa collection Firebase degli snapshot reali.
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => setDummySnapshotModalOpen(true)}
+                  className="border-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900/30"
+                >
+                  <FlaskConical className="mr-2 h-4 w-4" />
+                  Genera Snapshot di Test
+                </Button>
+              </div>
+
+              <div className="space-y-3 border-t border-orange-200 dark:border-orange-800 pt-4">
+                <h3 className="font-semibold text-sm text-foreground">Eliminazione Dati di Test</h3>
+                <p className="text-sm text-muted-foreground">
+                  Elimina tutti i dati dummy (snapshot, spese e categorie) in un&apos;unica operazione.
+                  Questa azione è irreversibile.
+                </p>
+                <Button
+                  variant="destructive"
+                  onClick={() => setDeleteDummyDataDialogOpen(true)}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Elimina Tutti i Dati Dummy
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
           </TabsContent>
         )}
@@ -1922,36 +1983,30 @@ export default function SettingsPage() {
         );
       })}
 
-      <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 p-4">
-        <h3 className="font-semibold text-blue-900 dark:text-blue-200">Note</h3>
-        <ul className="mt-2 space-y-1 text-sm text-blue-800 dark:text-blue-300">
-          <li>
-            • Il totale delle allocazioni delle asset class deve essere
-            esattamente 100%
-          </li>
-          <li>
-            • La liquidità può essere impostata come valore fisso in euro. In questo caso,
-            le percentuali delle altre asset class si applicheranno al patrimonio rimanente
-            (totale - liquidità fissa)
-          </li>
-          <li>
-            • Per ogni asset class con sotto-categorie abilitate, il totale
-            delle sotto-categorie deve essere esattamente 100%
-          </li>
-          <li>
-            • Le sotto-categorie sono espresse come percentuale della loro asset
-            class di appartenenza
-          </li>
-          <li>
-            • Usa il toggle &quot;Abilita&quot; per attivare/disattivare le sotto-categorie
-            per ciascuna asset class
-          </li>
-          <li>
-            • I cambiamenti saranno applicati immediatamente alla pagina
-            Allocazione
-          </li>
-        </ul>
-      </div>
+      {/* Notes block: collapsed by default to reduce visual noise */}
+      <Collapsible open={isNotesOpen} onOpenChange={setIsNotesOpen}>
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex w-full items-center justify-between rounded-lg border border-border px-4 py-3 text-sm text-muted-foreground hover:bg-muted/50 transition-colors"
+          >
+            <span className="font-medium text-foreground">Note e dettagli tecnici</span>
+            <ChevronDown className={cn('h-4 w-4 transition-transform duration-200', isNotesOpen && 'rotate-180')} />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-200">
+          <div className="rounded-b-lg border border-t-0 border-border bg-blue-50 dark:bg-blue-950/20 px-4 py-4">
+            <ul className="space-y-1 text-sm text-blue-800 dark:text-blue-300">
+              <li>• Il totale delle allocazioni delle asset class deve essere esattamente 100%</li>
+              <li>• La liquidità può essere impostata come valore fisso in euro. In questo caso, le percentuali delle altre asset class si applicheranno al patrimonio rimanente (totale - liquidità fissa)</li>
+              <li>• Per ogni asset class con sotto-categorie abilitate, il totale delle sotto-categorie deve essere esattamente 100%</li>
+              <li>• Le sotto-categorie sono espresse come percentuale della loro asset class di appartenenza</li>
+              <li>• Usa il toggle &quot;Abilita&quot; per attivare/disattivare le sotto-categorie per ciascuna asset class</li>
+              <li>• I cambiamenti saranno applicati immediatamente alla pagina Allocazione</li>
+            </ul>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
         </TabsContent>
 
@@ -2171,64 +2226,6 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
-
-      {/* Development Features Section */}
-      {enableTestSnapshots && (
-        <Card className="mt-4 sm:mt-8 border-orange-200 bg-orange-50">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <FlaskConical className="h-5 w-5 text-orange-600" />
-              <CardTitle className="text-orange-900">Funzionalità di Sviluppo</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4 sm:p-6 space-y-4">
-            <div className="rounded-lg bg-orange-100 border border-orange-300 p-4">
-              <p className="text-sm text-orange-900 font-semibold">⚠️ Attenzione</p>
-              <p className="text-sm text-orange-800 mt-1">
-                Questa sezione è visibile solo quando la variabile d&apos;ambiente{' '}
-                <code className="bg-orange-200 px-1 rounded">NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS</code>{' '}
-                è impostata su <code className="bg-orange-200 px-1 rounded">true</code>.
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="font-semibold text-sm text-foreground">
-                Generazione Snapshot di Test
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Genera snapshot mensili fittizi per testare grafici e statistiche.
-                Gli snapshot verranno salvati nella stessa collection Firebase degli snapshot reali.
-              </p>
-              <Button
-                variant="outline"
-                onClick={() => setDummySnapshotModalOpen(true)}
-                className="border-orange-300 hover:bg-orange-100"
-              >
-                <FlaskConical className="mr-2 h-4 w-4" />
-                Genera Snapshot di Test
-              </Button>
-            </div>
-
-            <div className="space-y-3 border-t border-orange-200 pt-4">
-              <h3 className="font-semibold text-sm text-foreground">
-                Eliminazione Dati di Test
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Elimina tutti i dati dummy (snapshot, spese e categorie) in un&apos;unica operazione.
-                Questa azione è irreversibile.
-              </p>
-              <Button
-                variant="destructive"
-                onClick={() => setDeleteDummyDataDialogOpen(true)}
-                className="bg-red-600 hover:bg-red-700"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Elimina Tutti i Dati Dummy
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
           </TabsContent>
         )}

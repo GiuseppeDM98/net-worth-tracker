@@ -5,9 +5,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-01, session 33): **Private API authorization hardening**. Private App Router routes that use Firebase Admin SDK now verify Firebase ID tokens server-side, enforce user/resource ownership, and accept `Authorization: Bearer <idToken>` from the client via a shared `authenticatedFetch()` wrapper. The monthly snapshot cron flow remains compatible through `cronSecret`, and targeted Vitest coverage now guards the auth regression cases.
+- Latest implementation (2026-04-02, session 34): **Settings information architecture**. Header upgraded with eyebrow label and `border-b` editorial separator. Long note block in Allocazione tab wrapped in `Collapsible` (closed by default). Dev tools section moved from Dividendi tab to bottom of Preferenze tab with `border-t` + orange eyebrow label clearly separating it from user-facing settings.
+- Previous implementation (2026-04-01, session 33): **Private API authorization hardening**. Private App Router routes that use Firebase Admin SDK now verify Firebase ID tokens server-side, enforce user/resource ownership, and accept `Authorization: Bearer <idToken>` from the client via a shared `authenticatedFetch()` wrapper. The monthly snapshot cron flow remains compatible through `cronSecret`, and targeted Vitest coverage now guards the auth regression cases.
 - Previous implementation (2026-04-01, session 32): **Progressive disclosure on Performance page**. Note Metodologiche now collapse by default via `Collapsible`; one-time guide strip orients first-time readers; badge "Avanzato" on TWR, IRR, Sharpe, YOC metrics; chart descriptions now explain what to read directly under each title.
-- Previous implementation (2026-04-01, session 31): **Visual hierarchy & layout orchestration**. Dashboard hero KPI card full-width with `border-l-primary` accent and `text-3xl/4xl`; `MetricSection` headers have left-border accent; emoji prefixes removed. Main analytics pages have eyebrow breadcrumb labels, `border-b` header separators, and de-emphasised utility actions.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -60,7 +60,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Dividends: `components/dividends/*`
 - Settings: `app/dashboard/settings/page.tsx`, `lib/services/assetAllocationService.ts`
 
-**Last updated**: 2026-04-01 (session 33)
+**Last updated**: 2026-04-02 (session 34)
 
 ## Design Context
 

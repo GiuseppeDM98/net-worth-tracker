@@ -7,6 +7,10 @@
 
 ## 🔧 Improvements
 
+- Improved the Settings page layout: the header now includes a section label and a cleaner visual separator, making the page feel less like a back-office form
+- Technical notes in the Allocation tab (Settings) are now collapsed by default — expand them only when needed instead of scrolling past them every time
+- Development tools in Settings are now clearly separated from the regular configuration options, so they're available when needed but don't clutter the product interface
+
 - Renamed navigation items to Italian across all platforms (sidebar, mobile bottom bar, and drawer menu): Overview → Panoramica, Assets → Patrimonio, Allocation → Allocazione, Performance → Rendimenti, History → Storico, Settings → Impostazioni
 - Renamed the Performance page to "Rendimenti del Portafoglio"
 - Renamed metric "Recovery Time" to "Tempo di Recupero" in the Performance page
