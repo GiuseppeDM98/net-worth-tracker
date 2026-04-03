@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useCountUp } from '@/lib/utils/useCountUp';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  pageVariants,
   staggerContainer,
   cardItem,
   slideDown,
@@ -405,12 +404,7 @@ export default function DashboardPage() {
 
   return (
     // pb-20 on portrait mobile compensates for the BottomNavigation bar (h-16 = 64px)
-    <motion.div
-      variants={pageVariants}
-      initial="hidden"
-      animate="visible"
-      className="space-y-6 max-desktop:portrait:pb-20"
-    >
+    <div className="space-y-6 max-desktop:portrait:pb-20">
       {/* Header — greeting text anchors the page; "Crea Snapshot" is the only primary
           action on this view so it gets full emphasis. A bottom border separates the
           editorial header zone from the data grid that follows. */}
@@ -921,6 +915,6 @@ export default function DashboardPage() {
           previousMonthExpenses={expenseStats.previousMonth.expenses}
         />
       )}
-    </motion.div>
+    </div>
   );
 }

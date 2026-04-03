@@ -120,6 +120,8 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
   - `Line` / `Area`: `animationDuration={800}` + `animationEasing="ease-out"`
   - `Pie` also needs `animationBegin={0}`
 - Decorative stacked background areas should keep `isAnimationActive={false}`
+- **Page transitions: use `template.tsx`, NOT `layout.tsx` + `AnimatePresence`**. Next.js App Router wraps navigations in `startTransition` (React 18 concurrent); `AnimatePresence` can inherit the previous variant context ("visible") and skip `initial="hidden"` on the new child, causing a 1-frame flash of fully-visible content. `template.tsx` re-mounts on every navigation, guaranteeing Framer Motion treats each mount as a true first mount. Trade-off: no exit animation (old page unmounts immediately). See `app/dashboard/template.tsx`
+- Page-level `motion.div variants={pageVariants}` wrappers on individual pages are **redundant** when `template.tsx` is in place — remove them to avoid compounded opacity (opacity `t²` instead of `t`). Panoramica (`app/dashboard/page.tsx`) is already cleaned up; other pages still have the wrapper and should be updated in future sessions
 
 ### Mobile Navigation Structure
 - Bottom navigation (portrait mobile): 3 primary routes + "Altro" button (MoreHorizontal icon)
@@ -211,6 +213,11 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - On mobile, CPU budget is ~3–5x tighter. Multiple concurrent tasks at mount (re-renders, Recharts SVG, Framer Motion stagger, rAF loops) can exceed the 16ms/frame budget and cause visible animation jank
 - When a page uses `useCountUp` for mount-time KPI animations, avoid simultaneously rendering heavy components (Recharts charts, large lists) that aren't immediately visible
 - Pattern: start collapsible/below-fold Recharts components as collapsed on mobile, let users expand — use `isMobile` from `useMediaQuery` in the `useState` initializer for the expanded state
+
+### AnimatePresence + Next.js App Router Flash
+- **Symptom:** Content flashes at full opacity for ~1 frame before entrance animations begin; only on navigation (not hard refresh); `style={{ opacity: 0 }}` on the `motion.div` does NOT fix it
+- **Cause:** `layout.tsx` persists between navigations. `AnimatePresence mode="wait"` with `key={pathname}` is supposed to handle transitions, but Next.js wraps navigations in `startTransition` (React 18 concurrent). The variant context ("visible") from the completed previous animation can be inherited by the new child, causing Framer Motion to skip `initial="hidden"` and show content at opacity 1 immediately
+- **Fix:** Use `template.tsx` — it re-mounts on every navigation, so Framer Motion always treats the mount as a true first mount. Remove `AnimatePresence` from `layout.tsx`. See `app/dashboard/template.tsx`
 
 ### next/font Preload
 - `next/font` with default `preload: true` emits a `<link rel="preload">` on every page using the root layout

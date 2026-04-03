@@ -18,9 +18,6 @@
 'use client';
 
 import { useState } from 'react';
-import { usePathname } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import { pageVariants } from '@/lib/utils/motionVariants';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
@@ -34,7 +31,6 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const pathname = usePathname();
 
   return (
     <ProtectedRoute>
@@ -66,18 +62,10 @@ export default function DashboardLayout({
           </div>
 
           <Header />
+          {/* Page transition is handled by template.tsx which re-mounts on every
+              navigation — see app/dashboard/template.tsx for the rationale */}
           <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-950 p-4 md:p-6 desktop:pb-6 max-desktop:portrait:pb-20 max-desktop:landscape:pb-6">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={pathname}
-                variants={pageVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-              >
-                {children}
-              </motion.div>
-            </AnimatePresence>
+            {children}
           </main>
         </div>
       </div>
