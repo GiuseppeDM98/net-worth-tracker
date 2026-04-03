@@ -10,6 +10,7 @@
 - Navigation now feels smoother and more app-like: the active section indicator in the sidebar glides between items instead of snapping — giving the interface a native, polished feel
 - The bottom navigation on mobile now shows an animated accent line that appears on the active tab, making it easier to see where you are at a glance
 - Tapping the theme toggle or the user icon in the header now has a subtle press response, making controls feel more tactile and immediate
+- The theme toggle icon now animates when switching between light, dark, and system modes — the old icon rotates out while the new one rotates in, giving clear visual feedback that the change was registered
 - Opening the "Altro" drawer on mobile now reveals sections in a smooth cascade rather than appearing all at once
 - Page navigation now includes a gentle slide-up effect, reinforcing the sense that you're moving through a connected app rather than loading separate pages
 - All animations now automatically respect your device's "Reduce Motion" accessibility setting — if you have it enabled, transitions become instant across the entire app

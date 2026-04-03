@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 
@@ -99,7 +99,20 @@ export function Header() {
           whileTap={{ scale: 0.88 }}
           transition={{ type: 'spring', stiffness: 500, damping: 30 }}
         >
-          <ThemeIcon className="h-5 w-5" />
+          {/* AnimatePresence mode="wait" re-mounts the icon on every theme change,
+              so exit completes before the new icon enters — clean swap with no overlap. */}
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.span
+              key={theme}
+              initial={{ opacity: 0, rotate: -30, scale: 0.6 }}
+              animate={{ opacity: 1, rotate: 0, scale: 1 }}
+              exit={{ opacity: 0, rotate: 30, scale: 0.6 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              className="flex items-center justify-center"
+            >
+              <ThemeIcon className="h-5 w-5" />
+            </motion.span>
+          </AnimatePresence>
         </MotionButton>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
