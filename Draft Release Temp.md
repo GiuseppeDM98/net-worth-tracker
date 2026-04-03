@@ -12,6 +12,8 @@
 - The mobile navigation drawer now groups sections by topic (Analisi, Pianificazione, Preferenze) instead of a flat unlabelled list — the app's structure is visible at a glance
 - On mobile, the three portfolio charts on the Overview page now start collapsed, making the page load faster and the most important numbers appear instantly without scrolling past charts
 
+- The Allocation page no longer shows a separate legend box — the rebalancing signals (Buy / Sell / OK) are now self-explanatory at a glance. The action column header shows the ±2% threshold directly, and mobile cards now display "Da acquistare", "Da ridurre", or "Bilanciato" instead of a generic "Differenza" label
+
 - The login and registration pages now match the look and feel of the rest of the app: cleaner layout, consistent typography, and a more personal tone ("Bentornato." / "Crea il tuo profilo.") — the first impression now feels like part of the same product
 
 - Improved the Settings page layout: the header now includes a section label and a cleaner visual separator, making the page feel less like a back-office form

@@ -503,7 +503,10 @@ export default function AllocationPage() {
                       <TableHead className="text-right">Target €</TableHead>
                       <TableHead className="text-right">Differenza %</TableHead>
                       <TableHead className="text-right">Differenza €</TableHead>
-                      <TableHead className="text-center">Azione</TableHead>
+                      <TableHead className="text-center">
+                        <span className="block">Azione</span>
+                        <span className="block text-[10px] font-normal text-muted-foreground">±2% soglia</span>
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -614,15 +617,6 @@ export default function AllocationPage() {
         </div>
       )}
 
-      {/* Legend */}
-      <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 p-3 sm:p-4">
-        <h3 className="font-semibold text-blue-900 dark:text-blue-200 text-sm sm:text-base">Legenda</h3>
-        <ul className="mt-2 space-y-1 text-xs sm:text-sm text-blue-800 dark:text-blue-300">
-          <li><strong>COMPRA:</strong> Sotto-allocato (compra di più)</li>
-          <li><strong>VENDI:</strong> Sovra-allocato (riduci posizione)</li>
-          <li><strong>OK:</strong> Allocazione ottimale (±2%)</li>
-        </ul>
-      </div>
 
       {/* ========== MOBILE + TABLET VIEW ========== */}
       {useCardView && (
@@ -691,7 +685,10 @@ export default function AllocationPage() {
                         <TableHead className="text-right">Target €</TableHead>
                         <TableHead className="text-right">Differenza %</TableHead>
                         <TableHead className="text-right">Differenza €</TableHead>
-                        <TableHead className="text-center">Azione</TableHead>
+                        <TableHead className="text-center">
+                          <span className="block">Azione</span>
+                          <span className="block text-[10px] font-normal text-muted-foreground">±2% soglia</span>
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -782,7 +779,10 @@ export default function AllocationPage() {
                           <TableHead className="text-right">Target €</TableHead>
                           <TableHead className="text-right">Differenza %</TableHead>
                           <TableHead className="text-right">Differenza €</TableHead>
-                          <TableHead className="text-center">Azione</TableHead>
+                          <TableHead className="text-center">
+                          <span className="block">Azione</span>
+                          <span className="block text-[10px] font-normal text-muted-foreground">±2% soglia</span>
+                        </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
