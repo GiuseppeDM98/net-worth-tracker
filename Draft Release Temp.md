@@ -7,6 +7,12 @@
 
 ## 🔧 Improvements
 
+- Improved the Performance page with smoother period switching, so key metrics and charts update with more continuity instead of feeling abruptly redrawn
+- Improved Performance metrics so values settle from the previous state more naturally during period changes, making comparisons easier to follow at a glance
+- Improved the monthly returns heatmap with a staged reveal that makes the section feel more polished without reducing readability
+- Improved the underwater drawdown chart with a calmer, more editorial presentation that highlights the deepest drawdown more clearly
+- Improved the custom date range and AI analysis dialogs on the Performance page so they feel visually tied to the buttons that opened them
+
 - Improved the Allocation page with clearer drill-down orientation on desktop, making it easier to understand where you are when moving from asset classes to subcategories and specific assets
 - Improved mobile Allocation navigation so each drill-down level opens from the top of its own content instead of keeping the previous scroll position
 - Improved Allocation progress bars with cleaner, better-centered target markers that are easier to read at a glance

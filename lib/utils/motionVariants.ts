@@ -84,6 +84,14 @@ export const heroMetricSettle: Variants = {
   },
 };
 
+/** Metric settle spring for KPI values that should update precisely, not bounce. */
+export const metricSettleTransition: Transition = {
+  type: "spring",
+  stiffness: 320,
+  damping: 34,
+  mass: 0.8,
+};
+
 /** List item: subtle slide-up 8px + fade in (for rows, compact cards) */
 export const listItem: Variants = {
   hidden: { opacity: 0, y: 8 },
@@ -123,6 +131,21 @@ export const chartReveal: Variants = {
     opacity: 0,
     y: -6,
     transition: { duration: 0.18, ease: easeOutQuart },
+  },
+};
+
+/** Period switch shell: slight fade/settle used when dense data re-computes in place. */
+export const periodContentSettle: Variants = {
+  idle: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+  },
+  settle: {
+    opacity: [0.985, 1],
+    y: [4, 0],
+    scale: [0.998, 1],
+    transition: { duration: 0.24, ease: easeOutQuart },
   },
 };
 
@@ -180,6 +203,19 @@ export const sectionRefreshPulse: Variants = {
   },
 };
 
+/** Chart shell settle: short container continuity around data changes. */
+export const chartShellSettle: Variants = {
+  idle: {
+    opacity: 1,
+    y: 0,
+  },
+  settle: {
+    opacity: [0.985, 1],
+    y: [6, 0],
+    transition: { duration: 0.22, ease: easeOutQuart },
+  },
+};
+
 /** Table shell settle: subtle container continuity without animating table geometry. */
 export const tableShellSettle: Variants = {
   inactive: {
@@ -230,6 +266,30 @@ export const contextualSheetPanel: Variants = {
   exit: {
     opacity: 0,
     y: 8,
+    transition: { duration: 0.14, ease: easeOutQuart },
+  },
+};
+
+/** Dialog surface settle: contextual fallback when transform-origin continuity is available. */
+export const contextualDialogSurface: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 8,
+    scale: 0.975,
+  },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.2,
+      ease: easeOutQuart,
+    },
+  },
+  exit: {
+    opacity: 0,
+    y: 4,
+    scale: 0.985,
     transition: { duration: 0.14, ease: easeOutQuart },
   },
 };

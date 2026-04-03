@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { HelpCircle } from 'lucide-react';
 import { formatCurrency, formatPercentage } from '@/lib/services/chartService';
 import { cn } from '@/lib/utils';
 import { useCountUp } from '@/lib/utils/useCountUp';
+import { metricSettleTransition } from '@/lib/utils/motionVariants';
 
 interface MetricCardProps {
   title: string;
@@ -127,15 +129,24 @@ export function MetricCard({
     return 'text-foreground';
   };
 
-  // Animated value — counts up from 0 whenever `value` changes
-  const animatedValue = useCountUp(value);
+  // Animate from the previous value so period switches settle into the next state
+  // instead of replaying a full 0 → target count-up on every interaction.
+  const animatedValue = useCountUp(value, {
+    duration: isPrimary ? 560 : 460,
+    fromPrevious: true,
+  });
 
   // === Rendering ===
 
   return (
+    <motion.div
+      layout
+      transition={metricSettleTransition}
+      className="h-full"
+    >
     <Card className={cn(
-      'h-full transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
-      isPrimary && 'border-primary'
+      'h-full transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:shadow-md',
+      isPrimary && 'border-primary shadow-sm'
     )}>
       {/* items-start keeps the help icon pinned top-right when the title wraps
           or a badge chip is present below it. */}
@@ -168,18 +179,27 @@ export function MetricCard({
       <CardContent>
         {/* isPrimary cards use a larger value to visually dominate the section
             and signal to the eye which metrics deserve attention first. */}
-        <div className={cn('font-bold tabular-nums', isPrimary ? 'text-3xl' : 'text-2xl', getValueColor(value))}>
+        <motion.div
+          layout="position"
+          transition={metricSettleTransition}
+          className={cn('font-bold tabular-nums', isPrimary ? 'text-3xl' : 'text-2xl', getValueColor(value))}
+        >
           {formatValue(animatedValue)}
-        </div>
+        </motion.div>
         {subtitle && (
-          <p className="text-xs text-muted-foreground mt-1 font-medium">
+          <motion.p
+            layout="position"
+            transition={metricSettleTransition}
+            className="text-xs text-muted-foreground mt-1 font-medium"
+          >
             {subtitle}
-          </p>
+          </motion.p>
         )}
         {description && (
           <CardDescription className="mt-1 text-xs">{description}</CardDescription>
         )}
       </CardContent>
     </Card>
+    </motion.div>
   );
 }

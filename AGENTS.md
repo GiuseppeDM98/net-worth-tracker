@@ -123,6 +123,9 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 ### Motion and Charts
 - Shared variants live in `lib/utils/motionVariants.ts`
 - For dense tabbed data views, prefer short container transitions (`tabPanelSwitch`, `tableShellSettle`) and scoped refresh feedback on the active panel only; do not animate table geometry or whole row sets
+- Performance page pattern: derive `chartData`, heatmap data, and underwater data with `useMemo`; do not store them in local state via `useEffect + setState`
+- Performance period morph: do not key KPI sections or metric cards by selected period; KPI values should settle from the previous rendered value (`useCountUp({ fromPrevious: true })`) while chart shells can re-key only when a first-class staged reveal is intentional
+- Performance staged reveals should run on first mount or major period change only; manual refresh feedback must stay scoped to the page header or active chart shell instead of replaying the whole page
 - Allocation mobile drill-down pattern: keep the sheet's native bottom-entry animation, but make the sheet body the only scrollable region and reset its scroll to top on each level/content change; this preserves orientation more reliably than custom container-entry choreography
 - Allocation target markers inside progress bars should use a centered dot without a vertical stem; if bar height/border changes, recheck visual centering against the live track
 - Do not wrap shadcn `TableRow` with `motion()`; use `motion.tr`
@@ -175,6 +178,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - `npm test -- <file>` or `npx vitest run <file>` for targeted tests
 - `npx tsc --noEmit` for repo-wide TypeScript checking without generating build output
 - For motion/perceived-performance changes, compare `npm run dev` against `npm run build && npm run start` before optimizing away production-safe motion
+- For Performance page UX/motion changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/performanceService.test.ts` before manual validation
 - For private API auth regressions, run `npx vitest run __tests__/apiAuthRoutes.test.ts`
 - For Settings UX-only changes, run `npx tsc --noEmit` plus a targeted smoke/auth check (`npx vitest run __tests__/apiAuthRoutes.test.ts`) before manual UI validation
 
