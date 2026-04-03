@@ -126,6 +126,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 ### Mobile Navigation Structure
 - Bottom navigation (portrait mobile): 3 primary routes + "Altro" button (MoreHorizontal icon)
 - "Altro" button shows active state (blue, `text-blue-600 bg-blue-50 dark:bg-blue-950/20`) when current route is any secondary route — same treatment as primary tabs
+- **Sidebar active state — Overview exact match**: `Sidebar.tsx` `isActive` for `/dashboard` must use `pathname === item.href` only, never `startsWith`. `startsWith('/dashboard/')` matches every sub-route (`/dashboard/assets`, `/dashboard/history`, etc.) and keeps Panoramica highlighted on all pages. All other routes can use prefix matching safely
 - `secondaryHrefs` array in `BottomNavigation.tsx` must stay in sync with `navigationGroups` hrefs in `SecondaryMenuDrawer.tsx`
 - Secondary drawer uses 3 semantic groups: Analisi (Allocazione, Rendimenti, Storico, Hall of Fame), Pianificazione (FIRE e Simulazioni), Preferenze (Impostazioni)
 - Eyebrow label style for group headers: `text-xs font-semibold uppercase tracking-wider text-muted-foreground/60`

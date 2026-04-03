@@ -43,6 +43,7 @@
 ## 🐛 Bug Fixes
 
 - Fixed a flash of fully-visible page content appearing for a split second before the entrance animation begins when navigating between pages — now all pages animate in cleanly every time
+- Fixed the sidebar always highlighting "Panoramica" regardless of the current page
 - Fixed a browser console warning on every page load: the Geist Mono font was being preloaded on all pages despite only being used on the FIRE and Hall of Fame pages
 
 ## 🔒 Security
