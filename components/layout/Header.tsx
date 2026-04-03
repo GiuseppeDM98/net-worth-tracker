@@ -1,7 +1,12 @@
 'use client';
 
+import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+
+// motion.create(Button) lets us apply Framer Motion props (whileTap) directly
+// on the shadcn Button without an extra wrapper element.
+const MotionButton = motion.create(Button);
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -85,20 +90,28 @@ export function Header() {
         )}
       </div>
       <div className="flex items-center gap-4">
-        <Button
+        <MotionButton
           variant="ghost"
           size="icon"
           onClick={cycleTheme}
           title={themeLabel}
           className="rounded-full"
+          whileTap={{ scale: 0.88 }}
+          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
         >
           <ThemeIcon className="h-5 w-5" />
-        </Button>
+        </MotionButton>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="rounded-full">
+            <MotionButton
+              variant="ghost"
+              size="icon"
+              className="rounded-full"
+              whileTap={{ scale: 0.88 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            >
               <User className="h-5 w-5" />
-            </Button>
+            </MotionButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Il mio account</DropdownMenuLabel>

@@ -7,6 +7,13 @@
 
 ## 🔧 Improvements
 
+- Navigation now feels smoother and more app-like: the active section indicator in the sidebar glides between items instead of snapping — giving the interface a native, polished feel
+- The bottom navigation on mobile now shows an animated accent line that appears on the active tab, making it easier to see where you are at a glance
+- Tapping the theme toggle or the user icon in the header now has a subtle press response, making controls feel more tactile and immediate
+- Opening the "Altro" drawer on mobile now reveals sections in a smooth cascade rather than appearing all at once
+- Page navigation now includes a gentle slide-up effect, reinforcing the sense that you're moving through a connected app rather than loading separate pages
+- All animations now automatically respect your device's "Reduce Motion" accessibility setting — if you have it enabled, transitions become instant across the entire app
+
 - The Overview and History pages now have a clearer visual structure: related metrics are grouped together, and subtle section dividers mark the transition between primary data, analysis, and reference sections — making long pages easier to scan without feeling overwhelming
 - The "Risparmiato da Lavoro" card in the History page now shows the total expenses for the period as a secondary line below the main value, making it immediately clear what drove the savings figure
 

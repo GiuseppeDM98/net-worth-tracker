@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
 import { LayoutDashboard, Wallet, Receipt, MoreHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -78,16 +79,33 @@ export function BottomNavigation() {
           {primaryNavigation.map((item) => {
             const isActive = pathname === item.href;
             return (
+              // relative positioning anchors the per-tab top-border indicator.
               <Link
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  'flex flex-col items-center justify-center flex-1 h-full gap-1 text-xs transition-colors',
+                  'relative flex flex-col items-center justify-center flex-1 h-full gap-1 text-xs transition-colors',
                   isActive
                     ? 'text-blue-600 bg-blue-50 dark:bg-blue-950/20'
                     : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                 )}
               >
+                {/* Per-tab fade-in indicator — no layoutId here.
+                    layoutId requires DOM layout measurement, which breaks inside
+                    fixed containers because Framer Motion's coordinate math
+                    relative to the offset parent produces incorrect transforms. */}
+                <AnimatePresence>
+                  {isActive && (
+                    <motion.div
+                      key="indicator"
+                      initial={{ opacity: 0, scaleX: 0.5 }}
+                      animate={{ opacity: 1, scaleX: 1 }}
+                      exit={{ opacity: 0, scaleX: 0.5 }}
+                      transition={{ duration: 0.2, ease: [0.25, 1, 0.5, 1] }}
+                      className="absolute top-0 left-0 right-0 h-0.5 bg-blue-600 origin-center"
+                    />
+                  )}
+                </AnimatePresence>
                 <item.icon className="h-6 w-6" />
                 <span className="font-medium">{item.name}</span>
               </Link>
@@ -100,12 +118,24 @@ export function BottomNavigation() {
           <button
             onClick={() => setDrawerOpen(true)}
             className={cn(
-              'flex flex-col items-center justify-center flex-1 h-full gap-1 text-xs transition-colors',
+              'relative flex flex-col items-center justify-center flex-1 h-full gap-1 text-xs transition-colors',
               isAltroActive
                 ? 'text-blue-600 bg-blue-50 dark:bg-blue-950/20'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted'
             )}
           >
+            <AnimatePresence>
+              {isAltroActive && (
+                <motion.div
+                  key="indicator"
+                  initial={{ opacity: 0, scaleX: 0.5 }}
+                  animate={{ opacity: 1, scaleX: 1 }}
+                  exit={{ opacity: 0, scaleX: 0.5 }}
+                  transition={{ duration: 0.2, ease: [0.25, 1, 0.5, 1] }}
+                  className="absolute top-0 left-0 right-0 h-0.5 bg-blue-600 origin-center"
+                />
+              )}
+            </AnimatePresence>
             <MoreHorizontal className="h-6 w-6" />
             <span className="font-medium">Altro</span>
           </button>

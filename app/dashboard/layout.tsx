@@ -18,6 +18,7 @@
 'use client';
 
 import { useState } from 'react';
+import { MotionConfig } from 'framer-motion';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
@@ -33,6 +34,9 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
+    // MotionConfig propagates to the entire dashboard tree — all Framer Motion
+    // animations respect prefers-reduced-motion without per-component guards.
+    <MotionConfig reducedMotion="user">
     <ProtectedRoute>
       <div className="flex h-screen overflow-hidden">
         {/* Mobile sidebar backdrop */}
@@ -49,7 +53,7 @@ export default function DashboardLayout({
         {/* Main content */}
         <div className="flex flex-1 flex-col overflow-hidden">
           {/* Mobile hamburger menu - solo landscape */}
-          <div className="flex items-center gap-4 bg-white dark:bg-gray-900 px-4 py-3 desktop:hidden max-desktop:portrait:hidden max-desktop:landscape:flex border-b">
+          <div className="flex items-center gap-4 bg-background px-4 py-3 desktop:hidden max-desktop:portrait:hidden max-desktop:landscape:flex border-b">
             <Button
               variant="ghost"
               size="sm"
@@ -73,5 +77,6 @@ export default function DashboardLayout({
       {/* Bottom Navigation - Solo mobile portrait */}
       <BottomNavigation />
     </ProtectedRoute>
+    </MotionConfig>
   );
 }

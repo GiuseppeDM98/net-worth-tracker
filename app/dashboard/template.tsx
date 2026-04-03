@@ -26,9 +26,10 @@ export default function DashboardTemplate({
       initial="hidden"
       animate="visible"
       variants={pageVariants}
-      // Belt-and-suspenders: CSS opacity:0 covers the single frame before
-      // Framer Motion's useLayoutEffect runs on very slow JS threads
-      style={{ opacity: 0 }}
+      // Belt-and-suspenders: CSS opacity:0 + translateY covers the single frame
+      // before Framer Motion's useLayoutEffect runs on very slow JS threads.
+      // Must match pageVariants.hidden values exactly.
+      style={{ opacity: 0, transform: 'translateY(4px)' }}
     >
       {children}
     </motion.div>

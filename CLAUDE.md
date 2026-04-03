@@ -5,9 +5,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-03, session 40): **Page transition flash fix + sidebar active state**. Replaced `AnimatePresence mode="wait"` + `motion.div key={pathname}` in `layout.tsx` with `app/dashboard/template.tsx` (re-mounts on every navigation, guaranteeing Framer Motion applies `initial="hidden"` correctly). Removed redundant `motion.div pageVariants` outer wrapper from all three affected pages (`app/dashboard/page.tsx`, `history/page.tsx`, `hall-of-fame/page.tsx`). Also fixed sidebar always highlighting Panoramica: `/dashboard` must use exact match only in `isActive` — `startsWith('/dashboard/')` matches all sub-routes.
-- Previous implementation (2026-04-03, session 39): **Secondary visual rhythm (Spec 10)**. Overview and History pages now have 3 explicit reading zones separated by `border-t border-border/40` dividers and tighter `space-y-4` grouping for secondary card clusters. Overview: secondary metrics (Variazioni, Expense Stats, Cost Cards) grouped with `space-y-4`; "Composizione" eyebrow + border-t before pie charts. History: zone dividers before "Risparmio vs Crescita" (evolution→analysis) and before "Tempo di Raddoppio" (analysis→context). Dividers added as `className` on existing `motion.div` so they animate with content. Also: "Risparmiato da Lavoro" card in History now shows total expenses for the period as a sub-line (`totalExpensesSum` exposed from `laborIncomeMetrics` useMemo return).
-- Previous implementation (2026-04-03, session 38): **Brand integration + contextual help distribution**. Hall of Fame: "Ranking/Rankings" → "Record" throughout Italian copy; title and nav unchanged (intentional English brand choice). Performance methodology section compressed: YOC 68→12 lines, Current Yield 94→12 lines, 5 chart sections trimmed (removed redundant intros and "Interpretazione" paragraphs already covered by CardDescriptions). Allocation: "Specific Assets" → "Asset specifici" in h1/CardTitle/sheet mobile; callout "Nota" → "Asset specifici"; goal-derived callout shortened. Settings: labor income helper tightened.
+- Latest implementation (2026-04-03, session 41): **Overdrive shell & navigation — fluidità premium**. `MotionConfig reducedMotion="user"` at layout root (covers entire dashboard tree). `pageVariants.hidden` now includes `y: 4` for native slide-up on enter; CSS fallback in `template.tsx` updated to match. Sidebar: animated active pill via `layoutId="sidebar-active-pill"` (spring stiffness 400 / damping 35). BottomNavigation: per-tab `AnimatePresence` top-border indicator with `scaleX` (`layoutId` avoided — incompatible with `fixed` containers). Header: `motion.create(Button)` with `whileTap={{ scale: 0.88 }}` on theme toggle and avatar. SecondaryMenuDrawer: staggered item entrance using `drawerContainer`/`drawerItem` from motionVariants. Fixed `bg-background` token in landscape hamburger bar.
+- Previous implementation (2026-04-03, session 40): **Page transition flash fix + sidebar active state**. Replaced `AnimatePresence mode="wait"` + `motion.div key={pathname}` in `layout.tsx` with `app/dashboard/template.tsx`. Removed redundant `motion.div pageVariants` outer wrappers from `page.tsx`, `history/page.tsx`, `hall-of-fame/page.tsx`. Fixed sidebar always highlighting Panoramica: `/dashboard` uses exact match only.
+- Previous implementation (2026-04-03, session 39): **Secondary visual rhythm (Spec 10)**. Overview and History pages have 3 explicit reading zones via `border-t border-border/40` dividers and `space-y-4` grouping. "Risparmiato da Lavoro" card in History shows total expenses sub-line.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -63,7 +63,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-03 (session 39)
+**Last updated**: 2026-04-03 (session 41)
 
 ## Design Context
 

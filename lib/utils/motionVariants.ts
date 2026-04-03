@@ -17,11 +17,13 @@ import type { Variants } from "framer-motion";
 /** Ease-out-quart cubic-bezier — matches useCountUp easing */
 const easeOutQuart = [0.25, 1, 0.5, 1] as const;
 
-/** Full-page fade-in on mount (used as outermost wrapper after loading resolves) */
+/** Full-page fade-in on mount (used as outermost wrapper after loading resolves).
+ *  y: 4 on hidden provides a native-app-style subtle slide-up on enter. */
 export const pageVariants: Variants = {
-  hidden: { opacity: 0 },
+  hidden: { opacity: 0, y: 4 },
   visible: {
     opacity: 1,
+    y: 0,
     transition: { duration: 0.35, ease: easeOutQuart },
   },
   exit: {
@@ -79,6 +81,24 @@ export const slideDown: Variants = {
     opacity: 0,
     height: 0,
     overflow: "hidden",
+    transition: { duration: 0.2, ease: easeOutQuart },
+  },
+};
+
+/** Stagger container for bottom-sheet drawer items (50ms stagger, small delay for sheet open) */
+export const drawerContainer: Variants = {
+  hidden: {},
+  visible: {
+    transition: { staggerChildren: 0.05, delayChildren: 0.05 },
+  },
+};
+
+/** Drawer list item: subtle slide-left + fade in (matches bottom-sheet direction) */
+export const drawerItem: Variants = {
+  hidden: { opacity: 0, x: -8 },
+  visible: {
+    opacity: 1,
+    x: 0,
     transition: { duration: 0.2, ease: easeOutQuart },
   },
 };
