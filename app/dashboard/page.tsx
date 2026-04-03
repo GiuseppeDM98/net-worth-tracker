@@ -591,6 +591,11 @@ export default function DashboardPage() {
         )}
       </AnimatePresence>
 
+      {/* Secondary metrics group — tighter internal spacing (space-y-4) vs the
+          space-y-6 page-level gap groups these three clusters visually together,
+          subordinating them to the hero above and the composition zone below */}
+      <div className="space-y-4">
+
       {/* Variazioni Cards */}
       <motion.div
         variants={staggerContainer}
@@ -794,8 +799,14 @@ export default function DashboardPage() {
         )}
       </AnimatePresence>
 
-      {/* Pie charts — collapsible on mobile to reduce scroll length (~1050px on portrait) */}
-      <div className="space-y-6">
+      </div>
+
+      {/* Pie charts — border-t + eyebrow signals shift from numeric metrics to visual
+          composition zone. Outer div uses space-y-4 to tighten eyebrow-to-chart gap;
+          inner div keeps space-y-6 between the three charts (they're tall components) */}
+      <div className="border-t border-border/40 pt-6 space-y-4">
+        <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Composizione</p>
+        <div className="space-y-6">
         <Card>
           <CardHeader
             className="max-desktop:cursor-pointer"
@@ -870,6 +881,7 @@ export default function DashboardPage() {
             )}
           </AnimatePresence>
         </Card>
+        </div>
       </div>
 
       {/* Confirm Dialog */}

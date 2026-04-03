@@ -7,6 +7,9 @@
 
 ## 🔧 Improvements
 
+- The Overview and History pages now have a clearer visual structure: related metrics are grouped together, and subtle section dividers mark the transition between primary data, analysis, and reference sections — making long pages easier to scan without feeling overwhelming
+- The "Risparmiato da Lavoro" card in the History page now shows the total expenses for the period as a secondary line below the main value, making it immediately clear what drove the savings figure
+
 - The Hall of Fame section now uses consistent Italian terminology throughout: section headings, button labels, and toast messages now read "Record mensili", "Record annuali", and "Aggiorna i record" instead of the mixed English/Italian "Ranking" wording — the section name and navigation label remain "Hall of Fame" by design
 - The "Specific Assets" drill-down in the Allocation page is now labelled "Asset specifici" in Italian, consistent with the rest of the interface
 - The methodology reference on the Performance page is now significantly more scannable: chart explanations are 2–3 lines each (down from 10–15), and the YOC and Current Yield sections are concise reference entries rather than multi-page walkthroughs — all key formulas and interpretation guidance are preserved

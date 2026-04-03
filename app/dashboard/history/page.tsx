@@ -333,7 +333,7 @@ export default function HistoryPage() {
     const estimatedTaxes = calculateTotalEstimatedTaxes(assets);
     const totalInvestmentGrowthNet = totalInvestmentGrowthGross - estimatedTaxes;
 
-    return { totalLaborIncome, totalSavedFromWork, totalInvestmentGrowthGross, totalInvestmentGrowthNet, startYear };
+    return { totalLaborIncome, totalSavedFromWork, totalExpensesSum, totalInvestmentGrowthGross, totalInvestmentGrowthNet, startYear };
   }, [expenses, snapshots, portfolioSettings, assets]);
 
   // Monthly labor vs investment breakdown — only when labor categories are configured in Settings
@@ -1388,7 +1388,8 @@ export default function HistoryPage() {
           - Blue/Red bar (Investment Growth): What markets contributed (positive/negative)
           Stacked bars sum to total Net Worth Growth for the period.
           Supports annual view (per-year) and monthly view (per-month within a year). */}
-      <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.4 }}>
+      {/* border-t signals zone shift: portfolio evolution (above) → cashflow analysis (below) */}
+      <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.4 }} className="border-t border-border/40 pt-4">
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -1636,6 +1637,9 @@ export default function HistoryPage() {
                       {laborIncomeMetrics.totalSavedFromWork >= 0 ? '+' : ''}{formatCurrency(laborIncomeMetrics.totalSavedFromWork)}
                     </div>
                     <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Spese: {formatCurrency(laborIncomeMetrics.totalExpensesSum)}
+                    </p>
                   </CardContent>
                 </Card>
 
@@ -1706,7 +1710,8 @@ export default function HistoryPage() {
       )}
 
       {/* Doubling Time Analysis */}
-      <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.5 }}>
+      {/* border-t signals zone shift: cashflow analysis (above) → context/reference (below) */}
+      <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.5 }} className="border-t border-border/40 pt-4">
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

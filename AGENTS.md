@@ -109,6 +109,8 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Page header zone: eyebrow label (`text-xs uppercase tracking-widest text-muted-foreground`) above the `h1` + `border-b border-border` below the full header row separates editorial zone from data grid
 - Action hierarchy: one `variant="default"` CTA per page; utility actions (refresh, CSV export, insert snapshot) use `variant="ghost"` or `variant="outline" size="sm"`
 - Auth pages (`/login`, `/register`): use `bg-background` + `border border-border rounded-xl bg-card p-8` panel — no `Card` component, no hardcoded grays. Top `h-px bg-border` accent line mirrors the dashboard page header separator. Eyebrow label + personal title ("Bentornato." / "Crea il tuo profilo.") apply the same typographic pattern as internal pages. Cross-links use `underline underline-offset-4 text-foreground`, not a colored link
+- Secondary rhythm on long pages: wrap secondary card clusters in `<div className="space-y-4">` nested inside the page's `space-y-6` container — the 16px vs 24px ratio visually subordinates the group without adding decoration. Use `border-t border-border/40 pt-4` (or `pt-6` when adding an eyebrow label) on a `motion.div` to signal a zone transition; the divider animates with the content automatically
+- Section zone eyebrows (e.g. "Composizione"): `text-xs font-medium uppercase tracking-widest text-muted-foreground` — same pattern as page header eyebrows but inside a `pt-6 border-t border-border/40` wrapper to act as a section separator
 
 ### Motion and Charts
 - Shared variants live in `lib/utils/motionVariants.ts`
