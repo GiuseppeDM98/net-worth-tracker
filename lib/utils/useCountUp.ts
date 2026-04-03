@@ -3,6 +3,8 @@ import { useState, useRef, useEffect } from 'react';
 export interface UseCountUpOptions {
   /** Delay in ms before animation starts. Default: 60 */
   startDelay?: number;
+  /** Duration in ms for the count-up animation. Default: 500 */
+  duration?: number;
   /**
    * When true, animates only on the first non-null value received and never
    * re-triggers on subsequent changes. Useful for page-level KPIs that should
@@ -23,7 +25,7 @@ export function useCountUp(
   target: number | null,
   options: UseCountUpOptions = {}
 ): number | null {
-  const { startDelay = 60, once = false } = options;
+  const { startDelay = 60, duration = 500, once = false } = options;
 
   const [current, setCurrent] = useState<number | null>(null);
   const rafRef = useRef<number | undefined>(undefined);
@@ -62,7 +64,6 @@ export function useCountUp(
       return;
     }
 
-    const duration = 500;
     let startTime: number | null = null;
 
     timerRef.current = setTimeout(() => {

@@ -5,9 +5,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-03, session 42): **Theme toggle icon transition**. `AnimatePresence mode="wait"` with `key={theme}` on a `motion.span` wrapping the icon in `Header.tsx` — exit rotates +30° + fade + scale-down, enter from -30°. `initial={false}` skips animation on first mount. `ThemeProvider.disableTransitionOnChange` kept (prevents CSS body flash; Framer animation is independent).
+- Latest implementation (2026-04-03, session 43): **Dashboard Overview overdrive polish**. Panoramica now has a more controlled hero KPI settle, softer reflow for conditional metric blocks, one-time chart reveal behavior, and a snapshot overwrite dialog that visually opens from the CTA while remaining neutral on close. The current-month snapshot check also uses Italy timezone helpers consistently, and late-night greeting copy now stays on `Buonasera` with a softer subtitle.
+- Previous implementation (2026-04-03, session 42): **Theme toggle icon transition**. `AnimatePresence mode="wait"` with `key={theme}` on a `motion.span` wrapping the icon in `Header.tsx` — exit rotates +30° + fade + scale-down, enter from -30°. `initial={false}` skips animation on first mount. `ThemeProvider.disableTransitionOnChange` kept (prevents CSS body flash; Framer animation is independent).
 - Previous implementation (2026-04-03, session 41): **Overdrive shell & navigation — fluidità premium**. `MotionConfig reducedMotion="user"` at layout root. Sidebar: animated active pill via `layoutId="sidebar-active-pill"`. BottomNavigation: per-tab `AnimatePresence` top-border indicator with `scaleX`. Header: `motion.create(Button)` with `whileTap={{ scale: 0.88 }}` on theme toggle and avatar. SecondaryMenuDrawer: staggered item entrance.
-- Previous implementation (2026-04-03, session 40): **Page transition flash fix + sidebar active state**. Replaced `AnimatePresence` in `layout.tsx` with `app/dashboard/template.tsx`. Fixed sidebar always highlighting Panoramica.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -19,6 +19,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Key Features (Active)
 - Portfolio tracking across equities, bonds, crypto, real estate, commodities, and cash
 - Automatic price updates via Yahoo Finance and Borsa Italiana bond support
+- Overview/Dashboard now emphasizes the primary net-worth KPI with a more precise count-up/settle pattern, softer conditional-card reflow, and chart reveals that avoid noisy replay on secondary updates
+- Snapshot overwrite on the Overview page now opens with visual continuity from the `Crea Snapshot` CTA and still degrades cleanly under reduced motion
 - Private API actions now require verified Firebase auth server-side, while scheduled maintenance flows continue to authenticate with `CRON_SECRET`
 - Cashflow tracking with categories, filters, Sankey drill-down, budget management, and linked cash-account updates
 - History page with net worth evolution, asset class breakdown, liquidity, YoY variation, savings vs investment growth, `Lavoro & Investimenti`, doubling analysis, and allocation comparison
@@ -63,7 +65,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-03 (session 41)
+**Last updated**: 2026-04-03 (session 43)
 
 ## Design Context
 

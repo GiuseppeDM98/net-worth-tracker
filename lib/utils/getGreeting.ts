@@ -15,5 +15,5 @@ export function getGreeting(hour: number): GreetingResult {
     return { greeting: 'Buonasera', subtitle: 'Riepilogo della giornata' };
   }
   // 22-4: late night / early morning
-  return { greeting: 'Buonanotte', subtitle: 'Sei sveglio tardi — ecco il tuo portafoglio' };
+  return { greeting: 'Buonasera', subtitle: "Uno sguardo al tuo patrimonio, anche a quest'ora" };
 }

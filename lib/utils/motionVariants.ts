@@ -12,10 +12,18 @@
  * Accessibility: wrap pages with <MotionConfig reducedMotion="user"> to
  * automatically disable all animations for users with prefers-reduced-motion.
  */
-import type { Variants } from "framer-motion";
+import type { Transition, Variants } from "framer-motion";
 
 /** Ease-out-quart cubic-bezier — matches useCountUp easing */
 const easeOutQuart = [0.25, 1, 0.5, 1] as const;
+
+/** Shared spring for layout reflow when conditional sections appear or resize. */
+export const springLayoutTransition: Transition = {
+  type: "spring",
+  stiffness: 280,
+  damping: 30,
+  mass: 0.9,
+};
 
 /** Full-page fade-in on mount (used as outermost wrapper after loading resolves).
  *  y: 4 on hidden provides a native-app-style subtle slide-up on enter. */
@@ -59,6 +67,23 @@ export const cardItem: Variants = {
   },
 };
 
+/** Hero KPI settle: slightly tighter spring to make the primary number feel precise. */
+export const heroMetricSettle: Variants = {
+  hidden: { opacity: 0, y: 18, scale: 0.985 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      type: "spring",
+      stiffness: 220,
+      damping: 24,
+      mass: 0.95,
+      delay: 0.04,
+    },
+  },
+};
+
 /** List item: subtle slide-up 8px + fade in (for rows, compact cards) */
 export const listItem: Variants = {
   hidden: { opacity: 0, y: 8 },
@@ -82,6 +107,22 @@ export const slideDown: Variants = {
     height: 0,
     overflow: "hidden",
     transition: { duration: 0.2, ease: easeOutQuart },
+  },
+};
+
+/** Subtle chart reveal once the card body is already expanding into place. */
+export const chartReveal: Variants = {
+  hidden: { opacity: 0, y: 10, scale: 0.995 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { duration: 0.28, ease: easeOutQuart },
+  },
+  exit: {
+    opacity: 0,
+    y: -6,
+    transition: { duration: 0.18, ease: easeOutQuart },
   },
 };
 

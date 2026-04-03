@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { PieChart as RechartsPC, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { PieChartData } from '@/types/assets';
 import { formatCurrency } from '@/lib/services/chartService';
@@ -7,12 +8,23 @@ import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 
 interface PieChartProps {
   data: PieChartData[];
+  animateOnMount?: boolean;
+  onFirstRender?: () => void;
 }
 
-export function PieChart({ data }: PieChartProps) {
+export function PieChart({
+  data,
+  animateOnMount = true,
+  onFirstRender,
+}: PieChartProps) {
+  // Detect mobile screen for responsive sizing
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  const prefersReducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
+  const [isAnimationActive, setIsAnimationActive] = useState(animateOnMount);
+
   if (!data || data.length === 0) {
     return (
-      <div className="flex h-64 items-center justify-center text-gray-500">
+      <div className="flex h-64 items-center justify-center text-muted-foreground">
         Nessun dato disponibile. Aggiungi assets per visualizzare il grafico.
       </div>
     );
@@ -21,8 +33,25 @@ export function PieChart({ data }: PieChartProps) {
   // Ensure data is sorted by value descending for legend order
   const sortedData = [...data].sort((a, b) => b.value - a.value);
 
-  // Detect mobile screen for responsive sizing
-  const isMobile = useMediaQuery('(max-width: 768px)');
+  useEffect(() => {
+    onFirstRender?.();
+    // We only need to mark the chart as seen once for the parent page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (prefersReducedMotion || !animateOnMount) {
+      setIsAnimationActive(false);
+      return;
+    }
+
+    setIsAnimationActive(true);
+    const frameId = requestAnimationFrame(() => {
+      setIsAnimationActive(false);
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [animateOnMount, prefersReducedMotion]);
 
   // Responsive configuration
   const chartConfig = {
@@ -46,6 +75,7 @@ export function PieChart({ data }: PieChartProps) {
           outerRadius={chartConfig.outerRadius}
           fill="#8884d8"
           dataKey="value"
+          isAnimationActive={isAnimationActive}
           animationBegin={0}
           animationDuration={600}
           animationEasing="ease-out"
@@ -106,7 +136,7 @@ export function PieChart({ data }: PieChartProps) {
                       flexShrink: 0,
                     }}
                   />
-                  <span className="text-gray-700 dark:text-gray-300">
+                  <span className="text-foreground/80">
                     {entry.name} ({entry.percentage.toFixed(1)}%)
                   </span>
                 </div>

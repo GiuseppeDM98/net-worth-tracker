@@ -7,6 +7,9 @@
 
 ## 🔧 Improvements
 
+- Improved the Overview dashboard with a smoother primary KPI entrance, softer reflow of conditional cards, and subtler chart reveals that feel more polished without getting in the way
+- Improved the snapshot overwrite flow on the Overview page so the confirmation dialog feels more connected to the "Crea Snapshot" action
+- Refined the late-night Overview greeting to keep a calmer evening tone while still acknowledging late usage
 - Navigation now feels smoother and more app-like: the active section indicator in the sidebar glides between items instead of snapping — giving the interface a native, polished feel
 - The bottom navigation on mobile now shows an animated accent line that appears on the active tab, making it easier to see where you are at a glance
 - Tapping the theme toggle or the user icon in the header now has a subtle press response, making controls feel more tactile and immediate

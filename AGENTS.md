@@ -116,11 +116,14 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Shared variants live in `lib/utils/motionVariants.ts`
 - Do not wrap shadcn `TableRow` with `motion()`; use `motion.tr`
 - Use `motion.create(Component)` — `motion(Component)` is deprecated in Framer Motion v11+ and logs a warning
+- Page-level Framer Motion quality should be validated in production mode (`npm run build` + `npm run start`) before treating desktop smoothness as a regression; `next dev` can noticeably exaggerate count-up and layout-motion cost
 - Recharts defaults:
   - `Bar` / `Pie`: `animationDuration={600}` + `animationEasing="ease-out"`
   - `Line` / `Area`: `animationDuration={800}` + `animationEasing="ease-out"`
   - `Pie` also needs `animationBegin={0}`
 - Decorative stacked background areas should keep `isAnimationActive={false}`
+- Overview/Panoramica pattern: keep hero KPI motion focused on the primary card, avoid replaying chart animations on every secondary refetch, and prefer one-time chart reveal flags for expensive Recharts mounts
+- Dialog continuity pattern: for trigger-to-dialog continuity, forward the ref through `DialogContent` and compute a `transform-origin` from the triggering control; clear the custom origin on close so the exit animation stays neutral
 - **Page transitions: use `template.tsx`, NOT `layout.tsx` + `AnimatePresence`**. Next.js App Router wraps navigations in `startTransition` (React 18 concurrent); `AnimatePresence` can inherit the previous variant context ("visible") and skip `initial="hidden"` on the new child, causing a 1-frame flash of fully-visible content. `template.tsx` re-mounts on every navigation, guaranteeing Framer Motion treats each mount as a true first mount. Trade-off: no exit animation (old page unmounts immediately). See `app/dashboard/template.tsx`
 - Page-level `motion.div variants={pageVariants}` wrappers on individual pages are **redundant** when `template.tsx` is in place — remove them to avoid compounded opacity (opacity `t²` instead of `t`)
 - **`prefers-reduced-motion`**: add `<MotionConfig reducedMotion="user">` at the layout root (`app/dashboard/layout.tsx`) — propagates to the entire tree, no per-component guards needed
@@ -159,6 +162,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 ### Commands
 - `npm test -- <file>` or `npx vitest run <file>` for targeted tests
 - `npx tsc --noEmit` for repo-wide TypeScript checking without generating build output
+- For motion/perceived-performance changes, compare `npm run dev` against `npm run build && npm run start` before optimizing away production-safe motion
 - For private API auth regressions, run `npx vitest run __tests__/apiAuthRoutes.test.ts`
 
 ### Test Patterns

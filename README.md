@@ -28,6 +28,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Yield on Cost (YOC) and Current Yield calculations
 - Monthly returns heatmap and underwater drawdown chart
 - Rolling performance charts
+- Overview dashboard polish: the main net worth KPI settles in more naturally on load, snapshot overwrite feels more connected to its CTA, and portfolio charts reveal more discreetly without noisy replay
 - Progressive disclosure: methodology section collapsed by default; one-time guide strip for new users; "Avanzato" badge on technical metrics (TWR, IRR, Sharpe, YOC); each chart has an inline 2-line reading hint
 - Animated metric cards: values count up on load and on period switch; staggered entrance cascade per section
 - Dashboard KPI cards (Total Portfolio, Liquid, Net Worth, Unrealized Gains, Taxes) animate their values on page load — numbers count up from zero once on mount
