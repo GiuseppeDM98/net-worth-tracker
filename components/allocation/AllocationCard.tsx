@@ -151,7 +151,10 @@ export function AllocationCard({
           )}
         >
           <div className="flex-1">
-            <p className="text-xs text-gray-600 dark:text-gray-400 mb-0.5">Differenza</p>
+            {/* Contextual label instead of generic "Differenza" — tells user what action the number implies */}
+            <p className="text-xs text-gray-600 dark:text-gray-400 mb-0.5">
+              {data.action === 'COMPRA' ? 'Da acquistare' : data.action === 'VENDI' ? 'Da ridurre' : 'Bilanciato'}
+            </p>
             <p className="text-sm font-bold">
               <span className={cn(
                 data.difference > 0 ? 'text-red-700 dark:text-red-400' : data.difference < 0 ? 'text-orange-700 dark:text-orange-400' : 'text-green-700 dark:text-green-400'

@@ -48,19 +48,22 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
 
   // WARNING: If you add/remove navigation items here, also update:
-  // - SecondaryMenuDrawer.tsx (6 secondary items: Allocation, Performance, History, Hall of Fame, FIRE, Settings)
-  // - BottomNavigation.tsx (3 primary items: Overview, Assets, Cashflow)
+  // - SecondaryMenuDrawer.tsx (6 secondary items: Allocazione, Rendimenti, Storico, Hall of Fame, FIRE, Impostazioni)
+  // - BottomNavigation.tsx (3 primary items: Panoramica, Patrimonio, Cashflow)
   // Total navigation: 9 routes (this sidebar contains all 9)
   const navigation = [
-    { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Assets', href: '/dashboard/assets', icon: Wallet },
-    { name: 'Allocation', href: '/dashboard/allocation', icon: PieChart },
-    { name: 'Performance', href: '/dashboard/performance', icon: TrendingUp },
-    { name: 'History', href: '/dashboard/history', icon: History },
+    { name: 'Panoramica', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Patrimonio', href: '/dashboard/assets', icon: Wallet },
+    { name: 'Allocazione', href: '/dashboard/allocation', icon: PieChart },
+    { name: 'Rendimenti', href: '/dashboard/performance', icon: TrendingUp },
+    { name: 'Storico', href: '/dashboard/history', icon: History },
+    // Hall of Fame: kept in English as an intentional premium brand choice
     { name: 'Hall of Fame', href: '/dashboard/hall-of-fame', icon: Trophy },
+    // FIRE: acronym (Financial Independence, Retire Early) — intentional hybrid
     { name: 'FIRE e Simulazioni', href: '/dashboard/fire-simulations', icon: Flame },
+    // Cashflow: established financial term used as-is in Italian finance
     { name: 'Cashflow', href: '/dashboard/cashflow', icon: Receipt },
-    { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+    { name: 'Impostazioni', href: '/dashboard/settings', icon: Settings },
   ];
 
   /**

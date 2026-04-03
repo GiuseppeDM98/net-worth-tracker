@@ -13,7 +13,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, TrendingUp, Info, Sparkles, CalendarDays } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
+import { RefreshCw, TrendingUp, Info, Sparkles, CalendarDays, ChevronDown, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency, formatPercentage, formatCurrencyCompact } from '@/lib/services/chartService';
 import {
@@ -44,6 +46,7 @@ import { PerformanceTooltip } from '@/components/performance/PerformanceTooltip'
 import { MonthlyReturnsHeatmap } from '@/components/performance/MonthlyReturnsHeatmap';
 import { UnderwaterDrawdownChart } from '@/components/performance/UnderwaterDrawdownChart';
 import { PerformancePageSkeleton } from '@/components/performance/PerformancePageSkeleton';
+import { authenticatedFetch } from '@/lib/utils/authFetch';
 
 /**
  * PERFORMANCE PAGE ARCHITECTURE
@@ -84,6 +87,11 @@ export default function PerformancePage() {
   const [showCustomDateDialog, setShowCustomDateDialog] = useState(false);
   const [showAIAnalysisDialog, setShowAIAnalysisDialog] = useState(false);
   const [cachedSnapshots, setCachedSnapshots] = useState<MonthlySnapshot[]>([]);
+  const [isMethodologyOpen, setIsMethodologyOpen] = useState(false);
+
+  // Guide strip shown once per user; localStorage flag persists across sessions.
+  const STRIP_STORAGE_KEY = 'perf_guide_dismissed';
+  const [showGuideStrip, setShowGuideStrip] = useState(false);
 
   // Responsive breakpoints
   const isMobile = useMediaQuery('(max-width: 767px)');
@@ -94,6 +102,16 @@ export default function PerformancePage() {
       loadPerformanceData();
     }
   }, [user]);
+
+  // Init guide strip after mount — localStorage is not available during SSR
+  useEffect(() => {
+    if (!localStorage.getItem(STRIP_STORAGE_KEY)) setShowGuideStrip(true);
+  }, []);
+
+  const dismissGuideStrip = () => {
+    localStorage.setItem(STRIP_STORAGE_KEY, '1');
+    setShowGuideStrip(false);
+  };
 
   /**
    * Load all performance data and cache snapshots for period switching.
@@ -153,8 +171,8 @@ export default function PerformancePage() {
 
           // Fetch YOC and Current Yield in parallel for each period
           const [yocResponse, currentYieldResponse] = await Promise.all([
-            fetch(`/api/performance/yoc?${params.toString()}`),
-            fetch(`/api/performance/current-yield?${params.toString()}`),
+            authenticatedFetch(`/api/performance/yoc?${params.toString()}`),
+            authenticatedFetch(`/api/performance/current-yield?${params.toString()}`),
           ]);
 
           const yocData = yocResponse.ok
@@ -260,8 +278,8 @@ export default function PerformancePage() {
 
           // Fetch YOC and Current Yield in parallel
           const [yocResponse, currentYieldResponse] = await Promise.all([
-            fetch(`/api/performance/yoc?${params.toString()}`),
-            fetch(`/api/performance/current-yield?${params.toString()}`),
+            authenticatedFetch(`/api/performance/yoc?${params.toString()}`),
+            authenticatedFetch(`/api/performance/current-yield?${params.toString()}`),
           ]);
 
           if (yocResponse.ok) {
@@ -509,7 +527,7 @@ export default function PerformancePage() {
       <div className="space-y-6 p-3 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Performance Portafoglio</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Rendimenti del Portafoglio</h1>
             <p className="text-muted-foreground mt-1">
               Analisi dei rendimenti e metriche di rischio-rendimento
             </p>
@@ -563,31 +581,37 @@ export default function PerformancePage() {
 
   return (
     <div className="space-y-6 p-3 sm:p-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Performance Portafoglio</h1>
-          <p className="text-muted-foreground mt-1">
-            Analisi dei rendimenti e metriche di rischio-rendimento
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2 sm:justify-end">
-          <Button variant="outline" onClick={() => setShowCustomDateDialog(true)} title="Periodo Personalizzato">
-            {isMobile ? <CalendarDays className="h-4 w-4" /> : 'Periodo Personalizzato'}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setShowAIAnalysisDialog(true)}
-            disabled={!metrics || metrics.hasInsufficientData}
-            className="group gap-2 transition-[border-color,color,box-shadow] duration-200 hover:border-purple-400 hover:text-purple-600 hover:shadow-[0_0_14px_rgba(139,92,246,0.35)] dark:hover:text-purple-400 dark:hover:border-purple-500"
-          >
-            <Sparkles className="h-4 w-4 transition-transform duration-200 group-hover:rotate-12 group-hover:scale-110" />
-            Analizza con AI
-          </Button>
-          <Button onClick={loadPerformanceData} className="dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Aggiorna
-          </Button>
+      {/* Page header — primary title gets full typographic weight; actions are grouped
+          right and sized to not compete. "Aggiorna" is a utility action so it sits
+          as outline to de-emphasise it relative to the AI analysis CTA. */}
+      <div className="pb-4 border-b border-border">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Portafoglio</p>
+            <h1 className="text-3xl font-bold tracking-tight">Rendimenti del Portafoglio</h1>
+            <p className="text-muted-foreground mt-1">
+              Analisi dei rendimenti e metriche di rischio-rendimento
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 sm:justify-end">
+            <Button variant="outline" size="sm" onClick={() => setShowCustomDateDialog(true)} title="Periodo Personalizzato">
+              {isMobile ? <CalendarDays className="h-4 w-4" /> : 'Periodo Personalizzato'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAIAnalysisDialog(true)}
+              disabled={!metrics || metrics.hasInsufficientData}
+              className="group gap-2 transition-[border-color,color,box-shadow] duration-200 hover:border-purple-400 hover:text-purple-600 hover:shadow-[0_0_14px_rgba(139,92,246,0.35)] dark:hover:text-purple-400 dark:hover:border-purple-500"
+            >
+              <Sparkles className="h-4 w-4 transition-transform duration-200 group-hover:rotate-12 group-hover:scale-110" />
+              Analizza con AI
+            </Button>
+            <Button variant="ghost" size="sm" onClick={loadPerformanceData} className="text-muted-foreground hover:text-foreground">
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Aggiorna
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -620,6 +644,30 @@ export default function PerformancePage() {
           </TabsList>
         )}
 
+        {/* Guide strip — shown once per user until dismissed. Orients first-time
+            readers without interrupting the data flow for returning users. */}
+        {showGuideStrip && (
+          <div className="mt-4 flex items-start gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-top-2 duration-300">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            <div className="flex-1 space-y-0.5">
+              <p className="font-medium text-foreground">Come leggere questa pagina</p>
+              <p className="text-muted-foreground">
+                Le metriche sono organizzate in 4 sezioni: Rendimento, Rischio, Contesto e Proventi Finanziari.
+                Passa il cursore sull&apos;icona <span className="font-medium">?</span> su ogni scheda per la definizione completa.
+                Per formule e metodologia, espandi <span className="font-medium">Note Metodologiche</span> in fondo alla pagina.
+              </p>
+            </div>
+            <button
+              type="button"
+              aria-label="Chiudi guida"
+              onClick={dismissGuideStrip}
+              className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
         {/* WARNING: If you change metric tooltips or formulas here, also update:
              - Methodology section at bottom of this file (lines ~595-716)
              - performanceService.ts calculation functions
@@ -631,7 +679,7 @@ export default function PerformancePage() {
 
         {/* === METRICHE DI RENDIMENTO === */}
         <MetricSection
-          title="📈 Metriche di Rendimento"
+          title="Metriche di Rendimento"
           description="Misurano quanto il tuo portafoglio è cresciuto nel tempo"
           sectionIndex={0}
         >
@@ -657,6 +705,7 @@ export default function PerformancePage() {
             description="Rendimento time-weighted (annualizzato)"
             tooltip="Metrica raccomandata per valutare la performance. Elimina l'effetto del timing dei contributi/prelievi, mostrando la vera capacità di generare rendimento. Ideale per confrontare con benchmark o altri portafogli. Calcolo: rendimenti mensili collegati geometricamente e annualizzati."
             isPrimary
+            badge="Avanzato"
           />
           <MetricCard
             title="Money-Weighted Return (IRR)"
@@ -664,12 +713,13 @@ export default function PerformancePage() {
             format="percentage"
             description="Tasso interno di rendimento"
             tooltip="Rendimento personale dell'investitore che tiene conto di QUANDO hai investito o prelevato denaro. Se investi molto prima di una crescita = IRR alto. Se investi prima di un calo = IRR basso. Usa questa metrica per capire quanto hai guadagnato TU con le TUE decisioni di timing."
+            badge="Avanzato"
           />
         </MetricSection>
 
         {/* === METRICHE DI RISCHIO === */}
         <MetricSection
-          title="⚠️ Metriche di Rischio"
+          title="Metriche di Rischio"
           description="Valutano la volatilità e i potenziali ribassi del portafoglio"
           sectionIndex={1}
         >
@@ -686,6 +736,7 @@ export default function PerformancePage() {
             format="number"
             description="Rendimento aggiustato per il rischio"
             tooltip={`Misura quanto rendimento extra si ottiene per ogni unità di rischio assunto. Formula: (TWR - Tasso Risk-Free ${formatPercentage(metrics.riskFreeRate)}) / Volatilità. Interpretazione: <1 = scarso, 1-2 = buono, 2-3 = molto buono, >3 = eccellente.`}
+            badge="Avanzato"
           />
           <MetricCard
             title="Max Drawdown"
@@ -704,7 +755,7 @@ export default function PerformancePage() {
             tooltip="Misura il tempo (in mesi) necessario per recuperare completamente dalla perdita più grande (Max Drawdown). Esempio: se il portafoglio perde il 15% a gennaio e recupera a dicembre, la durata è 11 mesi. Questo indicatore misura la resilienza del portafoglio: durate brevi indicano rapido recupero, durate lunghe segnalano lenta ripresa. Calcolo aggiustato per flussi di cassa per isolare la performance degli investimenti. Se il portafoglio è ancora in drawdown, mostra la durata dall'ultimo picco."
           />
           <MetricCard
-            title="Recovery Time"
+            title="Tempo di Recupero"
             value={metrics.recoveryTime}
             subtitle={metrics.recoveryPeriod}
             format="months"
@@ -715,7 +766,7 @@ export default function PerformancePage() {
 
         {/* === METRICHE DI CONTESTO === */}
         <MetricSection
-          title="📊 Metriche di Contesto"
+          title="Metriche di Contesto"
           description="Informazioni sul periodo e sui flussi di capitale"
           sectionIndex={2}
         >
@@ -738,7 +789,7 @@ export default function PerformancePage() {
         {/* === METRICHE DIVIDENDI (conditional) === */}
         {(metrics.yocGross !== null || metrics.yocNet !== null || metrics.currentYield !== null || metrics.currentYieldNet !== null) && (
           <MetricSection
-            title="💰 Metriche da Proventi Finanziari"
+            title="Metriche da Proventi Finanziari"
             description="Rendimento da dividendi e cedole rispetto al costo di acquisto e al valore corrente"
             sectionIndex={3}
           >
@@ -747,7 +798,8 @@ export default function PerformancePage() {
               value={metrics.yocGross}
               format="percentage"
               description={`Dividendi: ${formatCurrency(metrics.yocDividendsGross)} | Cost Basis: ${formatCurrency(metrics.yocCostBasis)} | Asset: ${metrics.yocAssetCount}`}
-              tooltip="Yield on Cost (YOC) Lordo misura il rendimento da dividendi lordi rispetto al costo originale di acquisto (cost basis). Formula: (Dividendi Annualizzati / Cost Basis) × 100. Esempio: Se hai comprato 100 azioni a €50 (cost basis €5.000) e ricevi €300/anno di dividendi lordi, YOC = 6%. A differenza del dividend yield corrente (dividendi/prezzo attuale), YOC mostra quanto rende il tuo investimento iniziale. YOC > Yield Corrente indica crescita dei dividendi nel tempo. Valori alti (>5-7%) indicano un buon ritorno sull'investimento originale."
+              tooltip="Yield on Cost (YOC) Lordo misura il rendimento da dividendi lordi rispetto al costo originale di acquisto (cost basis). Formula: (Dividendi Annualizzati / Cost Basis) × 100. Esempio: Se hai comprato 100 azioni a €50 (cost basis €5.000) e ricevi €300/anno di dividendi lordi, YOC = 6%. A differenza del rendimento corrente (dividendi/prezzo attuale), YOC mostra quanto rende il tuo investimento iniziale. YOC > Rendimento Corrente indica crescita dei dividendi nel tempo. Valori alti (>5-7%) indicano un buon ritorno sull'investimento originale."
+              badge="Avanzato"
             />
             <MetricCard
               title="YOC Netto"
@@ -755,13 +807,14 @@ export default function PerformancePage() {
               format="percentage"
               description={`Dividendi: ${formatCurrency(metrics.yocDividendsNet)} | Cost Basis: ${formatCurrency(metrics.yocCostBasis)} | Asset: ${metrics.yocAssetCount}`}
               tooltip="Yield on Cost (YOC) Netto misura il rendimento da dividendi netti (dopo tasse) rispetto al costo originale di acquisto. Formula: (Dividendi Netti Annualizzati / Cost Basis) × 100. Questa metrica mostra quanto effettivamente guadagni (al netto delle ritenute fiscali) rispetto al tuo investimento iniziale. Più realistica dello YOC Lordo perché considera l'impatto fiscale. Utile per valutare il rendimento effettivo del portafoglio nel tempo. La differenza tra YOC Lordo e Netto dipende dalle aliquote fiscali applicate (es. 26% in Italia per dividendi azionari)."
+              badge="Avanzato"
             />
             <MetricCard
-              title="Current Yield Lordo"
+              title="Rendimento Corrente Lordo"
               value={metrics.currentYield}
               format="percentage"
               description={`Dividendi: ${formatCurrency(metrics.currentYieldDividends)} | Valore Portafoglio: ${formatCurrency(metrics.currentYieldPortfolioValue)} | Asset: ${metrics.currentYieldAssetCount}`}
-              tooltip={`Current Yield Lordo misura il rendimento da dividendi lordi basato sul valore di mercato ATTUALE del portafoglio. Formula: (Dividendi Lordi Annualizzati / Valore Corrente Portafoglio) × 100. A differenza dello YOC (che usa il costo originale), il Current Yield mostra quanto renderebbe il portafoglio se lo acquistassi oggi ai prezzi correnti.${
+              tooltip={`Rendimento Corrente Lordo misura il rendimento da dividendi lordi basato sul valore di mercato ATTUALE del portafoglio. Formula: (Dividendi Lordi Annualizzati / Valore Corrente Portafoglio) × 100. A differenza dello YOC (che usa il costo originale), il Rendimento Corrente mostra quanto renderebbe il portafoglio se lo acquistassi oggi ai prezzi correnti.${
                 metrics.yocGross !== null
                   ? `\n\nConfronto con YOC Lordo (${metrics.yocGross.toFixed(2)}%): ${
                       metrics.currentYield !== null && metrics.currentYield > metrics.yocGross
@@ -774,11 +827,11 @@ export default function PerformancePage() {
               }`}
             />
             <MetricCard
-              title="Current Yield Netto"
+              title="Rendimento Corrente Netto"
               value={metrics.currentYieldNet}
               format="percentage"
               description={`Dividendi: ${formatCurrency(metrics.currentYieldDividendsNet)} | Valore Portafoglio: ${formatCurrency(metrics.currentYieldPortfolioValue)} | Asset: ${metrics.currentYieldAssetCount}`}
-              tooltip={`Current Yield Netto misura il rendimento da dividendi netti (dopo tasse) basato sul valore di mercato ATTUALE del portafoglio. Formula: (Dividendi Netti Annualizzati / Valore Corrente Portafoglio) × 100. Questa è la metrica più realistica perché considera sia il prezzo corrente che l'impatto fiscale sui dividendi. Mostra quanto effettivamente guadagneresti acquistando il portafoglio oggi ai prezzi correnti.${
+              tooltip={`Rendimento Corrente Netto misura il rendimento da dividendi netti (dopo tasse) basato sul valore di mercato ATTUALE del portafoglio. Formula: (Dividendi Netti Annualizzati / Valore Corrente Portafoglio) × 100. Questa è la metrica più realistica perché considera sia il prezzo corrente che l'impatto fiscale sui dividendi. Mostra quanto effettivamente guadagneresti acquistando il portafoglio oggi ai prezzi correnti.${
                 metrics.yocNet !== null
                   ? `\n\nConfronto con YOC Netto (${metrics.yocNet.toFixed(2)}%): ${
                       metrics.currentYieldNet !== null && metrics.currentYieldNet > metrics.yocNet
@@ -805,7 +858,10 @@ export default function PerformancePage() {
         <Card className="mt-6">
           <CardHeader>
             <CardTitle>Evoluzione Patrimonio</CardTitle>
-            <CardDescription>Patrimonio vs Contributi Cumulativi</CardDescription>
+            <CardDescription>
+              Area blu = capitale versato, area verde = rendimento generato, linea arancione = patrimonio totale.
+              Se l&apos;area verde cresce, gli investimenti stanno performando positivamente.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={getChartHeight()}>
@@ -859,7 +915,8 @@ export default function PerformancePage() {
             <CardHeader>
               <CardTitle>CAGR Rolling 12 Mesi</CardTitle>
               <CardDescription>
-                Evoluzione del rendimento annualizzato su finestra mobile
+                Ogni punto mostra il CAGR degli ultimi 12 mesi; linea tratteggiata = media mobile a 3M.
+                Una linea in salita segnala performance in miglioramento nel periodo recente.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -919,7 +976,8 @@ export default function PerformancePage() {
             <CardHeader>
               <CardTitle>Sharpe Ratio Rolling 12 Mesi</CardTitle>
               <CardDescription>
-                Evoluzione del rapporto rischio-rendimento su finestra mobile
+                Rapporto rischio-rendimento su finestra mobile di 12 mesi (&gt;1 buono, &gt;2 eccellente).
+                Ampie oscillazioni indicano volatilità elevata nel periodo.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -983,7 +1041,8 @@ export default function PerformancePage() {
           <CardHeader>
             <CardTitle>Heatmap Rendimenti Mensili</CardTitle>
             <CardDescription>
-              Andamento mensile dei rendimenti per anno (aggiustato per flussi di cassa)
+              Verde = mese positivo, rosso = negativo; l&apos;intensità cresce con l&apos;ampiezza (±5% soglia).
+              Utile per identificare mesi storicamente forti o deboli del portafoglio.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -998,7 +1057,8 @@ export default function PerformancePage() {
           <CardHeader>
             <CardTitle>Grafico Underwater (Drawdown)</CardTitle>
             <CardDescription>
-              Distanza percentuale dal massimo storico del portafoglio
+              L&apos;area rossa mostra quanto il portafoglio è sotto il suo massimo storico in quel momento.
+              Quando tocca 0% è stato raggiunto un nuovo massimo; si collega a Durata Drawdown e Tempo di Recupero.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -1007,18 +1067,30 @@ export default function PerformancePage() {
         </Card>
         </motion.div>
 
-        {/* Methodology Section */}
+        {/* Methodology Section — collapsed by default so it does not dominate
+            the primary reading path. All content is preserved; acts as a reference
+            document that power users open on demand. */}
         <motion.div variants={cardItem}>
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Note Metodologiche</CardTitle>
-          </CardHeader>
+        <Collapsible open={isMethodologyOpen} onOpenChange={setIsMethodologyOpen} className="mt-6">
+        <Card>
+          <CollapsibleTrigger asChild>
+            <CardHeader className="cursor-pointer select-none hover:bg-muted/40 transition-colors rounded-t-lg">
+              <div className="flex items-center justify-between">
+                <CardTitle>Note Metodologiche</CardTitle>
+                <ChevronDown
+                  className={cn(
+                    'h-5 w-5 text-muted-foreground transition-transform duration-200',
+                    isMethodologyOpen && 'rotate-180'
+                  )}
+                />
+              </div>
+              <CardDescription>Formule, grafici e definizioni di tutte le 15 metriche</CardDescription>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-200">
           <CardContent className="space-y-4 text-sm">
             <div>
               <h4 className="font-semibold mb-1">Organizzazione delle Metriche</h4>
-              <p className="text-muted-foreground">
-                Le 15 metriche di performance sono organizzate in 4 categorie logiche per facilitare la comprensione:
-              </p>
               <ul className="list-disc list-inside mt-2 space-y-1 text-muted-foreground">
                 <li><strong>📈 Rendimento</strong>: Quanto il portafoglio è cresciuto nel tempo (ROI, CAGR, TWR, IRR)</li>
                 <li><strong>⚠️ Rischio</strong>: Volatilità e potenziali ribassi (Volatilità, Sharpe, Max Drawdown, Durata Drawdown, Recovery Time)</li>
@@ -1029,69 +1101,47 @@ export default function PerformancePage() {
             <div>
               <h4 className="font-semibold mb-1">Grafico: Evoluzione Patrimonio</h4>
               <p className="text-muted-foreground">
-                Questo grafico mostra la composizione del patrimonio nel tempo, separando visivamente due componenti:
-                <br /><br />
-                <strong>Contributi (area blu):</strong> La somma cumulativa di tutti i flussi di cassa netti (entrate - uscite) registrati nella sezione Cashflow. Rappresenta quanto denaro hai effettivamente versato o prelevato nel tempo.
+                <strong>Contributi (area blu):</strong> Somma cumulativa dei flussi di cassa netti (entrate − uscite) da Cashflow.
                 <br />
-                <strong>Investimenti (area verde):</strong> La differenza tra il patrimonio totale e i contributi cumulativi. Mostra quanto valore è stato generato (o perso) dagli investimenti grazie alle variazioni di prezzo degli asset.
+                <strong>Investimenti (area verde):</strong> Differenza tra patrimonio totale e contributi cumulativi. Mostra il valore generato dagli investimenti.
                 <br />
-                <strong>Patrimonio Totale (linea arancione):</strong> Il net worth complessivo, dato dalla somma di contributi + investimenti.
-                <br /><br />
-                <em>Interpretazione:</em> Se l&apos;area verde cresce, i tuoi investimenti stanno generando rendimenti positivi. Se si riduce, stai perdendo valore sugli investimenti. Questo grafico ti permette di vedere quanto del patrimonio attuale deriva dal risparmio (contributi) rispetto agli investimenti.
+                <strong>Patrimonio Totale (linea arancione):</strong> Net worth complessivo = contributi + investimenti.
               </p>
             </div>
             <div>
               <h4 className="font-semibold mb-1">Grafico: CAGR Rolling 12 Mesi</h4>
               <p className="text-muted-foreground">
-                Questo grafico mostra l&apos;andamento del rendimento annualizzato calcolato su finestre mobili di 12 mesi consecutive.
-                <br /><br />
-                <strong>Finestra Mobile (Rolling):</strong> Per ogni punto del grafico viene calcolato il CAGR (Compound Annual Growth Rate) considerando i 12 mesi precedenti. Ad esempio, il punto di aprile 2025 mostra il CAGR del periodo maggio 2024 - aprile 2025.
+                <strong>Finestra mobile (Rolling):</strong> Ogni punto mostra il CAGR calcolato sui 12 mesi precedenti — es. aprile 2025 = CAGR maggio 2024–aprile 2025.
                 <br />
-                <strong>Media Mobile:</strong> La linea tratteggiata è una media mobile a 3 mesi che smussa le oscillazioni e aiuta a leggere il trend.
+                <strong>Media mobile:</strong> La linea tratteggiata è una media a 3 mesi che smussa le oscillazioni.
                 <br />
-                <strong>Utilità:</strong> Permette di vedere se la performance sta migliorando o peggiorando nel tempo, eliminando l&apos;effetto di singoli mesi fortunati/sfortunati. È più stabile del rendimento mensile ma più reattivo del rendimento totale dall&apos;inizio.
-                <br /><br />
-                <em>Interpretazione:</em> Una linea in salita indica che la performance è in miglioramento negli ultimi 12 mesi. Una linea in discesa segnala un peggioramento. Le oscillazioni riflettono la volatilità del portafoglio.
+                <strong>Utilità:</strong> Mostra se la performance migliora o peggiora nel tempo, più stabile del rendimento mensile e più reattivo del rendimento totale.
               </p>
             </div>
             <div>
               <h4 className="font-semibold mb-1">Grafico: Sharpe Ratio Rolling</h4>
               <p className="text-muted-foreground">
-                Questo grafico mostra l&apos;andamento del rapporto rischio-rendimento (Sharpe Ratio) calcolato su finestre mobili.
-                <br /><br />
-                <strong>Finestra Mobile (Rolling):</strong> Ogni punto rappresenta lo Sharpe Ratio calcolato sui 12 mesi precedenti.
+                <strong>Finestra mobile (Rolling):</strong> Ogni punto è lo Sharpe calcolato sui 12 mesi precedenti.
                 <br />
-                <strong>Media Mobile:</strong> La linea tratteggiata è una media mobile a 3 mesi che smussa le oscillazioni e aiuta a leggere il trend.
+                <strong>Calcolo:</strong> (TWR − tasso risk-free) / volatilità. Il tasso risk-free viene dalle impostazioni.
                 <br />
-                <strong>Calcolo:</strong> (Rendimento TWR - tasso risk-free) / volatilità. Il tasso risk-free deriva dalle impostazioni utente, con fallback a un valore di default.
-                <br />
-                <strong>Utilità:</strong> Evidenzia come cambia nel tempo l&apos;efficienza del portafoglio nel generare rendimento per unità di rischio.
-                <br /><br />
-                <em>Interpretazione:</em> Valori più alti indicano un miglior rapporto rischio-rendimento. Variazioni ampie possono riflettere periodi di volatilità elevata o rendimenti instabili.
+                <strong>Media mobile:</strong> Linea tratteggiata a 3 mesi per leggere il trend.
               </p>
             </div>
             <div>
               <h4 className="font-semibold mb-1">Grafico: Heatmap Rendimenti Mensili</h4>
               <p className="text-muted-foreground">
-                Questo grafico mostra i rendimenti percentuali mese per mese, organizzati per anno. Ogni cella rappresenta il rendimento di un singolo mese.
-                <br /><br />
-                <strong>Calcolo:</strong> Il rendimento mensile è calcolato come ((Patrimonio Fine Mese - Flussi di Cassa) / Patrimonio Inizio Mese - 1) × 100. I flussi di cassa sono sottratti per isolare la performance degli investimenti.
+                <strong>Calcolo:</strong> ((Patrimonio fine mese − Flussi di cassa) / Patrimonio inizio mese − 1) × 100. I flussi sono sottratti per isolare la performance degli investimenti.
                 <br />
-                <strong>Colori:</strong> Verde = rendimenti positivi, Rosso = rendimenti negativi. L&apos;intensità del colore aumenta con l&apos;ampiezza del rendimento (±5% soglia per colori più scuri).
-                <br /><br />
-                <em>Interpretazione:</em> Questo grafico aiuta a identificare pattern stagionali e mesi storicamente difficili o favorevoli. Ad esempio, se gennaio è spesso verde e settembre spesso rosso, potresti notare una stagionalità nel portafoglio.
+                <strong>Colori:</strong> Verde = positivo, rosso = negativo. Intensità più scura oltre ±5%.
               </p>
             </div>
             <div>
               <h4 className="font-semibold mb-1">Grafico: Underwater (Drawdown)</h4>
               <p className="text-muted-foreground">
-                Questo grafico mostra quanto il portafoglio si trova &quot;sotto&quot; il suo massimo storico (drawdown). L&apos;area rossa indica la distanza percentuale dal picco precedente.
-                <br /><br />
-                <strong>Funzionamento:</strong> Quando il portafoglio raggiunge un nuovo massimo storico, il grafico torna a 0%. Quando il portafoglio scende, il grafico mostra la percentuale di perdita rispetto al picco. Calcolo aggiustato per flussi di cassa per isolare la performance degli investimenti.
+                <strong>Funzionamento:</strong> A ogni nuovo massimo storico il grafico torna a 0%. Quando il portafoglio scende, mostra la perdita percentuale dal picco. Aggiustato per flussi di cassa.
                 <br />
-                <strong>Utilità:</strong> Visualizza rapidamente quanto tempo impiega il portafoglio a recuperare dopo le perdite. Periodi lunghi &quot;sott&apos;acqua&quot; (area rossa estesa) indicano lenti recuperi. Questo si collega alle metriche &quot;Durata Drawdown&quot; e &quot;Recovery Time&quot; mostrate sopra.
-                <br /><br />
-                <em>Interpretazione:</em> Un grafico che tocca spesso lo 0% indica un portafoglio che raggiunge frequentemente nuovi massimi (buon segno). Lunghe immersioni indicano periodi prolungati di sottoperformance rispetto ai picchi precedenti.
+                <strong>Collegamento:</strong> Si integra con le metriche Durata Drawdown e Recovery Time visibili sopra.
               </p>
             </div>
             <div>
@@ -1145,174 +1195,41 @@ export default function PerformancePage() {
             <div>
               <h4 className="font-semibold mb-1">Yield on Cost (YOC)</h4>
               <p className="text-muted-foreground">
-                Il Yield on Cost (YOC) misura il rendimento da dividendi basato sul costo originale di acquisto (average cost),
-                non sul prezzo di mercato attuale. Mostra quanto rendono i tuoi investimenti rispetto al capitale iniziale investito.
+                Rendimento da dividendi rispetto al costo originale di acquisto (average cost), non al prezzo attuale.
                 <br /><br />
                 <strong>Formula:</strong> YOC% = (Dividendi Annualizzati / Cost Basis) × 100
+                <br />
+                <strong>Annualizzazione:</strong> periodi &lt;12 mesi → (totale ÷ mesi) × 12 · periodi ≥12 mesi → totale ÷ anni.
                 <br /><br />
-                <strong>Cosa sono i Dividendi Annualizzati?</strong>
-                <br />
-                I dividendi totali del periodo vengono convertiti in un <strong>tasso annuale</strong> per rendere confrontabili periodi di durata diversa.
+                <strong>Interpretazione:</strong> YOC &gt; Current Yield = il prezzo è cresciuto più dei dividendi (comune in bull market).
+                Valori &gt;5% eccellenti per un portafoglio diversificato. Confronta tra periodi (1Y, 3Y, 5Y) per vedere la traiettoria.
                 <br /><br />
-                • <strong>Periodi &lt; 12 mesi</strong> (es. YTD con 5 mesi): si scala il tasso a un equivalente annuale
-                <br />
-                &nbsp;&nbsp;Dividendi Annualizzati = (Dividendi Totali / Numero Mesi) × 12
-                <br />
-                &nbsp;&nbsp;<em>Esempio: €100 in 5 mesi → (€100 / 5) × 12 = €240/anno</em>
-                <br /><br />
-                • <strong>Periodi ≥ 12 mesi</strong> (es. 3Y, 5Y): si calcola la media annuale
-                <br />
-                &nbsp;&nbsp;Dividendi Annualizzati = Dividendi Totali / Numero Anni
-                <br />
-                &nbsp;&nbsp;<em>Esempio: €600 in 3 anni → €600 / 3 = €200/anno</em>
-                <br /><br />
-                <strong>Esempio completo (portafoglio reale):</strong>
-                <br />
-                • Cost basis: €7.100 (5 asset in portafoglio)
-                <br />
-                • Periodo: 5 mesi (set 2025 - gen 2026)
-                <br />
-                • Dividendi lordi ricevuti: €197,52
-                <br />
-                • Dividendi Annualizzati: (€197,52 / 5) × 12 = €474/anno
-                <br />
-                • YOC Lordo: (€474 / €7.100) × 100 = <strong>6,68%</strong>
-                <br /><br />
-                <strong>Confronto con Current Yield:</strong>
-                <br />
-                • YOC si basa sul <strong>costo originale</strong> (€7.100)
-                <br />
-                • Current Yield si baserebbe sul <strong>valore attuale</strong> di mercato
-                <br /><br />
-                <strong>Come interpretarlo:</strong>
-                <br />
-                • <strong>YOC &gt; Current Yield:</strong> I dividendi sono cresciuti nel tempo (buon segno).
-                Significa che l&apos;azienda/ETF ha aumentato le distribuzioni, premiando chi ha investito presto.
-                <br />
-                • <strong>YOC = Current Yield:</strong> I dividendi sono rimasti stabili rispetto al prezzo.
-                <br />
-                • <strong>YOC &lt; Current Yield:</strong> I dividendi sono cresciuti meno del prezzo dell&apos;asset.
-                Non necessariamente negativo se il capitale totale è comunque aumentato.
-                <br /><br />
-                <strong>Quando è buono?</strong>
-                <br />
-                • YOC &gt; 5-7% è considerato eccellente per un portafoglio diversificato
-                <br />
-                • YOC in crescita anno dopo anno indica dividend growth sostenibile
-                <br />
-                • Confronta YOC tra periodi diversi (1Y, 3Y, 5Y) per vedere l&apos;evoluzione
-                <br /><br />
-                <strong>Limiti:</strong>
-                <br />
-                • Si applica solo ad asset con cost basis noto (average cost)
-                <br />
-                • Asset venduti (quantity = 0) non sono inclusi
-                <br />
-                • YOC non considera capital gains, solo dividendi
-                <br />
-                • I valori sono annualizzati per confrontare periodi diversi
+                <strong>Limiti:</strong> Richiede cost basis noto · Esclusi asset con quantity = 0 · Non considera capital gains.
               </p>
             </div>
 
             <div>
               <h4 className="font-semibold mb-1">Current Yield</h4>
               <p className="text-muted-foreground">
-                Il Current Yield misura il rendimento da dividendi basato sul valore di mercato attuale del portafoglio,
-                mostrando quanto renderebbe l&apos;investimento se lo acquistassi oggi ai prezzi correnti.
+                Rendimento da dividendi rispetto al valore di mercato attuale. Mostra quanto renderebbe l&apos;investimento acquistato oggi.
                 <br /><br />
-                <strong>Formula:</strong> Current Yield% = (Dividendi Annualizzati / Valore Corrente Portafoglio) × 100
+                <strong>Formula:</strong> Current Yield% = (Dividendi Annualizzati / Valore Corrente) × 100
+                <br />
+                <strong>Annualizzazione:</strong> stessa logica dello YOC.
                 <br /><br />
-                <strong>Cosa sono i Dividendi Annualizzati?</strong>
-                <br />
-                I dividendi del periodo vengono convertiti in un tasso annuale (stessa logica dello YOC):
+                <strong>YOC vs Current Yield:</strong> Se YOC &gt; CY, il prezzo è cresciuto più dei dividendi (capital appreciation).
+                Se CY &gt; YOC, i dividendi sono cresciuti più del prezzo (rendimento in crescita).
+                Le metriche Nette (dopo tasse) sono più realistiche per confronti tra asset.
                 <br /><br />
-                • <strong>Periodi &lt; 12 mesi</strong> (es. YTD con 5 mesi): si scala il tasso
+                <strong>Utile per:</strong> Confrontare il portafoglio con alternative (bond, ETF, depositi) · valutare la sostenibilità del reddito passivo.
                 <br />
-                &nbsp;&nbsp;Dividendi Annualizzati = (Dividendi Totali / Numero Mesi) × 12
-                <br />
-                &nbsp;&nbsp;<em>Esempio: €100 in 5 mesi → (€100 / 5) × 12 = €240/anno</em>
-                <br /><br />
-                • <strong>Periodi ≥ 12 mesi</strong> (es. 3Y): si calcola la media annuale
-                <br />
-                &nbsp;&nbsp;Dividendi Annualizzati = Dividendi Totali / Numero Anni
-                <br />
-                &nbsp;&nbsp;<em>Esempio: €600 in 3 anni → €600 / 3 = €200/anno</em>
-                <br /><br />
-                <strong>Esempio completo (stesso portafoglio YOC):</strong>
-                <br />
-                • Valore corrente portafoglio: €9.500 (5 asset che pagano dividendi)
-                <br />
-                • Periodo: 5 mesi (set 2025 - gen 2026)
-                <br />
-                • Dividendi lordi ricevuti: €197,52
-                <br />
-                • Dividendi netti ricevuti: €146,17 (dopo tasse 26%)
-                <br />
-                • Dividendi Annualizzati Lordi: (€197,52 / 5) × 12 = €474/anno
-                <br />
-                • Dividendi Annualizzati Netti: (€146,17 / 5) × 12 = €351/anno
-                <br />
-                • <strong>Current Yield Lordo:</strong> (€474 / €9.500) × 100 = <strong>4,99%</strong>
-                <br />
-                • <strong>Current Yield Netto:</strong> (€351 / €9.500) × 100 = <strong>3,69%</strong>
-                <br />
-                • YOC Lordo (dallo stesso esempio): <strong>6,68%</strong>
-                <br />
-                • YOC Netto (dallo stesso esempio): <strong>4,94%</strong>
-                <br /><br />
-                <strong>Confronto Lordo vs Netto:</strong>
-                <br />
-                • <strong>YOC:</strong> Lordo 6,68% vs Netto 4,94% (differenza 1,74 punti percentuali = 26% tasse)
-                <br />
-                • <strong>Current Yield:</strong> Lordo 4,99% vs Netto 3,69% (differenza 1,30 punti percentuali = 26% tasse)
-                <br />
-                • Le metriche Nette sono più realistiche perché mostrano il rendimento effettivo dopo tasse
-                <br /><br />
-                <strong>Confronto YOC vs Current Yield (metriche Nette):</strong>
-                <br />
-                In questo esempio, YOC Netto (4,94%) &gt; Current Yield Netto (3,69%), il che significa:
-                <br />
-                • Il prezzo degli asset è aumentato del 34% rispetto al costo originale (€9.500 / €7.100 = 1.34)
-                <br />
-                • I dividendi netti sono cresciuti, ma il prezzo è cresciuto più velocemente
-                <br />
-                • Chi ha comprato presto gode di un rendimento netto (YOC Netto 4,94%) superiore rispetto a chi compra oggi (CY Netto 3,69%)
-                <br />
-                • Ottimo scenario: capital appreciation + dividendi in crescita
-                <br /><br />
-                <strong>Come interpretarlo:</strong>
-                <br />
-                • <strong>Current Yield &gt; YOC:</strong> I dividendi sono cresciuti più del prezzo (raro, possibile se prezzo sceso). Segnale di potenziale acquisto se il prezzo è sottovalutato.
-                <br />
-                • <strong>Current Yield = YOC:</strong> Crescita proporzionale di prezzo e dividendi. Rendimento stabile.
-                <br />
-                • <strong>Current Yield &lt; YOC:</strong> Il prezzo è cresciuto più dei dividendi (scenario comune in bull market). Buon capital gain ma yield attuale più basso.
-                <br /><br />
-                <strong>Quando è utile?</strong>
-                <br />
-                • Confrontare il rendimento del portafoglio con altre opportunità di investimento (bond, ETF, depositi)
-                <br />
-                • Valutare se il portafoglio genera reddito passivo sufficiente rispetto al capitale investito
-                <br />
-                • Decidere se reinvestire dividendi o cercare alternative con yield più alto
-                <br />
-                • Tracciare l&apos;evoluzione del yield nel tempo (se scende troppo, potrebbe indicare sopravvalutazione)
-                <br /><br />
-                <strong>Limiti:</strong>
-                <br />
-                • Si applica solo ad asset con dividendi (asset growth-only esclusi)
-                <br />
-                • Non considera capital gains (solo dividendi)
-                <br />
-                • Current Yield dipende dalla volatilità del prezzo (può fluttuare)
-                <br />
-                • I valori sono annualizzati per confrontare periodi diversi
-                <br />
-                • Non include asset venduti (quantity = 0)
+                <strong>Limiti:</strong> Solo asset con dividendi · dipende dalla volatilità del prezzo · non include capital gains · esclusi asset con quantity = 0.
               </p>
             </div>
           </CardContent>
+          </CollapsibleContent>
         </Card>
+        </Collapsible>
         </motion.div>
 
         </motion.div>{/* end staggerContainer */}

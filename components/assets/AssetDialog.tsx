@@ -38,6 +38,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
+import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { Asset, AssetFormData, AssetType, AssetClass, AssetAllocationTarget, AssetComposition, CouponFrequency, BondDetails, CouponRateTier } from '@/types/assets';
 import { createAsset, updateAsset } from '@/lib/services/assetService';
 import { getNextCouponDate, calculateCouponPerShare, getApplicableCouponRate } from '@/lib/utils/couponUtils';
@@ -723,7 +724,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
             const gross = perShare * data.quantity;
             const tax = gross * (taxRate / 100);
 
-            const couponResponse = await fetch('/api/dividends', {
+            const couponResponse = await authenticatedFetch('/api/dividends', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -758,7 +759,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
             const premiumGross = premiumPerShare * data.quantity;
             const premiumTax = premiumGross * (taxRate / 100);
 
-            await fetch('/api/dividends', {
+            await authenticatedFetch('/api/dividends', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({

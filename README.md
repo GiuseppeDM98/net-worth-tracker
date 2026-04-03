@@ -28,6 +28,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Yield on Cost (YOC) and Current Yield calculations
 - Monthly returns heatmap and underwater drawdown chart
 - Rolling performance charts
+- Progressive disclosure: methodology section collapsed by default; one-time guide strip for new users; "Avanzato" badge on technical metrics (TWR, IRR, Sharpe, YOC); each chart has an inline 2-line reading hint
 - Animated metric cards: values count up on load and on period switch; staggered entrance cascade per section
 - Dashboard KPI cards (Total Portfolio, Liquid, Net Worth, Unrealized Gains, Taxes) animate their values on page load — numbers count up from zero once on mount
 - All major pages (Dashboard, Hall of Fame, History, Performance, Dividends) animate on load with staggered card entrances and smooth expand/collapse transitions; respects system "Reduce Motion" preference
@@ -124,6 +125,12 @@ Copy `.env.local.example` to `.env.local` and fill in your values:
 | `ANTHROPIC_API_KEY` | No | Enables AI-powered performance analysis |
 
 See [`.env.local.example`](.env.local.example) for detailed comments on each variable.
+
+### Security Notes
+
+- `NEXT_PUBLIC_FIREBASE_*` values are client configuration, not server secrets. They are expected to be visible in the browser bundle.
+- Keep `FIREBASE_ADMIN_*`, `FIREBASE_SERVICE_ACCOUNT_KEY`, `CRON_SECRET`, and `ANTHROPIC_API_KEY` server-only.
+- Private App Router API routes are expected to verify Firebase ID tokens server-side. Scheduled cron flows authenticate separately with `CRON_SECRET`.
 
 ## Architecture
 
@@ -315,4 +322,4 @@ See [LICENSE.md](LICENSE.md) for the full license text.
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=GiuseppeDM98/net-worth-tracker&type=Date)](https://star-history.com/#GiuseppeDM98/net-worth-tracker&Date)
+[![Star History Chart](https://api.star-history.com/image?repos=GiuseppeDM98/net-worth-tracker&type=date&legend=top-left)](https://www.star-history.com/?repos=GiuseppeDM98%2Fnet-worth-tracker&type=date&legend=top-left)

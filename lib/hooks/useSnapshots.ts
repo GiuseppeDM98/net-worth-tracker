@@ -13,6 +13,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query/queryKeys';
+import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { getUserSnapshots } from '@/lib/services/snapshotService';
 
 /**
@@ -70,7 +71,7 @@ export function useCreateSnapshot(userId: string) {
 
   return useMutation({
     mutationFn: async (params: Omit<CreateSnapshotParams, 'userId'> = {}) => {
-      const response = await fetch('/api/portfolio/snapshot', {
+      const response = await authenticatedFetch('/api/portfolio/snapshot', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

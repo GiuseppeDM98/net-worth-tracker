@@ -464,7 +464,7 @@ export default function AllocationPage() {
                   {assetClassLabels[drillDown.assetClass]} → {drillDown.subCategory}
                 </div>
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-                  Specific Assets
+                  Asset specifici
                 </h1>
                 <p className="mt-2 text-gray-600 dark:text-gray-400">
                   Target teorici per asset specifici
@@ -483,7 +483,7 @@ export default function AllocationPage() {
         <Card>
           <CardHeader>
             <CardTitle>
-              Allocazione Specific Assets - {drillDown.subCategory}
+              Asset specifici — {drillDown.subCategory}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -503,7 +503,10 @@ export default function AllocationPage() {
                       <TableHead className="text-right">Target €</TableHead>
                       <TableHead className="text-right">Differenza %</TableHead>
                       <TableHead className="text-right">Differenza €</TableHead>
-                      <TableHead className="text-center">Azione</TableHead>
+                      <TableHead className="text-center">
+                        <span className="block">Azione</span>
+                        <span className="block text-[10px] font-normal text-muted-foreground">±2% soglia</span>
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -564,16 +567,16 @@ export default function AllocationPage() {
         </Card>
 
         <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 p-4">
-          <h3 className="font-semibold text-blue-900 dark:text-blue-200">Nota</h3>
+          <h3 className="font-semibold text-blue-900 dark:text-blue-200">Asset specifici</h3>
           <ul className="mt-2 space-y-1 text-sm text-blue-800 dark:text-blue-300">
             <li>
-              • Gli specific assets sono target teorici e non sono collegati agli asset reali del portfolio
+              • Target teorici — non collegati agli asset reali del portafoglio
             </li>
             <li>
-              • I valori correnti sono sempre 0 e le azioni sono sempre COMPRA
+              • Il valore corrente è sempre 0: il segnale sarà sempre COMPRA
             </li>
             <li>
-              • Le percentuali target sono relative alla sottocategoria {drillDown.subCategory}
+              • Le percentuali sono relative alla sottocategoria {drillDown.subCategory}
             </li>
           </ul>
         </div>
@@ -609,20 +612,11 @@ export default function AllocationPage() {
       {usingGoalTargets && (
         <div className="rounded-lg border border-green-200 bg-green-50/50 p-3 sm:p-4 dark:border-green-800 dark:bg-green-950/10">
           <p className="text-sm text-green-800 dark:text-green-200">
-            <strong>Target calcolati dagli obiettivi</strong> — I target di allocazione sono derivati come media pesata delle allocazioni raccomandate dei tuoi obiettivi finanziari.
+            <strong>Target dagli obiettivi</strong> — Media pesata delle allocazioni raccomandate dagli obiettivi finanziari attivi.
           </p>
         </div>
       )}
 
-      {/* Legend */}
-      <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 p-3 sm:p-4">
-        <h3 className="font-semibold text-blue-900 dark:text-blue-200 text-sm sm:text-base">Legenda</h3>
-        <ul className="mt-2 space-y-1 text-xs sm:text-sm text-blue-800 dark:text-blue-300">
-          <li><strong>COMPRA:</strong> Sotto-allocato (compra di più)</li>
-          <li><strong>VENDI:</strong> Sovra-allocato (riduci posizione)</li>
-          <li><strong>OK:</strong> Allocazione ottimale (±2%)</li>
-        </ul>
-      </div>
 
       {/* ========== MOBILE + TABLET VIEW ========== */}
       {useCardView && (
@@ -648,7 +642,7 @@ export default function AllocationPage() {
             }}
             title={
               sheetNav.level === 'specificAsset'
-                ? 'Specific Assets'
+                ? 'Asset specifici'
                 : 'Sotto-Categoria'
             }
             breadcrumb={
@@ -691,7 +685,10 @@ export default function AllocationPage() {
                         <TableHead className="text-right">Target €</TableHead>
                         <TableHead className="text-right">Differenza %</TableHead>
                         <TableHead className="text-right">Differenza €</TableHead>
-                        <TableHead className="text-center">Azione</TableHead>
+                        <TableHead className="text-center">
+                          <span className="block">Azione</span>
+                          <span className="block text-[10px] font-normal text-muted-foreground">±2% soglia</span>
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -782,7 +779,10 @@ export default function AllocationPage() {
                           <TableHead className="text-right">Target €</TableHead>
                           <TableHead className="text-right">Differenza %</TableHead>
                           <TableHead className="text-right">Differenza €</TableHead>
-                          <TableHead className="text-center">Azione</TableHead>
+                          <TableHead className="text-center">
+                          <span className="block">Azione</span>
+                          <span className="block text-[10px] font-normal text-muted-foreground">±2% soglia</span>
+                        </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>

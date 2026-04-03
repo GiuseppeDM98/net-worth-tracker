@@ -56,6 +56,7 @@ import { getAllExpenses } from './expenseService';
 import { getAnnualExpenses, getAnnualIncome, calculateFIREMetrics } from './fireService';
 import { formatCurrency, formatPercentage } from './chartService';
 import { filterExpensesByTime } from '@/lib/utils/pdfTimeFilters';
+import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { calculatePerformanceForPeriod } from './performanceService';
 
 // Cached expenses to avoid duplicate fetching
@@ -563,8 +564,8 @@ export async function preparePerformanceData(
 
     // Parallel fetch for performance optimization
     const [yocResponse, currentYieldResponse] = await Promise.all([
-      fetch(`/api/performance/yoc?userId=${userId}&startDate=${startDate}&dividendEndDate=${dividendEndDate}&numberOfMonths=${numberOfMonths}`),
-      fetch(`/api/performance/current-yield?userId=${userId}&startDate=${startDate}&dividendEndDate=${dividendEndDate}&numberOfMonths=${numberOfMonths}`)
+      authenticatedFetch(`/api/performance/yoc?userId=${userId}&startDate=${startDate}&dividendEndDate=${dividendEndDate}&numberOfMonths=${numberOfMonths}`),
+      authenticatedFetch(`/api/performance/current-yield?userId=${userId}&startDate=${startDate}&dividendEndDate=${dividendEndDate}&numberOfMonths=${numberOfMonths}`)
     ]);
 
     // Merge YOC metrics if API call successful

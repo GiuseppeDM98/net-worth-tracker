@@ -7,6 +7,11 @@ import {
 } from '@/lib/services/dividendService';
 import { adminDb } from '@/lib/firebase/admin';
 import { AssetDividendGrowth, DividendGrowthData, TotalReturnAsset, YieldOnCostAsset } from '@/types/dividend';
+import {
+  assertSameUser,
+  getApiAuthErrorResponse,
+  requireFirebaseAuth,
+} from '@/lib/server/apiAuth';
 
 /**
  * GET /api/dividends/stats
@@ -15,18 +20,15 @@ import { AssetDividendGrowth, DividendGrowthData, TotalReturnAsset, YieldOnCostA
  */
 export async function GET(request: NextRequest) {
   try {
+    const decodedToken = await requireFirebaseAuth(request);
     const searchParams = request.nextUrl.searchParams;
     const userId = searchParams.get('userId');
     const startDateStr = searchParams.get('startDate');
     const endDateStr = searchParams.get('endDate');
     const assetId = searchParams.get('assetId') || undefined;
 
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'User ID is required' },
-        { status: 400 }
-      );
-    }
+    assertSameUser(decodedToken, userId);
+    const authenticatedUserId = userId as string;
 
     let startDate: Date | undefined;
     let endDate: Date | undefined;
@@ -51,19 +53,19 @@ export async function GET(request: NextRequest) {
     if (endDate && !startDate) startDate = new Date(0);
 
     // Calculate period statistics (filtered by date range and optionally by asset)
-    const periodStats = await calculateDividendStats(userId, startDate, endDate, assetId);
+    const periodStats = await calculateDividendStats(authenticatedUserId, startDate, endDate, assetId);
 
     // Calculate all-time statistics (also filtered by asset if provided)
-    const allTimeStats = await calculateDividendStats(userId, undefined, undefined, assetId);
+    const allTimeStats = await calculateDividendStats(authenticatedUserId, undefined, undefined, assetId);
 
     // Get upcoming dividends and filter by asset ownership
-    const upcomingDividends = await getUpcomingDividends(userId);
+    const upcomingDividends = await getUpcomingDividends(authenticatedUserId);
 
     // Fetch user assets to filter out dividends for sold assets (quantity = 0)
     // Using admin SDK to bypass Firestore Security Rules (server-side)
     const assetsSnapshot = await adminDb
       .collection('assets')
-      .where('userId', '==', userId)
+      .where('userId', '==', authenticatedUserId)
       .get();
 
     const userAssets = assetsSnapshot.docs.map(doc => ({
@@ -97,7 +99,7 @@ export async function GET(request: NextRequest) {
     })).sort((a, b) => b.totalNet - a.totalNet);
 
     // Get all dividends for year and month grouping
-    const allDividends = await getAllDividends(userId);
+    const allDividends = await getAllDividends(authenticatedUserId);
 
     // Helper function to convert Date | Timestamp to Date
     const toDate = (date: Date | Timestamp): Date => {
@@ -454,6 +456,11 @@ export async function GET(request: NextRequest) {
       } : 'all_time',
     });
   } catch (error) {
+    const authErrorResponse = getApiAuthErrorResponse(error);
+    if (authErrorResponse) {
+      return authErrorResponse;
+    }
+
     console.error('Error calculating dividend stats:', error);
     return NextResponse.json(
       { error: 'Failed to calculate dividend statistics', details: (error as Error).message },

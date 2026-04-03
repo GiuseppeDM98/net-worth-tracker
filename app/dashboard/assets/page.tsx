@@ -74,8 +74,8 @@ export default function AssetsPage() {
   return (
     <div className="space-y-6 max-desktop:portrait:pb-20">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">Assets</h1>
-        <p className="mt-2 text-gray-600 dark:text-gray-400">Gestisci e monitora i tuoi asset di investimento</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">Patrimonio</h1>
+        <p className="mt-2 text-gray-600 dark:text-gray-400">Gestisci e monitora il tuo patrimonio</p>
       </div>
 
       {/* Outer tabs: 3 macro-tabs */}

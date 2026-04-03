@@ -37,6 +37,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { toast } from 'sonner';
+import { authenticatedFetch } from '@/lib/utils/authFetch';
 
 // Custom tooltip that uses Tailwind dark-mode tokens for background/border,
 // while preserving per-series colors via entry.color.
@@ -178,7 +179,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
       if (endDate) params.append('endDate', endDate.toISOString());
       if (assetId) params.append('assetId', assetId);
 
-      const response = await fetch(`/api/dividends/stats?${params.toString()}`);
+      const response = await authenticatedFetch(`/api/dividends/stats?${params.toString()}`);
 
       if (!response.ok) {
         const error = await response.json();

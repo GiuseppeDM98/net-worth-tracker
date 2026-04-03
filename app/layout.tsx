@@ -36,9 +36,13 @@ const geistSans = Geist({
   subsets: ["latin"],
 });
 
+// preload: false because Geist Mono is only used on FIRE and Hall of Fame pages.
+// The default (preload: true) emits a <link rel="preload"> on every page in the
+// root layout, causing a browser warning on pages that never render font-mono elements.
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  preload: false,
 });
 
 export const metadata: Metadata = {

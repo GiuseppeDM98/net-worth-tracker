@@ -5,9 +5,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-01, session 29): **History Labor & Investments month counters**. Added two new cards to the History page that count positive and negative months inside `Lavoro & Investimenti`, based on total monthly net worth growth. The monthly labor metrics dataset now exposes `netWorthGrowth`, and the repo-wide TypeScript check passes after aligning stale budget test fixtures with the current `BudgetItem` type.
-- Previous implementation (2026-04-01, session 28): **Performance fixes + Labor section moved to History**. Fixed `useCountUp` with `once: true`, tightened hover transitions, moved `Lavoro & Investimenti` from Overview to History, and removed the unbounded expense query from Dashboard.
-- Previous implementation (2026-04-01, session 27): **Contextual dashboard greeting** based on Europe/Rome time and user first name.
+- Latest implementation (2026-04-03, session 39): **Secondary visual rhythm (Spec 10)**. Overview and History pages now have 3 explicit reading zones separated by `border-t border-border/40` dividers and tighter `space-y-4` grouping for secondary card clusters. Overview: secondary metrics (Variazioni, Expense Stats, Cost Cards) grouped with `space-y-4`; "Composizione" eyebrow + border-t before pie charts. History: zone dividers before "Risparmio vs Crescita" (evolution→analysis) and before "Tempo di Raddoppio" (analysis→context). Dividers added as `className` on existing `motion.div` so they animate with content. Also: "Risparmiato da Lavoro" card in History now shows total expenses for the period as a sub-line (`totalExpensesSum` exposed from `laborIncomeMetrics` useMemo return).
+- Previous implementation (2026-04-03, session 38): **Brand integration + contextual help distribution**. Hall of Fame: "Ranking/Rankings" → "Record" throughout Italian copy; title and nav unchanged (intentional English brand choice). Performance methodology section compressed: YOC 68→12 lines, Current Yield 94→12 lines, 5 chart sections trimmed (removed redundant intros and "Interpretazione" paragraphs already covered by CardDescriptions). Allocation: "Specific Assets" → "Asset specifici" in h1/CardTitle/sheet mobile; callout "Nota" → "Asset specifici"; goal-derived callout shortened. Settings: labor income helper tightened.
+- Previous implementation (2026-04-03, session 37): **Allocation page guidance integration**. Removed standalone blue `Legenda` box. All 3 desktop table "Azione" headers now show `±2% soglia` sub-line (`text-[10px] text-muted-foreground`). Mobile card difference banner replaced static "Differenza" label with contextual `Da acquistare` / `Da ridurre` / `Bilanciato` based on action signal.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -19,13 +19,14 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Key Features (Active)
 - Portfolio tracking across equities, bonds, crypto, real estate, commodities, and cash
 - Automatic price updates via Yahoo Finance and Borsa Italiana bond support
+- Private API actions now require verified Firebase auth server-side, while scheduled maintenance flows continue to authenticate with `CRON_SECRET`
 - Cashflow tracking with categories, filters, Sankey drill-down, budget management, and linked cash-account updates
 - History page with net worth evolution, asset class breakdown, liquidity, YoY variation, savings vs investment growth, `Lavoro & Investimenti`, doubling analysis, and allocation comparison
 - `Lavoro & Investimenti` in History now includes:
-  - lifetime KPI cards for labor income, saved from work, gross investment growth, and net investment growth
+  - lifetime KPI cards for labor income, saved from work (with total expenses sub-line), gross investment growth, and net investment growth
   - positive-month and negative-month counters based on monthly `netWorthGrowth`
   - monthly chart from `prepareMonthlyLaborMetricsData()`
-- Performance page with ROI, CAGR, TWR, IRR, Sharpe, drawdown metrics, YOC, current yield, rolling charts, and monthly returns heatmap
+- Performance page with ROI, CAGR, TWR, IRR, Sharpe, drawdown metrics, YOC, current yield, rolling charts, and monthly returns heatmap; progressive disclosure: collapsible methodology, one-time guide strip, "Avanzato" badges on technical metrics
 - Dividends and coupons tracking with EUR conversion, calendar, total return per asset, and DPS growth
 - FIRE planning with primary residence toggle, liquid vs illiquid split, and scenario projections
 - Monte Carlo simulations and goal-based investing
@@ -37,7 +38,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - `npm test -- <file>`
   - `npx vitest run <file>`
   - `npx tsc --noEmit`
-- Current repo includes targeted tests for pure utilities and services, including `__tests__/chartService.test.ts`
+- Current repo includes targeted tests for pure utilities/services plus private API auth regression coverage in `__tests__/apiAuthRoutes.test.ts`
 
 ## Data & Integrations
 - Firestore client + admin
@@ -59,7 +60,10 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Dividends: `components/dividends/*`
 - Settings: `app/dashboard/settings/page.tsx`, `lib/services/assetAllocationService.ts`
 
-**Last updated**: 2026-04-01 (session 29)
+- Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
+- Mobile perf: `lib/hooks/useMediaQuery.ts`
+
+**Last updated**: 2026-04-03 (session 39)
 
 ## Design Context
 

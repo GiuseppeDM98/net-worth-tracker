@@ -17,6 +17,7 @@ import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { formatTimePeriodLabel } from '@/lib/utils/formatters';
 import { cn } from '@/lib/utils';
+import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { toast } from 'sonner';
 import { TimePeriod } from '@/types/performance';
 
@@ -94,7 +95,7 @@ export function AIAnalysisDialog({
     setError(null);
 
     try {
-      const response = await fetch('/api/ai/analyze-performance', {
+      const response = await authenticatedFetch('/api/ai/analyze-performance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, metrics, timePeriod }),

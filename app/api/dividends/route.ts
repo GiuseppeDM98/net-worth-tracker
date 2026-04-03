@@ -12,6 +12,11 @@ import { createExpenseFromDividend } from '@/lib/services/dividendIncomeService'
 import { DividendFormData } from '@/types/dividend';
 import { Asset } from '@/types/assets';
 import { ExpenseCategory } from '@/types/expenses';
+import {
+  assertSameUser,
+  getApiAuthErrorResponse,
+  requireFirebaseAuth,
+} from '@/lib/server/apiAuth';
 
 /**
  * GET /api/dividends
@@ -40,24 +45,21 @@ import { ExpenseCategory } from '@/types/expenses';
  */
 export async function GET(request: NextRequest) {
   try {
+    const decodedToken = await requireFirebaseAuth(request);
     const searchParams = request.nextUrl.searchParams;
     const userId = searchParams.get('userId');
     const assetId = searchParams.get('assetId');
     const startDateStr = searchParams.get('startDate');
     const endDateStr = searchParams.get('endDate');
 
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'User ID is required' },
-        { status: 400 }
-      );
-    }
+    assertSameUser(decodedToken, userId);
+    const authenticatedUserId = userId as string;
 
     let dividends;
 
     // Filter by asset if provided
     if (assetId) {
-      dividends = await getDividendsByAsset(userId, assetId);
+      dividends = await getDividendsByAsset(authenticatedUserId, assetId);
     }
     // Filter by date range if provided
     else if (startDateStr && endDateStr) {
@@ -71,11 +73,11 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      dividends = await getDividendsByDateRange(userId, startDate, endDate);
+      dividends = await getDividendsByDateRange(authenticatedUserId, startDate, endDate);
     }
     // Otherwise, get all dividends
     else {
-      dividends = await getAllDividends(userId);
+      dividends = await getAllDividends(authenticatedUserId);
     }
 
     return NextResponse.json({
@@ -84,6 +86,11 @@ export async function GET(request: NextRequest) {
       count: dividends.length,
     });
   } catch (error) {
+    const authErrorResponse = getApiAuthErrorResponse(error);
+    if (authErrorResponse) {
+      return authErrorResponse;
+    }
+
     console.error('Error fetching dividends:', error);
     return NextResponse.json(
       { error: 'Failed to fetch dividends', details: (error as Error).message },
@@ -136,11 +143,14 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const decodedToken = await requireFirebaseAuth(request);
     const body = await request.json();
     const { userId, dividendData } = body as {
       userId: string;
       dividendData: DividendFormData;
     };
+
+    assertSameUser(decodedToken, userId);
 
     // Validate required fields
     if (!userId || !dividendData) {
@@ -318,6 +328,11 @@ export async function POST(request: NextRequest) {
       message: 'Dividend created successfully',
     });
   } catch (error) {
+    const authErrorResponse = getApiAuthErrorResponse(error);
+    if (authErrorResponse) {
+      return authErrorResponse;
+    }
+
     console.error('Error creating dividend:', error);
     return NextResponse.json(
       { error: 'Failed to create dividend', details: (error as Error).message },

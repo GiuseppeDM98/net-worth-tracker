@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/tooltip';
 import { Edit, Trash2, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import { toast } from 'sonner';
+import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils/formatters';
@@ -157,7 +158,7 @@ export function DividendTable({ dividends, onEdit, onRefresh, showTotals = false
     try {
       setDeletingId(dividend.id);
 
-      const response = await fetch(`/api/dividends/${dividend.id}`, {
+      const response = await authenticatedFetch(`/api/dividends/${dividend.id}`, {
         method: 'DELETE',
       });
 

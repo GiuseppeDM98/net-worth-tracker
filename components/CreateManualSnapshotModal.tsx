@@ -26,6 +26,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Trash2 } from 'lucide-react';
 
@@ -203,7 +204,7 @@ export function CreateManualSnapshotModal({
       };
 
       // Save to Firestore
-      const response = await fetch('/api/portfolio/snapshot/manual', {
+      const response = await authenticatedFetch('/api/portfolio/snapshot/manual', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

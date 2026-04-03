@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { HelpCircle } from 'lucide-react';
 import { formatCurrency, formatPercentage } from '@/lib/services/chartService';
@@ -13,6 +14,8 @@ interface MetricCardProps {
   description?: string;
   tooltip?: string;
   isPrimary?: boolean;
+  /** Optional label chip (e.g. "Avanzato") to signal that the metric requires domain knowledge. */
+  badge?: string;
 }
 
 /**
@@ -29,6 +32,7 @@ interface MetricCardProps {
  * @param description - Optional longer description text
  * @param tooltip - Optional help text shown when clicking the info icon
  * @param isPrimary - If true, applies primary border styling to highlight the card
+ * @param badge - Optional label chip displayed below the title (e.g. "Avanzato")
  */
 export function MetricCard({
   title,
@@ -38,6 +42,7 @@ export function MetricCard({
   description,
   tooltip,
   isPrimary = false,
+  badge,
 }: MetricCardProps) {
   // === Tooltip State Management ===
 
@@ -132,8 +137,17 @@ export function MetricCard({
       'h-full transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
       isPrimary && 'border-primary'
     )}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+      {/* items-start keeps the help icon pinned top-right when the title wraps
+          or a badge chip is present below it. */}
+      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+        <div className="flex flex-col gap-1">
+          <CardTitle className="text-sm font-medium">{title}</CardTitle>
+          {badge && (
+            <Badge variant="outline" className="w-fit text-[10px] px-1.5 py-0 font-normal text-muted-foreground border-muted-foreground/30">
+              {badge}
+            </Badge>
+          )}
+        </div>
         {tooltip && (
           <div className="relative" ref={tooltipRef}>
             <button
@@ -152,7 +166,9 @@ export function MetricCard({
         )}
       </CardHeader>
       <CardContent>
-        <div className={cn('text-2xl font-bold tabular-nums', getValueColor(value))}>
+        {/* isPrimary cards use a larger value to visually dominate the section
+            and signal to the eye which metrics deserve attention first. */}
+        <div className={cn('font-bold tabular-nums', isPrimary ? 'text-3xl' : 'text-2xl', getValueColor(value))}>
           {formatValue(animatedValue)}
         </div>
         {subtitle && (

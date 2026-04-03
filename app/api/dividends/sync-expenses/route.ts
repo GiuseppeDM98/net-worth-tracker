@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { syncDividendExpenses } from '@/lib/services/dividendIncomeService';
 import { Dividend } from '@/types/dividend';
+import {
+  assertSameUser,
+  getApiAuthErrorResponse,
+  requireFirebaseAuth,
+} from '@/lib/server/apiAuth';
 
 /**
  * POST /api/dividends/sync-expenses
@@ -37,10 +42,13 @@ import { Dividend } from '@/types/dividend';
  */
 export async function POST(request: NextRequest) {
   try {
+    const decodedToken = await requireFirebaseAuth(request);
     const body = await request.json();
     const { userId, dividends, categoryId, categoryName, subCategoryId, subCategoryName } = body;
 
-    if (!userId || !dividends || !categoryId || !categoryName) {
+    assertSameUser(decodedToken, userId);
+
+    if (!dividends || !categoryId || !categoryName) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -61,6 +69,11 @@ export async function POST(request: NextRequest) {
       result,
     });
   } catch (error) {
+    const authErrorResponse = getApiAuthErrorResponse(error);
+    if (authErrorResponse) {
+      return authErrorResponse;
+    }
+
     console.error('Error in sync-expenses API:', error);
     return NextResponse.json(
       { error: 'Failed to sync dividend expenses' },

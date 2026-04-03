@@ -37,6 +37,7 @@ import {
   listItem,
 } from '@/lib/utils/motionVariants';
 import { useAuth } from '@/contexts/AuthContext';
+import { authenticatedFetch } from '@/lib/utils/authFetch';
 import {
   HallOfFameData,
   MonthlyRecord,
@@ -100,7 +101,7 @@ export default function HallOfFamePage() {
 
     try {
       setRecalculating(true);
-      const response = await fetch('/api/hall-of-fame/recalculate', {
+      const response = await authenticatedFetch('/api/hall-of-fame/recalculate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -112,13 +113,13 @@ export default function HallOfFamePage() {
         throw new Error('Failed to recalculate Hall of Fame');
       }
 
-      toast.success('Rankings aggiornati con successo!');
+      toast.success('Record aggiornati.');
 
       // Ricarica i dati
       await loadData();
     } catch (error) {
       console.error('Error recalculating Hall of Fame:', error);
-      toast.error('Errore durante il ricalcolo dei rankings');
+      toast.error('Errore durante l\'aggiornamento dei record');
     } finally {
       setRecalculating(false);
     }
@@ -259,7 +260,7 @@ export default function HallOfFamePage() {
               Hall of Fame
             </h1>
             <p className="text-muted-foreground mt-1">
-              I tuoi migliori e peggiori record finanziari
+              I record personali del tuo percorso finanziario
             </p>
           </div>
           <Button
@@ -276,7 +277,7 @@ export default function HallOfFamePage() {
             ) : (
               <>
                 <RefreshCw className="h-4 w-4" />
-                Ricalcola Rankings
+                Aggiorna i record
               </>
             )}
           </Button>
@@ -284,7 +285,7 @@ export default function HallOfFamePage() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-center text-muted-foreground">
-              Nessun dato disponibile. Crea almeno 2 snapshot per visualizzare la Hall of Fame.
+              Nessun dato disponibile. Crea almeno 2 snapshot per visualizzare i tuoi record.
             </p>
           </CardContent>
         </Card>
@@ -307,7 +308,7 @@ export default function HallOfFamePage() {
             Hall of Fame
           </h1>
           <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-            I tuoi migliori e peggiori record finanziari
+            I record personali del tuo percorso finanziario
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
@@ -333,16 +334,16 @@ export default function HallOfFamePage() {
             ) : (
               <>
                 <RefreshCw className="h-4 w-4" />
-                Ricalcola Rankings
+                Aggiorna i record
               </>
             )}
           </Button>
         </div>
       </div>
 
-      {/* Ranking Mensili */}
+      {/* Record Mensili */}
       <div>
-        <h2 className="text-xl sm:text-2xl font-semibold mb-4">Ranking Mensili (Top 20)</h2>
+        <h2 className="text-xl sm:text-2xl font-semibold mb-4">Record mensili — Top 20</h2>
         <motion.div
           variants={staggerContainer}
           initial="hidden"
@@ -546,9 +547,9 @@ export default function HallOfFamePage() {
         </motion.div>
       </div>
 
-      {/* Ranking Annuali */}
+      {/* Record Annuali */}
       <div>
-        <h2 className="text-xl sm:text-2xl font-semibold mb-4">Ranking Annuali (Top 10)</h2>
+        <h2 className="text-xl sm:text-2xl font-semibold mb-4">Record annuali — Top 10</h2>
         <motion.div
           variants={staggerContainer}
           initial="hidden"

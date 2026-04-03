@@ -1,8 +1,8 @@
 /**
  * HallOfFameSkeleton — loading placeholder for the Hall of Fame page.
  *
- * Mirrors the layout: header, "Ranking Mensili" section (2×2 grid of 4 cards),
- * "Ranking Annuali" section (2×2 grid of 4 cards).
+ * Mirrors the layout: header, "Record mensili" section (2×2 grid of 4 cards),
+ * "Record annuali" section (2×2 grid of 4 cards).
  */
 
 import { cn } from '@/lib/utils';
@@ -66,7 +66,7 @@ export function HallOfFameSkeleton() {
         </div>
       </div>
 
-      {/* Ranking Mensili */}
+      {/* Record Mensili */}
       <div className="space-y-4">
         <SkeletonBar className="h-7 w-64" delayMs={120} />
         <div className="grid gap-4 sm:gap-6 grid-cols-1 desktop:grid-cols-2">
@@ -77,7 +77,7 @@ export function HallOfFameSkeleton() {
         </div>
       </div>
 
-      {/* Ranking Annuali */}
+      {/* Record Annuali */}
       <div className="space-y-4">
         <SkeletonBar className="h-7 w-56" delayMs={480} />
         <div className="grid gap-4 sm:gap-6 grid-cols-1 desktop:grid-cols-2">

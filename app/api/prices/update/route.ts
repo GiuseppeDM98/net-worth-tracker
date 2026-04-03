@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { updateUserAssetPrices } from '@/lib/helpers/priceUpdater';
+import {
+  assertSameUser,
+  getApiAuthErrorResponse,
+  requireFirebaseAuth,
+} from '@/lib/server/apiAuth';
 
 /**
  * POST /api/prices/update
@@ -25,22 +30,23 @@ import { updateUserAssetPrices } from '@/lib/helpers/priceUpdater';
  */
 export async function POST(request: NextRequest) {
   try {
+    const decodedToken = await requireFirebaseAuth(request);
     // Get user ID from request
     const body = await request.json();
     const { userId } = body;
 
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'User ID is required' },
-        { status: 401 }
-      );
-    }
+    assertSameUser(decodedToken, userId);
 
     // Update prices using the shared helper function
     const result = await updateUserAssetPrices(userId);
 
     return NextResponse.json(result);
   } catch (error) {
+    const authErrorResponse = getApiAuthErrorResponse(error);
+    if (authErrorResponse) {
+      return authErrorResponse;
+    }
+
     console.error('Error updating prices:', error);
     return NextResponse.json(
       { error: 'Failed to update prices', details: (error as Error).message },
