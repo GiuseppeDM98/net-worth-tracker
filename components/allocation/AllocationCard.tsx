@@ -16,6 +16,7 @@
  */
 'use client';
 
+import { MouseEvent, forwardRef } from 'react';
 import { AllocationData } from '@/types/assets';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -23,24 +24,33 @@ import { AllocationProgressBar } from './AllocationProgressBar';
 import { formatCurrency, formatPercentage } from '@/lib/services/chartService';
 import { TrendingUp, TrendingDown, Minus, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
+import { listItem } from '@/lib/utils/motionVariants';
 
 interface AllocationCardProps {
   name: string;
   data: AllocationData;
   level: 'assetClass' | 'subCategory' | 'specificAsset';
   hasChildren?: boolean;
-  onDrillDown?: () => void;
+  onDrillDown?: (payload: {
+    sourceId?: string;
+    rect: DOMRect;
+  }) => void;
   className?: string;
+  continuityId?: string;
+  isOrigin?: boolean;
 }
 
-export function AllocationCard({
+export const AllocationCard = forwardRef<HTMLDivElement, AllocationCardProps>(function AllocationCard({
   name,
   data,
   level,
   hasChildren = false,
   onDrillDown,
   className,
-}: AllocationCardProps) {
+  continuityId,
+  isOrigin = false,
+}, ref) {
   // Get action icon
   const getActionIcon = (action: 'COMPRA' | 'VENDI' | 'OK') => {
     switch (action) {
@@ -77,20 +87,39 @@ export function AllocationCard({
     }
   };
 
+  const handleClick = (event: MouseEvent<HTMLDivElement>) => {
+    if (!hasChildren || !onDrillDown) return;
+
+    onDrillDown({
+      sourceId: continuityId,
+      rect: event.currentTarget.getBoundingClientRect(),
+    });
+  };
+
   return (
-    <Card
-      className={cn(
-        'transition-all duration-200',
-        hasChildren && onDrillDown && 'cursor-pointer active:scale-[0.98] hover:shadow-md',
-        className
-      )}
-      onClick={hasChildren && onDrillDown ? onDrillDown : undefined}
+    <motion.div
+      ref={ref}
+      variants={listItem}
+      className={cn('h-full', className)}
+      layout={false}
     >
+      <Card
+        data-continuity-id={continuityId}
+        className={cn(
+          'h-full border-border bg-card transition-[transform,box-shadow,border-color] duration-200',
+          hasChildren && onDrillDown && 'cursor-pointer active:scale-[0.985] hover:border-primary/30 hover:shadow-md',
+          isOrigin && 'border-primary/40 shadow-md shadow-primary/10',
+        )}
+        onClick={handleClick}
+      >
       <CardContent className="p-4">
         {/* Header: Name + Action Badge */}
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-base text-gray-900 dark:text-gray-100 truncate" title={name}>
+            <p className="mb-1 text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
+              {level === 'assetClass' ? 'Livello 1' : level === 'subCategory' ? 'Livello 2' : 'Livello 3'}
+            </p>
+            <h3 className="truncate text-base font-semibold text-foreground" title={name}>
               {name}
             </h3>
           </div>
@@ -119,25 +148,25 @@ export function AllocationCard({
         </div>
 
         {/* Values Section (2 columns: Attuale | Target) */}
-        <div className="grid grid-cols-2 gap-3 mb-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+        <div className="mb-3 grid grid-cols-2 gap-3 rounded-lg border border-border/70 bg-muted/35 p-3">
           {/* Attuale */}
           <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Attuale</p>
-            <p className="text-sm font-bold text-gray-900 dark:text-gray-100">
+            <p className="mb-1 text-xs text-muted-foreground">Attuale</p>
+            <p className="text-sm font-bold text-foreground">
               {formatCurrency(data.currentValue)}
             </p>
-            <p className="text-xs text-gray-600 dark:text-gray-400">
+            <p className="font-mono text-xs text-muted-foreground">
               {formatPercentage(data.currentPercentage)}
             </p>
           </div>
 
           {/* Target */}
           <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Target</p>
-            <p className="text-sm font-bold text-gray-900 dark:text-gray-100">
+            <p className="mb-1 text-xs text-muted-foreground">Target</p>
+            <p className="text-sm font-bold text-foreground">
               {formatCurrency(data.targetValue)}
             </p>
-            <p className="text-xs text-gray-600 dark:text-gray-400">
+            <p className="font-mono text-xs text-muted-foreground">
               {formatPercentage(data.targetPercentage)}
             </p>
           </div>
@@ -152,17 +181,17 @@ export function AllocationCard({
         >
           <div className="flex-1">
             {/* Contextual label instead of generic "Differenza" — tells user what action the number implies */}
-            <p className="text-xs text-gray-600 dark:text-gray-400 mb-0.5">
+            <p className="mb-0.5 text-xs text-muted-foreground">
               {data.action === 'COMPRA' ? 'Da acquistare' : data.action === 'VENDI' ? 'Da ridurre' : 'Bilanciato'}
             </p>
-            <p className="text-sm font-bold">
+            <p className="text-sm font-bold tabular-nums">
               <span className={cn(
                 data.difference > 0 ? 'text-red-700 dark:text-red-400' : data.difference < 0 ? 'text-orange-700 dark:text-orange-400' : 'text-green-700 dark:text-green-400'
               )}>
                 {data.differenceValue > 0 ? '+' : ''}
                 {formatCurrency(data.differenceValue)}
               </span>
-              <span className="text-gray-600 dark:text-gray-400 ml-2">
+              <span className="ml-2 text-muted-foreground">
                 ({data.difference > 0 ? '+' : ''}
                 {formatPercentage(data.difference)})
               </span>
@@ -171,10 +200,11 @@ export function AllocationCard({
 
           {/* Chevron icon if has children */}
           {hasChildren && onDrillDown && (
-            <ChevronRight className="h-5 w-5 text-gray-400 shrink-0 ml-2" />
+            <ChevronRight className="ml-2 h-5 w-5 shrink-0 text-muted-foreground" />
           )}
         </div>
       </CardContent>
-    </Card>
+      </Card>
+    </motion.div>
   );
-}
+});

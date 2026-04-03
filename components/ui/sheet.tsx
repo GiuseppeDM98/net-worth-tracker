@@ -53,18 +53,30 @@ interface SheetContentProps
   extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>,
     VariantProps<typeof sheetVariants> {
   showCloseButton?: boolean
+  disableDefaultAnimation?: boolean
 }
 
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   SheetContentProps
->(({ side = "right", className, children, showCloseButton = true, ...props }, ref) => (
+>(({ side = "right", className, children, showCloseButton = true, disableDefaultAnimation = false, ...props }, ref) => (
   <SheetPortal>
     <SheetOverlay />
     <DialogPrimitive.Content
       ref={ref}
       aria-describedby={undefined}
-      className={cn(sheetVariants({ side }), className)}
+      className={cn(
+        disableDefaultAnimation
+          ? cn(
+              "fixed z-50 gap-4 bg-background p-6 shadow-lg",
+              side === "top" && "inset-x-0 top-0 border-b",
+              side === "bottom" && "inset-x-0 bottom-0 border-t",
+              side === "left" && "inset-y-0 left-0 h-full w-3/4 border-r sm:max-w-sm",
+              side === "right" && "inset-y-0 right-0 h-full w-3/4 border-l sm:max-w-sm",
+            )
+          : sheetVariants({ side }),
+        className
+      )}
       {...props}
     >
       {children}

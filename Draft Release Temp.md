@@ -7,6 +7,9 @@
 
 ## 🔧 Improvements
 
+- Improved the Allocation page with clearer drill-down orientation on desktop, making it easier to understand where you are when moving from asset classes to subcategories and specific assets
+- Improved mobile Allocation navigation so each drill-down level opens from the top of its own content instead of keeping the previous scroll position
+- Improved Allocation progress bars with cleaner, better-centered target markers that are easier to read at a glance
 - Improved the Assets page so `Gestione Asset`, `Anno Corrente`, and `Storico` feel more continuous when switching between sections
 - Improved the historical tables in Assets so the selected sub-view stays in place when moving between tabs, instead of feeling like it reloads
 - Improved refresh feedback in the Assets historical views with a subtle active-panel update state and last-updated timestamp

@@ -123,6 +123,8 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 ### Motion and Charts
 - Shared variants live in `lib/utils/motionVariants.ts`
 - For dense tabbed data views, prefer short container transitions (`tabPanelSwitch`, `tableShellSettle`) and scoped refresh feedback on the active panel only; do not animate table geometry or whole row sets
+- Allocation mobile drill-down pattern: keep the sheet's native bottom-entry animation, but make the sheet body the only scrollable region and reset its scroll to top on each level/content change; this preserves orientation more reliably than custom container-entry choreography
+- Allocation target markers inside progress bars should use a centered dot without a vertical stem; if bar height/border changes, recheck visual centering against the live track
 - Do not wrap shadcn `TableRow` with `motion()`; use `motion.tr`
 - Use `motion.create(Component)` — `motion(Component)` is deprecated in Framer Motion v11+ and logs a warning
 - Page-level Framer Motion quality should be validated in production mode (`npm run build` + `npm run start`) before treating desktop smoothness as a regression; `next dev` can noticeably exaggerate count-up and layout-motion cost
@@ -219,6 +221,16 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 ### Overflow Traps
 - `overflow-x-visible` disables useful table scrolling; use `overflow-x-auto`
 - `overflow-y-auto` clips absolute overlays such as custom dropdowns
+
+### Bottom Sheet Continuity Trap
+- Symptom: mobile drill-down sheets open at the previous level's scroll offset or content appears to slide behind the sticky header
+- Cause: the same scroll container is reused across levels, and sticky headers inside the scroll region let content pass underneath during transitions
+- Fix: keep the header outside the scrolling region, make only the sheet body scrollable, and reset scroll on level/content key changes
+
+### Custom Sheet Entry Overreach
+- Symptom: a custom "open from tapped point" animation feels worse than the native sheet entry even when `transform-origin` is computed correctly
+- Cause: shadcn/Radix bottom-sheet semantics and the built-in slide-from-bottom expectation on mobile can conflict with bespoke container-entry motion, especially when the content itself already animates
+- Fix: prefer the standard bottom-entry sheet animation and reserve contextual continuity for the internal content/header behavior unless the full container transition is visually verified on device
 
 ### Nullish vs Falsy Fallbacks
 - When `0` is semantically invalid for a snapshot-derived display value, prefer `||` over `??`

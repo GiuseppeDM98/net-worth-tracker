@@ -16,36 +16,60 @@
  */
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useRef } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, X as XIcon } from 'lucide-react';
+import { contextualSheetPanel } from '@/lib/utils/motionVariants';
+import { cn } from '@/lib/utils';
 
 interface AllocationSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
-  breadcrumb?: string;
+  breadcrumbPath?: string[];
   onBack?: () => void;
   children: ReactNode;
+  transformOrigin?: string;
+  levelLabel?: string;
+  contentKey: string;
 }
 
 export function AllocationSheet({
   open,
   onOpenChange,
   title,
-  breadcrumb,
+  breadcrumbPath,
   onBack,
   children,
+  transformOrigin,
+  levelLabel,
+  contentKey,
 }: AllocationSheetProps) {
+  const breadcrumb = breadcrumbPath?.filter(Boolean).join(' / ');
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open || !scrollContainerRef.current) return;
+
+    // Each drill-down level should open from the top of its own content,
+    // not inherit the previous scroll offset from the same sheet container.
+    scrollContainerRef.current.scrollTo({ top: 0, behavior: 'auto' });
+  }, [contentKey, open]);
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className="h-[85vh] overflow-y-auto"
+        className="flex h-[85vh] flex-col overflow-hidden border-border bg-background px-0"
         showCloseButton={false}
+        style={transformOrigin ? { transformOrigin } : undefined}
       >
-        <SheetHeader className="sticky top-0 bg-white dark:bg-gray-950 z-10 pb-4 border-b">
+        <SheetHeader className="shrink-0 border-b border-border bg-background px-4 pb-4 pt-3">
+          <div className="mb-3 flex justify-center">
+            <div className="h-1.5 w-12 rounded-full bg-border" />
+          </div>
           <div className="flex items-center gap-3">
             {/* Back button (conditional) */}
             {onBack && (
@@ -65,8 +89,13 @@ export function AllocationSheet({
 
             {/* Title and breadcrumb */}
             <div className="flex-1 min-w-0">
+              {levelLabel && (
+                <p className="mb-1 text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
+                  {levelLabel}
+                </p>
+              )}
               {breadcrumb && (
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate mb-1">
+                <p className="mb-1 truncate text-xs text-muted-foreground">
                   {breadcrumb}
                 </p>
               )}
@@ -83,17 +112,28 @@ export function AllocationSheet({
                 e.stopPropagation();
                 onOpenChange(false);
               }}
-              className="shrink-0 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
+              className="shrink-0 rounded-full bg-muted hover:bg-muted/80"
               aria-label="Chiudi"
             >
-              <XIcon className="h-5 w-5 text-gray-700 dark:text-gray-300" />
+              <XIcon className="h-5 w-5 text-muted-foreground" />
             </Button>
           </div>
         </SheetHeader>
 
         {/* Content area */}
-        <div className="mt-4 space-y-4 pb-8">
-          {children}
+        <div ref={scrollContainerRef} className="min-h-0 flex-1 overflow-y-auto px-4 pb-8 pt-4">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={contentKey}
+              variants={contextualSheetPanel}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className={cn('space-y-4')}
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </SheetContent>
     </Sheet>

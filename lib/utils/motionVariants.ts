@@ -192,3 +192,52 @@ export const tableShellSettle: Variants = {
     transition: { duration: 0.18, ease: easeOutQuart },
   },
 };
+
+/** Allocation drill-down shell: quick structural swap without animating rows/cells. */
+export const drillDownShell: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 10,
+  },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.22, ease: easeOutQuart },
+  },
+  exit: {
+    opacity: 0,
+    y: -8,
+    transition: { duration: 0.14, ease: easeOutQuart },
+  },
+};
+
+/** Contextual sheet content swap: settle the shell first, then reveal children. */
+export const contextualSheetPanel: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 12,
+  },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.2,
+      ease: easeOutQuart,
+      when: "beforeChildren",
+      staggerChildren: 0.04,
+    },
+  },
+  exit: {
+    opacity: 0,
+    y: 8,
+    transition: { duration: 0.14, ease: easeOutQuart },
+  },
+};
+
+/** Progress bar settle: short spring with no visible bounce. */
+export const progressSettleTransition: Transition = {
+  type: "spring",
+  stiffness: 360,
+  damping: 34,
+  mass: 0.78,
+};
