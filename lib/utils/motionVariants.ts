@@ -156,3 +156,39 @@ export const fadeVariants: Variants = {
     transition: { duration: 0.15 },
   },
 };
+
+/** Controlled tab panel switch: short fade + slight settle, tuned for dense data views. */
+export const tabPanelSwitch: Variants = {
+  hidden: { opacity: 0, y: 6 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.2, ease: easeOutQuart },
+  },
+};
+
+/** Section-level refresh feedback: brief pulse for the active shell only. */
+export const sectionRefreshPulse: Variants = {
+  idle: {
+    opacity: 1,
+    scale: 1,
+  },
+  pulse: {
+    opacity: [1, 1, 1],
+    scale: [1, 1.004, 1],
+    transition: { duration: 0.42, ease: easeOutQuart },
+  },
+};
+
+/** Table shell settle: subtle container continuity without animating table geometry. */
+export const tableShellSettle: Variants = {
+  inactive: {
+    opacity: 0.985,
+    y: 4,
+  },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.18, ease: easeOutQuart },
+  },
+};

@@ -7,6 +7,9 @@
 
 ## 🔧 Improvements
 
+- Improved the Assets page so `Gestione Asset`, `Anno Corrente`, and `Storico` feel more continuous when switching between sections
+- Improved the historical tables in Assets so the selected sub-view stays in place when moving between tabs, instead of feeling like it reloads
+- Improved refresh feedback in the Assets historical views with a subtle active-panel update state and last-updated timestamp
 - Improved the Settings page with clear "unsaved changes" feedback, so users can immediately see when edits are still in preview mode before saving
 - Improved responsiveness of Settings controls (toggles, selects, and inputs) with more consistent interaction feedback
 - Improved the nested Allocation editor in Settings with smoother expand/collapse behavior, making complex target editing easier to follow
@@ -57,6 +60,7 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed blank vertical gaps appearing on the Assets page when switching between force-mounted tabs
 - Fixed a flash of fully-visible page content appearing for a split second before the entrance animation begins when navigating between pages — now all pages animate in cleanly every time
 - Fixed the sidebar always highlighting "Panoramica" regardless of the current page
 - Fixed a browser console warning on every page load: the Geist Mono font was being preloaded on all pages despite only being used on the FIRE and Hall of Fame pages

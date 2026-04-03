@@ -27,7 +27,8 @@
  */
 'use client';
 
-import { useMemo } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { useEffect, useMemo, useState } from 'react';
 import type {
   Asset,
   MonthlySnapshot,
@@ -50,6 +51,7 @@ import {
 import { RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EmptyState, ChartEmptyIcon } from '@/components/ui/EmptyState';
+import { sectionRefreshPulse, tableShellSettle } from '@/lib/utils/motionVariants';
 
 interface AssetPriceHistoryTableProps {
   assets: Asset[];
@@ -60,6 +62,11 @@ interface AssetPriceHistoryTableProps {
   showTotalRow?: boolean; // Show total row at bottom (default: false)
   loading: boolean;
   onRefresh: () => Promise<void>;
+  isRefreshing?: boolean;
+  isActiveView?: boolean;
+  isLatestRefreshedView?: boolean;
+  refreshToken?: number;
+  lastRefreshAt?: Date | null;
 }
 
 // CSS classes for color-coded cells (visual accessibility)
@@ -79,7 +86,15 @@ export function AssetPriceHistoryTable({
   showTotalRow = false,
   loading,
   onRefresh,
+  isRefreshing = false,
+  isActiveView = false,
+  isLatestRefreshedView = false,
+  refreshToken = 0,
+  lastRefreshAt = null,
 }: AssetPriceHistoryTableProps) {
+  const prefersReducedMotion = useReducedMotion();
+  const [isRefreshHighlighted, setIsRefreshHighlighted] = useState(false);
+
   // Transform snapshot data into table format
   const tableData = useMemo(
     () => transformPriceHistoryData(snapshots, assets, filterYear, filterStartDate, displayMode),
@@ -88,26 +103,77 @@ export function AssetPriceHistoryTable({
 
   const { assets: assetRows, monthColumns, totalRow } = tableData;
 
+  useEffect(() => {
+    if (!isActiveView || !isLatestRefreshedView || refreshToken === 0) return;
+    if (prefersReducedMotion) {
+      setIsRefreshHighlighted(false);
+      return;
+    }
+
+    setIsRefreshHighlighted(true);
+    const timerId = window.setTimeout(() => {
+      setIsRefreshHighlighted(false);
+    }, 520);
+
+    return () => window.clearTimeout(timerId);
+  }, [isActiveView, isLatestRefreshedView, prefersReducedMotion, refreshToken]);
+
+  const refreshLabel = lastRefreshAt
+    ? new Intl.DateTimeFormat('it-IT', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }).format(lastRefreshAt)
+    : null;
+
   return (
-    <div className="space-y-4">
+    <motion.div
+      initial={false}
+      animate={isActiveView ? 'visible' : 'inactive'}
+      variants={tableShellSettle}
+      className="space-y-4"
+    >
       {/* Header with title and refresh button */}
-      <div className="flex justify-between items-center">
+      <motion.div
+        initial={false}
+        animate={isRefreshHighlighted ? 'pulse' : 'idle'}
+        variants={sectionRefreshPulse}
+        className={cn(
+          'flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-start sm:justify-between',
+          'border-border bg-card',
+          isRefreshHighlighted && 'border-primary/30 bg-primary/5'
+        )}
+      >
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
+          <h2 className="text-xl sm:text-2xl font-bold text-foreground">
             {displayMode === 'totalValue' ? 'Storico Valori' : 'Storico Prezzi'} {filterYear || 'Completo'}
           </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-muted-foreground">
             {displayMode === 'totalValue' ? 'Valori mensili' : 'Prezzi mensili'} da snapshot con variazioni month-over-month
           </p>
+          {refreshLabel && isActiveView ? (
+            <p className="mt-1 text-xs tabular-nums text-muted-foreground">
+              Ultimo aggiornamento: {refreshLabel}
+            </p>
+          ) : null}
         </div>
-        <Button onClick={onRefresh} disabled={loading} variant="outline">
-          <RefreshCw className={cn('mr-2 h-4 w-4', loading && 'animate-spin')} />
+        <Button onClick={onRefresh} disabled={loading || isRefreshing} variant="outline">
+          <RefreshCw className={cn('mr-2 h-4 w-4', (loading || isRefreshing) && 'animate-spin')} />
           Aggiorna
         </Button>
-      </div>
+      </motion.div>
 
       {/* Table Container - Horizontal Scroll */}
-      <div className="overflow-x-auto max-h-[600px] border rounded-lg text-xs sm:text-sm">
+      <motion.div
+        initial={false}
+        animate={isRefreshHighlighted ? 'pulse' : 'idle'}
+        variants={sectionRefreshPulse}
+        className={cn(
+          'overflow-x-auto max-h-[600px] rounded-xl border text-xs sm:text-sm',
+          'border-border bg-background',
+          isRefreshHighlighted && 'border-primary/20 shadow-sm'
+        )}
+      >
         {assetRows.length === 0 ? (
           <EmptyState
             icon={<ChartEmptyIcon />}
@@ -385,7 +451,7 @@ export function AssetPriceHistoryTable({
             )}
           </Table>
         )}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

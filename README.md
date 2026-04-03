@@ -22,6 +22,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Bond coupon scheduling: automatic coupon generation with step-up rate tiers and final premium (Premio Finale) support — full BTP Valore compatible
 - Average cost tracking with 4-decimal precision, including a built-in multi-broker PMC calculator for positions spread across multiple brokers
 - Current vs target asset allocation visualization
+- Assets workspace polish: macro-tabs and historical sub-tabs preserve their state more reliably, and historical refresh actions give scoped feedback without disrupting table readability
 
 ### Performance Analytics
 - Comprehensive metrics: ROI, CAGR, TWR, IRR, Sharpe Ratio, Maximum Drawdown

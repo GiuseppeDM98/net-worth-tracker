@@ -37,6 +37,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 ### React Query and Derived State
 - Invalidate all related caches after mutations
 - Never remove tabs from `mountedTabs`
+- For state-preserving tab UIs, keep per-scope active tab state explicitly (e.g. separate sub-tab state for `Anno Corrente` and `Storico`) instead of sharing one global sub-tab value
 - Use `useMemo` for derived state; do not use `useEffect + setState` for computed values
 
 ### Dynamic Imports
@@ -121,6 +122,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 
 ### Motion and Charts
 - Shared variants live in `lib/utils/motionVariants.ts`
+- For dense tabbed data views, prefer short container transitions (`tabPanelSwitch`, `tableShellSettle`) and scoped refresh feedback on the active panel only; do not animate table geometry or whole row sets
 - Do not wrap shadcn `TableRow` with `motion()`; use `motion.tr`
 - Use `motion.create(Component)` — `motion(Component)` is deprecated in Framer Motion v11+ and logs a warning
 - Page-level Framer Motion quality should be validated in production mode (`npm run build` + `npm run start`) before treating desktop smoothness as a regression; `next dev` can noticeably exaggerate count-up and layout-motion cost
@@ -157,6 +159,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Badge chips for complexity signals: `badge?: string` prop on `MetricCard` renders a `Badge variant="outline"` below the title; requires `CardHeader` to be `items-start` (not `items-center`) because the left column has variable height
 - One-time guide strips: position them outside the `key={selectedPeriod}` (or equivalent period/tab reset div) so they don't replay their entrance animation on every period switch
 - Dev/internal tool sections in settings pages: isolate with `border-t border-border pt-6` + a `text-xs uppercase tracking-widest` eyebrow label in a distinct color (e.g. orange for dev/danger zones); never co-locate dev tools in a functional product tab (dividendi, spese, etc.)
+- For refresh affordances on dense historical tables, highlight only the active shell/header and timestamp the refresh there; avoid flashing rows or cells broadly
 
 ### Dialog Layout
 - Prefer sticky header + sticky footer dialog layout for long forms
@@ -199,6 +202,10 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 ### Radix Select Empty String
 - Symptom: runtime error from `SelectItem`
 - Fix: use sentinels like `__all__`, `__none__`, `__create_new__`
+
+### Radix Tabs forceMount Layout Gap
+- Symptom: switching a `TabsContent forceMount` view leaves blank vertical space even though the old panel looks hidden
+- Fix: ensure inactive tab panels are explicitly removed from layout with `data-[state=inactive]:hidden` (see `components/ui/tabs.tsx`)
 
 ### Recharts Legend and Tooltip Mismatch
 - `Legend` reads `<Bar fill>`, not `<Cell>`
