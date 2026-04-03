@@ -1424,8 +1424,7 @@ export default function SettingsPage() {
               <div className="space-y-1">
                 <Label className="text-sm font-medium">Reddito da Lavoro</Label>
                 <p className="text-sm text-muted-foreground">
-                  Seleziona le categorie di entrata che rappresentano il reddito da lavoro (stipendio, freelance, ecc.).
-                  Verranno usate per calcolare le card &quot;Guadagnato da Lavoro&quot; e &quot;Risparmiato da Lavoro&quot; nella Dashboard.
+                  Categorie usate per le card Guadagnato e Risparmiato da Lavoro nella Dashboard. Includi stipendio, freelance e ogni altra forma di reddito attivo.
                 </p>
               </div>
               {getCategoriesByType('income').length === 0 ? (

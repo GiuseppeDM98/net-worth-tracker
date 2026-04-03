@@ -1091,9 +1091,6 @@ export default function PerformancePage() {
           <CardContent className="space-y-4 text-sm">
             <div>
               <h4 className="font-semibold mb-1">Organizzazione delle Metriche</h4>
-              <p className="text-muted-foreground">
-                Le 15 metriche di performance sono organizzate in 4 categorie logiche per facilitare la comprensione:
-              </p>
               <ul className="list-disc list-inside mt-2 space-y-1 text-muted-foreground">
                 <li><strong>📈 Rendimento</strong>: Quanto il portafoglio è cresciuto nel tempo (ROI, CAGR, TWR, IRR)</li>
                 <li><strong>⚠️ Rischio</strong>: Volatilità e potenziali ribassi (Volatilità, Sharpe, Max Drawdown, Durata Drawdown, Recovery Time)</li>
@@ -1104,69 +1101,47 @@ export default function PerformancePage() {
             <div>
               <h4 className="font-semibold mb-1">Grafico: Evoluzione Patrimonio</h4>
               <p className="text-muted-foreground">
-                Questo grafico mostra la composizione del patrimonio nel tempo, separando visivamente due componenti:
-                <br /><br />
-                <strong>Contributi (area blu):</strong> La somma cumulativa di tutti i flussi di cassa netti (entrate - uscite) registrati nella sezione Cashflow. Rappresenta quanto denaro hai effettivamente versato o prelevato nel tempo.
+                <strong>Contributi (area blu):</strong> Somma cumulativa dei flussi di cassa netti (entrate − uscite) da Cashflow.
                 <br />
-                <strong>Investimenti (area verde):</strong> La differenza tra il patrimonio totale e i contributi cumulativi. Mostra quanto valore è stato generato (o perso) dagli investimenti grazie alle variazioni di prezzo degli asset.
+                <strong>Investimenti (area verde):</strong> Differenza tra patrimonio totale e contributi cumulativi. Mostra il valore generato dagli investimenti.
                 <br />
-                <strong>Patrimonio Totale (linea arancione):</strong> Il net worth complessivo, dato dalla somma di contributi + investimenti.
-                <br /><br />
-                <em>Interpretazione:</em> Se l&apos;area verde cresce, i tuoi investimenti stanno generando rendimenti positivi. Se si riduce, stai perdendo valore sugli investimenti. Questo grafico ti permette di vedere quanto del patrimonio attuale deriva dal risparmio (contributi) rispetto agli investimenti.
+                <strong>Patrimonio Totale (linea arancione):</strong> Net worth complessivo = contributi + investimenti.
               </p>
             </div>
             <div>
               <h4 className="font-semibold mb-1">Grafico: CAGR Rolling 12 Mesi</h4>
               <p className="text-muted-foreground">
-                Questo grafico mostra l&apos;andamento del rendimento annualizzato calcolato su finestre mobili di 12 mesi consecutive.
-                <br /><br />
-                <strong>Finestra Mobile (Rolling):</strong> Per ogni punto del grafico viene calcolato il CAGR (Compound Annual Growth Rate) considerando i 12 mesi precedenti. Ad esempio, il punto di aprile 2025 mostra il CAGR del periodo maggio 2024 - aprile 2025.
+                <strong>Finestra mobile (Rolling):</strong> Ogni punto mostra il CAGR calcolato sui 12 mesi precedenti — es. aprile 2025 = CAGR maggio 2024–aprile 2025.
                 <br />
-                <strong>Media Mobile:</strong> La linea tratteggiata è una media mobile a 3 mesi che smussa le oscillazioni e aiuta a leggere il trend.
+                <strong>Media mobile:</strong> La linea tratteggiata è una media a 3 mesi che smussa le oscillazioni.
                 <br />
-                <strong>Utilità:</strong> Permette di vedere se la performance sta migliorando o peggiorando nel tempo, eliminando l&apos;effetto di singoli mesi fortunati/sfortunati. È più stabile del rendimento mensile ma più reattivo del rendimento totale dall&apos;inizio.
-                <br /><br />
-                <em>Interpretazione:</em> Una linea in salita indica che la performance è in miglioramento negli ultimi 12 mesi. Una linea in discesa segnala un peggioramento. Le oscillazioni riflettono la volatilità del portafoglio.
+                <strong>Utilità:</strong> Mostra se la performance migliora o peggiora nel tempo, più stabile del rendimento mensile e più reattivo del rendimento totale.
               </p>
             </div>
             <div>
               <h4 className="font-semibold mb-1">Grafico: Sharpe Ratio Rolling</h4>
               <p className="text-muted-foreground">
-                Questo grafico mostra l&apos;andamento del rapporto rischio-rendimento (Sharpe Ratio) calcolato su finestre mobili.
-                <br /><br />
-                <strong>Finestra Mobile (Rolling):</strong> Ogni punto rappresenta lo Sharpe Ratio calcolato sui 12 mesi precedenti.
+                <strong>Finestra mobile (Rolling):</strong> Ogni punto è lo Sharpe calcolato sui 12 mesi precedenti.
                 <br />
-                <strong>Media Mobile:</strong> La linea tratteggiata è una media mobile a 3 mesi che smussa le oscillazioni e aiuta a leggere il trend.
+                <strong>Calcolo:</strong> (TWR − tasso risk-free) / volatilità. Il tasso risk-free viene dalle impostazioni.
                 <br />
-                <strong>Calcolo:</strong> (Rendimento TWR - tasso risk-free) / volatilità. Il tasso risk-free deriva dalle impostazioni utente, con fallback a un valore di default.
-                <br />
-                <strong>Utilità:</strong> Evidenzia come cambia nel tempo l&apos;efficienza del portafoglio nel generare rendimento per unità di rischio.
-                <br /><br />
-                <em>Interpretazione:</em> Valori più alti indicano un miglior rapporto rischio-rendimento. Variazioni ampie possono riflettere periodi di volatilità elevata o rendimenti instabili.
+                <strong>Media mobile:</strong> Linea tratteggiata a 3 mesi per leggere il trend.
               </p>
             </div>
             <div>
               <h4 className="font-semibold mb-1">Grafico: Heatmap Rendimenti Mensili</h4>
               <p className="text-muted-foreground">
-                Questo grafico mostra i rendimenti percentuali mese per mese, organizzati per anno. Ogni cella rappresenta il rendimento di un singolo mese.
-                <br /><br />
-                <strong>Calcolo:</strong> Il rendimento mensile è calcolato come ((Patrimonio Fine Mese - Flussi di Cassa) / Patrimonio Inizio Mese - 1) × 100. I flussi di cassa sono sottratti per isolare la performance degli investimenti.
+                <strong>Calcolo:</strong> ((Patrimonio fine mese − Flussi di cassa) / Patrimonio inizio mese − 1) × 100. I flussi sono sottratti per isolare la performance degli investimenti.
                 <br />
-                <strong>Colori:</strong> Verde = rendimenti positivi, Rosso = rendimenti negativi. L&apos;intensità del colore aumenta con l&apos;ampiezza del rendimento (±5% soglia per colori più scuri).
-                <br /><br />
-                <em>Interpretazione:</em> Questo grafico aiuta a identificare pattern stagionali e mesi storicamente difficili o favorevoli. Ad esempio, se gennaio è spesso verde e settembre spesso rosso, potresti notare una stagionalità nel portafoglio.
+                <strong>Colori:</strong> Verde = positivo, rosso = negativo. Intensità più scura oltre ±5%.
               </p>
             </div>
             <div>
               <h4 className="font-semibold mb-1">Grafico: Underwater (Drawdown)</h4>
               <p className="text-muted-foreground">
-                Questo grafico mostra quanto il portafoglio si trova &quot;sotto&quot; il suo massimo storico (drawdown). L&apos;area rossa indica la distanza percentuale dal picco precedente.
-                <br /><br />
-                <strong>Funzionamento:</strong> Quando il portafoglio raggiunge un nuovo massimo storico, il grafico torna a 0%. Quando il portafoglio scende, il grafico mostra la percentuale di perdita rispetto al picco. Calcolo aggiustato per flussi di cassa per isolare la performance degli investimenti.
+                <strong>Funzionamento:</strong> A ogni nuovo massimo storico il grafico torna a 0%. Quando il portafoglio scende, mostra la perdita percentuale dal picco. Aggiustato per flussi di cassa.
                 <br />
-                <strong>Utilità:</strong> Visualizza rapidamente quanto tempo impiega il portafoglio a recuperare dopo le perdite. Periodi lunghi &quot;sott&apos;acqua&quot; (area rossa estesa) indicano lenti recuperi. Questo si collega alle metriche &quot;Durata Drawdown&quot; e &quot;Recovery Time&quot; mostrate sopra.
-                <br /><br />
-                <em>Interpretazione:</em> Un grafico che tocca spesso lo 0% indica un portafoglio che raggiunge frequentemente nuovi massimi (buon segno). Lunghe immersioni indicano periodi prolungati di sottoperformance rispetto ai picchi precedenti.
+                <strong>Collegamento:</strong> Si integra con le metriche Durata Drawdown e Recovery Time visibili sopra.
               </p>
             </div>
             <div>
@@ -1220,170 +1195,35 @@ export default function PerformancePage() {
             <div>
               <h4 className="font-semibold mb-1">Yield on Cost (YOC)</h4>
               <p className="text-muted-foreground">
-                Il Yield on Cost (YOC) misura il rendimento da dividendi basato sul costo originale di acquisto (average cost),
-                non sul prezzo di mercato attuale. Mostra quanto rendono i tuoi investimenti rispetto al capitale iniziale investito.
+                Rendimento da dividendi rispetto al costo originale di acquisto (average cost), non al prezzo attuale.
                 <br /><br />
                 <strong>Formula:</strong> YOC% = (Dividendi Annualizzati / Cost Basis) × 100
+                <br />
+                <strong>Annualizzazione:</strong> periodi &lt;12 mesi → (totale ÷ mesi) × 12 · periodi ≥12 mesi → totale ÷ anni.
                 <br /><br />
-                <strong>Cosa sono i Dividendi Annualizzati?</strong>
-                <br />
-                I dividendi totali del periodo vengono convertiti in un <strong>tasso annuale</strong> per rendere confrontabili periodi di durata diversa.
+                <strong>Interpretazione:</strong> YOC &gt; Current Yield = il prezzo è cresciuto più dei dividendi (comune in bull market).
+                Valori &gt;5% eccellenti per un portafoglio diversificato. Confronta tra periodi (1Y, 3Y, 5Y) per vedere la traiettoria.
                 <br /><br />
-                • <strong>Periodi &lt; 12 mesi</strong> (es. YTD con 5 mesi): si scala il tasso a un equivalente annuale
-                <br />
-                &nbsp;&nbsp;Dividendi Annualizzati = (Dividendi Totali / Numero Mesi) × 12
-                <br />
-                &nbsp;&nbsp;<em>Esempio: €100 in 5 mesi → (€100 / 5) × 12 = €240/anno</em>
-                <br /><br />
-                • <strong>Periodi ≥ 12 mesi</strong> (es. 3Y, 5Y): si calcola la media annuale
-                <br />
-                &nbsp;&nbsp;Dividendi Annualizzati = Dividendi Totali / Numero Anni
-                <br />
-                &nbsp;&nbsp;<em>Esempio: €600 in 3 anni → €600 / 3 = €200/anno</em>
-                <br /><br />
-                <strong>Esempio completo (portafoglio reale):</strong>
-                <br />
-                • Cost basis: €7.100 (5 asset in portafoglio)
-                <br />
-                • Periodo: 5 mesi (set 2025 - gen 2026)
-                <br />
-                • Dividendi lordi ricevuti: €197,52
-                <br />
-                • Dividendi Annualizzati: (€197,52 / 5) × 12 = €474/anno
-                <br />
-                • YOC Lordo: (€474 / €7.100) × 100 = <strong>6,68%</strong>
-                <br /><br />
-                <strong>Confronto con Current Yield:</strong>
-                <br />
-                • YOC si basa sul <strong>costo originale</strong> (€7.100)
-                <br />
-                • Current Yield si baserebbe sul <strong>valore attuale</strong> di mercato
-                <br /><br />
-                <strong>Come interpretarlo:</strong>
-                <br />
-                • <strong>YOC &gt; Current Yield:</strong> I dividendi sono cresciuti nel tempo (buon segno).
-                Significa che l&apos;azienda/ETF ha aumentato le distribuzioni, premiando chi ha investito presto.
-                <br />
-                • <strong>YOC = Current Yield:</strong> I dividendi sono rimasti stabili rispetto al prezzo.
-                <br />
-                • <strong>YOC &lt; Current Yield:</strong> I dividendi sono cresciuti meno del prezzo dell&apos;asset.
-                Non necessariamente negativo se il capitale totale è comunque aumentato.
-                <br /><br />
-                <strong>Quando è buono?</strong>
-                <br />
-                • YOC &gt; 5-7% è considerato eccellente per un portafoglio diversificato
-                <br />
-                • YOC in crescita anno dopo anno indica dividend growth sostenibile
-                <br />
-                • Confronta YOC tra periodi diversi (1Y, 3Y, 5Y) per vedere l&apos;evoluzione
-                <br /><br />
-                <strong>Limiti:</strong>
-                <br />
-                • Si applica solo ad asset con cost basis noto (average cost)
-                <br />
-                • Asset venduti (quantity = 0) non sono inclusi
-                <br />
-                • YOC non considera capital gains, solo dividendi
-                <br />
-                • I valori sono annualizzati per confrontare periodi diversi
+                <strong>Limiti:</strong> Richiede cost basis noto · Esclusi asset con quantity = 0 · Non considera capital gains.
               </p>
             </div>
 
             <div>
               <h4 className="font-semibold mb-1">Current Yield</h4>
               <p className="text-muted-foreground">
-                Il Current Yield misura il rendimento da dividendi basato sul valore di mercato attuale del portafoglio,
-                mostrando quanto renderebbe l&apos;investimento se lo acquistassi oggi ai prezzi correnti.
+                Rendimento da dividendi rispetto al valore di mercato attuale. Mostra quanto renderebbe l&apos;investimento acquistato oggi.
                 <br /><br />
-                <strong>Formula:</strong> Current Yield% = (Dividendi Annualizzati / Valore Corrente Portafoglio) × 100
+                <strong>Formula:</strong> Current Yield% = (Dividendi Annualizzati / Valore Corrente) × 100
+                <br />
+                <strong>Annualizzazione:</strong> stessa logica dello YOC.
                 <br /><br />
-                <strong>Cosa sono i Dividendi Annualizzati?</strong>
-                <br />
-                I dividendi del periodo vengono convertiti in un tasso annuale (stessa logica dello YOC):
+                <strong>YOC vs Current Yield:</strong> Se YOC &gt; CY, il prezzo è cresciuto più dei dividendi (capital appreciation).
+                Se CY &gt; YOC, i dividendi sono cresciuti più del prezzo (rendimento in crescita).
+                Le metriche Nette (dopo tasse) sono più realistiche per confronti tra asset.
                 <br /><br />
-                • <strong>Periodi &lt; 12 mesi</strong> (es. YTD con 5 mesi): si scala il tasso
+                <strong>Utile per:</strong> Confrontare il portafoglio con alternative (bond, ETF, depositi) · valutare la sostenibilità del reddito passivo.
                 <br />
-                &nbsp;&nbsp;Dividendi Annualizzati = (Dividendi Totali / Numero Mesi) × 12
-                <br />
-                &nbsp;&nbsp;<em>Esempio: €100 in 5 mesi → (€100 / 5) × 12 = €240/anno</em>
-                <br /><br />
-                • <strong>Periodi ≥ 12 mesi</strong> (es. 3Y): si calcola la media annuale
-                <br />
-                &nbsp;&nbsp;Dividendi Annualizzati = Dividendi Totali / Numero Anni
-                <br />
-                &nbsp;&nbsp;<em>Esempio: €600 in 3 anni → €600 / 3 = €200/anno</em>
-                <br /><br />
-                <strong>Esempio completo (stesso portafoglio YOC):</strong>
-                <br />
-                • Valore corrente portafoglio: €9.500 (5 asset che pagano dividendi)
-                <br />
-                • Periodo: 5 mesi (set 2025 - gen 2026)
-                <br />
-                • Dividendi lordi ricevuti: €197,52
-                <br />
-                • Dividendi netti ricevuti: €146,17 (dopo tasse 26%)
-                <br />
-                • Dividendi Annualizzati Lordi: (€197,52 / 5) × 12 = €474/anno
-                <br />
-                • Dividendi Annualizzati Netti: (€146,17 / 5) × 12 = €351/anno
-                <br />
-                • <strong>Current Yield Lordo:</strong> (€474 / €9.500) × 100 = <strong>4,99%</strong>
-                <br />
-                • <strong>Current Yield Netto:</strong> (€351 / €9.500) × 100 = <strong>3,69%</strong>
-                <br />
-                • YOC Lordo (dallo stesso esempio): <strong>6,68%</strong>
-                <br />
-                • YOC Netto (dallo stesso esempio): <strong>4,94%</strong>
-                <br /><br />
-                <strong>Confronto Lordo vs Netto:</strong>
-                <br />
-                • <strong>YOC:</strong> Lordo 6,68% vs Netto 4,94% (differenza 1,74 punti percentuali = 26% tasse)
-                <br />
-                • <strong>Current Yield:</strong> Lordo 4,99% vs Netto 3,69% (differenza 1,30 punti percentuali = 26% tasse)
-                <br />
-                • Le metriche Nette sono più realistiche perché mostrano il rendimento effettivo dopo tasse
-                <br /><br />
-                <strong>Confronto YOC vs Current Yield (metriche Nette):</strong>
-                <br />
-                In questo esempio, YOC Netto (4,94%) &gt; Current Yield Netto (3,69%), il che significa:
-                <br />
-                • Il prezzo degli asset è aumentato del 34% rispetto al costo originale (€9.500 / €7.100 = 1.34)
-                <br />
-                • I dividendi netti sono cresciuti, ma il prezzo è cresciuto più velocemente
-                <br />
-                • Chi ha comprato presto gode di un rendimento netto (YOC Netto 4,94%) superiore rispetto a chi compra oggi (CY Netto 3,69%)
-                <br />
-                • Ottimo scenario: capital appreciation + dividendi in crescita
-                <br /><br />
-                <strong>Come interpretarlo:</strong>
-                <br />
-                • <strong>Current Yield &gt; YOC:</strong> I dividendi sono cresciuti più del prezzo (raro, possibile se prezzo sceso). Segnale di potenziale acquisto se il prezzo è sottovalutato.
-                <br />
-                • <strong>Current Yield = YOC:</strong> Crescita proporzionale di prezzo e dividendi. Rendimento stabile.
-                <br />
-                • <strong>Current Yield &lt; YOC:</strong> Il prezzo è cresciuto più dei dividendi (scenario comune in bull market). Buon capital gain ma yield attuale più basso.
-                <br /><br />
-                <strong>Quando è utile?</strong>
-                <br />
-                • Confrontare il rendimento del portafoglio con altre opportunità di investimento (bond, ETF, depositi)
-                <br />
-                • Valutare se il portafoglio genera reddito passivo sufficiente rispetto al capitale investito
-                <br />
-                • Decidere se reinvestire dividendi o cercare alternative con yield più alto
-                <br />
-                • Tracciare l&apos;evoluzione del yield nel tempo (se scende troppo, potrebbe indicare sopravvalutazione)
-                <br /><br />
-                <strong>Limiti:</strong>
-                <br />
-                • Si applica solo ad asset con dividendi (asset growth-only esclusi)
-                <br />
-                • Non considera capital gains (solo dividendi)
-                <br />
-                • Current Yield dipende dalla volatilità del prezzo (può fluttuare)
-                <br />
-                • I valori sono annualizzati per confrontare periodi diversi
-                <br />
-                • Non include asset venduti (quantity = 0)
+                <strong>Limiti:</strong> Solo asset con dividendi · dipende dalla volatilità del prezzo · non include capital gains · esclusi asset con quantity = 0.
               </p>
             </div>
           </CardContent>

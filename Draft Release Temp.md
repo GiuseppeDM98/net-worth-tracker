@@ -7,6 +7,11 @@
 
 ## 🔧 Improvements
 
+- The Hall of Fame section now uses consistent Italian terminology throughout: section headings, button labels, and toast messages now read "Record mensili", "Record annuali", and "Aggiorna i record" instead of the mixed English/Italian "Ranking" wording — the section name and navigation label remain "Hall of Fame" by design
+- The "Specific Assets" drill-down in the Allocation page is now labelled "Asset specifici" in Italian, consistent with the rest of the interface
+- The methodology reference on the Performance page is now significantly more scannable: chart explanations are 2–3 lines each (down from 10–15), and the YOC and Current Yield sections are concise reference entries rather than multi-page walkthroughs — all key formulas and interpretation guidance are preserved
+- The informational callout in the Allocation drill-down is now titled "Asset specifici" instead of the generic "Nota", with clearer, more action-oriented bullet copy
+
 - Mobile bottom navigation now shows an active highlight on the "Altro" button when you're in a secondary section (Rendimenti, Storico, Allocazione, etc.) — you always know where you are in the app
 - Renamed the mobile "Menu" button to "Altro" with a clearer icon, so it's immediately obvious there's more to explore
 - The mobile navigation drawer now groups sections by topic (Analisi, Pianificazione, Preferenze) instead of a flat unlabelled list — the app's structure is visible at a glance

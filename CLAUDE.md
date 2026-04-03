@@ -5,9 +5,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-03, session 37): **Allocation page guidance integration**. Removed standalone blue `Legenda` box. All 3 desktop table "Azione" headers now show `±2% soglia` sub-line (`text-[10px] text-muted-foreground`). Mobile card difference banner replaced static "Differenza" label with contextual `Da acquistare` / `Da ridurre` / `Bilanciato` based on action signal.
+- Latest implementation (2026-04-03, session 38): **Brand integration + contextual help distribution**. Hall of Fame: "Ranking/Rankings" → "Record" throughout Italian copy; title and nav unchanged (intentional English brand choice). Performance methodology section compressed: YOC 68→12 lines, Current Yield 94→12 lines, 5 chart sections trimmed (removed redundant intros and "Interpretazione" paragraphs already covered by CardDescriptions). Allocation: "Specific Assets" → "Asset specifici" in h1/CardTitle/sheet mobile; callout "Nota" → "Asset specifici"; goal-derived callout shortened. Settings: labor income helper tightened.
+- Previous implementation (2026-04-03, session 37): **Allocation page guidance integration**. Removed standalone blue `Legenda` box. All 3 desktop table "Azione" headers now show `±2% soglia` sub-line (`text-[10px] text-muted-foreground`). Mobile card difference banner replaced static "Differenza" label with contextual `Da acquistare` / `Da ridurre` / `Bilanciato` based on action signal.
 - Previous implementation (2026-04-02, session 36): **Premium-editorial auth redesign**. Login and register pages now use `bg-background`, semantic tokens throughout, no `Card` component — replaced with `border border-border rounded-xl bg-card` panel. Eyebrow label pattern (`text-xs uppercase tracking-widest`) applied above form titles. Microcopy updated: "Bentornato." / "Crea il tuo profilo." Top `h-px bg-border` accent line mirrors dashboard page header separator.
-- Previous implementation (2026-04-02, session 35): **Mobile navigation discoverability + countUp performance fix**. "Menu" → "Altro" with `MoreHorizontal` icon; active state on Altro button when on secondary routes; drawer reorganized into 3 semantic groups (Analisi, Pianificazione, Preferenze). Fixed `useMediaQuery` spurious re-render on mobile (init with real value instead of `false`). Pie charts on Panoramica now start collapsed on mobile to avoid competing with countUp rAF loops at mount.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -63,7 +63,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-02 (session 35)
+**Last updated**: 2026-04-03 (session 38)
 
 ## Design Context
 
