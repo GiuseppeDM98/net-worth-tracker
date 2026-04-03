@@ -108,7 +108,11 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
       <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
         {navigation.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+          // Overview (/dashboard) must use exact match only — startsWith would
+          // match every sub-route (/dashboard/assets, /dashboard/history, etc.)
+          const isActive = item.href === '/dashboard'
+            ? pathname === item.href
+            : pathname === item.href || pathname.startsWith(item.href + '/');
           return (
             <Link
               key={item.name}
