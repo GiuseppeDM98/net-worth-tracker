@@ -30,7 +30,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  pageVariants,
   staggerContainer,
   cardItem,
   fastStaggerContainer,
@@ -294,12 +293,7 @@ export default function HallOfFamePage() {
   }
 
   return (
-    <motion.div
-      variants={pageVariants}
-      initial="hidden"
-      animate="visible"
-      className="p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 max-desktop:portrait:pb-20"
-    >
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 max-desktop:portrait:pb-20">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -775,7 +769,7 @@ export default function HallOfFamePage() {
           onDelete={handleNoteDelete}
         />
       )}
-    </motion.div>
+    </div>
   );
 }
 

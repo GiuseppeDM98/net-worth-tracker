@@ -3,7 +3,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  pageVariants,
   staggerContainer,
   cardItem,
   slideDown,
@@ -593,12 +592,7 @@ export default function HistoryPage() {
   }
 
   return (
-    <motion.div
-      variants={pageVariants}
-      initial="hidden"
-      animate="visible"
-      className="space-y-6 max-desktop:portrait:pb-20"
-    >
+    <div className="space-y-6 max-desktop:portrait:pb-20">
       {/* Page header — eyebrow label + title establish editorial entry point.
           PDF export is the primary persistent action; CSV and snapshot insertion
           are utility actions demoted to outline/ghost so the primary CTA is clear. */}
@@ -1901,6 +1895,6 @@ export default function HistoryPage() {
         snapshots={snapshots}
         onSave={handleSaveNote}
       />
-    </motion.div>
+    </div>
   );
 }
