@@ -74,6 +74,13 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Every new settings field must be handled in three places: type definition, `getSettings()`, `setSettings()`
 - `setSettings()` has two write branches; update both
 
+### Settings UX Layer (Overdrive)
+- Unsaved preview in Settings is local-only: use a baseline snapshot key captured on load/save and compare against current state (`hasUnsaved*`) without introducing autosave behavior
+- If you add a new Settings field that participates in unsaved preview, update both baseline and current snapshot builders; missing fields create false clean/dirty states
+- For immediate control feedback in Settings forms, prefer one shared utility class for `Input`/`SelectTrigger`/`Switch` transitions and include `motion-reduce` fallback
+- For nested allocation editors, prefer `CollapsibleContent` with short, sober transitions over custom animation stacks; keep expand/collapse readable under dense forms
+- Sensitive Settings dialogs (move/delete) should open with trigger continuity via `transform-origin` from the clicked control, and clear custom origin on close
+
 ### Private API Authorization
 - Any App Router API route that uses Firebase Admin SDK must authenticate server-side; Firestore rules do not protect Admin SDK calls
 - Private routes must verify the Firebase ID token and bind the request to `decodedToken.uid`, not just a client-supplied `userId`
@@ -164,6 +171,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - `npx tsc --noEmit` for repo-wide TypeScript checking without generating build output
 - For motion/perceived-performance changes, compare `npm run dev` against `npm run build && npm run start` before optimizing away production-safe motion
 - For private API auth regressions, run `npx vitest run __tests__/apiAuthRoutes.test.ts`
+- For Settings UX-only changes, run `npx tsc --noEmit` plus a targeted smoke/auth check (`npx vitest run __tests__/apiAuthRoutes.test.ts`) before manual UI validation
 
 ### Test Patterns
 - Use local `new Date(year, monthIndex, day)` in tests, not ISO strings

@@ -67,6 +67,7 @@ interface CategoryMoveDialogProps {
   sourceSubCategory?: ExpenseSubCategory;
   expenseCount: number;
   allCategories: ExpenseCategory[];
+  triggerOrigin?: string;
 }
 
 export function CategoryMoveDialog({
@@ -77,6 +78,7 @@ export function CategoryMoveDialog({
   sourceSubCategory,
   expenseCount,
   allCategories,
+  triggerOrigin,
 }: CategoryMoveDialogProps) {
   const { user } = useAuth();
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
@@ -233,7 +235,10 @@ export function CategoryMoveDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent
+        className="max-w-md"
+        style={triggerOrigin ? { transformOrigin: triggerOrigin } : undefined}
+      >
         {/* ========== Header Section ========== */}
         <DialogHeader>
           <div className="flex items-center gap-2 text-blue-600 mb-2">

@@ -81,6 +81,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - **Dark mode** — Full dark/light/system theme support. The header toggle cycles through three states: Light, Dark, and System (follows OS preference), using Sun, Moon, and Monitor icons. Every page, chart tooltip, and UI component is properly themed
 - **Hall of Fame** — Monthly and annual performance rankings with multi-section note system; fully responsive on mobile and tablet with touch-friendly card layouts
 - **PDF Export** — 8 configurable sections with custom year/month period selection; sections auto-disabled for past periods when historical data is unavailable
+- **Settings UX improvements** — The Settings area now gives clearer unsaved-change feedback, smoother nested allocation editing, and more contextual confirmations for sensitive category actions
 
 ## Quick Start
 

@@ -7,6 +7,10 @@
 
 ## 🔧 Improvements
 
+- Improved the Settings page with clear "unsaved changes" feedback, so users can immediately see when edits are still in preview mode before saving
+- Improved responsiveness of Settings controls (toggles, selects, and inputs) with more consistent interaction feedback
+- Improved the nested Allocation editor in Settings with smoother expand/collapse behavior, making complex target editing easier to follow
+- Improved contextual safety for category move/delete actions in Settings by making confirmation dialogs feel visually tied to the action that opened them
 - Improved the Overview dashboard with a smoother primary KPI entrance, softer reflow of conditional cards, and subtler chart reveals that feel more polished without getting in the way
 - Improved the snapshot overwrite flow on the Overview page so the confirmation dialog feels more connected to the "Crea Snapshot" action
 - Refined the late-night Overview greeting to keep a calmer evening tone while still acknowledging late usage

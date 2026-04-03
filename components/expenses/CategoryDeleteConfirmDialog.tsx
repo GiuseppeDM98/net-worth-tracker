@@ -71,6 +71,7 @@ interface CategoryDeleteConfirmDialogProps {
   expenseCount: number;
   allCategories: ExpenseCategory[];
   subCategoryToDelete?: ExpenseSubCategory;
+  triggerOrigin?: string;
 }
 
 export function CategoryDeleteConfirmDialog({
@@ -81,6 +82,7 @@ export function CategoryDeleteConfirmDialog({
   expenseCount,
   allCategories,
   subCategoryToDelete,
+  triggerOrigin,
 }: CategoryDeleteConfirmDialogProps) {
   const { user } = useAuth();
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
@@ -274,7 +276,10 @@ export function CategoryDeleteConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0">
+      <DialogContent
+        className="max-w-lg max-h-[90vh] flex flex-col p-0"
+        style={triggerOrigin ? { transformOrigin: triggerOrigin } : undefined}
+      >
         {/* ========== Header Section ========== */}
         <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
           <div className="flex items-center gap-2 text-amber-600 mb-2">

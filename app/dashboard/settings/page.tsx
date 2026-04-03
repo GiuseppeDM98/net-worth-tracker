@@ -29,7 +29,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import {
@@ -178,6 +178,25 @@ export default function SettingsPage() {
   type SettingsTabId = 'generale' | 'allocazione' | 'spese' | 'dividendi';
   const [mountedTabs, setMountedTabs] = useState<Set<SettingsTabId>>(new Set(['allocazione']));
   const [activeTab, setActiveTab] = useState<SettingsTabId>('allocazione');
+  const [allocationBaselineKey, setAllocationBaselineKey] = useState('');
+  const [generalBaselineKey, setGeneralBaselineKey] = useState('');
+  const [dividendBaselineKey, setDividendBaselineKey] = useState('');
+  const [deleteDialogOrigin, setDeleteDialogOrigin] = useState<string | undefined>(
+    undefined
+  );
+  const [moveDialogOrigin, setMoveDialogOrigin] = useState<string | undefined>(
+    undefined
+  );
+
+  const interactiveControlClass =
+    'motion-safe:transition-[border-color,box-shadow,background-color,color] motion-safe:duration-150 motion-reduce:transition-none';
+
+  const calculateDialogOrigin = (element: HTMLElement) => {
+    const rect = element.getBoundingClientRect();
+    const x = ((rect.left + rect.width / 2) / window.innerWidth) * 100;
+    const y = ((rect.top + rect.height / 2) / window.innerHeight) * 100;
+    return `${x.toFixed(2)}% ${y.toFixed(2)}%`;
+  };
 
   const handleTabChange = (value: string) => {
     setActiveTab(value as SettingsTabId);
@@ -382,6 +401,65 @@ export default function SettingsPage() {
 
       setAssetClassStates(states);
       setSubcategoryNameMap(nameMapByAssetClass);
+
+      setAllocationBaselineKey(
+        JSON.stringify({
+          userAge: settingsData?.userAge ?? null,
+          riskFreeRate: settingsData?.riskFreeRate ?? null,
+          autoCalculate:
+            settingsData?.userAge !== undefined &&
+            settingsData?.riskFreeRate !== undefined,
+          cashUseFixedAmount: cashTargetData?.useFixedAmount || false,
+          cashFixedAmount: roundToTwoDecimals(cashTargetData?.fixedAmount || 0),
+          assetClassStates: assetClasses.map((assetClass) => ({
+            assetClass,
+            targetPercentage: roundToTwoDecimals(
+              states[assetClass]?.targetPercentage || 0
+            ),
+            subCategoryEnabled: states[assetClass]?.subCategoryEnabled || false,
+            expanded: states[assetClass]?.expanded || false,
+            categories: states[assetClass]?.categories || [],
+            subTargets: (states[assetClass]?.subTargets || []).map((target) => ({
+              name: target.name,
+              percentage: roundToTwoDecimals(target.percentage),
+              specificAssetsEnabled: target.specificAssetsEnabled || false,
+              expanded: target.expanded || false,
+              specificAssets: (target.specificAssets || []).map((asset) => ({
+                name: asset.name,
+                targetPercentage: roundToTwoDecimals(asset.targetPercentage),
+              })),
+            })),
+          })),
+        })
+      );
+
+      setGeneralBaselineKey(
+        JSON.stringify({
+          includePrimaryResidenceInFIRE:
+            settingsData?.includePrimaryResidenceInFIRE ?? false,
+          goalBasedInvestingEnabled: settingsData?.goalBasedInvestingEnabled ?? false,
+          goalDrivenAllocationEnabled:
+            settingsData?.goalDrivenAllocationEnabled ?? false,
+          stampDutyEnabled: settingsData?.stampDutyEnabled ?? false,
+          stampDutyRate: roundToTwoDecimals(settingsData?.stampDutyRate ?? 0.2),
+          checkingAccountSubCategory:
+            settingsData?.checkingAccountSubCategory || '__none__',
+          defaultDebitCashAssetId:
+            settingsData?.defaultDebitCashAssetId || '__none__',
+          defaultCreditCashAssetId:
+            settingsData?.defaultCreditCashAssetId || '__none__',
+          cashflowHistoryStartYear: settingsData?.cashflowHistoryStartYear ?? 2025,
+          laborIncomeCategoryIds: [...(settingsData?.laborIncomeCategoryIds ?? [])].sort(),
+        })
+      );
+
+      setDividendBaselineKey(
+        JSON.stringify({
+          dividendIncomeCategoryId: settingsData?.dividendIncomeCategoryId || '',
+          dividendIncomeSubCategoryId:
+            settingsData?.dividendIncomeSubCategoryId || '',
+        })
+      );
     } catch (error) {
       console.error('Error loading targets:', error);
       toast.error('Errore nel caricamento dei target');
@@ -415,7 +493,11 @@ export default function SettingsPage() {
     setCategoryDialogOpen(true);
   };
 
-  const handleDeleteExpenseCategory = async (categoryId: string, categoryName: string) => {
+  const handleDeleteExpenseCategory = async (
+    categoryId: string,
+    categoryName: string,
+    triggerOrigin?: string
+  ) => {
     if (!user) return;
 
     try {
@@ -428,6 +510,7 @@ export default function SettingsPage() {
         if (category) {
           setCategoryToDelete(category);
           setExpenseCountToReassign(expenseCount);
+          setDeleteDialogOrigin(triggerOrigin);
           setDeleteConfirmDialogOpen(true);
         }
       } else {
@@ -520,7 +603,11 @@ export default function SettingsPage() {
 
   // ========== Move Category Handlers ==========
 
-  const handleMoveExpenseCategory = async (categoryId: string, categoryName: string) => {
+  const handleMoveExpenseCategory = async (
+    categoryId: string,
+    categoryName: string,
+    triggerOrigin?: string
+  ) => {
     if (!user) return;
 
     try {
@@ -535,6 +622,7 @@ export default function SettingsPage() {
       if (category) {
         setCategoryToMove(category);
         setExpenseCountToMove(expenseCount);
+        setMoveDialogOrigin(triggerOrigin);
         setMoveCategoryDialogOpen(true);
       }
     } catch (error) {
@@ -624,6 +712,7 @@ export default function SettingsPage() {
       });
 
       toast.success('Impostazioni dividendi salvate con successo');
+      setDividendBaselineKey(dividendSnapshotKey);
     } catch (error) {
       console.error('Error saving dividend settings:', error);
       toast.error('Errore nel salvataggio delle impostazioni dividendi');
@@ -892,6 +981,9 @@ export default function SettingsPage() {
         laborIncomeCategoryIds,
       });
       toast.success('Impostazioni salvate con successo');
+      setAllocationBaselineKey(allocationSnapshotKey);
+      setGeneralBaselineKey(generalSnapshotKey);
+      setDividendBaselineKey(dividendSnapshotKey);
     } catch (error) {
       console.error('Error saving targets:', error);
       toast.error('Errore nel salvataggio dei target');
@@ -1154,6 +1246,91 @@ export default function SettingsPage() {
     );
   };
 
+  const allocationSnapshotKey = useMemo(
+    () =>
+      JSON.stringify({
+        userAge: userAge ?? null,
+        riskFreeRate: riskFreeRate ?? null,
+        autoCalculate,
+        cashUseFixedAmount,
+        cashFixedAmount: roundToTwoDecimals(cashFixedAmount),
+        assetClassStates: assetClasses.map((assetClass) => ({
+          assetClass,
+          targetPercentage: roundToTwoDecimals(
+            assetClassStates[assetClass]?.targetPercentage || 0
+          ),
+          subCategoryEnabled: assetClassStates[assetClass]?.subCategoryEnabled || false,
+          expanded: assetClassStates[assetClass]?.expanded || false,
+          categories: assetClassStates[assetClass]?.categories || [],
+          subTargets: (assetClassStates[assetClass]?.subTargets || []).map((target) => ({
+            name: target.name,
+            percentage: roundToTwoDecimals(target.percentage),
+            specificAssetsEnabled: target.specificAssetsEnabled || false,
+            expanded: target.expanded || false,
+            specificAssets: (target.specificAssets || []).map((asset) => ({
+              name: asset.name,
+              targetPercentage: roundToTwoDecimals(asset.targetPercentage),
+            })),
+          })),
+        })),
+      }),
+    [userAge, riskFreeRate, autoCalculate, cashUseFixedAmount, cashFixedAmount, assetClassStates]
+  );
+
+  const generalSnapshotKey = useMemo(
+    () =>
+      JSON.stringify({
+        includePrimaryResidenceInFIRE,
+        goalBasedInvestingEnabled,
+        goalDrivenAllocationEnabled,
+        stampDutyEnabled,
+        stampDutyRate: roundToTwoDecimals(stampDutyRate),
+        checkingAccountSubCategory,
+        defaultDebitCashAssetId,
+        defaultCreditCashAssetId,
+        cashflowHistoryStartYear,
+        laborIncomeCategoryIds: [...laborIncomeCategoryIds].sort(),
+      }),
+    [
+      includePrimaryResidenceInFIRE,
+      goalBasedInvestingEnabled,
+      goalDrivenAllocationEnabled,
+      stampDutyEnabled,
+      stampDutyRate,
+      checkingAccountSubCategory,
+      defaultDebitCashAssetId,
+      defaultCreditCashAssetId,
+      cashflowHistoryStartYear,
+      laborIncomeCategoryIds,
+    ]
+  );
+
+  const dividendSnapshotKey = useMemo(
+    () =>
+      JSON.stringify({
+        dividendIncomeCategoryId: dividendIncomeCategoryId || '',
+        dividendIncomeSubCategoryId: dividendIncomeSubCategoryId || '',
+      }),
+    [dividendIncomeCategoryId, dividendIncomeSubCategoryId]
+  );
+
+  const hasUnsavedAllocationChanges =
+    allocationBaselineKey.length > 0 && allocationSnapshotKey !== allocationBaselineKey;
+  const hasUnsavedGeneralChanges =
+    generalBaselineKey.length > 0 && generalSnapshotKey !== generalBaselineKey;
+  const hasUnsavedDividendChanges =
+    dividendBaselineKey.length > 0 && dividendSnapshotKey !== dividendBaselineKey;
+
+  const hasUnsavedChanges =
+    hasUnsavedAllocationChanges ||
+    hasUnsavedGeneralChanges ||
+    hasUnsavedDividendChanges;
+
+  const activeTabHasUnsavedChanges =
+    (activeTab === 'allocazione' && hasUnsavedAllocationChanges) ||
+    (activeTab === 'generale' && hasUnsavedGeneralChanges) ||
+    (activeTab === 'dividendi' && hasUnsavedDividendChanges);
+
   if (loading) return null;
 
   const total = calculateTotal();
@@ -1171,6 +1348,21 @@ export default function SettingsPage() {
           </p>
         </div>
         <div className="flex flex-col landscape:flex-row gap-2 w-full landscape:w-auto">
+          <div className="order-last landscape:order-first flex items-center text-xs text-muted-foreground">
+            {activeTabHasUnsavedChanges ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-primary">
+                Anteprima attiva: modifiche non salvate
+              </span>
+            ) : hasUnsavedChanges ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-1">
+                Modifiche non salvate in altre sezioni
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-1">
+                Tutte le modifiche sono salvate
+              </span>
+            )}
+          </div>
           {/* Reset is only meaningful for allocation targets */}
           {activeTab === 'allocazione' && (
             <Button variant="outline" onClick={handleReset} className="w-full landscape:w-auto dark:border-gray-600 dark:text-gray-200">
@@ -1189,7 +1381,7 @@ export default function SettingsPage() {
         {/* Mobile: Radix Select, Desktop: TabsList — same pattern as Assets/FIRE/Performance pages */}
         <div className="desktop:hidden mb-4">
           <Select value={activeTab} onValueChange={handleTabChange}>
-            <SelectTrigger className="w-full">
+            <SelectTrigger className={cn('w-full', interactiveControlClass)}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -1222,6 +1414,11 @@ export default function SettingsPage() {
         {/* Tab: Impostazioni Generali (lazy) */}
         {mountedTabs.has('generale') && (
           <TabsContent value="generale" className="mt-6 space-y-4 sm:space-y-6">
+      {hasUnsavedGeneralChanges && (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-foreground">
+          Anteprima attiva: i cambi in questa sezione sono visibili subito ma non ancora salvati.
+        </div>
+      )}
 
       {/* FIRE & Goals Settings */}
       <Card>
@@ -1244,6 +1441,7 @@ export default function SettingsPage() {
                 id="firePrimaryResidence"
                 checked={includePrimaryResidenceInFIRE}
                 onCheckedChange={setIncludePrimaryResidenceInFIRE}
+                className={interactiveControlClass}
               />
             </div>
 
@@ -1265,6 +1463,7 @@ export default function SettingsPage() {
                   // Disable goal-driven allocation when goals are disabled
                   if (!checked) setGoalDrivenAllocationEnabled(false);
                 }}
+                className={interactiveControlClass}
               />
             </div>
 
@@ -1283,6 +1482,7 @@ export default function SettingsPage() {
                   id="goalDrivenAllocation"
                   checked={goalDrivenAllocationEnabled}
                   onCheckedChange={setGoalDrivenAllocationEnabled}
+                  className={interactiveControlClass}
                 />
               </div>
             )}
@@ -1311,6 +1511,7 @@ export default function SettingsPage() {
                 id="stampDutyToggle"
                 checked={stampDutyEnabled}
                 onCheckedChange={setStampDutyEnabled}
+                className={interactiveControlClass}
               />
             </div>
 
@@ -1327,6 +1528,7 @@ export default function SettingsPage() {
                     value={stampDutyRate}
                     onChange={(e) => setStampDutyRate(parseFloat(e.target.value) || 0)}
                     placeholder="es. 0.20"
+                    className={interactiveControlClass}
                   />
                   <p className="text-xs text-muted-foreground">
                     Aliquota annuale imposta di bollo (es. 0.20 per 0.20%). Si applica a tutti gli asset, tranne quelli marcati come esenti nel dialog di modifica asset.
@@ -1337,7 +1539,7 @@ export default function SettingsPage() {
                   <Label>Sottocategoria conti correnti</Label>
                   {assetClassStates.cash?.subCategoryEnabled && (assetClassStates.cash?.categories?.length ?? 0) > 0 ? (
                     <Select value={checkingAccountSubCategory} onValueChange={setCheckingAccountSubCategory}>
-                      <SelectTrigger>
+                      <SelectTrigger className={interactiveControlClass}>
                         <SelectValue placeholder="Seleziona sottocategoria..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -1384,7 +1586,10 @@ export default function SettingsPage() {
                       Conto di Prelievo (spese)
                     </Label>
                     <Select value={defaultDebitCashAssetId} onValueChange={setDefaultDebitCashAssetId}>
-                      <SelectTrigger id="defaultDebitAccount">
+                      <SelectTrigger
+                        id="defaultDebitAccount"
+                        className={interactiveControlClass}
+                      >
                         <SelectValue placeholder="Nessun default" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1402,7 +1607,10 @@ export default function SettingsPage() {
                       Conto di Accredito (entrate)
                     </Label>
                     <Select value={defaultCreditCashAssetId} onValueChange={setDefaultCreditCashAssetId}>
-                      <SelectTrigger id="defaultCreditAccount">
+                      <SelectTrigger
+                        id="defaultCreditAccount"
+                        className={interactiveControlClass}
+                      >
                         <SelectValue placeholder="Nessun default" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1484,7 +1692,7 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setCashflowHistoryStartYear(parseInt(e.target.value, 10) || 2025)
                 }
-                className="w-32"
+                className={cn('w-32', interactiveControlClass)}
               />
             </div>
           </div>
@@ -1550,6 +1758,11 @@ export default function SettingsPage() {
 
         {/* Tab: Allocazione (default, always mounted) */}
         <TabsContent value="allocazione" className="mt-6 space-y-4 sm:space-y-6">
+      {hasUnsavedAllocationChanges && (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-foreground">
+          Anteprima attiva: target e dipendenze mostrano già il nuovo assetto prima del salvataggio.
+        </div>
+      )}
 
       {/* Performance & Profile Settings */}
       <Card>
@@ -1572,6 +1785,7 @@ export default function SettingsPage() {
                     setUserAge(value);
                   }}
                   placeholder="Inserisci la tua età"
+                  className={interactiveControlClass}
                 />
               </div>
               <div className="space-y-2">
@@ -1590,6 +1804,7 @@ export default function SettingsPage() {
                     setRiskFreeRate(value);
                   }}
                   placeholder="Es: 3.5"
+                  className={interactiveControlClass}
                 />
                 {/* Inline hint so the source is visible next to the input */}
                 <p className="text-xs text-muted-foreground">
@@ -1612,7 +1827,7 @@ export default function SettingsPage() {
                 checked={autoCalculate}
                 onCheckedChange={setAutoCalculate}
                 disabled={userAge === undefined || riskFreeRate === undefined}
-                className="shrink-0"
+                className={cn('shrink-0', interactiveControlClass)}
               />
               <Label htmlFor="autoCalculate" className="text-sm block">
                 Calcola automaticamente % Azioni e Obbligazioni (Formula di{' '}
@@ -1678,6 +1893,7 @@ export default function SettingsPage() {
                         id="cashFixedToggle"
                         checked={cashUseFixedAmount}
                         onCheckedChange={setCashUseFixedAmount}
+                        className={interactiveControlClass}
                       />
                       <Label htmlFor="cashFixedToggle" className="text-sm">
                         Valore fisso in €
@@ -1706,7 +1922,10 @@ export default function SettingsPage() {
                         }
                       }}
                       disabled={isAutoCalculated}
-                      className={isAutoCalculated ? 'bg-gray-100 dark:bg-muted' : ''}
+                      className={cn(
+                        interactiveControlClass,
+                        isAutoCalculated ? 'bg-gray-100 dark:bg-muted' : ''
+                      )}
                     />
                     <span className="text-sm text-muted-foreground">
                       {isCash && cashUseFixedAmount ? '€' : '%'}
@@ -1763,6 +1982,7 @@ export default function SettingsPage() {
                       onCheckedChange={(checked: boolean) =>
                         handleToggleSubCategories(assetClass, checked)
                       }
+                      className={interactiveControlClass}
                     />
                   </div>
                   {state.subCategoryEnabled && (
@@ -1778,8 +1998,16 @@ export default function SettingsPage() {
                 </div>
               </div>
             </CardHeader>
-            {state.expanded && state.subCategoryEnabled && (
-              <CardContent className="p-4 sm:p-6">
+            <Collapsible open={state.expanded && state.subCategoryEnabled}>
+              <CollapsibleContent
+                forceMount
+                className={cn(
+                  'overflow-hidden motion-safe:transition-all motion-safe:duration-200 motion-reduce:transition-none',
+                  'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
+                  'data-[state=closed]:hidden'
+                )}
+              >
+                <CardContent className="p-4 sm:p-6">
                 <div className="space-y-4">
                   {/* Sub-Targets */}
                   <div className="space-y-3">
@@ -1807,6 +2035,7 @@ export default function SettingsPage() {
                                     )
                                   }
                                   list={`${assetClass}-categories`}
+                                  className={interactiveControlClass}
                                 />
                                 <datalist id={`${assetClass}-categories`}>
                                   {state.categories.map((cat) => (
@@ -1820,7 +2049,7 @@ export default function SettingsPage() {
                                   step="0.01"
                                   min="0"
                                   max="100"
-                                  className="w-24"
+                                  className={cn('w-24', interactiveControlClass)}
                                   value={target.percentage}
                                   onChange={(e) =>
                                     handleSubTargetChange(
@@ -1853,6 +2082,7 @@ export default function SettingsPage() {
                                       onCheckedChange={(checked) =>
                                         handleToggleSpecificAssets(assetClass, originalIndex, checked)
                                       }
+                                      className={interactiveControlClass}
                                     />
                                     <Label
                                       htmlFor={`specific-${assetClass}-${originalIndex}`}
@@ -1894,7 +2124,15 @@ export default function SettingsPage() {
                                       )}
                                     </Button>
 
-                                    {target.expanded && (
+                                    <Collapsible open={target.expanded}>
+                                      <CollapsibleContent
+                                        forceMount
+                                        className={cn(
+                                          'overflow-hidden motion-safe:transition-all motion-safe:duration-200 motion-reduce:transition-none',
+                                          'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
+                                          'data-[state=closed]:hidden'
+                                        )}
+                                      >
                                       <div className="space-y-2 ml-2 sm:ml-4">
                                         {target.specificAssets && target.specificAssets.map((specificAsset, specificIndex) => (
                                           <div key={specificIndex} className="flex items-center gap-2">
@@ -1910,14 +2148,20 @@ export default function SettingsPage() {
                                                   e.target.value
                                                 )
                                               }
-                                              className="flex-1 text-sm"
+                                              className={cn(
+                                                'flex-1 text-sm',
+                                                interactiveControlClass
+                                              )}
                                             />
                                             <Input
                                               type="number"
                                               step="0.01"
                                               min="0"
                                               max="100"
-                                              className="w-20 text-sm"
+                                              className={cn(
+                                                'w-20 text-sm',
+                                                interactiveControlClass
+                                              )}
                                               value={specificAsset.targetPercentage}
                                               onChange={(e) =>
                                                 handleSpecificAssetChange(
@@ -1951,7 +2195,8 @@ export default function SettingsPage() {
                                           Aggiungi Specific Asset
                                         </Button>
                                       </div>
-                                    )}
+                                      </CollapsibleContent>
+                                    </Collapsible>
                                   </div>
                                 )}
                               </div>
@@ -1976,8 +2221,9 @@ export default function SettingsPage() {
                     {formatPercentage(state.targetPercentage)})
                   </p>
                 </div>
-              </CardContent>
-            )}
+                </CardContent>
+              </CollapsibleContent>
+            </Collapsible>
           </Card>
         );
       })}
@@ -2076,7 +2322,13 @@ export default function SettingsPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleMoveExpenseCategory(category.id, category.name)}
+                                onClick={(event) =>
+                                  handleMoveExpenseCategory(
+                                    category.id,
+                                    category.name,
+                                    calculateDialogOrigin(event.currentTarget)
+                                  )
+                                }
                                 title="Sposta tutte le transazioni"
                               >
                                 <ArrowRightLeft className="h-4 w-4 text-blue-500" />
@@ -2084,7 +2336,13 @@ export default function SettingsPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleDeleteExpenseCategory(category.id, category.name)}
+                                onClick={(event) =>
+                                  handleDeleteExpenseCategory(
+                                    category.id,
+                                    category.name,
+                                    calculateDialogOrigin(event.currentTarget)
+                                  )
+                                }
                               >
                                 <Trash2 className="h-4 w-4 text-red-500" />
                               </Button>
@@ -2107,6 +2365,11 @@ export default function SettingsPage() {
         {/* Tab: Dividendi (lazy) */}
         {mountedTabs.has('dividendi') && (
           <TabsContent value="dividendi" className="mt-6 space-y-4 sm:space-y-6">
+      {hasUnsavedDividendChanges && (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-foreground">
+          Anteprima attiva: categoria e sottocategoria dividendi sono aggiornate localmente.
+        </div>
+      )}
 
       {/* Dividend Settings Section */}
       <Card>
@@ -2133,7 +2396,10 @@ export default function SettingsPage() {
                     setDividendIncomeSubCategoryId(''); // Reset subcategory
                   }}
                 >
-                  <SelectTrigger id="dividendIncomeCategory">
+                  <SelectTrigger
+                    id="dividendIncomeCategory"
+                    className={interactiveControlClass}
+                  >
                     <SelectValue placeholder="Seleziona categoria" />
                   </SelectTrigger>
                   <SelectContent>
@@ -2169,7 +2435,10 @@ export default function SettingsPage() {
                   onValueChange={setDividendIncomeSubCategoryId}
                   disabled={!dividendIncomeCategoryId}
                 >
-                  <SelectTrigger id="dividendIncomeSubCategory">
+                  <SelectTrigger
+                    id="dividendIncomeSubCategory"
+                    className={interactiveControlClass}
+                  >
                     <SelectValue placeholder="Seleziona sottocategoria" />
                   </SelectTrigger>
                   <SelectContent>
@@ -2247,11 +2516,13 @@ export default function SettingsPage() {
             setDeleteConfirmDialogOpen(false);
             setCategoryToDelete(null);
             setExpenseCountToReassign(0);
+            setDeleteDialogOrigin(undefined);
           }}
           onConfirm={handleConfirmDeleteWithReassignment}
           categoryToDelete={categoryToDelete}
           expenseCount={expenseCountToReassign}
           allCategories={expenseCategories}
+          triggerOrigin={deleteDialogOrigin}
         />
       )}
 
@@ -2263,11 +2534,13 @@ export default function SettingsPage() {
             setMoveCategoryDialogOpen(false);
             setCategoryToMove(null);
             setExpenseCountToMove(0);
+            setMoveDialogOrigin(undefined);
           }}
           onConfirm={handleConfirmMoveCategory}
           sourceCategory={categoryToMove}
           expenseCount={expenseCountToMove}
           allCategories={expenseCategories}
+          triggerOrigin={moveDialogOrigin}
         />
       )}
 

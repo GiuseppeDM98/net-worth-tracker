@@ -5,9 +5,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-03, session 43): **Dashboard Overview overdrive polish**. Panoramica now has a more controlled hero KPI settle, softer reflow for conditional metric blocks, one-time chart reveal behavior, and a snapshot overwrite dialog that visually opens from the CTA while remaining neutral on close. The current-month snapshot check also uses Italy timezone helpers consistently, and late-night greeting copy now stays on `Buonasera` with a softer subtitle.
+- Latest implementation (2026-04-03, session 44): **Settings overdrive UX layer**. Settings now provide local unsaved-change preview (header/tab feedback), coherent immediate feedback on input/select/toggle controls, smoother nested allocation editor expansion, and contextual move/delete dialogs that open from trigger-origin while remaining reduced-motion safe.
+- Previous implementation (2026-04-03, session 43): **Dashboard Overview overdrive polish**. Panoramica now has a more controlled hero KPI settle, softer reflow for conditional metric blocks, one-time chart reveal behavior, and a snapshot overwrite dialog that visually opens from the CTA while remaining neutral on close. The current-month snapshot check also uses Italy timezone helpers consistently, and late-night greeting copy now stays on `Buonasera` with a softer subtitle.
 - Previous implementation (2026-04-03, session 42): **Theme toggle icon transition**. `AnimatePresence mode="wait"` with `key={theme}` on a `motion.span` wrapping the icon in `Header.tsx` — exit rotates +30° + fade + scale-down, enter from -30°. `initial={false}` skips animation on first mount. `ThemeProvider.disableTransitionOnChange` kept (prevents CSS body flash; Framer animation is independent).
-- Previous implementation (2026-04-03, session 41): **Overdrive shell & navigation — fluidità premium**. `MotionConfig reducedMotion="user"` at layout root. Sidebar: animated active pill via `layoutId="sidebar-active-pill"`. BottomNavigation: per-tab `AnimatePresence` top-border indicator with `scaleX`. Header: `motion.create(Button)` with `whileTap={{ scale: 0.88 }}` on theme toggle and avatar. SecondaryMenuDrawer: staggered item entrance.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -29,6 +29,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - positive-month and negative-month counters based on monthly `netWorthGrowth`
   - monthly chart from `prepareMonthlyLaborMetricsData()`
 - Performance page with ROI, CAGR, TWR, IRR, Sharpe, drawdown metrics, YOC, current yield, rolling charts, and monthly returns heatmap; progressive disclosure: collapsible methodology, one-time guide strip, "Avanzato" badges on technical metrics
+- Settings page now offers visible unsaved-state preview and clearer in-context feedback for sensitive configuration changes (without autosave behavior changes)
 - Dividends and coupons tracking with EUR conversion, calendar, total return per asset, and DPS growth
 - FIRE planning with primary residence toggle, liquid vs illiquid split, and scenario projections
 - Monte Carlo simulations and goal-based investing
@@ -65,7 +66,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-03 (session 43)
+**Last updated**: 2026-04-03 (session 44)
 
 ## Design Context
 
