@@ -70,6 +70,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Amounts are stored monthly; annual views multiply by 12
 - Aggregate keys: `__subtotal_{type}__`, `__total_expenses__`, `__total_income__`
 - `BudgetItem.order` is required, including in tests and helper fixtures
+- In Budget desktop flows, prefer rendering large local subtrees as pure render helpers or top-level components, not nested JSX component definitions inside the page component; otherwise simple row selection can remount the whole table and cause visible flashes
 
 ### Settings Synchronization
 - Every new settings field must be handled in three places: type definition, `getSettings()`, `setSettings()`
@@ -124,6 +125,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Shared variants live in `lib/utils/motionVariants.ts`
 - For long, data-dense pages like History, prefer chapter-level reveals (`chapterReveal`) over one global stagger; reveal only the main sections on first entry
 - For dense tabbed data views, prefer short container transitions (`tabPanelSwitch`, `tableShellSettle`) and scoped refresh feedback on the active panel only; do not animate table geometry or whole row sets
+- For Nivo Sankey filter updates, keep the chart instance mounted and let the library animate data diffs; remounting via React `key` or keyed wrapper shells suppresses the native update animation
 - Performance page pattern: derive `chartData`, heatmap data, and underwater data with `useMemo`; do not store them in local state via `useEffect + setState`
 - Performance period morph: do not key KPI sections or metric cards by selected period; KPI values should settle from the previous rendered value (`useCountUp({ fromPrevious: true })`) while chart shells can re-key only when a first-class staged reveal is intentional
 - Performance staged reveals should run on first mount or major period change only; manual refresh feedback must stay scoped to the page header or active chart shell instead of replaying the whole page
@@ -192,6 +194,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Use fake timers when testing helpers that depend on the current date
 - Keep test fixtures aligned with current required types, especially `BudgetItem.order`
 - For private route auth tests, prefer route-handler unit tests with mocked `adminAuth.verifyIdToken` and Admin SDK service calls over heavier browser/E2E coverage
+- For Cashflow/Budget UX changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/budgetUtils.test.ts` before manual validation
 
 ---
 
@@ -257,6 +260,11 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - On mobile, CPU budget is ~3–5x tighter. Multiple concurrent tasks at mount (re-renders, Recharts SVG, Framer Motion stagger, rAF loops) can exceed the 16ms/frame budget and cause visible animation jank
 - When a page uses `useCountUp` for mount-time KPI animations, avoid simultaneously rendering heavy components (Recharts charts, large lists) that aren't immediately visible
 - Pattern: start collapsible/below-fold Recharts components as collapsed on mobile, let users expand — use `isMobile` from `useMediaQuery` in the `useState` initializer for the expanded state
+
+### Nested Component Remount Trap
+- Symptom: clicking a row or toggling local state causes an entire dense table below to flash or look recreated, even in production
+- Cause: a large subtree renderer is defined inside the parent component and used as JSX (`<InnerComponent />`), so every parent re-render gives React a new component identity and remounts the subtree
+- Fix: move the subtree to a top-level component or invoke it as a pure render helper (`InnerComponent()`) when it intentionally closes over local state
 
 ### AnimatePresence + Next.js App Router Flash
 - **Symptom:** Content flashes at full opacity for ~1 frame before entrance animations begin; only on navigation (not hard refresh); `style={{ opacity: 0 }}` on the `motion.div` does NOT fix it

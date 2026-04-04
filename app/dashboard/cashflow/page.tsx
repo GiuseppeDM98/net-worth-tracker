@@ -22,6 +22,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
 import { Wallet, Receipt, TrendingUp, BarChart3, Coins, Target } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -39,6 +40,7 @@ import { queryKeys } from '@/lib/query/queryKeys';
 import { getAllAssets } from '@/lib/services/assetService';
 import { getSettings } from '@/lib/services/assetAllocationService';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
+import { tabPanelSwitch } from '@/lib/utils/motionVariants';
 import { toast } from 'sonner';
 
 export default function CashflowPage() {
@@ -130,12 +132,13 @@ export default function CashflowPage() {
   return (
     <div className="space-y-6 p-4 desktop:p-8 max-desktop:portrait:pb-20">
       {/* Header */}
-      <div>
-        <h1 className="flex items-center gap-2 text-3xl font-bold text-gray-900 dark:text-gray-100">
-          <Wallet className="h-8 w-8 text-blue-500" />
+      <div className="border-b border-border pb-4">
+        <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Operatività</p>
+        <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+          <Wallet className="h-7 w-7 text-primary sm:h-8 sm:w-8" />
           Cashflow
         </h1>
-        <p className="mt-2 text-gray-600 dark:text-gray-400">
+        <p className="mt-2 text-muted-foreground">
           Traccia e analizza le tue entrate e uscite nel tempo
         </p>
       </div>
@@ -145,7 +148,7 @@ export default function CashflowPage() {
         {/* Mobile tab selector — Radix Select replaces cramped 5-tab TabsList on small screens */}
         <div className="desktop:hidden mb-2">
           <Select value={activeTab} onValueChange={handleTabChange}>
-            <SelectTrigger className="w-full">
+            <SelectTrigger className="w-full h-12 text-base">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -159,7 +162,7 @@ export default function CashflowPage() {
         </div>
 
         {/* Desktop TabsList — hidden on mobile/tablet */}
-        <TabsList className="hidden desktop:grid w-full max-w-4xl grid-cols-5">
+        <TabsList className="hidden desktop:grid w-full max-w-5xl grid-cols-5">
           <TabsTrigger value="tracking" className="flex items-center gap-2">
             <Receipt className="h-4 w-4" />
             Tracciamento
@@ -182,56 +185,86 @@ export default function CashflowPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="tracking" className="mt-6">
-          <ExpenseTrackingTab
-            allExpenses={allExpenses}
-            categories={categories}
-            loading={loading}
-            onRefresh={handleRefresh}
-          />
-        </TabsContent>
-
-        {mountedTabs.has('dividends') && (
-          <TabsContent value="dividends" className="mt-6">
-            <DividendTrackingTab
-              dividends={dividends}
-              assets={assets}
+        <TabsContent value="tracking" className="mt-6" forceMount>
+          <motion.div
+            initial={false}
+            animate={activeTab === 'tracking' ? 'visible' : 'hidden'}
+            variants={tabPanelSwitch}
+          >
+            <ExpenseTrackingTab
+              allExpenses={allExpenses}
+              categories={categories}
               loading={loading}
               onRefresh={handleRefresh}
             />
+          </motion.div>
+        </TabsContent>
+
+        {mountedTabs.has('dividends') && (
+          <TabsContent value="dividends" className="mt-6" forceMount>
+            <motion.div
+              initial={false}
+              animate={activeTab === 'dividends' ? 'visible' : 'hidden'}
+              variants={tabPanelSwitch}
+            >
+              <DividendTrackingTab
+                dividends={dividends}
+                assets={assets}
+                loading={loading}
+                onRefresh={handleRefresh}
+              />
+            </motion.div>
           </TabsContent>
         )}
 
         {mountedTabs.has('current-year') && (
-          <TabsContent value="current-year" className="mt-6">
-            <CurrentYearTab
-              allExpenses={allExpenses}
-              loading={loading}
-              onRefresh={handleRefresh}
-            />
+          <TabsContent value="current-year" className="mt-6" forceMount>
+            <motion.div
+              initial={false}
+              animate={activeTab === 'current-year' ? 'visible' : 'hidden'}
+              variants={tabPanelSwitch}
+            >
+              <CurrentYearTab
+                allExpenses={allExpenses}
+                loading={loading}
+                onRefresh={handleRefresh}
+              />
+            </motion.div>
           </TabsContent>
         )}
 
         {mountedTabs.has('total-history') && (
-          <TabsContent value="total-history" className="mt-6">
-            <TotalHistoryTab
-              allExpenses={allExpenses}
-              loading={loading}
-              onRefresh={handleRefresh}
-              historyStartYear={cashflowHistoryStartYear}
-            />
+          <TabsContent value="total-history" className="mt-6" forceMount>
+            <motion.div
+              initial={false}
+              animate={activeTab === 'total-history' ? 'visible' : 'hidden'}
+              variants={tabPanelSwitch}
+            >
+              <TotalHistoryTab
+                allExpenses={allExpenses}
+                loading={loading}
+                onRefresh={handleRefresh}
+                historyStartYear={cashflowHistoryStartYear}
+              />
+            </motion.div>
           </TabsContent>
         )}
 
         {mountedTabs.has('budget') && (
-          <TabsContent value="budget" className="mt-6">
-            <BudgetTab
-              allExpenses={allExpenses}
-              categories={categories}
-              loading={loading}
-              historyStartYear={cashflowHistoryStartYear}
-              userId={user?.uid ?? ''}
-            />
+          <TabsContent value="budget" className="mt-6" forceMount>
+            <motion.div
+              initial={false}
+              animate={activeTab === 'budget' ? 'visible' : 'hidden'}
+              variants={tabPanelSwitch}
+            >
+              <BudgetTab
+                allExpenses={allExpenses}
+                categories={categories}
+                loading={loading}
+                historyStartYear={cashflowHistoryStartYear}
+                userId={user?.uid ?? ''}
+              />
+            </motion.div>
           </TabsContent>
         )}
       </Tabs>

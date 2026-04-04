@@ -28,7 +28,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { slideDown } from '@/lib/utils/motionVariants';
+import { chartShellSettle, fadeVariants, slideDown } from '@/lib/utils/motionVariants';
 import { Expense, ExpenseCategory, ExpenseType } from '@/types/expenses';
 import { BudgetItem } from '@/types/budget';
 import { getBudgetConfig, saveBudgetConfig } from '@/lib/services/budgetService';
@@ -73,6 +73,7 @@ import {
 } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { cn } from '@/lib/utils';
 
 // ==================== Constants ====================
 
@@ -202,6 +203,7 @@ export function BudgetTab({
   historyStartYear,
   userId,
 }: BudgetTabProps) {
+  const controlClassName = 'transition-colors duration-200 border-border/70 hover:border-primary/40 focus-visible:ring-primary/30 data-[placeholder]:text-muted-foreground';
   const currentYear = getItalyYear();
   const currentMonth = getItalyMonth();
 
@@ -640,7 +642,7 @@ export function BudgetTab({
                             variants={slideDown}
                             initial="hidden"
                             animate="visible"
-                            exit="hidden"
+                            exit="exit"
                             style={{ overflow: 'hidden' }}
                           >
                             {/* Flex rows with widths matching the outer colgroup */}
@@ -1217,13 +1219,20 @@ export function BudgetTab({
                 ))}
 
                 {/* Inline subcategory add form */}
-                {isSubFormOpen && (
-                  <div className="mt-2 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 space-y-2">
-                    <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Aggiungi sottocategoria</p>
-                    <div className="flex flex-wrap gap-2 items-end">
+                <AnimatePresence initial={false}>
+                  {isSubFormOpen && (
+                    <motion.div
+                      variants={fadeVariants}
+                      initial="hidden"
+                      animate="visible"
+                      exit="exit"
+                      className="mt-2 rounded-lg border border-border bg-muted/30 p-3 space-y-2"
+                    >
+                      <p className="text-xs font-medium text-muted-foreground">Aggiungi sottocategoria</p>
+                      <div className="flex flex-wrap gap-2 items-end">
                       {/* Category select */}
                       <div className="flex flex-col gap-1 min-w-[150px]">
-                        <Label className="text-xs text-gray-500">Categoria</Label>
+                        <Label className="text-xs text-muted-foreground">Categoria</Label>
                         <Select
                           value={subForm!.categoryId}
                           onValueChange={(v) => {
@@ -1240,7 +1249,7 @@ export function BudgetTab({
                             } : f);
                           }}
                         >
-                          <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Seleziona…" /></SelectTrigger>
+                          <SelectTrigger className={cn('h-8 text-sm', controlClassName)}><SelectValue placeholder="Seleziona…" /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="__none__" disabled>Seleziona…</SelectItem>
                             {sectionCategories.map((c) => (
@@ -1252,7 +1261,7 @@ export function BudgetTab({
 
                       {/* Subcategory select */}
                       <div className="flex flex-col gap-1 min-w-[150px]">
-                        <Label className="text-xs text-gray-500">Sottocategoria</Label>
+                        <Label className="text-xs text-muted-foreground">Sottocategoria</Label>
                         <Select
                           value={subForm!.subCategoryId}
                           disabled={subForm!.categoryId === '__none__'}
@@ -1271,7 +1280,7 @@ export function BudgetTab({
                             } : f);
                           }}
                         >
-                          <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Seleziona…" /></SelectTrigger>
+                          <SelectTrigger className={cn('h-8 text-sm', controlClassName)}><SelectValue placeholder="Seleziona…" /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="__none__" disabled>Seleziona…</SelectItem>
                             {(categories.find((c) => c.id === subForm!.categoryId)?.subCategories ?? []).map((s) => (
@@ -1283,9 +1292,9 @@ export function BudgetTab({
 
                       {/* Amount input */}
                       <div className="flex flex-col gap-1 min-w-[110px]">
-                        <Label className="text-xs text-gray-500">Budget/mese (€)</Label>
+                        <Label className="text-xs text-muted-foreground">Budget/mese (€)</Label>
                         <Input
-                          type="number" min="0" step="1" className="h-8 text-sm"
+                          type="number" min="0" step="1" className={cn('h-8 text-sm', controlClassName)}
                           value={subForm!.monthlyAmount}
                           onChange={(e) => setSubForm((f) => f ? { ...f, monthlyAmount: e.target.value } : f)}
                           placeholder="0"
@@ -1296,9 +1305,10 @@ export function BudgetTab({
                       <Button variant="ghost" size="sm" className="h-8" onClick={() => setSubForm(null)}>
                         <X className="h-3.5 w-3.5" />
                       </Button>
-                    </div>
-                  </div>
-                )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* Add subcategory button (hidden if form already open) */}
                 {!isSubFormOpen && sectionCategories.length > 0 && (
@@ -1389,7 +1399,7 @@ export function BudgetTab({
                       variants={slideDown}
                       initial="hidden"
                       animate="visible"
-                      exit="hidden"
+                      exit="exit"
                       style={{ overflow: 'hidden' }}
                     >
                       <div className="space-y-2 pt-2">
@@ -1622,22 +1632,30 @@ export function BudgetTab({
           </button>
 
           {/* Collapsible guide */}
-          {showGuide && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50/60 dark:bg-blue-950/10 dark:border-blue-800 p-4 text-sm space-y-3">
-              <p className="font-medium text-gray-700 dark:text-gray-300">Come leggere la tabella</p>
-              <ul className="space-y-1.5 text-gray-600 dark:text-gray-400 text-xs list-disc list-inside">
-                <li><span className="font-medium">Budget/anno</span> — il tetto annuale impostato (budget/mese × 12). Di default corrisponde al totale speso l&apos;anno precedente.</li>
-                <li><span className="font-medium text-blue-600 dark:text-blue-400">{currentYear}</span> — quanto hai speso finora nell&apos;anno corrente.</li>
-                <li><span className="font-medium text-amber-600 dark:text-amber-400">{currentYear - 1}</span> — totale speso nell&apos;anno precedente.</li>
-                <li><span className="font-medium">vs {currentYear - 1}</span> — variazione % rispetto all&apos;anno scorso (verde = stai spendendo meno, rosso = di più).</li>
-                <li><span className="font-medium text-purple-600 dark:text-purple-400">Media storica</span> — media annuale dal {historyStartYear} al {currentYear - 1}.</li>
-                <li><span className="font-medium">Avanzamento</span> — spesa corrente ÷ budget/anno. Verde &lt;80%, arancione 80–100%, rosso oltre.</li>
-                <li>Clicca sull&apos;intestazione di una sezione per espanderla o collassarla.</li>
-                <li>Clicca una voce per aprire l&apos;analisi storica anno per anno con dettaglio mensile.</li>
-              </ul>
-              <p className="text-xs text-gray-400">Per le <span className="font-medium">Entrate</span> i colori sono invertiti: verde = entrate in crescita.</p>
-            </div>
-          )}
+          <AnimatePresence initial={false}>
+            {showGuide && (
+              <motion.div
+                variants={fadeVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                className="rounded-lg border border-blue-200 bg-blue-50/60 dark:bg-blue-950/10 dark:border-blue-800 p-4 text-sm space-y-3"
+              >
+                <p className="font-medium text-gray-700 dark:text-gray-300">Come leggere la tabella</p>
+                <ul className="space-y-1.5 text-gray-600 dark:text-gray-400 text-xs list-disc list-inside">
+                  <li><span className="font-medium">Budget/anno</span> — il tetto annuale impostato (budget/mese × 12). Di default corrisponde al totale speso l&apos;anno precedente.</li>
+                  <li><span className="font-medium text-blue-600 dark:text-blue-400">{currentYear}</span> — quanto hai speso finora nell&apos;anno corrente.</li>
+                  <li><span className="font-medium text-amber-600 dark:text-amber-400">{currentYear - 1}</span> — totale speso nell&apos;anno precedente.</li>
+                  <li><span className="font-medium">vs {currentYear - 1}</span> — variazione % rispetto all&apos;anno scorso (verde = stai spendendo meno, rosso = di più).</li>
+                  <li><span className="font-medium text-purple-600 dark:text-purple-400">Media storica</span> — media annuale dal {historyStartYear} al {currentYear - 1}.</li>
+                  <li><span className="font-medium">Avanzamento</span> — spesa corrente ÷ budget/anno. Verde &lt;80%, arancione 80–100%, rosso oltre.</li>
+                  <li>Clicca sull&apos;intestazione di una sezione per espanderla o collassarla.</li>
+                  <li>Clicca una voce per aprire l&apos;analisi storica anno per anno con dettaglio mensile.</li>
+                </ul>
+                <p className="text-xs text-gray-400">Per le <span className="font-medium">Entrate</span> i colori sono invertiti: verde = entrate in crescita.</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Mobile card view */}
           <div className="desktop:hidden">
@@ -1648,14 +1666,24 @@ export function BudgetTab({
           <div className="hidden desktop:block">
             <Card>
               <CardContent className="pt-6">
-                <AnnualTable />
+                {AnnualTable()}
               </CardContent>
             </Card>
           </div>
 
-          <div className="hidden desktop:block">
-            <CategoryDeepDive />
-          </div>
+          <AnimatePresence initial={false}>
+            {deepDiveData && (
+              <motion.div
+                variants={chartShellSettle}
+                initial={false}
+                animate="settle"
+                exit="idle"
+                className="hidden desktop:block"
+              >
+                {CategoryDeepDive()}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <p className="text-xs text-gray-400 flex items-center gap-1">
             <Info className="h-3 w-3" />

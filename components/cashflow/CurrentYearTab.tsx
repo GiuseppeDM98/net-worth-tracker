@@ -16,6 +16,7 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { calculateTotalIncome, calculateTotalExpenses } from '@/lib/services/expenseService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -45,6 +46,8 @@ import {
 import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
 import { getItalyMonth, getItalyMonthYear, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
 import { CashflowSankeyChart } from '@/components/cashflow/CashflowSankeyChart';
+import { chartShellSettle, fadeVariants } from '@/lib/utils/motionVariants';
+import { cn } from '@/lib/utils';
 
 interface ChartData {
   name: string;
@@ -121,6 +124,8 @@ interface CurrentYearTabProps {
 }
 
 export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
+  const controlClassName = 'transition-colors duration-200 border-border/70 hover:border-primary/40 focus-visible:ring-primary/30 data-[placeholder]:text-muted-foreground';
+
   // Drill-down state
   const [drillDown, setDrillDown] = useState<DrillDownState>({
     level: 'category',
@@ -800,14 +805,19 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
           <div className="flex flex-col gap-4 mb-6">
             {/* Month filter dropdown */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <Label htmlFor="monthFilter" className="text-sm font-semibold text-blue-900 dark:text-blue-100">
-                📊 Vista Mensile
-              </Label>
+              <div>
+                <Label htmlFor="monthFilter" className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                  Vista Mensile
+                </Label>
+                <p className="mt-1 text-xs text-blue-800/80 dark:text-blue-200/70">
+                  Il cambio filtro aggiorna Sankey e grafici in continuità, senza resettare il contesto.
+                </p>
+              </div>
               <Select
                 value={selectedMonth?.toString() || '__all__'}
                 onValueChange={(value) => setSelectedMonth(value === '__all__' ? null : parseInt(value))}
               >
-                <SelectTrigger id="monthFilter" className="w-full sm:w-[200px]">
+                <SelectTrigger id="monthFilter" className={cn('w-full sm:w-[220px]', controlClassName)}>
                   <SelectValue placeholder="Tutto l'anno" />
                 </SelectTrigger>
                 <SelectContent>
@@ -822,28 +832,41 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
             </div>
 
             {/* Active filter indicator */}
-            {selectedMonth !== null && (
-              <div className="rounded-md border border-blue-300 bg-blue-100 dark:bg-blue-900/30 dark:border-blue-700 p-3 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-blue-700 dark:text-blue-400">📅</span>
-                  <span className="font-medium text-blue-900 dark:text-blue-200">
-                    Filtro attivo: {ITALIAN_MONTHS[selectedMonth - 1]} {currentYear}
-                  </span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSelectedMonth(null)}
-                  className="h-7 text-xs text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-200"
+            <AnimatePresence initial={false}>
+              {selectedMonth !== null && (
+                <motion.div
+                  variants={fadeVariants}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                  className="rounded-md border border-blue-300 bg-blue-100 dark:bg-blue-900/30 dark:border-blue-700 p-3 flex items-center justify-between gap-2"
                 >
-                  Cancella
-                </Button>
-              </div>
-            )}
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-blue-700 dark:text-blue-400">●</span>
+                    <span className="font-medium text-blue-900 dark:text-blue-200">
+                      Filtro attivo: {ITALIAN_MONTHS[selectedMonth - 1]} {currentYear}
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedMonth(null)}
+                    className="h-7 text-xs text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-200"
+                  >
+                    Cancella
+                  </Button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Charts Container - renders only when data exists */}
-          <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
+          <motion.div
+            variants={chartShellSettle}
+            initial={false}
+            animate="settle"
+            className="grid gap-4 sm:gap-6 md:grid-cols-2"
+          >
             {/* Empty state: single message for all 3 charts */}
             {selectedMonth !== null && monthFilteredExpenses.length === 0 && (
               <Card className="md:col-span-2">
@@ -1358,7 +1381,7 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                 </>
               );
             })()}
-          </div>
+          </motion.div>
         </div>
       )}
 

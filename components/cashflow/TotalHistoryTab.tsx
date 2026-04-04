@@ -13,6 +13,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { calculateIncomeExpenseRatio, calculateTotalExpenses, calculateTotalIncome } from '@/lib/services/expenseService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,6 +43,8 @@ import {
 import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
 import { getItalyMonth, getItalyMonthYear, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
 import { CashflowSankeyChart } from '@/components/cashflow/CashflowSankeyChart';
+import { chartShellSettle, fadeVariants } from '@/lib/utils/motionVariants';
+import { cn } from '@/lib/utils';
 
 interface ChartData {
   name: string;
@@ -118,6 +121,8 @@ interface TotalHistoryTabProps {
 }
 
 export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 }: TotalHistoryTabProps) {
+  const controlClassName = 'transition-colors duration-200 border-border/70 hover:border-primary/40 focus-visible:ring-primary/30 data-[placeholder]:text-muted-foreground';
+
   // Percentage toggles for trend charts
   const [showMonthlyTrendPercentage, setShowMonthlyTrendPercentage] = useState(false);
   const [showYearlyTrendPercentage, setShowYearlyTrendPercentage] = useState(false);
@@ -988,16 +993,21 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
         <div className="flex flex-col gap-4 mb-6">
           {/* Year + Month filter dropdowns */}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <Label className="text-sm font-semibold text-blue-900 dark:text-blue-100">
-              📊 Analisi Periodo
-            </Label>
+            <div>
+              <Label className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                Analisi Periodo
+              </Label>
+              <p className="mt-1 text-xs text-blue-800/80 dark:text-blue-200/70">
+                I filtri aggiornano la lettura storica in-place, con feedback locale sul pannello attivo.
+              </p>
+            </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               {/* Year dropdown */}
               <Select
                 value={selectedYear?.toString() || '__all_years__'}
                 onValueChange={handleYearChange}
               >
-                <SelectTrigger className="w-full sm:w-[160px]">
+                <SelectTrigger className={cn('w-full sm:w-[160px]', controlClassName)}>
                   <SelectValue placeholder="Tutti gli anni" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1014,7 +1024,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                 onValueChange={handleMonthChange}
                 disabled={selectedYear === null}
               >
-                <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectTrigger className={cn('w-full sm:w-[180px]', controlClassName)}>
                   <SelectValue placeholder="Tutto l'anno" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1030,24 +1040,32 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
           </div>
 
           {/* Active filter indicator - shown only when filtering by specific year */}
-          {(selectedYear !== null || selectedMonth !== null) && (
-            <div className="rounded-md border border-blue-300 bg-blue-100 dark:bg-blue-900/30 dark:border-blue-700 p-3 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-blue-700 dark:text-blue-400">📅</span>
-                <span className="font-medium text-blue-900 dark:text-blue-200">
-                  Filtro attivo: {periodLabel}
-                </span>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => { setSelectedYear(null); setSelectedMonth(null); resetDrillDown(); }}
-                className="h-7 text-xs text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-200"
+          <AnimatePresence initial={false}>
+            {(selectedYear !== null || selectedMonth !== null) && (
+              <motion.div
+                variants={fadeVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                className="rounded-md border border-blue-300 bg-blue-100 dark:bg-blue-900/30 dark:border-blue-700 p-3 flex items-center justify-between gap-2"
               >
-                Cancella
-              </Button>
-            </div>
-          )}
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-blue-700 dark:text-blue-400">●</span>
+                  <span className="font-medium text-blue-900 dark:text-blue-200">
+                    Filtro attivo: {periodLabel}
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setSelectedYear(null); setSelectedMonth(null); resetDrillDown(); }}
+                  className="h-7 text-xs text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-200"
+                >
+                  Cancella
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Charts or empty state */}
@@ -1056,7 +1074,12 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
             Nessuna transazione trovata per {periodLabel}
           </div>
         ) : (
-          <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
+          <motion.div
+            variants={chartShellSettle}
+            initial={false}
+            animate="settle"
+            className="grid gap-4 sm:gap-6 md:grid-cols-2"
+          >
             {/* CHART 1: Sankey Flow Diagram */}
             <div className="md:col-span-2">
               <CashflowSankeyChart
@@ -1538,7 +1561,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                 </>
               );
             })()}
-          </div>
+          </motion.div>
         )}
       </div>
 

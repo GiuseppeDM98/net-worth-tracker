@@ -7,6 +7,11 @@
 
 ## 🔧 Improvements
 
+- Improved the Cashflow page so switching between workspaces feels more continuous and less like a full redraw
+- Improved Cashflow filters in `Anno Corrente` and `Storico Totale` with clearer active-state feedback and steadier in-place updates
+- Improved the Cashflow Sankey panel with a cleaner presentation and more readable drill-down context while preserving its natural filter-change animation
+- Improved the Budget tab with smoother expand/collapse behavior, a more polished inline subcategory flow, and a more stable historical analysis panel
+
 - Improved the History page with a clearer chapter-based structure, making long-term portfolio analysis easier to scan from top to bottom
 - Improved History chart transitions so switches between percentage/absolute views and annual/monthly analysis feel more continuous and less abrupt
 - Improved the Savings vs Investment Growth section on the History page with a steadier in-place mode switch and clearer context for the active view
@@ -73,6 +78,9 @@
 - Utility actions (Refresh, Export CSV, Insert Past Snapshot) are visually de-emphasised so the primary action on each page stands out
 
 ## 🐛 Bug Fixes
+
+- Fixed a visual flash in the Budget tab when opening the historical analysis for a row, subtotal, or total on desktop
+- Fixed the Cashflow Sankey animation so month and period filter changes animate correctly again instead of appearing static
 
 - Fixed blank vertical gaps appearing on the Assets page when switching between force-mounted tabs
 - Fixed a flash of fully-visible page content appearing for a split second before the entrance animation begins when navigating between pages — now all pages animate in cleanly every time
