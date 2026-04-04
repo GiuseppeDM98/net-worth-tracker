@@ -96,6 +96,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Borsa Italiana bond prices are `% of par`; store converted EUR values
 - FIRE annual expenses must use the last completed year
 - `includePrimaryResidence` must flow through both React Query key and query function
+- FIRE calculator unsaved preview is local-only: metrics may react immediately to form edits, but milestone surfaces like the "FIRE raggiunto" banner should remain anchored to saved/loaded data until persistence completes
 
 ### Formatter Duplication
 - `formatCurrency` and `formatCurrencyCompact` exist in both `lib/utils/formatters.ts` and `lib/services/chartService.ts`
@@ -125,12 +126,15 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Shared variants live in `lib/utils/motionVariants.ts`
 - For long, data-dense pages like History, prefer chapter-level reveals (`chapterReveal`) over one global stagger; reveal only the main sections on first entry
 - For dense tabbed data views, prefer short container transitions (`tabPanelSwitch`, `tableShellSettle`) and scoped refresh feedback on the active panel only; do not animate table geometry or whole row sets
+- Monte Carlo pattern: when re-running a simulation or switching scenario assumptions, keep the previous valid result shell mounted until the new computation completes; the update should read as a data morph, not an empty/reset state
+- Monte Carlo build pattern: percentile bands and histogram bins may reveal sequentially on first result entry or scenario rerun, but keep the underlying Recharts decorative areas non-animated to avoid chaotic multi-layer motion
 - Dividends page pattern: keep calendar, active date filter, stats, and table derived from the same source of truth; the calendar should reflect filter focus instead of running its own separate selection model
 - For Nivo Sankey filter updates, keep the chart instance mounted and let the library animate data diffs; remounting via React `key` or keyed wrapper shells suppresses the native update animation
 - Performance page pattern: derive `chartData`, heatmap data, and underwater data with `useMemo`; do not store them in local state via `useEffect + setState`
 - Performance period morph: do not key KPI sections or metric cards by selected period; KPI values should settle from the previous rendered value (`useCountUp({ fromPrevious: true })`) while chart shells can re-key only when a first-class staged reveal is intentional
 - Performance staged reveals should run on first mount or major period change only; manual refresh feedback must stay scoped to the page header or active chart shell instead of replaying the whole page
 - History page pattern: for mode switches (`%`/`€`, annual/monthly, doubling mode), animate the local chart shell or summary row only; avoid remounting or replaying unrelated sections
+- Goal-based investing pattern: drive summary cards, allocation chart, and detail cards from one shared focus state so the relationship between selected goal and resulting allocation stays explicit across the tab
 - For contextual dividend details, prefer a read-only detail surface first and compute `transform-origin` from the clicked row/card; only transition into edit mode when the user explicitly asks to modify the record
 - Allocation mobile drill-down pattern: keep the sheet's native bottom-entry animation, but make the sheet body the only scrollable region and reset its scroll to top on each level/content change; this preserves orientation more reliably than custom container-entry choreography
 - Allocation target markers inside progress bars should use a centered dot without a vertical stem; if bar height/border changes, recheck visual centering against the live track
@@ -186,6 +190,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - `npm test -- <file>` or `npx vitest run <file>` for targeted tests
 - `npx tsc --noEmit` for repo-wide TypeScript checking without generating build output
 - For motion/perceived-performance changes, compare `npm run dev` against `npm run build && npm run start` before optimizing away production-safe motion
+- For FIRE / Monte Carlo / Goal-based investing UX or motion changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/fireService.test.ts` and `npx vitest run __tests__/goalService.test.ts` before manual validation
 - For Dividendi & Cedole UX/motion changes, run `npx tsc --noEmit` and then manually validate calendar focus, table/detail continuity, and tooltip anchoring in the cashflow dividends tab
 - For Performance page UX/motion changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/performanceService.test.ts` before manual validation
 - For History page UX/motion changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/chartService.test.ts` before manual validation

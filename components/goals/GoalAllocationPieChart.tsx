@@ -14,6 +14,7 @@ import { formatCurrency } from '@/lib/utils/formatters';
 interface GoalAllocationPieChartProps {
   progressList: GoalProgress[];
   unassignedValue: number;
+  activeGoalId: string | null;
 }
 
 const UNASSIGNED_COLOR = '#D1D5DB'; // gray-300
@@ -21,11 +22,13 @@ const UNASSIGNED_COLOR = '#D1D5DB'; // gray-300
 export function GoalAllocationPieChart({
   progressList,
   unassignedValue,
+  activeGoalId,
 }: GoalAllocationPieChartProps) {
   const chartData = useMemo(() => {
     const data = progressList
       .filter((p) => p.currentValue > 0)
       .map((p) => ({
+        id: p.goalId,
         name: p.goalName,
         value: p.currentValue,
         color: p.goalColor,
@@ -33,6 +36,7 @@ export function GoalAllocationPieChart({
 
     if (unassignedValue > 0) {
       data.push({
+        id: '__unassigned__',
         name: 'Non Assegnato',
         value: unassignedValue,
         color: UNASSIGNED_COLOR,
@@ -46,6 +50,7 @@ export function GoalAllocationPieChart({
     () => chartData.reduce((sum, d) => sum + d.value, 0),
     [chartData]
   );
+  const activeSlice = chartData.find((entry) => entry.id === activeGoalId) ?? null;
 
   if (chartData.length === 0) {
     return null;
@@ -55,6 +60,9 @@ export function GoalAllocationPieChart({
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Allocazione per Obiettivo</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Seleziona una card riepilogo o un obiettivo per mettere a fuoco la quota di portafoglio corrispondente.
+        </p>
       </CardHeader>
       <CardContent>
         {/* Explicit height avoids Recharts measuring -1 when the tab is hidden */}
@@ -73,7 +81,13 @@ export function GoalAllocationPieChart({
                 animationEasing="ease-out"
               >
                 {chartData.map((entry, index) => (
-                  <Cell key={index} fill={entry.color} />
+                  <Cell
+                    key={index}
+                    fill={entry.color}
+                    opacity={!activeGoalId || activeGoalId === entry.id ? 1 : 0.3}
+                    stroke={!activeGoalId || activeGoalId !== entry.id ? 'transparent' : 'var(--foreground)'}
+                    strokeWidth={!activeGoalId || activeGoalId !== entry.id ? 0 : 1}
+                  />
                 ))}
               </Pie>
               <Tooltip
@@ -90,6 +104,16 @@ export function GoalAllocationPieChart({
                   <span className="text-sm text-gray-700 dark:text-gray-300">{value}</span>
                 )}
               />
+              {activeSlice && (
+                <>
+                  <text x="50%" y="46%" textAnchor="middle" className="fill-foreground text-sm font-medium">
+                    {activeSlice.name}
+                  </text>
+                  <text x="50%" y="56%" textAnchor="middle" className="fill-foreground text-base font-semibold">
+                    {formatCurrency(activeSlice.value)}
+                  </text>
+                </>
+              )}
             </PieChart>
           </ResponsiveContainer>
       </CardContent>

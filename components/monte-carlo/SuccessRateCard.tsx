@@ -1,6 +1,9 @@
+import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendingUp, AlertTriangle, CheckCircle } from 'lucide-react';
 import { formatCurrency, formatPercentage } from '@/lib/services/chartService';
+import { useCountUp } from '@/lib/utils/useCountUp';
+import { metricSettleTransition } from '@/lib/utils/motionVariants';
 
 interface SuccessRateCardProps {
   successRate: number;
@@ -39,6 +42,17 @@ export function SuccessRateCard({
   retirementYears,
   medianFinalValue,
 }: SuccessRateCardProps) {
+  const animatedSuccessRate = useCountUp(successRate, {
+    fromPrevious: true,
+    duration: 520,
+    startDelay: 0,
+  });
+  const animatedMedian = useCountUp(medianFinalValue, {
+    fromPrevious: true,
+    duration: 520,
+    startDelay: 0,
+  });
+
   /**
    * Returns color class based on success rate thresholds.
    * ≥90% = green (safe), ≥80% = yellow (caution), <80% = red (danger)
@@ -78,6 +92,7 @@ export function SuccessRateCard({
   };
 
   return (
+    <motion.div layout transition={metricSettleTransition}>
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
@@ -90,7 +105,7 @@ export function SuccessRateCard({
           {/* Success Rate */}
           <div className="text-center">
             <div className={`text-6xl font-bold ${getSuccessColor(successRate)}`}>
-              {formatPercentage(successRate)}
+              {formatPercentage(animatedSuccessRate ?? successRate)}
             </div>
             <p className="text-sm text-muted-foreground mt-2">
               In {successCount.toLocaleString('it-IT')} su{' '}
@@ -120,7 +135,7 @@ export function SuccessRateCard({
                   Valore Mediano (solo simulazioni riuscite):
                 </span>
                 <span className="text-lg font-semibold">
-                  {formatCurrency(medianFinalValue)}
+                  {formatCurrency(animatedMedian ?? medianFinalValue)}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
@@ -131,5 +146,6 @@ export function SuccessRateCard({
         </div>
       </CardContent>
     </Card>
+    </motion.div>
   );
 }

@@ -16,6 +16,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { getSettings } from '@/lib/services/assetAllocationService';
@@ -39,6 +40,7 @@ import { GoalAllocationPieChart } from '@/components/goals/GoalAllocationPieChar
 import { GoalDetailCard } from '@/components/goals/GoalDetailCard';
 import { GoalFormDialog } from '@/components/goals/GoalFormDialog';
 import { AssetAssignmentDialog } from '@/components/goals/AssetAssignmentDialog';
+import { goalLinkSettle } from '@/lib/utils/motionVariants';
 
 export function GoalBasedInvestingTab() {
   const { user } = useAuth();
@@ -50,6 +52,7 @@ export function GoalBasedInvestingTab() {
   const [editingGoal, setEditingGoal] = useState<InvestmentGoal | null>(null);
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
   const [assignmentGoalId, setAssignmentGoalId] = useState<string | null>(null);
+  const [activeGoalId, setActiveGoalId] = useState<string | null>(null);
 
   // Queries
   const { data: settings, isLoading: loadingSettings } = useQuery({
@@ -282,13 +285,18 @@ export function GoalBasedInvestingTab() {
           <GoalSummaryCards
             progressList={goalProgressList}
             unassignedValue={unassignedValue}
+            activeGoalId={activeGoalId}
+            onSelectGoal={setActiveGoalId}
           />
 
           {/* Pie Chart */}
-          <GoalAllocationPieChart
-            progressList={goalProgressList}
-            unassignedValue={unassignedValue}
-          />
+          <motion.div variants={goalLinkSettle} initial={false} animate={activeGoalId ? 'settle' : 'idle'}>
+            <GoalAllocationPieChart
+              progressList={goalProgressList}
+              unassignedValue={unassignedValue}
+              activeGoalId={activeGoalId}
+            />
+          </motion.div>
 
           {/* Goal Detail Cards */}
           <div className="space-y-4">
@@ -315,6 +323,8 @@ export function GoalBasedInvestingTab() {
                   onRemoveAssignment={(assetId) =>
                     handleRemoveAssignment(goal.id, assetId)
                   }
+                  isActive={activeGoalId === goal.id}
+                  onSelect={() => setActiveGoalId(goal.id)}
                 />
               );
             })}

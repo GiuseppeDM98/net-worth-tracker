@@ -1,3 +1,5 @@
+import { useEffect, useMemo, useState } from 'react';
+import { useReducedMotion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   BarChart,
@@ -16,6 +18,7 @@ interface DistributionChartProps {
     percentage: number;
   }[];
   retirementYears: number;
+  revealKey?: number;
 }
 
 /**
@@ -38,7 +41,37 @@ interface DistributionChartProps {
  * @param data - Array of distribution bins with range labels, counts, and percentages
  * @param retirementYears - Simulation duration in years (used in subtitle)
  */
-export function DistributionChart({ data, retirementYears }: DistributionChartProps) {
+export function DistributionChart({ data, retirementYears, revealKey = 0 }: DistributionChartProps) {
+  const reducedMotion = useReducedMotion();
+  const [visibleBars, setVisibleBars] = useState(reducedMotion ? data.length : 0);
+
+  useEffect(() => {
+    if (reducedMotion) {
+      setVisibleBars(data.length);
+      return;
+    }
+
+    setVisibleBars(0);
+    const timers = data.map((_, index) =>
+      window.setTimeout(() => {
+        setVisibleBars(index + 1);
+      }, 80 + (index * 45))
+    );
+
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, [data, reducedMotion, revealKey]);
+
+  const stagedData = useMemo(
+    () =>
+      data.map((entry, index) => ({
+        ...entry,
+        count: index < visibleBars ? entry.count : 0,
+      })),
+    [data, visibleBars]
+  );
+
   /**
    * Custom tooltip displayed on bar hover.
    *
@@ -72,10 +105,13 @@ export function DistributionChart({ data, retirementYears }: DistributionChartPr
         <p className="text-sm text-muted-foreground">
           Distribuzione dei valori del patrimonio dopo {retirementYears} anni
         </p>
+        <p className="text-xs text-muted-foreground">
+          I bucket entrano in sequenza per aiutare a leggere la probabilita&apos; relativa dei risultati finali.
+        </p>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={400}>
-          <BarChart data={data} margin={{ left: 50 }}>
+          <BarChart data={stagedData} margin={{ left: 50 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
             <XAxis
               dataKey="range"

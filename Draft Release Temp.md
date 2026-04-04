@@ -6,6 +6,8 @@
 - Each chart on the Performance page now shows a 2-line description directly below its title, explaining what you see and what to look for — no need to scroll to the methodology section
 - Added a contextual dividend detail view in `Dividendi & Cedole`, so selecting a row or mobile card opens a readable payment summary before entering edit mode
 - Added compact dividend insight cards for portfolio YOC and DPS growth, with inline help explaining how to read the metrics
+- Added a local preview mode to the FIRE calculator, so retirement metrics react immediately to unsaved changes before you decide to save them
+- Added linked focus behavior to Goal-Based Investing, so selecting a goal now highlights the same objective across summary cards, allocation view, and detail sections
 
 ## 🔧 Improvements
 
@@ -27,6 +29,10 @@
 - Improved the Dividends & Coupons workspace so calendar focus, active date filters, summary context, and the lower table stay visually aligned
 - Improved the dividend calendar with a clearer selected-day focus, month context, and a more readable daily summary when filtering by payment date
 - Improved dividend growth presentation with more consistent percentage formatting and clearer explanations directly in the cards
+- Improved Monte Carlo simulations so rerunning or changing scenario assumptions feels more continuous, with previous results staying visible until the new run is ready
+- Improved Monte Carlo percentile and distribution charts with a more progressive build that makes ranges and probabilities easier to read
+- Improved the Bear/Base/Bull comparison view in Monte Carlo with clearer scenario emphasis, helping users understand which path they are evaluating at a glance
+- Improved FIRE scenario projections so years-to-FIRE cards and charts settle into updated values more smoothly instead of feeling fully redrawn
 
 - Improved the Allocation page with clearer drill-down orientation on desktop, making it easier to understand where you are when moving from asset classes to subcategories and specific assets
 - Improved mobile Allocation navigation so each drill-down level opens from the top of its own content instead of keeping the previous scroll position

@@ -226,6 +226,44 @@ export const chartShellSettle: Variants = {
   },
 };
 
+/** Simulation shell settle: slightly stronger than chartShellSettle for scenario recalculations. */
+export const simulationShellSettle: Variants = {
+  idle: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+  },
+  settle: {
+    opacity: [0.985, 1],
+    y: [8, 0],
+    scale: [0.995, 1],
+    transition: { duration: 0.28, ease: easeOutQuart },
+  },
+};
+
+/** Progressive build for simulation cards/bins without replaying the whole page. */
+export const simulationStagger: Variants = {
+  hidden: {},
+  visible: {
+    transition: { staggerChildren: 0.06, delayChildren: 0.04 },
+  },
+};
+
+/** Short goal-link reveal used when summary, pie, and details respond to the same selection. */
+export const goalLinkSettle: Variants = {
+  idle: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+  },
+  settle: {
+    opacity: [0.98, 1],
+    y: [6, 0],
+    scale: [0.996, 1],
+    transition: { duration: 0.24, ease: easeOutQuart },
+  },
+};
+
 /** Table shell settle: subtle container continuity without animating table geometry. */
 export const tableShellSettle: Variants = {
   inactive: {

@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MonteCarloResults } from '@/types/assets';
 import { TrendingDown, Target, TrendingUp, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
@@ -16,6 +18,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
+import { cardItem, goalLinkSettle, simulationShellSettle, simulationStagger } from '@/lib/utils/motionVariants';
 
 interface ScenarioComparisonResultsProps {
   bear: MonteCarloResults;
@@ -23,6 +26,7 @@ interface ScenarioComparisonResultsProps {
   bull: MonteCarloResults;
   retirementYears: number;
   numberOfSimulations: number;
+  refreshKey?: number;
 }
 
 // Scenario styling
@@ -46,8 +50,23 @@ export function ScenarioComparisonResults({
   bull,
   retirementYears,
   numberOfSimulations,
+  refreshKey = 0,
 }: ScenarioComparisonResultsProps) {
+  const reducedMotion = useReducedMotion();
   const resultsByKey = { bear, base, bull };
+  const [activeScenario, setActiveScenario] = useState<typeof SCENARIOS[number]['key']>('base');
+  const [resultsAnimationState, setResultsAnimationState] = useState<'idle' | 'settle'>('idle');
+
+  useEffect(() => {
+    if (reducedMotion) {
+      setResultsAnimationState('idle');
+      return;
+    }
+
+    setResultsAnimationState('settle');
+    const timer = window.setTimeout(() => setResultsAnimationState('idle'), 320);
+    return () => window.clearTimeout(timer);
+  }, [reducedMotion, refreshKey]);
 
   // ===== Build overlay chart data =====
   // Merge percentile data from all 3 scenarios into a single dataset keyed by year
@@ -93,19 +112,39 @@ export function ScenarioComparisonResults({
   };
 
   return (
-    <div className="space-y-6">
+    <motion.div
+      className="space-y-6"
+      variants={simulationShellSettle}
+      initial={false}
+      animate={resultsAnimationState}
+    >
       {/* ===== Success Rate Cards ===== */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <motion.div
+        className="grid gap-4 md:grid-cols-3"
+        variants={simulationStagger}
+        initial={reducedMotion ? false : 'hidden'}
+        animate="visible"
+      >
         {SCENARIOS.map((s) => {
           const result = resultsByKey[s.key];
           const Icon = s.icon;
+          const isActive = activeScenario === s.key;
           return (
-            <Card key={s.key} className={`${s.borderColor} ${s.bgColor}`}>
+            <motion.div key={s.key} variants={cardItem}>
+            <Card
+              className={`${s.borderColor} ${s.bgColor} transition-[transform,box-shadow,border-color] duration-200 ${isActive ? 'shadow-md ring-1 ring-border/60' : 'opacity-90'}`}
+            >
               <CardHeader className="pb-2">
-                <CardTitle className={`flex items-center gap-2 text-base ${s.textColor}`}>
-                  <Icon className="h-4 w-4" />
-                  {s.label}
-                </CardTitle>
+                <button
+                  type="button"
+                  onClick={() => setActiveScenario(s.key)}
+                  className="w-full text-left"
+                >
+                  <CardTitle className={`flex items-center gap-2 text-base ${s.textColor}`}>
+                    <Icon className="h-4 w-4" />
+                    {s.label}
+                  </CardTitle>
+                </button>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-3 mb-3">
@@ -129,16 +168,21 @@ export function ScenarioComparisonResults({
                 </div>
               </CardContent>
             </Card>
+            </motion.div>
           );
         })}
-      </div>
+      </motion.div>
 
       {/* ===== Overlay Chart ===== */}
+      <motion.div variants={goalLinkSettle} initial={false} animate={resultsAnimationState}>
       <Card>
         <CardHeader>
           <CardTitle>Confronto Scenari ({retirementYears} anni)</CardTitle>
           <p className="text-sm text-muted-foreground">
             Linee: mediana (50° percentile). Bande colorate: range 10°-90° percentile per scenario.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Focus attivo: {SCENARIOS.find((scenario) => scenario.key === activeScenario)?.label}. Le altre traiettorie restano visibili ma subordinate.
           </p>
         </CardHeader>
         <CardContent>
@@ -166,29 +210,31 @@ export function ScenarioComparisonResults({
               {/* p10-p90 bands for each scenario (semi-transparent) — isAnimationActive={false}
                   perché sono 6 aree decorative sovrapposte: animarle singolarmente causerebbe
                   una sequenza visivamente caotica. Le linee mediane animano al loro posto. */}
-              <Area type="monotone" dataKey="bearP90" stroke="none" fill="#EF4444" fillOpacity={0.06} name="Orso p90" legendType="none" isAnimationActive={false} />
-              <Area type="monotone" dataKey="bearP10" stroke="none" fill="#EF4444" fillOpacity={0.06} name="Orso p10" legendType="none" isAnimationActive={false} />
-              <Area type="monotone" dataKey="baseP90" stroke="none" fill="#6366F1" fillOpacity={0.06} name="Base p90" legendType="none" isAnimationActive={false} />
-              <Area type="monotone" dataKey="baseP10" stroke="none" fill="#6366F1" fillOpacity={0.06} name="Base p10" legendType="none" isAnimationActive={false} />
-              <Area type="monotone" dataKey="bullP90" stroke="none" fill="#10B981" fillOpacity={0.06} name="Toro p90" legendType="none" isAnimationActive={false} />
-              <Area type="monotone" dataKey="bullP10" stroke="none" fill="#10B981" fillOpacity={0.06} name="Toro p10" legendType="none" isAnimationActive={false} />
+              <Area type="monotone" dataKey="bearP90" stroke="none" fill="#EF4444" fillOpacity={activeScenario === 'bear' ? 0.11 : 0.04} name="Orso p90" legendType="none" isAnimationActive={false} />
+              <Area type="monotone" dataKey="bearP10" stroke="none" fill="#EF4444" fillOpacity={activeScenario === 'bear' ? 0.11 : 0.04} name="Orso p10" legendType="none" isAnimationActive={false} />
+              <Area type="monotone" dataKey="baseP90" stroke="none" fill="#6366F1" fillOpacity={activeScenario === 'base' ? 0.12 : 0.04} name="Base p90" legendType="none" isAnimationActive={false} />
+              <Area type="monotone" dataKey="baseP10" stroke="none" fill="#6366F1" fillOpacity={activeScenario === 'base' ? 0.12 : 0.04} name="Base p10" legendType="none" isAnimationActive={false} />
+              <Area type="monotone" dataKey="bullP90" stroke="none" fill="#10B981" fillOpacity={activeScenario === 'bull' ? 0.11 : 0.04} name="Toro p90" legendType="none" isAnimationActive={false} />
+              <Area type="monotone" dataKey="bullP10" stroke="none" fill="#10B981" fillOpacity={activeScenario === 'bull' ? 0.11 : 0.04} name="Toro p10" legendType="none" isAnimationActive={false} />
 
               {/* Median lines */}
-              <Line type="monotone" dataKey="bearP50" stroke="#EF4444" strokeWidth={2.5} dot={false} name="Orso (mediana)" animationDuration={800} animationEasing="ease-out" />
-              <Line type="monotone" dataKey="baseP50" stroke="#6366F1" strokeWidth={2.5} dot={false} name="Base (mediana)" animationDuration={800} animationEasing="ease-out" />
-              <Line type="monotone" dataKey="bullP50" stroke="#10B981" strokeWidth={2.5} dot={false} name="Toro (mediana)" animationDuration={800} animationEasing="ease-out" />
+              <Line type="monotone" dataKey="bearP50" stroke="#EF4444" strokeOpacity={activeScenario === 'bear' ? 1 : 0.5} strokeWidth={activeScenario === 'bear' ? 3 : 2} dot={false} name="Orso (mediana)" animationDuration={800} animationEasing="ease-out" />
+              <Line type="monotone" dataKey="baseP50" stroke="#6366F1" strokeOpacity={activeScenario === 'base' ? 1 : 0.5} strokeWidth={activeScenario === 'base' ? 3 : 2} dot={false} name="Base (mediana)" animationDuration={800} animationEasing="ease-out" />
+              <Line type="monotone" dataKey="bullP50" stroke="#10B981" strokeOpacity={activeScenario === 'bull' ? 1 : 0.5} strokeWidth={activeScenario === 'bull' ? 3 : 2} dot={false} name="Toro (mediana)" animationDuration={800} animationEasing="ease-out" />
             </LineChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
+      </motion.div>
 
       {/* ===== Distribution Charts (3 side-by-side) ===== */}
       <div className="grid gap-4 md:grid-cols-3">
         {SCENARIOS.map((s) => {
           const result = resultsByKey[s.key];
           const Icon = s.icon;
+          const isActive = activeScenario === s.key;
           return (
-            <Card key={s.key} className={`${s.borderColor}`}>
+            <Card key={s.key} className={`${s.borderColor} transition-[transform,box-shadow,opacity] duration-200 ${isActive ? 'shadow-sm' : 'opacity-80'}`}>
               <CardHeader className="pb-2">
                 <CardTitle className={`flex items-center gap-2 text-sm ${s.textColor}`}>
                   <Icon className="h-3.5 w-3.5" />
@@ -279,6 +325,6 @@ export function ScenarioComparisonResults({
           </div>
         </CardContent>
       </Card>
-    </div>
+    </motion.div>
   );
 }
