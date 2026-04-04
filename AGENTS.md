@@ -125,11 +125,13 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Shared variants live in `lib/utils/motionVariants.ts`
 - For long, data-dense pages like History, prefer chapter-level reveals (`chapterReveal`) over one global stagger; reveal only the main sections on first entry
 - For dense tabbed data views, prefer short container transitions (`tabPanelSwitch`, `tableShellSettle`) and scoped refresh feedback on the active panel only; do not animate table geometry or whole row sets
+- Dividends page pattern: keep calendar, active date filter, stats, and table derived from the same source of truth; the calendar should reflect filter focus instead of running its own separate selection model
 - For Nivo Sankey filter updates, keep the chart instance mounted and let the library animate data diffs; remounting via React `key` or keyed wrapper shells suppresses the native update animation
 - Performance page pattern: derive `chartData`, heatmap data, and underwater data with `useMemo`; do not store them in local state via `useEffect + setState`
 - Performance period morph: do not key KPI sections or metric cards by selected period; KPI values should settle from the previous rendered value (`useCountUp({ fromPrevious: true })`) while chart shells can re-key only when a first-class staged reveal is intentional
 - Performance staged reveals should run on first mount or major period change only; manual refresh feedback must stay scoped to the page header or active chart shell instead of replaying the whole page
 - History page pattern: for mode switches (`%`/`€`, annual/monthly, doubling mode), animate the local chart shell or summary row only; avoid remounting or replaying unrelated sections
+- For contextual dividend details, prefer a read-only detail surface first and compute `transform-origin` from the clicked row/card; only transition into edit mode when the user explicitly asks to modify the record
 - Allocation mobile drill-down pattern: keep the sheet's native bottom-entry animation, but make the sheet body the only scrollable region and reset its scroll to top on each level/content change; this preserves orientation more reliably than custom container-entry choreography
 - Allocation target markers inside progress bars should use a centered dot without a vertical stem; if bar height/border changes, recheck visual centering against the live track
 - Do not wrap shadcn `TableRow` with `motion()`; use `motion.tr`
@@ -166,6 +168,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Collapsible methodology/reference blocks: use `Collapsible` (shadcn, from `@/components/ui/collapsible`) with `open` state defaulting to `false`; wrap the trigger around `CardHeader` via `asChild` for a large click target
 - `cn` is NOT auto-imported in page files — add `import { cn } from '@/lib/utils'` explicitly when using conditional class logic in pages (it is already available in all component files)
 - Badge chips for complexity signals: `badge?: string` prop on `MetricCard` renders a `Badge variant="outline"` below the title; requires `CardHeader` to be `items-start` (not `items-center`) because the left column has variable height
+- For compact explanatory help inside dense cards, prefer the local click-to-toggle pattern used in `components/performance/MetricCard.tsx` over generic Radix tooltip poppers when positioning must stay tightly anchored to the card header
 - One-time guide strips: position them outside the `key={selectedPeriod}` (or equivalent period/tab reset div) so they don't replay their entrance animation on every period switch
 - History chapter intro pattern: use a short editorial intro plus 2-3 sentence section headers to orient the user before dense chart clusters; keep these blocks informational, not decorative
 - Dev/internal tool sections in settings pages: isolate with `border-t border-border pt-6` + a `text-xs uppercase tracking-widest` eyebrow label in a distinct color (e.g. orange for dev/danger zones); never co-locate dev tools in a functional product tab (dividendi, spese, etc.)
@@ -183,6 +186,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - `npm test -- <file>` or `npx vitest run <file>` for targeted tests
 - `npx tsc --noEmit` for repo-wide TypeScript checking without generating build output
 - For motion/perceived-performance changes, compare `npm run dev` against `npm run build && npm run start` before optimizing away production-safe motion
+- For Dividendi & Cedole UX/motion changes, run `npx tsc --noEmit` and then manually validate calendar focus, table/detail continuity, and tooltip anchoring in the cashflow dividends tab
 - For Performance page UX/motion changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/performanceService.test.ts` before manual validation
 - For History page UX/motion changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/chartService.test.ts` before manual validation
 - For private API auth regressions, run `npx vitest run __tests__/apiAuthRoutes.test.ts`

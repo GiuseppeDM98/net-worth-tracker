@@ -4,6 +4,8 @@
 - A one-time guide strip appears on first visit to the Performance page, explaining the three reading levels (metric cards, tooltips, and methodology) — dismissible and never shown again
 - Advanced metrics (Time-Weighted Return, IRR, Sharpe Ratio, YOC Gross, YOC Net) are now labelled "Avanzato" so less experienced users know they can safely ignore them on a first read without losing the essentials
 - Each chart on the Performance page now shows a 2-line description directly below its title, explaining what you see and what to look for — no need to scroll to the methodology section
+- Added a contextual dividend detail view in `Dividendi & Cedole`, so selecting a row or mobile card opens a readable payment summary before entering edit mode
+- Added compact dividend insight cards for portfolio YOC and DPS growth, with inline help explaining how to read the metrics
 
 ## 🔧 Improvements
 
@@ -22,6 +24,9 @@
 - Improved the monthly returns heatmap with a staged reveal that makes the section feel more polished without reducing readability
 - Improved the underwater drawdown chart with a calmer, more editorial presentation that highlights the deepest drawdown more clearly
 - Improved the custom date range and AI analysis dialogs on the Performance page so they feel visually tied to the buttons that opened them
+- Improved the Dividends & Coupons workspace so calendar focus, active date filters, summary context, and the lower table stay visually aligned
+- Improved the dividend calendar with a clearer selected-day focus, month context, and a more readable daily summary when filtering by payment date
+- Improved dividend growth presentation with more consistent percentage formatting and clearer explanations directly in the cards
 
 - Improved the Allocation page with clearer drill-down orientation on desktop, making it easier to understand where you are when moving from asset classes to subcategories and specific assets
 - Improved mobile Allocation navigation so each drill-down level opens from the top of its own content instead of keeping the previous scroll position

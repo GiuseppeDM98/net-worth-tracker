@@ -11,9 +11,10 @@
  */
 'use client';
 
-import { useState, useMemo } from 'react';
+import type { CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { pageVariants, cardItem } from '@/lib/utils/motionVariants';
+import { cardItem, pageVariants, tableShellSettle } from '@/lib/utils/motionVariants';
 import { useAuth } from '@/contexts/AuthContext';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { Dividend, DividendType } from '@/types/dividend';
@@ -23,6 +24,7 @@ import { DividendTable } from './DividendTable';
 import { DividendCalendar } from './DividendCalendar';
 import { DividendStats } from './DividendStats';
 import { DividendStatsSkeleton } from './DividendStatsSkeleton';
+import { DividendRecordDetailsDialog } from './DividendRecordDetailsDialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -33,11 +35,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Plus, Download, Loader2 } from 'lucide-react';
+import { CalendarDays, Download, Filter, ListFilter, Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { toDate } from '@/lib/utils/dateHelpers';
+import { cn } from '@/lib/utils';
 
 const dividendTypeLabels: Record<DividendType, string> = {
   ordinary: 'Ordinario',
@@ -60,6 +63,11 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
   const [scraping, setScraping] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedDividend, setSelectedDividend] = useState<Dividend | null>(null);
+  const [detailDividend, setDetailDividend] = useState<Dividend | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [detailDialogStyle, setDetailDialogStyle] = useState<CSSProperties | undefined>(undefined);
+  const detailDialogRef = useRef<HTMLDivElement | null>(null);
+  const detailTriggerRef = useRef<HTMLElement | null>(null);
 
   // Filters
   const [assetFilter, setAssetFilter] = useState<string>('__all__');
@@ -69,6 +77,7 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
 
   // View mode (table or calendar)
   const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table');
+  const hasActiveFilters = assetFilter !== '__all__' || typeFilter !== '__all__' || startDate !== undefined || endDate !== undefined;
 
   // Derive filtered list synchronously — no extra render on filter change.
   const filteredDividends = useMemo(() => {
@@ -96,6 +105,41 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
     return filtered;
   }, [dividends, assetFilter, typeFilter, startDate, endDate]);
 
+  const focusedDate = useMemo(() => {
+    if (!startDate || !endDate) return null;
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (
+      start.getFullYear() === end.getFullYear() &&
+      start.getMonth() === end.getMonth() &&
+      start.getDate() === end.getDate()
+    ) {
+      return start;
+    }
+
+    return null;
+  }, [startDate, endDate]);
+  const focusSummary = useMemo(() => {
+    if (!focusedDate) return null;
+
+    const matchingDividends = filteredDividends.filter((dividend) => {
+      const paymentDate = toDate(dividend.paymentDate);
+      return (
+        paymentDate.getFullYear() === focusedDate.getFullYear() &&
+        paymentDate.getMonth() === focusedDate.getMonth() &&
+        paymentDate.getDate() === focusedDate.getDate()
+      );
+    });
+    const totalNet = matchingDividends.reduce((sum, dividend) => sum + (dividend.netAmountEur ?? dividend.netAmount), 0);
+
+    return {
+      count: matchingDividends.length,
+      totalNet,
+    };
+  }, [filteredDividends, focusedDate]);
+
   const handleCreate = () => {
     setSelectedDividend(null);
     setDialogOpen(true);
@@ -114,6 +158,39 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
   const handleDialogSuccess = async () => {
     await onRefresh();
   };
+
+  useEffect(() => {
+    if (!detailDialogOpen) {
+      setDetailDialogStyle(undefined);
+      return;
+    }
+
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setDetailDialogStyle(undefined);
+      return;
+    }
+
+    const frameId = requestAnimationFrame(() => {
+      const trigger = detailTriggerRef.current;
+      const dialog = detailDialogRef.current;
+
+      if (!trigger || !dialog) {
+        setDetailDialogStyle(undefined);
+        return;
+      }
+
+      const triggerRect = trigger.getBoundingClientRect();
+      const dialogRect = dialog.getBoundingClientRect();
+      const originX = triggerRect.left + (triggerRect.width / 2) - dialogRect.left;
+      const originY = triggerRect.top + (triggerRect.height / 2) - dialogRect.top;
+
+      setDetailDialogStyle({
+        transformOrigin: `${originX}px ${originY}px`,
+      });
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [detailDialogOpen]);
 
   const handleScrapeAll = async () => {
     if (!user) return;
@@ -273,6 +350,12 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
     setEndDate(endOfDay);
   };
 
+  const handleOpenDetails = (dividend: Dividend, triggerElement: HTMLElement) => {
+    detailTriggerRef.current = triggerElement;
+    setDetailDividend(dividend);
+    setDetailDialogOpen(true);
+  };
+
   // Use the same skeleton as DividendStats so the outer fetch (dividends/assets)
   // and the inner fetch (stats API) share a continuous visual — no flash between the two.
   if (loading) {
@@ -319,7 +402,19 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
 
       {/* Filters Row — positioned at top so they affect both charts and table */}
       <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.1 }} className="rounded-md border p-4 bg-muted/50">
-        <h3 className="font-semibold mb-4">Filtri</h3>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="font-semibold">Filtri</h3>
+            <p className="text-xs text-muted-foreground">
+              Calendario, metriche e lista restano allineati sullo stesso contesto.
+            </p>
+          </div>
+          {hasActiveFilters && (
+            <div className="rounded-full border border-border/70 bg-background px-3 py-1 text-xs text-muted-foreground">
+              {filteredDividends.length} risultati
+            </div>
+          )}
+        </div>
         <div className="grid gap-4 desktop:grid-cols-4">
           {/* Asset Filter */}
           <div className="space-y-2">
@@ -401,8 +496,13 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
         </div>
 
         {/* Clear Filters Button */}
-        {(assetFilter !== '__all__' || typeFilter !== '__all__' || startDate || endDate) && (
-          <div className="mt-4">
+        {hasActiveFilters && (
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">
+              {focusedDate
+                ? `Focus attivo su ${format(focusedDate, 'dd/MM/yyyy', { locale: it })}`
+                : 'I filtri attivi aggiornano statistiche, calendario e tabella in modo coerente.'}
+            </p>
             <Button onClick={clearFilters} variant="ghost" size="sm">
               Cancella Filtri
             </Button>
@@ -421,62 +521,83 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
 
       {/* View Mode Toggle */}
       <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.3 }}>
-      <div className="flex gap-2 border-b border-border">
-        <Button
-          variant={viewMode === 'table' ? 'default' : 'ghost'}
-          onClick={() => setViewMode('table')}
-          className={`rounded-b-none ${viewMode === 'table' ? 'dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600' : ''}`}
-        >
-          Tabella
-        </Button>
-        <Button
-          variant={viewMode === 'calendar' ? 'default' : 'ghost'}
-          onClick={() => setViewMode('calendar')}
-          className={`rounded-b-none ${viewMode === 'calendar' ? 'dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600' : ''}`}
-        >
-          Calendario
-        </Button>
-      </div>
-
-      {/* Active Filter Indicator (shown in both table and calendar views when filtering by single date) */}
-      {startDate && endDate && (
-        startDate.getTime() === endDate.getTime() ||
-        (startDate.getDate() === endDate.getDate() &&
-         startDate.getMonth() === endDate.getMonth() &&
-         startDate.getFullYear() === endDate.getFullYear())
-      ) && (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20 p-3 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-blue-700 dark:text-blue-400">📅</span>
-            <span className="font-medium text-blue-900 dark:text-blue-200">
-              Filtro attivo: {format(startDate, 'dd/MM/yyyy', { locale: it })}
-            </span>
+      <div className="space-y-4">
+        <div className="flex flex-col gap-3 border-b border-border pb-3 desktop:flex-row desktop:items-end desktop:justify-between">
+          <div className="space-y-1">
+            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Workspace</p>
+            <div className="flex gap-2">
+              <Button
+                variant={viewMode === 'table' ? 'default' : 'ghost'}
+                onClick={() => setViewMode('table')}
+                className={cn('rounded-b-none', viewMode === 'table' && 'dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600')}
+              >
+                <ListFilter className="mr-2 h-4 w-4" />
+                Tabella
+              </Button>
+              <Button
+                variant={viewMode === 'calendar' ? 'default' : 'ghost'}
+                onClick={() => setViewMode('calendar')}
+                className={cn('rounded-b-none', viewMode === 'calendar' && 'dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600')}
+              >
+                <CalendarDays className="mr-2 h-4 w-4" />
+                Calendario
+              </Button>
+            </div>
           </div>
-          <Button
-            onClick={clearFilters}
-            variant="ghost"
-            size="sm"
-            className="h-auto py-1 px-2 text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30"
-          >
-            Cancella
-          </Button>
+          <div className="text-xs text-muted-foreground">
+            {viewMode === 'table'
+              ? 'Apri un record per leggere il dettaglio senza entrare subito in modifica.'
+              : 'Seleziona un giorno per filtrare la lista sullo stesso contesto temporale.'}
+          </div>
         </div>
-      )}
 
-      {/* Conditional Rendering: Table or Calendar */}
-      {viewMode === 'table' ? (
-        <DividendTable
-          dividends={filteredDividends}
-          onEdit={handleEdit}
-          onRefresh={onRefresh}
-          showTotals={assetFilter !== '__all__' || typeFilter !== '__all__' || startDate !== undefined || endDate !== undefined}
-        />
-      ) : (
-        <DividendCalendar
-          dividends={filteredDividends}
-          onDateClick={handleCalendarDateClick}
-        />
-      )}
+        {focusedDate && focusSummary && (
+          <motion.div
+            variants={tableShellSettle}
+            initial="inactive"
+            animate="visible"
+            className="flex flex-col gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:bg-blue-950/20 desktop:flex-row desktop:items-center desktop:justify-between"
+          >
+            <div className="flex items-start gap-3">
+              <Filter className="mt-0.5 h-4 w-4 text-blue-700 dark:text-blue-400" />
+              <div className="text-sm">
+                <p className="font-medium text-blue-900 dark:text-blue-200">
+                  Focus attivo: {format(focusedDate, 'dd/MM/yyyy', { locale: it })}
+                </p>
+                <p className="text-blue-800/80 dark:text-blue-300/80">
+                  {focusSummary.count} {focusSummary.count === 1 ? 'pagamento' : 'pagamenti'} · netto previsto {focusSummary.totalNet.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={clearFilters}
+              variant="ghost"
+              size="sm"
+              className="h-auto px-2 py-1 text-blue-700 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30"
+            >
+              Cancella
+            </Button>
+          </motion.div>
+        )}
+
+        {/* Conditional Rendering: Table or Calendar */}
+        {viewMode === 'table' ? (
+          <DividendTable
+            dividends={filteredDividends}
+            onEdit={handleEdit}
+            onOpenDetails={handleOpenDetails}
+            onRefresh={onRefresh}
+            showTotals={hasActiveFilters}
+            activeDividendId={detailDividend?.id ?? null}
+          />
+        ) : (
+          <DividendCalendar
+            dividends={filteredDividends}
+            onDateClick={handleCalendarDateClick}
+            selectedDate={focusedDate}
+          />
+        )}
+      </div>
 
       </motion.div>
 
@@ -486,6 +607,20 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
         onClose={handleDialogClose}
         dividend={selectedDividend}
         onSuccess={handleDialogSuccess}
+      />
+
+      <DividendRecordDetailsDialog
+        open={detailDialogOpen}
+        dividend={detailDividend}
+        onOpenChange={(open) => {
+          setDetailDialogOpen(open);
+          if (!open) {
+            setDetailDialogStyle(undefined);
+          }
+        }}
+        onEdit={handleEdit}
+        dialogRef={detailDialogRef}
+        style={detailDialogStyle}
       />
     </motion.div>
   );

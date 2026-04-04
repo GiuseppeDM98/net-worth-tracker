@@ -5,9 +5,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-04, session 49): **Cashflow page overdrive pass**. Cashflow now switches workspaces more smoothly, filter changes in `Anno Corrente` and `Storico Totale` feel more reactive without replaying whole sections, the Sankey keeps its native filter-update animation, and the Budget tab opens historical deep dives without remount flashes in the desktop table.
+- Latest implementation (2026-04-04, session 50): **Dividends & Coupons overdrive pass**. `Dividendi & Cedole` now keeps calendar focus, table filters, and summary context more tightly aligned, opens dividend details from rows/cards with contextual continuity, and presents growth / YOC summary cards with clearer in-place explanations.
+- Previous implementation (2026-04-04, session 49): **Cashflow page overdrive pass**. Cashflow now switches workspaces more smoothly, filter changes in `Anno Corrente` and `Storico Totale` feel more reactive without replaying whole sections, the Sankey keeps its native filter-update animation, and the Budget tab opens historical deep dives without remount flashes in the desktop table.
 - Previous implementation (2026-04-04, session 48): **History page overdrive pass**. Storico now opens with clearer chapter-based hierarchy, uses calmer local continuity for dense chart mode switches, presents annual/monthly savings vs investment changes with a more stable in-place morph, and builds the doubling milestone timeline progressively without turning the page into a full replay.
-- Previous implementation (2026-04-03, session 47): **Performance page overdrive pass**. Rendimenti now switches periods with calmer in-place continuity, KPI values settle from the previous state instead of replaying from zero, the monthly heatmap reveals in controlled stages, the underwater chart feels more editorial, and the custom-range / AI dialogs open with contextual continuity from their triggers.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -20,6 +20,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Portfolio tracking across equities, bonds, crypto, real estate, commodities, and cash
 - Automatic price updates via Yahoo Finance and Borsa Italiana bond support
 - Cashflow now preserves context better across `Tracciamento`, `Dividendi & Cedole`, `Anno Corrente`, `Storico Totale`, and `Budget`, with calmer filter feedback and a steadier Budget deep-dive flow
+- Dividendi & Cedole now keeps calendar day focus, active date filtering, table/detail context, and summary cards more tightly in sync, with a read-only contextual detail step before edit mode
 - Storico now reads more like a guided analysis surface: main sections enter as chapters, dense blocks are separated more clearly, chart mode switches feel local instead of page-wide, and doubling milestones build progressively
 - Rendimenti now presents smoother period switching, KPI settling from prior values, staged monthly heatmap reveal, a more legible underwater drawdown surface, and contextual custom-range / AI dialogs
 - Allocazione now presents a more readable drill-down path on desktop and a steadier mobile sheet experience, with each drill-down level reopening from the top and progress bars using centered target markers
@@ -34,7 +35,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - positive-month and negative-month counters based on monthly `netWorthGrowth`
   - monthly chart from `prepareMonthlyLaborMetricsData()`
 - Settings page now offers visible unsaved-state preview and clearer in-context feedback for sensitive configuration changes (without autosave behavior changes)
-- Dividends and coupons tracking with EUR conversion, calendar, total return per asset, and DPS growth
+- Dividends and coupons tracking with EUR conversion, focused monthly calendar, contextual per-payment detail view, total return per asset, and DPS growth summaries
 - FIRE planning with primary residence toggle, liquid vs illiquid split, and scenario projections
 - Monte Carlo simulations and goal-based investing
 - PDF export and AI-powered performance analysis
@@ -71,7 +72,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-04 (session 49)
+**Last updated**: 2026-04-04 (session 50)
 
 ## Design Context
 

@@ -12,12 +12,13 @@
  */
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import { DividendStatsSkeleton } from './DividendStatsSkeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { DollarSign, TrendingDown, Calendar, TrendingUp, ChevronRight } from 'lucide-react';
+import { DollarSign, TrendingDown, Calendar, TrendingUp, ChevronRight, HelpCircle } from 'lucide-react';
 import { EmptyState, CalendarEmptyIcon, ChartEmptyIcon } from '@/components/ui/EmptyState';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { formatCurrencyCompact } from '@/lib/services/chartService';
@@ -32,12 +33,14 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   Legend,
   ResponsiveContainer,
 } from 'recharts';
 import { toast } from 'sonner';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
+import { chartShellSettle } from '@/lib/utils/motionVariants';
+import { useCountUp } from '@/lib/utils/useCountUp';
 
 // Custom tooltip that uses Tailwind dark-mode tokens for background/border,
 // while preserving per-series colors via entry.color.
@@ -154,12 +157,114 @@ interface DividendStatsData {
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF6B9D'];
 
+function SettledPercentValue({
+  value,
+  className,
+  decimals = 2,
+}: {
+  value?: number;
+  className?: string;
+  decimals?: number;
+}) {
+  const animatedValue = useCountUp(value ?? null, { fromPrevious: true, duration: 420, startDelay: 0 });
+
+  if (value === undefined || animatedValue === null) {
+    return <span className={className}>—</span>;
+  }
+
+  return (
+    <span className={className}>
+      {animatedValue >= 0 ? '+' : ''}
+      {animatedValue.toFixed(decimals)}%
+    </span>
+  );
+}
+
+function MetricInfoTooltip({ content }: { content: string }) {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (tooltipRef.current && !tooltipRef.current.contains(event.target as Node)) {
+        setShowTooltip(false);
+      }
+    };
+
+    if (showTooltip) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showTooltip]);
+
+  return (
+    <div className="relative" ref={tooltipRef}>
+      <button
+        type="button"
+        className="cursor-help rounded-full text-muted-foreground transition-colors hover:text-foreground"
+        onClick={() => setShowTooltip((current) => !current)}
+        aria-label="Come leggere questa card"
+      >
+        <HelpCircle className="h-4 w-4" />
+      </button>
+      {showTooltip && (
+        <div className="absolute right-0 top-6 z-50 w-72 max-w-[calc(100vw-2rem)] rounded-md border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95">
+          <p className="text-xs leading-relaxed">{content}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function DividendStats({ startDate, endDate, assetId }: DividendStatsProps) {
   const { user } = useAuth();
   const [stats, setStats] = useState<DividendStatsData | null>(null);
   const [loading, setLoading] = useState(true);
   type DpsAsset = NonNullable<DividendStatsData['dividendGrowthData']>['byAsset'][number];
   const [selectedDpsAsset, setSelectedDpsAsset] = useState<DpsAsset | null>(null);
+
+  const yocSummary = useMemo(() => {
+    if (!stats?.yieldOnCostAssets || stats.yieldOnCostAssets.length === 0 || stats.portfolioYieldOnCost === undefined) {
+      return null;
+    }
+
+    const totalCurrentValue = stats.yieldOnCostAssets.reduce(
+      (sum, asset) => sum + (asset.quantity * asset.currentPrice),
+      0
+    );
+    const totalTtmDividends = stats.yieldOnCostAssets.reduce(
+      (sum, asset) => sum + asset.ttmGrossDividends,
+      0
+    );
+    const currentYieldPortfolio = totalCurrentValue > 0
+      ? (totalTtmDividends / totalCurrentValue) * 100
+      : 0;
+
+    return {
+      coverage: stats.yieldOnCostAssets.length,
+      currentYieldPortfolio,
+      spread: stats.portfolioYieldOnCost - currentYieldPortfolio,
+    };
+  }, [stats]);
+
+  const growthSummary = useMemo(() => {
+    const growthData = stats?.dividendGrowthData;
+    if (!growthData || growthData.byAsset.length === 0) return null;
+
+    const leader = [...growthData.byAsset]
+      .filter((asset) => asset.latestYoyGrowth !== undefined)
+      .sort((a, b) => (b.latestYoyGrowth ?? Number.NEGATIVE_INFINITY) - (a.latestYoyGrowth ?? Number.NEGATIVE_INFINITY))[0];
+
+    return {
+      coverage: growthData.byAsset.length,
+      median: growthData.portfolioMedianGrowth,
+      average: growthData.portfolioAvgGrowth,
+      leader,
+    };
+  }, [stats]);
 
   useEffect(() => {
     if (user) {
@@ -272,6 +377,104 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
         </Card>
       </div>
 
+      {(yocSummary || growthSummary) && (
+        <div className="grid gap-4 grid-cols-1 desktop:grid-cols-2">
+          {yocSummary && (
+            <motion.div variants={chartShellSettle} initial="idle" animate="settle">
+              <Card className="border-border/70">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <CardTitle className="text-sm font-medium">YOC Portafoglio</CardTitle>
+                    <MetricInfoTooltip content="YOC Portafoglio misura il rendimento da dividendi lordi degli ultimi 12 mesi rispetto al costo storico totale degli asset che hanno dividendi. Lo spread vs rendimento corrente e' la differenza tra questo YOC e il rendimento calcolato sul valore di mercato attuale: positivo significa che il rendimento sul tuo costo storico e' piu' alto di quello sul valore corrente." />
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-end justify-between gap-4">
+                    <SettledPercentValue
+                      value={stats.portfolioYieldOnCost}
+                      className="text-3xl font-semibold text-foreground desktop:text-4xl tabular-nums"
+                    />
+                    <div className="text-right text-xs text-muted-foreground">
+                      <p>TTM lordo su costo storico</p>
+                      <p>{yocSummary.coverage} {yocSummary.coverage === 1 ? 'asset coperto' : 'asset coperti'}</p>
+                    </div>
+                  </div>
+                  <div className="grid gap-3 border-t border-border/50 pt-4 sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                        Spread vs Rendimento Corrente
+                      </p>
+                      <SettledPercentValue
+                        value={yocSummary.spread}
+                        className={`mt-1 text-lg font-semibold tabular-nums ${yocSummary.spread >= 0 ? 'text-emerald-600' : 'text-red-600'}`}
+                    />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                        Cost basis tracciato
+                      </p>
+                      <p className="mt-1 text-lg font-semibold tabular-nums">
+                        {stats.totalCostBasis !== undefined ? formatCurrency(stats.totalCostBasis) : '—'}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {growthSummary && (
+            <motion.div variants={chartShellSettle} initial="idle" animate="settle">
+              <Card className="border-border/70">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <CardTitle className="text-sm font-medium">Crescita DPS Mediana</CardTitle>
+                    <MetricInfoTooltip content="La crescita DPS mediana prende l'ultimo tasso di crescita anno su anno del dividendo per azione per ogni asset con storico sufficiente e ne usa la mediana, cosi' il risultato e' meno sensibile ai casi estremi. La media portafoglio e' invece la media aritmetica semplice degli stessi tassi YoY, quindi puo' spostarsi di piu' in presenza di outlier." />
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-end justify-between gap-4">
+                    <SettledPercentValue
+                      value={growthSummary.median}
+                      className={`text-3xl font-semibold desktop:text-4xl tabular-nums ${
+                        (growthSummary.median ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600'
+                      }`}
+                    />
+                    <div className="text-right text-xs text-muted-foreground">
+                      <p>Anno su anno, cedole escluse</p>
+                      <p>{growthSummary.coverage} {growthSummary.coverage === 1 ? 'asset con storico' : 'asset con storico'}</p>
+                    </div>
+                  </div>
+                  <div className="grid gap-3 border-t border-border/50 pt-4 sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                        Media portafoglio
+                      </p>
+                      <SettledPercentValue
+                        value={growthSummary.average}
+                        className={`mt-1 text-lg font-semibold tabular-nums ${
+                          (growthSummary.average ?? 0) >= 0 ? 'text-blue-600' : 'text-red-600'
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                        Miglior ultimo YoY
+                      </p>
+                      <p className="mt-1 text-sm font-semibold">
+                        {growthSummary.leader
+                          ? `${growthSummary.leader.assetTicker} ${growthSummary.leader.latestYoyGrowth! >= 0 ? '+' : ''}${growthSummary.leader.latestYoyGrowth!.toFixed(1)}%`
+                          : '—'}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+        </div>
+      )}
+
       {/* Charts Row 1: Pie Chart (Dividends by Asset) */}
       <div className="grid gap-6 desktop:grid-cols-2">
         <Card>
@@ -316,7 +519,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip content={<ChartTooltip />} />
+                    <RechartsTooltip content={<ChartTooltip />} />
                     <Legend iconSize={10} wrapperStyle={{ fontSize: '11px' }} />
                   </PieChart>
                 </ResponsiveContainer>
@@ -343,7 +546,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="year" />
                   <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
-                  <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--muted)' }} />
+                  <RechartsTooltip content={<ChartTooltip />} cursor={{ fill: 'var(--muted)' }} />
                   <Legend />
                   <Bar dataKey="totalGross" fill="#10B981" name="Lordo" animationDuration={600} animationEasing="ease-out" />
                   <Bar dataKey="totalTax" fill="#EF4444" name="Tasse" animationDuration={600} animationEasing="ease-out" />
@@ -373,7 +576,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis tickFormatter={(value) => formatCurrency(value).replace(/,00$/, '')} />
-                <Tooltip content={<ChartTooltip />} />
+                <RechartsTooltip content={<ChartTooltip />} />
                 <Legend />
                 <Line
                   type="monotone"
@@ -445,12 +648,12 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
               </div>
               {/* Portfolio median shown only in the all-assets view */}
               {!assetId && portfolioMedianGrowth !== undefined && (
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground">Mediana portafoglio</p>
-                  <p className={`text-xl font-bold ${portfolioMedianGrowth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {portfolioMedianGrowth >= 0 ? '+' : ''}{portfolioMedianGrowth.toFixed(1)}%
-                  </p>
-                </div>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">Mediana portafoglio</p>
+                    <p className={`text-xl font-bold ${portfolioMedianGrowth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {portfolioMedianGrowth >= 0 ? '+' : ''}{portfolioMedianGrowth.toFixed(2)}%
+                    </p>
+                  </div>
               )}
             </CardHeader>
             <CardContent>
@@ -472,14 +675,14 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <span>
                         YoY:{' '}
-                        <span className={`font-medium ${asset.latestYoyGrowth === undefined ? '' : asset.latestYoyGrowth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                          {asset.latestYoyGrowth === undefined ? '—' : `${asset.latestYoyGrowth >= 0 ? '+' : ''}${asset.latestYoyGrowth.toFixed(1)}%`}
+                          <span className={`font-medium ${asset.latestYoyGrowth === undefined ? '' : asset.latestYoyGrowth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          {asset.latestYoyGrowth === undefined ? '—' : `${asset.latestYoyGrowth >= 0 ? '+' : ''}${asset.latestYoyGrowth.toFixed(2)}%`}
                         </span>
                       </span>
                       <span>
                         CAGR:{' '}
                         <span className={`font-medium ${asset.cagr === undefined ? '' : asset.cagr >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                          {asset.cagr === undefined ? '—' : `${asset.cagr >= 0 ? '+' : ''}${asset.cagr.toFixed(1)}%`}
+                          {asset.cagr === undefined ? '—' : `${asset.cagr >= 0 ? '+' : ''}${asset.cagr.toFixed(2)}%`}
                         </span>
                       </span>
                     </div>
@@ -523,13 +726,13 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                           <div>
                             <p className="text-xs text-muted-foreground">YoY</p>
                             <p className={`font-semibold ${selectedDpsAsset.latestYoyGrowth === undefined ? 'text-muted-foreground' : selectedDpsAsset.latestYoyGrowth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                              {selectedDpsAsset.latestYoyGrowth === undefined ? '—' : `${selectedDpsAsset.latestYoyGrowth >= 0 ? '+' : ''}${selectedDpsAsset.latestYoyGrowth.toFixed(1)}%`}
+                              {selectedDpsAsset.latestYoyGrowth === undefined ? '—' : `${selectedDpsAsset.latestYoyGrowth >= 0 ? '+' : ''}${selectedDpsAsset.latestYoyGrowth.toFixed(2)}%`}
                             </p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">CAGR</p>
                             <p className={`font-semibold ${selectedDpsAsset.cagr === undefined ? 'text-muted-foreground' : selectedDpsAsset.cagr >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                              {selectedDpsAsset.cagr === undefined ? '—' : `${selectedDpsAsset.cagr >= 0 ? '+' : ''}${selectedDpsAsset.cagr.toFixed(1)}%`}
+                              {selectedDpsAsset.cagr === undefined ? '—' : `${selectedDpsAsset.cagr >= 0 ? '+' : ''}${selectedDpsAsset.cagr.toFixed(2)}%`}
                             </p>
                           </div>
                         </div>
@@ -571,7 +774,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                           }`}>
                             {asset.latestYoyGrowth === undefined
                               ? '—'
-                              : `${asset.latestYoyGrowth >= 0 ? '+' : ''}${asset.latestYoyGrowth.toFixed(1)}%`}
+                              : `${asset.latestYoyGrowth >= 0 ? '+' : ''}${asset.latestYoyGrowth.toFixed(2)}%`}
                           </td>
                           <td className={`text-right py-3 pl-2 font-medium tabular-nums ${
                             asset.cagr === undefined ? 'text-muted-foreground' :
@@ -579,7 +782,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                           }`}>
                             {asset.cagr === undefined
                               ? '—'
-                              : `${asset.cagr >= 0 ? '+' : ''}${asset.cagr.toFixed(1)}%`}
+                              : `${asset.cagr >= 0 ? '+' : ''}${asset.cagr.toFixed(2)}%`}
                           </td>
                         </tr>
                       );

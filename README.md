@@ -52,8 +52,8 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 ### Dividends
 - Multi-currency dividend recording with automatic EUR conversion
 - Borsa Italiana scraping for Italian market data (dividends and bond prices)
-- Monthly calendar view with drill-down
-- Dividend statistics and yield calculations
+- Monthly calendar view with synchronized date focus and drill-down
+- Dividend statistics, contextual payment detail, and yield calculations
 - **Total Return per Asset**: table combining unrealized capital gain % and all-time net dividends received % (calculated at historical cost basis per payment, not diluted by later purchases) to show the true investment return per asset; card layout on mobile
 - **Dividend Per Share Growth**: year-by-year gross DPS history per equity asset with YoY% and CAGR columns; portfolio median growth rate shown as a summary; tap any asset on mobile to open a vertical year-by-year dialog
 

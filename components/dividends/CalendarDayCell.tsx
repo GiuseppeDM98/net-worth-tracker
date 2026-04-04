@@ -13,15 +13,18 @@
  */
 'use client';
 
+import { motion } from 'framer-motion';
 import { Dividend } from '@/types/dividend';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { cn } from '@/lib/utils';
+import { metricSettleTransition } from '@/lib/utils/motionVariants';
 
 interface CalendarDayCellProps {
   date: Date;
   isCurrentMonth: boolean;
   isToday: boolean;
+  isSelected: boolean;
   dividends: Dividend[];
   onClick: (date: Date) => void;
 }
@@ -30,6 +33,7 @@ export function CalendarDayCell({
   date,
   isCurrentMonth,
   isToday,
+  isSelected,
   dividends,
   onClick,
 }: CalendarDayCellProps) {
@@ -51,37 +55,58 @@ export function CalendarDayCell({
   };
 
   return (
-    <div
+    <button
+      type="button"
       onClick={handleClick}
+      disabled={!hasDividends}
       className={cn(
         // Base styling
-        'border border-border p-1 md:p-2',
+        'relative border border-border p-1 text-left md:p-2',
         'min-h-[60px] md:min-h-[70px] desktop:min-h-[80px]',
         'flex flex-col gap-1',
-        'transition-colors',
+        'transition-colors motion-reduce:transition-none',
 
         // Cursor and hover state
         hasDividends && 'cursor-pointer hover:bg-accent',
+        !hasDividends && 'cursor-default',
 
         // Current month vs overflow days
         isCurrentMonth ? 'text-foreground' : 'text-muted-foreground opacity-50',
 
         // Today indicator (blue border)
-        isToday && 'border-2 border-blue-500',
+        isToday && !isSelected && 'border-2 border-blue-500',
+
+        // Selected date focus
+        isSelected && 'border-primary bg-primary/8 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.25)]',
 
         // Dates with dividends (green background)
-        hasDividends && 'bg-green-50 dark:bg-green-950/20',
-        hasDividends && 'hover:bg-green-100 dark:hover:bg-green-900/30'
+        hasDividends && !isSelected && 'bg-green-50 dark:bg-green-950/20',
+        hasDividends && !isSelected && 'hover:bg-green-100 dark:hover:bg-green-900/30'
       )}
     >
+      {isSelected && (
+        <motion.div
+          layout
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-1 rounded-md border border-primary/20 bg-primary/5"
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.98 }}
+          transition={metricSettleTransition}
+        />
+      )}
+
       {/* Day number */}
-      <div className="text-xs md:text-sm font-medium">
+      <div className={cn(
+        'relative z-10 text-xs font-medium md:text-sm',
+        isSelected && 'text-primary'
+      )}>
         {dayNumber}
       </div>
 
       {/* Dividend information */}
       {hasDividends && (
-        <div className="flex-1 flex flex-col gap-1 text-xs">
+        <div className="relative z-10 flex flex-1 flex-col gap-1 text-xs">
           {dividends.length === 1 ? (
             // Single dividend: show ticker + amount
             <>
@@ -108,6 +133,6 @@ export function CalendarDayCell({
           )}
         </div>
       )}
-    </div>
+    </button>
   );
 }
