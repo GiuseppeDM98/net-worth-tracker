@@ -7,6 +7,11 @@
 
 ## 🔧 Improvements
 
+- Improved the History page with a clearer chapter-based structure, making long-term portfolio analysis easier to scan from top to bottom
+- Improved History chart transitions so switches between percentage/absolute views and annual/monthly analysis feel more continuous and less abrupt
+- Improved the Savings vs Investment Growth section on the History page with a steadier in-place mode switch and clearer context for the active view
+- Improved the doubling milestones section on the History page with a more progressive build that gives important milestones more presence without slowing the page down
+
 - Improved the Performance page with smoother period switching, so key metrics and charts update with more continuity instead of feeling abruptly redrawn
 - Improved Performance metrics so values settle from the previous state more naturally during period changes, making comparisons easier to follow at a glance
 - Improved the monthly returns heatmap with a staged reveal that makes the section feel more polished without reducing readability

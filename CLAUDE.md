@@ -5,9 +5,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-03, session 47): **Performance page overdrive pass**. Rendimenti now switches periods with calmer in-place continuity, KPI values settle from the previous state instead of replaying from zero, the monthly heatmap reveals in controlled stages, the underwater chart feels more editorial, and the custom-range / AI dialogs open with contextual continuity from their triggers.
+- Latest implementation (2026-04-04, session 48): **History page overdrive pass**. Storico now opens with clearer chapter-based hierarchy, uses calmer local continuity for dense chart mode switches, presents annual/monthly savings vs investment changes with a more stable in-place morph, and builds the doubling milestone timeline progressively without turning the page into a full replay.
+- Previous implementation (2026-04-03, session 47): **Performance page overdrive pass**. Rendimenti now switches periods with calmer in-place continuity, KPI values settle from the previous state instead of replaying from zero, the monthly heatmap reveals in controlled stages, the underwater chart feels more editorial, and the custom-range / AI dialogs open with contextual continuity from their triggers.
 - Previous implementation (2026-04-03, session 46): **Allocation page overdrive pass**. Allocazione now has a clearer editorial header, more legible desktop drill-down orientation for `asset class → Sottocategoria → asset specifici`, and a more stable mobile sheet flow with top-reset content, fixed header separation, and cleaner target markers in allocation progress bars.
-- Previous implementation (2026-04-03, session 45): **Assets page overdrive pass**. Patrimonio now preserves macro-tab and sub-tab state more reliably, switches historical views with shorter panel continuity, and shows refresh feedback only on the active historical block. The shared tabs primitive also explicitly hides inactive force-mounted panels, preventing layout gaps when switching views.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -19,6 +19,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Key Features (Active)
 - Portfolio tracking across equities, bonds, crypto, real estate, commodities, and cash
 - Automatic price updates via Yahoo Finance and Borsa Italiana bond support
+- Storico now reads more like a guided analysis surface: main sections enter as chapters, dense blocks are separated more clearly, chart mode switches feel local instead of page-wide, and doubling milestones build progressively
 - Rendimenti now presents smoother period switching, KPI settling from prior values, staged monthly heatmap reveal, a more legible underwater drawdown surface, and contextual custom-range / AI dialogs
 - Allocazione now presents a more readable drill-down path on desktop and a steadier mobile sheet experience, with each drill-down level reopening from the top and progress bars using centered target markers
 - Patrimonio now preserves visited macro-tab and sub-tab state across `Gestione Asset`, `Anno Corrente`, and `Storico`, with calmer transitions for dense historical tables and scoped refresh feedback on the active view
@@ -69,7 +70,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-03 (session 47)
+**Last updated**: 2026-04-04 (session 48)
 
 ## Design Context
 

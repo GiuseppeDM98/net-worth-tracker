@@ -1,9 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { DoublingMilestone } from '@/types/assets';
 import { formatCurrency } from '@/lib/services/chartService';
 import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
-import { fastStaggerContainer, listItem } from '@/lib/utils/motionVariants';
+import { motion, useReducedMotion } from 'framer-motion';
+import { fastStaggerContainer, listItem, progressSettleTransition } from '@/lib/utils/motionVariants';
 import { hasCelebrated, markCelebrated, shouldReduceMotion } from '@/lib/utils/celebrationUtils';
 import { EmptyState, SeedlingIcon } from '@/components/ui/EmptyState';
 
@@ -33,11 +33,33 @@ export function DoublingMilestoneTimeline({
   milestones,
   currentInProgress,
 }: DoublingMilestoneTimelineProps) {
+  const prefersReducedMotion = useReducedMotion();
+
   // Combine completed milestones with current in-progress
   const allMilestones = [...milestones];
   if (currentInProgress) {
     allMilestones.push(currentInProgress);
   }
+
+  const [visibleMilestones, setVisibleMilestones] = useState(
+    prefersReducedMotion ? allMilestones.length : 1
+  );
+
+  useEffect(() => {
+    if (prefersReducedMotion || allMilestones.length <= 1) {
+      setVisibleMilestones(allMilestones.length);
+      return;
+    }
+
+    setVisibleMilestones(1);
+    const timers = allMilestones.slice(1).map((_, index) =>
+      window.setTimeout(() => {
+        setVisibleMilestones((current) => Math.min(current + 1, allMilestones.length));
+      }, 120 * (index + 1))
+    );
+
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [allMilestones.length, prefersReducedMotion]);
 
   // Celebrate each newly-seen completed milestone once.
   // Delay by 800ms so the stagger list animation finishes before confetti fires.
@@ -140,10 +162,12 @@ export function DoublingMilestoneTimeline({
           Complete milestones: green badge with checkmark
           In-progress milestones: blue badge with progress bar
           This creates clear visual hierarchy for user engagement */}
-      {allMilestones.map((milestone) => (
+      {allMilestones.slice(0, visibleMilestones).map((milestone) => (
         <motion.div
           key={`${milestone.milestoneType}-${milestone.milestoneNumber}`}
           variants={listItem}
+          initial="hidden"
+          animate="visible"
           className={cn(
             'rounded-lg border p-4 transition-colors',
             !milestone.isComplete && 'border-blue-300 bg-blue-50/50 dark:bg-blue-950/20'
@@ -195,9 +219,9 @@ export function DoublingMilestoneTimeline({
               <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                 <motion.div
                   className="h-full bg-blue-500 rounded-full"
-                  initial={{ width: '0%' }}
+                  initial={false}
                   animate={{ width: `${milestone.progressPercentage}%` }}
-                  transition={{ duration: 0.8, ease: [0.25, 1, 0.5, 1] }}
+                  transition={progressSettleTransition}
                 />
               </div>
             </div>

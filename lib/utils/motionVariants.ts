@@ -134,6 +134,16 @@ export const chartReveal: Variants = {
   },
 };
 
+/** Chapter reveal: controlled section entry for long editorial pages. */
+export const chapterReveal: Variants = {
+  hidden: { opacity: 0, y: 18 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.32, ease: easeOutQuart },
+  },
+};
+
 /** Period switch shell: slight fade/settle used when dense data re-computes in place. */
 export const periodContentSettle: Variants = {
   idle: {
