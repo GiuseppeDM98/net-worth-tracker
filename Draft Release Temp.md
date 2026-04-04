@@ -1,5 +1,7 @@
 ## ✨ New Features
 
+- Added current-period spotlight cards to Hall of Fame, so you can instantly see how the current month and year rank against your personal records
+- Added live values inside Hall of Fame spotlight cards, including percentage context for net worth change rankings when available
 - The Performance page (Rendimenti) now loads with a cleaner, less overwhelming layout: the methodology section is collapsed by default and can be expanded on demand with a single click
 - A one-time guide strip appears on first visit to the Performance page, explaining the three reading levels (metric cards, tooltips, and methodology) — dismissible and never shown again
 - Advanced metrics (Time-Weighted Return, IRR, Sharpe Ratio, YOC Gross, YOC Net) are now labelled "Avanzato" so less experienced users know they can safely ignore them on a first read without losing the essentials
@@ -11,6 +13,9 @@
 
 ## 🔧 Improvements
 
+- Improved Hall of Fame ranking presentation with a cleaner editorial layout across monthly and yearly sections, making dense record lists easier to scan
+- Improved Hall of Fame note interactions so opening a note feels more directly connected to the selected record on both desktop and mobile
+- Improved current-month and current-year visibility inside Hall of Fame rankings with clearer in-place highlighting
 - Improved the Cashflow page so switching between workspaces feels more continuous and less like a full redraw
 - Improved Cashflow filters in `Anno Corrente` and `Storico Totale` with clearer active-state feedback and steadier in-place updates
 - Improved the Cashflow Sankey panel with a cleaner presentation and more readable drill-down context while preserving its natural filter-change animation

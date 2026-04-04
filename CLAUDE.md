@@ -5,9 +5,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-04, session 51): **FIRE & Simulations overdrive pass**. Monte Carlo now preserves previous results during reruns and reveals distributions more progressively, Goal-Based Investing links summary focus to allocation and detail views more clearly, and the FIRE calculator/projection surfaces react with a steadier local preview instead of abrupt redraws.
+- Latest implementation (2026-04-04, session 52): **Hall of Fame overdrive pass**. Hall of Fame now presents monthly and yearly rankings with a more editorial hierarchy, adds current-period spotlight cards with live ranking values, and opens note dialogs with clearer trigger continuity from the selected record.
+- Previous implementation (2026-04-04, session 51): **FIRE & Simulations overdrive pass**. Monte Carlo now preserves previous results during reruns and reveals distributions more progressively, Goal-Based Investing links summary focus to allocation and detail views more clearly, and the FIRE calculator/projection surfaces react with a steadier local preview instead of abrupt redraws.
 - Previous implementation (2026-04-04, session 50): **Dividends & Coupons overdrive pass**. `Dividendi & Cedole` now keeps calendar focus, table filters, and summary context more tightly aligned, opens dividend details from rows/cards with contextual continuity, and presents growth / YOC summary cards with clearer in-place explanations.
-- Previous implementation (2026-04-04, session 49): **Cashflow page overdrive pass**. Cashflow now switches workspaces more smoothly, filter changes in `Anno Corrente` and `Storico Totale` feel more reactive without replaying whole sections, the Sankey keeps its native filter-update animation, and the Budget tab opens historical deep dives without remount flashes in the desktop table.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -19,6 +19,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Key Features (Active)
 - Portfolio tracking across equities, bonds, crypto, real estate, commodities, and cash
 - Automatic price updates via Yahoo Finance and Borsa Italiana bond support
+- Hall of Fame now reads as an editorial ranking surface with clearer monthly/yearly hierarchy, spotlight cards for the current month/year, and contextual note dialogs tied to the selected record
 - Cashflow now preserves context better across `Tracciamento`, `Dividendi & Cedole`, `Anno Corrente`, `Storico Totale`, and `Budget`, with calmer filter feedback and a steadier Budget deep-dive flow
 - Dividendi & Cedole now keeps calendar day focus, active date filtering, table/detail context, and summary cards more tightly in sync, with a read-only contextual detail step before edit mode
 - Storico now reads more like a guided analysis surface: main sections enter as chapters, dense blocks are separated more clearly, chart mode switches feel local instead of page-wide, and doubling milestones build progressively
@@ -72,7 +73,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-04 (session 51)
+**Last updated**: 2026-04-04 (session 52)
 
 ## Design Context
 
