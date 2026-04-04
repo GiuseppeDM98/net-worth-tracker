@@ -242,6 +242,14 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Always set `fill` on `<Bar>` even when per-bar colors are overridden by `<Cell>`
 - Do not set text `color` globally in tooltip style for line/area/bar charts
 
+### Pie Chart Legend Cap on Mobile
+- `renderLegendItems()` in cashflow tabs accepts a `maxItems` param — always pass `isMobile ? 3 : undefined` on **all** pie charts (category and subcategory drill-downs) to prevent legend overflow on mobile
+- The cap must be applied consistently: missing it on a single chart level (e.g. income but not expense) causes asymmetric overflow behavior across tabs
+
+### Recharts Conditional Props via Spread
+- `{...(condition && { prop: value })}` does **not** work reliably on Recharts components — when `condition` is `false` the spread evaluates to `{...false}`, which is silently ignored by React but can cause Recharts to misread the prop tree
+- Pattern: compute `domain` and `allowDataOverflow` as plain variables outside JSX, then pass them directly as props
+
 ### ResponsiveContainer in Hidden Tabs
 - Symptom: `width(-1)` / `height(-1)` warnings
 - Fix: use explicit pixel heights, not `height="100%"`

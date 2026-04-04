@@ -1021,7 +1021,7 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                                 layout={isMobile ? 'horizontal' : 'vertical'}
                                 align={isMobile ? 'center' : 'right'}
                                 verticalAlign={isMobile ? 'bottom' : 'middle'}
-                                content={() => renderLegendItems(currentSubcategoriesData, entry => handleSubcategoryClick(entry))}
+                                content={() => renderLegendItems(currentSubcategoriesData, entry => handleSubcategoryClick(entry), undefined, isMobile ? 3 : undefined)}
                               />
                             </RechartsPC>
                           </ResponsiveContainer>
@@ -1237,7 +1237,7 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                                 layout={isMobile ? 'horizontal' : 'vertical'}
                                 align={isMobile ? 'center' : 'right'}
                                 verticalAlign={isMobile ? 'bottom' : 'middle'}
-                                content={() => renderLegendItems(incomeByCategoryData, entry => handleCategoryClick(entry, 'income'))}
+                                content={() => renderLegendItems(incomeByCategoryData, entry => handleCategoryClick(entry, 'income'), undefined, isMobile ? 3 : undefined)}
                               />
                             </RechartsPC>
                           </ResponsiveContainer>
@@ -1280,7 +1280,7 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                                 layout={isMobile ? 'horizontal' : 'vertical'}
                                 align={isMobile ? 'center' : 'right'}
                                 verticalAlign={isMobile ? 'bottom' : 'middle'}
-                                content={() => renderLegendItems(currentSubcategoriesData, entry => handleSubcategoryClick(entry))}
+                                content={() => renderLegendItems(currentSubcategoriesData, entry => handleSubcategoryClick(entry), undefined, isMobile ? 3 : undefined)}
                               />
                             </RechartsPC>
                           </ResponsiveContainer>

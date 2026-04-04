@@ -494,6 +494,9 @@ export function FireCalculatorTab() {
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   Patrimonio FIRE × {previewWithdrawalRate}% — quanto puoi prelevare ogni anno senza intaccare il capitale nel lungo periodo
                 </p>
+                <p className="mt-0.5 font-mono text-xs tabular-nums text-gray-400 dark:text-gray-500">
+                  Patrimonio FIRE: {formatCurrency(currentNetWorth)}
+                </p>
                 {/* Proportion bar: liquid (green) vs illiquid (amber) share of total allowance */}
                 {displayedFireMetrics.annualAllowance > 0 && (
                   <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-amber-200 dark:bg-amber-900/50">

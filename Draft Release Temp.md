@@ -13,6 +13,9 @@
 
 ## 🔧 Improvements
 
+- The FIRE "Indennità Annuale" card now shows the Patrimonio FIRE base value directly, so you can immediately see which number the withdrawal rate is applied to without switching tabs
+- Fixed the income category pie chart legend on mobile (Cashflow → Anno Corrente) overflowing its container when four or more categories were above the 5% threshold — now consistently capped at three visible items, matching the expense chart
+
 - Improved the login and registration pages with a calmer first-load entrance, so authentication feels more consistent with the rest of the app
 - Improved sign-in and sign-up forms with clearer field focus states, keyboard-accessible password visibility toggles, and inline submit feedback during access or account creation
 - Improved Hall of Fame ranking presentation with a cleaner editorial layout across monthly and yearly sections, making dense record lists easier to scan
