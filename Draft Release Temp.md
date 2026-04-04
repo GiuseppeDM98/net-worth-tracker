@@ -13,6 +13,8 @@
 
 ## 🔧 Improvements
 
+- Improved the login and registration pages with a calmer first-load entrance, so authentication feels more consistent with the rest of the app
+- Improved sign-in and sign-up forms with clearer field focus states, keyboard-accessible password visibility toggles, and inline submit feedback during access or account creation
 - Improved Hall of Fame ranking presentation with a cleaner editorial layout across monthly and yearly sections, making dense record lists easier to scan
 - Improved Hall of Fame note interactions so opening a note feels more directly connected to the selected record on both desktop and mobile
 - Improved current-month and current-year visibility inside Hall of Fame rankings with clearer in-place highlighting
