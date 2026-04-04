@@ -18,9 +18,7 @@
 'use client';
 
 import { useState } from 'react';
-import { usePathname } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import { pageVariants } from '@/lib/utils/motionVariants';
+import { MotionConfig } from 'framer-motion';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
@@ -34,9 +32,11 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const pathname = usePathname();
 
   return (
+    // MotionConfig propagates to the entire dashboard tree — all Framer Motion
+    // animations respect prefers-reduced-motion without per-component guards.
+    <MotionConfig reducedMotion="user">
     <ProtectedRoute>
       <div className="flex h-screen overflow-hidden">
         {/* Mobile sidebar backdrop */}
@@ -53,7 +53,7 @@ export default function DashboardLayout({
         {/* Main content */}
         <div className="flex flex-1 flex-col overflow-hidden">
           {/* Mobile hamburger menu - solo landscape */}
-          <div className="flex items-center gap-4 bg-white dark:bg-gray-900 px-4 py-3 desktop:hidden max-desktop:portrait:hidden max-desktop:landscape:flex border-b">
+          <div className="flex items-center gap-4 bg-background px-4 py-3 desktop:hidden max-desktop:portrait:hidden max-desktop:landscape:flex border-b">
             <Button
               variant="ghost"
               size="sm"
@@ -66,18 +66,10 @@ export default function DashboardLayout({
           </div>
 
           <Header />
+          {/* Page transition is handled by template.tsx which re-mounts on every
+              navigation — see app/dashboard/template.tsx for the rationale */}
           <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-950 p-4 md:p-6 desktop:pb-6 max-desktop:portrait:pb-20 max-desktop:landscape:pb-6">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={pathname}
-                variants={pageVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-              >
-                {children}
-              </motion.div>
-            </AnimatePresence>
+            {children}
           </main>
         </div>
       </div>
@@ -85,5 +77,6 @@ export default function DashboardLayout({
       {/* Bottom Navigation - Solo mobile portrait */}
       <BottomNavigation />
     </ProtectedRoute>
+    </MotionConfig>
   );
 }

@@ -1,21 +1,27 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { motion } from 'framer-motion';
-import { staggerContainer, cardItem } from '@/lib/utils/motionVariants';
+import {
+  staggerContainer,
+  cardItem,
+  chartShellSettle,
+  periodContentSettle,
+  sectionRefreshPulse,
+} from '@/lib/utils/motionVariants';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { getAllPerformanceData, calculatePerformanceForPeriod, preparePerformanceChartData, getSnapshotsForPeriod, prepareMonthlyReturnsHeatmap, prepareUnderwaterDrawdownData } from '@/lib/services/performanceService';
 import { getUserSnapshots } from '@/lib/services/snapshotService';
-import { PerformanceData, PerformanceMetrics, TimePeriod, MonthlyReturnHeatmapData, UnderwaterDrawdownData } from '@/types/performance';
+import { PerformanceData, PerformanceMetrics, TimePeriod } from '@/types/performance';
 import { MonthlySnapshot } from '@/types/assets';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
-import { RefreshCw, TrendingUp, Info, Sparkles, CalendarDays, ChevronDown, X } from 'lucide-react';
+import { RefreshCw, Info, Sparkles, CalendarDays, ChevronDown, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency, formatPercentage, formatCurrencyCompact } from '@/lib/services/chartService';
 import {
@@ -81,6 +87,7 @@ import { authenticatedFetch } from '@/lib/utils/authFetch';
 
 export default function PerformancePage() {
   const { user } = useAuth();
+  const [isPendingPeriodChange, startPeriodTransition] = useTransition();
   const [performanceData, setPerformanceData] = useState<PerformanceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('YTD');
@@ -88,10 +95,23 @@ export default function PerformancePage() {
   const [showAIAnalysisDialog, setShowAIAnalysisDialog] = useState(false);
   const [cachedSnapshots, setCachedSnapshots] = useState<MonthlySnapshot[]>([]);
   const [isMethodologyOpen, setIsMethodologyOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshAnimationTick, setRefreshAnimationTick] = useState(0);
+  const [customDialogOrigin, setCustomDialogOrigin] = useState<string | undefined>(undefined);
+  const [aiDialogOrigin, setAiDialogOrigin] = useState<string | undefined>(undefined);
+  const hasLoadedOnceRef = useRef(false);
 
   // Guide strip shown once per user; localStorage flag persists across sessions.
   const STRIP_STORAGE_KEY = 'perf_guide_dismissed';
   const [showGuideStrip, setShowGuideStrip] = useState(false);
+  const periodLabels: Record<Exclude<TimePeriod, 'ROLLING_12M' | 'ROLLING_36M'>, string> = {
+    YTD: 'YTD',
+    '1Y': '1 Anno',
+    '3Y': '3 Anni',
+    '5Y': '5 Anni',
+    ALL: 'Storico',
+    CUSTOM: 'Personalizzato',
+  };
 
   // Responsive breakpoints
   const isMobile = useMediaQuery('(max-width: 767px)');
@@ -113,6 +133,21 @@ export default function PerformancePage() {
     setShowGuideStrip(false);
   };
 
+  const calculateDialogOrigin = (element: HTMLElement) => {
+    const rect = element.getBoundingClientRect();
+    const x = ((rect.left + rect.width / 2) / window.innerWidth) * 100;
+    const y = ((rect.top + rect.height / 2) / window.innerHeight) * 100;
+    return `${x.toFixed(2)}% ${y.toFixed(2)}%`;
+  };
+
+  const handlePeriodChange = (nextPeriod: TimePeriod) => {
+    if (nextPeriod === selectedPeriod) return;
+
+    startPeriodTransition(() => {
+      setSelectedPeriod(nextPeriod);
+    });
+  };
+
   /**
    * Load all performance data and cache snapshots for period switching.
    *
@@ -128,7 +163,13 @@ export default function PerformancePage() {
     if (!user) return;
 
     try {
-      setLoading(true);
+      const isInitialLoad = !hasLoadedOnceRef.current;
+      if (isInitialLoad) {
+        setLoading(true);
+      } else {
+        setIsRefreshing(true);
+        setRefreshAnimationTick((currentTick) => currentTick + 1);
+      }
 
       // Fetch snapshots once and cache them in component state.
       // This cache will be reused for all period switches and custom date ranges,
@@ -232,11 +273,13 @@ export default function PerformancePage() {
       });
 
       setPerformanceData(data);
+      hasLoadedOnceRef.current = true;
     } catch (error) {
       console.error('Error loading performance data:', error);
       toast.error('Errore nel caricamento delle metriche di performance');
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -302,7 +345,7 @@ export default function PerformancePage() {
         custom: customMetrics,
       });
 
-      setSelectedPeriod('CUSTOM');
+      handlePeriodChange('CUSTOM');
       toast.success('Periodo personalizzato calcolato');
     } catch (error) {
       console.error('Error calculating custom period:', error);
@@ -318,7 +361,7 @@ export default function PerformancePage() {
    * Note: Custom period only exists after user creates it via date picker dialog.
    * All other periods (YTD, 1Y, 3Y, 5Y, ALL) pre-calculated on page load.
    */
-  const getCurrentMetrics = (): PerformanceMetrics | null => {
+  const metrics = useMemo<PerformanceMetrics | null>(() => {
     if (!performanceData) return null;
 
     switch (selectedPeriod) {
@@ -330,72 +373,39 @@ export default function PerformancePage() {
       case 'CUSTOM': return performanceData.custom;
       default: return performanceData.ytd;
     }
-  };
+  }, [performanceData, selectedPeriod]);
 
-  /**
-   * Prepare chart data for net worth evolution visualization.
-   *
-   * Process:
-   * 1. Filter cached snapshots to current period (uses cache, no API call)
-   * 2. Transform into chart format: contributions vs returns vs total
-   *
-   * Chart shows:
-   * - Blue area: Cumulative contributions (cash added/removed by investor)
-   * - Green area: Investment returns (market gains/losses)
-   * - Orange line: Total portfolio value (contributions + returns)
-   *
-   * @returns Array of chart data points with date, netWorth, contributions, returns
-   */
-  const getChartData = () => {
-    if (!performanceData || cachedSnapshots.length === 0) return [];
+  const periodSnapshots = useMemo(() => {
+    if (!metrics || cachedSnapshots.length === 0) return [];
 
-    const metrics = getCurrentMetrics();
-    if (!metrics) return [];
-
-    // Use cached snapshots instead of fetching (instant period switching)
-    const periodSnapshots = getSnapshotsForPeriod(
-      cachedSnapshots,  // Reuse cache from loadPerformanceData
+    return getSnapshotsForPeriod(
+      cachedSnapshots,
       metrics.timePeriod,
       metrics.startDate,
       metrics.endDate
     );
+  }, [cachedSnapshots, metrics]);
+
+  const chartData = useMemo(() => {
+    if (!metrics || periodSnapshots.length === 0) return [];
 
     // YTD/1Y/3Y/5Y periods include an extra baseline snapshot before the range;
     // skip it so the chart starts at the first actual month of the selected period.
     const hasBaseline = ['YTD', '1Y', '3Y', '5Y'].includes(metrics.timePeriod);
     return preparePerformanceChartData(periodSnapshots, metrics.cashFlows, hasBaseline);
-  };
+  }, [metrics, periodSnapshots]);
 
-  const [chartData, setChartData] = useState<any[]>([]);
-  const [heatmapData, setHeatmapData] = useState<MonthlyReturnHeatmapData[]>([]);
-  const [underwaterData, setUnderwaterData] = useState<UnderwaterDrawdownData[]>([]);
+  const heatmapData = useMemo(() => {
+    if (!metrics || periodSnapshots.length === 0) return [];
+    return prepareMonthlyReturnsHeatmap(periodSnapshots, metrics.cashFlows);
+  }, [metrics, periodSnapshots]);
 
-  useEffect(() => {
-    if (performanceData && cachedSnapshots.length > 0) {
-      const data = getChartData();  // ✅ Ora sincrono!
-      setChartData(data);
+  const underwaterData = useMemo(() => {
+    if (!metrics || periodSnapshots.length === 0) return [];
 
-      // Calculate heatmap and underwater data
-      const metrics = getCurrentMetrics();
-      if (metrics) {
-        const periodSnapshots = getSnapshotsForPeriod(
-          cachedSnapshots,
-          metrics.timePeriod,
-          metrics.startDate,
-          metrics.endDate
-        );
-
-        const heatmap = prepareMonthlyReturnsHeatmap(periodSnapshots, metrics.cashFlows);
-        setHeatmapData(heatmap);
-
-        // YTD/1Y/3Y/5Y include an extra baseline snapshot; skip it from the chart
-        // (same logic as preparePerformanceChartData and prepareMonthlyReturnsHeatmap).
-        const hasBaselineUnderwater = ['YTD', '1Y', '3Y', '5Y'].includes(metrics.timePeriod);
-        const underwater = prepareUnderwaterDrawdownData(periodSnapshots, metrics.cashFlows, hasBaselineUnderwater);
-        setUnderwaterData(underwater);
-      }
-    }
-  }, [performanceData, selectedPeriod, cachedSnapshots]);
+    const hasBaseline = ['YTD', '1Y', '3Y', '5Y'].includes(metrics.timePeriod);
+    return prepareUnderwaterDrawdownData(periodSnapshots, metrics.cashFlows, hasBaseline);
+  }, [metrics, periodSnapshots]);
 
   // Responsive helper function
   const getChartHeight = () => {
@@ -499,9 +509,14 @@ export default function PerformancePage() {
     });
   };
 
-  const metrics = getCurrentMetrics();
   const rollingCagrData = getRollingCagrData(metrics);
   const rollingSharpeData = getRollingSharpeData(metrics);
+  const periodRenderKey = metrics
+    ? `${selectedPeriod}-${metrics.startDate.toISOString()}-${metrics.endDate.toISOString()}`
+    : selectedPeriod;
+  const periodDateRangeLabel = metrics
+    ? `${metrics.startDate.toLocaleDateString('it-IT')} - ${metrics.endDate.toLocaleDateString('it-IT')}`
+    : '';
 
   if (loading) {
     // Skeleton screen mirrors the real page layout so the transition feels seamless.
@@ -534,9 +549,9 @@ export default function PerformancePage() {
           </div>
         </div>
 
-        <Tabs value={selectedPeriod} onValueChange={(value) => setSelectedPeriod(value as TimePeriod)}>
+        <Tabs value={selectedPeriod} onValueChange={(value) => handlePeriodChange(value as TimePeriod)}>
           {isMobile ? (
-            <Select value={selectedPeriod} onValueChange={(value) => setSelectedPeriod(value as TimePeriod)}>
+            <Select value={selectedPeriod} onValueChange={(value) => handlePeriodChange(value as TimePeriod)}>
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -584,7 +599,13 @@ export default function PerformancePage() {
       {/* Page header — primary title gets full typographic weight; actions are grouped
           right and sized to not compete. "Aggiorna" is a utility action so it sits
           as outline to de-emphasise it relative to the AI analysis CTA. */}
-      <div className="pb-4 border-b border-border">
+      <motion.div
+        key={`header-${refreshAnimationTick}`}
+        variants={sectionRefreshPulse}
+        initial="idle"
+        animate={isRefreshing ? 'pulse' : 'idle'}
+        className="border-b border-border pb-4"
+      >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Portafoglio</p>
@@ -594,31 +615,48 @@ export default function PerformancePage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2 sm:justify-end">
-            <Button variant="outline" size="sm" onClick={() => setShowCustomDateDialog(true)} title="Periodo Personalizzato">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(event) => {
+                setCustomDialogOrigin(calculateDialogOrigin(event.currentTarget));
+                setShowCustomDateDialog(true);
+              }}
+              title="Periodo Personalizzato"
+            >
               {isMobile ? <CalendarDays className="h-4 w-4" /> : 'Periodo Personalizzato'}
             </Button>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setShowAIAnalysisDialog(true)}
+              onClick={(event) => {
+                setAiDialogOrigin(calculateDialogOrigin(event.currentTarget));
+                setShowAIAnalysisDialog(true);
+              }}
               disabled={!metrics || metrics.hasInsufficientData}
               className="group gap-2 transition-[border-color,color,box-shadow] duration-200 hover:border-purple-400 hover:text-purple-600 hover:shadow-[0_0_14px_rgba(139,92,246,0.35)] dark:hover:text-purple-400 dark:hover:border-purple-500"
             >
               <Sparkles className="h-4 w-4 transition-transform duration-200 group-hover:rotate-12 group-hover:scale-110" />
               Analizza con AI
             </Button>
-            <Button variant="ghost" size="sm" onClick={loadPerformanceData} className="text-muted-foreground hover:text-foreground">
-              <RefreshCw className="mr-2 h-4 w-4" />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={loadPerformanceData}
+              disabled={isRefreshing}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <RefreshCw className={cn('mr-2 h-4 w-4', isRefreshing && 'animate-spin')} />
               Aggiorna
             </Button>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Period Selector */}
-      <Tabs value={selectedPeriod} onValueChange={(value) => setSelectedPeriod(value as TimePeriod)}>
+      <Tabs value={selectedPeriod} onValueChange={(value) => handlePeriodChange(value as TimePeriod)}>
         {isMobile ? (
-          <Select value={selectedPeriod} onValueChange={(value) => setSelectedPeriod(value as TimePeriod)}>
+          <Select value={selectedPeriod} onValueChange={(value) => handlePeriodChange(value as TimePeriod)}>
             <SelectTrigger className="w-full">
               <SelectValue />
             </SelectTrigger>
@@ -643,6 +681,26 @@ export default function PerformancePage() {
             </TabsTrigger>
           </TabsList>
         )}
+
+        <motion.div
+          key={periodRenderKey}
+          variants={periodContentSettle}
+          initial="idle"
+          animate="settle"
+          className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
+        >
+          <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1 font-medium text-foreground">
+            Periodo {periodLabels[selectedPeriod as keyof typeof periodLabels]}
+          </span>
+          <span className="rounded-full border border-border bg-background px-2.5 py-1">
+            {periodDateRangeLabel}
+          </span>
+          {(isPendingPeriodChange || isRefreshing) && (
+            <span className="rounded-full border border-border bg-background px-2.5 py-1">
+              Aggiornamento in corso...
+            </span>
+          )}
+        </motion.div>
 
         {/* Guide strip — shown once per user until dismissed. Orients first-time
             readers without interrupting the data flow for returning users. */}
@@ -674,8 +732,10 @@ export default function PerformancePage() {
              - Performance documentation in /docs (if exists)
              Keep explanations consistent across all locations! */}
 
-        {/* key={selectedPeriod} forces remount on period switch, replaying entrance animations */}
-        <div key={selectedPeriod}>
+        <motion.div
+          layout
+          className="space-y-0"
+        >
 
         {/* === METRICHE DI RENDIMENTO === */}
         <MetricSection
@@ -846,11 +906,17 @@ export default function PerformancePage() {
           </MetricSection>
         )}
 
-        </div>{/* end key={selectedPeriod} animation wrapper */}
+        </motion.div>
 
         {/* Chart cards — stagger container propagates hidden→visible to children,
              preventing the compound-opacity flash caused by having both a page-level
              fade and independent initial="hidden" on every card simultaneously. */}
+        <motion.div
+          key={`charts-${periodRenderKey}`}
+          variants={chartShellSettle}
+          initial="idle"
+          animate="settle"
+        >
         <motion.div variants={staggerContainer} initial="hidden" animate="visible">
 
         {/* Net Worth Evolution Chart */}
@@ -1046,7 +1112,7 @@ export default function PerformancePage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <MonthlyReturnsHeatmap data={heatmapData} />
+            <MonthlyReturnsHeatmap data={heatmapData} revealKey={periodRenderKey} />
           </CardContent>
         </Card>
         </motion.div>
@@ -1062,7 +1128,11 @@ export default function PerformancePage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <UnderwaterDrawdownChart data={underwaterData} height={getChartHeight()} />
+            <UnderwaterDrawdownChart
+              data={underwaterData}
+              height={getChartHeight()}
+              revealKey={periodRenderKey}
+            />
           </CardContent>
         </Card>
         </motion.div>
@@ -1233,23 +1303,36 @@ export default function PerformancePage() {
         </motion.div>
 
         </motion.div>{/* end staggerContainer */}
+        </motion.div>
       </Tabs>
 
       {/* Custom Date Range Dialog */}
       <CustomDateRangeDialog
         open={showCustomDateDialog}
-        onOpenChange={setShowCustomDateDialog}
+        onOpenChange={(open) => {
+          setShowCustomDateDialog(open);
+          if (!open) {
+            setCustomDialogOrigin(undefined);
+          }
+        }}
         onConfirm={handleCustomDateRange}
+        triggerOrigin={customDialogOrigin}
       />
 
       {/* AI Analysis Dialog */}
       {user && metrics && !metrics.hasInsufficientData && (
         <AIAnalysisDialog
           open={showAIAnalysisDialog}
-          onOpenChange={setShowAIAnalysisDialog}
+          onOpenChange={(open) => {
+            setShowAIAnalysisDialog(open);
+            if (!open) {
+              setAiDialogOrigin(undefined);
+            }
+          }}
           metrics={metrics}
           timePeriod={selectedPeriod}
           userId={user.uid}
+          triggerOrigin={aiDialogOrigin}
         />
       )}
     </div>

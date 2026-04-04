@@ -47,6 +47,7 @@ export interface AIAnalysisDialogProps {
   metrics: any; // PerformanceMetrics
   timePeriod: TimePeriod;
   userId: string;
+  triggerOrigin?: string;
 }
 
 // Format percentage metric, returns "N/D" for null
@@ -73,6 +74,7 @@ export function AIAnalysisDialog({
   metrics,
   timePeriod,
   userId,
+  triggerOrigin,
 }: AIAnalysisDialogProps) {
   const [analysis, setAnalysis] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
@@ -176,7 +178,10 @@ export function AIAnalysisDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] md:max-w-6xl max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogContent
+        className="flex max-h-[85vh] max-w-[95vw] flex-col overflow-hidden rounded-xl md:max-w-6xl"
+        style={triggerOrigin ? { transformOrigin: triggerOrigin } : undefined}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-purple-600" />

@@ -18,6 +18,7 @@
  */
 
 import { useState, useMemo, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FIREProjectionScenarios, FIREScenarioParams } from '@/types/assets';
@@ -33,6 +34,8 @@ import { TrendingUp, TrendingDown, Target, RotateCcw, Save, Info, Wallet } from 
 import { toast } from 'sonner';
 import { FIREProjectionChart } from './FIREProjectionChart';
 import { FIREProjectionTable } from './FIREProjectionTable';
+import { useCountUp } from '@/lib/utils/useCountUp';
+import { metricSettleTransition, simulationShellSettle } from '@/lib/utils/motionVariants';
 
 interface FIREProjectionSectionProps {
   userId: string;
@@ -50,6 +53,16 @@ const SCENARIO_CONFIG = {
 
 type ScenarioKey = keyof typeof SCENARIO_CONFIG;
 
+function SettledYearsToFire({ years }: { years: number | null }) {
+  const animatedYears = useCountUp(years, { fromPrevious: true, duration: 500, startDelay: 0 });
+
+  if (years === null) {
+    return <span>50+ anni</span>;
+  }
+
+  return <span>{Math.round(animatedYears ?? years)} anni</span>;
+}
+
 export function FIREProjectionSection({
   userId,
   currentNetWorth,
@@ -64,6 +77,7 @@ export function FIREProjectionSection({
   const [scenarios, setScenarios] = useState<FIREProjectionScenarios>(
     settings?.fireProjectionScenarios ?? defaults
   );
+  const [resultsAnimationState, setResultsAnimationState] = useState<'idle' | 'settle'>('idle');
 
   // Sync from settings when they load/change
   useEffect(() => {
@@ -132,6 +146,14 @@ export function FIREProjectionSection({
     }));
   };
 
+  useEffect(() => {
+    if (!projection) return;
+
+    setResultsAnimationState('settle');
+    const timer = window.setTimeout(() => setResultsAnimationState('idle'), 320);
+    return () => window.clearTimeout(timer);
+  }, [projection]);
+
   if (isLoadingSavings) {
     return (
       <div className="flex h-32 items-center justify-center">
@@ -144,10 +166,13 @@ export function FIREProjectionSection({
     <div className="space-y-6">
       {/* Section Header */}
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">📈 Proiezione Scenari</h2>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Proiezione Scenari</h2>
         <p className="text-sm text-gray-600 dark:text-gray-400">
           Proiezione del patrimonio sotto 3 scenari di mercato con inflazione sulle spese.
           Il FIRE Number cresce ogni anno perché le spese aumentano con l&apos;inflazione.
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Ogni modifica ai parametri aggiorna subito gli scenari, senza resettare la lettura del grafico.
         </p>
       </div>
 
@@ -237,7 +262,12 @@ export function FIREProjectionSection({
       {projection && (
         <>
           {/* Summary Cards: Years to FIRE */}
-          <div className="grid gap-4 desktop:grid-cols-3">
+          <motion.div
+            className="grid gap-4 desktop:grid-cols-3"
+            variants={simulationShellSettle}
+            initial={false}
+            animate={resultsAnimationState}
+          >
             {(Object.keys(SCENARIO_CONFIG) as ScenarioKey[]).map((key) => {
               const config = SCENARIO_CONFIG[key];
               const Icon = config.icon;
@@ -254,7 +284,7 @@ export function FIREProjectionSection({
                   </CardHeader>
                   <CardContent>
                     <div className={`text-3xl font-bold ${config.boldColor}`}>
-                      {years !== null ? `${years} anni` : '50+ anni'}
+                      <SettledYearsToFire years={years} />
                     </div>
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       {years !== null
@@ -266,9 +296,10 @@ export function FIREProjectionSection({
                 </Card>
               );
             })}
-          </div>
+          </motion.div>
 
           {/* Projection Chart */}
+          <motion.div variants={simulationShellSettle} initial={false} animate={resultsAnimationState}>
           <Card>
             <CardHeader>
               <CardTitle>Proiezione Patrimonio</CardTitle>
@@ -287,6 +318,7 @@ export function FIREProjectionSection({
               />
             </CardContent>
           </Card>
+          </motion.div>
 
           {/* Year-by-Year Table */}
           <FIREProjectionTable yearlyData={projection.yearlyData} />

@@ -17,7 +17,8 @@
  * @returns Tab component with parameter form, simulation button, and results visualization
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAllAssets, calculateTotalValue, calculateLiquidNetWorth } from '@/lib/services/assetService';
@@ -40,6 +41,7 @@ import { DistributionChart } from '@/components/monte-carlo/DistributionChart';
 import { ScenarioParameterCards } from '@/components/monte-carlo/ScenarioParameterCards';
 import { ScenarioComparisonResults } from '@/components/monte-carlo/ScenarioComparisonResults';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { chartReveal, simulationShellSettle } from '@/lib/utils/motionVariants';
 
 export function MonteCarloTab() {
   // ========== State and Data Fetching ==========
@@ -48,6 +50,10 @@ export function MonteCarloTab() {
   const queryClient = useQueryClient();
   const [results, setResults] = useState<MonteCarloResults | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const reducedMotion = useReducedMotion();
+  const [singleRunVersion, setSingleRunVersion] = useState(0);
+  const [scenarioRunVersion, setScenarioRunVersion] = useState(0);
+  const [resultsAnimationState, setResultsAnimationState] = useState<'idle' | 'settle'>('idle');
 
   // Scenario mode state
   const [scenarioMode, setScenarioMode] = useState(false);
@@ -57,6 +63,20 @@ export function MonteCarloTab() {
     base: MonteCarloResults;
     bull: MonteCarloResults;
   } | null>(null);
+
+  useEffect(() => {
+    if (reducedMotion) {
+      setResultsAnimationState('idle');
+      return;
+    }
+
+    const version = scenarioMode ? scenarioRunVersion : singleRunVersion;
+    if (version === 0) return;
+
+    setResultsAnimationState('settle');
+    const timer = window.setTimeout(() => setResultsAnimationState('idle'), 320);
+    return () => window.clearTimeout(timer);
+  }, [reducedMotion, scenarioMode, scenarioRunVersion, singleRunVersion]);
 
   /**
    * React Query Integration: Both queries run in parallel and are cached for 5 minutes.
@@ -232,6 +252,7 @@ export function MonteCarloTab() {
       try {
         const simulationResults = runMonteCarloSimulation(params);
         setResults(simulationResults);
+        setSingleRunVersion((current) => current + 1);
         toast.success(`Simulazione completata! Tasso di successo: ${simulationResults.successRate.toFixed(1)}%`);
       } catch (error) {
         console.error('Error running simulation:', error);
@@ -259,6 +280,7 @@ export function MonteCarloTab() {
         const bullResults = runMonteCarloSimulation(bullParams);
 
         setScenarioResults({ bear: bearResults, base: baseResults, bull: bullResults });
+        setScenarioRunVersion((current) => current + 1);
         toast.success('Simulazione scenari completata!');
       } catch (error) {
         console.error('Error running scenario simulation:', error);
@@ -274,6 +296,11 @@ export function MonteCarloTab() {
   if (isLoadingAssets || isLoadingSettings) {
     return <MonteCarloSkeleton />;
   }
+
+  const hasVisibleResults = useMemo(
+    () => (!scenarioMode && !!results) || (scenarioMode && !!scenarioResults),
+    [results, scenarioMode, scenarioResults]
+  );
 
   return (
     <div className="space-y-6">
@@ -359,9 +386,25 @@ export function MonteCarloTab() {
         />
       )}
 
+      {isRunning && hasVisibleResults && (
+        <Card className="border-border bg-muted/40">
+          <CardContent className="flex items-center gap-3 py-4 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>
+              Ricalcolo in corso. Manteniamo visibile l&apos;ultima simulazione valida finche&apos; il nuovo scenario non si assesta.
+            </span>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ========== Single Mode Results ========== */}
       {!scenarioMode && results && (
-        <>
+        <motion.div
+          className="space-y-6"
+          variants={simulationShellSettle}
+          initial={false}
+          animate={resultsAnimationState}
+        >
           {/* Success Rate Card */}
           <SuccessRateCard
             successRate={results.successRate}
@@ -372,10 +415,22 @@ export function MonteCarloTab() {
           />
 
           {/* Simulation Chart (Fan Chart) */}
-          <SimulationChart data={results.percentiles} retirementYears={params.retirementYears} />
+          <motion.div variants={chartReveal} initial={reducedMotion ? false : 'hidden'} animate="visible">
+            <SimulationChart
+              data={results.percentiles}
+              retirementYears={params.retirementYears}
+              revealKey={singleRunVersion}
+            />
+          </motion.div>
 
           {/* Distribution Chart */}
-          <DistributionChart data={results.distribution} retirementYears={params.retirementYears} />
+          <motion.div variants={chartReveal} initial={reducedMotion ? false : 'hidden'} animate="visible">
+            <DistributionChart
+              data={results.distribution}
+              retirementYears={params.retirementYears}
+              revealKey={singleRunVersion}
+            />
+          </motion.div>
 
           {/* Failure Analysis (if applicable) */}
           {results.failureAnalysis && (
@@ -479,7 +534,7 @@ export function MonteCarloTab() {
               </div>
             </CardContent>
           </Card>
-        </>
+        </motion.div>
       )}
 
       {/* ========== Scenario Mode Results ========== */}
@@ -490,6 +545,7 @@ export function MonteCarloTab() {
           bull={scenarioResults.bull}
           retirementYears={params.retirementYears}
           numberOfSimulations={params.numberOfSimulations}
+          refreshKey={scenarioRunVersion}
         />
       )}
 

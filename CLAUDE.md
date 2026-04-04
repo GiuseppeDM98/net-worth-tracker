@@ -5,9 +5,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-03, session 39): **Secondary visual rhythm (Spec 10)**. Overview and History pages now have 3 explicit reading zones separated by `border-t border-border/40` dividers and tighter `space-y-4` grouping for secondary card clusters. Overview: secondary metrics (Variazioni, Expense Stats, Cost Cards) grouped with `space-y-4`; "Composizione" eyebrow + border-t before pie charts. History: zone dividers before "Risparmio vs Crescita" (evolution→analysis) and before "Tempo di Raddoppio" (analysis→context). Dividers added as `className` on existing `motion.div` so they animate with content. Also: "Risparmiato da Lavoro" card in History now shows total expenses for the period as a sub-line (`totalExpensesSum` exposed from `laborIncomeMetrics` useMemo return).
-- Previous implementation (2026-04-03, session 38): **Brand integration + contextual help distribution**. Hall of Fame: "Ranking/Rankings" → "Record" throughout Italian copy; title and nav unchanged (intentional English brand choice). Performance methodology section compressed: YOC 68→12 lines, Current Yield 94→12 lines, 5 chart sections trimmed (removed redundant intros and "Interpretazione" paragraphs already covered by CardDescriptions). Allocation: "Specific Assets" → "Asset specifici" in h1/CardTitle/sheet mobile; callout "Nota" → "Asset specifici"; goal-derived callout shortened. Settings: labor income helper tightened.
-- Previous implementation (2026-04-03, session 37): **Allocation page guidance integration**. Removed standalone blue `Legenda` box. All 3 desktop table "Azione" headers now show `±2% soglia` sub-line (`text-[10px] text-muted-foreground`). Mobile card difference banner replaced static "Differenza" label with contextual `Da acquistare` / `Da ridurre` / `Bilanciato` based on action signal.
+- Latest implementation (2026-04-04, session 53): **Auth polish pass**. Login and Register now enter with a calmer shared motion pattern, keep field focus continuity more refined, and provide clearer inline submit feedback without changing the authentication flows.
+- Previous implementation (2026-04-04, session 52): **Hall of Fame overdrive pass**. Hall of Fame now presents monthly and yearly rankings with a more editorial hierarchy, adds current-period spotlight cards with live ranking values, and opens note dialogs with clearer trigger continuity from the selected record.
+- Previous implementation (2026-04-04, session 51): **FIRE & Simulations overdrive pass**. Monte Carlo now preserves previous results during reruns and reveals distributions more progressively, Goal-Based Investing links summary focus to allocation and detail views more clearly, and the FIRE calculator/projection surfaces react with a steadier local preview instead of abrupt redraws.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -19,6 +19,15 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Key Features (Active)
 - Portfolio tracking across equities, bonds, crypto, real estate, commodities, and cash
 - Automatic price updates via Yahoo Finance and Borsa Italiana bond support
+- Login and Register now feel more native to the product, with calmer entry motion, cleaner field focus choreography, keyboard-reachable password toggles, and inline submit status feedback
+- Hall of Fame now reads as an editorial ranking surface with clearer monthly/yearly hierarchy, spotlight cards for the current month/year, and contextual note dialogs tied to the selected record
+- Cashflow now preserves context better across `Tracciamento`, `Dividendi & Cedole`, `Anno Corrente`, `Storico Totale`, and `Budget`, with calmer filter feedback and a steadier Budget deep-dive flow
+- Dividendi & Cedole now keeps calendar day focus, active date filtering, table/detail context, and summary cards more tightly in sync, with a read-only contextual detail step before edit mode
+- Storico now reads more like a guided analysis surface: main sections enter as chapters, dense blocks are separated more clearly, chart mode switches feel local instead of page-wide, and doubling milestones build progressively
+- Rendimenti now presents smoother period switching, KPI settling from prior values, staged monthly heatmap reveal, a more legible underwater drawdown surface, and contextual custom-range / AI dialogs
+- Allocazione now presents a more readable drill-down path on desktop and a steadier mobile sheet experience, with each drill-down level reopening from the top and progress bars using centered target markers
+- Patrimonio now preserves visited macro-tab and sub-tab state across `Gestione Asset`, `Anno Corrente`, and `Storico`, with calmer transitions for dense historical tables and scoped refresh feedback on the active view
+- Overview/Dashboard now emphasizes the primary net-worth KPI with a more precise count-up/settle pattern, softer conditional-card reflow, and chart reveals that avoid noisy replay on secondary updates
 - Private API actions now require verified Firebase auth server-side, while scheduled maintenance flows continue to authenticate with `CRON_SECRET`
 - Cashflow tracking with categories, filters, Sankey drill-down, budget management, and linked cash-account updates
 - History page with net worth evolution, asset class breakdown, liquidity, YoY variation, savings vs investment growth, `Lavoro & Investimenti`, doubling analysis, and allocation comparison
@@ -26,10 +35,11 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - lifetime KPI cards for labor income, saved from work (with total expenses sub-line), gross investment growth, and net investment growth
   - positive-month and negative-month counters based on monthly `netWorthGrowth`
   - monthly chart from `prepareMonthlyLaborMetricsData()`
-- Performance page with ROI, CAGR, TWR, IRR, Sharpe, drawdown metrics, YOC, current yield, rolling charts, and monthly returns heatmap; progressive disclosure: collapsible methodology, one-time guide strip, "Avanzato" badges on technical metrics
-- Dividends and coupons tracking with EUR conversion, calendar, total return per asset, and DPS growth
-- FIRE planning with primary residence toggle, liquid vs illiquid split, and scenario projections
-- Monte Carlo simulations and goal-based investing
+- Settings page now offers visible unsaved-state preview and clearer in-context feedback for sensitive configuration changes (without autosave behavior changes)
+- Dividends and coupons tracking with EUR conversion, focused monthly calendar, contextual per-payment detail view, total return per asset, and DPS growth summaries
+- FIRE planning now includes local preview feedback in the calculator, steadier scenario projections, and clearer liquid vs illiquid readouts
+- Monte Carlo simulations now preserve result continuity across reruns, with progressive percentile/distribution reveal and more explicit Bear/Base/Bull comparison focus
+- Goal-based investing now links summary cards, allocation chart, and detail cards through a shared focus model for faster visual comprehension
 - PDF export and AI-powered performance analysis
 
 ## Testing
@@ -59,11 +69,12 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - FIRE: `components/fire-simulations/*`, `lib/services/fireService.ts`
 - Dividends: `components/dividends/*`
 - Settings: `app/dashboard/settings/page.tsx`, `lib/services/assetAllocationService.ts`
-
+- Allocation: `app/dashboard/allocation/page.tsx`, `components/allocation/*`
+- Assets: `app/dashboard/assets/page.tsx`, `components/assets/AssetPriceHistoryTable.tsx`, `components/assets/AssetClassHistoryTable.tsx`
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-03 (session 39)
+**Last updated**: 2026-04-04 (session 53)
 
 ## Design Context
 

@@ -1,12 +1,16 @@
 'use client';
 
+import { useId, useMemo } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { UnderwaterDrawdownData } from '@/types/performance';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { formatPercentage } from '@/lib/services/chartService';
+import { chartShellSettle } from '@/lib/utils/motionVariants';
 
 interface UnderwaterDrawdownChartProps {
   data: UnderwaterDrawdownData[];
   height?: number;
+  revealKey?: string;
 }
 
 interface CustomTooltipProps {
@@ -57,7 +61,23 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
  * @param data - Array of date/drawdown data points
  * @param height - Chart height in pixels (default: 400)
  */
-export function UnderwaterDrawdownChart({ data, height = 400 }: UnderwaterDrawdownChartProps) {
+export function UnderwaterDrawdownChart({
+  data,
+  height = 400,
+  revealKey,
+}: UnderwaterDrawdownChartProps) {
+  const prefersReducedMotion = useReducedMotion();
+  const gradientId = useId();
+
+  const deepestPoint = useMemo(() => (
+    data.reduce<UnderwaterDrawdownData | null>((lowestPoint, currentPoint) => {
+      if (!lowestPoint || currentPoint.drawdown < lowestPoint.drawdown) {
+        return currentPoint;
+      }
+      return lowestPoint;
+    }, null)
+  ), [data]);
+
   if (data.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
@@ -67,8 +87,32 @@ export function UnderwaterDrawdownChart({ data, height = 400 }: UnderwaterDrawdo
   }
 
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <motion.div
+      key={revealKey}
+      variants={chartShellSettle}
+      initial={prefersReducedMotion ? false : 'idle'}
+      animate={prefersReducedMotion ? 'idle' : 'settle'}
+      className="space-y-3"
+    >
+      {deepestPoint && (
+        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+          <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1">
+            Max Drawdown {formatPercentage(deepestPoint.drawdown)}
+          </span>
+          <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1">
+            Punto piu&apos; profondo {deepestPoint.date}
+          </span>
+        </div>
+      )}
+      <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={data}>
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#ef4444" stopOpacity={0.42} />
+            <stop offset="65%" stopColor="#ef4444" stopOpacity={0.18} />
+            <stop offset="100%" stopColor="#ef4444" stopOpacity={0.06} />
+          </linearGradient>
+        </defs>
         {/* stroke="var(--border)" makes the grid theme-aware without JS theme detection */}
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
         <XAxis
@@ -91,13 +135,14 @@ export function UnderwaterDrawdownChart({ data, height = 400 }: UnderwaterDrawdo
           type="monotone"
           dataKey="drawdown"
           stroke="#EF4444" // red-500
-          fill="#EF4444"
-          fillOpacity={0.3}
+          fill={`url(#${gradientId})`}
           name="Drawdown"
-          animationDuration={800}
+          animationBegin={0}
+          animationDuration={prefersReducedMotion ? 0 : 900}
           animationEasing="ease-out"
         />
       </AreaChart>
-    </ResponsiveContainer>
+      </ResponsiveContainer>
+    </motion.div>
   );
 }

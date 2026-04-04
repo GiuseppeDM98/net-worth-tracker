@@ -16,6 +16,7 @@ interface CustomDateRangeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: (startDate: Date, endDate: Date) => void;
+  triggerOrigin?: string;
 }
 
 /**
@@ -33,6 +34,7 @@ export function CustomDateRangeDialog({
   open,
   onOpenChange,
   onConfirm,
+  triggerOrigin,
 }: CustomDateRangeDialogProps) {
   // === State Management ===
 
@@ -70,15 +72,18 @@ export function CustomDateRangeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
+      <DialogContent
+        className="sm:max-w-md"
+        style={triggerOrigin ? { transformOrigin: triggerOrigin } : undefined}
+      >
+        <DialogHeader className="pb-2">
           <DialogTitle>Seleziona Periodo Personalizzato</DialogTitle>
           <DialogDescription>
             Scegli le date di inizio e fine per calcolare le metriche di performance.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4 py-4">
+        <div className="grid gap-4 py-2">
           <div className="grid gap-2">
             <Label htmlFor="start-date">Data di Inizio</Label>
             <Input

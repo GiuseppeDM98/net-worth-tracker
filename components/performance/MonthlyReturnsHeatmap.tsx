@@ -1,10 +1,13 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
+import { useReducedMotion } from 'framer-motion';
 import { MonthlyReturnHeatmapData } from '@/types/performance';
 import { formatPercentage } from '@/lib/services/chartService';
 
 interface MonthlyReturnsHeatmapProps {
   data: MonthlyReturnHeatmapData[];
+  revealKey?: string;
 }
 
 const MONTH_NAMES = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
@@ -41,7 +44,33 @@ function getTextColor(returnValue: number | null): string {
   return 'text-foreground';
 }
 
-export function MonthlyReturnsHeatmap({ data }: MonthlyReturnsHeatmapProps) {
+export function MonthlyReturnsHeatmap({ data, revealKey }: MonthlyReturnsHeatmapProps) {
+  const prefersReducedMotion = useReducedMotion();
+  const [revealedRows, setRevealedRows] = useState<number>(0);
+
+  const rowCount = data.length;
+
+  useEffect(() => {
+    if (prefersReducedMotion || rowCount === 0) {
+      setRevealedRows(rowCount);
+      return;
+    }
+
+    setRevealedRows(0);
+
+    const timeouts = data.map((_, index) => (
+      window.setTimeout(() => {
+        setRevealedRows((previous) => Math.max(previous, index + 1));
+      }, index * 90)
+    ));
+
+    return () => {
+      timeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
+    };
+  }, [data, prefersReducedMotion, revealKey, rowCount]);
+
+  const columnHeaders = useMemo(() => MONTH_NAMES.map((month, i) => ({ month, letter: MONTH_LETTERS[i] })), []);
+
   if (data.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
@@ -58,26 +87,46 @@ export function MonthlyReturnsHeatmap({ data }: MonthlyReturnsHeatmapProps) {
         <thead>
           <tr>
             <th className="border border-border p-1 desktop:p-2 bg-muted font-semibold text-left sticky left-0 z-10">Anno</th>
-            {MONTH_NAMES.map((month, i) => (
+            {columnHeaders.map(({ month, letter }) => (
               <th key={month} className="border border-border p-1 desktop:p-2 bg-muted font-semibold text-center">
-                <span className="desktop:hidden">{MONTH_LETTERS[i]}</span>
+                <span className="desktop:hidden">{letter}</span>
                 <span className="hidden desktop:inline">{month}</span>
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {data.map((yearData) => (
-            <tr key={yearData.year}>
+          {data.map((yearData, rowIndex) => (
+            <tr
+              key={yearData.year}
+              className="transition-[opacity,transform] duration-300 ease-out"
+              style={
+                prefersReducedMotion
+                  ? undefined
+                  : {
+                      opacity: revealedRows > rowIndex ? 1 : 0,
+                      transform: revealedRows > rowIndex ? 'translateY(0)' : 'translateY(6px)',
+                    }
+              }
+            >
               <td className="border border-border p-1 desktop:p-2 bg-muted font-semibold sticky left-0 z-10">{yearData.year}</td>
-              {yearData.months.map((monthData) => {
+              {yearData.months.map((monthData, monthIndex) => {
                 const bgColor = getReturnColor(monthData.return);
                 const textColor = getTextColor(monthData.return);
 
                 return (
                   <td
                     key={monthData.month}
-                    className={`border border-border p-1 desktop:p-2 text-center ${bgColor} ${textColor}`}
+                    className={`border border-border p-1 desktop:p-2 text-center transition-[background-color,opacity,transform] duration-300 ease-out ${bgColor} ${textColor}`}
+                    style={
+                      prefersReducedMotion
+                        ? undefined
+                        : {
+                            opacity: revealedRows > rowIndex ? 1 : 0.1,
+                            transform: revealedRows > rowIndex ? 'scale(1)' : 'scale(0.985)',
+                            transitionDelay: `${monthIndex * 14}ms`,
+                          }
+                    }
                     title={
                       monthData.return !== null
                         ? `${MONTH_NAMES[monthData.month - 1]} ${yearData.year}: ${formatPercentage(monthData.return)}`

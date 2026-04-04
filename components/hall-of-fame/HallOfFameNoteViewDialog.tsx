@@ -27,6 +27,7 @@
  * AIAnalysisDialog.tsx (footer button pattern for actions)
  */
 
+import type { CSSProperties, RefObject } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -87,6 +88,8 @@ interface HallOfFameNoteViewDialogProps {
   onOpenChange: (open: boolean) => void;
   note: HallOfFameNote | null;
   onEditClick: () => void; // Triggers transition to edit mode
+  dialogRef?: RefObject<HTMLDivElement | null>;
+  style?: CSSProperties;
 }
 
 export function HallOfFameNoteViewDialog({
@@ -94,6 +97,8 @@ export function HallOfFameNoteViewDialog({
   onOpenChange,
   note,
   onEditClick,
+  dialogRef,
+  style,
 }: HallOfFameNoteViewDialogProps) {
   // Early return if no note provided (defensive programming)
   if (!note) {
@@ -118,7 +123,11 @@ export function HallOfFameNoteViewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+      <DialogContent
+        ref={dialogRef}
+        style={style}
+        className="max-w-lg max-h-[80vh] overflow-hidden flex flex-col"
+      >
         <DialogHeader>
           <DialogTitle>Visualizza Nota</DialogTitle>
         </DialogHeader>

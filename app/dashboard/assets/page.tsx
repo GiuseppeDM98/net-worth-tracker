@@ -22,12 +22,11 @@
 
 'use client';
 
-import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
-import { useQueryClient } from '@tanstack/react-query';
-import { queryKeys } from '@/lib/query/queryKeys';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Wallet, CalendarClock, History, Monitor } from 'lucide-react';
@@ -35,33 +34,98 @@ import { AssetManagementTab } from '@/components/assets/AssetManagementTab';
 import { AssetPriceHistoryTable } from '@/components/assets/AssetPriceHistoryTable';
 import { AssetClassHistoryTable } from '@/components/assets/AssetClassHistoryTable';
 import { getCurrentYear } from '@/lib/utils/assetPriceHistoryUtils';
+import { cn } from '@/lib/utils';
+import { tabPanelSwitch } from '@/lib/utils/motionVariants';
+
+type MacroTabId = 'management' | 'anno-corrente' | 'storico';
+type HistoricalSubTabId = 'prezzi' | 'valori' | 'asset-class';
 
 export default function AssetsPage() {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
 
   // React Query hooks - automatic caching and invalidation
-  const { data: assets = [], isLoading: loading, refetch } = useAssets(user?.uid);
-  const { data: snapshots = [], isLoading: snapshotsLoading } = useSnapshots(user?.uid);
+  const { data: assets = [], isLoading: loading, refetch: refetchAssets } = useAssets(user?.uid);
+  const {
+    data: snapshots = [],
+    isLoading: snapshotsLoading,
+    refetch: refetchSnapshots,
+  } = useSnapshots(user?.uid);
 
   // Macro-tab state — lazy loading applied only to 'anno-corrente' and 'storico'
-  type MacroTabId = 'management' | 'anno-corrente' | 'storico';
   const [mountedTabs, setMountedTabs] = useState<Set<MacroTabId>>(new Set(['management']));
   const [activeTab, setActiveTab] = useState<MacroTabId>('management');
+  const [mountedHistoricalSubTabs, setMountedHistoricalSubTabs] = useState<
+    Record<Exclude<MacroTabId, 'management'>, Set<HistoricalSubTabId>>
+  >({
+    'anno-corrente': new Set(['prezzi']),
+    storico: new Set(['prezzi']),
+  });
+  const [historicalSubTabs, setHistoricalSubTabs] = useState<
+    Record<Exclude<MacroTabId, 'management'>, HistoricalSubTabId>
+  >({
+    'anno-corrente': 'prezzi',
+    storico: 'prezzi',
+  });
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshToken, setRefreshToken] = useState(0);
+  const [lastRefreshAt, setLastRefreshAt] = useState<Date | null>(null);
+  const [lastRefreshedViewKey, setLastRefreshedViewKey] = useState<string | null>(null);
 
   const handleTabChange = (value: string) => {
     setActiveTab(value as MacroTabId);
     setMountedTabs((prev) => new Set(prev).add(value as MacroTabId));
   };
 
-  const handleRefresh = async () => {
-    await Promise.all([
-      refetch(),
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.snapshots.all(user?.uid || ''),
-      }),
-    ]);
+  const handleHistoricalSubTabChange = (
+    tab: Exclude<MacroTabId, 'management'>,
+    value: string
+  ) => {
+    const nextValue = value as HistoricalSubTabId;
+    setHistoricalSubTabs((prev) => ({
+      ...prev,
+      [tab]: nextValue,
+    }));
+    setMountedHistoricalSubTabs((prev) => ({
+      ...prev,
+      [tab]: new Set(prev[tab]).add(nextValue),
+    }));
   };
+
+  const activeViewKey = useMemo(() => {
+    if (activeTab === 'management') return 'management';
+    return `${activeTab}:${historicalSubTabs[activeTab]}`;
+  }, [activeTab, historicalSubTabs]);
+
+  const handleRefresh = async () => {
+    const refreshViewKey = activeViewKey;
+    setIsRefreshing(true);
+
+    try {
+      await Promise.all([refetchAssets(), refetchSnapshots()]);
+      setLastRefreshAt(new Date());
+      setLastRefreshedViewKey(refreshViewKey);
+      setRefreshToken((prev) => prev + 1);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const formatRefreshTime = (date: Date | null) => {
+    if (!date) return null;
+
+    return new Intl.DateTimeFormat('it-IT', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).format(date);
+  };
+
+  const lastRefreshLabel = formatRefreshTime(lastRefreshAt);
+  const mobileBannerClassName = cn(
+    'desktop:hidden mb-4 flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm',
+    'border-border bg-card text-muted-foreground',
+    isRefreshing && 'border-primary/30 bg-primary/5 text-foreground'
+  );
 
   if (loading) {
     return (
@@ -74,8 +138,9 @@ export default function AssetsPage() {
   return (
     <div className="space-y-6 max-desktop:portrait:pb-20">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">Patrimonio</h1>
-        <p className="mt-2 text-gray-600 dark:text-gray-400">Gestisci e monitora il tuo patrimonio</p>
+        <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Patrimonio</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Patrimonio</h1>
+        <p className="mt-2 text-muted-foreground">Gestisci e monitora il tuo patrimonio</p>
       </div>
 
       {/* Outer tabs: 3 macro-tabs */}
@@ -113,19 +178,35 @@ export default function AssetsPage() {
         </div>
 
         {/* Macro-tab 1: Gestione Asset (always mounted) */}
-        <TabsContent value="management" className="mt-6">
-          <AssetManagementTab assets={assets} loading={loading} onRefresh={handleRefresh} />
+        <TabsContent value="management" className="mt-6" forceMount>
+          <motion.div
+            initial={false}
+            animate={activeTab === 'management' ? 'visible' : 'hidden'}
+            variants={tabPanelSwitch}
+          >
+            <AssetManagementTab assets={assets} loading={loading} onRefresh={handleRefresh} />
+          </motion.div>
         </TabsContent>
 
         {/* Macro-tab 2: Anno Corrente (lazy-loaded) — sub-tabs: Prezzi, Valori, Asset Class */}
         {mountedTabs.has('anno-corrente') && (
-          <TabsContent value="anno-corrente" className="mt-6">
-            {/* Desktop recommended banner — hidden on 1440px+ where the table is fully usable */}
-            <div className="desktop:hidden flex items-center gap-2 mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700 dark:border-blue-800 dark:bg-blue-950/20 dark:text-blue-400">
-              <Monitor className="h-4 w-4 shrink-0" />
-              <span>Per una migliore esperienza si consiglia la visualizzazione su desktop.</span>
+          <TabsContent value="anno-corrente" className="mt-6" forceMount>
+            <div className={mobileBannerClassName}>
+              <div className="flex items-center gap-2">
+                <Monitor className="h-4 w-4 shrink-0" />
+                <span>Per una migliore esperienza si consiglia la visualizzazione su desktop.</span>
+              </div>
+              {lastRefreshLabel && activeTab === 'anno-corrente' ? (
+                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                  Agg. {lastRefreshLabel}
+                </span>
+              ) : null}
             </div>
-            <Tabs defaultValue="prezzi" className="w-full">
+            <Tabs
+              value={historicalSubTabs['anno-corrente']}
+              onValueChange={(value) => handleHistoricalSubTabChange('anno-corrente', value)}
+              className="w-full"
+            >
               <TabsList className="grid grid-cols-3 mb-4">
                 <TabsTrigger value="prezzi" className="text-xs sm:text-sm">
                   Prezzi
@@ -138,51 +219,100 @@ export default function AssetsPage() {
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="prezzi">
-                <AssetPriceHistoryTable
-                  assets={assets}
-                  snapshots={snapshots}
-                  filterYear={getCurrentYear()}
-                  displayMode="price"
-                  showTotalRow={false}
-                  loading={snapshotsLoading}
-                  onRefresh={handleRefresh}
-                />
-              </TabsContent>
+              {mountedHistoricalSubTabs['anno-corrente'].has('prezzi') && (
+                <TabsContent value="prezzi" forceMount>
+                  <motion.div
+                    initial={false}
+                    animate={historicalSubTabs['anno-corrente'] === 'prezzi' ? 'visible' : 'hidden'}
+                    variants={tabPanelSwitch}
+                  >
+                    <AssetPriceHistoryTable
+                      assets={assets}
+                      snapshots={snapshots}
+                      filterYear={getCurrentYear()}
+                      displayMode="price"
+                      showTotalRow={false}
+                      loading={snapshotsLoading}
+                      onRefresh={handleRefresh}
+                      isRefreshing={isRefreshing}
+                      isActiveView={activeViewKey === 'anno-corrente:prezzi'}
+                      isLatestRefreshedView={lastRefreshedViewKey === 'anno-corrente:prezzi'}
+                      refreshToken={refreshToken}
+                      lastRefreshAt={lastRefreshAt}
+                    />
+                  </motion.div>
+                </TabsContent>
+              )}
 
-              <TabsContent value="valori">
-                <AssetPriceHistoryTable
-                  assets={assets}
-                  snapshots={snapshots}
-                  filterYear={getCurrentYear()}
-                  displayMode="totalValue"
-                  showTotalRow={true}
-                  loading={snapshotsLoading}
-                  onRefresh={handleRefresh}
-                />
-              </TabsContent>
+              {mountedHistoricalSubTabs['anno-corrente'].has('valori') && (
+                <TabsContent value="valori" forceMount>
+                  <motion.div
+                    initial={false}
+                    animate={historicalSubTabs['anno-corrente'] === 'valori' ? 'visible' : 'hidden'}
+                    variants={tabPanelSwitch}
+                  >
+                    <AssetPriceHistoryTable
+                      assets={assets}
+                      snapshots={snapshots}
+                      filterYear={getCurrentYear()}
+                      displayMode="totalValue"
+                      showTotalRow={true}
+                      loading={snapshotsLoading}
+                      onRefresh={handleRefresh}
+                      isRefreshing={isRefreshing}
+                      isActiveView={activeViewKey === 'anno-corrente:valori'}
+                      isLatestRefreshedView={lastRefreshedViewKey === 'anno-corrente:valori'}
+                      refreshToken={refreshToken}
+                      lastRefreshAt={lastRefreshAt}
+                    />
+                  </motion.div>
+                </TabsContent>
+              )}
 
-              <TabsContent value="asset-class">
-                <AssetClassHistoryTable
-                  snapshots={snapshots}
-                  filterYear={getCurrentYear()}
-                  loading={snapshotsLoading}
-                  onRefresh={handleRefresh}
-                />
-              </TabsContent>
+              {mountedHistoricalSubTabs['anno-corrente'].has('asset-class') && (
+                <TabsContent value="asset-class" forceMount>
+                  <motion.div
+                    initial={false}
+                    animate={historicalSubTabs['anno-corrente'] === 'asset-class' ? 'visible' : 'hidden'}
+                    variants={tabPanelSwitch}
+                  >
+                    <AssetClassHistoryTable
+                      snapshots={snapshots}
+                      filterYear={getCurrentYear()}
+                      loading={snapshotsLoading}
+                      onRefresh={handleRefresh}
+                      isRefreshing={isRefreshing}
+                      isActiveView={activeViewKey === 'anno-corrente:asset-class'}
+                      isLatestRefreshedView={lastRefreshedViewKey === 'anno-corrente:asset-class'}
+                      refreshToken={refreshToken}
+                      lastRefreshAt={lastRefreshAt}
+                    />
+                  </motion.div>
+                </TabsContent>
+              )}
             </Tabs>
           </TabsContent>
         )}
 
         {/* Macro-tab 3: Storico (lazy-loaded) — sub-tabs: Prezzi, Valori, Asset Class */}
         {mountedTabs.has('storico') && (
-          <TabsContent value="storico" className="mt-6">
-            {/* Desktop recommended banner — hidden on 1440px+ where the table is fully usable */}
-            <div className="desktop:hidden flex items-center gap-2 mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700 dark:border-blue-800 dark:bg-blue-950/20 dark:text-blue-400">
-              <Monitor className="h-4 w-4 shrink-0" />
-              <span>Per una migliore esperienza si consiglia la visualizzazione su desktop.</span>
+          <TabsContent value="storico" className="mt-6" forceMount>
+            <div className={mobileBannerClassName}>
+              <div className="flex items-center gap-2">
+                <Monitor className="h-4 w-4 shrink-0" />
+                <span>Per una migliore esperienza si consiglia la visualizzazione su desktop.</span>
+              </div>
+              {lastRefreshLabel && activeTab === 'storico' ? (
+                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                  Agg. {lastRefreshLabel}
+                </span>
+              ) : null}
             </div>
-            <Tabs defaultValue="prezzi" className="w-full">
+            <Tabs
+              value={historicalSubTabs.storico}
+              onValueChange={(value) => handleHistoricalSubTabChange('storico', value)}
+              className="w-full"
+            >
               <TabsList className="grid grid-cols-3 mb-4">
                 <TabsTrigger value="prezzi" className="text-xs sm:text-sm">
                   Prezzi
@@ -195,38 +325,77 @@ export default function AssetsPage() {
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="prezzi">
-                <AssetPriceHistoryTable
-                  assets={assets}
-                  snapshots={snapshots}
-                  filterStartDate={{ year: 2025, month: 11 }}
-                  displayMode="price"
-                  showTotalRow={false}
-                  loading={snapshotsLoading}
-                  onRefresh={handleRefresh}
-                />
-              </TabsContent>
+              {mountedHistoricalSubTabs.storico.has('prezzi') && (
+                <TabsContent value="prezzi" forceMount>
+                  <motion.div
+                    initial={false}
+                    animate={historicalSubTabs.storico === 'prezzi' ? 'visible' : 'hidden'}
+                    variants={tabPanelSwitch}
+                  >
+                    <AssetPriceHistoryTable
+                      assets={assets}
+                      snapshots={snapshots}
+                      filterStartDate={{ year: 2025, month: 11 }}
+                      displayMode="price"
+                      showTotalRow={false}
+                      loading={snapshotsLoading}
+                      onRefresh={handleRefresh}
+                      isRefreshing={isRefreshing}
+                      isActiveView={activeViewKey === 'storico:prezzi'}
+                      isLatestRefreshedView={lastRefreshedViewKey === 'storico:prezzi'}
+                      refreshToken={refreshToken}
+                      lastRefreshAt={lastRefreshAt}
+                    />
+                  </motion.div>
+                </TabsContent>
+              )}
 
-              <TabsContent value="valori">
-                <AssetPriceHistoryTable
-                  assets={assets}
-                  snapshots={snapshots}
-                  filterStartDate={{ year: 2025, month: 11 }}
-                  displayMode="totalValue"
-                  showTotalRow={true}
-                  loading={snapshotsLoading}
-                  onRefresh={handleRefresh}
-                />
-              </TabsContent>
+              {mountedHistoricalSubTabs.storico.has('valori') && (
+                <TabsContent value="valori" forceMount>
+                  <motion.div
+                    initial={false}
+                    animate={historicalSubTabs.storico === 'valori' ? 'visible' : 'hidden'}
+                    variants={tabPanelSwitch}
+                  >
+                    <AssetPriceHistoryTable
+                      assets={assets}
+                      snapshots={snapshots}
+                      filterStartDate={{ year: 2025, month: 11 }}
+                      displayMode="totalValue"
+                      showTotalRow={true}
+                      loading={snapshotsLoading}
+                      onRefresh={handleRefresh}
+                      isRefreshing={isRefreshing}
+                      isActiveView={activeViewKey === 'storico:valori'}
+                      isLatestRefreshedView={lastRefreshedViewKey === 'storico:valori'}
+                      refreshToken={refreshToken}
+                      lastRefreshAt={lastRefreshAt}
+                    />
+                  </motion.div>
+                </TabsContent>
+              )}
 
-              <TabsContent value="asset-class">
-                <AssetClassHistoryTable
-                  snapshots={snapshots}
-                  filterStartDate={{ year: 2025, month: 11 }}
-                  loading={snapshotsLoading}
-                  onRefresh={handleRefresh}
-                />
-              </TabsContent>
+              {mountedHistoricalSubTabs.storico.has('asset-class') && (
+                <TabsContent value="asset-class" forceMount>
+                  <motion.div
+                    initial={false}
+                    animate={historicalSubTabs.storico === 'asset-class' ? 'visible' : 'hidden'}
+                    variants={tabPanelSwitch}
+                  >
+                    <AssetClassHistoryTable
+                      snapshots={snapshots}
+                      filterStartDate={{ year: 2025, month: 11 }}
+                      loading={snapshotsLoading}
+                      onRefresh={handleRefresh}
+                      isRefreshing={isRefreshing}
+                      isActiveView={activeViewKey === 'storico:asset-class'}
+                      isLatestRefreshedView={lastRefreshedViewKey === 'storico:asset-class'}
+                      refreshToken={refreshToken}
+                      lastRefreshAt={lastRefreshAt}
+                    />
+                  </motion.div>
+                </TabsContent>
+              )}
             </Tabs>
           </TabsContent>
         )}

@@ -22,14 +22,18 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Bond coupon scheduling: automatic coupon generation with step-up rate tiers and final premium (Premio Finale) support — full BTP Valore compatible
 - Average cost tracking with 4-decimal precision, including a built-in multi-broker PMC calculator for positions spread across multiple brokers
 - Current vs target asset allocation visualization
+- Hierarchical asset allocation analysis with desktop drill-down and mobile bottom-sheet navigation
+- Assets workspace polish: macro-tabs and historical sub-tabs preserve their state more reliably, and historical refresh actions give scoped feedback without disrupting table readability
 
 ### Performance Analytics
 - Comprehensive metrics: ROI, CAGR, TWR, IRR, Sharpe Ratio, Maximum Drawdown
 - Yield on Cost (YOC) and Current Yield calculations
 - Monthly returns heatmap and underwater drawdown chart
 - Rolling performance charts
+- Performance page polish: smoother in-place period switching, metric settling from prior values, staged heatmap reveal, a calmer underwater drawdown presentation, and contextual dialogs for custom ranges and AI analysis
+- Overview dashboard polish: the main net worth KPI settles in more naturally on load, snapshot overwrite feels more connected to its CTA, and portfolio charts reveal more discreetly without noisy replay
 - Progressive disclosure: methodology section collapsed by default; one-time guide strip for new users; "Avanzato" badge on technical metrics (TWR, IRR, Sharpe, YOC); each chart has an inline 2-line reading hint
-- Animated metric cards: values count up on load and on period switch; staggered entrance cascade per section
+- Animated metric cards: values count up on load and settle more naturally during period changes; staggered entrance cascade per section
 - Dashboard KPI cards (Total Portfolio, Liquid, Net Worth, Unrealized Gains, Taxes) animate their values on page load — numbers count up from zero once on mount
 - All major pages (Dashboard, Hall of Fame, History, Performance, Dividends) animate on load with staggered card entrances and smooth expand/collapse transitions; respects system "Reduce Motion" preference
 - All charts animate on load: bars grow up from baseline, lines draw in left to right, area fills expand, pie slices fan out — covers every page with data visualization (History, Performance, Cashflow, Dividends, FIRE, Monte Carlo, Goals)
@@ -48,8 +52,8 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 ### Dividends
 - Multi-currency dividend recording with automatic EUR conversion
 - Borsa Italiana scraping for Italian market data (dividends and bond prices)
-- Monthly calendar view with drill-down
-- Dividend statistics and yield calculations
+- Monthly calendar view with synchronized date focus and drill-down
+- Dividend statistics, contextual payment detail, and yield calculations
 - **Total Return per Asset**: table combining unrealized capital gain % and all-time net dividends received % (calculated at historical cost basis per payment, not diluted by later purchases) to show the true investment return per asset; card layout on mobile
 - **Dividend Per Share Growth**: year-by-year gross DPS history per equity asset with YoY% and CAGR columns; portfolio median growth rate shown as a summary; tap any asset on mobile to open a vertical year-by-year dialog
 
@@ -78,8 +82,10 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 
 ### Other
 - **Dark mode** — Full dark/light/system theme support. The header toggle cycles through three states: Light, Dark, and System (follows OS preference), using Sun, Moon, and Monitor icons. Every page, chart tooltip, and UI component is properly themed
-- **Hall of Fame** — Monthly and annual performance rankings with multi-section note system; fully responsive on mobile and tablet with touch-friendly card layouts
+- **Authentication flow** — Login and registration screens follow the same visual language as the dashboard, with accessible focus states, keyboard-friendly password toggles, and clearer in-place submit feedback
+- **Hall of Fame** — Monthly and annual performance rankings with current-period spotlight cards, contextual notes, and fully responsive mobile/tablet layouts
 - **PDF Export** — 8 configurable sections with custom year/month period selection; sections auto-disabled for past periods when historical data is unavailable
+- **Settings UX improvements** — The Settings area now gives clearer unsaved-change feedback, smoother nested allocation editing, and more contextual confirmations for sensitive category actions
 
 ## Quick Start
 

@@ -5,7 +5,8 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Asset } from '@/types/assets';
 import { InvestmentGoal, GoalAssetAssignment, GoalProgress } from '@/types/goals';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -23,6 +24,7 @@ import {
 import { formatCurrency } from '@/lib/utils/formatters';
 import { AllocationComparisonBar } from './AllocationComparisonBar';
 import { calculateAssetValue } from '@/lib/services/assetService';
+import { goalLinkSettle, slideDown } from '@/lib/utils/motionVariants';
 
 interface GoalDetailCardProps {
   goal: InvestmentGoal;
@@ -33,6 +35,8 @@ interface GoalDetailCardProps {
   onDelete: () => void;
   onAddAssignment: () => void;
   onRemoveAssignment: (assetId: string) => void;
+  isActive: boolean;
+  onSelect: () => void;
 }
 
 const PRIORITY_LABELS: Record<string, string> = {
@@ -56,9 +60,17 @@ export function GoalDetailCard({
   onDelete,
   onAddAssignment,
   onRemoveAssignment,
+  isActive,
+  onSelect,
 }: GoalDetailCardProps) {
   const [expanded, setExpanded] = useState(false);
   const assetMap = new Map(assets.map((a) => [a.id, a]));
+
+  useEffect(() => {
+    if (isActive) {
+      setExpanded(true);
+    }
+  }, [isActive]);
 
   // Format target date
   const targetDateStr = goal.targetDate
@@ -80,12 +92,16 @@ export function GoalDetailCard({
     : null;
 
   return (
-    <Card>
+    <motion.div variants={goalLinkSettle} initial={false} animate={isActive ? 'settle' : 'idle'}>
+    <Card className={isActive ? 'ring-1 ring-border shadow-sm' : ''}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           {/* Left: expand toggle + goal info */}
           <button
-            onClick={() => setExpanded(!expanded)}
+            onClick={() => {
+              onSelect();
+              setExpanded(!expanded);
+            }}
             className="flex items-center gap-3 text-left flex-1 min-w-0"
           >
             {expanded ? (
@@ -163,7 +179,15 @@ export function GoalDetailCard({
       </CardHeader>
 
       {/* Expanded content */}
+      <AnimatePresence initial={false}>
       {expanded && (
+        <motion.div
+          key="expanded"
+          variants={slideDown}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+        >
         <CardContent className="pt-0 space-y-4">
           {/* Mobile values (hidden on desktop, visible on mobile) */}
           <div className="sm:hidden text-sm text-gray-600 dark:text-gray-400">
@@ -306,7 +330,10 @@ export function GoalDetailCard({
             </Button>
           </div>
         </CardContent>
+        </motion.div>
       )}
+      </AnimatePresence>
     </Card>
+    </motion.div>
   );
 }

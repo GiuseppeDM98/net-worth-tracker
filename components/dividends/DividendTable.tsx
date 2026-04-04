@@ -13,6 +13,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { Dividend, DividendType } from '@/types/dividend';
 import { Timestamp } from 'firebase/firestore';
 import {
@@ -39,14 +40,18 @@ import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { toDate } from '@/lib/utils/dateHelpers';
+import { tableShellSettle } from '@/lib/utils/motionVariants';
+import { cn } from '@/lib/utils';
 
 const ITEMS_PER_PAGE = 50;
 
 interface DividendTableProps {
   dividends: Dividend[];
   onEdit: (dividend: Dividend) => void;
+  onOpenDetails: (dividend: Dividend, triggerElement: HTMLElement) => void;
   onRefresh: () => void;
   showTotals?: boolean; // Show totals row at bottom when filtering
+  activeDividendId?: string | null;
 }
 
 // WARNING: If you add a DividendType, update both maps below.
@@ -69,7 +74,14 @@ const dividendTypeBadgeColor: Record<DividendType, string> = {
   finalPremium: 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800',
 };
 
-export function DividendTable({ dividends, onEdit, onRefresh, showTotals = false }: DividendTableProps) {
+export function DividendTable({
+  dividends,
+  onEdit,
+  onOpenDetails,
+  onRefresh,
+  showTotals = false,
+  activeDividendId,
+}: DividendTableProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortColumn, setSortColumn] = useState<'exDate' | 'paymentDate' | 'totalNet' | null>(null);
@@ -269,11 +281,33 @@ export function DividendTable({ dividends, onEdit, onRefresh, showTotals = false
   }
 
   return (
-    <div className="space-y-4">
+    <motion.div
+      className="space-y-4"
+      variants={tableShellSettle}
+      initial="inactive"
+      animate="visible"
+    >
       {/* Mobile card view — table has 13 columns, not suitable for small screens */}
       <div className="desktop:hidden space-y-3">
         {paginatedDividends.map((dividend) => (
-          <div key={dividend.id} className="rounded-md border p-3 space-y-2">
+          <div
+            key={dividend.id}
+            onClick={(event) => onOpenDetails(dividend, event.currentTarget)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onOpenDetails(dividend, event.currentTarget);
+              }
+            }}
+            role="button"
+            tabIndex={0}
+            className={cn(
+              'w-full rounded-md border p-3 text-left space-y-2 transition-colors motion-reduce:transition-none',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+              'hover:bg-muted/30',
+              activeDividendId === dividend.id && 'border-primary/50 bg-primary/5'
+            )}
+          >
             {/* Header: asset + type badge + actions */}
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
@@ -284,10 +318,16 @@ export function DividendTable({ dividends, onEdit, onRefresh, showTotals = false
                 <Badge variant="outline" className={`text-xs ${dividendTypeBadgeColor[dividend.dividendType]}`}>
                   {dividendTypeLabels[dividend.dividendType]}
                 </Badge>
-                <Button variant="ghost" size="sm" onClick={() => onEdit(dividend)} disabled={deletingId === dividend.id} title="Modifica">
+                <Button variant="ghost" size="sm" onClick={(event) => {
+                  event.stopPropagation();
+                  onEdit(dividend);
+                }} disabled={deletingId === dividend.id} title="Modifica">
                   <Edit className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => handleDelete(dividend)} disabled={deletingId === dividend.id} title="Elimina">
+                <Button variant="ghost" size="sm" onClick={(event) => {
+                  event.stopPropagation();
+                  handleDelete(dividend);
+                }} disabled={deletingId === dividend.id} title="Elimina">
                   <Trash2 className="h-4 w-4 text-red-500" />
                 </Button>
               </div>
@@ -340,7 +380,15 @@ export function DividendTable({ dividends, onEdit, onRefresh, showTotals = false
           </TableHeader>
           <TableBody>
             {paginatedDividends.map((dividend) => (
-              <TableRow key={dividend.id}>
+              <TableRow
+                key={dividend.id}
+                className={cn(
+                  'cursor-pointer transition-colors motion-reduce:transition-none',
+                  'hover:bg-muted/30',
+                  activeDividendId === dividend.id && 'bg-primary/5'
+                )}
+                onClick={(event) => onOpenDetails(dividend, event.currentTarget as HTMLElement)}
+              >
                 <TableCell className="font-medium text-sm">
                   <div>
                     <div className="font-semibold">{dividend.assetTicker}</div>
@@ -418,7 +466,10 @@ export function DividendTable({ dividends, onEdit, onRefresh, showTotals = false
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => onEdit(dividend)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onEdit(dividend);
+                      }}
                       disabled={deletingId === dividend.id}
                       title="Modifica"
                     >
@@ -427,7 +478,10 @@ export function DividendTable({ dividends, onEdit, onRefresh, showTotals = false
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleDelete(dividend)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleDelete(dividend);
+                      }}
                       disabled={deletingId === dividend.id}
                       title="Elimina"
                     >
@@ -494,6 +548,6 @@ export function DividendTable({ dividends, onEdit, onRefresh, showTotals = false
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

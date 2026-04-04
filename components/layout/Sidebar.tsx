@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
@@ -108,21 +109,36 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
       <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
         {navigation.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+          // Overview (/dashboard) must use exact match only — startsWith would
+          // match every sub-route (/dashboard/assets, /dashboard/history, etc.)
+          const isActive = item.href === '/dashboard'
+            ? pathname === item.href
+            : pathname === item.href || pathname.startsWith(item.href + '/');
           return (
+            // Each link is relative-positioned so the absolute pill sits behind content.
             <Link
               key={item.name}
               href={item.href}
               onClick={handleLinkClick}
               className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                'relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  ? 'text-sidebar-accent-foreground'
+                  : 'text-sidebar-foreground/70 hover:text-sidebar-accent-foreground'
               )}
             >
-              <item.icon className="h-5 w-5" />
-              {item.name}
+              {/* Animated pill slides between active nav items via shared layoutId.
+                  Spring physics (stiff + low damping) gives a snappy native feel
+                  without overshoot. */}
+              {isActive && (
+                <motion.div
+                  layoutId="sidebar-active-pill"
+                  className="absolute inset-0 rounded-lg bg-sidebar-accent"
+                  transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+                />
+              )}
+              <item.icon className="relative z-10 h-5 w-5" />
+              <span className="relative z-10">{item.name}</span>
             </Link>
           );
         })}

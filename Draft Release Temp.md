@@ -1,11 +1,66 @@
 ## ✨ New Features
 
+- Added current-period spotlight cards to Hall of Fame, so you can instantly see how the current month and year rank against your personal records
+- Added live values inside Hall of Fame spotlight cards, including percentage context for net worth change rankings when available
 - The Performance page (Rendimenti) now loads with a cleaner, less overwhelming layout: the methodology section is collapsed by default and can be expanded on demand with a single click
 - A one-time guide strip appears on first visit to the Performance page, explaining the three reading levels (metric cards, tooltips, and methodology) — dismissible and never shown again
 - Advanced metrics (Time-Weighted Return, IRR, Sharpe Ratio, YOC Gross, YOC Net) are now labelled "Avanzato" so less experienced users know they can safely ignore them on a first read without losing the essentials
 - Each chart on the Performance page now shows a 2-line description directly below its title, explaining what you see and what to look for — no need to scroll to the methodology section
+- Added a contextual dividend detail view in `Dividendi & Cedole`, so selecting a row or mobile card opens a readable payment summary before entering edit mode
+- Added compact dividend insight cards for portfolio YOC and DPS growth, with inline help explaining how to read the metrics
+- Added a local preview mode to the FIRE calculator, so retirement metrics react immediately to unsaved changes before you decide to save them
+- Added linked focus behavior to Goal-Based Investing, so selecting a goal now highlights the same objective across summary cards, allocation view, and detail sections
 
 ## 🔧 Improvements
+
+- Improved the login and registration pages with a calmer first-load entrance, so authentication feels more consistent with the rest of the app
+- Improved sign-in and sign-up forms with clearer field focus states, keyboard-accessible password visibility toggles, and inline submit feedback during access or account creation
+- Improved Hall of Fame ranking presentation with a cleaner editorial layout across monthly and yearly sections, making dense record lists easier to scan
+- Improved Hall of Fame note interactions so opening a note feels more directly connected to the selected record on both desktop and mobile
+- Improved current-month and current-year visibility inside Hall of Fame rankings with clearer in-place highlighting
+- Improved the Cashflow page so switching between workspaces feels more continuous and less like a full redraw
+- Improved Cashflow filters in `Anno Corrente` and `Storico Totale` with clearer active-state feedback and steadier in-place updates
+- Improved the Cashflow Sankey panel with a cleaner presentation and more readable drill-down context while preserving its natural filter-change animation
+- Improved the Budget tab with smoother expand/collapse behavior, a more polished inline subcategory flow, and a more stable historical analysis panel
+
+- Improved the History page with a clearer chapter-based structure, making long-term portfolio analysis easier to scan from top to bottom
+- Improved History chart transitions so switches between percentage/absolute views and annual/monthly analysis feel more continuous and less abrupt
+- Improved the Savings vs Investment Growth section on the History page with a steadier in-place mode switch and clearer context for the active view
+- Improved the doubling milestones section on the History page with a more progressive build that gives important milestones more presence without slowing the page down
+
+- Improved the Performance page with smoother period switching, so key metrics and charts update with more continuity instead of feeling abruptly redrawn
+- Improved Performance metrics so values settle from the previous state more naturally during period changes, making comparisons easier to follow at a glance
+- Improved the monthly returns heatmap with a staged reveal that makes the section feel more polished without reducing readability
+- Improved the underwater drawdown chart with a calmer, more editorial presentation that highlights the deepest drawdown more clearly
+- Improved the custom date range and AI analysis dialogs on the Performance page so they feel visually tied to the buttons that opened them
+- Improved the Dividends & Coupons workspace so calendar focus, active date filters, summary context, and the lower table stay visually aligned
+- Improved the dividend calendar with a clearer selected-day focus, month context, and a more readable daily summary when filtering by payment date
+- Improved dividend growth presentation with more consistent percentage formatting and clearer explanations directly in the cards
+- Improved Monte Carlo simulations so rerunning or changing scenario assumptions feels more continuous, with previous results staying visible until the new run is ready
+- Improved Monte Carlo percentile and distribution charts with a more progressive build that makes ranges and probabilities easier to read
+- Improved the Bear/Base/Bull comparison view in Monte Carlo with clearer scenario emphasis, helping users understand which path they are evaluating at a glance
+- Improved FIRE scenario projections so years-to-FIRE cards and charts settle into updated values more smoothly instead of feeling fully redrawn
+
+- Improved the Allocation page with clearer drill-down orientation on desktop, making it easier to understand where you are when moving from asset classes to subcategories and specific assets
+- Improved mobile Allocation navigation so each drill-down level opens from the top of its own content instead of keeping the previous scroll position
+- Improved Allocation progress bars with cleaner, better-centered target markers that are easier to read at a glance
+- Improved the Assets page so `Gestione Asset`, `Anno Corrente`, and `Storico` feel more continuous when switching between sections
+- Improved the historical tables in Assets so the selected sub-view stays in place when moving between tabs, instead of feeling like it reloads
+- Improved refresh feedback in the Assets historical views with a subtle active-panel update state and last-updated timestamp
+- Improved the Settings page with clear "unsaved changes" feedback, so users can immediately see when edits are still in preview mode before saving
+- Improved responsiveness of Settings controls (toggles, selects, and inputs) with more consistent interaction feedback
+- Improved the nested Allocation editor in Settings with smoother expand/collapse behavior, making complex target editing easier to follow
+- Improved contextual safety for category move/delete actions in Settings by making confirmation dialogs feel visually tied to the action that opened them
+- Improved the Overview dashboard with a smoother primary KPI entrance, softer reflow of conditional cards, and subtler chart reveals that feel more polished without getting in the way
+- Improved the snapshot overwrite flow on the Overview page so the confirmation dialog feels more connected to the "Crea Snapshot" action
+- Refined the late-night Overview greeting to keep a calmer evening tone while still acknowledging late usage
+- Navigation now feels smoother and more app-like: the active section indicator in the sidebar glides between items instead of snapping — giving the interface a native, polished feel
+- The bottom navigation on mobile now shows an animated accent line that appears on the active tab, making it easier to see where you are at a glance
+- Tapping the theme toggle or the user icon in the header now has a subtle press response, making controls feel more tactile and immediate
+- The theme toggle icon now animates when switching between light, dark, and system modes — the old icon rotates out while the new one rotates in, giving clear visual feedback that the change was registered
+- Opening the "Altro" drawer on mobile now reveals sections in a smooth cascade rather than appearing all at once
+- Page navigation now includes a gentle slide-up effect, reinforcing the sense that you're moving through a connected app rather than loading separate pages
+- All animations now automatically respect your device's "Reduce Motion" accessibility setting — if you have it enabled, transitions become instant across the entire app
 
 - The Overview and History pages now have a clearer visual structure: related metrics are grouped together, and subtle section dividers mark the transition between primary data, analysis, and reference sections — making long pages easier to scan without feeling overwhelming
 - The "Risparmiato da Lavoro" card in the History page now shows the total expenses for the period as a secondary line below the main value, making it immediately clear what drove the savings figure
@@ -42,6 +97,12 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed a visual flash in the Budget tab when opening the historical analysis for a row, subtotal, or total on desktop
+- Fixed the Cashflow Sankey animation so month and period filter changes animate correctly again instead of appearing static
+
+- Fixed blank vertical gaps appearing on the Assets page when switching between force-mounted tabs
+- Fixed a flash of fully-visible page content appearing for a split second before the entrance animation begins when navigating between pages — now all pages animate in cleanly every time
+- Fixed the sidebar always highlighting "Panoramica" regardless of the current page
 - Fixed a browser console warning on every page load: the Geist Mono font was being preloaded on all pages despite only being used on the FIRE and Hall of Fame pages
 
 ## 🔒 Security

@@ -1,6 +1,8 @@
 import { ReactNode } from 'react';
 import React from 'react';
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { metricSettleTransition } from '@/lib/utils/motionVariants';
 
 interface MetricSectionProps {
   title: string;
@@ -38,39 +40,47 @@ export function MetricSection({
   const sectionDelay = sectionIndex * 120;
 
   return (
-    <div className={cn('mt-8', className)}>
+    <motion.div
+      layout
+      transition={metricSettleTransition}
+      className={cn('mt-8', className)}
+    >
       {/* Section Header — slides in from left; skipped when reduced-motion is preferred.
           Left-border accent creates visual hierarchy between section tiers without
           introducing decorative noise — relies on layout contrast, not color alone. */}
-      <div
+      <motion.div
+        layout="position"
+        transition={metricSettleTransition}
         className="mb-4 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-left-4 duration-500 [animation-fill-mode:both]"
         style={{ animationDelay: `${sectionDelay}ms` }}
       >
         <div className="flex items-center gap-3">
           <div className="w-[3px] h-5 rounded-full bg-primary opacity-70 shrink-0" />
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+          <h2 className="text-xl font-semibold text-foreground">
             {title}
           </h2>
         </div>
         {description && (
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400 pl-[15px]">
+          <p className="mt-1 pl-[15px] text-sm text-muted-foreground">
             {description}
           </p>
         )}
-      </div>
+      </motion.div>
 
       {/* Metric Cards Grid — each card fades+slides up with stagger */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 desktop:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 desktop:grid-cols-4">
         {React.Children.map(children, (child, i) => (
-          <div
+          <motion.div
+            layout
+            transition={metricSettleTransition}
             key={i}
             className="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-4 duration-500 [animation-fill-mode:both] h-full"
             style={{ animationDelay: `${sectionDelay + 80 + i * 80}ms` }}
           >
             {child}
-          </div>
+          </motion.div>
         ))}
       </div>
-    </div>
+    </motion.div>
   );
 }

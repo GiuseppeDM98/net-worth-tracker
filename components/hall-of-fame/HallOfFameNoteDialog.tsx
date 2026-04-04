@@ -20,6 +20,7 @@
  * 5. Save → validates → calls service → shows toast → closes dialog
  */
 
+import type { CSSProperties, RefObject } from 'react';
 import { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
@@ -91,7 +92,6 @@ const ITALIAN_MONTHS = [
 interface HallOfFameNoteDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  userId: string;
   editNote?: HallOfFameNote | null; // If provided, dialog is in edit mode
   availableYears: number[]; // Years that have data (from rankings)
   onSave: (noteData: {
@@ -102,16 +102,19 @@ interface HallOfFameNoteDialogProps {
     month?: number;
   }) => Promise<void>;
   onDelete?: (noteId: string) => Promise<void>;
+  dialogRef?: RefObject<HTMLDivElement | null>;
+  style?: CSSProperties;
 }
 
 export function HallOfFameNoteDialog({
   open,
   onOpenChange,
-  userId,
   editNote,
   availableYears,
   onSave,
   onDelete,
+  dialogRef,
+  style,
 }: HallOfFameNoteDialogProps) {
   // Form state
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
@@ -220,7 +223,11 @@ export function HallOfFameNoteDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        ref={dialogRef}
+        style={style}
+        className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto"
+      >
         <DialogHeader>
           <DialogTitle>
             {editNote ? 'Modifica Nota Hall of Fame' : 'Aggiungi Nota Hall of Fame'}

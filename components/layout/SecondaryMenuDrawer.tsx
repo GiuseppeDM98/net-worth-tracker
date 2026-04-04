@@ -1,9 +1,11 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { PieChart, History, Trophy, Flame, Settings, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { drawerContainer, drawerItem } from '@/lib/utils/motionVariants';
 
 // WARNING: If you add/remove navigation items here, also update:
 // - Sidebar.tsx (9 total items including these 6 secondary routes)
@@ -94,18 +96,29 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
         <SheetHeader>
           <SheetTitle>Altro</SheetTitle>
         </SheetHeader>
-        <nav className="mt-4 space-y-4">
+        {/* Staggered entrance: each group staggers its items as the sheet opens.
+            drawerContainer/drawerItem live in motionVariants for consistency. */}
+        <motion.nav
+          className="mt-4 space-y-4"
+          variants={drawerContainer}
+          initial="hidden"
+          animate="visible"
+        >
           {navigationGroups.map((group) => (
             <div key={group.label}>
-              <p className="px-4 mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground/60">
+              <motion.p
+                variants={drawerItem}
+                className="px-4 mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground/60"
+              >
                 {group.label}
-              </p>
+              </motion.p>
               <div className="space-y-1">
                 {group.items.map((item) => {
                   const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
                   return (
-                    <button
+                    <motion.button
                       key={item.name}
+                      variants={drawerItem}
                       onClick={() => handleNavigation(item.href)}
                       className={cn(
                         'flex items-center gap-3 w-full rounded-lg px-4 py-3 text-left text-sm font-medium transition-colors',
@@ -116,13 +129,13 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
                     >
                       <item.icon className="h-5 w-5" />
                       {item.name}
-                    </button>
+                    </motion.button>
                   );
                 })}
               </div>
             </div>
           ))}
-        </nav>
+        </motion.nav>
       </SheetContent>
     </Sheet>
   );

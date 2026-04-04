@@ -33,7 +33,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { getAllAssets, ASSET_CLASS_ORDER } from '@/lib/services/assetService';
@@ -61,6 +61,9 @@ import { toast } from 'sonner';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { AllocationCard } from '@/components/allocation/AllocationCard';
 import { AllocationSheet } from '@/components/allocation/AllocationSheet';
+import { AnimatePresence, motion } from 'framer-motion';
+import { drillDownShell } from '@/lib/utils/motionVariants';
+import { cn } from '@/lib/utils';
 
 type DrillDownLevel = 'assetClass' | 'subCategory' | 'specificAsset';
 
@@ -75,6 +78,11 @@ interface SheetNavigation {
   level: 'subCategory' | 'specificAsset' | null;
   assetClass: string | null;
   subCategory: string | null;
+}
+
+interface TriggerOrigin {
+  sourceId: string | null;
+  xPercent: number;
 }
 
 export default function AllocationPage() {
@@ -113,6 +121,7 @@ export default function AllocationPage() {
     assetClass: null,
     subCategory: null,
   });
+  const [sheetOrigin, setSheetOrigin] = useState<TriggerOrigin | null>(null);
 
   // Responsive detection
   // isMobile: phone-sized screens (cards + bottom sheets)
@@ -307,11 +316,13 @@ export default function AllocationPage() {
     } else {
       // Close sheet
       setSheetNav({ isOpen: false, level: null, assetClass: null, subCategory: null });
+      setSheetOrigin(null);
     }
   };
 
   const handleSheetClose = () => {
     setSheetNav({ isOpen: false, level: null, assetClass: null, subCategory: null });
+    setSheetOrigin(null);
   };
 
   // ========== DESKTOP NAVIGATION HANDLERS ==========
@@ -334,6 +345,19 @@ export default function AllocationPage() {
 
   // ========== MOBILE RENDERING FUNCTIONS ==========
 
+  const setContextualOrigin = (sourceId?: string, rect?: DOMRect) => {
+    if (!rect) {
+      setSheetOrigin(null);
+      return;
+    }
+
+    const xPercent = Math.min(Math.max((rect.left + rect.width / 2) / window.innerWidth, 0.12), 0.88) * 100;
+    setSheetOrigin({
+      sourceId: sourceId || null,
+      xPercent,
+    });
+  };
+
   const renderAssetClassCards = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {Object.entries(allocation!.byAssetClass)
@@ -352,7 +376,16 @@ export default function AllocationPage() {
               data={data}
               level="assetClass"
               hasChildren={hasSubCats}
-              onDrillDown={hasSubCats ? () => openSubCategories(assetClass) : undefined}
+              continuityId={`assetClass:${assetClass}`}
+              isOrigin={sheetOrigin?.sourceId === `assetClass:${assetClass}`}
+              onDrillDown={
+                hasSubCats
+                  ? ({ sourceId, rect }) => {
+                      setContextualOrigin(sourceId, rect);
+                      openSubCategories(assetClass);
+                    }
+                  : undefined
+              }
             />
           );
         })}
@@ -379,9 +412,14 @@ export default function AllocationPage() {
                 data={data}
                 level="subCategory"
                 hasChildren={hasSpecificAssets}
+                continuityId={`subCategory:${sheetNav.assetClass}:${subCategory}`}
+                isOrigin={sheetOrigin?.sourceId === `subCategory:${sheetNav.assetClass}:${subCategory}`}
                 onDrillDown={
                   hasSpecificAssets
-                    ? () => openSpecificAssets(sheetNav.assetClass!, subCategory)
+                    ? ({ sourceId, rect }) => {
+                        setContextualOrigin(sourceId, rect);
+                        openSpecificAssets(sheetNav.assetClass!, subCategory);
+                      }
                     : undefined
                 }
               />
@@ -401,8 +439,8 @@ export default function AllocationPage() {
 
     if (Object.keys(specificAssets).length === 0) {
       return (
-        <div className="flex h-32 items-center justify-center text-gray-500 text-sm">
-          Nessun specific asset configurato per questa sottocategoria.
+        <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
+          Nessun asset specifico configurato per questa Sottocategoria.
         </div>
       );
     }
@@ -434,6 +472,25 @@ export default function AllocationPage() {
     return null;
   };
 
+  const desktopDrillPath = useMemo(() => {
+    if (!drillDown.assetClass) return [];
+
+    return [
+      assetClassLabels[drillDown.assetClass],
+      drillDown.subCategory,
+      drillDown.level === 'specificAsset' ? 'Asset specifici' : null,
+    ].filter(Boolean) as string[];
+  }, [drillDown.assetClass, drillDown.level, drillDown.subCategory]);
+
+  const sheetBreadcrumbPath = useMemo(() => {
+    return [
+      sheetNav.assetClass ? assetClassLabels[sheetNav.assetClass] : null,
+      sheetNav.subCategory,
+    ].filter(Boolean) as string[];
+  }, [sheetNav.assetClass, sheetNav.subCategory]);
+
+  const sheetTransformOrigin = sheetOrigin ? `${sheetOrigin.xPercent}% 100%` : undefined;
+
   // ========== LOADING & EMPTY STATES ==========
 
   if (loading) return null;
@@ -452,32 +509,41 @@ export default function AllocationPage() {
     const specificAssets = getSpecificAssetsForSubCategory(drillDown.assetClass, drillDown.subCategory);
 
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
+      <motion.div
+        variants={drillDownShell}
+        initial="hidden"
+        animate="visible"
+        exit="exit"
+        className="space-y-6"
+      >
+        <div className="border-b border-border pb-4">
+          <div className="mb-3 text-xs font-medium uppercase tracking-widest text-muted-foreground">
+            Allocazione
+          </div>
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="sm" onClick={handleBackToSubCategories}>
                 <ArrowLeft className="h-4 w-4" />
               </Button>
               <div>
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  {assetClassLabels[drillDown.assetClass]} → {drillDown.subCategory}
+                <div className="text-sm text-muted-foreground">
+                  {desktopDrillPath.join(' / ')}
                 </div>
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                <h1 className="text-3xl font-bold text-foreground">
                   Asset specifici
                 </h1>
-                <p className="mt-2 text-gray-600 dark:text-gray-400">
+                <p className="mt-2 text-muted-foreground">
                   Target teorici per asset specifici
                 </p>
               </div>
             </div>
+            <Link href="/dashboard/settings">
+              <Button variant="outline">
+                <Settings className="mr-2 h-4 w-4" />
+                Modifica Target
+              </Button>
+            </Link>
           </div>
-          <Link href="/dashboard/settings">
-            <Button variant="outline">
-              <Settings className="mr-2 h-4 w-4" />
-              Modifica Target
-            </Button>
-          </Link>
         </div>
 
         <Card>
@@ -566,7 +632,7 @@ export default function AllocationPage() {
           </CardContent>
         </Card>
 
-        <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 p-4">
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/20">
           <h3 className="font-semibold text-blue-900 dark:text-blue-200">Asset specifici</h3>
           <ul className="mt-2 space-y-1 text-sm text-blue-800 dark:text-blue-300">
             <li>
@@ -580,7 +646,7 @@ export default function AllocationPage() {
             </li>
           </ul>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
@@ -589,23 +655,28 @@ export default function AllocationPage() {
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
-            Allocazione Asset
-          </h1>
-          <p className="mt-1 text-sm sm:text-base text-gray-600 dark:text-gray-400">
-            Confronta l'allocazione corrente con i tuoi obiettivi
-          </p>
+      <div className="border-b border-border pb-4">
+        <div className="mb-2 text-xs font-medium uppercase tracking-widest text-muted-foreground">
+          Analisi composizione
         </div>
-        {!usingGoalTargets && (
-          <Link href="/dashboard/settings" className="w-full sm:w-auto shrink-0">
-            <Button variant="outline" size="sm" className="w-full sm:w-auto dark:border-gray-600 dark:text-gray-200">
-              <Settings className="h-4 w-4 mr-2" />
-              Modifica Target
-            </Button>
-          </Link>
-        )}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
+              Allocazione Asset
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground sm:text-base">
+              Confronta l'allocazione corrente con i tuoi obiettivi
+            </p>
+          </div>
+          {!usingGoalTargets && (
+            <Link href="/dashboard/settings" className="w-full shrink-0 sm:w-auto">
+              <Button variant="outline" size="sm" className="w-full sm:w-auto">
+                <Settings className="mr-2 h-4 w-4" />
+                Modifica Target
+              </Button>
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Goal-derived targets indicator */}
@@ -643,16 +714,13 @@ export default function AllocationPage() {
             title={
               sheetNav.level === 'specificAsset'
                 ? 'Asset specifici'
-                : 'Sotto-Categoria'
+                : 'Sottocategoria'
             }
-            breadcrumb={
-              sheetNav.assetClass
-                ? `${assetClassLabels[sheetNav.assetClass]}${
-                    sheetNav.subCategory ? ` → ${sheetNav.subCategory}` : ''
-                  }`
-                : undefined
-            }
+            breadcrumbPath={sheetBreadcrumbPath}
             onBack={sheetNav.level === 'specificAsset' ? handleBack : undefined}
+            transformOrigin={sheetTransformOrigin}
+            levelLabel={sheetNav.level === 'specificAsset' ? 'Livello 3' : 'Livello 2'}
+            contentKey={`${sheetNav.level ?? 'closed'}:${sheetNav.assetClass ?? 'none'}:${sheetNav.subCategory ?? 'none'}`}
           >
             {renderSheetContent()}
           </AllocationSheet>
@@ -661,7 +729,15 @@ export default function AllocationPage() {
 
       {/* ========== DESKTOP VIEW (≥1024px — tables) ========== */}
       {!useCardView && (
-        <>
+        <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key="allocation-desktop-overview"
+          variants={drillDownShell}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          className="space-y-6"
+        >
           {/* Asset Class Table */}
           <Card>
             <CardHeader>
@@ -764,15 +840,15 @@ export default function AllocationPage() {
               <Card key={`sub-${assetClass}`}>
                 <CardHeader>
                   <CardTitle>
-                    Allocazione Sotto-Categoria {assetClassLabels[assetClass]}
+                    Allocazione Sottocategoria {assetClassLabels[assetClass]}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="overflow-x-auto">
                     <Table>
-                      <TableHeader>
+                        <TableHeader>
                         <TableRow>
-                          <TableHead>Sotto-Categoria</TableHead>
+                          <TableHead>Sottocategoria</TableHead>
                           <TableHead className="text-right">Corrente %</TableHead>
                           <TableHead className="text-right">Corrente €</TableHead>
                           <TableHead className="text-right">Target %</TableHead>
@@ -794,7 +870,9 @@ export default function AllocationPage() {
                             return (
                               <TableRow
                                 key={subCategory}
-                                className={hasSpecificAssets ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800' : ''}
+                                className={cn(
+                                  hasSpecificAssets && 'cursor-pointer hover:bg-muted/50'
+                                )}
                                 onClick={() => {
                                   if (hasSpecificAssets) {
                                     handleDrillDownToSpecificAssets(assetClass, subCategory);
@@ -859,7 +937,8 @@ export default function AllocationPage() {
               </Card>
             )
           )}
-        </>
+        </motion.div>
+        </AnimatePresence>
       )}
     </div>
   );

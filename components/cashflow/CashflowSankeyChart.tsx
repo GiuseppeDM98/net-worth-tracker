@@ -23,6 +23,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { ResponsiveSankey } from '@nivo/sankey';
 import { format } from 'date-fns';
@@ -33,6 +34,7 @@ import { toDate } from '@/lib/utils/dateHelpers';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ExternalLink } from 'lucide-react';
+import { chartReveal, fadeVariants } from '@/lib/utils/motionVariants';
 
 // Color palette for categories (matches existing COLORS array in CurrentYearTab/TotalHistoryTab)
 const COLORS = [
@@ -719,10 +721,11 @@ const buildDrillDownData = (
 export function CashflowSankeyChart({
   expenses,
   isMobile,
-  title
+  title,
 }: CashflowSankeyChartProps) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
+  const prefersReducedMotion = useReducedMotion();
 
   // Drill-down state: tracks selected item for drill-down view
   // mode: 'type' for Type→Categories, 'category' for Category→Subcategories, 'transactions' for transaction list
@@ -1040,31 +1043,51 @@ export function CashflowSankeyChart({
     );
   }
 
+  const sankeyViewKey = selectedCategory
+    ? `${selectedCategory.mode}-${selectedCategory.parentType ?? 'root'}-${selectedCategory.parentCategory ?? selectedCategory.name}-${selectedCategory.selectedSubcategory ?? 'all'}`
+    : `budget-${showSubcategories ? 'subcategories' : 'categories'}`;
+
+  const sankeyModeLabel = selectedCategory
+    ? selectedCategory.mode === 'type'
+      ? 'Dettaglio per tipologia'
+      : selectedCategory.mode === 'category'
+        ? 'Dettaglio per categoria'
+        : 'Dettaglio movimenti'
+    : showSubcategories
+      ? 'Vista con sottocategorie'
+      : 'Vista compatta';
+
   return (
     <Card className="md:col-span-2">
       <CardHeader>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            {selectedCategory && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleBack}
-                className="gap-1"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Indietro
-              </Button>
-            )}
-            <CardTitle>
-              {getBreadcrumbTitle()}
-            </CardTitle>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              {selectedCategory && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleBack}
+                  className="gap-1"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Indietro
+                </Button>
+              )}
+              <CardTitle>
+                {getBreadcrumbTitle()}
+              </CardTitle>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {sankeyModeLabel} · {sankeyData.nodes.length} nodi · {sankeyData.links.length} flussi
+            </p>
           </div>
           {!selectedCategory && (
             <Button
               variant="outline"
               size="sm"
               onClick={() => setShowSubcategories(!showSubcategories)}
+              className="transition-colors duration-200 hover:border-primary/40"
             >
               {showSubcategories ? 'Nascondi sottocategorie' : 'Mostra sottocategorie'}
             </Button>
@@ -1074,70 +1097,81 @@ export function CashflowSankeyChart({
       <CardContent>
         {/* Render Sankey chart only when NOT in transactions mode */}
         {selectedCategory?.mode !== 'transactions' && (
-          <div style={{ height: chartConfig.height }}>
-            <ResponsiveSankey
-            data={sankeyData}
-            margin={chartConfig.margin}
-            align="justify"
-            colors={{ datum: 'nodeColor' }}
-            valueFormat={(value) => formatCurrencyForSankey(value)}
-            nodeOpacity={1}
-            nodeHoverOpacity={0.8}
-            nodeThickness={chartConfig.nodeThickness}
-            nodeSpacing={chartConfig.nodeSpacing}
-            nodeBorderWidth={chartConfig.nodeBorderWidth}
-            nodeBorderColor={{ from: 'color', modifiers: [['darker', 0.8]] }}
-            nodeBorderRadius={3}
-            linkOpacity={isDark ? 0.65 : 0.4}
-            linkHoverOpacity={isDark ? 0.85 : 0.6}
-            linkContract={3}
-            enableLinkGradient={chartConfig.enableLinkGradient}
-            label={(node: any) => node.label || node.id}
-            labelPosition={chartConfig.labelPosition}
-            labelPadding={chartConfig.labelOffset}
-            labelOrientation="horizontal"
-            labelTextColor={isDark ? { from: 'color', modifiers: [['brighter', 1.5]] } : { from: 'color', modifiers: [['darker', 2]] }}
-            // Click handler for drill-down
-            onClick={(node: any) => {
-              // Only handle node clicks, not link clicks
-              if (node.id) {
-                handleNodeClick(node);
-              }
-            }}
-            // Custom tooltip to match existing chart tooltip style
-            nodeTooltip={({ node }) => (
-              <div className="rounded-md border border-border bg-popover px-3 py-2 shadow-md text-sm text-popover-foreground">
-                <strong>{node.label || node.id}</strong>
-                <br />
-                {formatCurrencyForSankey(node.value || 0)}
-                <br />
-                <span className="text-xs text-muted-foreground">
-                  {totalAmount > 0
-                    ? ((node.value || 0) / totalAmount * 100).toFixed(1)
-                    : '0.0'}%
-                </span>
-                {!selectedCategory && node.id !== 'Budget' && node.id !== 'Risparmi' && (
-                  <>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={sankeyViewKey}
+              variants={prefersReducedMotion ? fadeVariants : chartReveal}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              style={{ height: chartConfig.height }}
+            >
+              <ResponsiveSankey
+                data={sankeyData}
+                margin={chartConfig.margin}
+                align="justify"
+                colors={{ datum: 'nodeColor' }}
+                valueFormat={(value) => formatCurrencyForSankey(value)}
+                animate={!prefersReducedMotion}
+                motionConfig="gentle"
+                nodeOpacity={1}
+                nodeHoverOpacity={0.84}
+                nodeThickness={chartConfig.nodeThickness}
+                nodeSpacing={chartConfig.nodeSpacing}
+                nodeBorderWidth={chartConfig.nodeBorderWidth}
+                nodeBorderColor={{ from: 'color', modifiers: [['darker', 0.8]] }}
+                nodeBorderRadius={3}
+                linkOpacity={isDark ? 0.68 : 0.42}
+                linkHoverOpacity={isDark ? 0.88 : 0.62}
+                linkContract={3}
+                enableLinkGradient={chartConfig.enableLinkGradient}
+                label={(node: any) => node.label || node.id}
+                labelPosition={chartConfig.labelPosition}
+                labelPadding={chartConfig.labelOffset}
+                labelOrientation="horizontal"
+                labelTextColor={isDark ? { from: 'color', modifiers: [['brighter', 1.5]] } : { from: 'color', modifiers: [['darker', 2]] }}
+                // Click handler for drill-down
+                onClick={(node: any) => {
+                  // Only handle node clicks, not link clicks
+                  if (node.id) {
+                    handleNodeClick(node);
+                  }
+                }}
+                // Custom tooltip to match existing chart tooltip style
+                nodeTooltip={({ node }) => (
+                  <div className="rounded-md border border-border bg-popover px-3 py-2 shadow-md text-sm text-popover-foreground">
+                    <strong>{node.label || node.id}</strong>
                     <br />
-                    <span className="text-xs text-muted-foreground italic">
-                      Click per dettagli
+                    {formatCurrencyForSankey(node.value || 0)}
+                    <br />
+                    <span className="text-xs text-muted-foreground">
+                      {totalAmount > 0
+                        ? ((node.value || 0) / totalAmount * 100).toFixed(1)
+                        : '0.0'}%
                     </span>
-                  </>
+                    {!selectedCategory && node.id !== 'Budget' && node.id !== 'Risparmi' && (
+                      <>
+                        <br />
+                        <span className="text-xs text-muted-foreground italic">
+                          Click per dettagli
+                        </span>
+                      </>
+                    )}
+                  </div>
                 )}
-              </div>
-            )}
-            theme={{
-              tooltip: {
-                container: {
-                  background: 'var(--popover)',
-                  border: '1px solid var(--border)',
-                  color: 'var(--popover-foreground)',
-                  fontSize: '14px',
-                },
-              },
-            }}
-          />
-          </div>
+                theme={{
+                  tooltip: {
+                    container: {
+                      background: 'var(--popover)',
+                      border: '1px solid var(--border)',
+                      color: 'var(--popover-foreground)',
+                      fontSize: '14px',
+                    },
+                  },
+                }}
+              />
+            </motion.div>
+          </AnimatePresence>
         )}
 
         {/* Transaction list view: shown when mode='transactions' */}

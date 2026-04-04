@@ -1,11 +1,11 @@
 /**
  * Allocation Progress Bar - Visual Progress Indicator for Asset Allocation
  *
- * Shows current allocation percentage with target marker (diamond icon).
+ * Shows current allocation percentage with target marker.
  *
  * Key Features:
  * - Filled bar shows current percentage (colored by action: green/orange/red)
- * - Diamond marker indicates target percentage position
+ * - Circular marker indicates target percentage position
  * - Handles edge case: >100% allocation (overallocated positions)
  *
  * Why handle >100% allocation?
@@ -20,6 +20,8 @@
 
 import { cn } from '@/lib/utils';
 import { formatPercentage } from '@/lib/services/chartService';
+import { motion, useReducedMotion } from 'framer-motion';
+import { progressSettleTransition } from '@/lib/utils/motionVariants';
 
 interface AllocationProgressBarProps {
   currentPercentage: number;
@@ -38,15 +40,32 @@ export function AllocationProgressBar({
   height = 24,
   className,
 }: AllocationProgressBarProps) {
+  const reducedMotion = useReducedMotion();
+
   // Color mapping based on action (green: OK, orange: buy, red: sell)
   const getColors = (action: 'COMPRA' | 'VENDI' | 'OK') => {
     switch (action) {
       case 'OK':
-        return { bg: 'bg-green-500', text: 'text-green-600', border: 'border-green-700' };
+        return {
+          fill: 'bg-green-500 dark:bg-green-500',
+          text: 'text-green-700 dark:text-green-400',
+          marker: 'bg-green-500 dark:bg-green-500',
+          markerBorder: 'border-green-700 dark:border-green-500',
+        };
       case 'COMPRA':
-        return { bg: 'bg-orange-500', text: 'text-orange-600', border: 'border-orange-700' };
+        return {
+          fill: 'bg-orange-500 dark:bg-orange-500',
+          text: 'text-orange-700 dark:text-orange-400',
+          marker: 'bg-orange-500 dark:bg-orange-500',
+          markerBorder: 'border-orange-700 dark:border-orange-500',
+        };
       case 'VENDI':
-        return { bg: 'bg-red-500', text: 'text-red-600', border: 'border-red-700' };
+        return {
+          fill: 'bg-red-500 dark:bg-red-500',
+          text: 'text-red-700 dark:text-red-400',
+          marker: 'bg-red-500 dark:bg-red-500',
+          markerBorder: 'border-red-700 dark:border-red-500',
+        };
     }
   };
 
@@ -67,7 +86,7 @@ export function AllocationProgressBar({
           <span className={cn('font-medium', colors.text)}>
             Corrente: {formatPercentage(currentPercentage)}
           </span>
-          <span className="text-gray-600">
+          <span className="text-muted-foreground">
             Target: {formatPercentage(targetPercentage)}
           </span>
         </div>
@@ -75,32 +94,41 @@ export function AllocationProgressBar({
 
       {/* Progress bar track */}
       <div
-        className="relative w-full bg-gray-200 rounded-full overflow-hidden"
+        className="relative w-full overflow-hidden rounded-full border border-border/70 bg-muted/70"
         style={{ height: `${height}px` }}
       >
         {/* Current allocation fill */}
-        <div
+        <motion.div
           className={cn(
-            'absolute inset-y-0 left-0 rounded-full transition-all duration-300',
-            colors.bg
+            'absolute inset-y-0 left-0 rounded-full',
+            colors.fill
           )}
-          style={{ width: `${currentWidth}%` }}
+          animate={reducedMotion ? undefined : { width: `${currentWidth}%` }}
+          initial={reducedMotion ? false : { width: 0 }}
+          transition={reducedMotion ? undefined : progressSettleTransition}
+          style={reducedMotion ? { width: `${currentWidth}%` } : undefined}
         />
 
-        {/* Target marker (dashed line) */}
-        <div
-          className={cn('absolute inset-y-0 border-l-2 border-dashed', colors.border)}
-          style={{ left: `${targetPosition}%` }}
+        {/* Target marker */}
+        <motion.div
+          className="absolute inset-y-0"
+          animate={reducedMotion ? undefined : { left: `${targetPosition}%` }}
+          initial={reducedMotion ? false : { left: 0 }}
+          transition={reducedMotion ? undefined : { ...progressSettleTransition, stiffness: 320 }}
+          style={reducedMotion ? { left: `${targetPosition}%` } : undefined}
         >
           {/* Marker dot */}
-          <div
+          <motion.div
             className={cn(
-              'absolute -top-1 -left-1.5 w-3 h-3 rounded-full',
-              colors.bg,
-              'ring-2 ring-white'
+              'absolute left-0 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background',
+              colors.marker,
+              colors.markerBorder
             )}
+            animate={reducedMotion ? undefined : { scale: 1 }}
+            initial={reducedMotion ? false : { scale: 0.9 }}
+            transition={reducedMotion ? undefined : { duration: 0.16 }}
           />
-        </div>
+        </motion.div>
       </div>
 
       {/* Difference indicator */}

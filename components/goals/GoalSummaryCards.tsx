@@ -1,29 +1,43 @@
+'use client';
+
+import { motion } from 'framer-motion';
 /**
  * Summary cards showing progress for each goal plus unassigned portfolio value.
  * Displays as a horizontal scrollable row on mobile.
  */
-
-'use client';
-
 import { GoalProgress } from '@/types/goals';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { cardItem, simulationStagger } from '@/lib/utils/motionVariants';
 
 interface GoalSummaryCardsProps {
   progressList: GoalProgress[];
   unassignedValue: number;
+  activeGoalId: string | null;
+  onSelectGoal: (goalId: string | null) => void;
 }
 
 export function GoalSummaryCards({
   progressList,
   unassignedValue,
+  activeGoalId,
+  onSelectGoal,
 }: GoalSummaryCardsProps) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:gap-4 desktop:grid-cols-4">
+    <motion.div
+      className="grid grid-cols-2 gap-3 sm:gap-4 desktop:grid-cols-4"
+      variants={simulationStagger}
+      initial="hidden"
+      animate="visible"
+    >
       {progressList.map((progress) => (
-        <Card
-          key={progress.goalId}
+        <motion.div key={progress.goalId} variants={cardItem}>
+        <button
+          type="button"
+          onClick={() => onSelectGoal(activeGoalId === progress.goalId ? null : progress.goalId)}
+          className="w-full text-left"
         >
+        <Card className={activeGoalId === progress.goalId ? 'ring-1 ring-border shadow-sm' : 'opacity-90'}>
           <CardContent className="p-4">
             {/* Goal name with color indicator */}
             <div className="flex items-center gap-2 mb-3">
@@ -67,10 +81,18 @@ export function GoalSummaryCards({
             )}
           </CardContent>
         </Card>
+        </button>
+        </motion.div>
       ))}
 
       {/* Unassigned value card */}
-      <Card className="border-dashed">
+      <motion.div variants={cardItem}>
+      <button
+        type="button"
+        onClick={() => onSelectGoal(activeGoalId === '__unassigned__' ? null : '__unassigned__')}
+        className="w-full text-left"
+      >
+      <Card className={`border-dashed ${activeGoalId === '__unassigned__' ? 'ring-1 ring-border shadow-sm' : 'opacity-90'}`}>
         <CardContent className="p-4">
           <div className="flex items-center gap-2 mb-3">
             <div className="w-3 h-3 rounded-full bg-gray-300 dark:bg-gray-600 shrink-0" />
@@ -83,6 +105,8 @@ export function GoalSummaryCards({
           </p>
         </CardContent>
       </Card>
-    </div>
+      </button>
+      </motion.div>
+    </motion.div>
   );
 }

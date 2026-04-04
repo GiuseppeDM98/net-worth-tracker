@@ -22,7 +22,8 @@
  */
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Dividend } from '@/types/dividend';
 import { CalendarDayCell } from './CalendarDayCell';
 import { DividendDetailsDialog } from './DividendDetailsDialog';
@@ -30,6 +31,8 @@ import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { getItalyMonth, getItalyYear, getItalyDate, getItalyMonthYear, toDate } from '@/lib/utils/dateHelpers';
 import { EmptyState, CalendarEmptyIcon } from '@/components/ui/EmptyState';
+import { formatCurrency, formatDate } from '@/lib/utils/formatters';
+import { chartShellSettle, metricSettleTransition } from '@/lib/utils/motionVariants';
 
 // Italian month names (full)
 const ITALIAN_MONTHS = [
@@ -43,13 +46,14 @@ const ITALIAN_DAY_ABBR = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
 interface DividendCalendarProps {
   dividends: Dividend[];
   onDateClick: (date: Date) => void;
+  selectedDate?: Date | null;
 }
 
-export function DividendCalendar({ dividends, onDateClick }: DividendCalendarProps) {
+export function DividendCalendar({ dividends, onDateClick, selectedDate }: DividendCalendarProps) {
   // Initialize to current month/year in Italy timezone
   const [currentMonth, setCurrentMonth] = useState(getItalyMonth());
   const [currentYear, setCurrentYear] = useState(getItalyYear());
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [detailDate, setDetailDate] = useState<Date | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   /**
@@ -117,6 +121,21 @@ export function DividendCalendar({ dividends, onDateClick }: DividendCalendarPro
     return dividendsByDate.get(key) || [];
   };
 
+  useEffect(() => {
+    if (!selectedDate) return;
+
+    const nextDate = getItalyDate(selectedDate);
+    const { month, year } = getItalyMonthYear(nextDate);
+
+    if (month !== currentMonth) {
+      setCurrentMonth(month);
+    }
+
+    if (year !== currentYear) {
+      setCurrentYear(year);
+    }
+  }, [selectedDate, currentMonth, currentYear]);
+
   /**
    * Handle previous month navigation
    */
@@ -148,7 +167,7 @@ export function DividendCalendar({ dividends, onDateClick }: DividendCalendarPro
   const handleDateClick = (date: Date) => {
     const dateDividends = getDividendsForDate(date);
     if (dateDividends.length > 0) {
-      setSelectedDate(date);
+      setDetailDate(date);
       setDialogOpen(true);
       onDateClick(date); // Notify parent to filter table by this date
     }
@@ -180,14 +199,35 @@ export function DividendCalendar({ dividends, onDateClick }: DividendCalendarPro
     if (!isCurrentMonth(date)) return false;
     return getDividendsForDate(date).length > 0;
   }).length;
+  const selectedDateKey = selectedDate
+    ? `${selectedDate.getFullYear()}-${selectedDate.getMonth()}-${selectedDate.getDate()}`
+    : null;
+  const focusedDividends = selectedDate ? getDividendsForDate(selectedDate) : [];
+  const focusedNetTotal = focusedDividends.reduce((sum, div) => sum + (div.netAmountEur ?? div.netAmount), 0);
 
   return (
     <div className="space-y-4">
       {/* Calendar header with month navigation */}
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">
-          {ITALIAN_MONTHS[currentMonth - 1]} {currentYear}
-        </h3>
+        <div className="min-w-0">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.h3
+              key={`${currentYear}-${currentMonth}`}
+              className="text-lg font-semibold"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={metricSettleTransition}
+            >
+              {ITALIAN_MONTHS[currentMonth - 1]} {currentYear}
+            </motion.h3>
+          </AnimatePresence>
+          <p className="text-xs text-muted-foreground">
+            {dividendsInCurrentMonth === 0
+              ? 'Nessun pagamento previsto nel mese visualizzato'
+              : `${dividendsInCurrentMonth} ${dividendsInCurrentMonth === 1 ? 'giorno con pagamento' : 'giorni con pagamenti'} nel mese`}
+          </p>
+        </div>
         <div className="flex gap-2">
           <Button
             variant="outline"
@@ -208,8 +248,36 @@ export function DividendCalendar({ dividends, onDateClick }: DividendCalendarPro
         </div>
       </div>
 
+      {selectedDate && focusedDividends.length > 0 && (
+        <motion.div
+          variants={chartShellSettle}
+          initial="idle"
+          animate="settle"
+          className="rounded-lg border border-border/70 bg-muted/40 px-3 py-2"
+        >
+          <div className="flex flex-col gap-1 desktop:flex-row desktop:items-center desktop:justify-between">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                Focus calendario
+              </p>
+              <p className="text-sm font-medium">
+                {formatDate(selectedDate)} · {focusedDividends.length} {focusedDividends.length === 1 ? 'pagamento' : 'pagamenti'}
+              </p>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Netto previsto <span className="font-semibold text-foreground">{formatCurrency(focusedNetTotal)}</span>
+            </p>
+          </div>
+        </motion.div>
+      )}
+
       {/* Calendar grid */}
-      <div className="rounded-lg border border-border overflow-hidden">
+      <motion.div
+        variants={chartShellSettle}
+        initial="idle"
+        animate="settle"
+        className="overflow-hidden rounded-lg border border-border"
+      >
         {/* Day headers (Monday to Sunday) */}
         <div className="grid grid-cols-7 bg-muted">
           {ITALIAN_DAY_ABBR.map((day) => (
@@ -226,19 +294,22 @@ export function DividendCalendar({ dividends, onDateClick }: DividendCalendarPro
         <div className="grid grid-cols-7">
           {calendarGrid.map((date, index) => {
             const dateDividends = getDividendsForDate(date);
+            const normalizedDate = getItalyDate(date);
+            const isSelected = selectedDateKey === `${normalizedDate.getFullYear()}-${normalizedDate.getMonth()}-${normalizedDate.getDate()}`;
             return (
               <CalendarDayCell
                 key={index}
                 date={date}
                 isCurrentMonth={isCurrentMonth(date)}
                 isToday={isToday(date)}
+                isSelected={isSelected}
                 dividends={dateDividends}
                 onClick={handleDateClick}
               />
             );
           })}
         </div>
-      </div>
+      </motion.div>
 
       {/* Empty state message */}
       {dividendsInCurrentMonth === 0 && (
@@ -249,12 +320,12 @@ export function DividendCalendar({ dividends, onDateClick }: DividendCalendarPro
       )}
 
       {/* Dividend details dialog */}
-      {selectedDate && (
+      {detailDate && (
         <DividendDetailsDialog
           open={dialogOpen}
           onOpenChange={setDialogOpen}
-          date={selectedDate}
-          dividends={getDividendsForDate(selectedDate)}
+          date={detailDate}
+          dividends={getDividendsForDate(detailDate)}
         />
       )}
     </div>

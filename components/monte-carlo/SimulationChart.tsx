@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+import { useReducedMotion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PercentilesData } from '@/types/assets';
 import {
@@ -17,6 +19,7 @@ import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartServi
 interface SimulationChartProps {
   data: PercentilesData[];
   retirementYears: number;
+  revealKey?: number;
 }
 
 /**
@@ -43,7 +46,28 @@ interface SimulationChartProps {
  * @param data - Array of percentile data for each year of retirement
  * @param retirementYears - Total duration of simulation in years
  */
-export function SimulationChart({ data, retirementYears }: SimulationChartProps) {
+export function SimulationChart({ data, retirementYears, revealKey = 0 }: SimulationChartProps) {
+  const reducedMotion = useReducedMotion();
+  const [visibleBands, setVisibleBands] = useState(reducedMotion ? 4 : 0);
+
+  useEffect(() => {
+    if (reducedMotion) {
+      setVisibleBands(4);
+      return;
+    }
+
+    setVisibleBands(0);
+    const timers = [0, 1, 2, 3].map((index) =>
+      window.setTimeout(() => {
+        setVisibleBands(index + 1);
+      }, 90 + (index * 70))
+    );
+
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, [data, reducedMotion, revealKey]);
+
   /**
    * Custom tooltip displaying all five percentile values on hover.
    *
@@ -96,6 +120,9 @@ export function SimulationChart({ data, retirementYears }: SimulationChartProps)
           Il grafico mostra i percentili delle simulazioni. La linea blu rappresenta il
           valore mediano (50° percentile).
         </p>
+        <p className="text-xs text-muted-foreground">
+          Le bande percentile si compongono progressivamente per rendere piu&apos; leggibile l&apos;ampiezza degli esiti.
+        </p>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={400}>
@@ -142,42 +169,50 @@ export function SimulationChart({ data, retirementYears }: SimulationChartProps)
             {/* Percentile band areas — isAnimationActive={false} perché sono 4 aree decorative
                 sovrapposte: animarle individualmente causerebbe una sequenza visiva caotica.
                 La linea mediana anima in modo pulito al loro posto. */}
-            <Area
-              type="monotone"
-              dataKey="p90"
-              stroke="none"
-              fill="#10b981"
-              fillOpacity={0.1}
-              name="90° percentile"
-              isAnimationActive={false}
-            />
-            <Area
-              type="monotone"
-              dataKey="p75"
-              stroke="none"
-              fill="#10b981"
-              fillOpacity={0.15}
-              name="75° percentile"
-              isAnimationActive={false}
-            />
-            <Area
-              type="monotone"
-              dataKey="p25"
-              stroke="none"
-              fill="#f97316"
-              fillOpacity={0.15}
-              name="25° percentile"
-              isAnimationActive={false}
-            />
-            <Area
-              type="monotone"
-              dataKey="p10"
-              stroke="none"
-              fill="#ef4444"
-              fillOpacity={0.1}
-              name="10° percentile"
-              isAnimationActive={false}
-            />
+            {visibleBands >= 1 && (
+              <Area
+                type="monotone"
+                dataKey="p90"
+                stroke="none"
+                fill="#10b981"
+                fillOpacity={0.1}
+                name="90° percentile"
+                isAnimationActive={false}
+              />
+            )}
+            {visibleBands >= 2 && (
+              <Area
+                type="monotone"
+                dataKey="p75"
+                stroke="none"
+                fill="#10b981"
+                fillOpacity={0.15}
+                name="75° percentile"
+                isAnimationActive={false}
+              />
+            )}
+            {visibleBands >= 3 && (
+              <Area
+                type="monotone"
+                dataKey="p25"
+                stroke="none"
+                fill="#f97316"
+                fillOpacity={0.15}
+                name="25° percentile"
+                isAnimationActive={false}
+              />
+            )}
+            {visibleBands >= 4 && (
+              <Area
+                type="monotone"
+                dataKey="p10"
+                stroke="none"
+                fill="#ef4444"
+                fillOpacity={0.1}
+                name="10° percentile"
+                isAnimationActive={false}
+              />
+            )}
 
             {/* Median line */}
             <Line

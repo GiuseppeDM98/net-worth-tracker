@@ -47,7 +47,8 @@
  * @returns Tab component with metric cards, settings form, and historical chart
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { useAuth } from '@/contexts/AuthContext';
@@ -77,6 +78,33 @@ import {
 import { Settings } from '@/types/settings';
 import { FIREProjectionSection } from './FIREProjectionSection';
 import { FireReachedBanner } from './FireReachedBanner';
+import { cn } from '@/lib/utils';
+import { useCountUp } from '@/lib/utils/useCountUp';
+import { metricSettleTransition } from '@/lib/utils/motionVariants';
+
+const FIRE_CONTROL_CLASSNAME = 'mt-1 transition-[border-color,background-color,box-shadow] duration-200 focus-visible:ring-2 focus-visible:ring-primary/25 motion-reduce:transition-none';
+
+function SettledCurrencyValue({
+  value,
+  className,
+}: {
+  value: number | null;
+  className?: string;
+}) {
+  const animatedValue = useCountUp(value, { fromPrevious: true, duration: 520, startDelay: 0 });
+  return <span className={className}>{formatCurrency(animatedValue ?? value ?? 0)}</span>;
+}
+
+function SettledPercentageValue({
+  value,
+  className,
+}: {
+  value: number | null;
+  className?: string;
+}) {
+  const animatedValue = useCountUp(value, { fromPrevious: true, duration: 520, startDelay: 0 });
+  return <span className={className}>{formatPercentage(animatedValue ?? value ?? 0)}</span>;
+}
 
 export function FireCalculatorTab() {
   const { user } = useAuth();
@@ -125,11 +153,39 @@ export function FireCalculatorTab() {
     : null;
   const chartData = fireData?.chartData ?? [];
 
-  // Calculate planned metrics, dependent on fireData and settings
-  const plannedFireMetrics =
-    plannedAnnualExpenses && plannedAnnualExpenses > 0 && currentNetWorth > 0
-      ? calculatePlannedFIREMetrics(currentNetWorth, plannedAnnualExpenses, withdrawalRate)
-      : null;
+  const parsedPreviewWithdrawalRate = Number.parseFloat(tempWithdrawalRate);
+  const previewWithdrawalRate =
+    Number.isFinite(parsedPreviewWithdrawalRate) && parsedPreviewWithdrawalRate > 0
+      ? parsedPreviewWithdrawalRate
+      : withdrawalRate;
+  const trimmedPreviewExpenses = tempPlannedAnnualExpenses.trim();
+  const parsedPreviewExpenses = trimmedPreviewExpenses !== '' ? Number.parseFloat(trimmedPreviewExpenses) : null;
+  const previewPlannedAnnualExpenses =
+    parsedPreviewExpenses !== null && Number.isFinite(parsedPreviewExpenses) && parsedPreviewExpenses >= 0
+      ? parsedPreviewExpenses
+      : plannedAnnualExpenses;
+  const hasUnsavedChanges =
+    tempWithdrawalRate !== (settings?.withdrawalRate ?? 4.0).toString() ||
+    tempPlannedAnnualExpenses !== (settings?.plannedAnnualExpenses ? settings.plannedAnnualExpenses.toString() : '') ||
+    includePrimaryResidence !== (settings?.includePrimaryResidenceInFIRE ?? false);
+
+  const displayedFireMetrics = useMemo(() => {
+    if (!fireData?.metrics) return null;
+    return calculateFIREMetrics(
+      currentNetWorth,
+      fireData.metrics.annualExpenses,
+      previewWithdrawalRate,
+      liquidNetWorth,
+      illiquidNetWorth
+    );
+  }, [currentNetWorth, fireData?.metrics, liquidNetWorth, previewWithdrawalRate, illiquidNetWorth]);
+
+  const plannedFireMetrics = useMemo(() => {
+    if (!previewPlannedAnnualExpenses || previewPlannedAnnualExpenses <= 0 || currentNetWorth <= 0) {
+      return null;
+    }
+    return calculatePlannedFIREMetrics(currentNetWorth, previewPlannedAnnualExpenses, previewWithdrawalRate);
+  }, [currentNetWorth, previewPlannedAnnualExpenses, previewWithdrawalRate]);
 
   useEffect(() => {
     if (settings) {
@@ -210,6 +266,19 @@ export function FireCalculatorTab() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {hasUnsavedChanges && (
+            <div className="mb-4 rounded-lg border border-border bg-muted/40 p-4 text-sm">
+              <div className="flex items-start gap-2">
+                <Loader2 className={cn('mt-0.5 h-4 w-4 shrink-0', mutation.isPending ? 'animate-spin' : 'opacity-60')} />
+                <div className="space-y-1">
+                  <p className="font-medium text-foreground">Anteprima locale attiva</p>
+                  <p className="text-muted-foreground">
+                    Le metriche sotto riflettono i valori inseriti ma non ancora salvati. Il salvataggio resta esplicito.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="grid gap-4 desktop:grid-cols-2 mb-4">
             <div>
               <Label htmlFor="withdrawalRate">Safe Withdrawal Rate (%)</Label>
@@ -221,7 +290,7 @@ export function FireCalculatorTab() {
                 max="100"
                 value={tempWithdrawalRate}
                 onChange={(e) => setTempWithdrawalRate(e.target.value)}
-                className="mt-1"
+                className={FIRE_CONTROL_CLASSNAME}
               />
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Tipicamente 4% secondo la regola del 4% (Trinity Study)
@@ -236,7 +305,7 @@ export function FireCalculatorTab() {
                 min="0"
                 value={tempPlannedAnnualExpenses}
                 onChange={(e) => setTempPlannedAnnualExpenses(e.target.value)}
-                className="mt-1"
+                className={FIRE_CONTROL_CLASSNAME}
                 placeholder="Es. 25000"
               />
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -270,13 +339,13 @@ export function FireCalculatorTab() {
             disabled={mutation.isPending}
             className="w-full desktop:w-auto dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
           >
-            {mutation.isPending ? 'Salvataggio...' : 'Salva Impostazioni'}
+            {mutation.isPending ? 'Salvataggio...' : hasUnsavedChanges ? 'Salva Anteprima' : 'Salva Impostazioni'}
           </Button>
         </CardContent>
       </Card>
 
       {/* FIRE Metrics Cards */}
-      {fireMetrics && (
+      {displayedFireMetrics && (
         <>
           {/* Section Title: Current Metrics */}
           <div>
@@ -288,7 +357,8 @@ export function FireCalculatorTab() {
 
           {/* Row 1: FIRE Number and Progress (Current) */}
           <div className="grid gap-6 desktop:grid-cols-2">
-            <Card>
+            <motion.div layout transition={metricSettleTransition}>
+            <Card className="border-border/70">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <TrendingUp className="h-5 w-5 text-blue-500" />
@@ -296,19 +366,19 @@ export function FireCalculatorTab() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-blue-600">
-                  {formatCurrency(fireMetrics.fireNumber)}
-                </div>
+                <SettledCurrencyValue value={displayedFireMetrics.fireNumber} className="text-3xl font-bold text-blue-600" />
                 <p className="mt-2 font-mono text-sm text-gray-500 dark:text-gray-400 tabular-nums">
-                  {formatCurrency(fireMetrics.annualExpenses)} / {withdrawalRate}%
+                  {formatCurrency(displayedFireMetrics.annualExpenses)} / {previewWithdrawalRate}%
                 </p>
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   Spese annuali ({getItalyYear() - 1}) su Safe Withdrawal Rate
                 </p>
               </CardContent>
             </Card>
+            </motion.div>
 
-            <Card>
+            <motion.div layout transition={metricSettleTransition}>
+            <Card className="border-border/70">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Percent className="h-5 w-5 text-green-500" />
@@ -316,31 +386,31 @@ export function FireCalculatorTab() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-green-600">
-                  {formatPercentage(fireMetrics.progressToFI)}
-                </div>
+                <SettledPercentageValue value={displayedFireMetrics.progressToFI} className="text-3xl font-bold text-green-600" />
                 <div className="mt-3">
                   <div className="h-4 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-                    <div
+                    <motion.div
                       className="h-full bg-gradient-to-r from-green-400 to-green-600 transition-all"
                       style={{
-                        width: `${Math.min(fireMetrics.progressToFI, 100)}%`,
+                        width: `${Math.min(displayedFireMetrics.progressToFI, 100)}%`,
                       }}
+                      transition={metricSettleTransition}
                     />
                   </div>
                   <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                    {fireMetrics.progressToFI >= 100
+                    {displayedFireMetrics.progressToFI >= 100
                       ? '🎉 Hai raggiunto la Financial Independence!'
-                      : `Ancora ${formatCurrency(fireMetrics.fireNumber - fireMetrics.currentNetWorth)} da accumulare`
+                      : `Ancora ${formatCurrency(displayedFireMetrics.fireNumber - displayedFireMetrics.currentNetWorth)} da accumulare`
                     }
                   </p>
                 </div>
               </CardContent>
             </Card>
+            </motion.div>
           </div>
 
           {/* Planned Metrics Section (if plannedAnnualExpenses is set) */}
-          {plannedFireMetrics && fireMetrics && (
+          {plannedFireMetrics && displayedFireMetrics && (
             <>
               <div className="mt-8">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2"><Target className="h-5 w-5 text-purple-500" />Metriche Previste</h2>
@@ -359,19 +429,19 @@ export function FireCalculatorTab() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-3xl font-bold text-purple-700 dark:text-purple-300">
-                      {formatCurrency(plannedFireMetrics.plannedFireNumber)}
+                      <SettledCurrencyValue value={plannedFireMetrics.plannedFireNumber} />
                     </div>
                     <p className="mt-2 font-mono text-sm text-purple-700 dark:text-purple-300 tabular-nums">
-                      {formatCurrency(plannedFireMetrics.plannedAnnualExpenses)} / {withdrawalRate}%
+                      {formatCurrency(plannedFireMetrics.plannedAnnualExpenses)} / {previewWithdrawalRate}%
                     </p>
                     <p className="mt-1 text-xs text-purple-700 dark:text-purple-400">
                       Spese previste su Safe Withdrawal Rate
                     </p>
-                    {fireMetrics.fireNumber !== plannedFireMetrics.plannedFireNumber && (
+                    {displayedFireMetrics.fireNumber !== plannedFireMetrics.plannedFireNumber && (
                       <p className="mt-2 text-xs text-purple-700 dark:text-purple-300 font-semibold flex items-center gap-1">
-                        {plannedFireMetrics.plannedFireNumber < fireMetrics.fireNumber
-                          ? <><TrendingDown className="h-3.5 w-3.5 inline shrink-0" />{formatCurrency(fireMetrics.fireNumber - plannedFireMetrics.plannedFireNumber)} in meno rispetto all&apos;attuale</>
-                          : <><TrendingUp className="h-3.5 w-3.5 inline shrink-0" />{formatCurrency(plannedFireMetrics.plannedFireNumber - fireMetrics.fireNumber)} in più rispetto all&apos;attuale</>
+                        {plannedFireMetrics.plannedFireNumber < displayedFireMetrics.fireNumber
+                          ? <><TrendingDown className="h-3.5 w-3.5 inline shrink-0" />{formatCurrency(displayedFireMetrics.fireNumber - plannedFireMetrics.plannedFireNumber)} in meno rispetto all&apos;attuale</>
+                          : <><TrendingUp className="h-3.5 w-3.5 inline shrink-0" />{formatCurrency(plannedFireMetrics.plannedFireNumber - displayedFireMetrics.fireNumber)} in più rispetto all&apos;attuale</>
                         }
                       </p>
                     )}
@@ -386,22 +456,21 @@ export function FireCalculatorTab() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-purple-700 dark:text-purple-300">
-                      {formatPercentage(plannedFireMetrics.plannedProgressToFI)}
-                    </div>
+                    <SettledPercentageValue value={plannedFireMetrics.plannedProgressToFI} className="text-3xl font-bold text-purple-700 dark:text-purple-300" />
                     <div className="mt-3">
                       <div className="h-4 w-full overflow-hidden rounded-full bg-purple-200 dark:bg-purple-900/40">
-                        <div
+                        <motion.div
                           className="h-full bg-gradient-to-r from-purple-400 to-purple-600 transition-all"
                           style={{
                             width: `${Math.min(plannedFireMetrics.plannedProgressToFI, 100)}%`,
                           }}
+                          transition={metricSettleTransition}
                         />
                       </div>
                       <p className="mt-2 text-sm text-purple-900 dark:text-purple-200">
                         {plannedFireMetrics.plannedProgressToFI >= 100
                           ? '🎉 Hai raggiunto il target previsto!'
-                          : `Ancora ${formatCurrency(plannedFireMetrics.plannedFireNumber - fireMetrics.currentNetWorth)} da accumulare per il target previsto`
+                          : `Ancora ${formatCurrency(plannedFireMetrics.plannedFireNumber - displayedFireMetrics.currentNetWorth)} da accumulare per il target previsto`
                         }
                       </p>
                     </div>
@@ -421,29 +490,27 @@ export function FireCalculatorTab() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="font-mono text-2xl font-bold tabular-nums text-purple-600">
-                  {formatCurrency(fireMetrics.annualAllowance)}
-                </div>
+                <SettledCurrencyValue value={displayedFireMetrics.annualAllowance} className="font-mono text-2xl font-bold tabular-nums text-purple-600" />
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Patrimonio FIRE × {withdrawalRate}% — quanto puoi prelevare ogni anno senza intaccare il capitale nel lungo periodo
+                  Patrimonio FIRE × {previewWithdrawalRate}% — quanto puoi prelevare ogni anno senza intaccare il capitale nel lungo periodo
                 </p>
                 {/* Proportion bar: liquid (green) vs illiquid (amber) share of total allowance */}
-                {fireMetrics.annualAllowance > 0 && (
+                {displayedFireMetrics.annualAllowance > 0 && (
                   <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-amber-200 dark:bg-amber-900/50">
                     <div
                       className="h-full rounded-full bg-green-500 dark:bg-green-400 transition-all"
-                      style={{ width: `${(fireMetrics.liquidAnnualAllowance / fireMetrics.annualAllowance) * 100}%` }}
+                      style={{ width: `${(displayedFireMetrics.liquidAnnualAllowance / displayedFireMetrics.annualAllowance) * 100}%` }}
                     />
                   </div>
                 )}
                 <div className="mt-2 flex flex-col gap-2 border-t pt-3 text-xs text-gray-500 dark:text-gray-400">
                   <div className="flex justify-between">
                     <span>Di cui liquidi</span>
-                    <span className="font-mono font-medium tabular-nums text-green-600 dark:text-green-400">{formatCurrency(fireMetrics.liquidAnnualAllowance)}</span>
+                    <span className="font-mono font-medium tabular-nums text-green-600 dark:text-green-400">{formatCurrency(displayedFireMetrics.liquidAnnualAllowance)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Di cui illiquidi</span>
-                    <span className="font-mono font-medium tabular-nums text-amber-600 dark:text-amber-400">{formatCurrency(fireMetrics.illiquidAnnualAllowance)}</span>
+                    <span className="font-mono font-medium tabular-nums text-amber-600 dark:text-amber-400">{formatCurrency(displayedFireMetrics.illiquidAnnualAllowance)}</span>
                   </div>
                 </div>
               </CardContent>
@@ -457,28 +524,26 @@ export function FireCalculatorTab() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="font-mono text-2xl font-bold tabular-nums text-indigo-600">
-                  {formatCurrency(fireMetrics.monthlyAllowance)}
-                </div>
+                <SettledCurrencyValue value={displayedFireMetrics.monthlyAllowance} className="font-mono text-2xl font-bold tabular-nums text-indigo-600" />
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   Indennità annuale ÷ 12 — reddito mensile passivo sostenibile
                 </p>
-                {fireMetrics.annualAllowance > 0 && (
+                {displayedFireMetrics.annualAllowance > 0 && (
                   <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-amber-200 dark:bg-amber-900/50">
                     <div
                       className="h-full rounded-full bg-green-500 dark:bg-green-400 transition-all"
-                      style={{ width: `${(fireMetrics.liquidAnnualAllowance / fireMetrics.annualAllowance) * 100}%` }}
+                      style={{ width: `${(displayedFireMetrics.liquidAnnualAllowance / displayedFireMetrics.annualAllowance) * 100}%` }}
                     />
                   </div>
                 )}
                 <div className="mt-2 flex flex-col gap-2 border-t pt-3 text-xs text-gray-500 dark:text-gray-400">
                   <div className="flex justify-between">
                     <span>Di cui liquidi</span>
-                    <span className="font-mono font-medium tabular-nums text-green-600 dark:text-green-400">{formatCurrency(fireMetrics.liquidAnnualAllowance / 12)}</span>
+                    <span className="font-mono font-medium tabular-nums text-green-600 dark:text-green-400">{formatCurrency(displayedFireMetrics.liquidAnnualAllowance / 12)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Di cui illiquidi</span>
-                    <span className="font-mono font-medium tabular-nums text-amber-600 dark:text-amber-400">{formatCurrency(fireMetrics.illiquidAnnualAllowance / 12)}</span>
+                    <span className="font-mono font-medium tabular-nums text-amber-600 dark:text-amber-400">{formatCurrency(displayedFireMetrics.illiquidAnnualAllowance / 12)}</span>
                   </div>
                 </div>
               </CardContent>
@@ -492,28 +557,26 @@ export function FireCalculatorTab() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="font-mono text-2xl font-bold tabular-nums text-teal-600">
-                  {formatCurrency(fireMetrics.dailyAllowance)}
-                </div>
+                <SettledCurrencyValue value={displayedFireMetrics.dailyAllowance} className="font-mono text-2xl font-bold tabular-nums text-teal-600" />
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   Indennità annuale ÷ 365 — budget giornaliero sostenibile
                 </p>
-                {fireMetrics.annualAllowance > 0 && (
+                {displayedFireMetrics.annualAllowance > 0 && (
                   <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-amber-200 dark:bg-amber-900/50">
                     <div
                       className="h-full rounded-full bg-green-500 dark:bg-green-400 transition-all"
-                      style={{ width: `${(fireMetrics.liquidAnnualAllowance / fireMetrics.annualAllowance) * 100}%` }}
+                      style={{ width: `${(displayedFireMetrics.liquidAnnualAllowance / displayedFireMetrics.annualAllowance) * 100}%` }}
                     />
                   </div>
                 )}
                 <div className="mt-2 flex flex-col gap-2 border-t pt-3 text-xs text-gray-500 dark:text-gray-400">
                   <div className="flex justify-between">
                     <span>Di cui liquidi</span>
-                    <span className="font-mono font-medium tabular-nums text-green-600 dark:text-green-400">{formatCurrency(fireMetrics.liquidAnnualAllowance / 365)}</span>
+                    <span className="font-mono font-medium tabular-nums text-green-600 dark:text-green-400">{formatCurrency(displayedFireMetrics.liquidAnnualAllowance / 365)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Di cui illiquidi</span>
-                    <span className="font-mono font-medium tabular-nums text-amber-600 dark:text-amber-400">{formatCurrency(fireMetrics.illiquidAnnualAllowance / 365)}</span>
+                    <span className="font-mono font-medium tabular-nums text-amber-600 dark:text-amber-400">{formatCurrency(displayedFireMetrics.illiquidAnnualAllowance / 365)}</span>
                   </div>
                 </div>
               </CardContent>
@@ -530,20 +593,18 @@ export function FireCalculatorTab() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="font-mono text-3xl font-bold tabular-nums text-orange-600">
-                  {formatPercentage(fireMetrics.currentWR)}
-                </div>
+                <SettledPercentageValue value={displayedFireMetrics.currentWR} className="font-mono text-3xl font-bold tabular-nums text-orange-600" />
                 {/* Formula breakdown: makes clear which two numbers drive the percentage */}
                 <p className="mt-2 font-mono text-sm text-gray-500 dark:text-gray-400 tabular-nums">
-                  {formatCurrency(fireMetrics.annualExpenses)} / {formatCurrency(currentNetWorth)}
+                  {formatCurrency(displayedFireMetrics.annualExpenses)} / {formatCurrency(currentNetWorth)}
                 </p>
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   Spese annuali ({getItalyYear() - 1}) su patrimonio attuale
                 </p>
-                {fireMetrics.currentWR > withdrawalRate && (
+                {displayedFireMetrics.currentWR > previewWithdrawalRate && (
                   <p className="mt-2 text-sm text-red-600 font-semibold flex items-center gap-1">
                     <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                    Superiore al Safe Withdrawal Rate ({withdrawalRate}%)
+                    Superiore al Safe Withdrawal Rate ({previewWithdrawalRate}%)
                   </p>
                 )}
               </CardContent>
@@ -560,9 +621,9 @@ export function FireCalculatorTab() {
                 {/* Primary: liquid years — most actionable since no asset sales are needed */}
                 <div className="flex items-baseline gap-2">
                   <span className="font-mono text-3xl font-bold tabular-nums text-cyan-600">
-                    {fireMetrics.liquidYearsOfExpenses > 0 ? fireMetrics.liquidYearsOfExpenses.toFixed(1) : '—'}
+                    {displayedFireMetrics.liquidYearsOfExpenses > 0 ? displayedFireMetrics.liquidYearsOfExpenses.toFixed(1) : '—'}
                   </span>
-                  {fireMetrics.liquidYearsOfExpenses > 0 && (
+                  {displayedFireMetrics.liquidYearsOfExpenses > 0 && (
                     <span className="text-base font-medium text-cyan-600">anni</span>
                   )}
                   <span className="ml-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/40 dark:text-green-300">
@@ -572,29 +633,29 @@ export function FireCalculatorTab() {
                 <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                   Anni di spesa coperti senza dover vendere immobili o asset illiquidi
                 </p>
-                {fireMetrics.annualExpenses > 0 && (
+                {displayedFireMetrics.annualExpenses > 0 && (
                   <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                    Spese annuali {formatCurrency(fireMetrics.annualExpenses)} — recuperate dall&apos;anno {getItalyYear() - 1}
+                    Spese annuali {formatCurrency(displayedFireMetrics.annualExpenses)} — recuperate dall&apos;anno {getItalyYear() - 1}
                   </p>
                 )}
                 {/* Proportion bar: liquid (cyan) vs illiquid (amber) years */}
-                {fireMetrics.yearsOfExpenses > 0 && (
+                {displayedFireMetrics.yearsOfExpenses > 0 && (
                   <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-amber-200 dark:bg-amber-900/50">
                     <div
                       className="h-full rounded-full bg-cyan-500 dark:bg-cyan-400 transition-all"
-                      style={{ width: `${Math.min((fireMetrics.liquidYearsOfExpenses / fireMetrics.yearsOfExpenses) * 100, 100)}%` }}
+                      style={{ width: `${Math.min((displayedFireMetrics.liquidYearsOfExpenses / displayedFireMetrics.yearsOfExpenses) * 100, 100)}%` }}
                     />
                   </div>
                 )}
                 <div className="mt-2 flex flex-col gap-2 border-t pt-3 text-xs text-gray-500 dark:text-gray-400">
                   <div className="flex justify-between">
                     <span>Patrimonio totale FIRE</span>
-                    <span className="font-mono font-medium tabular-nums">{fireMetrics.yearsOfExpenses.toFixed(1)} anni</span>
+                    <span className="font-mono font-medium tabular-nums">{displayedFireMetrics.yearsOfExpenses.toFixed(1)} anni</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Solo illiquidi</span>
                     <span className="font-mono font-medium tabular-nums text-amber-600 dark:text-amber-400">
-                      {fireMetrics.illiquidYearsOfExpenses > 0 ? `${fireMetrics.illiquidYearsOfExpenses.toFixed(1)} anni` : '—'}
+                      {displayedFireMetrics.illiquidYearsOfExpenses > 0 ? `${displayedFireMetrics.illiquidYearsOfExpenses.toFixed(1)} anni` : '—'}
                     </span>
                   </div>
                 </div>
@@ -667,11 +728,11 @@ export function FireCalculatorTab() {
       </Card>
 
       {/* FIRE Projection Scenarios */}
-      {fireMetrics && currentNetWorth > 0 && (
+      {displayedFireMetrics && currentNetWorth > 0 && (
         <FIREProjectionSection
           userId={user!.uid}
           currentNetWorth={currentNetWorth}
-          withdrawalRate={withdrawalRate}
+          withdrawalRate={previewWithdrawalRate}
           settings={settings}
         />
       )}

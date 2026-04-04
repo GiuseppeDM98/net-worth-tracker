@@ -1,12 +1,15 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
-  pageVariants,
   staggerContainer,
   cardItem,
   slideDown,
+  chapterReveal,
+  chartShellSettle,
+  periodContentSettle,
+  tabPanelSwitch,
 } from '@/lib/utils/motionVariants';
 import { useAuth } from '@/contexts/AuthContext';
 import { HistoryPageSkeleton } from '@/components/history/HistoryPageSkeleton';
@@ -115,6 +118,16 @@ const getMonthName = (month: number): string => {
   return months[month - 1];
 };
 
+type HistoryChapterId = 'overview' | 'growth' | 'drivers' | 'milestones' | 'reference';
+
+const HISTORY_CHAPTER_SEQUENCE: HistoryChapterId[] = [
+  'overview',
+  'growth',
+  'drivers',
+  'milestones',
+  'reference',
+];
+
 export default function HistoryPage() {
   const { user } = useAuth();
   const [snapshots, setSnapshots] = useState<MonthlySnapshot[]>([]);
@@ -133,6 +146,8 @@ export default function HistoryPage() {
   const [savingsView, setSavingsView] = useState<'annual' | 'monthly'>('annual');
   // 'all' shows all years as a continuous monthly timeline; a number filters to that year
   const [savingsSelectedYear, setSavingsSelectedYear] = useState<number | 'all'>('all');
+  const [visibleChapters, setVisibleChapters] = useState<HistoryChapterId[]>([]);
+  const prefersReducedMotion = useReducedMotion();
 
   // Responsive breakpoints
   const isMobile = useMediaQuery('(max-width: 767px)');
@@ -159,6 +174,26 @@ export default function HistoryPage() {
       loadData();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (loading) return;
+
+    if (prefersReducedMotion) {
+      setVisibleChapters(HISTORY_CHAPTER_SEQUENCE);
+      return;
+    }
+
+    setVisibleChapters([HISTORY_CHAPTER_SEQUENCE[0]]);
+    const timers = HISTORY_CHAPTER_SEQUENCE.slice(1).map((chapterId, index) =>
+      window.setTimeout(() => {
+        setVisibleChapters((current) =>
+          current.includes(chapterId) ? current : [...current, chapterId]
+        );
+      }, 90 * (index + 1))
+    );
+
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [loading, prefersReducedMotion]);
 
   /**
    * Load all data needed for history visualization.
@@ -290,6 +325,23 @@ export default function HistoryPage() {
     [snapshots]
   );
   const doublingTimeSummary = prepareDoublingTimeData(snapshots, doublingMode);
+  const visibleChapterSet = useMemo(() => new Set(visibleChapters), [visibleChapters]);
+  const notesCount = useMemo(
+    () => netWorthHistory.filter((item) => item.note && item.note.trim() !== '').length,
+    [netWorthHistory]
+  );
+  const savingsViewLabel = savingsView === 'annual' ? 'Annuale' : 'Mensile';
+  const savingsScopeLabel = useMemo(() => {
+    if (savingsView === 'annual') {
+      return 'Confronto per anno';
+    }
+
+    if (savingsSelectedYear === 'all') {
+      return 'Timeline mensile completa';
+    }
+
+    return `Dettaglio ${savingsSelectedYear}`;
+  }, [savingsSelectedYear, savingsView]);
 
   // Aggregate lifetime labor/investment metrics for the 4 KPI cards.
   // Mirrors the same calculation from the dashboard, using assets already loaded here
@@ -593,12 +645,7 @@ export default function HistoryPage() {
   }
 
   return (
-    <motion.div
-      variants={pageVariants}
-      initial="hidden"
-      animate="visible"
-      className="space-y-6 max-desktop:portrait:pb-20"
-    >
+    <div className="space-y-6 max-desktop:portrait:pb-20">
       {/* Page header — eyebrow label + title establish editorial entry point.
           PDF export is the primary persistent action; CSV and snapshot insertion
           are utility actions demoted to outline/ghost so the primary CTA is clear. */}
@@ -606,8 +653,8 @@ export default function HistoryPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex-1">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Patrimonio</p>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">Storico</h1>
-            <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-400">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Storico</h1>
+            <p className="mt-1 sm:mt-2 text-sm sm:text-base text-muted-foreground">
               Analizza l'evoluzione del tuo patrimonio (lordo) nel tempo
             </p>
           </div>
@@ -642,14 +689,72 @@ export default function HistoryPage() {
         </div>
       </div>
 
+      <motion.section
+        variants={chapterReveal}
+        initial="hidden"
+        animate={visibleChapterSet.has('overview') ? 'visible' : 'hidden'}
+        className="space-y-4"
+      >
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="rounded-xl border bg-card px-4 py-4">
+            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Capitolo 1</p>
+            <p className="mt-2 text-sm font-semibold text-foreground">Evoluzione del patrimonio</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Parti dal trend complessivo e usa le note per contestualizzare i punti di svolta.
+            </p>
+          </div>
+          <div className="rounded-xl border bg-card px-4 py-4">
+            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Capitolo 2</p>
+            <p className="mt-2 text-sm font-semibold text-foreground">Driver della crescita</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Separa risparmio, crescita degli investimenti e contributo del lavoro.
+            </p>
+          </div>
+          <div className="rounded-xl border bg-card px-4 py-4">
+            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Capitolo 3</p>
+            <p className="mt-2 text-sm font-semibold text-foreground">Milestone e assetto</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Chiudi con raddoppi, traguardi e confronto tra allocazione attuale e desiderata.
+            </p>
+          </div>
+        </div>
+      </motion.section>
+
       {/* Net Worth History Chart — first chart on the page gets hero treatment:
           left-accent border and a slightly larger title signal this is the primary
           data story. All other charts follow at standard weight. */}
+      <motion.section
+        variants={chapterReveal}
+        initial="hidden"
+        animate={visibleChapterSet.has('growth') ? 'visible' : 'hidden'}
+        className="space-y-4 pt-6 border-t border-border/40"
+      >
+      <div>
+        <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Capitolo 1</p>
+        <h2 className="mt-1 text-lg font-semibold text-foreground">Evoluzione e composizione</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          I blocchi principali sono allineati per raccontare prima il patrimonio totale, poi la sua composizione e infine la variazione anno su anno.
+        </p>
+      </div>
+      <div className="space-y-4">
       <motion.div variants={cardItem} initial="hidden" animate="visible">
       <Card className="border-l-4 border-l-primary">
         <CardHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="text-xl sm:text-2xl">Evoluzione Patrimonio Netto</CardTitle>
+            <div className="space-y-2">
+              <CardTitle className="text-xl sm:text-2xl">Evoluzione Patrimonio Netto</CardTitle>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1 font-medium text-foreground">
+                  Vista principale
+                </span>
+                <span className="rounded-full border border-border bg-background px-2.5 py-1">
+                  {netWorthHistory.length} rilevazioni
+                </span>
+                <span className="rounded-full border border-border bg-background px-2.5 py-1">
+                  {notesCount} {notesCount === 1 ? 'nota' : 'note'}
+                </span>
+              </div>
+            </div>
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               {/* Toggle Visualizza Note */}
               <Button
@@ -893,6 +998,14 @@ export default function HistoryPage() {
               Nessuno storico disponibile.
             </div>
           ) : (
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={showAssetClassPercentage ? 'asset-class-percentage' : 'asset-class-absolute'}
+                variants={tabPanelSwitch}
+                initial="hidden"
+                animate="visible"
+                exit="hidden"
+              >
             <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-asset-class-evolution">
               {/*
                 CHART MODE SWITCHING: Percentage vs Absolute Values
@@ -1131,6 +1244,8 @@ export default function HistoryPage() {
                 </AreaChart>
               )}
             </ResponsiveContainer>
+              </motion.div>
+            </AnimatePresence>
           )}
         </CardContent>
       </Card>
@@ -1158,6 +1273,14 @@ export default function HistoryPage() {
               Nessuno storico disponibile.
             </div>
           ) : (
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={showLiquidityPercentage ? 'liquidity-percentage' : 'liquidity-absolute'}
+                variants={tabPanelSwitch}
+                initial="hidden"
+                animate="visible"
+                exit="hidden"
+              >
             <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-liquidity">
               {showLiquidityPercentage ? (
                 // Percentage mode: Use LineChart with separate lines
@@ -1285,6 +1408,8 @@ export default function HistoryPage() {
                 </AreaChart>
               )}
             </ResponsiveContainer>
+              </motion.div>
+            </AnimatePresence>
           )}
         </CardContent>
       </Card>
@@ -1312,6 +1437,14 @@ export default function HistoryPage() {
               Nessuno storico disponibile.
             </div>
           ) : (
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={showYoYPercentage ? 'yoy-percentage' : 'yoy-absolute'}
+                variants={tabPanelSwitch}
+                initial="hidden"
+                animate="visible"
+                exit="hidden"
+              >
             <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-yoy-variation">
               <BarChart data={yoyVariationData} margin={getChartMargins()}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -1377,10 +1510,14 @@ export default function HistoryPage() {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+              </motion.div>
+            </AnimatePresence>
           )}
         </CardContent>
       </Card>
       </motion.div>
+      </div>
+      </motion.section>
 
       {/* Savings vs Investment Growth Chart */}
       {/* Shows breakdown of net worth growth into two components:
@@ -1389,13 +1526,43 @@ export default function HistoryPage() {
           Stacked bars sum to total Net Worth Growth for the period.
           Supports annual view (per-year) and monthly view (per-month within a year). */}
       {/* border-t signals zone shift: portfolio evolution (above) → cashflow analysis (below) */}
-      <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.4 }} className="border-t border-border/40 pt-4">
+      <motion.section
+        variants={chapterReveal}
+        initial="hidden"
+        animate={visibleChapterSet.has('drivers') ? 'visible' : 'hidden'}
+        className="space-y-4 pt-6 border-t border-border/40"
+      >
+      <div>
+        <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Capitolo 2</p>
+        <h2 className="mt-1 text-lg font-semibold text-foreground">Driver della crescita</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Questo capitolo separa il contributo del risparmio da quello del mercato e aggiunge la lettura lavoro vs investimenti solo quando la configurazione è completa.
+        </p>
+      </div>
+      <div className="space-y-4">
+      <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.4 }}>
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <CardTitle className="text-lg sm:text-xl">
-              Risparmio vs Crescita Investimenti
-            </CardTitle>
+            <div className="space-y-2">
+              <CardTitle className="text-lg sm:text-xl">
+                Risparmio vs Crescita Investimenti
+              </CardTitle>
+              <motion.div
+                key={`${savingsView}-${savingsSelectedYear}`}
+                variants={periodContentSettle}
+                initial="idle"
+                animate="settle"
+                className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
+              >
+                <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1 font-medium text-foreground">
+                  Modalità {savingsViewLabel}
+                </span>
+                <span className="rounded-full border border-border bg-background px-2.5 py-1">
+                  {savingsScopeLabel}
+                </span>
+              </motion.div>
+            </div>
             <div className="flex items-center gap-2 flex-wrap">
               {/* Annual / Monthly view toggle */}
               <div className="flex gap-1">
@@ -1439,14 +1606,22 @@ export default function HistoryPage() {
           </div>
         </CardHeader>
         <CardContent>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={`${savingsView}-${savingsSelectedYear}`}
+              variants={tabPanelSwitch}
+              initial="hidden"
+              animate="visible"
+              exit="hidden"
+            >
           {savingsView === 'annual' ? (
-            // Annual view
             savingsVsInvestmentData.length === 0 ? (
               <div className="flex h-64 items-center justify-center text-gray-500 dark:text-gray-400">
                 Dati insufficienti per la visualizzazione.
                 Servono snapshot e transazioni cashflow per ogni anno.
               </div>
             ) : (
+              <motion.div variants={chartShellSettle} initial="idle" animate="settle">
               <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-savings-vs-investment">
                 <BarChart data={savingsVsInvestmentData} margin={getChartMargins()}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -1513,9 +1688,9 @@ export default function HistoryPage() {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
+              </motion.div>
             )
           ) : (
-            // Monthly view — either all years combined or a single selected year
             (() => {
               const monthlyData =
                 savingsSelectedYear === 'all'
@@ -1527,6 +1702,7 @@ export default function HistoryPage() {
                   Servono snapshot consecutivi e transazioni cashflow.
                 </div>
               ) : (
+                <motion.div variants={chartShellSettle} initial="idle" animate="settle">
                 <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-savings-vs-investment-monthly">
                   <BarChart data={monthlyData} margin={getChartMargins()}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -1593,9 +1769,12 @@ export default function HistoryPage() {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
+                </motion.div>
               );
             })()
           )}
+            </motion.div>
+          </AnimatePresence>
         </CardContent>
       </Card>
       </motion.div>
@@ -1702,16 +1881,34 @@ export default function HistoryPage() {
 
               {/* Monthly breakdown chart */}
               {laborMetricsChartData.length > 0 && (
-                <LaborMetricsChart data={laborMetricsChartData} isMobile={isMobile} />
+                <motion.div variants={chartShellSettle} initial="idle" animate="settle">
+                  <LaborMetricsChart data={laborMetricsChartData} isMobile={isMobile} />
+                </motion.div>
               )}
             </CardContent>
           </Card>
         </motion.div>
       )}
+      </div>
+      </motion.section>
 
       {/* Doubling Time Analysis */}
       {/* border-t signals zone shift: cashflow analysis (above) → context/reference (below) */}
-      <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.5 }} className="border-t border-border/40 pt-4">
+      <motion.section
+        variants={chapterReveal}
+        initial="hidden"
+        animate={visibleChapterSet.has('milestones') ? 'visible' : 'hidden'}
+        className="space-y-4 pt-6 border-t border-border/40"
+      >
+      <div>
+        <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Capitolo 3</p>
+        <h2 className="mt-1 text-lg font-semibold text-foreground">Milestone e assetto finale</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Prima leggi velocità e progressione delle milestone, poi confronta l’allocazione attuale con quella desiderata per capire dove si concentra il prossimo lavoro.
+        </p>
+      </div>
+      <div className="space-y-4">
+      <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.5 }}>
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -1750,6 +1947,20 @@ export default function HistoryPage() {
             </div>
           ) : (
             <div className="space-y-6">
+              <motion.div
+                key={doublingMode}
+                variants={periodContentSettle}
+                initial="idle"
+                animate="settle"
+                className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
+              >
+                <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1 font-medium text-foreground">
+                  Lettura {doublingMode === 'geometric' ? 'Geometrica' : 'a Traguardi'}
+                </span>
+                <span className="rounded-full border border-border bg-background px-2.5 py-1">
+                  {doublingTimeSummary.totalDoublings} milestone completate
+                </span>
+              </motion.div>
               {/* Summary Metrics */}
               <DoublingTimeSummaryCards summary={doublingTimeSummary} doublingMode={doublingMode} />
 
@@ -1822,8 +2033,23 @@ export default function HistoryPage() {
           </CardContent>
         </Card>
         </motion.div>
+      </div>
+      </motion.section>
 
       {snapshots.length > 0 && (
+        <motion.section
+          variants={chapterReveal}
+          initial="hidden"
+          animate={visibleChapterSet.has('reference') ? 'visible' : 'hidden'}
+          className="space-y-4 pt-6 border-t border-border/40"
+        >
+        <div>
+          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Appendice</p>
+          <h2 className="mt-1 text-lg font-semibold text-foreground">Snapshot recenti</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Gli ultimi snapshot servono come riferimento operativo rapido per controllare date di creazione, valori e note recenti.
+          </p>
+        </div>
         <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0 }}>
         <Card>
           <CardHeader>
@@ -1886,6 +2112,7 @@ export default function HistoryPage() {
           </CardContent>
         </Card>
         </motion.div>
+        </motion.section>
       )}
 
       <CreateManualSnapshotModal
@@ -1901,6 +2128,6 @@ export default function HistoryPage() {
         snapshots={snapshots}
         onSave={handleSaveNote}
       />
-    </motion.div>
+    </div>
   );
 }

@@ -1,13 +1,15 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
 import { useCountUp } from '@/lib/utils/useCountUp';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
-  pageVariants,
   staggerContainer,
   cardItem,
+  chartReveal,
+  heroMetricSettle,
   slideDown,
+  springLayoutTransition,
 } from '@/lib/utils/motionVariants';
 import { useAuth } from '@/contexts/AuthContext';
 import { AssetAllocationSettings, MonthlySnapshot } from '@/types/assets';
@@ -50,8 +52,10 @@ import { useSnapshots, useCreateSnapshot } from '@/lib/hooks/useSnapshots';
 import { useExpenseStats } from '@/lib/hooks/useExpenseStats';
 import { SavingsRateBadge } from '@/components/ui/SavingsRateBadge';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
-import { getItalyDate } from '@/lib/utils/dateHelpers';
+import { getItalyDate, getItalyMonthYear } from '@/lib/utils/dateHelpers';
 import { getGreeting } from '@/lib/utils/getGreeting';
+
+const MotionButtonShell = motion.div;
 
 /**
  * MAIN DASHBOARD PAGE
@@ -90,6 +94,7 @@ import { getGreeting } from '@/lib/utils/getGreeting';
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const prefersReducedMotion = useReducedMotion();
 
   // Calculated once at mount — no need to re-evaluate on every render.
   // Hour extracted in Europe/Rome timezone so the greeting is always contextually correct.
@@ -117,6 +122,11 @@ export default function DashboardPage() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [existingSnapshot, setExistingSnapshot] = useState<MonthlySnapshot | null>(null);
   const [portfolioSettings, setPortfolioSettings] = useState<AssetAllocationSettings | null>(null);
+  const [revealedCharts, setRevealedCharts] = useState<Set<string>>(new Set());
+  const [chartRenderReady, setChartRenderReady] = useState(false);
+  const [snapshotDialogStyle, setSnapshotDialogStyle] = useState<CSSProperties | undefined>(undefined);
+  const snapshotButtonRef = useRef<HTMLButtonElement | null>(null);
+  const snapshotDialogRef = useRef<HTMLDivElement | null>(null);
 
   // On mobile, charts start collapsed to avoid rendering 3 heavy Recharts SVGs
   // at mount time while countUp animations are running. User can expand individually.
@@ -132,6 +142,48 @@ export default function DashboardPage() {
       return next;
     });
   };
+
+  useEffect(() => {
+    if (prefersReducedMotion || isMobile) {
+      setChartRenderReady(true);
+      return;
+    }
+
+    setChartRenderReady(false);
+    const timerId = window.setTimeout(() => {
+      setChartRenderReady(true);
+    }, 320);
+
+    return () => window.clearTimeout(timerId);
+  }, [isMobile, prefersReducedMotion]);
+
+  useEffect(() => {
+    if (!showConfirmDialog || prefersReducedMotion) {
+      setSnapshotDialogStyle(undefined);
+      return;
+    }
+
+    const frameId = requestAnimationFrame(() => {
+      const trigger = snapshotButtonRef.current;
+      const dialog = snapshotDialogRef.current;
+
+      if (!trigger || !dialog) {
+        setSnapshotDialogStyle(undefined);
+        return;
+      }
+
+      const triggerRect = trigger.getBoundingClientRect();
+      const dialogRect = dialog.getBoundingClientRect();
+      const originX = triggerRect.left + (triggerRect.width / 2) - dialogRect.left;
+      const originY = triggerRect.top + (triggerRect.height / 2) - dialogRect.top;
+
+      setSnapshotDialogStyle({
+        transformOrigin: `${originX}px ${originY}px`,
+      });
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [showConfirmDialog, prefersReducedMotion]);
 
   useEffect(() => {
     if (user) {
@@ -211,9 +263,7 @@ export default function DashboardPage() {
   const variations = useMemo(() => {
     if (snapshots.length === 0) return { monthly: null, yearly: null };
 
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
+    const { month: currentMonth, year: currentYear } = getItalyMonthYear();
 
     // Check if a snapshot exists for the current month
     const currentMonthSnapshot = snapshots.find(
@@ -245,6 +295,11 @@ export default function DashboardPage() {
 
     return { monthly: monthlyVariation, yearly: yearlyVariation };
   }, [snapshots, portfolioMetrics.totalValue]);
+
+  const currentMonthSnapshot = useMemo(() => {
+    const { month, year } = getItalyMonthYear();
+    return snapshots.find((snapshot) => snapshot.year === year && snapshot.month === month) ?? null;
+  }, [snapshots]);
 
   // Memoize chart data
   const chartData = useMemo(() => {
@@ -296,16 +351,8 @@ export default function DashboardPage() {
 
     // Check if snapshot for current month already exists (prevent accidental duplicates)
     try {
-      const now = new Date();
-      const currentYear = now.getFullYear();
-      const currentMonth = now.getMonth() + 1;
-
-      const existing = snapshots.find(
-        (s) => s.year === currentYear && s.month === currentMonth
-      );
-
-      if (existing) {
-        setExistingSnapshot(existing);
+      if (currentMonthSnapshot) {
+        setExistingSnapshot(currentMonthSnapshot);
         setShowConfirmDialog(true);
       } else {
         await createSnapshot();
@@ -378,12 +425,36 @@ export default function DashboardPage() {
 
   // Animated KPI values — fire once on first meaningful (non-zero) data load, never re-trigger.
   // Hooks must be called unconditionally (before any early return).
-  const animatedTotalValue = useCountUp(portfolioMetrics.totalValue, { once: true });
-  const animatedLiquidNetWorth = useCountUp(portfolioMetrics.liquidNetWorth, { once: true });
-  const animatedNetTotal = useCountUp(portfolioMetrics.netTotal, { once: true });
-  const animatedLiquidNetTotal = useCountUp(liquidNetTotal, { once: true });
-  const animatedUnrealizedGains = useCountUp(portfolioMetrics.unrealizedGains, { once: true });
-  const animatedEstimatedTaxes = useCountUp(portfolioMetrics.estimatedTaxes, { once: true });
+  const animatedTotalValue = useCountUp(portfolioMetrics.totalValue, {
+    once: true,
+    startDelay: 80,
+    duration: 420,
+  });
+  const animatedLiquidNetWorth = useCountUp(portfolioMetrics.liquidNetWorth, {
+    once: true,
+    startDelay: 105,
+    duration: 390,
+  });
+  const animatedNetTotal = useCountUp(portfolioMetrics.netTotal, {
+    once: true,
+    startDelay: 125,
+    duration: 380,
+  });
+  const animatedLiquidNetTotal = useCountUp(liquidNetTotal, {
+    once: true,
+    startDelay: 140,
+    duration: 380,
+  });
+  const animatedUnrealizedGains = useCountUp(portfolioMetrics.unrealizedGains, {
+    once: true,
+    startDelay: 155,
+    duration: 380,
+  });
+  const animatedEstimatedTaxes = useCountUp(portfolioMetrics.estimatedTaxes, {
+    once: true,
+    startDelay: 170,
+    duration: 380,
+  });
 
   // Only show cost basis cards if user is actually tracking cost basis on any asset.
   // Prevents empty cards saying "€0.00 gains" for users not using this feature.
@@ -394,6 +465,23 @@ export default function DashboardPage() {
   // Similar rationale to cost basis: hide irrelevant metrics.
   const hasTERTracking = assets.some(a => a.totalExpenseRatio && a.totalExpenseRatio > 0);
   const hasStampDuty = !!(portfolioSettings?.stampDutyEnabled && portfolioMetrics.annualStampDuty > 0);
+  const chartSections = [
+    {
+      id: 'assetClass',
+      title: 'Distribuzione per Asset Class',
+      data: chartData.assetClassData,
+    },
+    {
+      id: 'asset',
+      title: 'Distribuzione per Asset',
+      data: chartData.assetData,
+    },
+    {
+      id: 'liquidity',
+      title: 'Liquidità Portfolio',
+      data: chartData.liquidityData,
+    },
+  ] as const;
 
   if (loading) {
     return (
@@ -406,9 +494,8 @@ export default function DashboardPage() {
   return (
     // pb-20 on portrait mobile compensates for the BottomNavigation bar (h-16 = 64px)
     <motion.div
-      variants={pageVariants}
-      initial="hidden"
-      animate="visible"
+      layout="position"
+      transition={springLayoutTransition}
       className="space-y-6 max-desktop:portrait:pb-20"
     >
       {/* Header — greeting text anchors the page; "Crea Snapshot" is the only primary
@@ -418,20 +505,26 @@ export default function DashboardPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Panoramica</p>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 sm:text-3xl">{greeting.label}</h1>
-            <p className="mt-1 text-gray-600 dark:text-gray-400 sm:mt-2">
+            <h1 className="text-2xl font-bold text-foreground sm:text-3xl">{greeting.label}</h1>
+            <p className="mt-1 text-muted-foreground sm:mt-2">
               {greeting.subtitle}
             </p>
           </div>
-          <Button
-            onClick={handleCreateSnapshot}
-            disabled={creatingSnapshot || portfolioMetrics.assetCount === 0}
-            variant="default"
-            className="w-full sm:w-auto dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+          <MotionButtonShell
+            whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
+            transition={springLayoutTransition}
           >
-            <Camera className="mr-2 h-4 w-4" />
-            {creatingSnapshot ? 'Creazione...' : 'Crea Snapshot'}
-          </Button>
+            <Button
+              ref={snapshotButtonRef}
+              onClick={handleCreateSnapshot}
+              disabled={creatingSnapshot || portfolioMetrics.assetCount === 0}
+              variant="default"
+              className="w-full sm:w-auto"
+            >
+              <Camera className="mr-2 h-4 w-4" />
+              {creatingSnapshot ? 'Creazione...' : 'Crea Snapshot'}
+            </Button>
+          </MotionButtonShell>
         </div>
       </div>
 
@@ -439,10 +532,21 @@ export default function DashboardPage() {
           on the dashboard. Full-width, larger type, left-accent border communicate
           primary status without adding decoration. The two secondary KPIs follow
           in a 2-col row, visually subordinate by smaller font and narrower cards. */}
-      <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-4">
+      <motion.section
+        layout="position"
+        transition={springLayoutTransition}
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+        className="space-y-4"
+      >
 
         {/* Hero card — full-width, dominant number */}
-        <motion.div variants={cardItem}>
+        <motion.div
+          layout="position"
+          transition={springLayoutTransition}
+          variants={heroMetricSettle}
+        >
           <Card className="border-l-4 border-l-primary">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Patrimonio Totale Lordo</CardTitle>
@@ -460,8 +564,12 @@ export default function DashboardPage() {
         </motion.div>
 
         {/* Secondary KPI row — 2-col at sm+; these contextualize the hero number */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <motion.div variants={cardItem}>
+        <motion.div
+          layout="position"
+          transition={springLayoutTransition}
+          className="grid gap-4 sm:grid-cols-2"
+        >
+          <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
             <Card className="h-full">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Patrimonio Liquido Lordo</CardTitle>
@@ -473,7 +581,7 @@ export default function DashboardPage() {
             </Card>
           </motion.div>
 
-          <motion.div variants={cardItem}>
+          <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
             <Card className="h-full">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Numero Assets</CardTitle>
@@ -487,15 +595,17 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </motion.div>
-        </div>
+        </motion.div>
 
-      </motion.div>
+      </motion.section>
 
       {/* Cost Basis Cards - only show if any asset has cost basis tracking */}
-      <AnimatePresence>
+      <AnimatePresence initial={false} mode="popLayout">
         {hasCostBasisTracking && (
           <motion.div
             key="cost-basis-section"
+            layout
+            transition={springLayoutTransition}
             variants={slideDown}
             initial="hidden"
             animate="visible"
@@ -504,12 +614,14 @@ export default function DashboardPage() {
           >
             {/* Net Worth Cards */}
             <motion.div
+              layout="position"
+              transition={springLayoutTransition}
               variants={staggerContainer}
               initial="hidden"
               animate="visible"
               className="grid gap-6 md:grid-cols-2"
             >
-              <motion.div variants={cardItem}>
+              <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Patrimonio Totale Netto</CardTitle>
@@ -526,7 +638,7 @@ export default function DashboardPage() {
                 </Card>
               </motion.div>
 
-              <motion.div variants={cardItem}>
+              <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Patrimonio Liquido Netto</CardTitle>
@@ -546,12 +658,14 @@ export default function DashboardPage() {
 
             {/* Gains and Taxes Cards */}
             <motion.div
+              layout="position"
+              transition={springLayoutTransition}
               variants={staggerContainer}
               initial="hidden"
               animate="visible"
               className="grid gap-6 md:grid-cols-2"
             >
-              <motion.div variants={cardItem}>
+              <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Plusvalenze Non Realizzate</CardTitle>
@@ -570,7 +684,7 @@ export default function DashboardPage() {
                 </Card>
               </motion.div>
 
-              <motion.div variants={cardItem}>
+              <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Tasse Stimate</CardTitle>
@@ -594,16 +708,22 @@ export default function DashboardPage() {
       {/* Secondary metrics group — tighter internal spacing (space-y-4) vs the
           space-y-6 page-level gap groups these three clusters visually together,
           subordinating them to the hero above and the composition zone below */}
-      <div className="space-y-4">
+      <motion.div
+        layout="position"
+        transition={springLayoutTransition}
+        className="space-y-4"
+      >
 
       {/* Variazioni Cards */}
       <motion.div
+        layout="position"
+        transition={springLayoutTransition}
         variants={staggerContainer}
         initial="hidden"
         animate="visible"
         className="grid gap-6 md:grid-cols-2"
       >
-        <motion.div variants={cardItem}>
+        <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Variazione Mensile</CardTitle>
@@ -638,7 +758,7 @@ export default function DashboardPage() {
         </Card>
         </motion.div>
 
-        <motion.div variants={cardItem}>
+        <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Variazione Annuale (YTD)</CardTitle>
@@ -676,12 +796,14 @@ export default function DashboardPage() {
 
       {/* Expense Stats Cards */}
       <motion.div
+        layout="position"
+        transition={springLayoutTransition}
         variants={staggerContainer}
         initial="hidden"
         animate="visible"
         className="grid gap-6 md:grid-cols-2"
       >
-        <motion.div variants={cardItem}>
+        <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Entrate Questo Mese</CardTitle>
@@ -711,7 +833,7 @@ export default function DashboardPage() {
         </Card>
         </motion.div>
 
-        <motion.div variants={cardItem}>
+        <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Spese Questo Mese</CardTitle>
@@ -743,10 +865,12 @@ export default function DashboardPage() {
       </motion.div>
 
       {/* Cost cards — shown if any asset has TER tracking or stamp duty is enabled */}
-      <AnimatePresence>
+      <AnimatePresence initial={false} mode="popLayout">
         {(hasTERTracking || hasStampDuty) && (
         <motion.div
           key="cost-cards"
+          layout
+          transition={springLayoutTransition}
           variants={staggerContainer}
           initial="hidden"
           animate="visible"
@@ -754,7 +878,7 @@ export default function DashboardPage() {
           className="grid gap-6 md:grid-cols-2"
         >
           {hasTERTracking && (
-            <motion.div variants={cardItem}>
+            <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
             <Card className="h-full">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">TER Portfolio</CardTitle>
@@ -772,7 +896,12 @@ export default function DashboardPage() {
             </motion.div>
           )}
 
-          <motion.div variants={cardItem} className={!hasTERTracking ? 'md:col-span-2' : ''}>
+          <motion.div
+            layout="position"
+            transition={springLayoutTransition}
+            variants={cardItem}
+            className={!hasTERTracking ? 'md:col-span-2' : ''}
+          >
           <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Costo Annuale Portfolio</CardTitle>
@@ -799,95 +928,109 @@ export default function DashboardPage() {
         )}
       </AnimatePresence>
 
-      </div>
+      </motion.div>
 
       {/* Pie charts — border-t + eyebrow signals shift from numeric metrics to visual
           composition zone. Outer div uses space-y-4 to tighten eyebrow-to-chart gap;
           inner div keeps space-y-6 between the three charts (they're tall components) */}
-      <div className="border-t border-border/40 pt-6 space-y-4">
+      <motion.div
+        layout="position"
+        transition={springLayoutTransition}
+        className="border-t border-border/40 pt-6 space-y-4"
+      >
         <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Composizione</p>
         <div className="space-y-6">
-        <Card>
-          <CardHeader
-            className="max-desktop:cursor-pointer"
-            onClick={() => toggleChart('assetClass')}
+        {chartSections.map((section) => (
+          <motion.div
+            key={section.id}
+            layout="position"
+            transition={springLayoutTransition}
           >
-            <div className="flex items-center justify-between">
-              <CardTitle>Distribuzione per Asset Class</CardTitle>
-              <ChevronDown
-                className={`h-4 w-4 transition-transform desktop:hidden ${
-                  expandedCharts.has('assetClass') ? 'rotate-180' : ''
-                }`}
-              />
-            </div>
-          </CardHeader>
-          <AnimatePresence initial={false}>
-            {expandedCharts.has('assetClass') && (
-              <motion.div key="assetClass-content" variants={slideDown} initial="hidden" animate="visible" exit="exit">
-                <CardContent>
-                  <PieChartComponent data={chartData.assetClassData} />
-                </CardContent>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </Card>
+            <Card>
+              <CardHeader
+                className="max-desktop:cursor-pointer"
+                onClick={() => toggleChart(section.id)}
+              >
+                <div className="flex items-center justify-between">
+                  <CardTitle>{section.title}</CardTitle>
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform desktop:hidden ${
+                      expandedCharts.has(section.id) ? 'rotate-180' : ''
+                    }`}
+                  />
+                </div>
+              </CardHeader>
+              <AnimatePresence initial={false}>
+                {expandedCharts.has(section.id) && (
+                  <motion.div
+                    key={`${section.id}-content`}
+                    layout
+                    transition={springLayoutTransition}
+                    variants={slideDown}
+                    initial="hidden"
+                    animate="visible"
+                    exit="exit"
+                  >
+                    <motion.div
+                      variants={chartReveal}
+                      initial="hidden"
+                      animate="visible"
+                      exit="exit"
+                    >
+                      <CardContent>
+                        {!chartRenderReady && !isMobile ? (
+                          <div className="flex h-[350px] items-center justify-center text-sm text-muted-foreground">
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Preparazione grafico...
+                          </div>
+                        ) : (
+                          <PieChartComponent
+                            data={section.data}
+                            animateOnMount={!revealedCharts.has(section.id)}
+                            onFirstRender={() => {
+                              setRevealedCharts((previous) => {
+                                if (previous.has(section.id)) {
+                                  return previous;
+                                }
 
-        <Card>
-          <CardHeader
-            className="max-desktop:cursor-pointer"
-            onClick={() => toggleChart('asset')}
-          >
-            <div className="flex items-center justify-between">
-              <CardTitle>Distribuzione per Asset</CardTitle>
-              <ChevronDown
-                className={`h-4 w-4 transition-transform desktop:hidden ${
-                  expandedCharts.has('asset') ? 'rotate-180' : ''
-                }`}
-              />
-            </div>
-          </CardHeader>
-          <AnimatePresence initial={false}>
-            {expandedCharts.has('asset') && (
-              <motion.div key="asset-content" variants={slideDown} initial="hidden" animate="visible" exit="exit">
-                <CardContent>
-                  <PieChartComponent data={chartData.assetData} />
-                </CardContent>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </Card>
-
-        <Card>
-          <CardHeader
-            className="max-desktop:cursor-pointer"
-            onClick={() => toggleChart('liquidity')}
-          >
-            <div className="flex items-center justify-between">
-              <CardTitle>Liquidità Portfolio</CardTitle>
-              <ChevronDown
-                className={`h-4 w-4 transition-transform desktop:hidden ${
-                  expandedCharts.has('liquidity') ? 'rotate-180' : ''
-                }`}
-              />
-            </div>
-          </CardHeader>
-          <AnimatePresence initial={false}>
-            {expandedCharts.has('liquidity') && (
-              <motion.div key="liquidity-content" variants={slideDown} initial="hidden" animate="visible" exit="exit">
-                <CardContent>
-                  <PieChartComponent data={chartData.liquidityData} />
-                </CardContent>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </Card>
+                                const next = new Set(previous);
+                                next.add(section.id);
+                                return next;
+                              });
+                            }}
+                          />
+                        )}
+                      </CardContent>
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </Card>
+          </motion.div>
+        ))}
         </div>
-      </div>
+      </motion.div>
 
       {/* Confirm Dialog */}
-      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <DialogContent>
+      <Dialog
+        open={showConfirmDialog}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            setSnapshotDialogStyle(undefined);
+          }
+          setShowConfirmDialog(nextOpen);
+        }}
+      >
+        <DialogContent
+          ref={snapshotDialogRef}
+          style={snapshotDialogStyle}
+          className="duration-300 data-[state=open]:zoom-in-90 data-[state=closed]:zoom-out-100 data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 sm:max-w-md"
+          showCloseButton={false}
+        >
           <DialogHeader>
+            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              Snapshot mensile
+            </p>
             <DialogTitle>Snapshot già esistente</DialogTitle>
             <DialogDescription>
               Esiste già uno snapshot per questo mese (

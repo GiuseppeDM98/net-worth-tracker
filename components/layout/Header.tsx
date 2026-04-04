@@ -1,7 +1,12 @@
 'use client';
 
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+
+// motion.create(Button) lets us apply Framer Motion props (whileTap) directly
+// on the shadcn Button without an extra wrapper element.
+const MotionButton = motion.create(Button);
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -85,20 +90,41 @@ export function Header() {
         )}
       </div>
       <div className="flex items-center gap-4">
-        <Button
+        <MotionButton
           variant="ghost"
           size="icon"
           onClick={cycleTheme}
           title={themeLabel}
           className="rounded-full"
+          whileTap={{ scale: 0.88 }}
+          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
         >
-          <ThemeIcon className="h-5 w-5" />
-        </Button>
+          {/* AnimatePresence mode="wait" re-mounts the icon on every theme change,
+              so exit completes before the new icon enters — clean swap with no overlap. */}
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.span
+              key={theme}
+              initial={{ opacity: 0, rotate: -30, scale: 0.6 }}
+              animate={{ opacity: 1, rotate: 0, scale: 1 }}
+              exit={{ opacity: 0, rotate: 30, scale: 0.6 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              className="flex items-center justify-center"
+            >
+              <ThemeIcon className="h-5 w-5" />
+            </motion.span>
+          </AnimatePresence>
+        </MotionButton>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="rounded-full">
+            <MotionButton
+              variant="ghost"
+              size="icon"
+              className="rounded-full"
+              whileTap={{ scale: 0.88 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            >
               <User className="h-5 w-5" />
-            </Button>
+            </MotionButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Il mio account</DropdownMenuLabel>

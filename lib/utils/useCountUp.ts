@@ -3,6 +3,8 @@ import { useState, useRef, useEffect } from 'react';
 export interface UseCountUpOptions {
   /** Delay in ms before animation starts. Default: 60 */
   startDelay?: number;
+  /** Duration in ms for the count-up animation. Default: 500 */
+  duration?: number;
   /**
    * When true, animates only on the first non-null value received and never
    * re-triggers on subsequent changes. Useful for page-level KPIs that should
@@ -10,6 +12,13 @@ export interface UseCountUpOptions {
    * Default: false (re-triggers on every target change — original MetricCard behavior)
    */
   once?: boolean;
+  /**
+   * When true, animate from the previous rendered value instead of restarting
+   * from zero on every update. Useful for period switches where values should
+   * "settle" into the next state rather than replay a fresh count-up.
+   * Default: false.
+   */
+  fromPrevious?: boolean;
 }
 
 /**
@@ -23,12 +32,19 @@ export function useCountUp(
   target: number | null,
   options: UseCountUpOptions = {}
 ): number | null {
-  const { startDelay = 60, once = false } = options;
+  const { startDelay = 60, duration = 500, once = false, fromPrevious = false } = options;
 
   const [current, setCurrent] = useState<number | null>(null);
   const rafRef = useRef<number | undefined>(undefined);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const hasAnimatedRef = useRef(false);
+  const currentRef = useRef<number | null>(null);
+  const previousTargetRef = useRef<number | null>(null);
+
+  const updateCurrent = (nextValue: number | null) => {
+    currentRef.current = nextValue;
+    setCurrent(nextValue);
+  };
 
   useEffect(() => {
     // When `once` is true, skip any re-trigger after the first meaningful animation.
@@ -37,7 +53,8 @@ export function useCountUp(
     if (once && hasAnimatedRef.current) {
       // Already animated once — update value silently without re-animating.
       // Handles cases like snapshot overwrite where underlying data changes after mount.
-      setCurrent(target);
+      updateCurrent(target);
+      previousTargetRef.current = target;
       return;
     }
 
@@ -45,25 +62,39 @@ export function useCountUp(
     if (timerRef.current) clearTimeout(timerRef.current);
 
     if (target === null) {
-      setCurrent(null);
+      updateCurrent(null);
+      previousTargetRef.current = null;
       return;
     }
 
     // For zero targets, jump immediately without counting as "animated" in once-mode.
     // This handles the loading phase where all metrics compute to 0 from empty assets.
-    if (target === 0) {
-      setCurrent(0);
+    if (target === 0 && !fromPrevious) {
+      updateCurrent(0);
+      previousTargetRef.current = 0;
       return;
     }
 
     if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setCurrent(target);
+      updateCurrent(target);
+      previousTargetRef.current = target;
       if (once) hasAnimatedRef.current = true;
       return;
     }
 
-    const duration = 500;
+    const startValue = fromPrevious
+      ? currentRef.current ?? previousTargetRef.current ?? 0
+      : 0;
+
+    if (startValue === target) {
+      updateCurrent(target);
+      previousTargetRef.current = target;
+      if (once) hasAnimatedRef.current = true;
+      return;
+    }
+
     let startTime: number | null = null;
+    updateCurrent(startValue);
 
     timerRef.current = setTimeout(() => {
       const tick = (now: number) => {
@@ -72,7 +103,10 @@ export function useCountUp(
         const progress = Math.min(elapsed / duration, 1);
         // ease-out-quart: fast start, smooth deceleration
         const eased = 1 - Math.pow(1 - progress, 4);
-        setCurrent(progress >= 1 ? target : target * eased);
+        const nextValue = progress >= 1
+          ? target
+          : startValue + (target - startValue) * eased;
+        updateCurrent(nextValue);
         if (progress < 1) {
           rafRef.current = requestAnimationFrame(tick);
         } else if (once) {
@@ -82,6 +116,8 @@ export function useCountUp(
       };
       rafRef.current = requestAnimationFrame(tick);
     }, startDelay);
+
+    previousTargetRef.current = target;
 
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
