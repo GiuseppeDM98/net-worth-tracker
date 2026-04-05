@@ -109,6 +109,12 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - `formatCurrency` and `formatCurrencyCompact` exist in both `lib/utils/formatters.ts` and `lib/services/chartService.ts`
 - Update both when changing formatting behavior
 
+### Formatter Cache
+- `lib/utils/formatters.ts` exports `cachedFormatCurrencyEUR(amount, compact?)` backed by two module-level `Intl.NumberFormat` instances
+- Use `cachedFormatCurrencyEUR` in components that format inside animation loops (count-up rAF ticks, Recharts tooltips rendered at 60fps)
+- `formatCurrency(amount, 'EUR')` also reuses the cached instance internally — the cache benefit is automatic for the common EUR path
+- Add a new cached instance only for a genuinely distinct locale/format combination; do not cache per-call options objects
+
 ### Dashboard Data Isolation
 - Do not add `useAllExpenses` or other full-history queries to Overview/Dashboard
 - Full-history expense analysis belongs in History or Cashflow
@@ -160,7 +166,9 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
   - `Line` / `Area`: `animationDuration={800}` + `animationEasing="ease-out"`
   - `Pie` also needs `animationBegin={0}`
 - Decorative stacked background areas should keep `isAnimationActive={false}`
-- Overview/Panoramica pattern: keep hero KPI motion focused on the primary card, avoid replaying chart animations on every secondary refetch, and prefer one-time chart reveal flags for expensive Recharts mounts
+- Overview/Panoramica pattern: count-up lives in `OverviewAnimatedCurrency` leaf nodes, NOT in the page component — each rAF tick re-renders only that leaf, leaving the chart subtree and all other cards untouched. The page passes final computed values as stable props; display timing is entirely the leaf's concern.
+- Overview/Panoramica chart scheduling: `OverviewChartsSection` is wrapped with `React.memo` and receives `heroSettled: boolean` from the page. When `heroSettled` becomes true, it schedules chart SVG mount via `requestIdleCallback` (with `{ timeout: 800 }`) or `setTimeout(0)` as fallback — never a fixed arbitrary timeout as the primary strategy. On mobile and reduced-motion, `chartRenderReady` starts true immediately.
+- `OverviewAnimatedCurrency` format prop: use `format="integer"` for count-based KPIs (e.g. asset count) to avoid fractional display during rAF interpolation. Default is `"currency"` via `cachedFormatCurrencyEUR`. Add new format values here only if a genuinely distinct format is needed — do not extract a separate component per format.
 - Dialog continuity pattern: for trigger-to-dialog continuity, forward the ref through `DialogContent` and compute a `transform-origin` from the triggering control; clear the custom origin on close so the exit animation stays neutral
 - **Page transitions: use `template.tsx`, NOT `layout.tsx` + `AnimatePresence`**. Next.js App Router wraps navigations in `startTransition` (React 18 concurrent); `AnimatePresence` can inherit the previous variant context ("visible") and skip `initial="hidden"` on the new child, causing a 1-frame flash of fully-visible content. `template.tsx` re-mounts on every navigation, guaranteeing Framer Motion treats each mount as a true first mount. Trade-off: no exit animation (old page unmounts immediately). See `app/dashboard/template.tsx`
 - Page-level `motion.div variants={pageVariants}` wrappers on individual pages are **redundant** when `template.tsx` is in place — remove them to avoid compounded opacity (opacity `t²` instead of `t`)

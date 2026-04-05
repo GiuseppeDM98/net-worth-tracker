@@ -1,12 +1,10 @@
 'use client';
 
-import { CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
-import { useCountUp } from '@/lib/utils/useCountUp';
+import { CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   staggerContainer,
   cardItem,
-  chartReveal,
   heroMetricSettle,
   slideDown,
   springLayoutTransition,
@@ -35,7 +33,6 @@ import {
 import { calculateMonthlyChange, calculateYearlyChange } from '@/lib/services/snapshotService';
 import { updateHallOfFame } from '@/lib/services/hallOfFameService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PieChart as PieChartComponent } from '@/components/ui/pie-chart';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -45,7 +42,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Wallet, TrendingUp, PieChart, DollarSign, Camera, TrendingDown, Receipt, ChevronDown, Loader2 } from 'lucide-react';
+import { Wallet, TrendingUp, PieChart, DollarSign, Camera, TrendingDown, Receipt, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useSnapshots, useCreateSnapshot } from '@/lib/hooks/useSnapshots';
@@ -54,6 +51,8 @@ import { SavingsRateBadge } from '@/components/ui/SavingsRateBadge';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { getItalyDate, getItalyMonthYear } from '@/lib/utils/dateHelpers';
 import { getGreeting } from '@/lib/utils/getGreeting';
+import { OverviewAnimatedCurrency } from '@/components/dashboard/OverviewAnimatedCurrency';
+import { OverviewChartsSection } from '@/components/dashboard/OverviewChartsSection';
 
 const MotionButtonShell = motion.div;
 
@@ -122,40 +121,20 @@ export default function DashboardPage() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [existingSnapshot, setExistingSnapshot] = useState<MonthlySnapshot | null>(null);
   const [portfolioSettings, setPortfolioSettings] = useState<AssetAllocationSettings | null>(null);
-  const [revealedCharts, setRevealedCharts] = useState<Set<string>>(new Set());
-  const [chartRenderReady, setChartRenderReady] = useState(false);
   const [snapshotDialogStyle, setSnapshotDialogStyle] = useState<CSSProperties | undefined>(undefined);
   const snapshotButtonRef = useRef<HTMLButtonElement | null>(null);
   const snapshotDialogRef = useRef<HTMLDivElement | null>(null);
 
-  // On mobile, charts start collapsed to avoid rendering 3 heavy Recharts SVGs
-  // at mount time while countUp animations are running. User can expand individually.
-  // On desktop all three start expanded for immediate data visibility.
   const isMobile = useMediaQuery('(max-width: 1439px)');
-  const [expandedCharts, setExpandedCharts] = useState<Set<string>>(
-    () => isMobile ? new Set() : new Set(['assetClass', 'asset', 'liquidity'])
-  );
-  const toggleChart = (id: string) => {
-    setExpandedCharts(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
 
-  useEffect(() => {
-    if (prefersReducedMotion || isMobile) {
-      setChartRenderReady(true);
-      return;
-    }
+  // heroSettled becomes true when the Patrimonio Totale Lordo count-up completes.
+  // OverviewChartsSection watches this flag to schedule the chart SVG mount via
+  // requestIdleCallback, ensuring charts never render while the hero is counting.
+  const [heroSettled, setHeroSettled] = useState(false);
 
-    setChartRenderReady(false);
-    const timerId = window.setTimeout(() => {
-      setChartRenderReady(true);
-    }, 320);
-
-    return () => window.clearTimeout(timerId);
-  }, [isMobile, prefersReducedMotion]);
+  // Stable callback ref — prevents OverviewAnimatedCurrency from re-rendering
+  // just because DashboardPage re-renders while heroSettled is still false.
+  const handleHeroSettled = useCallback(() => setHeroSettled(true), []);
 
   useEffect(() => {
     if (!showConfirmDialog || prefersReducedMotion) {
@@ -423,39 +402,6 @@ export default function DashboardPage() {
   // Calculate derived values for display
   const liquidNetTotal = portfolioMetrics.liquidNetWorth - portfolioMetrics.liquidEstimatedTaxes;
 
-  // Animated KPI values — fire once on first meaningful (non-zero) data load, never re-trigger.
-  // Hooks must be called unconditionally (before any early return).
-  const animatedTotalValue = useCountUp(portfolioMetrics.totalValue, {
-    once: true,
-    startDelay: 80,
-    duration: 420,
-  });
-  const animatedLiquidNetWorth = useCountUp(portfolioMetrics.liquidNetWorth, {
-    once: true,
-    startDelay: 105,
-    duration: 390,
-  });
-  const animatedNetTotal = useCountUp(portfolioMetrics.netTotal, {
-    once: true,
-    startDelay: 125,
-    duration: 380,
-  });
-  const animatedLiquidNetTotal = useCountUp(liquidNetTotal, {
-    once: true,
-    startDelay: 140,
-    duration: 380,
-  });
-  const animatedUnrealizedGains = useCountUp(portfolioMetrics.unrealizedGains, {
-    once: true,
-    startDelay: 155,
-    duration: 380,
-  });
-  const animatedEstimatedTaxes = useCountUp(portfolioMetrics.estimatedTaxes, {
-    once: true,
-    startDelay: 170,
-    duration: 380,
-  });
-
   // Only show cost basis cards if user is actually tracking cost basis on any asset.
   // Prevents empty cards saying "€0.00 gains" for users not using this feature.
   // Keeps dashboard clean and relevant to user's tracking preferences.
@@ -465,7 +411,10 @@ export default function DashboardPage() {
   // Similar rationale to cost basis: hide irrelevant metrics.
   const hasTERTracking = assets.some(a => a.totalExpenseRatio && a.totalExpenseRatio > 0);
   const hasStampDuty = !!(portfolioSettings?.stampDutyEnabled && portfolioMetrics.annualStampDuty > 0);
-  const chartSections = [
+
+  // Chart sections are stable memoized objects so OverviewChartsSection's memo
+  // shallowly compares them without re-rendering during non-chart state updates.
+  const chartSections = useMemo(() => [
     {
       id: 'assetClass',
       title: 'Distribuzione per Asset Class',
@@ -481,7 +430,7 @@ export default function DashboardPage() {
       title: 'Liquidità Portfolio',
       data: chartData.liquidityData,
     },
-  ] as const;
+  ] as const, [chartData]);
 
   if (loading) {
     return (
@@ -553,9 +502,15 @@ export default function DashboardPage() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold desktop:text-4xl tabular-nums">
-                {formatCurrency(animatedTotalValue ?? portfolioMetrics.totalValue)}
-              </div>
+              {/* animateOnMount=true — hero is the primary KPI, animates once on load.
+                  onSettled triggers heroSettled so OverviewChartsSection can schedule
+                  chart mount via requestIdleCallback after the animation completes. */}
+              <OverviewAnimatedCurrency
+                value={portfolioMetrics.totalValue}
+                animateOnMount={true}
+                onSettled={handleHeroSettled}
+                className="text-3xl font-bold desktop:text-4xl"
+              />
               <p className="text-xs text-muted-foreground mt-1">
                 {portfolioMetrics.assetCount === 0 ? 'Aggiungi assets per iniziare' : `${portfolioMetrics.assetCount} asset${portfolioMetrics.assetCount !== 1 ? 's' : ''}`}
               </p>
@@ -576,7 +531,13 @@ export default function DashboardPage() {
                 <Wallet className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold tabular-nums">{formatCurrency(animatedLiquidNetWorth ?? portfolioMetrics.liquidNetWorth)}</div>
+                <OverviewAnimatedCurrency
+                  value={portfolioMetrics.liquidNetWorth}
+                  animateOnMount={true}
+                  startDelay={105}
+                  duration={390}
+                  className="text-2xl font-bold"
+                />
               </CardContent>
             </Card>
           </motion.div>
@@ -588,7 +549,14 @@ export default function DashboardPage() {
                 <PieChart className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{portfolioMetrics.assetCount}</div>
+                <OverviewAnimatedCurrency
+                  value={portfolioMetrics.assetCount}
+                  animateOnMount={true}
+                  format="integer"
+                  startDelay={105}
+                  duration={390}
+                  className="text-2xl font-bold"
+                />
                 <p className="text-xs text-muted-foreground">
                   {portfolioMetrics.assetCount === 0 ? 'Nessun asset presente' : 'Asset in portafoglio'}
                 </p>
@@ -628,9 +596,15 @@ export default function DashboardPage() {
                     <DollarSign className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-blue-600">
-                      {formatCurrency(animatedNetTotal ?? portfolioMetrics.netTotal)}
-                    </div>
+                    {/* animateOnMount=true — second primary KPI per step-2 spec.
+                        No onSettled here; hero (Lordo) already drives the settled signal. */}
+                    <OverviewAnimatedCurrency
+                      value={portfolioMetrics.netTotal}
+                      animateOnMount={true}
+                      startDelay={125}
+                      duration={380}
+                      className="text-2xl font-bold text-blue-600"
+                    />
                     <p className="text-xs text-muted-foreground">
                       Dopo tasse stimate
                     </p>
@@ -645,9 +619,13 @@ export default function DashboardPage() {
                     <Wallet className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-blue-600">
-                      {formatCurrency(animatedLiquidNetTotal ?? liquidNetTotal)}
-                    </div>
+                    <OverviewAnimatedCurrency
+                      value={liquidNetTotal}
+                      animateOnMount={true}
+                      startDelay={140}
+                      duration={380}
+                      className="text-2xl font-bold text-blue-600"
+                    />
                     <p className="text-xs text-muted-foreground">
                       Liquidità dopo tasse stimate
                     </p>
@@ -675,7 +653,13 @@ export default function DashboardPage() {
                     <div className={`text-2xl font-bold ${
                       portfolioMetrics.unrealizedGains >= 0 ? 'text-green-600' : 'text-red-600'
                     }`}>
-                      {portfolioMetrics.unrealizedGains >= 0 ? '+' : ''}{formatCurrency(animatedUnrealizedGains ?? portfolioMetrics.unrealizedGains)}
+                      {portfolioMetrics.unrealizedGains >= 0 ? '+' : ''}
+                      <OverviewAnimatedCurrency
+                        value={portfolioMetrics.unrealizedGains}
+                        animateOnMount={true}
+                        startDelay={155}
+                        duration={380}
+                      />
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Guadagno/perdita rispetto al costo medio
@@ -691,9 +675,13 @@ export default function DashboardPage() {
                     <Receipt className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-orange-600">
-                      {formatCurrency(animatedEstimatedTaxes ?? portfolioMetrics.estimatedTaxes)}
-                    </div>
+                    <OverviewAnimatedCurrency
+                      value={portfolioMetrics.estimatedTaxes}
+                      animateOnMount={true}
+                      startDelay={170}
+                      duration={380}
+                      className="text-2xl font-bold text-orange-600"
+                    />
                     <p className="text-xs text-muted-foreground">
                       Imposte su plusvalenze non realizzate
                     </p>
@@ -930,86 +918,14 @@ export default function DashboardPage() {
 
       </motion.div>
 
-      {/* Pie charts — border-t + eyebrow signals shift from numeric metrics to visual
-          composition zone. Outer div uses space-y-4 to tighten eyebrow-to-chart gap;
-          inner div keeps space-y-6 between the three charts (they're tall components) */}
-      <motion.div
-        layout="position"
-        transition={springLayoutTransition}
-        className="border-t border-border/40 pt-6 space-y-4"
-      >
-        <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Composizione</p>
-        <div className="space-y-6">
-        {chartSections.map((section) => (
-          <motion.div
-            key={section.id}
-            layout="position"
-            transition={springLayoutTransition}
-          >
-            <Card>
-              <CardHeader
-                className="max-desktop:cursor-pointer"
-                onClick={() => toggleChart(section.id)}
-              >
-                <div className="flex items-center justify-between">
-                  <CardTitle>{section.title}</CardTitle>
-                  <ChevronDown
-                    className={`h-4 w-4 transition-transform desktop:hidden ${
-                      expandedCharts.has(section.id) ? 'rotate-180' : ''
-                    }`}
-                  />
-                </div>
-              </CardHeader>
-              <AnimatePresence initial={false}>
-                {expandedCharts.has(section.id) && (
-                  <motion.div
-                    key={`${section.id}-content`}
-                    layout
-                    transition={springLayoutTransition}
-                    variants={slideDown}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
-                  >
-                    <motion.div
-                      variants={chartReveal}
-                      initial="hidden"
-                      animate="visible"
-                      exit="exit"
-                    >
-                      <CardContent>
-                        {!chartRenderReady && !isMobile ? (
-                          <div className="flex h-[350px] items-center justify-center text-sm text-muted-foreground">
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Preparazione grafico...
-                          </div>
-                        ) : (
-                          <PieChartComponent
-                            data={section.data}
-                            animateOnMount={!revealedCharts.has(section.id)}
-                            onFirstRender={() => {
-                              setRevealedCharts((previous) => {
-                                if (previous.has(section.id)) {
-                                  return previous;
-                                }
-
-                                const next = new Set(previous);
-                                next.add(section.id);
-                                return next;
-                              });
-                            }}
-                          />
-                        )}
-                      </CardContent>
-                    </motion.div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </Card>
-          </motion.div>
-        ))}
-        </div>
-      </motion.div>
+      {/* Composition charts — isolated in a memoized subtree so count-up re-renders
+          in OverviewAnimatedCurrency leaf nodes never reach this section. */}
+      <OverviewChartsSection
+        sections={chartSections}
+        heroSettled={heroSettled}
+        isMobile={isMobile}
+        prefersReducedMotion={!!prefersReducedMotion}
+      />
 
       {/* Confirm Dialog */}
       <Dialog

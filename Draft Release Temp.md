@@ -58,7 +58,8 @@
 - Improved responsiveness of Settings controls (toggles, selects, and inputs) with more consistent interaction feedback
 - Improved the nested Allocation editor in Settings with smoother expand/collapse behavior, making complex target editing easier to follow
 - Improved contextual safety for category move/delete actions in Settings by making confirmation dialogs feel visually tied to the action that opened them
-- Improved the Overview dashboard with a smoother primary KPI entrance, softer reflow of conditional cards, and subtler chart reveals that feel more polished without getting in the way
+- Improved the Overview dashboard so all KPI values — including asset count — now animate with a count-up on page load, making the numbers feel more alive and satisfying to arrive at
+- Improved the Overview dashboard so portfolio composition charts on desktop appear only after the key numbers have finished animating, reducing visual competition and making the page feel more focused on load
 - Improved the snapshot overwrite flow on the Overview page so the confirmation dialog feels more connected to the "Crea Snapshot" action
 - Refined the late-night Overview greeting to keep a calmer evening tone while still acknowledging late usage
 - Navigation now feels smoother and more app-like: the active section indicator in the sidebar glides between items instead of snapping — giving the interface a native, polished feel
