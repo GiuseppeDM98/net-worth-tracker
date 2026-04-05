@@ -50,6 +50,7 @@
 - Improved the Assets page so `Gestione Asset`, `Anno Corrente`, and `Storico` feel more continuous when switching between sections
 - Improved the historical tables in Assets so the selected sub-view stays in place when moving between tabs, instead of feeling like it reloads
 - Improved refresh feedback in the Assets historical views with a subtle active-panel update state and last-updated timestamp
+- Improved the current-year historical tables in Assets so the first visible month can be compared against the previous month without showing an extra baseline column, keeping January growth and summary percentages accurate
 - Improved the Settings page with clear "unsaved changes" feedback, so users can immediately see when edits are still in preview mode before saving
 - Improved responsiveness of Settings controls (toggles, selects, and inputs) with more consistent interaction feedback
 - Improved the nested Allocation editor in Settings with smoother expand/collapse behavior, making complex target editing easier to follow

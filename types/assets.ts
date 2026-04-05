@@ -349,6 +349,13 @@ export interface AssetHistoryDateFilter {
   month: number; // 1-12
 }
 
+export interface AssetHistoryTransformOptions {
+  filterYear?: number;
+  filterStartDate?: AssetHistoryDateFilter;
+  includePreviousMonthBaseline?: boolean;
+  excludeCash?: boolean;
+}
+
 export interface AssetHistoryTotalRow {
   monthColumns: string[];
   totals: {

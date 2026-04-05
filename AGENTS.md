@@ -55,6 +55,8 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - End date for Firestore month queries must include the full last day
 - Annual deltas use December of the previous year as baseline, not January of the same year
 - Monthly heatmaps remain month-over-month and always use the immediately previous month
+- For Patrimonio `Anno Corrente` historical tables, include the previous month as a hidden calculation baseline when the first visible month needs a comparison (e.g. January vs previous December), but do not render the baseline month in the UI
+- When a hidden baseline is present and only one month is visible in the current year, both `Mese Prec. %` and `YTD %` should reuse that baseline-backed change instead of showing `-`
 - `MonthlySnapshot` fields built in `createSnapshot()` must also be added to `POST /api/portfolio/snapshot`
 
 ### History: Savings vs Labor vs Performance
@@ -93,6 +95,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 ### Asset and FIRE Rules
 - `quantity = 0` is valid and marks sold assets in history logic
 - Cash asset balance lives in `quantity`, not via price updates
+- Do not filter `cash` out of Patrimonio historical tables unless the product request is explicit; the default behavior keeps liquidity visible in both `Anno Corrente` and `Storico`
 - Borsa Italiana bond prices are `% of par`; store converted EUR values
 - FIRE annual expenses must use the last completed year
 - `includePrimaryResidence` must flow through both React Query key and query function
@@ -195,6 +198,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 ### Commands
 - `npm test -- <file>` or `npx vitest run <file>` for targeted tests
 - `npx tsc --noEmit` for repo-wide TypeScript checking without generating build output
+- For Patrimonio historical-table baseline changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/assetHistoryUtils.test.ts` before manual validation
 - For auth UX-only changes, run `npx tsc --noEmit` and then manually validate keyboard tab flow, password toggle focus continuity, and inline submit feedback on both `/login` and `/register`
 - For motion/perceived-performance changes, compare `npm run dev` against `npm run build && npm run start` before optimizing away production-safe motion
 - For Hall of Fame UX/motion changes, run `npx tsc --noEmit` and then manually validate current-period spotlight cards, ranking highlight continuity, and note dialog trigger continuity on both desktop and mobile

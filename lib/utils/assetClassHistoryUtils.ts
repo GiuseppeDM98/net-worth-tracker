@@ -2,7 +2,7 @@ import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import type {
   MonthlySnapshot,
-  AssetHistoryDateFilter,
+  AssetHistoryTransformOptions,
   AssetHistoryTotalRow,
 } from '@/types/assets';
 import { ASSET_CLASS_ORDER } from '@/lib/services/assetService';
@@ -93,11 +93,16 @@ function calculateColorCode(
  */
 export function transformAssetClassHistoryData(
   snapshots: MonthlySnapshot[],
-  filterYear?: number,
-  filterStartDate?: AssetHistoryDateFilter
+  options: AssetHistoryTransformOptions = {}
 ): AssetClassHistoryTableData {
-  // Step 1: Filter snapshots by start date or year
-  const filteredSnapshots = snapshots.filter((snapshot) => {
+  const {
+    filterYear,
+    filterStartDate,
+    includePreviousMonthBaseline = false,
+    excludeCash = false,
+  } = options;
+
+  const matchesFilter = (snapshot: MonthlySnapshot) => {
     if (filterStartDate) {
       if (snapshot.year < filterStartDate.year) return false;
       if (snapshot.year === filterStartDate.year && snapshot.month < filterStartDate.month) return false;
@@ -107,15 +112,34 @@ export function transformAssetClassHistoryData(
       return snapshot.year === filterYear;
     }
     return true;
-  });
+  };
 
-  // Step 2: Sort chronologically and build month columns
-  const sortedSnapshots = [...filteredSnapshots].sort((a, b) => {
+  // Step 1: Filter snapshots by the visible range
+  const visibleSnapshots = snapshots.filter(matchesFilter);
+
+  // Step 2: Sort chronologically and optionally prepend one hidden baseline month
+  const sortedVisibleSnapshots = [...visibleSnapshots].sort((a, b) => {
     if (a.year !== b.year) return a.year - b.year;
     return a.month - b.month;
   });
 
-  const monthColumns = sortedSnapshots.map((s) => ({
+  const firstVisibleSnapshot = sortedVisibleSnapshots[0];
+  let baselineSnapshot: MonthlySnapshot | undefined;
+
+  if (includePreviousMonthBaseline && firstVisibleSnapshot) {
+    const baselineDate = new Date(firstVisibleSnapshot.year, firstVisibleSnapshot.month - 2, 1);
+    baselineSnapshot = snapshots.find(
+      (snapshot) =>
+        snapshot.year === baselineDate.getFullYear() &&
+        snapshot.month === baselineDate.getMonth() + 1
+    );
+  }
+
+  const calculationSnapshots = baselineSnapshot
+    ? [baselineSnapshot, ...sortedVisibleSnapshots]
+    : sortedVisibleSnapshots;
+
+  const monthColumns = sortedVisibleSnapshots.map((s) => ({
     key: `${s.year}-${s.month}`,
     label: formatMonthLabel(s.year, s.month),
     year: s.year,
@@ -129,8 +153,9 @@ export function transformAssetClassHistoryData(
   // Step 3: Collect all asset classes that appear in at least one snapshot.
   // Sort by ASSET_CLASS_ORDER for consistent display (equity first, crypto last).
   const classSet = new Set<string>();
-  sortedSnapshots.forEach((snapshot) => {
+  calculationSnapshots.forEach((snapshot) => {
     Object.keys(snapshot.byAssetClass || {}).forEach((cls) => {
+      if (excludeCash && cls === 'cash') return;
       if ((snapshot.byAssetClass[cls] ?? 0) > 0) classSet.add(cls);
     });
   });
@@ -146,11 +171,10 @@ export function transformAssetClassHistoryData(
     const months: { [monthKey: string]: AssetClassMonthCell } = {};
     let previousValue: number | null = null;
 
-    monthColumns.forEach((monthCol) => {
-      const snapshot = sortedSnapshots.find(
-        (s) => s.year === monthCol.year && s.month === monthCol.month
-      );
-      const rawValue = snapshot?.byAssetClass?.[assetClass];
+    calculationSnapshots.forEach((snapshot) => {
+      const monthKey = `${snapshot.year}-${snapshot.month}`;
+      const isVisibleMonth = monthColumns.some((column) => column.key === monthKey);
+      const rawValue = snapshot.byAssetClass?.[assetClass];
       // Treat missing or zero as null so cells display "—" when class was absent
       const value = rawValue != null && rawValue > 0 ? rawValue : null;
 
@@ -160,7 +184,9 @@ export function transformAssetClassHistoryData(
           ? ((value - previousValue) / previousValue) * 100
           : undefined;
 
-      months[monthCol.key] = { value, colorCode, change };
+      if (isVisibleMonth) {
+        months[monthKey] = { value, colorCode, change };
+      }
       // Only advance the comparison chain when we have real data
       if (value !== null) previousValue = value;
       else previousValue = null; // Reset chain on gap
@@ -175,6 +201,10 @@ export function transformAssetClassHistoryData(
       const first = months[currentYearNonNull[0].key].value!;
       const last = months[currentYearNonNull[currentYearNonNull.length - 1].key].value!;
       if (first !== 0) ytd = ((last - first) / first) * 100;
+    } else if (includePreviousMonthBaseline && currentYearNonNull.length === 1) {
+      // When only one visible month exists, YTD should mirror that month's
+      // change vs the hidden baseline (e.g. January vs previous December).
+      ytd = months[currentYearNonNull[0].key].change;
     }
 
     // Calculate fromStart (first available month → last available month)
@@ -206,7 +236,17 @@ export function transformAssetClassHistoryData(
   // Step 5: Build total row (sum all classes per month, same logic as AssetHistoryTotalRow)
   const totals: { [monthKey: string]: number } = {};
   const monthlyChanges: { [monthKey: string]: number | undefined } = {};
-  let previousMonthTotal: number | null = null;
+  const baselineTotal =
+    baselineSnapshot
+      ? Object.entries(baselineSnapshot.byAssetClass || {}).reduce((sum, [assetClass, value]) => {
+          if (excludeCash && assetClass === 'cash') {
+            return sum;
+          }
+          return sum + (value || 0);
+        }, 0)
+      : null;
+  let previousMonthTotal: number | null =
+    includePreviousMonthBaseline && baselineSnapshot ? baselineTotal : null;
 
   // First pass: calculate per-month totals across all classes
   monthColumns.forEach((monthCol) => {
@@ -239,6 +279,8 @@ export function transformAssetClassHistoryData(
     const first = totals[totalCurrentYearCols[0].key];
     const last = totals[totalCurrentYearCols[totalCurrentYearCols.length - 1].key];
     if (first > 0) totalYtd = ((last - first) / first) * 100;
+  } else if (includePreviousMonthBaseline && totalCurrentYearCols.length === 1) {
+    totalYtd = monthlyChanges[totalCurrentYearCols[0].key];
   }
 
   // fromStart for total row
@@ -253,6 +295,8 @@ export function transformAssetClassHistoryData(
   let totalLastMonthChange: number | undefined;
   if (monthColumns.length >= 2) {
     totalLastMonthChange = monthlyChanges[monthColumns[monthColumns.length - 1].key];
+  } else if (includePreviousMonthBaseline && monthColumns.length === 1) {
+    totalLastMonthChange = monthlyChanges[monthColumns[0].key];
   }
 
   const totalRow: AssetHistoryTotalRow = {

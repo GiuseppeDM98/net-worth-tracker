@@ -4,7 +4,7 @@ import type {
   Asset,
   MonthlySnapshot,
   AssetHistoryDisplayMode,
-  AssetHistoryDateFilter,
+  AssetHistoryTransformOptions,
   AssetHistoryTotalRow
 } from '@/types/assets';
 
@@ -123,65 +123,109 @@ export function getCurrentYear(): number {
 export function transformPriceHistoryData(
   snapshots: MonthlySnapshot[],
   currentAssets: Asset[],
-  filterYear?: number,
-  filterStartDate?: AssetHistoryDateFilter,
-  displayMode: AssetHistoryDisplayMode = 'price'
+  options: AssetHistoryTransformOptions & {
+    displayMode?: AssetHistoryDisplayMode;
+  } = {}
 ): PriceHistoryTableData {
-  // Step 1: Filter snapshots by start date or year if specified
-  const filteredSnapshots = snapshots.filter((snapshot) => {
-    // filterStartDate takes precedence over filterYear
-    if (filterStartDate) {
-      const snapshotYear = snapshot.year;
-      const snapshotMonth = snapshot.month;
+  const {
+    filterYear,
+    filterStartDate,
+    displayMode = 'price',
+    includePreviousMonthBaseline = false,
+    excludeCash = false,
+  } = options;
 
-      if (snapshotYear < filterStartDate.year) return false;
-      if (snapshotYear === filterStartDate.year && snapshotMonth < filterStartDate.month) return false;
+  const matchesFilter = (snapshot: MonthlySnapshot) => {
+    if (filterStartDate) {
+      if (snapshot.year < filterStartDate.year) return false;
+      if (snapshot.year === filterStartDate.year && snapshot.month < filterStartDate.month) return false;
       return true;
     }
 
-    // Existing year filter
     if (filterYear) {
       return snapshot.year === filterYear;
     }
 
     return true;
-  });
+  };
 
-  // Step 2: Build month columns (chronological order)
-  // Sort snapshots by year, then month
-  const sortedSnapshots = [...filteredSnapshots].sort((a, b) => {
+  // Step 1: Filter snapshots by the visible range
+  const visibleSnapshots = snapshots.filter(matchesFilter);
+
+  // Step 2: Sort visible snapshots and optionally prepend one hidden baseline month
+  const sortedVisibleSnapshots = [...visibleSnapshots].sort((a, b) => {
     if (a.year !== b.year) return a.year - b.year;
     return a.month - b.month;
   });
 
-  const monthColumns = sortedSnapshots.map((s) => ({
+  const firstVisibleSnapshot = sortedVisibleSnapshots[0];
+  let baselineSnapshot: MonthlySnapshot | undefined;
+
+  if (includePreviousMonthBaseline && firstVisibleSnapshot) {
+    const baselineDate = new Date(firstVisibleSnapshot.year, firstVisibleSnapshot.month - 2, 1);
+    baselineSnapshot = snapshots.find(
+      (snapshot) =>
+        snapshot.year === baselineDate.getFullYear() &&
+        snapshot.month === baselineDate.getMonth() + 1
+    );
+  }
+
+  const calculationSnapshots = baselineSnapshot
+    ? [baselineSnapshot, ...sortedVisibleSnapshots]
+    : sortedVisibleSnapshots;
+
+  const monthColumns = sortedVisibleSnapshots.map((s) => ({
     key: `${s.year}-${s.month}`,
     label: formatMonthLabel(s.year, s.month),
     year: s.year,
     month: s.month,
   }));
 
+  const visibleMonthKeys = new Set(monthColumns.map((column) => column.key));
+
   // Step 3: Collect all unique assets by name (aggregate re-acquired assets)
   // Use name as key to unify assets that were sold and re-purchased
   const assetMetadata = new Map<
     string,
-    { ticker: string; name: string; isDeleted: boolean }
+    { ticker: string; name: string; isDeleted: boolean; isCash: boolean }
   >();
+
+  const cashAssetIds = new Set(currentAssets.filter((asset) => asset.assetClass === 'cash').map((asset) => asset.id));
+  const cashAssetKeys = new Set(
+    currentAssets
+      .filter((asset) => asset.assetClass === 'cash')
+      .flatMap((asset) => [asset.name, asset.ticker])
+      .filter(Boolean)
+  );
 
   // Add current assets (group by name)
   currentAssets.forEach((asset) => {
+    if (excludeCash && asset.assetClass === 'cash') {
+      return;
+    }
+
     // Use name as key - if multiple assets with same name exist, use latest ticker
     // qty=0 behaves like sold in price history — show Venduto badge, preserve historical data
     assetMetadata.set(asset.name, {
       ticker: asset.ticker,
       name: asset.name,
       isDeleted: asset.quantity === 0,
+      isCash: asset.assetClass === 'cash',
     });
   });
 
   // Add historical assets from snapshots (only if not already in current portfolio)
-  filteredSnapshots.forEach((snapshot) => {
+  calculationSnapshots.forEach((snapshot) => {
     snapshot.byAsset.forEach((snapshotAsset) => {
+      const isCashAsset =
+        cashAssetIds.has(snapshotAsset.assetId) ||
+        cashAssetKeys.has(snapshotAsset.name) ||
+        cashAssetKeys.has(snapshotAsset.ticker);
+
+      if (excludeCash && isCashAsset) {
+        return;
+      }
+
       // Check if asset with this name is already tracked
       const existingMetadata = assetMetadata.get(snapshotAsset.name);
 
@@ -191,6 +235,7 @@ export function transformPriceHistoryData(
           ticker: snapshotAsset.ticker,
           name: snapshotAsset.name,
           isDeleted: true, // Not in current portfolio
+          isCash: isCashAsset,
         });
       } else if (existingMetadata.isDeleted) {
         // If we already marked it as deleted but find it in a snapshot,
@@ -207,28 +252,29 @@ export function transformPriceHistoryData(
   const assetRows: AssetPriceHistoryRow[] = [];
 
   assetMetadata.forEach((metadata, assetName) => {
+    if (excludeCash && metadata.isCash) {
+      return;
+    }
+
     const months: { [monthKey: string]: MonthDataCell } = {};
     let previousPrice: number | null = null; // Track for color coding
     let previousTotalValue: number | null = null; // Track for color coding
 
-    monthColumns.forEach((monthCol) => {
-      // Find snapshot for this month
-      const snapshot = sortedSnapshots.find(
-        (s) => s.year === monthCol.year && s.month === monthCol.month
-      );
+    calculationSnapshots.forEach((snapshot) => {
+      const monthKey = `${snapshot.year}-${snapshot.month}`;
+      const isVisibleMonth = visibleMonthKeys.has(monthKey);
 
       // Find asset in snapshot.byAsset by name (aggregate all instances with same name)
-      const snapshotAsset = snapshot?.byAsset.find(
-        (a) => a.name === assetName
-      );
-
+      const snapshotAsset = snapshot.byAsset.find((a) => a.name === assetName);
       if (!snapshotAsset) {
         // Asset didn't exist in this month
-        months[monthCol.key] = {
-          price: null,
-          totalValue: null,
-          colorCode: 'neutral',
-        };
+        if (isVisibleMonth) {
+          months[monthKey] = {
+            price: null,
+            totalValue: null,
+            colorCode: 'neutral',
+          };
+        }
         previousPrice = null; // Reset comparison chain
         previousTotalValue = null;
       } else {
@@ -254,12 +300,14 @@ export function transformPriceHistoryData(
             ? ((currentValue - previousValue) / previousValue) * 100
             : undefined;
 
-        months[monthCol.key] = {
-          price: currentPrice,
-          totalValue: currentTotalValue,
-          colorCode,
-          change,
-        };
+        if (isVisibleMonth) {
+          months[monthKey] = {
+            price: currentPrice,
+            totalValue: currentTotalValue,
+            colorCode,
+            change,
+          };
+        }
 
         previousPrice = currentPrice;
         previousTotalValue = currentTotalValue;
@@ -280,32 +328,36 @@ export function transformPriceHistoryData(
       }))
       .filter((entry) => entry.cell.price !== null || entry.cell.totalValue !== null);
 
-    if (sortedMonthEntries.length >= 2) {
-      // Determine which value to use (price or totalValue)
-      const getValue = (cell: MonthDataCell) => {
-        // Use totalValue if displayMode is 'totalValue' or if price === 1 (cash/liquidity)
-        if (displayMode === 'totalValue' || cell.price === 1) {
-          return cell.totalValue;
-        }
-        return cell.price;
-      };
-
-      // Calculate YTD (year-to-date): first month → last month of current year
-      const currentYear = new Date().getFullYear();
-      const currentYearEntries = sortedMonthEntries.filter((e) => e.year === currentYear);
-
-      if (currentYearEntries.length >= 2) {
-        const firstEntry = currentYearEntries[0];
-        const lastEntry = currentYearEntries[currentYearEntries.length - 1];
-
-        const firstValue = getValue(firstEntry.cell);
-        const lastValue = getValue(lastEntry.cell);
-
-        if (firstValue !== null && lastValue !== null && firstValue !== 0) {
-          ytd = ((lastValue - firstValue) / firstValue) * 100;
-        }
+    // Determine which value to use (price or totalValue)
+    const getValue = (cell: MonthDataCell) => {
+      // Use totalValue if displayMode is 'totalValue' or if price === 1 (cash/liquidity)
+      if (displayMode === 'totalValue' || cell.price === 1) {
+        return cell.totalValue;
       }
+      return cell.price;
+    };
 
+    // Calculate YTD (year-to-date): first month → last month of current year
+    const currentYear = new Date().getFullYear();
+    const currentYearEntries = sortedMonthEntries.filter((e) => e.year === currentYear);
+
+    if (currentYearEntries.length >= 2) {
+      const firstEntry = currentYearEntries[0];
+      const lastEntry = currentYearEntries[currentYearEntries.length - 1];
+
+      const firstValue = getValue(firstEntry.cell);
+      const lastValue = getValue(lastEntry.cell);
+
+      if (firstValue !== null && lastValue !== null && firstValue !== 0) {
+        ytd = ((lastValue - firstValue) / firstValue) * 100;
+      }
+    } else if (includePreviousMonthBaseline && currentYearEntries.length === 1) {
+      // When only one visible month exists (e.g. January), reuse its pre-computed
+      // change vs the hidden baseline month so YTD reflects Jan vs Dec.
+      ytd = currentYearEntries[0].cell.change;
+    }
+
+    if (sortedMonthEntries.length >= 2) {
       // Calculate fromStart: first available month → last available month
       const firstEntry = sortedMonthEntries[0];
       const lastEntry = sortedMonthEntries[sortedMonthEntries.length - 1];
@@ -344,7 +396,23 @@ export function transformPriceHistoryData(
   if (displayMode === 'totalValue') {
     const totals: { [monthKey: string]: number } = {};
     const monthlyChanges: { [monthKey: string]: number | undefined } = {};
-    let previousMonthTotal: number | null = null;
+    const baselineMonthTotal = baselineSnapshot
+      ? baselineSnapshot.byAsset.reduce((sum, snapshotAsset) => {
+          const isCashAsset =
+            cashAssetIds.has(snapshotAsset.assetId) ||
+            cashAssetKeys.has(snapshotAsset.name) ||
+            cashAssetKeys.has(snapshotAsset.ticker);
+
+          if (excludeCash && isCashAsset) {
+            return sum;
+          }
+
+          const totalValue = snapshotAsset.totalValue || (snapshotAsset.price * snapshotAsset.quantity);
+          return sum + totalValue;
+        }, 0)
+      : null;
+    let previousMonthTotal: number | null =
+      includePreviousMonthBaseline && baselineSnapshot ? baselineMonthTotal : null;
 
     // First pass: Calculate monthly totals
     // Calculate monthly totals by summing all assets with data in that month.
@@ -397,6 +465,8 @@ export function transformPriceHistoryData(
       if (firstTotal > 0) {  // Avoid division by zero
         ytd = ((lastTotal - firstTotal) / firstTotal) * 100;
       }
+    } else if (includePreviousMonthBaseline && currentYearMonths.length === 1) {
+      ytd = monthlyChanges[currentYearMonths[0].key];
     }
 
     // Calculate From Start percentage
@@ -419,6 +489,8 @@ export function transformPriceHistoryData(
     let lastMonthChange: number | undefined;
     if (monthColumns.length >= 2) {
       lastMonthChange = monthlyChanges[monthColumns[monthColumns.length - 1].key];
+    } else if (includePreviousMonthBaseline && monthColumns.length === 1) {
+      lastMonthChange = monthlyChanges[monthColumns[0].key];
     }
 
     totalRow = {

@@ -23,7 +23,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Average cost tracking with 4-decimal precision, including a built-in multi-broker PMC calculator for positions spread across multiple brokers
 - Current vs target asset allocation visualization
 - Hierarchical asset allocation analysis with desktop drill-down and mobile bottom-sheet navigation
-- Assets workspace polish: macro-tabs and historical sub-tabs preserve their state more reliably, and historical refresh actions give scoped feedback without disrupting table readability
+- Assets workspace polish: macro-tabs and historical sub-tabs preserve their state more reliably, historical refresh actions give scoped feedback without disrupting table readability, and current-year historical tables can compare January against the previous December without showing an extra baseline column
 
 ### Performance Analytics
 - Comprehensive metrics: ROI, CAGR, TWR, IRR, Sharpe Ratio, Maximum Drawdown

@@ -231,6 +231,7 @@ export default function AssetsPage() {
                       snapshots={snapshots}
                       filterYear={getCurrentYear()}
                       displayMode="price"
+                      includePreviousMonthBaseline={true}
                       showTotalRow={false}
                       loading={snapshotsLoading}
                       onRefresh={handleRefresh}
@@ -256,6 +257,7 @@ export default function AssetsPage() {
                       snapshots={snapshots}
                       filterYear={getCurrentYear()}
                       displayMode="totalValue"
+                      includePreviousMonthBaseline={true}
                       showTotalRow={true}
                       loading={snapshotsLoading}
                       onRefresh={handleRefresh}
@@ -279,6 +281,7 @@ export default function AssetsPage() {
                     <AssetClassHistoryTable
                       snapshots={snapshots}
                       filterYear={getCurrentYear()}
+                      includePreviousMonthBaseline={true}
                       loading={snapshotsLoading}
                       onRefresh={handleRefresh}
                       isRefreshing={isRefreshing}

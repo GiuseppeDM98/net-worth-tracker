@@ -41,6 +41,8 @@ interface AssetClassHistoryTableProps {
   snapshots: MonthlySnapshot[];
   filterYear?: number;
   filterStartDate?: AssetHistoryDateFilter;
+  includePreviousMonthBaseline?: boolean;
+  excludeCash?: boolean;
   loading: boolean;
   onRefresh: () => Promise<void>;
   isRefreshing?: boolean;
@@ -82,6 +84,8 @@ export function AssetClassHistoryTable({
   snapshots,
   filterYear,
   filterStartDate,
+  includePreviousMonthBaseline = false,
+  excludeCash = false,
   loading,
   onRefresh,
   isRefreshing = false,
@@ -94,8 +98,13 @@ export function AssetClassHistoryTable({
   const [isRefreshHighlighted, setIsRefreshHighlighted] = useState(false);
 
   const tableData = useMemo(
-    () => transformAssetClassHistoryData(snapshots, filterYear, filterStartDate),
-    [snapshots, filterYear, filterStartDate]
+    () => transformAssetClassHistoryData(snapshots, {
+      filterYear,
+      filterStartDate,
+      includePreviousMonthBaseline,
+      excludeCash,
+    }),
+    [snapshots, filterYear, filterStartDate, includePreviousMonthBaseline, excludeCash]
   );
 
   const { rows, monthColumns, totalRow } = tableData;

@@ -59,6 +59,8 @@ interface AssetPriceHistoryTableProps {
   filterYear?: number; // undefined = show all years
   filterStartDate?: AssetHistoryDateFilter; // Optional start date filter (overrides filterYear)
   displayMode?: AssetHistoryDisplayMode; // 'price' or 'totalValue' (default: 'price')
+  includePreviousMonthBaseline?: boolean;
+  excludeCash?: boolean;
   showTotalRow?: boolean; // Show total row at bottom (default: false)
   loading: boolean;
   onRefresh: () => Promise<void>;
@@ -83,6 +85,8 @@ export function AssetPriceHistoryTable({
   filterYear,
   filterStartDate,
   displayMode = 'price',
+  includePreviousMonthBaseline = false,
+  excludeCash = false,
   showTotalRow = false,
   loading,
   onRefresh,
@@ -97,8 +101,14 @@ export function AssetPriceHistoryTable({
 
   // Transform snapshot data into table format
   const tableData = useMemo(
-    () => transformPriceHistoryData(snapshots, assets, filterYear, filterStartDate, displayMode),
-    [snapshots, assets, filterYear, filterStartDate, displayMode]
+    () => transformPriceHistoryData(snapshots, assets, {
+      filterYear,
+      filterStartDate,
+      displayMode,
+      includePreviousMonthBaseline,
+      excludeCash,
+    }),
+    [snapshots, assets, filterYear, filterStartDate, displayMode, includePreviousMonthBaseline, excludeCash]
   );
 
   const { assets: assetRows, monthColumns, totalRow } = tableData;
