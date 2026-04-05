@@ -26,6 +26,7 @@ const secondaryHrefs = [
   '/dashboard/allocation',
   '/dashboard/performance',
   '/dashboard/history',
+  '/dashboard/assistant',
   '/dashboard/hall-of-fame',
   '/dashboard/fire-simulations',
   '/dashboard/settings',
@@ -41,9 +42,9 @@ const secondaryHrefs = [
  *
  * Navigation structure:
  * - 3 primary routes: Overview, Assets, Cashflow (most frequently accessed)
- * - 1 "Altro" button: Opens SecondaryMenuDrawer with 6 additional routes grouped
+ * - 1 "Altro" button: Opens SecondaryMenuDrawer with 7 additional routes grouped
  *   by information architecture (Analisi, Pianificazione, Preferenze)
- * - Total 9 routes accessible: 3 direct + 6 via drawer
+ * - Total 10 routes accessible: 3 direct + 7 via drawer
  * - "Altro" button shows active state when current route is any secondary route,
  *   so users always have a visual cue of where they are in the app
  *

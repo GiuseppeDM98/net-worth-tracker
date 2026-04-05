@@ -12,6 +12,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Use `formatCurrency()` for EUR and `formatDate()` for `DD/MM/YYYY`
 - Use `Sottocategoria` (no hyphen)
 - **Navigation taxonomy (established in session 30):** Panoramica, Patrimonio, Allocazione, Rendimenti, Storico, Impostazioni. The following are kept in English intentionally: `Hall of Fame` (premium brand name), `FIRE e Simulazioni` (acronym), `Cashflow` (established financial term in Italian). Do not translate these back.
+- `Assistente AI` is an established secondary navigation label under `Analisi`; do not rename it to `Chat AI`, `Copilot`, or generic `Assistant`
 - **Performance metric names:** `Time-Weighted Return`, `Money-Weighted Return (IRR)`, `Sharpe Ratio`, `YOC`, `Max Drawdown` are kept as international standard terms. `Recovery Time` → `Tempo di Recupero`, `Current Yield` → `Rendimento Corrente`.
 
 ### Firebase Dates and Timezone
@@ -39,6 +40,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Never remove tabs from `mountedTabs`
 - For state-preserving tab UIs, keep per-scope active tab state explicitly (e.g. separate sub-tab state for `Anno Corrente` and `Storico`) instead of sharing one global sub-tab value
 - Use `useMemo` for derived state; do not use `useEffect + setState` for computed values
+- When a private API returns date-like values for React Query consumers, normalize them at the hook boundary with `toDate()` instead of scattering conversions inside page components
 
 ### Dynamic Imports
 - `next/dynamic` with named exports must unwrap via `.then(m => ({ default: m.Named }))`
@@ -77,6 +79,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 ### Settings Synchronization
 - Every new settings field must be handled in three places: type definition, `getSettings()`, `setSettings()`
 - `setSettings()` has two write branches; update both
+- Assistant preference fields mirrored into settings must stay aligned with the assistant memory document and `AssetAllocationSettings`
 
 ### Settings UX Layer (Overdrive)
 - Unsaved preview in Settings is local-only: use a baseline snapshot key captured on load/save and compare against current state (`hasUnsaved*`) without introducing autosave behavior
@@ -91,6 +94,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - For record-level mutations on Admin SDK routes, enforce ownership after loading the document (e.g. `dividend.userId`, `asset.userId`)
 - Client-side calls to private API routes should use `authenticatedFetch()` so `Authorization: Bearer <idToken>` is sent consistently
 - Scheduled server-to-server flows are the exception: cron routes authenticate with `CRON_SECRET`, and `/api/portfolio/snapshot` must continue to accept `cronSecret` for internal cron orchestration
+- For user-owned conversational features (assistant threads, messages, memory), generate authoritative thread metadata server-side; do not let the client decide persisted titles or ownership-bound identifiers
 
 ### Asset and FIRE Rules
 - `quantity = 0` is valid and marks sold assets in history logic
@@ -141,6 +145,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Performance page pattern: derive `chartData`, heatmap data, and underwater data with `useMemo`; do not store them in local state via `useEffect + setState`
 - Performance period morph: do not key KPI sections or metric cards by selected period; KPI values should settle from the previous rendered value (`useCountUp({ fromPrevious: true })`) while chart shells can re-key only when a first-class staged reveal is intentional
 - Performance staged reveals should run on first mount or major period change only; manual refresh feedback must stay scoped to the page header or active chart shell instead of replaying the whole page
+- Assistant SSE pattern: keep Anthropic orchestration server-side, stream `data: {JSON}\n\n` events with typed envelopes (`meta`, `text`, `status`, `done`, `error`), and let the client progressively append chunks without owning persistence decisions
 - History page pattern: for mode switches (`%`/`€`, annual/monthly, doubling mode), animate the local chart shell or summary row only; avoid remounting or replaying unrelated sections
 - Goal-based investing pattern: drive summary cards, allocation chart, and detail cards from one shared focus state so the relationship between selected goal and resulting allocation stays explicit across the tab
 - For contextual dividend details, prefer a read-only detail surface first and compute `transform-origin` from the clicked row/card; only transition into edit mode when the user explicitly asks to modify the record
@@ -169,6 +174,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - **Sidebar active state — Overview exact match**: `Sidebar.tsx` `isActive` for `/dashboard` must use `pathname === item.href` only, never `startsWith`. `startsWith('/dashboard/')` matches every sub-route (`/dashboard/assets`, `/dashboard/history`, etc.) and keeps Panoramica highlighted on all pages. All other routes can use prefix matching safely
 - `secondaryHrefs` array in `BottomNavigation.tsx` must stay in sync with `navigationGroups` hrefs in `SecondaryMenuDrawer.tsx`
 - Secondary drawer uses 3 semantic groups: Analisi (Allocazione, Rendimenti, Storico, Hall of Fame), Pianificazione (FIRE e Simulazioni), Preferenze (Impostazioni)
+- `Assistente AI` belongs in the `Analisi` group and must be included anywhere secondary analytical routes are enumerated
 - Eyebrow label style for group headers: `text-xs font-semibold uppercase tracking-wider text-muted-foreground/60`
 
 ### One-Time UI Effects
@@ -207,6 +213,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - For Performance page UX/motion changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/performanceService.test.ts` before manual validation
 - For History page UX/motion changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/chartService.test.ts` before manual validation
 - For private API auth regressions, run `npx vitest run __tests__/apiAuthRoutes.test.ts`
+- For Assistant AI foundation changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/assistantRoutes.test.ts __tests__/assistantWebSearchPolicy.test.ts` before manual validation
 - For Settings UX-only changes, run `npx tsc --noEmit` plus a targeted smoke/auth check (`npx vitest run __tests__/apiAuthRoutes.test.ts`) before manual UI validation
 
 ### Test Patterns

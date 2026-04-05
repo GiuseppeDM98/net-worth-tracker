@@ -1,5 +1,8 @@
 ## ✨ New Features
 
+- Added a new `Assistente AI` area in the dashboard navigation, available from both desktop and mobile secondary menus
+- Added the first assistant workspace with suggested prompts, month-aware analysis mode, recent threads, and saved response preferences
+- Added a graceful unavailable state for the assistant when AI is not configured, so the page remains accessible and explains what is missing
 - Added current-period spotlight cards to Hall of Fame, so you can instantly see how the current month and year rank against your personal records
 - Added live values inside Hall of Fame spotlight cards, including percentage context for net worth change rankings when available
 - The Performance page (Rendimenti) now loads with a cleaner, less overwhelming layout: the methodology section is collapsed by default and can be expanded on demand with a single click

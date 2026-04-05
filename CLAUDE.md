@@ -5,9 +5,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-05, session 55): **Assets current-year baseline fix**. Patrimonio `Anno Corrente` historical tables now compare the first visible month against the previous month as a hidden baseline, so January can show growth vs previous December without rendering December in the UI. `Mese Prec. %` and `YTD %` now stay meaningful even when only one month is visible.
+- Latest implementation (2026-04-05, session 56): **AI Assistant foundation**. Added the new `/dashboard/assistant` entry across desktop and mobile secondary navigation, a responsive assistant shell, shared assistant contracts, private assistant API scaffolding, and a standardized SSE stream route with server-side Firebase auth and optional web-search policy.
+- Previous implementation (2026-04-05, session 55): **Assets current-year baseline fix**. Patrimonio `Anno Corrente` historical tables now compare the first visible month against the previous month as a hidden baseline, so January can show growth vs previous December without rendering December in the UI. `Mese Prec. %` and `YTD %` now stay meaningful even when only one month is visible.
 - Previous implementation (2026-04-04, session 54): **Cashflow & FIRE small fixes**. Cashflow Anno Corrente income pie chart legend no longer overflows on mobile (capped at 3 items, matching the expense chart). FIRE Indennità Annuale card now shows the Patrimonio FIRE base value at a glance.
-- Previous implementation (2026-04-04, session 53): **Auth polish pass**. Login and Register now enter with a calmer shared motion pattern, keep field focus continuity more refined, and provide clearer inline submit feedback without changing the authentication flows.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -19,6 +19,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Key Features (Active)
 - Portfolio tracking across equities, bonds, crypto, real estate, commodities, and cash
 - Automatic price updates via Yahoo Finance and Borsa Italiana bond support
+- AI Assistant foundation now exists as a first-class dashboard area, with secondary navigation entry, responsive conversation shell, assistant preferences, and authenticated server-side scaffolding for threads, memory, and streaming responses
 - Login and Register now feel more native to the product, with calmer entry motion, cleaner field focus choreography, keyboard-reachable password toggles, and inline submit status feedback
 - Hall of Fame now reads as an editorial ranking surface with clearer monthly/yearly hierarchy, spotlight cards for the current month/year, and contextual note dialogs tied to the selected record
 - Cashflow "Entrate per categoria" pie chart on mobile now caps legend items at 3 (same as expense chart), preventing overflow when 4+ categories exceed the 5% threshold
@@ -49,7 +50,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - `npm test -- <file>`
   - `npx vitest run <file>`
   - `npx tsc --noEmit`
-- Current repo includes targeted tests for pure utilities/services plus private API auth regression coverage in `__tests__/apiAuthRoutes.test.ts`
+- Current repo includes targeted tests for pure utilities/services plus private API auth regression coverage in `__tests__/apiAuthRoutes.test.ts` and assistant auth / policy coverage in `__tests__/assistantRoutes.test.ts` and `__tests__/assistantWebSearchPolicy.test.ts`
 
 ## Data & Integrations
 - Firestore client + admin
@@ -62,6 +63,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - FX conversion depends on Frankfurter API availability, with cache fallback
 
 ## Key Files
+- Assistant: `app/dashboard/assistant/page.tsx`, `components/assistant/AssistantPageClient.tsx`, `app/api/ai/assistant/*`, `lib/server/assistant/*`, `types/assistant.ts`
 - History: `app/dashboard/history/page.tsx`
 - History components: `components/dashboard/LaborMetricsChart.tsx`, `components/history/*`
 - Chart service: `lib/services/chartService.ts`
@@ -75,7 +77,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-05 (session 55)
+**Last updated**: 2026-04-05 (session 56)
 
 ## Design Context
 

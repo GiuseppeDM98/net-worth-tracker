@@ -21,4 +21,11 @@ export const queryKeys = {
     stats: (userId: string) => ['expense-stats', userId] as const,
     categories: (userId: string) => ['expense-categories', userId] as const,
   },
+
+  // Assistant
+  assistant: {
+    threads: (userId: string) => ['assistant', 'threads', userId] as const,
+    thread: (threadId: string) => ['assistant', 'thread', threadId] as const,
+    memory: (userId: string) => ['assistant', 'memory', userId] as const,
+  },
 } as const;

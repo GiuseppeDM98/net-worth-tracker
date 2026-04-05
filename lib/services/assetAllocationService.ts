@@ -45,6 +45,9 @@ export async function getSettings(
       checkingAccountSubCategory: data.checkingAccountSubCategory,
       cashflowHistoryStartYear: data.cashflowHistoryStartYear,
       laborIncomeCategoryIds: data.laborIncomeCategoryIds ?? [],
+      assistantResponseStyle: data.assistantResponseStyle,
+      assistantMacroContextEnabled: data.assistantMacroContextEnabled,
+      assistantMemoryEnabled: data.assistantMemoryEnabled,
       targets: data.targets as AssetAllocationTarget,
     };
   } catch (error) {
@@ -147,6 +150,15 @@ export async function setSettings(
       if (settings.laborIncomeCategoryIds !== undefined) {
         docData.laborIncomeCategoryIds = settings.laborIncomeCategoryIds;
       }
+      if (settings.assistantResponseStyle !== undefined) {
+        docData.assistantResponseStyle = settings.assistantResponseStyle;
+      }
+      if (settings.assistantMacroContextEnabled !== undefined) {
+        docData.assistantMacroContextEnabled = settings.assistantMacroContextEnabled;
+      }
+      if (settings.assistantMemoryEnabled !== undefined) {
+        docData.assistantMemoryEnabled = settings.assistantMemoryEnabled;
+      }
 
       // Use setDoc WITHOUT merge to completely replace targets
       await setDoc(targetRef, docData);
@@ -210,6 +222,15 @@ export async function setSettings(
       }
       if (settings.laborIncomeCategoryIds !== undefined) {
         docData.laborIncomeCategoryIds = settings.laborIncomeCategoryIds;
+      }
+      if (settings.assistantResponseStyle !== undefined) {
+        docData.assistantResponseStyle = settings.assistantResponseStyle;
+      }
+      if (settings.assistantMacroContextEnabled !== undefined) {
+        docData.assistantMacroContextEnabled = settings.assistantMacroContextEnabled;
+      }
+      if (settings.assistantMemoryEnabled !== undefined) {
+        docData.assistantMemoryEnabled = settings.assistantMemoryEnabled;
       }
 
       // Use merge: true to preserve existing fields

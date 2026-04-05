@@ -168,6 +168,9 @@ export interface AssetAllocationSettings {
   checkingAccountSubCategory?: string; // Cash subcategory name representing checking accounts (conti correnti); stamp duty applies only if value > 5000€
   cashflowHistoryStartYear?: number; // Min year shown in TotalHistoryTab charts (excludes bulk-imported older data); defaults to 2025
   laborIncomeCategoryIds?: string[]; // Category IDs of type 'income' representing labor/salary income; used for dashboard KPI cards
+  assistantResponseStyle?: 'balanced' | 'concise' | 'deep'; // Mirrors assistant preference for cross-feature defaults
+  assistantMacroContextEnabled?: boolean; // Enables macro/web context in assistant flows when explicitly requested
+  assistantMemoryEnabled?: boolean; // Allows the assistant to persist reusable user context
   targets: AssetAllocationTarget;
 }
 

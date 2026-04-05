@@ -12,7 +12,7 @@
 
 Net Worth Tracker is a full-featured personal finance application built for Italian investors. It provides comprehensive portfolio tracking, performance analytics, cashflow management, dividend monitoring, and long-term financial planning tools — all in a single dashboard.
 
-The app integrates with Yahoo Finance for real-time price updates and includes advanced features like Monte Carlo simulations, FIRE (Financial Independence, Retire Early) projections, and AI-powered performance analysis via Claude. The UI is in Italian while the codebase follows English conventions.
+The app integrates with Yahoo Finance for real-time price updates and includes advanced features like Monte Carlo simulations, FIRE (Financial Independence, Retire Early) projections, AI-powered performance analysis, and a dedicated AI assistant foundation via Claude. The UI is in Italian while the codebase follows English conventions.
 
 ## Key Features
 
@@ -36,6 +36,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - All major pages (Dashboard, Hall of Fame, History, Performance, Dividends) animate on load with staggered card entrances and smooth expand/collapse transitions; respects system "Reduce Motion" preference
 - All charts animate on load: bars grow up from baseline, lines draw in left to right, area fills expand, pie slices fan out — covers every page with data visualization (History, Performance, Cashflow, Dividends, FIRE, Monte Carlo, Goals)
 - AI-powered analysis using Claude with Extended Thinking and web search
+- Dedicated AI assistant area in the dashboard with responsive conversation UI, month-aware prompts, and server-authenticated assistant APIs
 - Fully responsive on mobile and tablet: dropdown period selector, stacked header, color-only heatmap view on small screens
 
 ### Cashflow

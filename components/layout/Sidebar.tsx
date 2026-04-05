@@ -16,6 +16,7 @@ import {
   Trophy,
   Dices,
   TrendingUp,
+  Bot,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -49,15 +50,16 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
 
   // WARNING: If you add/remove navigation items here, also update:
-  // - SecondaryMenuDrawer.tsx (6 secondary items: Allocazione, Rendimenti, Storico, Hall of Fame, FIRE, Impostazioni)
+  // - SecondaryMenuDrawer.tsx (7 secondary items: Allocazione, Rendimenti, Storico, Assistente AI, Hall of Fame, FIRE, Impostazioni)
   // - BottomNavigation.tsx (3 primary items: Panoramica, Patrimonio, Cashflow)
-  // Total navigation: 9 routes (this sidebar contains all 9)
+  // Total navigation: 10 routes (this sidebar contains all 10)
   const navigation = [
     { name: 'Panoramica', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Patrimonio', href: '/dashboard/assets', icon: Wallet },
     { name: 'Allocazione', href: '/dashboard/allocation', icon: PieChart },
     { name: 'Rendimenti', href: '/dashboard/performance', icon: TrendingUp },
     { name: 'Storico', href: '/dashboard/history', icon: History },
+    { name: 'Assistente AI', href: '/dashboard/assistant', icon: Bot },
     // Hall of Fame: kept in English as an intentional premium brand choice
     { name: 'Hall of Fame', href: '/dashboard/hall-of-fame', icon: Trophy },
     // FIRE: acronym (Financial Independence, Retire Early) — intentional hybrid
