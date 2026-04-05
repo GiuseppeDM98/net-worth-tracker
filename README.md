@@ -23,15 +23,13 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Average cost tracking with 4-decimal precision, including a built-in multi-broker PMC calculator for positions spread across multiple brokers
 - Current vs target asset allocation visualization
 - Hierarchical asset allocation analysis with desktop drill-down and mobile bottom-sheet navigation
-- Assets workspace polish: macro-tabs and historical sub-tabs preserve their state more reliably, historical refresh actions give scoped feedback without disrupting table readability, and current-year historical tables can compare January against the previous December without showing an extra baseline column
+- Current-year historical tables use a hidden previous-month baseline so January can show growth vs the previous December without rendering an extra visible column
 
 ### Performance Analytics
 - Comprehensive metrics: ROI, CAGR, TWR, IRR, Sharpe Ratio, Maximum Drawdown
 - Yield on Cost (YOC) and Current Yield calculations
 - Monthly returns heatmap and underwater drawdown chart
 - Rolling performance charts
-- Performance page polish: smoother in-place period switching, metric settling from prior values, staged heatmap reveal, a calmer underwater drawdown presentation, and contextual dialogs for custom ranges and AI analysis
-- Overview dashboard polish: the main net worth KPI settles in more naturally on load, snapshot overwrite feels more connected to its CTA, and portfolio charts reveal more discreetly without noisy replay
 - Progressive disclosure: methodology section collapsed by default; one-time guide strip for new users; "Avanzato" badge on technical metrics (TWR, IRR, Sharpe, YOC); each chart has an inline 2-line reading hint
 - Animated metric cards: values count up on load and settle more naturally during period changes; staggered entrance cascade per section
 - Dashboard KPI cards (Total Portfolio, Liquid, Net Worth, Unrealized Gains, Taxes) animate their values on page load — numbers count up from zero once on mount
@@ -85,7 +83,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - **Authentication flow** — Login and registration screens follow the same visual language as the dashboard, with accessible focus states, keyboard-friendly password toggles, and clearer in-place submit feedback
 - **Hall of Fame** — Monthly and annual performance rankings with current-period spotlight cards, contextual notes, and fully responsive mobile/tablet layouts
 - **PDF Export** — 8 configurable sections with custom year/month period selection; sections auto-disabled for past periods when historical data is unavailable
-- **Settings UX improvements** — The Settings area now gives clearer unsaved-change feedback, smoother nested allocation editing, and more contextual confirmations for sensitive category actions
+- **Settings** — Unsaved-change feedback, smooth nested allocation editing, and contextual confirmations for sensitive category actions
 
 ## Quick Start
 
