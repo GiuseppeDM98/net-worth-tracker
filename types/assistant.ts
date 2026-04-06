@@ -106,6 +106,55 @@ export interface AssistantCreateThreadInput {
   pinnedMonth?: AssistantMonthSelectorValue | null;
 }
 
+// Full numeric context bundle for a selected month, built server-side.
+// Client sends the month selector; server regenerates this from Firestore — never trust client-supplied numbers.
+export interface AssistantMonthContextBundle {
+  selector: { year: number; month: number };
+  currentSnapshot: import('@/types/assets').MonthlySnapshot | null;
+  previousSnapshot: import('@/types/assets').MonthlySnapshot | null;
+  cashflow: {
+    totalIncome: number;
+    totalExpenses: number;
+    totalDividends: number;
+    netCashFlow: number;
+    transactionCount: number;
+  };
+  netWorth: {
+    start: number | null;
+    end: number | null;
+    delta: number | null;
+    deltaPct: number | null;
+  };
+  allocationChanges: {
+    assetClass: string;
+    previousValue: number | null;
+    currentValue: number | null;
+    absoluteChange: number;
+    percentagePointsChange: number | null;
+  }[];
+  // Top expense categories by absolute total, sorted descending. Gives Claude
+  // enough detail to cite specific spending drivers without flooding the prompt.
+  topExpensesByCategory: {
+    categoryName: string;
+    total: number; // negative (expense sign convention)
+    transactionCount: number;
+  }[];
+  // Top 5 individual expenses by absolute amount. Lets Claude cite specific
+  // large outlier transactions (e.g. "Canone mutuo -€1.200").
+  topIndividualExpenses: {
+    categoryName: string;
+    amount: number; // negative
+    notes?: string;
+  }[];
+  dataQuality: {
+    hasSnapshot: boolean;
+    hasPreviousBaseline: boolean;
+    hasCashflowData: boolean;
+    isPartialMonth: boolean;
+    notes: string[];
+  };
+}
+
 export interface AssistantStreamRequest {
   userId: string;
   mode: AssistantMode;
@@ -117,6 +166,9 @@ export interface AssistantStreamRequest {
 
 export type AssistantStreamEvent =
   | { type: 'meta'; threadId?: string; title?: string }
+  // Sent once before text streaming starts, carrying the server-built context bundle.
+  // Client uses this to render the numeric panel without a separate fetch.
+  | { type: 'context'; bundle: AssistantMonthContextBundle }
   | { type: 'text'; text: string }
   | { type: 'status'; status: 'searching' | 'writing' | 'saving' }
   | { type: 'done'; threadId?: string; messageId?: string; webSearchUsed: boolean }

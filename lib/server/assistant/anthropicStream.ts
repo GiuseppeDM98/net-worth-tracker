@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { AssistantMode, AssistantMonthSelectorValue, AssistantPreferences } from '@/types/assistant';
+import { AssistantMode, AssistantMonthContextBundle, AssistantMonthSelectorValue, AssistantPreferences } from '@/types/assistant';
+import { buildChatPrompt, buildMonthAnalysisPrompt } from './prompts';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
@@ -8,6 +9,9 @@ const anthropic = new Anthropic({
 interface StreamAssistantResponseArgs {
   mode: AssistantMode;
   prompt: string;
+  // Context bundle is required for month_analysis mode; null for chat mode.
+  // Built server-side so the prompt always reflects authoritative Firestore data.
+  contextBundle: AssistantMonthContextBundle | null;
   month?: AssistantMonthSelectorValue | null;
   preferences: AssistantPreferences;
   enableWebSearch: boolean;
@@ -15,45 +19,40 @@ interface StreamAssistantResponseArgs {
   onText: (text: string) => void;
 }
 
-function buildAssistantPrompt(
+/**
+ * Selects the appropriate prompt builder based on the assistant mode.
+ *
+ * For month_analysis: uses the full structured bundle so Claude has reliable
+ * numbers and knows exactly what data is/isn't available.
+ * For chat: uses a lighter prompt without numeric context.
+ */
+function buildPrompt(
   mode: AssistantMode,
   prompt: string,
+  contextBundle: AssistantMonthContextBundle | null,
   month: AssistantMonthSelectorValue | null | undefined,
   preferences: AssistantPreferences
 ): string {
-  const responseStyleInstruction =
-    preferences.responseStyle === 'concise'
-      ? 'Rispondi in modo sintetico, con punti chiari e pochi fronzoli.'
-      : preferences.responseStyle === 'deep'
-        ? 'Rispondi con maggiore profondità, esplicitando ipotesi e limiti.'
-        : 'Rispondi in modo equilibrato: chiaro, concreto e leggibile.';
+  if (mode === 'month_analysis' && contextBundle) {
+    return buildMonthAnalysisPrompt(contextBundle, prompt, preferences);
+  }
 
-  const monthContext = month
-    ? `Il contesto mensile selezionato è ${String(month.month).padStart(2, '0')}/${month.year}.`
-    : 'Non è stato selezionato un mese di riferimento.';
+  // Chat mode: include the month label if one was selected, but no numeric data
+  const MONTH_NAMES = [
+    'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+    'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
+  ];
+  const monthLabel = month
+    ? `${MONTH_NAMES[month.month - 1]} ${month.year}`
+    : undefined;
 
-  const modeInstruction =
-    mode === 'month_analysis'
-      ? 'Stai aiutando l’utente a interpretare un mese del proprio patrimonio.'
-      : 'Stai rispondendo a una conversazione generale sul portafoglio dell’utente.';
-
-  return [
-    'Sei l’Assistente AI di Net Worth Tracker per un investitore italiano.',
-    'Rispondi sempre in italiano.',
-    responseStyleInstruction,
-    modeInstruction,
-    monthContext,
-    preferences.memoryEnabled
-      ? 'Puoi riutilizzare preferenze e fatti salvati quando sono pertinenti.'
-      : 'Non fare affidamento su memoria persistente; usa solo il contesto esplicito del messaggio.',
-    '',
-    `Richiesta utente: ${prompt.trim()}`,
-  ].join('\n');
+  return buildChatPrompt(prompt, preferences, monthLabel);
 }
 
 export async function streamAssistantResponse({
   mode,
   prompt,
+  contextBundle,
   month,
   preferences,
   enableWebSearch,
@@ -87,7 +86,7 @@ export async function streamAssistantResponse({
       messages: [
         {
           role: 'user',
-          content: buildAssistantPrompt(mode, prompt, month, preferences),
+          content: buildPrompt(mode, prompt, contextBundle, month, preferences),
         },
       ],
       stream: true,

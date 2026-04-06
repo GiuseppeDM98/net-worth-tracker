@@ -5,9 +5,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-06, session 59): **Performance page count-up animation fix**. `MetricCard` now uses `useCountUp({ once: true })` instead of `{ fromPrevious: true }`, matching the Overview pattern. Without `once`, rapid React Query cache hits would cancel and restart the 60ms startDelay window before any animation was visible to the user.
+- Latest implementation (2026-04-06, session 60): **Assistente AI — Step 2: analisi mensile guidata**. Bundle `AssistantMonthContextBundle` costruito server-side via Admin SDK; prompt strutturato con `buildMonthAnalysisPrompt`; evento SSE `context` invia i numeri al client prima dello streaming; pannello `AssistantContextCard` con variazione patrimonio, cashflow, top categorie spese, top spese singole, variazioni allocazione; month picker sincronizzato al thread caricato; markdown rendering nelle risposte; 13 unit test.
+- Previous implementation (2026-04-06, session 59): **Performance page count-up animation fix**. `MetricCard` now uses `useCountUp({ once: true })` instead of `{ fromPrevious: true }`, matching the Overview pattern.
 - Previous implementation (2026-04-06, session 58): **Overview data pipeline and Firebase optimization**. Panoramica now loads through a single authenticated `GET /api/dashboard/overview` route backed by a server-side `DashboardOverviewPayload`, a materialized `dashboardOverviewSummaries/{userId}` document with live fallback, and Firestore local persistence with safe memory-cache fallback.
-- Previous implementation (2026-04-05, session 57): **Overview rendering and count-up refactor**. Count-up moved from DashboardPage into `OverviewAnimatedCurrency` leaf nodes so each rAF tick re-renders only the animating card. Chart section extracted into memoized `OverviewChartsSection`, scheduled via `requestIdleCallback` after the hero KPI settles. Formatter cache added to `lib/utils/formatters.ts`. All KPI cards (including asset count via `format="integer"`) animate on mount.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -19,7 +19,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Key Features (Active)
 - Portfolio tracking across equities, bonds, crypto, real estate, commodities, and cash
 - Automatic price updates via Yahoo Finance and Borsa Italiana bond support
-- AI Assistant foundation now exists as a first-class dashboard area, with secondary navigation entry, responsive conversation shell, assistant preferences, and authenticated server-side scaffolding for threads, memory, and streaming responses
+- Assistente AI ora include analisi mensile guidata: bundle contestuale costruito server-side (snapshot, cashflow, dividendi, allocazione, top spese per categoria e singole), prompt strutturato inviato a Claude, streaming SSE con evento `context` che popola il pannello numerico laterale, month picker sincronizzato al thread caricato, markdown rendering nelle risposte, web search opzionale via toggle "Contesto macro"
 - Login and Register now feel more native to the product, with calmer entry motion, cleaner field focus choreography, keyboard-reachable password toggles, and inline submit status feedback
 - Hall of Fame now reads as an editorial ranking surface with clearer monthly/yearly hierarchy, spotlight cards for the current month/year, and contextual note dialogs tied to the selected record
 - Cashflow "Entrate per categoria" pie chart on mobile now caps legend items at 3 (same as expense chart), preventing overflow when 4+ categories exceed the 5% threshold
@@ -51,7 +51,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - `npm test -- <file>`
   - `npx vitest run <file>`
   - `npx tsc --noEmit`
-- Current repo includes targeted tests for pure utilities/services plus private API auth regression coverage in `__tests__/apiAuthRoutes.test.ts` and assistant auth / policy coverage in `__tests__/assistantRoutes.test.ts` and `__tests__/assistantWebSearchPolicy.test.ts`
+- Current repo includes targeted tests for pure utilities/services plus private API auth regression coverage in `__tests__/apiAuthRoutes.test.ts` and assistant auth / policy coverage in `__tests__/assistantRoutes.test.ts`, `__tests__/assistantWebSearchPolicy.test.ts`, and month context bundle coverage in `__tests__/assistantMonthContextService.test.ts`
 
 ## Data & Integrations
 - Firestore client + admin
@@ -67,7 +67,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Overview data pipeline: `app/api/dashboard/overview/route.ts`, `lib/services/dashboardOverviewService.ts`, `lib/hooks/useDashboardOverview.ts`, `types/dashboardOverview.ts`
 - Overview KPI animation: `components/dashboard/OverviewAnimatedCurrency.tsx`, `components/dashboard/OverviewChartsSection.tsx`
 - Formatter cache: `lib/utils/formatters.ts` (`cachedFormatCurrencyEUR`)
-- Assistant: `app/dashboard/assistant/page.tsx`, `components/assistant/AssistantPageClient.tsx`, `app/api/ai/assistant/*`, `lib/server/assistant/*`, `types/assistant.ts`
+- Assistant: `app/dashboard/assistant/page.tsx`, `components/assistant/AssistantPageClient.tsx`, `components/assistant/AssistantContextCard.tsx`, `components/assistant/AssistantMonthPicker.tsx`, `components/assistant/AssistantStreamingResponse.tsx`, `app/api/ai/assistant/*`, `lib/server/assistant/*`, `lib/services/assistantMonthContextService.ts`, `types/assistant.ts`
 - History: `app/dashboard/history/page.tsx`
 - History components: `components/dashboard/LaborMetricsChart.tsx`, `components/history/*`
 - Chart service: `lib/services/chartService.ts`
@@ -81,7 +81,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-06 (session 59)
+**Last updated**: 2026-04-06 (session 60)
 
 ## Design Context
 

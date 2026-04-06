@@ -1,5 +1,7 @@
 ## ✨ New Features
 
+- Added guided monthly analysis to the AI assistant: select any past month and the assistant automatically loads net worth changes, cashflow breakdown, top expense categories, and allocation shifts — presenting them in a readable numeric panel before writing its commentary
+- Added a suggested prompt chip strip to the assistant's month analysis mode, so you can start common analyses (patrimonio, spese, investimenti, dividendi, cashflow) with one tap instead of writing from scratch
 - Added a new `Assistente AI` area in the dashboard navigation, available from both desktop and mobile secondary menus
 - Added the first assistant workspace with suggested prompts, month-aware analysis mode, recent threads, and saved response preferences
 - Added a graceful unavailable state for the assistant when AI is not configured, so the page remains accessible and explains what is missing
@@ -107,6 +109,9 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed the AI assistant streaming response disappearing mid-conversation — messages now display correctly as they arrive instead of vanishing after the first words
+- Fixed the month picker in the AI assistant not syncing to the thread's month when switching between past conversations — the selector and subtitle now always reflect the month that was analysed
+- Fixed AI assistant thread previews showing raw markdown syntax (`**bold**`, `## Heading`) — previews are now plain readable text
 - Fixed the Performance page (Rendimenti) metric cards not counting up when the page first loads — numbers now animate from zero as expected instead of jumping directly to their final values
 - Fixed a visual flash in the Budget tab when opening the historical analysis for a row, subtotal, or total on desktop
 - Fixed the Cashflow Sankey animation so month and period filter changes animate correctly again instead of appearing static

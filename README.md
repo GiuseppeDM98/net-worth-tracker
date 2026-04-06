@@ -36,7 +36,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - All major pages (Dashboard, Hall of Fame, History, Performance, Dividends) animate on load with staggered card entrances and smooth expand/collapse transitions; respects system "Reduce Motion" preference
 - All charts animate on load: bars grow up from baseline, lines draw in left to right, area fills expand, pie slices fan out — covers every page with data visualization (History, Performance, Cashflow, Dividends, FIRE, Monte Carlo, Goals)
 - AI-powered analysis using Claude with Extended Thinking and web search
-- Dedicated AI assistant area in the dashboard with responsive conversation UI, month-aware prompts, and server-authenticated assistant APIs
+- Dedicated AI assistant area in the dashboard with guided monthly analysis: select any past month to get a structured breakdown of net worth changes, cashflow, top expenses, and allocation shifts, followed by a Claude-written Italian commentary; suggested prompt chips, streaming responses with markdown rendering, and per-thread month pinning
 - Fully responsive on mobile and tablet: dropdown period selector, stacked header, color-only heatmap view on small screens
 
 ### Cashflow

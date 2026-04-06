@@ -1,10 +1,22 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Bot, CalendarDays, Globe, Loader2, Lock, MessageSquare, RefreshCw, Sparkles, WandSparkles } from 'lucide-react';
+import {
+  Bot,
+  CalendarDays,
+  Globe,
+  Loader2,
+  Lock,
+  MessageSquare,
+  Sparkles,
+  WandSparkles,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { AssistantContextCard } from '@/components/assistant/AssistantContextCard';
+import { AssistantMonthPicker } from '@/components/assistant/AssistantMonthPicker';
+import { AssistantStreamingResponse } from '@/components/assistant/AssistantStreamingResponse';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,16 +24,17 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAssistantMemory, useUpdateAssistantMemory } from '@/lib/hooks/useAssistantMemory';
 import { useAssistantThread, useAssistantThreads } from '@/lib/hooks/useAssistantThreads';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
+import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
 import { cn } from '@/lib/utils';
 import { formatDate } from '@/lib/utils/formatters';
 import {
   AssistantMessage,
   AssistantMode,
+  AssistantMonthContextBundle,
   AssistantMonthSelectorValue,
   AssistantPromptChip,
   AssistantStreamEvent,
@@ -34,25 +47,33 @@ interface AssistantPageClientProps {
 }
 
 const MONTH_NAMES = [
-  'Gennaio',
-  'Febbraio',
-  'Marzo',
-  'Aprile',
-  'Maggio',
-  'Giugno',
-  'Luglio',
-  'Agosto',
-  'Settembre',
-  'Ottobre',
-  'Novembre',
-  'Dicembre',
+  'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+  'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
 ];
 
+// Prompt chips always reference the selected month — they are starting points,
+// not final prompts, so users can customise before sending
 const PROMPT_CHIPS: AssistantPromptChip[] = [
   {
     id: 'month-summary',
     label: 'Leggi il mese',
     prompt: 'Analizza il mese selezionato e spiegami i driver principali del patrimonio.',
+    mode: 'month_analysis',
+    requiresMonthContext: true,
+    webContextHint: 'none',
+  },
+  {
+    id: 'month-cashflow',
+    label: 'Focus cashflow',
+    prompt: 'Commenta le entrate, le uscite e il flusso netto del mese selezionato.',
+    mode: 'month_analysis',
+    requiresMonthContext: true,
+    webContextHint: 'none',
+  },
+  {
+    id: 'month-allocation',
+    label: 'Variazioni allocazione',
+    prompt: 'Quali classi d\'asset hanno cambiato peso questo mese? Ci sono segnali da considerare?',
     mode: 'month_analysis',
     requiresMonthContext: true,
     webContextHint: 'none',
@@ -67,7 +88,7 @@ const PROMPT_CHIPS: AssistantPromptChip[] = [
   },
   {
     id: 'portfolio-chat',
-    label: 'Fai una domanda libera',
+    label: 'Domanda libera',
     prompt: 'Aiutami a capire quali temi stanno emergendo dal mio portafoglio.',
     mode: 'chat',
     requiresMonthContext: false,
@@ -75,10 +96,12 @@ const PROMPT_CHIPS: AssistantPromptChip[] = [
   },
 ];
 
+/**
+ * Builds the list of selectable months (current month + 3 years back).
+ * Uses Italy timezone for the current month so the default selection is always correct.
+ */
 function buildMonthOptions(): AssistantMonthSelectorValue[] {
-  const today = new Date();
-  const currentYear = today.getFullYear();
-  const currentMonth = today.getMonth() + 1;
+  const { year: currentYear, month: currentMonth } = getItalyMonthYear(new Date());
   const options: AssistantMonthSelectorValue[] = [];
 
   for (let year = currentYear; year >= currentYear - 3; year -= 1) {
@@ -86,12 +109,28 @@ function buildMonthOptions(): AssistantMonthSelectorValue[] {
       if (year === currentYear && month > currentMonth) {
         continue;
       }
-
       options.push({ year, month });
     }
   }
 
   return options;
+}
+
+/**
+ * Strips markdown syntax so thread previews read as plain text.
+ * Covers headings, bold/italic, inline code, horizontal rules, and list markers.
+ */
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/#{1,6}\s+/g, '')       // headings
+    .replace(/\*\*(.+?)\*\*/g, '$1') // bold
+    .replace(/\*(.+?)\*/g, '$1')     // italic
+    .replace(/`(.+?)`/g, '$1')       // inline code
+    .replace(/^---+$/gm, '')         // horizontal rules
+    .replace(/^[-*+]\s+/gm, '')      // unordered list markers
+    .replace(/^\d+\.\s+/gm, '')      // ordered list markers
+    .replace(/\n+/g, ' ')            // collapse newlines to spaces
+    .trim();
 }
 
 function parseSseEvent(rawChunk: string): AssistantStreamEvent | null {
@@ -112,17 +151,23 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+
+  // Month options are stable for the session — computed once on mount
   const monthOptions = useMemo(() => buildMonthOptions(), []);
+
   const [selectedThreadId, setSelectedThreadId] = useState<string>();
   const [draft, setDraft] = useState('');
-  const [mode, setMode] = useState<AssistantMode>('chat');
-  const [selectedMonth, setSelectedMonth] = useState<AssistantMonthSelectorValue>(() => {
-    const today = new Date();
-    return { year: today.getFullYear(), month: today.getMonth() + 1 };
-  });
+  const [mode, setMode] = useState<AssistantMode>('month_analysis');
+  const [selectedMonth, setSelectedMonth] = useState<AssistantMonthSelectorValue>(
+    // Default to Italy current month; matches buildMonthOptions logic
+    () => getItalyMonthYear(new Date())
+  );
+
   const [streamingMessages, setStreamingMessages] = useState<AssistantMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isInterrupted, setIsInterrupted] = useState(false);
+  // Context bundle is populated from the SSE 'context' event sent before text streaming
+  const [contextBundle, setContextBundle] = useState<AssistantMonthContextBundle | null>(null);
 
   const { data: threads = [], isLoading: loadingThreads, error: threadsError } = useAssistantThreads(user?.uid);
   const { data: threadDetail, isLoading: loadingThreadDetail, error: threadError } = useAssistantThread(
@@ -136,20 +181,35 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     if (streamingMessages.length > 0) {
       return streamingMessages;
     }
-
     return threadDetail?.messages ?? [];
   }, [streamingMessages, threadDetail?.messages]);
 
+  // Auto-select the most recent thread on first load.
+  // Only runs when selectedThreadId is still undefined to avoid overwriting a
+  // thread ID received mid-stream from the SSE meta event.
   useEffect(() => {
     if (!selectedThreadId && threads.length > 0) {
       setSelectedThreadId(threads[0].id);
     }
   }, [selectedThreadId, threads]);
 
+  // Sync mode and month picker to the loaded thread so the UI stays coherent
+  // with the conversation being shown. Runs when threadDetail resolves, but not
+  // during streaming (streamingMessages.length > 0) to avoid disrupting active input.
   useEffect(() => {
-    setStreamingMessages([]);
-    setIsInterrupted(false);
-  }, [selectedThreadId]);
+    if (!threadDetail || streamingMessages.length > 0) {
+      return;
+    }
+    setMode(threadDetail.thread.mode);
+    if (threadDetail.thread.pinnedMonth) {
+      setSelectedMonth(threadDetail.thread.pinnedMonth);
+    }
+  }, [threadDetail]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // NOTE: we do NOT clear streamingMessages on selectedThreadId changes here.
+  // The meta event sets selectedThreadId mid-stream; a useEffect dependency on it
+  // would fire and wipe the streaming buffer before text arrives. Instead, we
+  // clear streaming state explicitly when the user clicks a thread (see thread list).
 
   const handleChipClick = (chip: AssistantPromptChip) => {
     setMode(chip.mode);
@@ -189,24 +249,27 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
 
     setIsStreaming(true);
     setIsInterrupted(false);
-    setStreamingMessages([...(threadDetail?.messages ?? []), userMessage, {
-      id: assistantMessageId,
-      threadId: selectedThreadId ?? 'pending',
-      userId: user.uid,
-      role: 'assistant',
-      content: '',
-      createdAt: new Date(),
-      mode,
-      monthContext: mode === 'month_analysis' ? selectedMonth : null,
-      webSearchUsed: false,
-    }]);
+    setContextBundle(null);
+    setStreamingMessages([
+      ...(threadDetail?.messages ?? []),
+      userMessage,
+      {
+        id: assistantMessageId,
+        threadId: selectedThreadId ?? 'pending',
+        userId: user.uid,
+        role: 'assistant',
+        content: '',
+        createdAt: new Date(),
+        mode,
+        monthContext: mode === 'month_analysis' ? selectedMonth : null,
+        webSearchUsed: false,
+      },
+    ]);
 
     try {
       const response = await authenticatedFetch('/api/ai/assistant/stream', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: user.uid,
           mode,
@@ -219,7 +282,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
 
       if (!response.ok || !response.body) {
         const payload = await response.json().catch(() => null);
-        throw new Error(payload?.error ?? 'Impossibile avviare lo stream dell’assistente');
+        throw new Error(payload?.error ?? 'Impossibile avviare lo stream dell\'assistente');
       }
 
       setDraft('');
@@ -229,7 +292,6 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
 
       while (true) {
         const { done, value } = await reader.read();
-
         if (done) {
           break;
         }
@@ -246,6 +308,11 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
 
           if (event.type === 'meta' && event.threadId) {
             setSelectedThreadId(event.threadId);
+          }
+
+          // Populate the context panel from the server-built bundle
+          if (event.type === 'context') {
+            setContextBundle(event.bundle);
           }
 
           if (event.type === 'text') {
@@ -291,11 +358,28 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     }
   };
 
+  // Allow retrying last user prompt without clearing the text area
+  const handleRetry = () => {
+    if (!isStreaming) {
+      handleStreamSubmit();
+    }
+  };
+
   const activeMonthLabel = `${MONTH_NAMES[selectedMonth.month - 1]} ${selectedMonth.year}`;
+
+  // CTA is disabled when month_analysis mode has no data available to analyse
+  const isAnalysisBlocked =
+    mode === 'month_analysis' &&
+    contextBundle !== null &&
+    !contextBundle.dataQuality.hasSnapshot &&
+    !contextBundle.dataQuality.hasCashflowData;
+
+  const canSubmit = draft.trim().length > 0 && !isStreaming && !isAnalysisBlocked;
 
   return (
     <ProtectedRoute>
       <div className="space-y-6 max-desktop:portrait:pb-20">
+        {/* Page header */}
         <header className="space-y-4 border-b border-border pb-4">
           <div className="space-y-1">
             <p className="text-xs uppercase tracking-widest text-muted-foreground">Analisi</p>
@@ -303,12 +387,12 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
               <div className="space-y-2">
                 <h1 className="text-3xl font-semibold tracking-tight text-foreground">Assistente AI</h1>
                 <p className="max-w-2xl text-sm text-muted-foreground">
-                  Conversazioni guidate sul portafoglio, con analisi mensile e contesto macro opzionale.
+                  Analisi mensile guidata: seleziona un mese, scegli un punto di partenza e leggi il tuo portafoglio con Claude.
                 </p>
               </div>
               <Badge variant="outline" className="w-fit gap-2 text-xs">
                 <Sparkles className="h-3.5 w-3.5" />
-                Step 1: fondazioni e contratti
+                Step 2: analisi mensile
               </Badge>
             </div>
           </div>
@@ -320,7 +404,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
               <EmptyState
                 icon={<Lock className="h-10 w-10" />}
                 title="Servizio AI non configurato"
-                description="La pagina resta accessibile, ma per usare l’assistente devi configurare ANTHROPIC_API_KEY nell’ambiente."
+                description="La pagina resta accessibile, ma per usare l'assistente devi configurare ANTHROPIC_API_KEY nell'ambiente."
                 action={
                   <Button variant="outline" onClick={() => router.back()}>
                     Torna indietro
@@ -332,11 +416,15 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
           </Card>
         ) : (
           <div className="grid gap-6 desktop:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.9fr)]">
+            {/* Left column: conversation + input */}
             <div className="space-y-4">
+              {/* Prompt chip shortcuts */}
               <Card>
-                <CardHeader>
+                <CardHeader className="pb-3">
                   <CardTitle>Prompt suggeriti</CardTitle>
-                  <CardDescription>Scegli un punto di partenza e personalizzalo prima di inviare.</CardDescription>
+                  <CardDescription>
+                    Scegli un punto di partenza e personalizzalo prima di inviare.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-wrap gap-2">
                   {PROMPT_CHIPS.map((chip) => (
@@ -351,6 +439,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                 </CardContent>
               </Card>
 
+              {/* Conversation */}
               <Card className="min-h-[420px]">
                 <CardHeader>
                   <div className="flex items-center justify-between gap-3">
@@ -365,213 +454,228 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                     {isStreaming && (
                       <Badge variant="outline" className="gap-2">
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        In scrittura
+                        In scrittura…
                       </Badge>
                     )}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-3">
+                  {/* Message list */}
+                  <div className="min-h-[180px] space-y-3 rounded-xl border border-border bg-muted/20 p-3">
                     {loadingThreadDetail ? (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Caricamento conversazione...
+                        Caricamento conversazione…
                       </div>
                     ) : renderedMessages.length === 0 ? (
                       <EmptyState
                         icon={<MessageSquare className="h-8 w-8" />}
                         title="Nessun messaggio ancora"
-                        description="Invia il primo prompt per creare un thread e iniziare la conversazione."
+                        description="Scegli un prompt suggerito o scrivi la tua domanda."
                         className="py-8"
                       />
                     ) : (
-                      renderedMessages.map((message) => (
-                        <div
-                          key={message.id}
-                          className={cn(
-                            'rounded-xl border px-3 py-2 text-sm',
-                            message.role === 'user'
-                              ? 'border-primary/25 bg-primary/5'
-                              : 'border-border bg-background'
-                          )}
-                        >
-                          <div className="mb-1 flex items-center justify-between gap-3">
-                            <span className="font-medium text-foreground">
-                              {message.role === 'user' ? 'Tu' : 'Assistente'}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {formatDate(message.createdAt)}
-                            </span>
-                          </div>
-                          <p className="whitespace-pre-wrap text-foreground">{message.content || '...'}</p>
-                          {message.webSearchUsed && (
-                            <Badge variant="outline" className="mt-2 gap-1.5 text-[11px]">
-                              <Globe className="h-3 w-3" />
-                              Web search usata
-                            </Badge>
-                          )}
-                        </div>
-                      ))
+                      <AssistantStreamingResponse
+                        messages={renderedMessages}
+                        isInterrupted={isInterrupted}
+                        onRetry={handleRetry}
+                      />
                     )}
                   </div>
 
-                  {isInterrupted && (
-                    <Alert>
-                      <RefreshCw className="h-4 w-4" />
-                      <AlertTitle>Risposta interrotta</AlertTitle>
-                      <AlertDescription>
-                        La risposta parziale è rimasta visibile. Puoi correggere il prompt e riprovare.
-                      </AlertDescription>
-                    </Alert>
-                  )}
+                  {/* Mode + month + prompt input */}
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                          Modalità
+                        </label>
+                        <Select value={mode} onValueChange={(value) => setMode(value as AssistantMode)}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleziona modalità" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="month_analysis">Analisi mensile</SelectItem>
+                            <SelectItem value="chat">Chat libera</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                  <div className="grid gap-3 sm:grid-cols-[180px_180px_minmax(0,1fr)]">
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                        Modalità
-                      </label>
-                      <Select value={mode} onValueChange={(value) => setMode(value as AssistantMode)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleziona modalità" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="chat">Chat</SelectItem>
-                          <SelectItem value="month_analysis">Analisi mensile</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      {mode === 'month_analysis' && (
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                            Mese di analisi
+                          </label>
+                          <AssistantMonthPicker
+                            value={selectedMonth}
+                            options={monthOptions}
+                            onChange={setSelectedMonth}
+                            disabled={isStreaming}
+                          />
+                        </div>
+                      )}
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                        Mese attivo
-                      </label>
-                      <Select
-                        value={`${selectedMonth.year}-${selectedMonth.month}`}
-                        onValueChange={(value) => {
-                          const [year, month] = value.split('-').map(Number);
-                          setSelectedMonth({ year, month });
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleziona mese" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {monthOptions.map((option) => (
-                            <SelectItem key={`${option.year}-${option.month}`} value={`${option.year}-${option.month}`}>
-                              {MONTH_NAMES[option.month - 1]} {option.year}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <label className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
                         Prompt
                       </label>
                       <Textarea
                         value={draft}
                         onChange={(event) => setDraft(event.target.value)}
-                        placeholder="Scrivi una domanda sul tuo portafoglio o sul mese selezionato..."
-                        className="min-h-[120px]"
+                        onKeyDown={(event) => {
+                          // Cmd/Ctrl+Enter sends the message
+                          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                            event.preventDefault();
+                            if (canSubmit) {
+                              handleStreamSubmit();
+                            }
+                          }
+                        }}
+                        placeholder={
+                          mode === 'month_analysis'
+                            ? `Scrivi la tua domanda sul mese di ${activeMonthLabel}…`
+                            : 'Scrivi una domanda libera sul tuo portafoglio…'
+                        }
+                        className="min-h-[100px] resize-none"
+                        disabled={isStreaming}
                       />
                     </div>
                   </div>
 
+                  {/* Submit row */}
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-xs text-muted-foreground">
-                      I titoli dei thread vengono assegnati lato server per mantenere coerenza tra stream e storico.
-                    </p>
-                    <Button onClick={handleStreamSubmit} disabled={!draft.trim() || isStreaming}>
-                      {isStreaming ? 'Generazione in corso...' : 'Invia al modello'}
+                    {isAnalysisBlocked ? (
+                      <p className="text-xs text-destructive">
+                        Nessun dato disponibile per {activeMonthLabel}. Seleziona un altro mese.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        {mode === 'month_analysis'
+                          ? 'Il contesto numerico viene ricostruito lato server — i numeri nel pannello sono affidabili.'
+                          : '⌘↵ per inviare'}
+                      </p>
+                    )}
+                    <Button
+                      onClick={handleStreamSubmit}
+                      disabled={!canSubmit}
+                      className="sm:self-end"
+                    >
+                      {isStreaming ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Generazione in corso…
+                        </>
+                      ) : mode === 'month_analysis' ? (
+                        'Analizza il mese'
+                      ) : (
+                        'Invia'
+                      )}
                     </Button>
                   </div>
                 </CardContent>
               </Card>
             </div>
 
+            {/* Right column: context + preferences + threads */}
             <div className="space-y-4">
+              {/* Context panel: visible after first analysis of the selected month */}
+              {contextBundle ? (
+                <AssistantContextCard bundle={contextBundle} />
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Contesto numerico</CardTitle>
+                    <CardDescription>
+                      Appare qui al termine della prima analisi del mese selezionato.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="rounded-xl border border-border p-3">
+                      <div className="mb-1 flex items-center gap-2 text-sm font-medium text-foreground">
+                        <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                        Mese di riferimento
+                      </div>
+                      <p className="text-sm text-muted-foreground">{activeMonthLabel}</p>
+                    </div>
+                    <div className="mt-3 rounded-xl border border-border p-3">
+                      <div className="mb-1 flex items-center gap-2 text-sm font-medium text-foreground">
+                        <Globe className="h-4 w-4 text-muted-foreground" />
+                        Web search
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Attiva in analisi mensile solo con contesto macro abilitato.
+                        In chat si attiva per richieste macro/geopolitiche esplicite.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Preferences */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Contesto attivo</CardTitle>
-                  <CardDescription>Mese selezionato, policy web search e preferenze persistenti.</CardDescription>
+                  <CardTitle className="flex items-center gap-2">
+                    <WandSparkles className="h-4 w-4 text-muted-foreground" />
+                    Preferenze
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="rounded-xl border border-border p-3">
-                    <div className="mb-1 flex items-center gap-2 text-sm font-medium text-foreground">
-                      <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                      Mese di riferimento
-                    </div>
-                    <p className="text-sm text-muted-foreground">{activeMonthLabel}</p>
+                <CardContent className="space-y-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                      Stile di risposta
+                    </label>
+                    <Select
+                      value={memory?.preferences.responseStyle ?? 'balanced'}
+                      onValueChange={(value) =>
+                        handlePreferencesChange({
+                          responseStyle: value as 'balanced' | 'concise' | 'deep',
+                        })
+                      }
+                      disabled={loadingMemory || updateMemoryMutation.isPending}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Stile di risposta" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="balanced">Bilanciato</SelectItem>
+                        <SelectItem value="concise">Conciso</SelectItem>
+                        <SelectItem value="deep">Approfondito</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
-                  <div className="rounded-xl border border-border p-3">
-                    <div className="mb-1 flex items-center gap-2 text-sm font-medium text-foreground">
-                      <Globe className="h-4 w-4 text-muted-foreground" />
-                      Web search
+                  <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Contesto macro</p>
+                      <p className="text-xs text-muted-foreground">
+                        Abilita ricerca web nelle analisi mensili.
+                      </p>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      In analisi mensile si attiva solo con contesto macro abilitato. In chat si attiva solo per richieste macro/geopolitiche o esplicite.
-                    </p>
+                    <Switch
+                      checked={memory?.preferences.includeMacroContext ?? false}
+                      onCheckedChange={(checked) => handlePreferencesChange({ includeMacroContext: checked })}
+                      disabled={loadingMemory || updateMemoryMutation.isPending}
+                    />
                   </div>
 
-                  <div className="space-y-3 rounded-xl border border-border p-3">
-                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      <WandSparkles className="h-4 w-4 text-muted-foreground" />
-                      Preferenze
+                  <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Memoria assistente</p>
+                      <p className="text-xs text-muted-foreground">
+                        Conserva preferenze e fatti tra i thread.
+                      </p>
                     </div>
-
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                        Stile di risposta
-                      </label>
-                      <Select
-                        value={memory?.preferences.responseStyle ?? 'balanced'}
-                        onValueChange={(value) =>
-                          handlePreferencesChange({
-                            responseStyle: value as 'balanced' | 'concise' | 'deep',
-                          })
-                        }
-                        disabled={loadingMemory || updateMemoryMutation.isPending}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Stile di risposta" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="balanced">Bilanciato</SelectItem>
-                          <SelectItem value="concise">Conciso</SelectItem>
-                          <SelectItem value="deep">Approfondito</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">Contesto macro</p>
-                        <p className="text-xs text-muted-foreground">Abilita ricerca web opzionale nelle analisi mensili.</p>
-                      </div>
-                      <Switch
-                        checked={memory?.preferences.includeMacroContext ?? false}
-                        onCheckedChange={(checked) => handlePreferencesChange({ includeMacroContext: checked })}
-                        disabled={loadingMemory || updateMemoryMutation.isPending}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">Memoria assistente</p>
-                        <p className="text-xs text-muted-foreground">Permette di conservare preferenze e fatti utili tra i thread.</p>
-                      </div>
-                      <Switch
-                        checked={memory?.preferences.memoryEnabled ?? true}
-                        onCheckedChange={(checked) => handlePreferencesChange({ memoryEnabled: checked })}
-                        disabled={loadingMemory || updateMemoryMutation.isPending}
-                      />
-                    </div>
+                    <Switch
+                      checked={memory?.preferences.memoryEnabled ?? true}
+                      onCheckedChange={(checked) => handlePreferencesChange({ memoryEnabled: checked })}
+                      disabled={loadingMemory || updateMemoryMutation.isPending}
+                    />
                   </div>
                 </CardContent>
               </Card>
 
+              {/* Recent threads */}
               <Card>
                 <CardHeader>
                   <CardTitle>Thread recenti</CardTitle>
@@ -581,7 +685,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                   {loadingThreads ? (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Caricamento thread...
+                      Caricamento thread…
                     </div>
                   ) : threads.length === 0 ? (
                     <EmptyState
@@ -594,7 +698,17 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                     threads.map((thread) => (
                       <button
                         key={thread.id}
-                        onClick={() => setSelectedThreadId(thread.id)}
+                        onClick={() => {
+                          // Clear streaming state and sync mode/month to the selected thread
+                          setSelectedThreadId(thread.id);
+                          setStreamingMessages([]);
+                          setIsInterrupted(false);
+                          setContextBundle(null);
+                          setMode(thread.mode);
+                          if (thread.pinnedMonth) {
+                            setSelectedMonth(thread.pinnedMonth);
+                          }
+                        }}
                         className={cn(
                           'w-full rounded-xl border px-3 py-2 text-left transition-colors',
                           selectedThreadId === thread.id
@@ -609,8 +723,13 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                           </Badge>
                         </div>
                         <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                          {thread.lastMessagePreview || 'Ancora nessun messaggio salvato'}
+                          {thread.lastMessagePreview ? stripMarkdown(thread.lastMessagePreview) : 'Ancora nessun messaggio salvato'}
                         </p>
+                        {thread.pinnedMonth && (
+                          <p className="mt-0.5 text-[10px] text-muted-foreground/60">
+                            {MONTH_NAMES[thread.pinnedMonth.month - 1]} {thread.pinnedMonth.year}
+                          </p>
+                        )}
                       </button>
                     ))
                   )}
@@ -618,12 +737,9 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
               </Card>
 
               {(threadsError || threadError || memoryError) && (
-                <Alert variant="destructive">
-                  <AlertTitle>Errore di caricamento</AlertTitle>
-                  <AlertDescription>
-                    {(threadsError || threadError || memoryError)?.message}
-                  </AlertDescription>
-                </Alert>
+                <p className="text-xs text-destructive">
+                  {(threadsError || threadError || memoryError)?.message}
+                </p>
               )}
             </div>
           </div>

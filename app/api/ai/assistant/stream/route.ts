@@ -17,6 +17,7 @@ import {
   getDefaultAssistantPreferences,
   resolveAssistantWebSearchPolicy,
 } from '@/lib/server/assistant/webSearchPolicy';
+import { buildAssistantMonthContext } from '@/lib/services/assistantMonthContextService';
 import { AssistantStreamEvent, AssistantStreamRequest } from '@/types/assistant';
 
 function encodeAssistantEvent(event: AssistantStreamEvent): Uint8Array {
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest) {
     if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json(
         {
-          error: 'Servizio AI non configurato. Aggiungi ANTHROPIC_API_KEY per abilitare l’assistente.',
+          error: "Servizio AI non configurato. Aggiungi ANTHROPIC_API_KEY per abilitare l'assistente.",
         },
         { status: 500 }
       );
@@ -55,6 +56,14 @@ export async function POST(request: NextRequest) {
       body.prompt,
       preferences
     );
+
+    // Build the numeric context bundle server-side for month_analysis mode.
+    // We never trust client-supplied numbers — the month selector from the body
+    // is used only as a key to re-derive authoritative Firestore data.
+    const contextBundle =
+      body.mode === 'month_analysis' && body.month
+        ? await buildAssistantMonthContext(body.userId, body.month)
+        : null;
 
     let existingThread = body.threadId
       ? await getAssistantThread(body.threadId, body.userId)
@@ -95,9 +104,21 @@ export async function POST(request: NextRequest) {
             })
           );
 
+          // Include the bundle in the SSE meta so the client can render the
+          // numeric panel without a separate API round-trip
+          if (contextBundle) {
+            controller.enqueue(
+              encodeAssistantEvent({
+                type: 'context',
+                bundle: contextBundle,
+              })
+            );
+          }
+
           const result = await streamAssistantResponse({
             mode: body.mode,
             prompt: body.prompt.trim(),
+            contextBundle,
             month: body.month ?? null,
             preferences,
             enableWebSearch,
@@ -143,7 +164,7 @@ export async function POST(request: NextRequest) {
             encodeAssistantEvent({
               type: 'error',
               error:
-                error?.message ?? 'Errore durante la generazione della risposta dell’assistente',
+                error?.message ?? "Errore durante la generazione della risposta dell'assistente",
               retryable: Boolean(error?.retryable),
             })
           );
@@ -171,7 +192,7 @@ export async function POST(request: NextRequest) {
 
     console.error('[API /ai/assistant/stream] POST error:', error);
     return NextResponse.json(
-      { error: 'Impossibile avviare lo stream dell’assistente' },
+      { error: "Impossibile avviare lo stream dell'assistente" },
       { status: 500 }
     );
   }
