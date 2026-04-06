@@ -107,6 +107,7 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed the Performance page (Rendimenti) metric cards not counting up when the page first loads — numbers now animate from zero as expected instead of jumping directly to their final values
 - Fixed a visual flash in the Budget tab when opening the historical analysis for a row, subtotal, or total on desktop
 - Fixed the Cashflow Sankey animation so month and period filter changes animate correctly again instead of appearing static
 - Fixed the Overview summary invalidation flow so asset and cashflow changes no longer trigger a Firestore permissions warning in the browser console — the client now invalidates the server-owned summary through an authenticated private API route

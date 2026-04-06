@@ -5,9 +5,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-06, session 58): **Overview data pipeline and Firebase optimization**. Panoramica now loads through a single authenticated `GET /api/dashboard/overview` route backed by a server-side `DashboardOverviewPayload`, a materialized `dashboardOverviewSummaries/{userId}` document with live fallback, and Firestore local persistence with safe memory-cache fallback.
+- Latest implementation (2026-04-06, session 59): **Performance page count-up animation fix**. `MetricCard` now uses `useCountUp({ once: true })` instead of `{ fromPrevious: true }`, matching the Overview pattern. Without `once`, rapid React Query cache hits would cancel and restart the 60ms startDelay window before any animation was visible to the user.
+- Previous implementation (2026-04-06, session 58): **Overview data pipeline and Firebase optimization**. Panoramica now loads through a single authenticated `GET /api/dashboard/overview` route backed by a server-side `DashboardOverviewPayload`, a materialized `dashboardOverviewSummaries/{userId}` document with live fallback, and Firestore local persistence with safe memory-cache fallback.
 - Previous implementation (2026-04-05, session 57): **Overview rendering and count-up refactor**. Count-up moved from DashboardPage into `OverviewAnimatedCurrency` leaf nodes so each rAF tick re-renders only the animating card. Chart section extracted into memoized `OverviewChartsSection`, scheduled via `requestIdleCallback` after the hero KPI settles. Formatter cache added to `lib/utils/formatters.ts`. All KPI cards (including asset count via `format="integer"`) animate on mount.
-- Previous implementation (2026-04-05, session 56): **AI Assistant foundation**. Added the new `/dashboard/assistant` entry across desktop and mobile secondary navigation, a responsive assistant shell, shared assistant contracts, private assistant API scaffolding, and a standardized SSE stream route with server-side Firebase auth and optional web-search policy.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -81,7 +81,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-06 (session 58)
+**Last updated**: 2026-04-06 (session 59)
 
 ## Design Context
 

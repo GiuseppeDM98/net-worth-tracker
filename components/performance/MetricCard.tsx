@@ -129,11 +129,13 @@ export function MetricCard({
     return 'text-foreground';
   };
 
-  // Animate from the previous value so period switches settle into the next state
-  // instead of replaying a full 0 → target count-up on every interaction.
+  // Animate once from 0 to the target on first meaningful data load.
+  // `once: true` prevents re-triggering on React Query cache refreshes or rapid
+  // re-renders: without it, the 60ms startDelay window is cancelled and restarted
+  // on each update, so the user never sees the full count-up on first load.
   const animatedValue = useCountUp(value, {
     duration: isPrimary ? 560 : 460,
-    fromPrevious: true,
+    once: true,
   });
 
   // === Rendering ===
