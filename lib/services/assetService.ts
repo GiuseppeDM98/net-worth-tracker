@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
+import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
 import { Asset, AssetFormData } from '@/types/assets';
 
 const ASSETS_COLLECTION = 'assets';
@@ -199,11 +200,13 @@ export async function createAsset(
       // Reuse existing ID
       const assetRef = doc(db, ASSETS_COLLECTION, assetId);
       await setDoc(assetRef, cleanedData);
+      await invalidateDashboardOverviewSummary(userId, 'asset_created');
       console.log(`Asset created with existing ID: ${assetId}`);
       return assetId;
     } else {
       // Generate new ID
       const docRef = await addDoc(assetsRef, cleanedData);
+      await invalidateDashboardOverviewSummary(userId, 'asset_created');
       console.log(`Asset created with new ID: ${docRef.id}`);
       return docRef.id;
     }
@@ -222,6 +225,7 @@ export async function updateAsset(
 ): Promise<void> {
   try {
     const assetRef = doc(db, ASSETS_COLLECTION, assetId);
+    const existingAsset = await getDoc(assetRef);
 
     // Remove undefined fields to prevent Firebase errors
     const cleanedUpdates = removeUndefinedFields({
@@ -230,6 +234,11 @@ export async function updateAsset(
     });
 
     await updateDoc(assetRef, cleanedUpdates);
+
+    const userId = existingAsset.data()?.userId;
+    if (userId) {
+      await invalidateDashboardOverviewSummary(userId, 'asset_updated');
+    }
   } catch (error) {
     console.error('Error updating asset:', error);
     throw new Error('Failed to update asset');
@@ -245,12 +254,18 @@ export async function updateAssetPrice(
 ): Promise<void> {
   try {
     const assetRef = doc(db, ASSETS_COLLECTION, assetId);
+    const existingAsset = await getDoc(assetRef);
 
     await updateDoc(assetRef, {
       currentPrice: price,
       lastPriceUpdate: Timestamp.now(),
       updatedAt: Timestamp.now(),
     });
+
+    const userId = existingAsset.data()?.userId;
+    if (userId) {
+      await invalidateDashboardOverviewSummary(userId, 'asset_price_updated');
+    }
   } catch (error) {
     console.error('Error updating asset price:', error);
     throw new Error('Failed to update asset price');
@@ -286,6 +301,7 @@ export async function updateCashAssetBalance(assetId: string, signedDelta: numbe
       quantity: newQuantity,
       updatedAt: Timestamp.now(),
     });
+    await invalidateDashboardOverviewSummary(asset.userId, 'cash_asset_balance_updated');
   } catch (error) {
     console.error('Error updating cash asset balance:', error);
     throw new Error('Failed to update cash asset balance');

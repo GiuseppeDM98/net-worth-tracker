@@ -1,10 +1,19 @@
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
+import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
 import { Asset, AssetClass, AssetAllocationTarget, AssetAllocationSettings, AllocationResult, SubCategoryTarget, SpecificAssetAllocation, AllocationData } from '@/types/assets';
 import { calculateAssetValue, calculateTotalValue } from './assetService';
 import { DEFAULT_SUB_CATEGORIES, DEFAULT_EQUITY_SUB_TARGETS } from '@/lib/constants/defaultSubCategories';
 
 const ALLOCATION_TARGETS_COLLECTION = 'assetAllocationTargets';
+
+function settingsAffectDashboardOverview(settings: AssetAllocationSettings): boolean {
+  return (
+    settings.stampDutyEnabled !== undefined ||
+    settings.stampDutyRate !== undefined ||
+    settings.checkingAccountSubCategory !== undefined
+  );
+}
 
 /**
  * Get allocation settings for a user
@@ -235,6 +244,10 @@ export async function setSettings(
 
       // Use merge: true to preserve existing fields
       await setDoc(targetRef, docData, { merge: true });
+    }
+
+    if (settingsAffectDashboardOverview(settings)) {
+      await invalidateDashboardOverviewSummary(userId, 'overview_settings_updated');
     }
   } catch (error) {
     console.error('Error setting allocation settings:', error);

@@ -5,6 +5,7 @@ import {
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
+import { invalidateDashboardOverviewSummaryServer } from '@/lib/services/dashboardOverviewInvalidation.server';
 
 /**
  * POST /api/prices/update
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
 
     // Update prices using the shared helper function
     const result = await updateUserAssetPrices(userId);
+    await invalidateDashboardOverviewSummaryServer(userId, 'asset_prices_updated');
 
     return NextResponse.json(result);
   } catch (error) {

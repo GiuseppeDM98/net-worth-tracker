@@ -1,0 +1,3 @@
+export const DASHBOARD_OVERVIEW_SUMMARY_COLLECTION = 'dashboardOverviewSummaries';
+export const DASHBOARD_OVERVIEW_SOURCE_VERSION = 1;
+export const DASHBOARD_OVERVIEW_SUMMARY_TTL_MS = 5 * 60 * 1000;

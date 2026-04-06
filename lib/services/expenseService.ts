@@ -31,6 +31,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
+import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
 import {
   Expense,
   ExpenseFormData,
@@ -254,6 +255,7 @@ export async function createExpense(
     });
 
     const docRef = await addDoc(expensesRef, cleanedData);
+    await invalidateDashboardOverviewSummary(userId, 'expense_created');
 
     return docRef.id;
   } catch (error) {
@@ -328,6 +330,7 @@ async function createRecurringExpenses(
     }
 
     await batch.commit();
+    await invalidateDashboardOverviewSummary(userId, 'expense_created');
 
     return createdIds;
   } catch (error) {
@@ -442,6 +445,7 @@ async function createInstallmentExpenses(
     }
 
     await batch.commit();
+    await invalidateDashboardOverviewSummary(userId, 'expense_created');
 
     console.log(`Created ${installmentCount} installment expenses with parent ID: ${parentId}`);
     return createdIds;
@@ -465,12 +469,16 @@ export async function deleteInstallmentExpenses(installmentParentId: string): Pr
 
     const querySnapshot = await getDocs(q);
     const batch = writeBatch(db);
+    const userId = querySnapshot.docs[0]?.data()?.userId as string | undefined;
 
     querySnapshot.docs.forEach(docSnapshot => {
       batch.delete(docSnapshot.ref);
     });
 
     await batch.commit();
+    if (userId) {
+      await invalidateDashboardOverviewSummary(userId, 'expense_deleted');
+    }
     console.log(`Deleted ${querySnapshot.size} installment expenses with parent ID: ${installmentParentId}`);
   } catch (error) {
     console.error('Error deleting installment expenses:', error);
@@ -489,6 +497,7 @@ export async function updateExpense(
 ): Promise<void> {
   try {
     const expenseRef = doc(db, EXPENSES_COLLECTION, expenseId);
+    const existingExpense = await getDoc(expenseRef);
 
     // If amount is being updated, ensure correct sign
     let updatedAmount = updates.amount;
@@ -510,6 +519,10 @@ export async function updateExpense(
     });
 
     await updateDoc(expenseRef, cleanedUpdates);
+    const userId = existingExpense.data()?.userId as string | undefined;
+    if (userId) {
+      await invalidateDashboardOverviewSummary(userId, 'expense_updated');
+    }
   } catch (error) {
     console.error('Error updating expense:', error);
     throw new Error('Failed to update expense');
@@ -522,7 +535,12 @@ export async function updateExpense(
 export async function deleteExpense(expenseId: string): Promise<void> {
   try {
     const expenseRef = doc(db, EXPENSES_COLLECTION, expenseId);
+    const existingExpense = await getDoc(expenseRef);
     await deleteDoc(expenseRef);
+    const userId = existingExpense.data()?.userId as string | undefined;
+    if (userId) {
+      await invalidateDashboardOverviewSummary(userId, 'expense_deleted');
+    }
   } catch (error) {
     console.error('Error deleting expense:', error);
     throw new Error('Failed to delete expense');
@@ -542,12 +560,16 @@ export async function deleteRecurringExpenses(recurringParentId: string): Promis
 
     const querySnapshot = await getDocs(q);
     const batch = writeBatch(db);
+    const userId = querySnapshot.docs[0]?.data()?.userId as string | undefined;
 
     querySnapshot.docs.forEach(docSnapshot => {
       batch.delete(docSnapshot.ref);
     });
 
     await batch.commit();
+    if (userId) {
+      await invalidateDashboardOverviewSummary(userId, 'expense_deleted');
+    }
   } catch (error) {
     console.error('Error deleting recurring expenses:', error);
     throw new Error('Failed to delete recurring expenses');

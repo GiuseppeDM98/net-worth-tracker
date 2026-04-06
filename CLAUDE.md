@@ -5,9 +5,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-05, session 57): **Overview rendering and count-up refactor**. Count-up moved from DashboardPage into `OverviewAnimatedCurrency` leaf nodes so each rAF tick re-renders only the animating card. Chart section extracted into memoized `OverviewChartsSection`, scheduled via `requestIdleCallback` after the hero KPI settles. Formatter cache added to `lib/utils/formatters.ts`. All KPI cards (including asset count via `format="integer"`) animate on mount.
+- Latest implementation (2026-04-06, session 58): **Overview data pipeline and Firebase optimization**. Panoramica now loads through a single authenticated `GET /api/dashboard/overview` route backed by a server-side `DashboardOverviewPayload`, a materialized `dashboardOverviewSummaries/{userId}` document with live fallback, and Firestore local persistence with safe memory-cache fallback.
+- Previous implementation (2026-04-05, session 57): **Overview rendering and count-up refactor**. Count-up moved from DashboardPage into `OverviewAnimatedCurrency` leaf nodes so each rAF tick re-renders only the animating card. Chart section extracted into memoized `OverviewChartsSection`, scheduled via `requestIdleCallback` after the hero KPI settles. Formatter cache added to `lib/utils/formatters.ts`. All KPI cards (including asset count via `format="integer"`) animate on mount.
 - Previous implementation (2026-04-05, session 56): **AI Assistant foundation**. Added the new `/dashboard/assistant` entry across desktop and mobile secondary navigation, a responsive assistant shell, shared assistant contracts, private assistant API scaffolding, and a standardized SSE stream route with server-side Firebase auth and optional web-search policy.
-- Previous implementation (2026-04-05, session 55): **Assets current-year baseline fix**. Patrimonio `Anno Corrente` historical tables now compare the first visible month against the previous month as a hidden baseline, so January can show growth vs previous December without rendering December in the UI. `Mese Prec. %` and `YTD %` now stay meaningful even when only one month is visible.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -29,6 +29,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Rendimenti now presents smoother period switching, KPI settling from prior values, staged monthly heatmap reveal, a more legible underwater drawdown surface, and contextual custom-range / AI dialogs
 - Allocazione now presents a more readable drill-down path on desktop and a steadier mobile sheet experience, with each drill-down level reopening from the top and progress bars using centered target markers
 - Patrimonio now preserves visited macro-tab and sub-tab state across `Gestione Asset`, `Anno Corrente`, and `Storico`, with calmer transitions for dense historical tables, scoped refresh feedback on the active view, and a hidden previous-month baseline for `Anno Corrente` so first-month comparisons and summary percentages remain accurate without adding an extra visible column
+- Overview/Panoramica now loads KPI, variations, expense summary, charts, and rendering flags from one authenticated overview query, improving warm loads and keeping related data in sync after asset, cashflow, snapshot, and stamp-duty-setting changes
 - Overview/Dashboard KPI cards all animate on mount via `OverviewAnimatedCurrency` leaf nodes (count-up isolated per card, not page-level). Charts mount after hero settles via `requestIdleCallback`. Formatter cache in `lib/utils/formatters.ts` avoids `Intl.NumberFormat` allocation on every render.
 - Private API actions now require verified Firebase auth server-side, while scheduled maintenance flows continue to authenticate with `CRON_SECRET`
 - Cashflow tracking with categories, filters, Sankey drill-down, budget management, and linked cash-account updates
@@ -63,6 +64,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - FX conversion depends on Frankfurter API availability, with cache fallback
 
 ## Key Files
+- Overview data pipeline: `app/api/dashboard/overview/route.ts`, `lib/services/dashboardOverviewService.ts`, `lib/hooks/useDashboardOverview.ts`, `types/dashboardOverview.ts`
 - Overview KPI animation: `components/dashboard/OverviewAnimatedCurrency.tsx`, `components/dashboard/OverviewChartsSection.tsx`
 - Formatter cache: `lib/utils/formatters.ts` (`cachedFormatCurrencyEUR`)
 - Assistant: `app/dashboard/assistant/page.tsx`, `components/assistant/AssistantPageClient.tsx`, `app/api/ai/assistant/*`, `lib/server/assistant/*`, `types/assistant.ts`
@@ -79,7 +81,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-05 (session 56)
+**Last updated**: 2026-04-06 (session 58)
 
 ## Design Context
 

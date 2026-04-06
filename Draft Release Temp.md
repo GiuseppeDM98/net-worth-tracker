@@ -61,6 +61,8 @@
 - Improved the Overview dashboard so all KPI values — including asset count — now animate with a count-up on page load, making the numbers feel more alive and satisfying to arrive at
 - Improved the Overview dashboard so portfolio composition charts on desktop appear only after the key numbers have finished animating, reducing visual competition and making the page feel more focused on load
 - Improved the snapshot overwrite flow on the Overview page so the confirmation dialog feels more connected to the "Crea Snapshot" action
+- Improved the Overview dashboard so key metrics, monthly changes, expense summaries, and composition charts now load together in one faster, more consistent response
+- Improved Overview freshness after portfolio, cashflow, snapshot, price-update, and stamp-duty setting changes, reducing cases where the dashboard could briefly feel out of sync
 - Refined the late-night Overview greeting to keep a calmer evening tone while still acknowledging late usage
 - Navigation now feels smoother and more app-like: the active section indicator in the sidebar glides between items instead of snapping — giving the interface a native, polished feel
 - The bottom navigation on mobile now shows an animated accent line that appears on the active tab, making it easier to see where you are at a glance
