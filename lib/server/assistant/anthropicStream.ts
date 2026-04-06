@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { AssistantMode, AssistantMonthContextBundle, AssistantMonthSelectorValue, AssistantPreferences } from '@/types/assistant';
+import { AssistantMemoryItem, AssistantMode, AssistantMonthContextBundle, AssistantMonthSelectorValue, AssistantPreferences } from '@/types/assistant';
 import { buildChatPrompt, buildMonthAnalysisPrompt } from './prompts';
 
 const anthropic = new Anthropic({
@@ -14,6 +14,9 @@ interface StreamAssistantResponseArgs {
   contextBundle: AssistantMonthContextBundle | null;
   month?: AssistantMonthSelectorValue | null;
   preferences: AssistantPreferences;
+  // Active memory items for this user, injected into the prompt so Claude can
+  // reference declared goals, preferences, and facts across conversations.
+  memoryItems?: AssistantMemoryItem[];
   enableWebSearch: boolean;
   onStatus: (status: 'searching' | 'writing' | 'saving') => void;
   onText: (text: string) => void;
@@ -31,13 +34,9 @@ function buildPrompt(
   prompt: string,
   contextBundle: AssistantMonthContextBundle | null,
   month: AssistantMonthSelectorValue | null | undefined,
-  preferences: AssistantPreferences
+  preferences: AssistantPreferences,
+  memoryItems: AssistantMemoryItem[] = []
 ): string {
-  if (mode === 'month_analysis' && contextBundle) {
-    return buildMonthAnalysisPrompt(contextBundle, prompt, preferences);
-  }
-
-  // Chat mode: include the month label if one was selected, but no numeric data
   const MONTH_NAMES = [
     'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
     'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
@@ -46,7 +45,13 @@ function buildPrompt(
     ? `${MONTH_NAMES[month.month - 1]} ${month.year}`
     : undefined;
 
-  return buildChatPrompt(prompt, preferences, monthLabel);
+  if (mode === 'month_analysis' && contextBundle) {
+    return buildMonthAnalysisPrompt(contextBundle, prompt, preferences, memoryItems);
+  }
+
+  // Chat mode: pass the bundle when available so Claude has real numbers.
+  // The prompt builder uses it without forcing a fixed response structure.
+  return buildChatPrompt(prompt, preferences, monthLabel, memoryItems, contextBundle);
 }
 
 export async function streamAssistantResponse({
@@ -55,6 +60,7 @@ export async function streamAssistantResponse({
   contextBundle,
   month,
   preferences,
+  memoryItems = [],
   enableWebSearch,
   onStatus,
   onText,
@@ -86,7 +92,7 @@ export async function streamAssistantResponse({
       messages: [
         {
           role: 'user',
-          content: buildPrompt(mode, prompt, contextBundle, month, preferences),
+          content: buildPrompt(mode, prompt, contextBundle, month, preferences, memoryItems),
         },
       ],
       stream: true,

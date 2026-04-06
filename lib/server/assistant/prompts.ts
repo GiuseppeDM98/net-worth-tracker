@@ -6,7 +6,7 @@
  * and keep anthropicStream.ts focused on the HTTP/SSE layer.
  */
 
-import { AssistantMonthContextBundle, AssistantPreferences } from '@/types/assistant';
+import { AssistantMemoryItem, AssistantMonthContextBundle, AssistantPreferences } from '@/types/assistant';
 
 const MONTH_NAMES = [
   'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
@@ -23,6 +23,39 @@ function eur(value: number): string {
 
 function pct(value: number): string {
   return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
+}
+
+const MEMORY_CATEGORY_LABELS: Record<AssistantMemoryItem['category'], string> = {
+  goal: 'Obiettivi finanziari',
+  preference: 'Preferenze',
+  risk: 'Profilo di rischio',
+  fact: 'Fatti utili',
+};
+
+/**
+ * Serialises active memory items into a structured text block for the prompt.
+ * Only active items are included — archived ones are excluded.
+ * Returns an empty string when there are no items to inject.
+ */
+function formatMemoryForPrompt(items: AssistantMemoryItem[]): string {
+  const active = items.filter((item) => item.status === 'active');
+  if (active.length === 0) return '';
+
+  // Group by category preserving canonical order
+  const order: AssistantMemoryItem['category'][] = ['goal', 'preference', 'risk', 'fact'];
+  const lines: string[] = ['--- COSA SAI GIÀ SULL\'INVESTITORE (memoria persistente) ---'];
+
+  for (const cat of order) {
+    const group = active.filter((i) => i.category === cat);
+    if (group.length === 0) continue;
+    lines.push(`${MEMORY_CATEGORY_LABELS[cat]}:`);
+    for (const item of group) {
+      lines.push(`- ${item.text}`);
+    }
+  }
+
+  lines.push('Usa questi fatti per personalizzare la risposta quando sono pertinenti.');
+  return lines.join('\n');
 }
 
 /**
@@ -145,7 +178,8 @@ function formatBundleForPrompt(bundle: AssistantMonthContextBundle): string {
 export function buildMonthAnalysisPrompt(
   bundle: AssistantMonthContextBundle,
   userPrompt: string,
-  preferences: AssistantPreferences
+  preferences: AssistantPreferences,
+  memoryItems: AssistantMemoryItem[] = []
 ): string {
   const monthLabel = `${MONTH_NAMES[bundle.selector.month - 1]} ${bundle.selector.year}`;
   const numericBlock = formatBundleForPrompt(bundle);
@@ -161,8 +195,9 @@ export function buildMonthAnalysisPrompt(
     ? 'Puoi integrare contesto macro (mercati, tassi, geopolitica) se rilevante per il mese. Usa al massimo 2 ricerche web.'
     : 'Non cercare informazioni macro esterne. Concentrati esclusivamente sui dati del portafoglio forniti.';
 
-  const memoryInstruction = preferences.memoryEnabled
-    ? 'Puoi riutilizzare preferenze e fatti salvati sulla situazione dell\'investitore quando sono pertinenti.'
+  // Inject actual memory items when memoryEnabled, otherwise tell Claude to ignore stored facts
+  const memoryBlock = preferences.memoryEnabled
+    ? formatMemoryForPrompt(memoryItems)
     : 'Non fare affidamento su memoria persistente. Usa solo il contesto esplicito di questa sessione.';
 
   const sections = [
@@ -170,7 +205,7 @@ export function buildMonthAnalysisPrompt(
     'Rispondi sempre in italiano.',
     responseStyleInstruction,
     macroInstruction,
-    memoryInstruction,
+    memoryBlock,
     '',
     `Stai analizzando il mese di ${monthLabel}.`,
     'Di seguito trovi i dati finanziari del mese, estratti in modo affidabile dal sistema:',
@@ -198,10 +233,20 @@ export function buildMonthAnalysisPrompt(
  * Builds the prompt for chat mode (no structured month context).
  * Used when mode === 'chat' to keep a single entry point in anthropicStream.ts.
  */
+/**
+ * Builds the prompt for chat mode.
+ *
+ * When a context bundle is available (user has a month selected), the numeric
+ * data is injected so Claude can answer questions like "cosa pesa di più sul
+ * patrimonio?" with real numbers. The response format is intentionally free-form
+ * — no forced section structure unlike month_analysis mode.
+ */
 export function buildChatPrompt(
   prompt: string,
   preferences: AssistantPreferences,
-  monthLabel?: string
+  monthLabel?: string,
+  memoryItems: AssistantMemoryItem[] = [],
+  contextBundle?: AssistantMonthContextBundle | null
 ): string {
   const responseStyleInstruction =
     preferences.responseStyle === 'concise'
@@ -210,22 +255,37 @@ export function buildChatPrompt(
         ? 'Rispondi con maggiore profondità, esplicitando ipotesi e limiti.'
         : 'Rispondi in modo equilibrato: chiaro, concreto e leggibile.';
 
-  const monthContext = monthLabel
-    ? `Il contesto mensile selezionato è ${monthLabel}.`
-    : 'Non è stato selezionato un mese di riferimento specifico.';
-
-  const memoryInstruction = preferences.memoryEnabled
-    ? 'Puoi riutilizzare preferenze e fatti salvati quando sono pertinenti.'
+  // Inject actual memory items when memoryEnabled, otherwise tell Claude to ignore stored facts
+  const memoryBlock = preferences.memoryEnabled
+    ? formatMemoryForPrompt(memoryItems)
     : 'Non fare affidamento su memoria persistente; usa solo il contesto esplicito del messaggio.';
 
-  return [
+  const sections: string[] = [
     'Sei l\'Assistente AI di Net Worth Tracker per un investitore italiano.',
     'Rispondi sempre in italiano.',
     responseStyleInstruction,
     'Stai rispondendo a una conversazione generale sul portafoglio dell\'utente.',
-    monthContext,
-    memoryInstruction,
+    memoryBlock,
     '',
-    `Richiesta utente: ${prompt.trim()}`,
-  ].join('\n');
+  ];
+
+  if (contextBundle) {
+    // Numeric data available: inject it and instruct Claude to use it freely
+    const numericBlock = formatBundleForPrompt(contextBundle);
+    sections.push(
+      'Di seguito trovi i dati finanziari del mese selezionato. Usali per rispondere alla domanda dell\'utente — non è richiesta una struttura fissa.',
+      '',
+      numericBlock,
+    );
+  } else {
+    // No month selected: remind Claude it has no portfolio numbers
+    const noDataNote = monthLabel
+      ? `Il contesto mensile selezionato è ${monthLabel}, ma non sono disponibili dati numerici per questo mese.`
+      : 'Non è stato selezionato un mese di riferimento. Rispondi in modo generale senza inventare numeri.';
+    sections.push(noDataNote);
+  }
+
+  sections.push('', `Richiesta utente: ${prompt.trim()}`);
+
+  return sections.join('\n');
 }

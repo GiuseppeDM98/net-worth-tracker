@@ -75,22 +75,16 @@ export function AssistantComposer({
           </SelectContent>
         </Select>
 
-        {mode === 'month_analysis' && (
-          <div className="w-auto min-w-[160px]">
-            <AssistantMonthPicker
-              value={selectedMonth}
-              options={monthOptions}
-              onChange={onMonthChange}
-              disabled={isStreaming}
-            />
-          </div>
-        )}
-
-        {mode === 'chat' && (
-          <span className="text-xs text-muted-foreground">
-            Chat libera sul patrimonio
-          </span>
-        )}
+        {/* Month picker shown in both modes — chat mode now uses the same
+            numeric context as month_analysis, just without the forced structure */}
+        <div className="w-auto min-w-[160px]">
+          <AssistantMonthPicker
+            value={selectedMonth}
+            options={monthOptions}
+            onChange={onMonthChange}
+            disabled={isStreaming}
+          />
+        </div>
       </div>
 
       {/* Textarea + send button row */}

@@ -1,5 +1,18 @@
 ## ✨ New Features
 
+- Added an AI Memory panel to the Assistant page: the assistant now remembers goals, preferences, risk profile, and stable facts you declare across conversations — visible in a dedicated "Memoria" panel in the right column
+- Memory items are grouped by type (Obiettivi, Preferenze, Rischio, Fatti utili) and show the date they were learned
+- You can edit any memory item inline, archive it to keep it out of active use, restore it, or delete it permanently
+- Added a full reset option for memory with an explicit confirmation dialog — preferences (style, macro context, learning toggle) are preserved
+- Added an "Apprendimento automatico" toggle: when off, the assistant stops learning new facts but existing memory remains visible and active
+- Chat mode now has access to your real portfolio data: selecting a month in the composer gives the assistant the same financial context as a monthly analysis — net worth, cashflow, allocation changes, and top expenses — without forcing the structured report format
+
+## 🐛 Bug Fixes
+
+- Fixed the assistant not actually using saved memory when answering questions — goals, preferences, and facts were stored but never sent to Claude, so the assistant answered as if it knew nothing about you
+- Fixed the "Rigenera" (retry) button doing nothing after a failed or interrupted response — it now correctly resends the last message without requiring you to retype it
+- Fixed the month picker not being sent to the server in chat mode — the assistant was receiving no data even after a month was selected
+
 - AI Assistant conversations are now fully persistent: every thread is saved and can be reopened at any time from the "Conversazioni" list — your analysis history is never lost between sessions
 - The last conversation you had with the assistant automatically reopens when you revisit the page, so you can continue right where you left off
 - Added a "Conversazioni" button in the assistant header on mobile and tablet that opens a side drawer with your full conversation history, making it easy to switch between threads without leaving the page

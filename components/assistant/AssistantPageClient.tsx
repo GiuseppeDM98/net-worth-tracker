@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { AssistantComposer } from '@/components/assistant/AssistantComposer';
 import { AssistantContextCard } from '@/components/assistant/AssistantContextCard';
+import { AssistantMemoryPanel } from '@/components/assistant/AssistantMemoryPanel';
 import { AssistantPromptChips } from '@/components/assistant/AssistantPromptChips';
 import { AssistantStreamingResponse } from '@/components/assistant/AssistantStreamingResponse';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -245,6 +246,9 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   // Without this, setting selectedThreadId to undefined (new thread) would
   // immediately re-trigger the effect and re-select the first thread.
   const hasAutoSelectedRef = useRef(false);
+  // Stores the last successfully submitted prompt so retry can re-send it
+  // after draft is cleared. Using a ref avoids stale closure issues.
+  const lastSentPromptRef = useRef('');
 
   // Month options are stable for the session — computed once on mount
   const monthOptions = useMemo(() => buildMonthOptions(), []);
@@ -358,7 +362,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
       content: promptToSend,
       createdAt: new Date(),
       mode: modeToSend,
-      monthContext: modeToSend === 'month_analysis' ? selectedMonth : null,
+      monthContext: selectedMonth,
     };
 
     // Allocate the assistant slot ID upfront so AssistantStreamingResponse can
@@ -380,7 +384,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
         content: '',
         createdAt: new Date(),
         mode: modeToSend,
-        monthContext: modeToSend === 'month_analysis' ? selectedMonth : null,
+        monthContext: selectedMonth,
         webSearchUsed: false,
       },
     ]);
@@ -394,7 +398,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
           mode: modeToSend,
           prompt: promptToSend,
           threadId: selectedThreadId,
-          month: modeToSend === 'month_analysis' ? selectedMonth : undefined,
+          month: selectedMonth,
           preferences: memory?.preferences,
         }),
       });
@@ -404,6 +408,8 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
         throw new Error(payload?.error ?? 'Impossibile avviare lo stream dell\'assistente');
       }
 
+      // Save prompt for retry before clearing draft — retry needs the original text
+      lastSentPromptRef.current = promptToSend;
       // Clear draft only after the request succeeds to avoid losing text on network errors
       setDraft('');
 
@@ -489,8 +495,8 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   };
 
   const handleRetry = () => {
-    if (!isStreaming) {
-      handleStreamSubmit();
+    if (!isStreaming && lastSentPromptRef.current) {
+      handleStreamSubmit(lastSentPromptRef.current);
     }
   };
 
@@ -602,7 +608,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                 </Button>
                 <Badge variant="outline" className="w-fit gap-2 text-xs">
                   <Sparkles className="h-3.5 w-3.5" />
-                  Step 4: thread persistenti
+                  Step 5: memoria automatica
                 </Badge>
               </div>
             </div>
@@ -659,7 +665,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                     <p className="text-sm font-medium text-foreground">
                       {mode === 'month_analysis'
                         ? `Analisi · ${activeMonthLabel}`
-                        : 'Chat libera sul portafoglio'}
+                        : `Chat · ${activeMonthLabel}`}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -828,6 +834,15 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Memory panel */}
+              {user?.uid && (
+                <AssistantMemoryPanel
+                  userId={user.uid}
+                  memory={memory}
+                  isLoading={loadingMemory}
+                />
+              )}
 
               {/* Thread list — hidden on mobile where the drawer is used instead */}
               <Card className="hidden desktop:block">

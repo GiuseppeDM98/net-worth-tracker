@@ -115,6 +115,22 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Use `FieldValue.increment(1)` (from `firebase-admin/firestore`) inside `appendAssistantMessage` to atomically increment `messageCount` on the thread document without a separate read-modify-write cycle.
 - `ThreadList` is defined as a module-level component (not nested inside the page component) and rendered both in the desktop right panel and in the mobile `Sheet` drawer — keeps selection, date formatting, and delete behaviour in one place. Never inline it as JSX inside the page or selection updates will remount the whole list.
 
+### Assistant Memory Injection
+- Saving items to `assistantMemory/{userId}` is not enough — Claude has no implicit access to Firestore. Items must be serialized into the prompt via `formatMemoryForPrompt()` in `prompts.ts`. A generic instruction like "you can reuse saved preferences" without the actual text is useless.
+- Only `status === 'active'` items are injected. Archived items are explicitly excluded.
+- Memory fetch in the stream route is wrapped in `.catch(() => null)` — memory failure must never block the chat stream.
+- `extractAndSaveMemory` is fire-and-forget: call with `.catch(...)` after `appendAssistantMessage`, never `await` it inside the stream. Errors are logged server-side only.
+- The Anthropic client for memory extraction is instantiated lazily inside `extractAndSaveMemory` (dynamic import), not at module level — module-level `new Anthropic()` breaks test environments where `ANTHROPIC_API_KEY` is absent.
+
+### Assistant Chat Mode Unification (Step 5+)
+- Chat mode and month_analysis mode now share the same `buildAssistantMonthContext` call in the stream route — the mode check was removed. The prompt builder controls format, not data availability.
+- `month` must always be sent in the SSE request body when the month picker is visible, regardless of mode. Conditioning it on `mode === 'month_analysis'` silently breaks chat mode data injection.
+- The SSE `context` event (numeric panel) is still only sent in `month_analysis` mode — chat mode receives data in the prompt but does not surface the side panel.
+
+### Assistant Retry Pattern
+- `handleRetry` must use a ref (`lastSentPromptRef`) to store the last successfully submitted prompt before `setDraft('')` clears it. Calling `handleStreamSubmit()` without an override after draft is cleared sends an empty string and exits silently — no error, no visible feedback.
+- Update `lastSentPromptRef.current` only after `response.ok` — not on click — so a failed network request before the stream starts doesn't overwrite the ref with a prompt that was never sent.
+
 ### Assistant Thread List UX
 - Thread dates: use `formatDistanceToNow` (date-fns, Italian locale) for dates within the past 7 days; fall back to `toLocaleDateString('it-IT', {day:'2-digit', month:'2-digit', year:'numeric'})` for older dates. Never use relative-only formatting — absolute dates are more useful for threads weeks old.
 - Mobile thread list: use a `Sheet` (`side="right"`) triggered by a button in the page header (hidden on `desktop:` via `desktop:hidden`). The desktop right panel card uses `hidden desktop:block`. This ensures the same `ThreadList` component is used in both surfaces without duplicating the item render logic.
