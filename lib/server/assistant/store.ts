@@ -1,5 +1,5 @@
 import { adminDb } from '@/lib/firebase/admin';
-import { Timestamp } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import {
   AssistantCreateThreadInput,
   AssistantMemoryDocument,
@@ -52,6 +52,7 @@ function mapThread(docId: string, data: Record<string, any>): AssistantThread {
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
     lastMessagePreview: data.lastMessagePreview ?? '',
+    messageCount: data.messageCount ?? 0,
     mode: data.mode,
     pinnedMonth: data.pinnedMonth ?? null,
   };
@@ -139,6 +140,7 @@ export async function createAssistantThread(
     mode,
     pinnedMonth: input.pinnedMonth ?? null,
     lastMessagePreview: '',
+    messageCount: 0,
     createdAt: now,
     updatedAt: now,
   };
@@ -203,7 +205,15 @@ export async function appendAssistantMessage(
     createdAt: now,
   };
 
-  await messageRef.set(messageData);
+  // Persist the message and atomically increment the thread's messageCount
+  // so the thread list always reflects an accurate count without a separate read.
+  await Promise.all([
+    messageRef.set(messageData),
+    adminDb
+      .collection(THREADS_COLLECTION)
+      .doc(threadId)
+      .set({ messageCount: FieldValue.increment(1) }, { merge: true }),
+  ]);
 
   return mapMessage(threadId, messageRef.id, messageData);
 }
@@ -371,6 +381,37 @@ export async function deleteAssistantMemoryDocument(
     items: filteredItems,
     updatedAt: new Date(),
   };
+}
+
+/**
+ * Deletes a thread and all its messages.
+ * Verifies ownership before deletion — throws AssistantStoreError 403 if the
+ * thread exists but belongs to a different user.
+ *
+ * Firestore Admin SDK does not cascade-delete subcollections automatically,
+ * so messages are deleted in a batch before removing the parent document.
+ */
+export async function deleteAssistantThread(threadId: string, userId: string): Promise<void> {
+  // Verify ownership first — never delete without confirming the caller owns the thread
+  await getAssistantThread(threadId, userId);
+
+  const messagesRef = adminDb
+    .collection(THREADS_COLLECTION)
+    .doc(threadId)
+    .collection('messages');
+
+  // Delete messages in batches of 400 (well under Firestore 500-write limit)
+  const BATCH_SIZE = 400;
+  let snapshot = await messagesRef.limit(BATCH_SIZE).get();
+
+  while (!snapshot.empty) {
+    const batch = adminDb.batch();
+    snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+    snapshot = await messagesRef.limit(BATCH_SIZE).get();
+  }
+
+  await adminDb.collection(THREADS_COLLECTION).doc(threadId).delete();
 }
 
 export { buildThreadTitleFromPrompt, getDefaultThreadTitle };

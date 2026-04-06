@@ -8,10 +8,14 @@ import {
   Loader2,
   Lock,
   MessageSquare,
+  MessagesSquare,
   Plus,
   Sparkles,
+  Trash2,
   WandSparkles,
 } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+import { it } from 'date-fns/locale';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
@@ -22,12 +26,13 @@ import { AssistantStreamingResponse } from '@/components/assistant/AssistantStre
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAssistantMemory, useUpdateAssistantMemory } from '@/lib/hooks/useAssistantMemory';
-import { useAssistantThread, useAssistantThreads } from '@/lib/hooks/useAssistantThreads';
+import { useAssistantThread, useAssistantThreads, useDeleteAssistantThread } from '@/lib/hooks/useAssistantThreads';
 import { assistantPromptChips } from '@/lib/constants/assistantPrompts';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
@@ -89,6 +94,18 @@ function stripMarkdown(text: string): string {
     .trim();
 }
 
+/**
+ * Returns a relative label (e.g. "3 ore fa") for dates within the past 7 days,
+ * or a DD/MM/YYYY absolute date otherwise. Keeps thread list readable at a glance.
+ */
+function formatThreadDate(date: Date): string {
+  const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+  if (Date.now() - date.getTime() < ONE_WEEK_MS) {
+    return formatDistanceToNow(date, { addSuffix: true, locale: it });
+  }
+  return date.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
 function parseSseEvent(rawChunk: string): AssistantStreamEvent | null {
   const trimmedChunk = rawChunk.trim();
   if (!trimmedChunk.startsWith('data:')) {
@@ -101,6 +118,122 @@ function parseSseEvent(rawChunk: string): AssistantStreamEvent | null {
   }
 
   return JSON.parse(payload) as AssistantStreamEvent;
+}
+
+interface ThreadListProps {
+  threads: import('@/types/assistant').AssistantThread[];
+  loadingThreads: boolean;
+  selectedThreadId: string | undefined;
+  isStreaming: boolean;
+  isDeletingId: string | undefined;
+  onSelect: (thread: import('@/types/assistant').AssistantThread) => void;
+  onDelete: (threadId: string) => void;
+  onNewThread: () => void;
+}
+
+/**
+ * Shared thread list rendered both in the desktop right panel and the mobile Sheet drawer.
+ * Keeps selection, date formatting, and delete behaviour in one place to avoid drift.
+ */
+function ThreadList({
+  threads,
+  loadingThreads,
+  selectedThreadId,
+  isStreaming,
+  isDeletingId,
+  onSelect,
+  onDelete,
+  onNewThread,
+}: ThreadListProps) {
+  if (loadingThreads) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Caricamento conversazioni…
+      </div>
+    );
+  }
+
+  if (threads.length === 0) {
+    return (
+      <EmptyState
+        icon={<Bot className="h-8 w-8" />}
+        title="Nessuna conversazione"
+        description="Il primo messaggio crea automaticamente una nuova conversazione."
+        className="py-6"
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {threads.map((thread) => {
+        const isActive = selectedThreadId === thread.id;
+        const isDeleting = isDeletingId === thread.id;
+
+        return (
+          <div
+            key={thread.id}
+            className={cn(
+              'group relative w-full rounded-xl border text-left transition-colors',
+              isActive ? 'border-primary/30 bg-primary/5' : 'border-border hover:bg-muted/40'
+            )}
+          >
+            <button
+              onClick={() => onSelect(thread)}
+              disabled={isStreaming}
+              className="w-full px-3 py-2.5 text-left"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-medium leading-snug text-foreground line-clamp-1">
+                  {thread.title}
+                </p>
+                <Badge variant="outline" className="mt-px shrink-0 text-[10px] uppercase">
+                  {thread.mode === 'month_analysis' ? 'Mese' : 'Chat'}
+                </Badge>
+              </div>
+              <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                {thread.lastMessagePreview
+                  ? stripMarkdown(thread.lastMessagePreview)
+                  : 'Nessun messaggio ancora'}
+              </p>
+              <div className="mt-1.5 flex items-center gap-2">
+                {thread.pinnedMonth && (
+                  <span className="text-[10px] text-muted-foreground">
+                    {MONTH_NAMES[thread.pinnedMonth.month - 1]} {thread.pinnedMonth.year}
+                  </span>
+                )}
+                <span className="text-[10px] text-muted-foreground/70">
+                  {formatThreadDate(thread.updatedAt)}
+                </span>
+              </div>
+            </button>
+
+            {/* Delete button: shown on hover or while this thread is being deleted */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(thread.id);
+              }}
+              disabled={isStreaming || isDeleting}
+              aria-label="Elimina conversazione"
+              className={cn(
+                'absolute right-2 top-2.5 rounded-md p-1 text-muted-foreground/50 opacity-0 transition-opacity',
+                'hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100',
+                isDeleting && 'opacity-100'
+              )}
+            >
+              {isDeleting ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5" />
+              )}
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 export function AssistantPageClient({ assistantConfigured }: AssistantPageClientProps) {
@@ -140,6 +273,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   );
   const { data: memory, isLoading: loadingMemory, error: memoryError } = useAssistantMemory(user?.uid);
   const updateMemoryMutation = useUpdateAssistantMemory(user?.uid ?? '');
+  const deleteThreadMutation = useDeleteAssistantThread(user?.uid ?? '');
 
   // Derive messages to render: streaming buffer takes priority over persisted thread messages.
   // When selectedThreadId is undefined (new conversation state) we return [] even if
@@ -382,6 +516,19 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     setDraft('');
   };
 
+  const handleDeleteThread = async (threadId: string) => {
+    try {
+      await deleteThreadMutation.mutateAsync(threadId);
+      // If the deleted thread was selected, return to hero state
+      if (selectedThreadId === threadId) {
+        handleNewThread();
+      }
+      toast.success('Conversazione eliminata');
+    } catch (error) {
+      toast.error((error as Error).message);
+    }
+  };
+
   const composerErrorHint = isAnalysisBlocked
     ? `Nessun dato disponibile per ${activeMonthLabel}. Seleziona un altro mese.`
     : undefined;
@@ -402,6 +549,47 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                 </p>
               </div>
               <div className="flex items-center gap-3">
+                {/* Mobile-only: opens thread list drawer. Hidden on desktop where the right panel is always visible */}
+                <div className="desktop:hidden">
+                  <Sheet>
+                    <SheetTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <MessagesSquare className="h-4 w-4" />
+                        Conversazioni
+                        {threads.length > 0 && (
+                          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
+                            {threads.length > 99 ? '99' : threads.length}
+                          </span>
+                        )}
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="right" className="w-[320px] overflow-y-auto p-0">
+                      <SheetHeader className="border-b border-border px-4 py-3">
+                        <SheetTitle className="text-left text-sm">Conversazioni</SheetTitle>
+                      </SheetHeader>
+                      <div className="px-4 py-3">
+                        <ThreadList
+                          threads={threads}
+                          loadingThreads={loadingThreads}
+                          selectedThreadId={selectedThreadId}
+                          isStreaming={isStreaming}
+                          isDeletingId={deleteThreadMutation.variables as string | undefined}
+                          onSelect={(thread) => {
+                            setSelectedThreadId(thread.id);
+                            setStreamingMessages([]);
+                            setStreamingMessageId(undefined);
+                            setIsInterrupted(false);
+                            setContextBundle(null);
+                            setMode(thread.mode);
+                            if (thread.pinnedMonth) setSelectedMonth(thread.pinnedMonth);
+                          }}
+                          onDelete={handleDeleteThread}
+                          onNewThread={handleNewThread}
+                        />
+                      </div>
+                    </SheetContent>
+                  </Sheet>
+                </div>
                 <Button
                   variant="outline"
                   size="sm"
@@ -414,7 +602,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                 </Button>
                 <Badge variant="outline" className="w-fit gap-2 text-xs">
                   <Sparkles className="h-3.5 w-3.5" />
-                  Step 3: chat e prompt suggeriti
+                  Step 4: thread persistenti
                 </Badge>
               </div>
             </div>
@@ -641,72 +829,35 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                 </CardContent>
               </Card>
 
-              {/* Recent threads */}
-              <Card>
+              {/* Thread list — hidden on mobile where the drawer is used instead */}
+              <Card className="hidden desktop:block">
                 <CardHeader>
-                  <CardTitle>Thread recenti</CardTitle>
-                  <CardDescription>Ordinati per ultimo aggiornamento.</CardDescription>
+                  <CardTitle>Conversazioni</CardTitle>
+                  <CardDescription>Ordinate per ultimo aggiornamento.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-2">
-                  {loadingThreads ? (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Caricamento thread…
-                    </div>
-                  ) : threads.length === 0 ? (
-                    <EmptyState
-                      icon={<Bot className="h-8 w-8" />}
-                      title="Nessun thread salvato"
-                      description="Il primo invio creerà automaticamente una conversazione."
-                      className="py-6"
-                    />
-                  ) : (
-                    threads.map((thread) => (
-                      <button
-                        key={thread.id}
-                        onClick={() => {
-                          // Explicit thread switch: clear streaming state before loading
-                          // the new thread. Do NOT do this reactively in a useEffect —
-                          // the meta SSE event updates selectedThreadId mid-stream,
-                          // which would wipe the buffer. See AGENTS.md.
-                          setSelectedThreadId(thread.id);
-                          setStreamingMessages([]);
-                          setStreamingMessageId(undefined);
-                          setIsInterrupted(false);
-                          setContextBundle(null);
-                          setMode(thread.mode);
-                          if (thread.pinnedMonth) {
-                            setSelectedMonth(thread.pinnedMonth);
-                          }
-                        }}
-                        className={cn(
-                          'w-full rounded-xl border px-3 py-2 text-left transition-colors',
-                          selectedThreadId === thread.id
-                            ? 'border-primary/30 bg-primary/5'
-                            : 'border-border hover:bg-muted/40'
-                        )}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="text-sm font-medium text-foreground">{thread.title}</p>
-                          <div className="flex shrink-0 items-center gap-1.5">
-                            {thread.pinnedMonth && (
-                              <span className="text-[10px] text-muted-foreground">
-                                {MONTH_NAMES[thread.pinnedMonth.month - 1]} {thread.pinnedMonth.year}
-                              </span>
-                            )}
-                            <Badge variant="outline" className="text-[10px] uppercase">
-                              {thread.mode === 'month_analysis' ? 'Mese' : 'Chat'}
-                            </Badge>
-                          </div>
-                        </div>
-                        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                          {thread.lastMessagePreview
-                            ? stripMarkdown(thread.lastMessagePreview)
-                            : 'Ancora nessun messaggio salvato'}
-                        </p>
-                      </button>
-                    ))
-                  )}
+                <CardContent className="max-h-[480px] overflow-y-auto space-y-2 pr-1">
+                  <ThreadList
+                    threads={threads}
+                    loadingThreads={loadingThreads}
+                    selectedThreadId={selectedThreadId}
+                    isStreaming={isStreaming}
+                    isDeletingId={deleteThreadMutation.variables as string | undefined}
+                    onSelect={(thread) => {
+                      // Explicit thread switch: clear streaming state before loading
+                      // the new thread. Do NOT do this reactively in a useEffect —
+                      // the meta SSE event updates selectedThreadId mid-stream,
+                      // which would wipe the buffer. See AGENTS.md.
+                      setSelectedThreadId(thread.id);
+                      setStreamingMessages([]);
+                      setStreamingMessageId(undefined);
+                      setIsInterrupted(false);
+                      setContextBundle(null);
+                      setMode(thread.mode);
+                      if (thread.pinnedMonth) setSelectedMonth(thread.pinnedMonth);
+                    }}
+                    onDelete={handleDeleteThread}
+                    onNewThread={handleNewThread}
+                  />
                 </CardContent>
               </Card>
 

@@ -72,6 +72,29 @@ export function useAssistantThread(threadId: string | undefined, userId: string 
   });
 }
 
+export function useDeleteAssistantThread(userId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (threadId: string) => {
+      const response = await authenticatedFetch(
+        `/api/ai/assistant/threads/${threadId}?userId=${userId}`,
+        { method: 'DELETE' }
+      );
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error ?? 'Impossibile eliminare il thread');
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.assistant.threads(userId),
+      });
+    },
+  });
+}
+
 export function useCreateAssistantThread(userId: string) {
   const queryClient = useQueryClient();
 

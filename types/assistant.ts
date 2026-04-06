@@ -53,6 +53,7 @@ export interface AssistantThread {
   createdAt: Date;
   updatedAt: Date;
   lastMessagePreview: string;
+  messageCount: number;
   mode: AssistantMode;
   pinnedMonth?: AssistantMonthSelectorValue | null;
 }

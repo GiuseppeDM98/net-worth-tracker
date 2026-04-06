@@ -33,7 +33,7 @@ function pct(value: number): string {
  * financial narrative tasks; the key/value format mimics a briefing note.
  */
 function formatBundleForPrompt(bundle: AssistantMonthContextBundle): string {
-  const { selector, netWorth, cashflow, allocationChanges, dataQuality } = bundle;
+  const { selector, netWorth, cashflow, allocationChanges, dataQuality, currentSnapshot } = bundle;
   const monthLabel = `${MONTH_NAMES[selector.month - 1]} ${selector.year}`;
 
   const lines: string[] = [];
@@ -81,9 +81,26 @@ function formatBundleForPrompt(bundle: AssistantMonthContextBundle): string {
     lines.push('');
   }
 
-  // Allocation changes section
+  // Full current allocation by asset class — includes all classes (e.g. real_estate, pension funds)
+  // even when they have zero monthly change. Without this, Claude only sees the top-5 movers
+  // and incorrectly labels stable classes (like real estate) as "unclassified" patrimony.
+  const byAssetClass = currentSnapshot?.byAssetClass;
+  if (byAssetClass && Object.keys(byAssetClass).length > 0) {
+    const totalNetWorth = currentSnapshot?.totalNetWorth ?? 0;
+    lines.push('--- ALLOCAZIONE CORRENTE (tutte le classi) ---');
+    const entries = Object.entries(byAssetClass).sort((a, b) => b[1] - a[1]);
+    for (const [assetClass, value] of entries) {
+      const pctOfTotal =
+        totalNetWorth > 0 ? ` (${pct((value / totalNetWorth) * 100)})` : '';
+      lines.push(`${assetClass}: ${eur(value)}${pctOfTotal}`);
+    }
+    lines.push('');
+  }
+
+  // Top-5 movers section: shows which classes changed most this month.
+  // allocationChanges is already capped at 5 by the context builder.
   if (allocationChanges.length > 0) {
-    lines.push('--- VARIAZIONI ALLOCAZIONE (top 5 per variazione assoluta) ---');
+    lines.push('--- VARIAZIONI ALLOCAZIONE MENSILI (top 5 per variazione assoluta) ---');
     for (const change of allocationChanges) {
       const prev = change.previousValue !== null ? eur(change.previousValue) : 'N/D';
       const curr = change.currentValue !== null ? eur(change.currentValue) : 'N/D';

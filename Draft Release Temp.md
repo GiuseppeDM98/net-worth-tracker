@@ -1,5 +1,11 @@
 ## ✨ New Features
 
+- AI Assistant conversations are now fully persistent: every thread is saved and can be reopened at any time from the "Conversazioni" list — your analysis history is never lost between sessions
+- The last conversation you had with the assistant automatically reopens when you revisit the page, so you can continue right where you left off
+- Added a "Conversazioni" button in the assistant header on mobile and tablet that opens a side drawer with your full conversation history, making it easy to switch between threads without leaving the page
+- Each conversation in the list now shows a relative timestamp ("3 ore fa") for recent threads and an absolute date for older ones, so you always know when the analysis was done
+- You can now delete individual conversations directly from the list — hover the thread and click the trash icon
+
 - Added a full conversational chat experience to the AI Assistant page, replacing the single-form layout with a persistent thread workspace
 - Added five suggested prompt chips on the assistant home screen: "Analizza questo mese", "Cosa pesa di più sul patrimonio?", "Spese e risparmio", "Rendimenti recenti", and "Contesto geopolitico" — one tap to start any common analysis
 - Added a fixed composer at the bottom of the assistant page with an auto-sizing textarea: press Enter to send, Shift+Enter for a new line
@@ -115,6 +121,7 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed the AI assistant incorrectly labelling real estate, pension funds, and other stable asset classes as "unclassified patrimony" — the assistant now sees your complete portfolio breakdown, not just the five asset classes that changed the most that month
 - Fixed the "Nuova conversazione" button not working — the assistant was immediately re-selecting the previous thread instead of showing the empty hero state
 - Fixed the assistant conversation area still showing the previous thread's messages after switching to a new thread, due to stale React Query cache
 - Fixed clicking the send button in the assistant throwing a runtime error when using suggested prompt chips

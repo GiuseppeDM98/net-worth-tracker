@@ -105,6 +105,20 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Pattern: inline Admin SDK queries matching `dashboardOverviewService.ts`; mock `adminDb.collection` in tests, not the service functions
 - The server never trusts client-supplied numbers for month analysis: always rebuild the bundle from the `month` selector via `buildAssistantMonthContext`
 
+### Assistant Prompt Builder (`formatBundleForPrompt`)
+- Always include a full `--- ALLOCAZIONE CORRENTE (tutte le classi) ---` section built from `currentSnapshot.byAssetClass` before the top-5 movers section. Without it, Claude only sees the 5 largest monthly movers and labels stable asset classes (real estate, pension funds) as "unclassified" patrimony — producing hallucinated gap analysis.
+- `allocationChanges` is already capped at 5 by the context builder; render it as a *separate* section labelled `--- VARIAZIONI ALLOCAZIONE MENSILI (top 5) ---` so the distinction between "current holdings" and "this month's movement" is explicit in the prompt.
+- `currentSnapshot` was already present in `AssistantMonthContextBundle` but `formatBundleForPrompt` was destructuring only named fields — adding a new field to the prompt requires explicitly reading it from `bundle`, not from the destructured const.
+
+### Assistant Thread Store
+- `deleteAssistantThread` must delete the `messages` subcollection in batches (≤400 docs per batch) before deleting the parent document — Firestore Admin SDK does not cascade-delete subcollections automatically.
+- Use `FieldValue.increment(1)` (from `firebase-admin/firestore`) inside `appendAssistantMessage` to atomically increment `messageCount` on the thread document without a separate read-modify-write cycle.
+- `ThreadList` is defined as a module-level component (not nested inside the page component) and rendered both in the desktop right panel and in the mobile `Sheet` drawer — keeps selection, date formatting, and delete behaviour in one place. Never inline it as JSX inside the page or selection updates will remount the whole list.
+
+### Assistant Thread List UX
+- Thread dates: use `formatDistanceToNow` (date-fns, Italian locale) for dates within the past 7 days; fall back to `toLocaleDateString('it-IT', {day:'2-digit', month:'2-digit', year:'numeric'})` for older dates. Never use relative-only formatting — absolute dates are more useful for threads weeks old.
+- Mobile thread list: use a `Sheet` (`side="right"`) triggered by a button in the page header (hidden on `desktop:` via `desktop:hidden`). The desktop right panel card uses `hidden desktop:block`. This ensures the same `ThreadList` component is used in both surfaces without duplicating the item render logic.
+
 ### Private API Authorization
 - Any App Router API route that uses Firebase Admin SDK must authenticate server-side; Firestore rules do not protect Admin SDK calls
 - Private routes must verify the Firebase ID token and bind the request to `decodedToken.uid`, not just a client-supplied `userId`
