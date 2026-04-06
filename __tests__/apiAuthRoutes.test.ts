@@ -135,6 +135,7 @@ import { DELETE as deleteDividendRoute } from '@/app/api/dividends/[dividendId]/
 import { POST as updatePricesRoute } from '@/app/api/prices/update/route';
 import { POST as snapshotRoute } from '@/app/api/portfolio/snapshot/route';
 import { GET as dashboardOverviewRoute } from '@/app/api/dashboard/overview/route';
+import { POST as invalidateDashboardOverviewRoute } from '@/app/api/dashboard/overview/invalidate/route';
 
 function createJsonRequest(
   url: string,
@@ -382,6 +383,30 @@ describe('Private API route auth', () => {
       error: 'Authenticated user does not match requested user',
     });
     expect(updateUserAssetPricesMock).not.toHaveBeenCalled();
+  });
+
+  it('invalidates the overview summary via authenticated route', async () => {
+    const response = await invalidateDashboardOverviewRoute(
+      createJsonRequest('http://localhost/api/dashboard/overview/invalidate', {
+        method: 'POST',
+        body: { reason: 'expense_created' },
+        headers: {
+          Authorization: 'Bearer valid-token',
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ ok: true });
+    expect(verifyIdTokenMock).toHaveBeenCalledWith('valid-token');
+    expect(overviewSummaryDocSetMock).toHaveBeenCalledTimes(1);
+    expect(overviewSummaryDocSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user-1',
+        lastInvalidationReason: 'expense_created',
+      }),
+      { merge: true }
+    );
   });
 
   it('allows snapshot creation for cron callers using cronSecret without Firebase auth', async () => {

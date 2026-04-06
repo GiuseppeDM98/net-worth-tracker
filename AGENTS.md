@@ -93,6 +93,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Private routes must verify the Firebase ID token and bind the request to `decodedToken.uid`, not just a client-supplied `userId`
 - For record-level mutations on Admin SDK routes, enforce ownership after loading the document (e.g. `dividend.userId`, `asset.userId`)
 - Client-side calls to private API routes should use `authenticatedFetch()` so `Authorization: Bearer <idToken>` is sent consistently
+- For server-owned materialized documents such as `dashboardOverviewSummaries/{userId}`, client-side mutations must invalidate via a private authenticated API route; do not write these collections directly from the client SDK
 - Scheduled server-to-server flows are the exception: cron routes authenticate with `CRON_SECRET`, and `/api/portfolio/snapshot` must continue to accept `cronSecret` for internal cron orchestration
 - For user-owned conversational features (assistant threads, messages, memory), generate authoritative thread metadata server-side; do not let the client decide persisted titles or ownership-bound identifiers
 

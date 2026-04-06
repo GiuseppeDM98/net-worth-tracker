@@ -109,6 +109,7 @@
 
 - Fixed a visual flash in the Budget tab when opening the historical analysis for a row, subtotal, or total on desktop
 - Fixed the Cashflow Sankey animation so month and period filter changes animate correctly again instead of appearing static
+- Fixed the Overview summary invalidation flow so asset and cashflow changes no longer trigger a Firestore permissions warning in the browser console — the client now invalidates the server-owned summary through an authenticated private API route
 
 - Fixed blank vertical gaps appearing on the Assets page when switching between force-mounted tabs
 - Fixed a flash of fully-visible page content appearing for a split second before the entrance animation begins when navigating between pages — now all pages animate in cleanly every time
