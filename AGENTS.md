@@ -93,6 +93,12 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Clear streaming state explicitly only on user-initiated thread switches (click handler), not reactively
 - The `context` SSE event fires before text streaming begins; handle it separately from `text` events to populate the numeric panel without touching the message buffer
 - When loading a thread, sync `mode` and `selectedMonth` to `thread.pinnedMonth`/`thread.mode` via a `useEffect([threadDetail])` guarded by `streamingMessages.length === 0`
+- Track `streamingMessageId` (the ID of the assistant message slot currently receiving tokens) and pass it to the message renderer to switch between plain-text and ReactMarkdown — plain text during stream avoids re-parse layout jumps on every chunk; markdown renders on `done`
+- Auto-select the most recent thread on first load using a `hasAutoSelectedRef` guard; without the ref, setting `selectedThreadId` to `undefined` (new thread) re-triggers the effect and immediately re-selects the old thread
+- After "new thread" deselection, React Query keeps the previous thread's data in cache (query disabled but stale data present); guard `renderedMessages` with `!selectedThreadId` to return `[]` and show the hero immediately
+- `handleStreamSubmit` accepts optional `promptOverride`/`modeOverride` so chip clicks can pass values synchronously — React state updates are async; relying on updated state after `setDraft`/`setMode` inside the same handler does not work
+- Button `onClick` always passes the `MouseEvent` as the first argument; if the handler signature accepts an optional string (`promptOverride?`), wrap as `onClick={() => onSubmit()}` — never `onClick={onSubmit}` — or the event object is received as the prompt and `.trim()` throws
+- Chat mode (`mode: 'chat'`) does NOT send numeric context to Claude — only the month label. Real financial data requires `month_analysis` mode or will be addressed in Step 5 (automatic memory). Do not add explorative chips that imply data access while in chat mode.
 
 ### Assistant Month Context Service
 - `assistantMonthContextService.ts` runs server-side inside an API route — use `adminDb` (Firebase Admin SDK) directly, not `getUserSnapshots`/`getExpensesByDateRange`/`getSettings` (client SDK, requires browser auth session)

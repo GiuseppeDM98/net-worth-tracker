@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bot,
   CalendarDays,
@@ -8,29 +8,30 @@ import {
   Loader2,
   Lock,
   MessageSquare,
+  Plus,
   Sparkles,
   WandSparkles,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { AssistantComposer } from '@/components/assistant/AssistantComposer';
 import { AssistantContextCard } from '@/components/assistant/AssistantContextCard';
-import { AssistantMonthPicker } from '@/components/assistant/AssistantMonthPicker';
+import { AssistantPromptChips } from '@/components/assistant/AssistantPromptChips';
 import { AssistantStreamingResponse } from '@/components/assistant/AssistantStreamingResponse';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAssistantMemory, useUpdateAssistantMemory } from '@/lib/hooks/useAssistantMemory';
 import { useAssistantThread, useAssistantThreads } from '@/lib/hooks/useAssistantThreads';
+import { assistantPromptChips } from '@/lib/constants/assistantPrompts';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
 import { cn } from '@/lib/utils';
-import { formatDate } from '@/lib/utils/formatters';
 import {
   AssistantMessage,
   AssistantMode,
@@ -49,51 +50,6 @@ interface AssistantPageClientProps {
 const MONTH_NAMES = [
   'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
   'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
-];
-
-// Prompt chips always reference the selected month — they are starting points,
-// not final prompts, so users can customise before sending
-const PROMPT_CHIPS: AssistantPromptChip[] = [
-  {
-    id: 'month-summary',
-    label: 'Leggi il mese',
-    prompt: 'Analizza il mese selezionato e spiegami i driver principali del patrimonio.',
-    mode: 'month_analysis',
-    requiresMonthContext: true,
-    webContextHint: 'none',
-  },
-  {
-    id: 'month-cashflow',
-    label: 'Focus cashflow',
-    prompt: 'Commenta le entrate, le uscite e il flusso netto del mese selezionato.',
-    mode: 'month_analysis',
-    requiresMonthContext: true,
-    webContextHint: 'none',
-  },
-  {
-    id: 'month-allocation',
-    label: 'Variazioni allocazione',
-    prompt: 'Quali classi d\'asset hanno cambiato peso questo mese? Ci sono segnali da considerare?',
-    mode: 'month_analysis',
-    requiresMonthContext: true,
-    webContextHint: 'none',
-  },
-  {
-    id: 'month-macro',
-    label: 'Collega il contesto macro',
-    prompt: 'Metti in relazione il mese selezionato con il contesto macro e i mercati globali.',
-    mode: 'month_analysis',
-    requiresMonthContext: true,
-    webContextHint: 'macro',
-  },
-  {
-    id: 'portfolio-chat',
-    label: 'Domanda libera',
-    prompt: 'Aiutami a capire quali temi stanno emergendo dal mio portafoglio.',
-    mode: 'chat',
-    requiresMonthContext: false,
-    webContextHint: 'optional',
-  },
 ];
 
 /**
@@ -117,19 +73,19 @@ function buildMonthOptions(): AssistantMonthSelectorValue[] {
 }
 
 /**
- * Strips markdown syntax so thread previews read as plain text.
+ * Strips markdown syntax so thread list previews read as plain text.
  * Covers headings, bold/italic, inline code, horizontal rules, and list markers.
  */
 function stripMarkdown(text: string): string {
   return text
-    .replace(/#{1,6}\s+/g, '')       // headings
-    .replace(/\*\*(.+?)\*\*/g, '$1') // bold
-    .replace(/\*(.+?)\*/g, '$1')     // italic
-    .replace(/`(.+?)`/g, '$1')       // inline code
-    .replace(/^---+$/gm, '')         // horizontal rules
-    .replace(/^[-*+]\s+/gm, '')      // unordered list markers
-    .replace(/^\d+\.\s+/gm, '')      // ordered list markers
-    .replace(/\n+/g, ' ')            // collapse newlines to spaces
+    .replace(/#{1,6}\s+/g, '')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/`(.+?)`/g, '$1')
+    .replace(/^---+$/gm, '')
+    .replace(/^[-*+]\s+/gm, '')
+    .replace(/^\d+\.\s+/gm, '')
+    .replace(/\n+/g, ' ')
     .trim();
 }
 
@@ -151,6 +107,11 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const conversationEndRef = useRef<HTMLDivElement>(null);
+  // Guards the one-time auto-select of the most recent thread on first load.
+  // Without this, setting selectedThreadId to undefined (new thread) would
+  // immediately re-trigger the effect and re-select the first thread.
+  const hasAutoSelectedRef = useRef(false);
 
   // Month options are stable for the session — computed once on mount
   const monthOptions = useMemo(() => buildMonthOptions(), []);
@@ -164,6 +125,9 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   );
 
   const [streamingMessages, setStreamingMessages] = useState<AssistantMessage[]>([]);
+  // Tracks the ID of the assistant message slot that is currently receiving tokens.
+  // Used by AssistantStreamingResponse to switch between plain-text and markdown rendering.
+  const [streamingMessageId, setStreamingMessageId] = useState<string | undefined>();
   const [isStreaming, setIsStreaming] = useState(false);
   const [isInterrupted, setIsInterrupted] = useState(false);
   // Context bundle is populated from the SSE 'context' event sent before text streaming
@@ -177,18 +141,26 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   const { data: memory, isLoading: loadingMemory, error: memoryError } = useAssistantMemory(user?.uid);
   const updateMemoryMutation = useUpdateAssistantMemory(user?.uid ?? '');
 
+  // Derive messages to render: streaming buffer takes priority over persisted thread messages.
+  // When selectedThreadId is undefined (new conversation state) we return [] even if
+  // React Query still holds stale cached data from the previously selected thread.
+  // useMemo avoids the useEffect+setState anti-pattern for computed state.
   const renderedMessages = useMemo(() => {
     if (streamingMessages.length > 0) {
       return streamingMessages;
     }
+    if (!selectedThreadId) {
+      return [];
+    }
     return threadDetail?.messages ?? [];
-  }, [streamingMessages, threadDetail?.messages]);
+  }, [streamingMessages, selectedThreadId, threadDetail?.messages]);
 
-  // Auto-select the most recent thread on first load.
-  // Only runs when selectedThreadId is still undefined to avoid overwriting a
-  // thread ID received mid-stream from the SSE meta event.
+  // Auto-select the most recent thread on first load only.
+  // The ref guard prevents this from re-firing when the user explicitly
+  // clicks "Nuova conversazione" (which sets selectedThreadId to undefined).
   useEffect(() => {
-    if (!selectedThreadId && threads.length > 0) {
+    if (!hasAutoSelectedRef.current && !selectedThreadId && threads.length > 0) {
+      hasAutoSelectedRef.current = true;
       setSelectedThreadId(threads[0].id);
     }
   }, [selectedThreadId, threads]);
@@ -206,32 +178,41 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     }
   }, [threadDetail]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // NOTE: we do NOT clear streamingMessages on selectedThreadId changes here.
+  // Scroll the conversation area to the bottom whenever messages change
+  useEffect(() => {
+    conversationEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [renderedMessages]);
+
+  // NOTE: we do NOT clear streamingMessages in a useEffect([selectedThreadId]).
   // The meta event sets selectedThreadId mid-stream; a useEffect dependency on it
-  // would fire and wipe the streaming buffer before text arrives. Instead, we
-  // clear streaming state explicitly when the user clicks a thread (see thread list).
+  // would fire and wipe the streaming buffer before text arrives. See AGENTS.md.
 
-  const handleChipClick = (chip: AssistantPromptChip) => {
-    setMode(chip.mode);
-    setDraft(chip.prompt);
-  };
+  const activeMonthLabel = `${MONTH_NAMES[selectedMonth.month - 1]} ${selectedMonth.year}`;
 
-  const handlePreferencesChange = async (
-    patch: Partial<NonNullable<typeof memory>['preferences']>
-  ) => {
-    if (!user?.uid) {
-      return;
-    }
+  // CTA is disabled when month_analysis mode has no data available to analyse.
+  // Derived with useMemo — no useEffect+setState needed.
+  const isAnalysisBlocked = useMemo(
+    () =>
+      mode === 'month_analysis' &&
+      contextBundle !== null &&
+      !contextBundle.dataQuality.hasSnapshot &&
+      !contextBundle.dataQuality.hasCashflowData,
+    [mode, contextBundle]
+  );
 
-    try {
-      await updateMemoryMutation.mutateAsync({ preferences: patch });
-    } catch (error) {
-      toast.error((error as Error).message);
-    }
-  };
+  const canSubmit = draft.trim().length > 0 && !isStreaming && !isAnalysisBlocked;
 
-  const handleStreamSubmit = async () => {
-    if (!user?.uid || !draft.trim() || isStreaming) {
+  /**
+   * Core streaming submit.
+   * Accepts optional overrides for prompt and mode so that chip clicks can supply
+   * both values synchronously (React state updates are async; waiting for them
+   * would require a follow-up effect or ref which is harder to reason about).
+   */
+  const handleStreamSubmit = async (promptOverride?: string, modeOverride?: AssistantMode) => {
+    const promptToSend = (promptOverride ?? draft).trim();
+    const modeToSend = modeOverride ?? mode;
+
+    if (!user?.uid || !promptToSend || isStreaming) {
       return;
     }
 
@@ -240,16 +221,20 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
       threadId: selectedThreadId ?? 'pending',
       userId: user.uid,
       role: 'user',
-      content: draft.trim(),
+      content: promptToSend,
       createdAt: new Date(),
-      mode,
-      monthContext: mode === 'month_analysis' ? selectedMonth : null,
+      mode: modeToSend,
+      monthContext: modeToSend === 'month_analysis' ? selectedMonth : null,
     };
+
+    // Allocate the assistant slot ID upfront so AssistantStreamingResponse can
+    // identify which message is still streaming and render it as plain text.
     const assistantMessageId = `local-assistant-${Date.now()}`;
 
     setIsStreaming(true);
     setIsInterrupted(false);
     setContextBundle(null);
+    setStreamingMessageId(assistantMessageId);
     setStreamingMessages([
       ...(threadDetail?.messages ?? []),
       userMessage,
@@ -260,8 +245,8 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
         role: 'assistant',
         content: '',
         createdAt: new Date(),
-        mode,
-        monthContext: mode === 'month_analysis' ? selectedMonth : null,
+        mode: modeToSend,
+        monthContext: modeToSend === 'month_analysis' ? selectedMonth : null,
         webSearchUsed: false,
       },
     ]);
@@ -272,10 +257,10 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: user.uid,
-          mode,
-          prompt: draft.trim(),
+          mode: modeToSend,
+          prompt: promptToSend,
           threadId: selectedThreadId,
-          month: mode === 'month_analysis' ? selectedMonth : undefined,
+          month: modeToSend === 'month_analysis' ? selectedMonth : undefined,
           preferences: memory?.preferences,
         }),
       });
@@ -285,16 +270,16 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
         throw new Error(payload?.error ?? 'Impossibile avviare lo stream dell\'assistente');
       }
 
+      // Clear draft only after the request succeeds to avoid losing text on network errors
       setDraft('');
+
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) {
-          break;
-        }
+        if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
         const events = buffer.split('\n\n');
@@ -302,15 +287,14 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
 
         for (const rawEvent of events) {
           const event = parseSseEvent(rawEvent);
-          if (!event) {
-            continue;
-          }
+          if (!event) continue;
 
           if (event.type === 'meta' && event.threadId) {
             setSelectedThreadId(event.threadId);
           }
 
-          // Populate the context panel from the server-built bundle
+          // Populate the context panel from the server-built bundle.
+          // This fires before text streaming starts.
           if (event.type === 'context') {
             setContextBundle(event.bundle);
           }
@@ -326,6 +310,9 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
           }
 
           if (event.type === 'done') {
+            // Mark stream complete: clears streamingMessageId so the message
+            // transitions from plain-text to ReactMarkdown rendering.
+            setStreamingMessageId(undefined);
             setStreamingMessages((current) =>
               current.map((message) =>
                 message.id === assistantMessageId
@@ -353,31 +340,55 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     } catch (error) {
       toast.error((error as Error).message);
       setIsInterrupted(true);
+      setStreamingMessageId(undefined);
     } finally {
       setIsStreaming(false);
     }
   };
 
-  // Allow retrying last user prompt without clearing the text area
+  // All chips prefill the composer — none auto-submit.
+  // This lets the user change the selected month (or edit the prompt) before sending,
+  // which matters especially for month_analysis chips where the month selector is the key input.
+  const handleChipClick = (chip: AssistantPromptChip) => {
+    setMode(chip.mode);
+    setDraft(chip.prompt);
+  };
+
   const handleRetry = () => {
     if (!isStreaming) {
       handleStreamSubmit();
     }
   };
 
-  const activeMonthLabel = `${MONTH_NAMES[selectedMonth.month - 1]} ${selectedMonth.year}`;
+  const handlePreferencesChange = async (
+    patch: Partial<NonNullable<typeof memory>['preferences']>
+  ) => {
+    if (!user?.uid) return;
+    try {
+      await updateMemoryMutation.mutateAsync({ preferences: patch });
+    } catch (error) {
+      toast.error((error as Error).message);
+    }
+  };
 
-  // CTA is disabled when month_analysis mode has no data available to analyse
-  const isAnalysisBlocked =
-    mode === 'month_analysis' &&
-    contextBundle !== null &&
-    !contextBundle.dataQuality.hasSnapshot &&
-    !contextBundle.dataQuality.hasCashflowData;
+  // Deselects the current thread so the hero state reappears and the next
+  // submit creates a fresh thread server-side (threadId omitted from the request).
+  const handleNewThread = () => {
+    setSelectedThreadId(undefined);
+    setStreamingMessages([]);
+    setStreamingMessageId(undefined);
+    setIsInterrupted(false);
+    setContextBundle(null);
+    setDraft('');
+  };
 
-  const canSubmit = draft.trim().length > 0 && !isStreaming && !isAnalysisBlocked;
+  const composerErrorHint = isAnalysisBlocked
+    ? `Nessun dato disponibile per ${activeMonthLabel}. Seleziona un altro mese.`
+    : undefined;
 
   return (
     <ProtectedRoute>
+      {/* max-desktop:portrait:pb-20 provides clearance for the fixed bottom navigation on mobile portrait */}
       <div className="space-y-6 max-desktop:portrait:pb-20">
         {/* Page header */}
         <header className="space-y-4 border-b border-border pb-4">
@@ -387,13 +398,25 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
               <div className="space-y-2">
                 <h1 className="text-3xl font-semibold tracking-tight text-foreground">Assistente AI</h1>
                 <p className="max-w-2xl text-sm text-muted-foreground">
-                  Analisi mensile guidata: seleziona un mese, scegli un punto di partenza e leggi il tuo portafoglio con Claude.
+                  Fai domande sul tuo patrimonio, analizza un mese specifico o esplora spese, rendimenti e contesto macro.
                 </p>
               </div>
-              <Badge variant="outline" className="w-fit gap-2 text-xs">
-                <Sparkles className="h-3.5 w-3.5" />
-                Step 2: analisi mensile
-              </Badge>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleNewThread}
+                  disabled={isStreaming}
+                  className="gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Nuova conversazione
+                </Button>
+                <Badge variant="outline" className="w-fit gap-2 text-xs">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Step 3: chat e prompt suggeriti
+                </Badge>
+              </div>
             </div>
           </div>
         </header>
@@ -415,171 +438,114 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-6 desktop:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.9fr)]">
-            {/* Left column: conversation + input */}
-            <div className="space-y-4">
-              {/* Prompt chip shortcuts */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle>Prompt suggeriti</CardTitle>
-                  <CardDescription>
-                    Scegli un punto di partenza e personalizzalo prima di inviare.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-wrap gap-2">
-                  {PROMPT_CHIPS.map((chip) => (
-                    <button
-                      key={chip.id}
-                      onClick={() => handleChipClick(chip)}
-                      className="rounded-full border border-border px-3 py-1.5 text-left text-sm text-foreground transition-colors hover:bg-muted"
-                    >
-                      {chip.label}
-                    </button>
-                  ))}
-                </CardContent>
-              </Card>
-
-              {/* Conversation */}
-              <Card className="min-h-[420px]">
-                <CardHeader>
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <CardTitle>Conversazione</CardTitle>
-                      <CardDescription>
-                        {mode === 'month_analysis'
-                          ? `Analisi del mese ${activeMonthLabel}`
-                          : 'Chat libera sul tuo portafoglio'}
-                      </CardDescription>
+          <div className="grid gap-6 desktop:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.85fr)]">
+            {/* ── Left column: conversation + sticky composer ── */}
+            <div className="flex flex-col gap-0">
+              {/* Hero state: shown when no messages exist yet */}
+              {renderedMessages.length === 0 && !loadingThreadDetail && (
+                <div className="mb-4 rounded-2xl border border-border bg-muted/20 p-6">
+                  <div className="mb-4 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                      <Sparkles className="h-5 w-5 text-primary" />
                     </div>
+                    <div>
+                      <p className="font-semibold text-foreground">Come posso aiutarti?</p>
+                      <p className="text-sm text-muted-foreground">
+                        Scegli un punto di partenza o scrivi direttamente nel composer.
+                      </p>
+                    </div>
+                  </div>
+                  <AssistantPromptChips
+                    chips={assistantPromptChips}
+                    onSelect={handleChipClick}
+                    disabled={isStreaming}
+                  />
+                </div>
+              )}
+
+              {/* Conversation area */}
+              <div className="min-h-[200px] space-y-0 rounded-2xl border border-border bg-background overflow-hidden">
+                {/* Conversation header */}
+                <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      {mode === 'month_analysis'
+                        ? `Analisi · ${activeMonthLabel}`
+                        : 'Chat libera sul portafoglio'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
                     {isStreaming && (
-                      <Badge variant="outline" className="gap-2">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <Badge variant="outline" className="gap-1.5 text-xs">
+                        <Loader2 className="h-3 w-3 animate-spin" />
                         In scrittura…
                       </Badge>
                     )}
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Message list */}
-                  <div className="min-h-[180px] space-y-3 rounded-xl border border-border bg-muted/20 p-3">
-                    {loadingThreadDetail ? (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Caricamento conversazione…
+                    {/* Quick chip access while in conversation */}
+                    {renderedMessages.length > 0 && !isStreaming && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {assistantPromptChips.slice(0, 2).map((chip) => (
+                          <button
+                            key={chip.id}
+                            onClick={() => handleChipClick(chip)}
+                            className="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          >
+                            {chip.label}
+                          </button>
+                        ))}
                       </div>
-                    ) : renderedMessages.length === 0 ? (
-                      <EmptyState
-                        icon={<MessageSquare className="h-8 w-8" />}
-                        title="Nessun messaggio ancora"
-                        description="Scegli un prompt suggerito o scrivi la tua domanda."
-                        className="py-8"
-                      />
-                    ) : (
-                      <AssistantStreamingResponse
-                        messages={renderedMessages}
-                        isInterrupted={isInterrupted}
-                        onRetry={handleRetry}
-                      />
                     )}
                   </div>
+                </div>
 
-                  {/* Mode + month + prompt input */}
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                          Modalità
-                        </label>
-                        <Select value={mode} onValueChange={(value) => setMode(value as AssistantMode)}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleziona modalità" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="month_analysis">Analisi mensile</SelectItem>
-                            <SelectItem value="chat">Chat libera</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {mode === 'month_analysis' && (
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                            Mese di analisi
-                          </label>
-                          <AssistantMonthPicker
-                            value={selectedMonth}
-                            options={monthOptions}
-                            onChange={setSelectedMonth}
-                            disabled={isStreaming}
-                          />
-                        </div>
-                      )}
+                {/* Messages */}
+                <div className="p-4">
+                  {loadingThreadDetail ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Caricamento conversazione…
                     </div>
+                  ) : renderedMessages.length === 0 ? (
+                    <EmptyState
+                      icon={<MessageSquare className="h-8 w-8" />}
+                      title="Nessun messaggio ancora"
+                      description="Scegli un prompt suggerito o scrivi la tua domanda nel composer in basso."
+                      className="py-10"
+                    />
+                  ) : (
+                    <AssistantStreamingResponse
+                      messages={renderedMessages}
+                      isInterrupted={isInterrupted}
+                      onRetry={handleRetry}
+                      streamingMessageId={streamingMessageId}
+                    />
+                  )}
+                  {/* Anchor for auto-scroll to latest message */}
+                  <div ref={conversationEndRef} />
+                </div>
+              </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                        Prompt
-                      </label>
-                      <Textarea
-                        value={draft}
-                        onChange={(event) => setDraft(event.target.value)}
-                        onKeyDown={(event) => {
-                          // Cmd/Ctrl+Enter sends the message
-                          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-                            event.preventDefault();
-                            if (canSubmit) {
-                              handleStreamSubmit();
-                            }
-                          }
-                        }}
-                        placeholder={
-                          mode === 'month_analysis'
-                            ? `Scrivi la tua domanda sul mese di ${activeMonthLabel}…`
-                            : 'Scrivi una domanda libera sul tuo portafoglio…'
-                        }
-                        className="min-h-[100px] resize-none"
-                        disabled={isStreaming}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Submit row */}
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    {isAnalysisBlocked ? (
-                      <p className="text-xs text-destructive">
-                        Nessun dato disponibile per {activeMonthLabel}. Seleziona un altro mese.
-                      </p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">
-                        {mode === 'month_analysis'
-                          ? 'Il contesto numerico viene ricostruito lato server — i numeri nel pannello sono affidabili.'
-                          : '⌘↵ per inviare'}
-                      </p>
-                    )}
-                    <Button
-                      onClick={handleStreamSubmit}
-                      disabled={!canSubmit}
-                      className="sm:self-end"
-                    >
-                      {isStreaming ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Generazione in corso…
-                        </>
-                      ) : mode === 'month_analysis' ? (
-                        'Analizza il mese'
-                      ) : (
-                        'Invia'
-                      )}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Sticky composer — stays at bottom of viewport as conversation grows */}
+              <div className="sticky bottom-0 max-desktop:portrait:bottom-20 z-10 mt-0">
+                <AssistantComposer
+                  draft={draft}
+                  onChange={setDraft}
+                  onSubmit={handleStreamSubmit}
+                  isStreaming={isStreaming}
+                  canSubmit={canSubmit}
+                  mode={mode}
+                  onModeChange={setMode}
+                  selectedMonth={selectedMonth}
+                  monthOptions={monthOptions}
+                  onMonthChange={setSelectedMonth}
+                  errorHint={composerErrorHint}
+                />
+              </div>
             </div>
 
-            {/* Right column: context + preferences + threads */}
+            {/* ── Right column: context panel + preferences + threads ── */}
             <div className="space-y-4">
-              {/* Context panel: visible after first analysis of the selected month */}
+              {/* Context panel: visible after first analysis populates a bundle */}
               {contextBundle ? (
                 <AssistantContextCard bundle={contextBundle} />
               ) : (
@@ -587,10 +553,10 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                   <CardHeader>
                     <CardTitle>Contesto numerico</CardTitle>
                     <CardDescription>
-                      Appare qui al termine della prima analisi del mese selezionato.
+                      Appare qui al termine della prima analisi mensile.
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="space-y-2">
                     <div className="rounded-xl border border-border p-3">
                       <div className="mb-1 flex items-center gap-2 text-sm font-medium text-foreground">
                         <CalendarDays className="h-4 w-4 text-muted-foreground" />
@@ -598,14 +564,14 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                       </div>
                       <p className="text-sm text-muted-foreground">{activeMonthLabel}</p>
                     </div>
-                    <div className="mt-3 rounded-xl border border-border p-3">
+                    <div className="rounded-xl border border-border p-3">
                       <div className="mb-1 flex items-center gap-2 text-sm font-medium text-foreground">
                         <Globe className="h-4 w-4 text-muted-foreground" />
                         Web search
                       </div>
                       <p className="text-sm text-muted-foreground">
                         Attiva in analisi mensile solo con contesto macro abilitato.
-                        In chat si attiva per richieste macro/geopolitiche esplicite.
+                        In chat si attiva per richieste macro esplicite.
                       </p>
                     </div>
                   </CardContent>
@@ -679,7 +645,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
               <Card>
                 <CardHeader>
                   <CardTitle>Thread recenti</CardTitle>
-                  <CardDescription>Elenco ordinato per ultimo aggiornamento.</CardDescription>
+                  <CardDescription>Ordinati per ultimo aggiornamento.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {loadingThreads ? (
@@ -699,9 +665,13 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                       <button
                         key={thread.id}
                         onClick={() => {
-                          // Clear streaming state and sync mode/month to the selected thread
+                          // Explicit thread switch: clear streaming state before loading
+                          // the new thread. Do NOT do this reactively in a useEffect —
+                          // the meta SSE event updates selectedThreadId mid-stream,
+                          // which would wipe the buffer. See AGENTS.md.
                           setSelectedThreadId(thread.id);
                           setStreamingMessages([]);
+                          setStreamingMessageId(undefined);
                           setIsInterrupted(false);
                           setContextBundle(null);
                           setMode(thread.mode);
@@ -716,20 +686,24 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                             : 'border-border hover:bg-muted/40'
                         )}
                       >
-                        <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-start justify-between gap-3">
                           <p className="text-sm font-medium text-foreground">{thread.title}</p>
-                          <Badge variant="outline" className="text-[10px] uppercase">
-                            {thread.mode === 'month_analysis' ? 'Mese' : 'Chat'}
-                          </Badge>
+                          <div className="flex shrink-0 items-center gap-1.5">
+                            {thread.pinnedMonth && (
+                              <span className="text-[10px] text-muted-foreground">
+                                {MONTH_NAMES[thread.pinnedMonth.month - 1]} {thread.pinnedMonth.year}
+                              </span>
+                            )}
+                            <Badge variant="outline" className="text-[10px] uppercase">
+                              {thread.mode === 'month_analysis' ? 'Mese' : 'Chat'}
+                            </Badge>
+                          </div>
                         </div>
                         <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                          {thread.lastMessagePreview ? stripMarkdown(thread.lastMessagePreview) : 'Ancora nessun messaggio salvato'}
+                          {thread.lastMessagePreview
+                            ? stripMarkdown(thread.lastMessagePreview)
+                            : 'Ancora nessun messaggio salvato'}
                         </p>
-                        {thread.pinnedMonth && (
-                          <p className="mt-0.5 text-[10px] text-muted-foreground/60">
-                            {MONTH_NAMES[thread.pinnedMonth.month - 1]} {thread.pinnedMonth.year}
-                          </p>
-                        )}
                       </button>
                     ))
                   )}

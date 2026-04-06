@@ -13,61 +13,85 @@ interface AssistantStreamingResponseProps {
   messages: AssistantMessage[];
   isInterrupted: boolean;
   onRetry: () => void;
+  /**
+   * ID of the message currently being streamed.
+   * While a message is active, it renders as plain text (whitespace-pre-wrap)
+   * to avoid ReactMarkdown re-parsing partial/incomplete markdown on every chunk.
+   * Once streaming finishes (this prop is undefined or points to a different message),
+   * the message renders as full markdown.
+   *
+   * Pattern mirrors AIAnalysisDialog.tsx: plain text during stream → markdown on done.
+   */
+  streamingMessageId?: string;
 }
 
 /**
- * Renders the conversation message list with markdown support for assistant replies.
- * User messages stay plain text; assistant messages render structured markdown so
- * the three-section output from buildMonthAnalysisPrompt (In sintesi / Cosa ha mosso
- * il patrimonio / 1-2 azioni) displays correctly with headings and lists.
+ * Renders the conversation message list.
+ * User messages are always plain text.
+ * Assistant messages show plain text while streaming, then switch to ReactMarkdown on completion.
  */
 export function AssistantStreamingResponse({
   messages,
   isInterrupted,
   onRetry,
+  streamingMessageId,
 }: AssistantStreamingResponseProps) {
   return (
     <div className="space-y-3">
-      {messages.map((message) => (
-        <div
-          key={message.id}
-          className={cn(
-            'rounded-xl border px-4 py-3 text-sm',
-            message.role === 'user'
-              ? 'border-primary/25 bg-primary/5'
-              : 'border-border bg-background'
-          )}
-        >
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              {message.role === 'user' ? 'Tu' : 'Assistente'}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              {formatDate(message.createdAt)}
-            </span>
-          </div>
+      {messages.map((message) => {
+        // An assistant message is "streaming" while its id matches the active stream slot.
+        // User messages are never streamed — always plain text.
+        const isActiveStream = message.role === 'assistant' && message.id === streamingMessageId;
 
-          {message.role === 'assistant' ? (
-            // Render assistant replies as markdown so the structured sections display correctly
-            <div className="prose prose-sm dark:prose-invert max-w-none text-foreground prose-headings:text-foreground prose-strong:text-foreground prose-li:text-foreground">
-              {message.content ? (
-                <ReactMarkdown>{message.content}</ReactMarkdown>
-              ) : (
-                <span className="italic text-muted-foreground">...</span>
-              )}
+        return (
+          <div
+            key={message.id}
+            className={cn(
+              'rounded-xl border px-4 py-3 text-sm',
+              message.role === 'user'
+                ? 'border-primary/25 bg-primary/5'
+                : 'border-border bg-background',
+            )}
+          >
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                {message.role === 'user' ? 'Tu' : 'Assistente'}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {formatDate(message.createdAt)}
+              </span>
             </div>
-          ) : (
-            <p className="whitespace-pre-wrap text-foreground">{message.content}</p>
-          )}
 
-          {message.webSearchUsed && (
-            <Badge variant="outline" className="mt-2 gap-1.5 text-[11px]">
-              <Globe className="h-3 w-3" />
-              Web search usata
-            </Badge>
-          )}
-        </div>
-      ))}
+            {message.role === 'assistant' ? (
+              isActiveStream ? (
+                // Plain text during streaming: avoids ReactMarkdown re-parse on every chunk
+                // which causes layout jumps when markdown syntax is incomplete mid-stream.
+                <p className="whitespace-pre-wrap text-foreground">
+                  {message.content || <span className="italic text-muted-foreground">…</span>}
+                </p>
+              ) : (
+                // Full markdown once the stream is done
+                <div className="prose prose-sm dark:prose-invert max-w-none text-foreground prose-headings:text-foreground prose-strong:text-foreground prose-li:text-foreground">
+                  {message.content ? (
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                  ) : (
+                    <span className="italic text-muted-foreground">…</span>
+                  )}
+                </div>
+              )
+            ) : (
+              <p className="whitespace-pre-wrap text-foreground">{message.content}</p>
+            )}
+
+            {message.webSearchUsed && (
+              <Badge variant="outline" className="mt-2 gap-1.5 text-[11px]">
+                <Globe className="h-3 w-3" />
+                Web search usata
+              </Badge>
+            )}
+          </div>
+        );
+      })}
 
       {isInterrupted && (
         <Alert>

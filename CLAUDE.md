@@ -5,9 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-06, session 60): **Assistente AI — Step 2: analisi mensile guidata**. Bundle `AssistantMonthContextBundle` costruito server-side via Admin SDK; prompt strutturato con `buildMonthAnalysisPrompt`; evento SSE `context` invia i numeri al client prima dello streaming; pannello `AssistantContextCard` con variazione patrimonio, cashflow, top categorie spese, top spese singole, variazioni allocazione; month picker sincronizzato al thread caricato; markdown rendering nelle risposte; 13 unit test.
-- Previous implementation (2026-04-06, session 59): **Performance page count-up animation fix**. `MetricCard` now uses `useCountUp({ once: true })` instead of `{ fromPrevious: true }`, matching the Overview pattern.
-- Previous implementation (2026-04-06, session 58): **Overview data pipeline and Firebase optimization**. Panoramica now loads through a single authenticated `GET /api/dashboard/overview` route backed by a server-side `DashboardOverviewPayload`, a materialized `dashboardOverviewSummaries/{userId}` document with live fallback, and Firestore local persistence with safe memory-cache fallback.
+- Latest implementation (2026-04-06, session 61): **Assistente AI — Step 3: chat e prompt suggeriti**. Full chat page experience: hero state con 5 prompt chips (`lib/constants/assistantPrompts.ts`), `AssistantComposer` sticky con autosize textarea (Enter invia, Shift+Enter va a capo), `AssistantPromptChips`, tutti i chip fanno prefill (nessun auto-invio), pulsante "Nuova conversazione", plain text durante streaming → ReactMarkdown a done, fix stale React Query cache su nuovo thread, mese visibile nella lista thread.
+- Previous implementation (2026-04-06, session 60): **Assistente AI — Step 2: analisi mensile guidata**. Bundle `AssistantMonthContextBundle` costruito server-side via Admin SDK; prompt strutturato con `buildMonthAnalysisPrompt`; evento SSE `context` invia i numeri al client prima dello streaming; pannello `AssistantContextCard`; month picker sincronizzato al thread caricato; 13 unit test.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -19,7 +18,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Key Features (Active)
 - Portfolio tracking across equities, bonds, crypto, real estate, commodities, and cash
 - Automatic price updates via Yahoo Finance and Borsa Italiana bond support
-- Assistente AI ora include analisi mensile guidata: bundle contestuale costruito server-side (snapshot, cashflow, dividendi, allocazione, top spese per categoria e singole), prompt strutturato inviato a Claude, streaming SSE con evento `context` che popola il pannello numerico laterale, month picker sincronizzato al thread caricato, markdown rendering nelle risposte, web search opzionale via toggle "Contesto macro"
+- Assistente AI è ora una chat page completa: hero state con 5 prompt chips (analisi mensile, patrimonio, spese, rendimenti, macro), composer fisso in basso con autosize textarea (Enter invia, Shift+Enter va a capo), pulsante "Nuova conversazione", plain text durante streaming poi markdown. L'analisi mensile invia bundle numerico completo server-side; la chat libera invia solo label del mese (dati reali in Step 5)
 - Login and Register now feel more native to the product, with calmer entry motion, cleaner field focus choreography, keyboard-reachable password toggles, and inline submit status feedback
 - Hall of Fame now reads as an editorial ranking surface with clearer monthly/yearly hierarchy, spotlight cards for the current month/year, and contextual note dialogs tied to the selected record
 - Cashflow "Entrate per categoria" pie chart on mobile now caps legend items at 3 (same as expense chart), preventing overflow when 4+ categories exceed the 5% threshold
@@ -67,7 +66,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Overview data pipeline: `app/api/dashboard/overview/route.ts`, `lib/services/dashboardOverviewService.ts`, `lib/hooks/useDashboardOverview.ts`, `types/dashboardOverview.ts`
 - Overview KPI animation: `components/dashboard/OverviewAnimatedCurrency.tsx`, `components/dashboard/OverviewChartsSection.tsx`
 - Formatter cache: `lib/utils/formatters.ts` (`cachedFormatCurrencyEUR`)
-- Assistant: `app/dashboard/assistant/page.tsx`, `components/assistant/AssistantPageClient.tsx`, `components/assistant/AssistantContextCard.tsx`, `components/assistant/AssistantMonthPicker.tsx`, `components/assistant/AssistantStreamingResponse.tsx`, `app/api/ai/assistant/*`, `lib/server/assistant/*`, `lib/services/assistantMonthContextService.ts`, `types/assistant.ts`
+- Assistant: `app/dashboard/assistant/page.tsx`, `components/assistant/AssistantPageClient.tsx`, `components/assistant/AssistantComposer.tsx`, `components/assistant/AssistantPromptChips.tsx`, `components/assistant/AssistantContextCard.tsx`, `components/assistant/AssistantMonthPicker.tsx`, `components/assistant/AssistantStreamingResponse.tsx`, `lib/constants/assistantPrompts.ts`, `app/api/ai/assistant/*`, `lib/server/assistant/*`, `lib/services/assistantMonthContextService.ts`, `types/assistant.ts`
 - History: `app/dashboard/history/page.tsx`
 - History components: `components/dashboard/LaborMetricsChart.tsx`, `components/history/*`
 - Chart service: `lib/services/chartService.ts`

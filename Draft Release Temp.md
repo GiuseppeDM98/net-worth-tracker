@@ -1,5 +1,11 @@
 ## ✨ New Features
 
+- Added a full conversational chat experience to the AI Assistant page, replacing the single-form layout with a persistent thread workspace
+- Added five suggested prompt chips on the assistant home screen: "Analizza questo mese", "Cosa pesa di più sul patrimonio?", "Spese e risparmio", "Rendimenti recenti", and "Contesto geopolitico" — one tap to start any common analysis
+- Added a fixed composer at the bottom of the assistant page with an auto-sizing textarea: press Enter to send, Shift+Enter for a new line
+- Added a "Nuova conversazione" button in the assistant header so you can start a fresh thread for a different month at any time
+- The selected month is now visible directly in the recent threads list, next to the thread type badge
+
 - Added guided monthly analysis to the AI assistant: select any past month and the assistant automatically loads net worth changes, cashflow breakdown, top expense categories, and allocation shifts — presenting them in a readable numeric panel before writing its commentary
 - Added a suggested prompt chip strip to the assistant's month analysis mode, so you can start common analyses (patrimonio, spese, investimenti, dividendi, cashflow) with one tap instead of writing from scratch
 - Added a new `Assistente AI` area in the dashboard navigation, available from both desktop and mobile secondary menus
@@ -108,6 +114,12 @@
 - Utility actions (Refresh, Export CSV, Insert Past Snapshot) are visually de-emphasised so the primary action on each page stands out
 
 ## 🐛 Bug Fixes
+
+- Fixed the "Nuova conversazione" button not working — the assistant was immediately re-selecting the previous thread instead of showing the empty hero state
+- Fixed the assistant conversation area still showing the previous thread's messages after switching to a new thread, due to stale React Query cache
+- Fixed clicking the send button in the assistant throwing a runtime error when using suggested prompt chips
+
+
 
 - Fixed the AI assistant streaming response disappearing mid-conversation — messages now display correctly as they arrive instead of vanishing after the first words
 - Fixed the month picker in the AI assistant not syncing to the thread's month when switching between past conversations — the selector and subtitle now always reflect the month that was analysed
