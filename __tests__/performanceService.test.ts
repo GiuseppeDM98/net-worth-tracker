@@ -318,10 +318,10 @@ describe('getSnapshotsForPeriod', () => {
     { ...makeSnapshot(2025, 7, 0), isDummy: true } as MonthlySnapshot,
   ]
 
-  it('should filter out dummy snapshots for ALL', () => {
+  it('should include dummy snapshots for ALL', () => {
     const result = getSnapshotsForPeriod(allSnapshots, 'ALL')
-    expect(result.every(s => !s.isDummy)).toBe(true)
-    expect(result.length).toBe(5)
+    expect(result.length).toBe(6)
+    expect(result.some(s => s.isDummy)).toBe(true)
   })
 
   it('should return empty array for CUSTOM without dates', () => {

@@ -45,7 +45,7 @@ export function Header() {
   const greeting = getGreeting(getItalyDate(new Date()).getHours());
   const firstName = user?.displayName?.split(' ')[0];
   const greetingLabel = firstName && firstName.length <= 20
-    ? `${greeting.greeting}, ${firstName}`
+    ? `${greeting.greeting} ${firstName}`
     : greeting.greeting;
 
   // Cycle through explicit states so the user can always get back to "follow system".
