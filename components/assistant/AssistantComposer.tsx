@@ -5,7 +5,7 @@ import { Loader2, Send } from 'lucide-react';
 import { AssistantMonthPicker } from '@/components/assistant/AssistantMonthPicker';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AssistantMode, AssistantMonthSelectorValue } from '@/types/assistant';
+import { AssistantChatContextType, AssistantMode, AssistantMonthSelectorValue } from '@/types/assistant';
 import { cn } from '@/lib/utils';
 
 interface AssistantComposerProps {
@@ -20,6 +20,14 @@ interface AssistantComposerProps {
   selectedMonth: AssistantMonthSelectorValue;
   monthOptions: AssistantMonthSelectorValue[];
   onMonthChange: (month: AssistantMonthSelectorValue) => void;
+  /** For year_analysis: the currently selected year */
+  selectedYear: number;
+  /** Available years for the year picker */
+  yearOptions: number[];
+  onYearChange: (year: number) => void;
+  /** Context type for chat mode: determines which period bundle is passed to Claude. */
+  chatContextType: AssistantChatContextType;
+  onChatContextTypeChange: (type: AssistantChatContextType) => void;
   /** Error message shown inline above the submit button (e.g. no data for selected month). */
   errorHint?: string;
 }
@@ -33,8 +41,14 @@ const MONTH_NAMES = [
  * Fixed composer area for the assistant chat.
  * - Autosize textarea: grows up to max-h-[200px] then scrolls inside.
  * - Enter submits; Shift+Enter inserts a newline (standard chat convention).
- * - Mode selector + month picker stay compact above the textarea.
+ * - Mode selector + period picker stay compact above the textarea.
  * - Sticky positioning and bottom clearance are handled by the parent layout.
+ *
+ * Period picker visibility by mode:
+ *   month_analysis / chat → month picker
+ *   year_analysis          → year picker
+ *   ytd_analysis           → no picker (period is implicit: current year)
+ *   history_analysis       → no picker (period is implicit: from settings)
  */
 export function AssistantComposer({
   draft,
@@ -47,6 +61,11 @@ export function AssistantComposer({
   selectedMonth,
   monthOptions,
   onMonthChange,
+  selectedYear,
+  yearOptions,
+  onYearChange,
+  chatContextType,
+  onChatContextTypeChange,
   errorHint,
 }: AssistantComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -61,30 +80,133 @@ export function AssistantComposer({
 
   const activeMonthLabel = `${MONTH_NAMES[selectedMonth.month - 1]} ${selectedMonth.year}`;
 
+  const textareaPlaceholder = (() => {
+    if (mode === 'month_analysis') return `Scrivi la tua domanda sul mese di ${activeMonthLabel}…`;
+    if (mode === 'year_analysis') return `Scrivi la tua domanda sull'anno ${selectedYear}…`;
+    if (mode === 'ytd_analysis') return 'Scrivi la tua domanda sull\'andamento da inizio anno…';
+    if (mode === 'history_analysis') return 'Scrivi la tua domanda sullo storico del portafoglio…';
+    if (mode === 'chat') {
+      if (chatContextType === 'month') return `Scrivi la tua domanda — contesto: ${activeMonthLabel}…`;
+      if (chatContextType === 'year') return `Scrivi la tua domanda — contesto: anno ${selectedYear}…`;
+      if (chatContextType === 'ytd') return 'Scrivi la tua domanda — contesto: YTD…';
+      if (chatContextType === 'history') return 'Scrivi la tua domanda — contesto: storico totale…';
+    }
+    return 'Scrivi una domanda sul tuo portafoglio…';
+  })();
+
   return (
     <div className="border-t border-border bg-background px-4 pb-3 pt-3 max-desktop:portrait:pb-[88px]">
-      {/* Context row: mode + month picker */}
+      {/* Context row: mode selector + optional period picker */}
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <Select value={mode} onValueChange={(v) => onModeChange(v as AssistantMode)} disabled={isStreaming}>
-          <SelectTrigger className="h-8 w-auto min-w-[140px] text-xs">
+          <SelectTrigger className="h-8 w-auto min-w-[160px] text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="month_analysis">Analisi mensile</SelectItem>
+            <SelectItem value="year_analysis">Analisi annuale</SelectItem>
+            <SelectItem value="ytd_analysis">YTD</SelectItem>
+            <SelectItem value="history_analysis">Storico totale</SelectItem>
             <SelectItem value="chat">Chat libera</SelectItem>
           </SelectContent>
         </Select>
 
-        {/* Month picker shown in both modes — chat mode now uses the same
-            numeric context as month_analysis, just without the forced structure */}
-        <div className="w-auto min-w-[160px]">
-          <AssistantMonthPicker
-            value={selectedMonth}
-            options={monthOptions}
-            onChange={onMonthChange}
+        {/* Month picker: shown for month_analysis */}
+        {mode === 'month_analysis' && (
+          <div className="w-auto min-w-[160px]">
+            <AssistantMonthPicker
+              value={selectedMonth}
+              options={monthOptions}
+              onChange={onMonthChange}
+              disabled={isStreaming}
+            />
+          </div>
+        )}
+
+        {/* Year picker: shown for year_analysis mode */}
+        {mode === 'year_analysis' && (
+          <Select
+            value={String(selectedYear)}
+            onValueChange={(v) => onYearChange(Number(v))}
             disabled={isStreaming}
-          />
-        </div>
+          >
+            <SelectTrigger className="h-8 w-auto min-w-[100px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {yearOptions.map((year) => (
+                <SelectItem key={year} value={String(year)}>
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {/* YTD / history: no picker — the period is fully implicit */}
+        {mode === 'ytd_analysis' && (
+          <span className="text-xs text-muted-foreground">Da inizio anno a oggi</span>
+        )}
+        {mode === 'history_analysis' && (
+          <span className="text-xs text-muted-foreground">Dall'anno di inizio cashflow</span>
+        )}
+
+        {/* Chat mode: context type selector + optional period picker */}
+        {mode === 'chat' && (
+          <>
+            <Select
+              value={chatContextType}
+              onValueChange={(v) => onChatContextTypeChange(v as AssistantChatContextType)}
+              disabled={isStreaming}
+            >
+              <SelectTrigger className="h-8 w-auto min-w-[140px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Nessun contesto</SelectItem>
+                <SelectItem value="month">Mese</SelectItem>
+                <SelectItem value="year">Anno</SelectItem>
+                <SelectItem value="ytd">YTD</SelectItem>
+                <SelectItem value="history">Storico totale</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {chatContextType === 'month' && (
+              <div className="w-auto min-w-[160px]">
+                <AssistantMonthPicker
+                  value={selectedMonth}
+                  options={monthOptions}
+                  onChange={onMonthChange}
+                  disabled={isStreaming}
+                />
+              </div>
+            )}
+            {chatContextType === 'year' && (
+              <Select
+                value={String(selectedYear)}
+                onValueChange={(v) => onYearChange(Number(v))}
+                disabled={isStreaming}
+              >
+                <SelectTrigger className="h-8 w-auto min-w-[100px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map((year) => (
+                    <SelectItem key={year} value={String(year)}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {chatContextType === 'ytd' && (
+              <span className="text-xs text-muted-foreground">Da inizio anno a oggi</span>
+            )}
+            {chatContextType === 'history' && (
+              <span className="text-xs text-muted-foreground">Dall'anno di inizio cashflow</span>
+            )}
+          </>
+        )}
       </div>
 
       {/* Textarea + send button row */}
@@ -100,11 +222,7 @@ export function AssistantComposer({
               if (canSubmit) onSubmit();
             }
           }}
-          placeholder={
-            mode === 'month_analysis'
-              ? `Scrivi la tua domanda sul mese di ${activeMonthLabel}…`
-              : 'Scrivi una domanda sul tuo portafoglio…'
-          }
+          placeholder={textareaPlaceholder}
           disabled={isStreaming}
           rows={1}
           className={cn(

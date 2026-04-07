@@ -52,12 +52,19 @@ export function shouldUseWebSearch(prompt: string): boolean {
   );
 }
 
+const STRUCTURED_ANALYSIS_MODES: AssistantMode[] = [
+  'month_analysis',
+  'year_analysis',
+  'ytd_analysis',
+  'history_analysis',
+];
+
 export function resolveAssistantWebSearchPolicy(
   mode: AssistantMode,
   prompt: string,
   preferences: AssistantPreferences
 ): boolean {
-  if (mode === 'month_analysis') {
+  if (STRUCTURED_ANALYSIS_MODES.includes(mode)) {
     return preferences.includeMacroContext;
   }
 

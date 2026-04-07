@@ -1,4 +1,10 @@
-export type AssistantMode = 'month_analysis' | 'chat';
+// WARNING: If you add a mode here, also update:
+// - AssistantComposer.tsx (mode selector options)
+// - anthropicStream.ts (buildPrompt routing)
+// - prompts.ts (add prompt builder)
+// - assistantMonthContextService.ts (context builder)
+// - store.ts (getDefaultThreadTitle)
+export type AssistantMode = 'month_analysis' | 'year_analysis' | 'ytd_analysis' | 'history_analysis' | 'chat';
 
 export type AssistantWebContextMode = 'portfolio_only' | 'hybrid';
 
@@ -56,6 +62,9 @@ export interface AssistantThread {
   messageCount: number;
   mode: AssistantMode;
   pinnedMonth?: AssistantMonthSelectorValue | null;
+  // Used for year_analysis threads to identify which year is pinned.
+  // null for all other modes.
+  pinnedYear?: number | null;
 }
 
 export interface AssistantMessage {
@@ -105,10 +114,18 @@ export interface AssistantCreateThreadInput {
   userId: string;
   mode?: AssistantMode;
   pinnedMonth?: AssistantMonthSelectorValue | null;
+  // Used for year_analysis threads
+  pinnedYear?: number | null;
 }
 
-// Full numeric context bundle for a selected month, built server-side.
-// Client sends the month selector; server regenerates this from Firestore — never trust client-supplied numbers.
+// Full numeric context bundle for a selected period, built server-side.
+// Client sends the period selector; server regenerates this from Firestore — never trust client-supplied numbers.
+//
+// The `selector.month` field encodes the period type:
+//   month > 0  → monthly analysis (standard)
+//   month === 0 → full-year analysis (pinnedYear = selector.year)
+//   month === -1 → YTD (Jan 1 → latest month of current year)
+//   month === -2 → total history (from cashflowHistoryStartYear → now)
 export interface AssistantMonthContextBundle {
   selector: { year: number; month: number };
   currentSnapshot: import('@/types/assets').MonthlySnapshot | null;
@@ -147,21 +164,39 @@ export interface AssistantMonthContextBundle {
     amount: number; // negative
     notes?: string;
   }[];
+  // Sub-category breakdown within each asset class, built from live asset records.
+  // Only populated when assets have subCategory set; empty object when no breakdown exists.
+  // Claude uses this to cite specific sub-allocations (e.g. "Azioni USA €42.000").
+  bySubCategoryAllocation: {
+    [assetClass: string]: {
+      [subCategory: string]: number; // EUR value from snapshot
+    };
+  };
   dataQuality: {
     hasSnapshot: boolean;
     hasPreviousBaseline: boolean;
     hasCashflowData: boolean;
+    // True when the analysis period is in progress (current month, current year, YTD with current month, etc.)
     isPartialMonth: boolean;
     notes: string[];
   };
 }
+
+// Context type for chat mode. Determines which period bundle is built server-side.
+// 'none' → no numeric context; 'month' → monthly bundle; 'year/ytd/history' → respective builders.
+export type AssistantChatContextType = 'none' | 'month' | 'year' | 'ytd' | 'history';
 
 export interface AssistantStreamRequest {
   userId: string;
   mode: AssistantMode;
   prompt: string;
   threadId?: string;
+  // Used for month_analysis and chat modes
   month?: AssistantMonthSelectorValue;
+  // Used for year_analysis mode and chat mode with year context
+  year?: number;
+  // Used only in chat mode to specify the context period type
+  chatContext?: AssistantChatContextType;
   preferences?: AssistantPreferences;
 }
 

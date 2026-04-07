@@ -23,7 +23,12 @@ import {
   getDefaultAssistantPreferences,
   resolveAssistantWebSearchPolicy,
 } from '@/lib/server/assistant/webSearchPolicy';
-import { buildAssistantMonthContext } from '@/lib/services/assistantMonthContextService';
+import {
+  buildAssistantMonthContext,
+  buildAssistantYearContext,
+  buildAssistantYtdContext,
+  buildAssistantHistoryContext,
+} from '@/lib/services/assistantMonthContextService';
 import { AssistantStreamEvent, AssistantStreamRequest } from '@/types/assistant';
 
 /**
@@ -123,16 +128,47 @@ export async function POST(request: NextRequest) {
       mode: body.mode,
       webSearch: enableWebSearch,
       hasMonth: Boolean(body.month),
+      hasYear: Boolean(body.year),
       hasThreadId: Boolean(body.threadId),
     });
 
-    // Build the numeric context bundle for both modes when a month is selected.
-    // Chat mode now receives the same data as month_analysis — the prompt builder
-    // controls how it's used (free-form vs. structured analysis).
-    // We never trust client-supplied numbers — month is only used as a Firestore key.
-    const contextBundle = body.month
-      ? await buildAssistantMonthContext(body.userId, body.month)
-      : null;
+    // Build the numeric context bundle based on mode.
+    // For structured analysis modes the server always rebuilds from Firestore —
+    // client-supplied numbers are never trusted; only the period selector is used.
+    // For chat mode, chatContext determines which builder to use (or none).
+    const getHistoryStartYear = async () => {
+      const settingsSnap = await (await import('@/lib/firebase/admin')).adminDb
+        .collection('assetAllocationTargets')
+        .doc(body.userId)
+        .get();
+      return settingsSnap.data()?.cashflowHistoryStartYear ?? new Date().getFullYear() - 5;
+    };
+
+    let contextBundle = null;
+    if (body.mode === 'year_analysis' && body.year) {
+      contextBundle = await buildAssistantYearContext(body.userId, body.year);
+    } else if (body.mode === 'ytd_analysis') {
+      contextBundle = await buildAssistantYtdContext(body.userId);
+    } else if (body.mode === 'history_analysis') {
+      contextBundle = await buildAssistantHistoryContext(body.userId, await getHistoryStartYear());
+    } else if (body.mode === 'chat') {
+      // Chat mode: build context only when chatContext is set and not 'none'
+      if (body.chatContext === 'year' && body.year) {
+        contextBundle = await buildAssistantYearContext(body.userId, body.year);
+      } else if (body.chatContext === 'ytd') {
+        contextBundle = await buildAssistantYtdContext(body.userId);
+      } else if (body.chatContext === 'history') {
+        contextBundle = await buildAssistantHistoryContext(body.userId, await getHistoryStartYear());
+      } else if (body.chatContext === 'month' && body.month) {
+        contextBundle = await buildAssistantMonthContext(body.userId, body.month);
+      } else if (!body.chatContext && body.month) {
+        // Backwards-compat: old clients that send month without chatContext
+        contextBundle = await buildAssistantMonthContext(body.userId, body.month);
+      }
+    } else if (body.month) {
+      // month_analysis: always use month context
+      contextBundle = await buildAssistantMonthContext(body.userId, body.month);
+    }
 
     // Load active memory items to inject into the prompt.
     // Errors are non-fatal: if memory fetch fails we proceed without items
@@ -150,6 +186,7 @@ export async function POST(request: NextRequest) {
         userId: body.userId,
         mode: body.mode,
         pinnedMonth: body.month ?? null,
+        pinnedYear: body.year ?? null,
         title: buildThreadTitleFromPrompt(body.prompt, body.mode),
       }));
 
@@ -233,6 +270,7 @@ export async function POST(request: NextRequest) {
             lastMessagePreview: assistantText || userMessage.content,
             mode: body.mode,
             pinnedMonth: body.month ?? existingThread?.pinnedMonth ?? null,
+            pinnedYear: body.year ?? existingThread?.pinnedYear ?? null,
           });
 
           controller.enqueue(

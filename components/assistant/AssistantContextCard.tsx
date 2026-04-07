@@ -12,6 +12,31 @@ const MONTH_NAMES = [
   'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
 ];
 
+/**
+ * Returns a human-readable label for the period encoded in selector.
+ * Duplicated from prompts.ts to avoid importing server-only code in this client component.
+ *   month > 0  → "Marzo 2025"
+ *   month === 0 → "Anno 2025"
+ *   month === -1 → "YTD 2025"
+ *   month === -2 → "Storico da 2020"
+ */
+function getPeriodLabel(selector: { year: number; month: number }): string {
+  if (selector.month > 0) return `${MONTH_NAMES[selector.month - 1]} ${selector.year}`;
+  if (selector.month === 0) return `Anno ${selector.year}`;
+  if (selector.month === -1) return `YTD ${selector.year}`;
+  if (selector.month === -2) return `Storico da ${selector.year}`;
+  return `${selector.year}`;
+}
+
+/**
+ * Returns a human-readable "in progress" badge label for the period.
+ */
+function getPartialLabel(selector: { year: number; month: number }): string {
+  if (selector.month > 0) return 'Mese in corso';
+  if (selector.month === 0) return 'Anno in corso';
+  return 'In corso';
+}
+
 function eur(value: number): string {
   return new Intl.NumberFormat('it-IT', {
     style: 'currency',
@@ -107,7 +132,7 @@ export function AssistantContextCard({ bundle, className, isLoading }: Assistant
     return <AssistantContextCardSkeleton className={className} />;
   }
   const { selector, netWorth, cashflow, allocationChanges, dataQuality } = bundle;
-  const monthLabel = `${MONTH_NAMES[selector.month - 1]} ${selector.year}`;
+  const periodLabel = getPeriodLabel(selector);
 
   const deltaPositive =
     netWorth.delta !== null ? netWorth.delta >= 0 : null;
@@ -123,9 +148,9 @@ export function AssistantContextCard({ bundle, className, isLoading }: Assistant
     <Card className={cn('overflow-hidden', className)}>
       <CardHeader className="border-b border-border pb-3 pt-4">
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-sm font-medium">Contesto {monthLabel}</CardTitle>
+          <CardTitle className="text-sm font-medium">Contesto {periodLabel}</CardTitle>
           {dataQuality.isPartialMonth && (
-            <Badge variant="outline" className="text-[10px]">Mese in corso</Badge>
+            <Badge variant="outline" className="text-[10px]">{getPartialLabel(selector)}</Badge>
           )}
         </div>
       </CardHeader>

@@ -32,7 +32,11 @@ function sanitizePreview(content: string): string {
 }
 
 function getDefaultThreadTitle(mode: AssistantMode): string {
-  return mode === 'month_analysis' ? 'Nuova analisi mensile' : 'Nuova conversazione';
+  if (mode === 'month_analysis') return 'Nuova analisi mensile';
+  if (mode === 'year_analysis') return 'Nuova analisi annuale';
+  if (mode === 'ytd_analysis') return 'Nuova analisi YTD';
+  if (mode === 'history_analysis') return 'Nuova analisi storico';
+  return 'Nuova conversazione';
 }
 
 function buildThreadTitleFromPrompt(prompt: string, mode: AssistantMode): string {
@@ -55,6 +59,7 @@ function mapThread(docId: string, data: Record<string, any>): AssistantThread {
     messageCount: data.messageCount ?? 0,
     mode: data.mode,
     pinnedMonth: data.pinnedMonth ?? null,
+    pinnedYear: data.pinnedYear ?? null,
   };
 }
 
@@ -139,6 +144,7 @@ export async function createAssistantThread(
     title: input.title ?? getDefaultThreadTitle(mode),
     mode,
     pinnedMonth: input.pinnedMonth ?? null,
+    pinnedYear: input.pinnedYear ?? null,
     lastMessagePreview: '',
     messageCount: 0,
     createdAt: now,
@@ -225,6 +231,7 @@ export async function updateAssistantThreadMetadata(
     lastMessagePreview?: string;
     mode?: AssistantMode;
     pinnedMonth?: AssistantThread['pinnedMonth'];
+    pinnedYear?: AssistantThread['pinnedYear'];
   }
 ): Promise<void> {
   await adminDb.collection(THREADS_COLLECTION).doc(threadId).set(

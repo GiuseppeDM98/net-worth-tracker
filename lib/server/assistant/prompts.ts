@@ -33,6 +33,23 @@ const MEMORY_CATEGORY_LABELS: Record<AssistantMemoryItem['category'], string> = 
 };
 
 /**
+ * Returns a human-readable label for the period encoded in selector.
+ *   month > 0  → "Marzo 2025"
+ *   month === 0 → "Anno 2025"
+ *   month === -1 → "YTD 2025"
+ *   month === -2 → "Storico da 2020"
+ */
+export function getPeriodLabel(selector: { year: number; month: number }): string {
+  if (selector.month > 0) {
+    return `${MONTH_NAMES[selector.month - 1]} ${selector.year}`;
+  }
+  if (selector.month === 0) return `Anno ${selector.year}`;
+  if (selector.month === -1) return `YTD ${selector.year}`;
+  if (selector.month === -2) return `Storico da ${selector.year}`;
+  return `${selector.year}`;
+}
+
+/**
  * Serialises active memory items into a structured text block for the prompt.
  * Only active items are included — archived ones are excluded.
  * Returns an empty string when there are no items to inject.
@@ -67,17 +84,17 @@ function formatMemoryForPrompt(items: AssistantMemoryItem[]): string {
  */
 function formatBundleForPrompt(bundle: AssistantMonthContextBundle): string {
   const { selector, netWorth, cashflow, allocationChanges, dataQuality, currentSnapshot } = bundle;
-  const monthLabel = `${MONTH_NAMES[selector.month - 1]} ${selector.year}`;
+  const periodLabel = getPeriodLabel(selector);
 
   const lines: string[] = [];
 
-  lines.push(`=== DATI FINANZIARI: ${monthLabel} ===`);
+  lines.push(`=== DATI FINANZIARI: ${periodLabel} ===`);
   lines.push('');
 
   // Net worth section
   lines.push('--- PATRIMONIO ---');
-  lines.push(`Inizio mese: ${netWorth.start !== null ? eur(netWorth.start) : 'N/D'}`);
-  lines.push(`Fine mese: ${netWorth.end !== null ? eur(netWorth.end) : 'N/D'}`);
+  lines.push(`Inizio periodo: ${netWorth.start !== null ? eur(netWorth.start) : 'N/D'}`);
+  lines.push(`Fine periodo: ${netWorth.end !== null ? eur(netWorth.end) : 'N/D'}`);
   if (netWorth.delta !== null) {
     lines.push(`Variazione assoluta: ${eur(netWorth.delta)}`);
   }
@@ -130,10 +147,28 @@ function formatBundleForPrompt(bundle: AssistantMonthContextBundle): string {
     lines.push('');
   }
 
-  // Top-5 movers section: shows which classes changed most this month.
+  // Sub-category breakdown within each asset class.
+  // Only rendered when assets have subCategory metadata — otherwise omitted entirely.
+  // This lets Claude cite specific sub-allocations like "Azioni USA €42.000"
+  // rather than just "equity €80.000".
+  const subCatAlloc = bundle.bySubCategoryAllocation;
+  if (subCatAlloc && Object.keys(subCatAlloc).length > 0) {
+    const totalNetWorth = currentSnapshot?.totalNetWorth ?? 0;
+    lines.push('--- SOTTO-ALLOCAZIONE PER CLASSE ---');
+    for (const [assetClass, subCats] of Object.entries(subCatAlloc)) {
+      const sorted = Object.entries(subCats).sort((a, b) => b[1] - a[1]);
+      for (const [subCat, value] of sorted) {
+        const pctOfTotal = totalNetWorth > 0 ? ` (${pct((value / totalNetWorth) * 100)})` : '';
+        lines.push(`  ${assetClass} › ${subCat}: ${eur(value)}${pctOfTotal}`);
+      }
+    }
+    lines.push('');
+  }
+
+  // Top-5 movers section: shows which classes changed most this period.
   // allocationChanges is already capped at 5 by the context builder.
   if (allocationChanges.length > 0) {
-    lines.push('--- VARIAZIONI ALLOCAZIONE MENSILI (top 5 per variazione assoluta) ---');
+    lines.push('--- VARIAZIONI ALLOCAZIONE (top 5 per variazione assoluta) ---');
     for (const change of allocationChanges) {
       const prev = change.previousValue !== null ? eur(change.previousValue) : 'N/D';
       const curr = change.currentValue !== null ? eur(change.currentValue) : 'N/D';
@@ -159,6 +194,16 @@ function formatBundleForPrompt(bundle: AssistantMonthContextBundle): string {
   return lines.join('\n');
 }
 
+// ─── Common instruction builders ─────────────────────────────────────────────
+
+function buildResponseStyleInstruction(style: AssistantPreferences['responseStyle']): string {
+  if (style === 'concise') return 'Rispondi in modo sintetico, con punti chiari e pochi fronzoli.';
+  if (style === 'deep') return 'Rispondi con maggiore profondità, esplicitando ipotesi e limiti dei dati.';
+  return 'Rispondi in modo equilibrato: chiaro, concreto e leggibile.';
+}
+
+// ─── Prompt builders ──────────────────────────────────────────────────────────
+
 /**
  * Builds the full system + user content sent to Claude for a month analysis.
  *
@@ -181,21 +226,13 @@ export function buildMonthAnalysisPrompt(
   preferences: AssistantPreferences,
   memoryItems: AssistantMemoryItem[] = []
 ): string {
-  const monthLabel = `${MONTH_NAMES[bundle.selector.month - 1]} ${bundle.selector.year}`;
+  const monthLabel = getPeriodLabel(bundle.selector);
   const numericBlock = formatBundleForPrompt(bundle);
-
-  const responseStyleInstruction =
-    preferences.responseStyle === 'concise'
-      ? 'Rispondi in modo sintetico, con punti chiari e pochi fronzoli.'
-      : preferences.responseStyle === 'deep'
-        ? 'Rispondi con maggiore profondità, esplicitando ipotesi e limiti dei dati.'
-        : 'Rispondi in modo equilibrato: chiaro, concreto e leggibile.';
 
   const macroInstruction = preferences.includeMacroContext
     ? 'Puoi integrare contesto macro (mercati, tassi, geopolitica) se rilevante per il mese. Usa al massimo 2 ricerche web.'
     : 'Non cercare informazioni macro esterne. Concentrati esclusivamente sui dati del portafoglio forniti.';
 
-  // Inject actual memory items when memoryEnabled, otherwise tell Claude to ignore stored facts
   const memoryBlock = preferences.memoryEnabled
     ? formatMemoryForPrompt(memoryItems)
     : 'Non fare affidamento su memoria persistente. Usa solo il contesto esplicito di questa sessione.';
@@ -203,7 +240,7 @@ export function buildMonthAnalysisPrompt(
   const sections = [
     'Sei l\'Assistente AI di Net Worth Tracker per un investitore italiano self-directed.',
     'Rispondi sempre in italiano.',
-    responseStyleInstruction,
+    buildResponseStyleInstruction(preferences.responseStyle),
     macroInstruction,
     memoryBlock,
     '',
@@ -211,7 +248,6 @@ export function buildMonthAnalysisPrompt(
     'Di seguito trovi i dati finanziari del mese, estratti in modo affidabile dal sistema:',
     '',
     numericBlock,
-    // Output structure constraint: keeps the response focused and scannable
     'Struttura la risposta in tre sezioni markdown:',
     '1. **In sintesi** — 2-3 frasi sul risultato complessivo del mese',
     '2. **Cosa ha mosso il patrimonio** — i principali driver (mercato, cashflow, allocazione)',
@@ -222,6 +258,167 @@ export function buildMonthAnalysisPrompt(
     '- Usa markdown semplice (grassetto, elenchi puntati, niente tabelle complesse)',
     '- Non inventare numeri non presenti nel blocco dati',
     '- Se un dato è N/D, non speculare sul suo valore',
+    '',
+    `Domanda dell'utente: ${userPrompt.trim()}`,
+  ];
+
+  return sections.join('\n');
+}
+
+/**
+ * Builds the prompt for a full-year analysis.
+ *
+ * Same 3-section structure as monthly, but uses annual framing.
+ * When the year is still in progress (isCurrentYear encoded in dataQuality.isPartialMonth),
+ * Claude is explicitly told to avoid drawing final annual conclusions.
+ */
+export function buildYearAnalysisPrompt(
+  bundle: AssistantMonthContextBundle,
+  userPrompt: string,
+  preferences: AssistantPreferences,
+  memoryItems: AssistantMemoryItem[] = []
+): string {
+  const yearLabel = `Anno ${bundle.selector.year}`;
+  const isCurrentYear = bundle.dataQuality.isPartialMonth;
+  const numericBlock = formatBundleForPrompt(bundle);
+
+  const macroInstruction = preferences.includeMacroContext
+    ? `Puoi integrare contesto macro annuale (mercati, tassi, ciclo economico) rilevante per il ${yearLabel}. Usa al massimo 2 ricerche web.`
+    : 'Non cercare informazioni macro esterne. Concentrati sui dati forniti.';
+
+  const memoryBlock = preferences.memoryEnabled
+    ? formatMemoryForPrompt(memoryItems)
+    : 'Non fare affidamento su memoria persistente. Usa solo il contesto esplicito.';
+
+  const partialNote = isCurrentYear
+    ? `IMPORTANTE: il ${yearLabel} è ancora in corso. I dati cashflow e patrimoniali sono parziali. Non trarre conclusioni definitive sull'anno — evidenzia le tendenze finora visibili.`
+    : '';
+
+  const sections = [
+    'Sei l\'Assistente AI di Net Worth Tracker per un investitore italiano self-directed.',
+    'Rispondi sempre in italiano.',
+    buildResponseStyleInstruction(preferences.responseStyle),
+    macroInstruction,
+    memoryBlock,
+    '',
+    ...(partialNote ? [partialNote, ''] : []),
+    `Stai analizzando ${yearLabel}.`,
+    'Di seguito trovi i dati finanziari aggregati per l\'anno, estratti in modo affidabile dal sistema:',
+    '',
+    numericBlock,
+    'Struttura la risposta in tre sezioni markdown:',
+    '1. **In sintesi** — 2-3 frasi sul risultato complessivo dell\'anno',
+    '2. **Cosa ha mosso il patrimonio nell\'anno** — i principali driver (mercato, cashflow, allocazione, eventi)' + (isCurrentYear ? ' — finora' : ''),
+    '3. **1-2 azioni o attenzioni** — osservazioni pratiche per l\'investitore',
+    '',
+    'Rispetta questi vincoli:',
+    '- Massimo 500 parole',
+    '- Usa markdown semplice (grassetto, elenchi puntati)',
+    '- Non inventare numeri non presenti nel blocco dati',
+    '- Se un dato è N/D, non speculare sul suo valore',
+    '',
+    `Domanda dell'utente: ${userPrompt.trim()}`,
+  ];
+
+  return sections.join('\n');
+}
+
+/**
+ * Builds the prompt for a YTD (Year-to-Date) analysis.
+ *
+ * Covers Jan 1 of the current year to the latest available month.
+ * Always partial — Claude must be told not to extrapolate to the full year.
+ */
+export function buildYtdAnalysisPrompt(
+  bundle: AssistantMonthContextBundle,
+  userPrompt: string,
+  preferences: AssistantPreferences,
+  memoryItems: AssistantMemoryItem[] = []
+): string {
+  const yearLabel = `${bundle.selector.year}`;
+  const numericBlock = formatBundleForPrompt(bundle);
+
+  const macroInstruction = preferences.includeMacroContext
+    ? 'Puoi integrare contesto macro (mercati, tassi) rilevante per l\'anno in corso. Usa al massimo 2 ricerche web.'
+    : 'Non cercare informazioni macro esterne. Concentrati sui dati forniti.';
+
+  const memoryBlock = preferences.memoryEnabled
+    ? formatMemoryForPrompt(memoryItems)
+    : 'Non fare affidamento su memoria persistente.';
+
+  const sections = [
+    'Sei l\'Assistente AI di Net Worth Tracker per un investitore italiano self-directed.',
+    'Rispondi sempre in italiano.',
+    buildResponseStyleInstruction(preferences.responseStyle),
+    macroInstruction,
+    memoryBlock,
+    '',
+    `IMPORTANTE: stai analizzando il periodo YTD (da inizio ${yearLabel} a oggi). L\'anno è in corso — i dati sono parziali. Non trarre conclusioni finali sull\'anno.`,
+    '',
+    'Di seguito trovi i dati finanziari YTD, estratti in modo affidabile dal sistema:',
+    '',
+    numericBlock,
+    'Struttura la risposta in tre sezioni markdown:',
+    '1. **In sintesi** — 2-3 frasi sul risultato YTD',
+    '2. **Cosa ha mosso il patrimonio da inizio anno** — principali driver finora',
+    '3. **1-2 azioni o attenzioni** — osservazioni pratiche',
+    '',
+    'Rispetta questi vincoli:',
+    '- Massimo 450 parole',
+    '- Usa markdown semplice',
+    '- Non inventare numeri non presenti nel blocco dati',
+    '- Non proiettare valori annualizzati salvo esplicita richiesta dell\'utente',
+    '',
+    `Domanda dell'utente: ${userPrompt.trim()}`,
+  ];
+
+  return sections.join('\n');
+}
+
+/**
+ * Builds the prompt for a total-history analysis.
+ *
+ * Covers from cashflowHistoryStartYear to today. Claude should focus on
+ * long-term trends, cumulative cashflow, and overall patrimony evolution.
+ */
+export function buildHistoryAnalysisPrompt(
+  bundle: AssistantMonthContextBundle,
+  userPrompt: string,
+  preferences: AssistantPreferences,
+  memoryItems: AssistantMemoryItem[] = []
+): string {
+  const startYear = bundle.selector.year;
+  const numericBlock = formatBundleForPrompt(bundle);
+
+  const macroInstruction = preferences.includeMacroContext
+    ? 'Puoi citare eventi macro rilevanti nel periodo storico. Usa al massimo 2 ricerche web.'
+    : 'Non cercare informazioni macro esterne. Concentrati sui dati storici forniti.';
+
+  const memoryBlock = preferences.memoryEnabled
+    ? formatMemoryForPrompt(memoryItems)
+    : 'Non fare affidamento su memoria persistente.';
+
+  const sections = [
+    'Sei l\'Assistente AI di Net Worth Tracker per un investitore italiano self-directed.',
+    'Rispondi sempre in italiano.',
+    buildResponseStyleInstruction(preferences.responseStyle),
+    macroInstruction,
+    memoryBlock,
+    '',
+    `Stai analizzando lo storico totale del portafoglio dal ${startYear} ad oggi. L\'anno corrente è incluso nei dati (parziale).`,
+    'Di seguito trovi i dati finanziari aggregati sull\'intero periodo storico:',
+    '',
+    numericBlock,
+    'Struttura la risposta in tre sezioni markdown:',
+    '1. **In sintesi** — 2-3 frasi sull\'evoluzione complessiva del patrimonio nel periodo',
+    '2. **Trend storici principali** — cashflow cumulativo, crescita patrimonio, composizione del portafoglio nel tempo',
+    '3. **1-2 osservazioni strategiche** — cosa emerge dal lungo periodo, opportunità o rischi strutturali',
+    '',
+    'Rispetta questi vincoli:',
+    '- Massimo 550 parole',
+    '- Usa markdown semplice',
+    '- Non inventare numeri non presenti nel blocco dati',
+    '- Privilegia la visione di lungo periodo, non i dettagli mensili',
     '',
     `Domanda dell'utente: ${userPrompt.trim()}`,
   ];
@@ -249,14 +446,6 @@ export function buildChatPrompt(
   contextBundle?: AssistantMonthContextBundle | null,
   enableWebSearch?: boolean
 ): string {
-  const responseStyleInstruction =
-    preferences.responseStyle === 'concise'
-      ? 'Rispondi in modo sintetico, con punti chiari e pochi fronzoli.'
-      : preferences.responseStyle === 'deep'
-        ? 'Rispondi con maggiore profondità, esplicitando ipotesi e limiti.'
-        : 'Rispondi in modo equilibrato: chiaro, concreto e leggibile.';
-
-  // Inject actual memory items when memoryEnabled, otherwise tell Claude to ignore stored facts
   const memoryBlock = preferences.memoryEnabled
     ? formatMemoryForPrompt(memoryItems)
     : 'Non fare affidamento su memoria persistente; usa solo il contesto esplicito del messaggio.';
@@ -271,7 +460,7 @@ export function buildChatPrompt(
   const sections: string[] = [
     'Sei l\'Assistente AI di Net Worth Tracker per un investitore italiano.',
     'Rispondi sempre in italiano.',
-    responseStyleInstruction,
+    buildResponseStyleInstruction(preferences.responseStyle),
     'Stai rispondendo a una conversazione generale sul portafoglio dell\'utente.',
     ...(webSearchInstruction ? [webSearchInstruction] : []),
     memoryBlock,
@@ -282,15 +471,15 @@ export function buildChatPrompt(
     // Numeric data available: inject it and instruct Claude to use it freely
     const numericBlock = formatBundleForPrompt(contextBundle);
     sections.push(
-      'Di seguito trovi i dati finanziari del mese selezionato. Usali per rispondere alla domanda dell\'utente — non è richiesta una struttura fissa.',
+      'Di seguito trovi i dati finanziari del periodo selezionato. Usali per rispondere alla domanda dell\'utente — non è richiesta una struttura fissa.',
       '',
       numericBlock,
     );
   } else {
     // No month selected: remind Claude it has no portfolio numbers
     const noDataNote = monthLabel
-      ? `Il contesto mensile selezionato è ${monthLabel}, ma non sono disponibili dati numerici per questo mese.`
-      : 'Non è stato selezionato un mese di riferimento. Rispondi in modo generale senza inventare numeri.';
+      ? `Il contesto selezionato è ${monthLabel}, ma non sono disponibili dati numerici.`
+      : 'Non è stato selezionato un periodo di riferimento. Rispondi in modo generale senza inventare numeri.';
     sections.push(noDataNote);
   }
 

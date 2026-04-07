@@ -34,19 +34,21 @@ import { Switch } from '@/components/ui/switch';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAssistantMemory, useUpdateAssistantMemory } from '@/lib/hooks/useAssistantMemory';
-import { useAssistantMonthContext } from '@/lib/hooks/useAssistantMonthContext';
+import { useAssistantPeriodContext } from '@/lib/hooks/useAssistantMonthContext';
 import { useAssistantThread, useAssistantThreads, useDeleteAssistantThread } from '@/lib/hooks/useAssistantThreads';
 import { assistantPromptChips } from '@/lib/constants/assistantPrompts';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
 import { cn } from '@/lib/utils';
 import {
+  AssistantChatContextType,
   AssistantMessage,
   AssistantMode,
   AssistantMonthContextBundle,
   AssistantMonthSelectorValue,
   AssistantPromptChip,
   AssistantStreamEvent,
+  AssistantThread,
 } from '@/types/assistant';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { useQueryClient } from '@tanstack/react-query';
@@ -78,6 +80,44 @@ function buildMonthOptions(): AssistantMonthSelectorValue[] {
   }
 
   return options;
+}
+
+/**
+ * Builds the list of selectable years for year_analysis (current year + 4 years back).
+ */
+function buildYearOptions(): number[] {
+  const { year: currentYear } = getItalyMonthYear(new Date());
+  const options: number[] = [];
+  for (let y = currentYear; y >= currentYear - 4; y -= 1) {
+    options.push(y);
+  }
+  return options;
+}
+
+/**
+ * Returns a human-readable badge label for a thread's mode.
+ */
+function getModeBadgeLabel(mode: AssistantMode): string {
+  if (mode === 'month_analysis') return 'Mese';
+  if (mode === 'year_analysis') return 'Anno';
+  if (mode === 'ytd_analysis') return 'YTD';
+  if (mode === 'history_analysis') return 'Storico';
+  return 'Chat';
+}
+
+/**
+ * Returns a human-readable label for the current active period in the conversation header.
+ */
+function getActivePeriodLabel(
+  mode: AssistantMode,
+  selectedMonth: AssistantMonthSelectorValue,
+  selectedYear: number
+): string {
+  if (mode === 'month_analysis') return `Analisi · ${MONTH_NAMES[selectedMonth.month - 1]} ${selectedMonth.year}`;
+  if (mode === 'year_analysis') return `Analisi annuale · ${selectedYear}`;
+  if (mode === 'ytd_analysis') return `YTD · ${selectedMonth.year}`;
+  if (mode === 'history_analysis') return 'Storico totale';
+  return `Chat · ${MONTH_NAMES[selectedMonth.month - 1]} ${selectedMonth.year}`;
 }
 
 /**
@@ -124,12 +164,12 @@ function parseSseEvent(rawChunk: string): AssistantStreamEvent | null {
 }
 
 interface ThreadListProps {
-  threads: import('@/types/assistant').AssistantThread[];
+  threads: AssistantThread[];
   loadingThreads: boolean;
   selectedThreadId: string | undefined;
   isStreaming: boolean;
   isDeletingId: string | undefined;
-  onSelect: (thread: import('@/types/assistant').AssistantThread) => void;
+  onSelect: (thread: AssistantThread) => void;
   onDelete: (threadId: string) => void;
   onNewThread: () => void;
 }
@@ -192,7 +232,7 @@ function ThreadList({
                   {thread.title}
                 </p>
                 <Badge variant="outline" className="mt-px shrink-0 text-[10px] uppercase">
-                  {thread.mode === 'month_analysis' ? 'Mese' : 'Chat'}
+                  {getModeBadgeLabel(thread.mode)}
                 </Badge>
               </div>
               <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
@@ -204,6 +244,11 @@ function ThreadList({
                 {thread.pinnedMonth && (
                   <span className="text-[10px] text-muted-foreground">
                     {MONTH_NAMES[thread.pinnedMonth.month - 1]} {thread.pinnedMonth.year}
+                  </span>
+                )}
+                {thread.pinnedYear && (
+                  <span className="text-[10px] text-muted-foreground">
+                    {thread.pinnedYear}
                   </span>
                 )}
                 <span className="text-[10px] text-muted-foreground/70">
@@ -248,8 +293,12 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   // after draft is cleared. Using a ref avoids stale closure issues.
   const lastSentPromptRef = useRef('');
 
-  // Month options are stable for the session — computed once on mount
+  // Italy current month/year — stable for the session
+  const { year: currentYear, month: currentMonth } = useMemo(() => getItalyMonthYear(new Date()), []);
+
+  // Month and year options are stable for the session — computed once on mount
   const monthOptions = useMemo(() => buildMonthOptions(), []);
+  const yearOptions = useMemo(() => buildYearOptions(), []);
 
   const [selectedThreadId, setSelectedThreadId] = useState<string>();
   const [draft, setDraft] = useState('');
@@ -258,6 +307,8 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     // Default to Italy current month; matches buildMonthOptions logic
     () => getItalyMonthYear(new Date())
   );
+  const [selectedYear, setSelectedYear] = useState<number>(() => getItalyMonthYear(new Date()).year);
+  const [chatContextType, setChatContextType] = useState<AssistantChatContextType>('month');
 
   const [streamingMessages, setStreamingMessages] = useState<AssistantMessage[]>([]);
   // Tracks the ID of the assistant message slot that is currently receiving tokens.
@@ -280,20 +331,36 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   const updateMemoryMutation = useUpdateAssistantMemory(user?.uid ?? '');
   const deleteThreadMutation = useDeleteAssistantThread(user?.uid ?? '');
 
-  // Fetch the context bundle for existing month_analysis threads that have a pinnedMonth.
-  // Enabled only when the thread is loaded, has a pinnedMonth, and no SSE bundle is active
-  // (SSE bundle always takes priority over the fetched one — see contextBundle priority below).
+  // Fetch the context bundle for existing analysis threads on open.
+  // Enabled only when: thread is loaded, has a pinned period, no SSE bundle is active.
+  // SSE bundle always takes priority over the fetched one.
   const pinnedMonth = threadDetail?.thread.pinnedMonth ?? null;
+  const pinnedYear = threadDetail?.thread.pinnedYear ?? null;
+  const threadMode = threadDetail?.thread.mode ?? mode;
   const shouldFetchContext =
-    !!pinnedMonth &&
+    !!selectedThreadId &&
     streamingMessages.length === 0 &&
-    contextBundle === null;
+    contextBundle === null &&
+    // Only fetch for analysis modes that have a pinned period
+    (
+      (threadMode === 'month_analysis' && pinnedMonth !== null) ||
+      (threadMode === 'year_analysis' && pinnedYear !== null) ||
+      threadMode === 'ytd_analysis' ||
+      threadMode === 'history_analysis'
+    );
+
   const {
     data: fetchedContextBundle,
     isLoading: loadingContextBundle,
-  } = useAssistantMonthContext(
+  } = useAssistantPeriodContext(
     shouldFetchContext ? user?.uid : undefined,
-    shouldFetchContext ? pinnedMonth : null
+    threadMode,
+    pinnedMonth,
+    pinnedYear,
+    currentYear,
+    // history start year: the hook fetches it server-side; pass 0 as placeholder key
+    0,
+    shouldFetchContext
   );
 
   // Populate the context panel from the fetched bundle when no SSE bundle is present.
@@ -319,7 +386,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     return threadDetail?.messages ?? [];
   }, [streamingMessages, selectedThreadId, threadDetail?.messages]);
 
-  // Sync mode and month picker to the loaded thread so the UI stays coherent
+  // Sync mode and period picker to the loaded thread so the UI stays coherent
   // with the conversation being shown. Runs when threadDetail resolves, but not
   // during streaming (streamingMessages.length > 0) to avoid disrupting active input.
   useEffect(() => {
@@ -329,6 +396,9 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     setMode(threadDetail.thread.mode);
     if (threadDetail.thread.pinnedMonth) {
       setSelectedMonth(threadDetail.thread.pinnedMonth);
+    }
+    if (threadDetail.thread.pinnedYear) {
+      setSelectedYear(threadDetail.thread.pinnedYear);
     }
   }, [threadDetail]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -355,8 +425,6 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   // The meta event sets selectedThreadId mid-stream; a useEffect dependency on it
   // would fire and wipe the streaming buffer before text arrives. See AGENTS.md.
 
-  const activeMonthLabel = `${MONTH_NAMES[selectedMonth.month - 1]} ${selectedMonth.year}`;
-
   // CTA is disabled when month_analysis mode has no data available to analyse.
   // Derived with useMemo — no useEffect+setState needed.
   const isAnalysisBlocked = useMemo(
@@ -371,6 +439,51 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   const canSubmit = draft.trim().length > 0 && !isStreaming && !isAnalysisBlocked;
 
   /**
+   * Auto-selects an existing thread matching the new mode + period when the user switches modes.
+   * Called from handleModeChange so it only fires on explicit user action, never on page load.
+   * Scans the already-loaded threads list — no extra fetch needed.
+   */
+  const autoSelectThreadForMode = (newMode: AssistantMode) => {
+    let match: AssistantThread | undefined;
+
+    if (newMode === 'month_analysis') {
+      // Match: same mode + same pinned month as currently selected month
+      match = threads.find(
+        (t) =>
+          t.mode === 'month_analysis' &&
+          t.pinnedMonth?.year === selectedMonth.year &&
+          t.pinnedMonth?.month === selectedMonth.month
+      );
+    } else if (newMode === 'year_analysis') {
+      // Match: same mode + same pinned year as currently selected year
+      match = threads.find(
+        (t) => t.mode === 'year_analysis' && t.pinnedYear === selectedYear
+      );
+    } else if (newMode === 'ytd_analysis') {
+      // Match: most recent ytd_analysis thread (only one meaningful per year)
+      match = threads.find((t) => t.mode === 'ytd_analysis');
+    } else if (newMode === 'history_analysis') {
+      // Match: most recent history_analysis thread
+      match = threads.find((t) => t.mode === 'history_analysis');
+    }
+    // chat mode: no auto-select — always starts fresh
+
+    if (match) {
+      setSelectedThreadId(match.id);
+      setStreamingMessages([]);
+      setStreamingMessageId(undefined);
+      setIsInterrupted(false);
+      setContextBundle(null);
+      // Thread sync useEffect will update mode/month/year when threadDetail resolves
+    }
+  };
+
+  const handleModeChange = (newMode: AssistantMode) => {
+    setMode(newMode);
+    autoSelectThreadForMode(newMode);
+  };
+
+  /**
    * Core streaming submit.
    * Accepts optional overrides for prompt and mode so that chip clicks can supply
    * both values synchronously (React state updates are async; waiting for them
@@ -383,6 +496,11 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     if (!user?.uid || !promptToSend || isStreaming) {
       return;
     }
+
+    // Tracks the resolved thread ID throughout this stream (may differ from the
+    // selectedThreadId closure value when a new thread is created mid-stream via the meta event).
+    // Using a local variable ensures the post-stream invalidation always uses the correct ID.
+    let resolvedThreadId = selectedThreadId;
 
     const userMessage: AssistantMessage = {
       id: `local-user-${Date.now()}`,
@@ -432,7 +550,14 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
           mode: modeToSend,
           prompt: promptToSend,
           threadId: selectedThreadId,
-          month: selectedMonth,
+          // Include period selectors based on mode
+          ...(modeToSend === 'month_analysis' ? { month: selectedMonth } : {}),
+          ...(modeToSend === 'year_analysis' ? { year: selectedYear } : {}),
+          ...(modeToSend === 'chat' ? {
+            chatContext: chatContextType,
+            ...(chatContextType === 'month' ? { month: selectedMonth } : {}),
+            ...(chatContextType === 'year' ? { year: selectedYear } : {}),
+          } : {}),
           preferences: memory?.preferences,
         }),
       });
@@ -465,6 +590,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
 
           if (event.type === 'meta' && event.threadId) {
             setSelectedThreadId(event.threadId);
+            resolvedThreadId = event.threadId;
           }
 
           // Populate the context panel from the server-built bundle.
@@ -508,8 +634,8 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
       if (user.uid) {
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: queryKeys.assistant.threads(user.uid) }),
-          selectedThreadId
-            ? queryClient.invalidateQueries({ queryKey: queryKeys.assistant.thread(selectedThreadId) })
+          resolvedThreadId
+            ? queryClient.invalidateQueries({ queryKey: queryKeys.assistant.thread(resolvedThreadId) })
             : Promise.resolve(),
         ]);
       }
@@ -524,7 +650,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   };
 
   // All chips prefill the composer — none auto-submit.
-  // This lets the user change the selected month (or edit the prompt) before sending,
+  // This lets the user change the selected period (or edit the prompt) before sending,
   // which matters especially for month_analysis chips where the month selector is the key input.
   const handleChipClick = (chip: AssistantPromptChip) => {
     setMode(chip.mode);
@@ -573,7 +699,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   };
 
   const composerErrorHint = isAnalysisBlocked
-    ? `Nessun dato disponibile per ${activeMonthLabel}. Seleziona un altro mese.`
+    ? `Nessun dato disponibile per ${MONTH_NAMES[selectedMonth.month - 1]} ${selectedMonth.year}. Seleziona un altro periodo.`
     : undefined;
 
   // Show skeleton while threads resolve on first load
@@ -584,6 +710,8 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
       </ProtectedRoute>
     );
   }
+
+  const activePeriodLabel = getActivePeriodLabel(mode, selectedMonth, selectedYear);
 
   return (
     <ProtectedRoute>
@@ -597,7 +725,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
               <div className="space-y-2">
                 <h1 className="text-3xl font-semibold tracking-tight text-foreground">Assistente AI</h1>
                 <p className="max-w-2xl text-sm text-muted-foreground">
-                  Fai domande sul tuo patrimonio, analizza un mese specifico o esplora spese, rendimenti e contesto macro.
+                  Fai domande sul tuo patrimonio, analizza un mese, un anno, il tuo YTD o l'intera storia del portafoglio.
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -634,6 +762,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                             setContextBundle(null);
                             setMode(thread.mode);
                             if (thread.pinnedMonth) setSelectedMonth(thread.pinnedMonth);
+                            if (thread.pinnedYear) setSelectedYear(thread.pinnedYear);
                           }}
                           onDelete={handleDeleteThread}
                           onNewThread={handleNewThread}
@@ -704,6 +833,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                               setContextBundle(null);
                               setMode(thread.mode);
                               if (thread.pinnedMonth) setSelectedMonth(thread.pinnedMonth);
+                              if (thread.pinnedYear) setSelectedYear(thread.pinnedYear);
                             }}
                             disabled={isStreaming}
                             className="w-full rounded-xl border border-border px-3 py-2.5 text-left transition-colors hover:bg-muted/40"
@@ -711,7 +841,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                             <div className="flex items-center justify-between gap-2">
                               <p className="text-sm font-medium text-foreground line-clamp-1">{thread.title}</p>
                               <Badge variant="outline" className="shrink-0 text-[10px] uppercase">
-                                {thread.mode === 'month_analysis' ? 'Mese' : 'Chat'}
+                                {getModeBadgeLabel(thread.mode)}
                               </Badge>
                             </div>
                             {thread.lastMessagePreview && (
@@ -751,11 +881,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                 {/* Conversation header */}
                 <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
                   <div>
-                    <p className="text-sm font-medium text-foreground">
-                      {mode === 'month_analysis'
-                        ? `Analisi · ${activeMonthLabel}`
-                        : `Chat · ${activeMonthLabel}`}
-                    </p>
+                    <p className="text-sm font-medium text-foreground">{activePeriodLabel}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     {isStreaming && !isSlowResponse && (
@@ -823,10 +949,15 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                   isStreaming={isStreaming}
                   canSubmit={canSubmit}
                   mode={mode}
-                  onModeChange={setMode}
+                  onModeChange={handleModeChange}
                   selectedMonth={selectedMonth}
                   monthOptions={monthOptions}
                   onMonthChange={setSelectedMonth}
+                  selectedYear={selectedYear}
+                  yearOptions={yearOptions}
+                  onYearChange={setSelectedYear}
+                  chatContextType={chatContextType}
+                  onChatContextTypeChange={setChatContextType}
                   errorHint={composerErrorHint}
                 />
               </div>
@@ -859,6 +990,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                       setContextBundle(null);
                       setMode(thread.mode);
                       if (thread.pinnedMonth) setSelectedMonth(thread.pinnedMonth);
+                      if (thread.pinnedYear) setSelectedYear(thread.pinnedYear);
                     }}
                     onDelete={handleDeleteThread}
                     onNewThread={handleNewThread}
@@ -867,7 +999,8 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
               </Card>
 
               {/* Context panel: visible after first analysis or when fetching for a pinned thread.
-                  Priority: SSE bundle > fetched bundle > skeleton (loading) > empty placeholder. */}
+                  Priority: SSE bundle > fetched bundle > skeleton (loading) > empty placeholder.
+                  Shown for all analysis modes, not just month_analysis. */}
               {contextBundle ? (
                 <AssistantContextCard bundle={contextBundle} />
               ) : loadingContextBundle ? (
@@ -877,16 +1010,16 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                   <CardHeader>
                     <CardTitle>Contesto numerico</CardTitle>
                     <CardDescription>
-                      Appare qui al termine della prima analisi mensile.
+                      Appare qui al termine della prima analisi.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-2">
                     <div className="rounded-xl border border-border p-3">
                       <div className="mb-1 flex items-center gap-2 text-sm font-medium text-foreground">
                         <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                        Mese di riferimento
+                        Periodo di riferimento
                       </div>
-                      <p className="text-sm text-muted-foreground">{activeMonthLabel}</p>
+                      <p className="text-sm text-muted-foreground">{activePeriodLabel}</p>
                     </div>
                     <div className="rounded-xl border border-border p-3">
                       <div className="mb-1 flex items-center gap-2 text-sm font-medium text-foreground">
@@ -894,7 +1027,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                         Web search
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        Attiva in analisi mensile solo con contesto macro abilitato.
+                        Attiva nelle analisi solo con contesto macro abilitato.
                         In chat si attiva per richieste macro esplicite.
                       </p>
                     </div>
@@ -939,7 +1072,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                     <div>
                       <p className="text-sm font-medium text-foreground">Contesto macro</p>
                       <p className="text-xs text-muted-foreground">
-                        Abilita ricerca web nelle analisi mensili.
+                        Abilita ricerca web nelle analisi.
                       </p>
                     </div>
                     <Switch

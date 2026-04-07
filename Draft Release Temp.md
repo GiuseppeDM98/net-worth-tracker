@@ -9,10 +9,17 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - The numeric context panel (net worth delta, cashflow, allocation changes) now reappears automatically when you reopen a past monthly analysis thread — no need to rerun the analysis every time
 - The context panel shows a loading skeleton while the data is being fetched, so the layout stays stable as the panel populates
 - The assistant now sees your complete portfolio breakdown by asset class, not just the five that changed the most in the month
+- The assistant now sees your portfolio breakdown within each asset class (e.g. "Azioni USA €42.000, Azioni Europa €18.000") when subcategory data is available — not just the class total
+
+**Annual, YTD, and total history analysis**
+- Added annual analysis mode: ask the assistant about any full year — it receives the complete cashflow summary, net worth delta (vs prior December), allocation shifts, and top expenses for the entire year. When analysing the current year, the assistant knows the period is still in progress
+- Added YTD analysis: covers January 1 to the latest available month of the current year — a single tap gives you a year-to-date picture of net worth, cashflow, and portfolio changes
+- Added total history analysis: covers all years from your configured cashflow start year to today — ask long-term questions about your financial trajectory and the assistant has the full picture
+- When you switch to a mode that already has a conversation (e.g. Annual 2025), the existing thread is automatically reopened instead of creating a duplicate
 
 **Chat mode**
-- Chat mode has full access to your real portfolio data: selecting a month in the composer gives the assistant the same financial context as a monthly analysis — net worth, cashflow, allocation changes, and top expenses — without forcing the structured report format
-- Web search is available in both modes: the assistant cites specific recent events (geopolitical, central bank decisions, market moves) and links them directly to your portfolio
+- Chat mode now has a context type selector: choose between No context, Month, Year, YTD, or Total history — the assistant receives the same numeric data as the structured analysis modes without the fixed report format
+- Web search is available in all modes: the assistant cites specific recent events (geopolitical, central bank decisions, market moves) and links them directly to your portfolio
 
 **Memory**
 - The assistant now remembers goals, preferences, risk profile, and stable facts you declare across conversations — visible in a dedicated "Memoria" panel in the right column
@@ -56,6 +63,7 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 
 ### Assistente AI
 
+- Fixed opening a past annual, YTD, or history analysis thread after navigating away — messages were missing until a hard refresh; the thread now loads correctly on every visit
 - Fixed the assistant not actually using saved memory when answering questions — goals, preferences, and facts were stored but never sent to Claude, so the assistant answered as if it knew nothing about you
 - Fixed the "Rigenera" (retry) button doing nothing after a failed or interrupted response — it now correctly resends the last message without requiring you to retype it
 - Fixed the month picker not being sent to the server in chat mode — the assistant was receiving no data even after a month was selected

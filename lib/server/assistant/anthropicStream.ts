@@ -1,6 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { AssistantMemoryItem, AssistantMode, AssistantMonthContextBundle, AssistantMonthSelectorValue, AssistantPreferences } from '@/types/assistant';
-import { buildChatPrompt, buildMonthAnalysisPrompt } from './prompts';
+import {
+  buildChatPrompt,
+  buildHistoryAnalysisPrompt,
+  buildMonthAnalysisPrompt,
+  buildYearAnalysisPrompt,
+  buildYtdAnalysisPrompt,
+} from './prompts';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
@@ -50,6 +56,20 @@ function buildPrompt(
     return buildMonthAnalysisPrompt(contextBundle, prompt, preferences, memoryItems);
   }
 
+  // Year, YTD, and history modes all use their own structured prompt builder with context.
+  // Falls through to chat if context is somehow unavailable.
+  if (mode === 'year_analysis' && contextBundle) {
+    return buildYearAnalysisPrompt(contextBundle, prompt, preferences, memoryItems);
+  }
+
+  if (mode === 'ytd_analysis' && contextBundle) {
+    return buildYtdAnalysisPrompt(contextBundle, prompt, preferences, memoryItems);
+  }
+
+  if (mode === 'history_analysis' && contextBundle) {
+    return buildHistoryAnalysisPrompt(contextBundle, prompt, preferences, memoryItems);
+  }
+
   // Chat mode: pass the bundle when available so Claude has real numbers.
   // The prompt builder uses it without forcing a fixed response structure.
   return buildChatPrompt(prompt, preferences, monthLabel, memoryItems, contextBundle, enableWebSearch);
@@ -72,16 +92,16 @@ export async function streamAssistantResponse({
   try {
     onStatus(enableWebSearch ? 'searching' : 'writing');
 
-    // month_analysis uses extended thinking (budget 2000) and more tokens for
-    // the structured breakdown. Chat without web search is light (1500).
+    // Structured analysis modes (month/year/ytd/history) use extended thinking (budget 2000)
+    // and more tokens for the structured breakdown. Chat without web search is light (1500).
     // When chat triggers web search (macro/geopolitical question) the response
     // is naturally longer — raise the cap to avoid mid-sentence truncation.
-    const isMonthAnalysis = mode === 'month_analysis';
+    const isStructuredAnalysis = ['month_analysis', 'year_analysis', 'ytd_analysis', 'history_analysis'].includes(mode);
     const chatMaxTokens = enableWebSearch ? 2500 : 1500;
     const stream = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: isMonthAnalysis ? 3500 : chatMaxTokens,
-      ...(isMonthAnalysis
+      max_tokens: isStructuredAnalysis ? 3500 : chatMaxTokens,
+      ...(isStructuredAnalysis
         ? { thinking: { type: 'enabled', budget_tokens: 2000 } }
         : {}),
       ...(enableWebSearch
@@ -90,7 +110,7 @@ export async function streamAssistantResponse({
               {
                 type: 'web_search_20250305',
                 name: 'web_search',
-                max_uses: mode === 'month_analysis' ? 2 : 3,
+                max_uses: isStructuredAnalysis ? 2 : 3,
               } as any,
             ],
           }
