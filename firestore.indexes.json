@@ -15,6 +15,20 @@
       ]
     },
     {
+      "collectionGroup": "assets",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "isin",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "monthly-snapshots",
       "queryScope": "COLLECTION",
       "fields": [
@@ -24,10 +38,38 @@
         },
         {
           "fieldPath": "year",
-          "order": "DESCENDING"
+          "order": "ASCENDING"
         },
         {
           "fieldPath": "month",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "expenseCategories",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "name",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "expenses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
           "order": "DESCENDING"
         }
       ]
@@ -75,20 +117,6 @@
         {
           "fieldPath": "paymentDate",
           "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "assets",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "userId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "isin",
-          "order": "ASCENDING"
         }
       ]
     }
