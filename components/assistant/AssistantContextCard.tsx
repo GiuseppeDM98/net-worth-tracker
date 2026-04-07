@@ -54,19 +54,58 @@ function KpiRow({ label, value, sub, positive }: KpiRowProps) {
   );
 }
 
+/**
+ * Skeleton shown while the context bundle is being fetched after thread selection.
+ * Mirrors the card structure so the layout shift is minimal on data arrival.
+ */
+function AssistantContextCardSkeleton({ className }: { className?: string }) {
+  return (
+    <Card className={cn('overflow-hidden animate-pulse', className)}>
+      <CardHeader className="border-b border-border pb-3 pt-4">
+        <div className="h-4 w-36 rounded bg-muted" />
+      </CardHeader>
+      <CardContent className="space-y-4 p-4">
+        {/* Hero KPI placeholder */}
+        <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+          <div className="h-3 w-28 rounded bg-muted" />
+          <div className="h-6 w-32 rounded bg-muted" />
+          <div className="h-3 w-48 rounded bg-muted" />
+        </div>
+        {/* Cashflow rows placeholder */}
+        <div className="space-y-1">
+          <div className="h-3 w-16 rounded bg-muted mb-2" />
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="flex justify-between py-1.5">
+              <div className="h-3 w-20 rounded bg-muted" />
+              <div className="h-3 w-24 rounded bg-muted" />
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 interface AssistantContextCardProps {
   bundle: AssistantMonthContextBundle;
   className?: string;
+  isLoading?: boolean;
 }
 
 /**
  * Numeric context panel shown in the right sidebar during and after month analysis.
  * All data comes from the server-built bundle — no additional fetches needed.
  *
+ * When isLoading is true (bundle being fetched for an existing thread), renders a
+ * skeleton that matches the card structure to minimise layout shift on data arrival.
+ *
  * Layout: Net worth delta at the top (hero KPI), then cashflow rows, then allocation changes.
  * Data quality notes are rendered as a light callout below.
  */
-export function AssistantContextCard({ bundle, className }: AssistantContextCardProps) {
+export function AssistantContextCard({ bundle, className, isLoading }: AssistantContextCardProps) {
+  if (isLoading) {
+    return <AssistantContextCardSkeleton className={className} />;
+  }
   const { selector, netWorth, cashflow, allocationChanges, dataQuality } = bundle;
   const monthLabel = `${MONTH_NAMES[selector.month - 1]} ${selector.year}`;
 

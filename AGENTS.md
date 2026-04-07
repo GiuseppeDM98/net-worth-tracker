@@ -130,6 +130,14 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - `enableWebSearch` must be passed from `streamAssistantResponse` through `buildPrompt` → `buildChatPrompt` — without it, the chat prompt has no instruction to use web results for specific recent events even when the tool is active.
 - Chat max_tokens is 1500 normally, 2500 when web search is enabled — macro/geopolitical responses with web search are structurally longer and truncate at 1500.
 
+### Assistant Context Panel Persistence
+- The context bundle lives in React state, populated by the SSE `context` event during streaming. On reload or thread switch the panel is empty even if the thread has a `pinnedMonth`.
+- Pattern to repopulate: `GET /api/ai/assistant/context?userId=&year=&month=` rebuilds the bundle synchronously via `buildAssistantMonthContext`. Hook: `useAssistantMonthContext(userId, month)` with `staleTime: 5 min`.
+- Enable the hook only when `shouldFetchContext` is true: `thread.pinnedMonth !== null && streamingMessages.length === 0 && contextBundle === null`. All three conditions matter — without the `streamingMessages` guard the hook fires while SSE is delivering its own bundle.
+- Populate state via `useEffect`: `if (fetchedContextBundle && contextBundle === null) setContextBundle(fetchedContextBundle)`. The SSE path always writes directly to `setContextBundle` and never checks `contextBundle` first — the two paths never race.
+- Never persist the bundle to the thread Firestore document. Rebuilding from source keeps the streaming and storage layers independent.
+- The `AssistantContextCard` renders a skeleton (plain `animate-pulse` divs) when `isLoading` is passed. Pass `bundle={{} as AssistantMonthContextBundle} isLoading` — the prop is safe because `isLoading` short-circuits before any field access.
+
 ### Assistant Retry Pattern
 - `handleRetry` must use a ref (`lastSentPromptRef`) to store the last successfully submitted prompt before `setDraft('')` clears it. Calling `handleStreamSubmit()` without an override after draft is cleared sends an empty string and exits silently — no error, no visible feedback.
 - Update `lastSentPromptRef.current` only after `response.ok` — not on click — so a failed network request before the stream starts doesn't overwrite the ref with a prompt that was never sent.

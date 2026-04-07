@@ -34,6 +34,7 @@ import { Switch } from '@/components/ui/switch';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAssistantMemory, useUpdateAssistantMemory } from '@/lib/hooks/useAssistantMemory';
+import { useAssistantMonthContext } from '@/lib/hooks/useAssistantMonthContext';
 import { useAssistantThread, useAssistantThreads, useDeleteAssistantThread } from '@/lib/hooks/useAssistantThreads';
 import { assistantPromptChips } from '@/lib/constants/assistantPrompts';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
@@ -278,6 +279,31 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   const { data: memory, isLoading: loadingMemory, error: memoryError } = useAssistantMemory(user?.uid);
   const updateMemoryMutation = useUpdateAssistantMemory(user?.uid ?? '');
   const deleteThreadMutation = useDeleteAssistantThread(user?.uid ?? '');
+
+  // Fetch the context bundle for existing month_analysis threads that have a pinnedMonth.
+  // Enabled only when the thread is loaded, has a pinnedMonth, and no SSE bundle is active
+  // (SSE bundle always takes priority over the fetched one — see contextBundle priority below).
+  const pinnedMonth = threadDetail?.thread.pinnedMonth ?? null;
+  const shouldFetchContext =
+    !!pinnedMonth &&
+    streamingMessages.length === 0 &&
+    contextBundle === null;
+  const {
+    data: fetchedContextBundle,
+    isLoading: loadingContextBundle,
+  } = useAssistantMonthContext(
+    shouldFetchContext ? user?.uid : undefined,
+    shouldFetchContext ? pinnedMonth : null
+  );
+
+  // Populate the context panel from the fetched bundle when no SSE bundle is present.
+  // SSE bundle (set via setContextBundle in the stream handler) always takes priority —
+  // this effect only fires when contextBundle is still null.
+  useEffect(() => {
+    if (fetchedContextBundle && contextBundle === null) {
+      setContextBundle(fetchedContextBundle);
+    }
+  }, [fetchedContextBundle]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Derive messages to render: streaming buffer takes priority over persisted thread messages.
   // When selectedThreadId is undefined (new conversation state) we return [] even if
@@ -840,9 +866,12 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                 </CardContent>
               </Card>
 
-              {/* Context panel: visible after first analysis populates a bundle */}
+              {/* Context panel: visible after first analysis or when fetching for a pinned thread.
+                  Priority: SSE bundle > fetched bundle > skeleton (loading) > empty placeholder. */}
               {contextBundle ? (
                 <AssistantContextCard bundle={contextBundle} />
+              ) : loadingContextBundle ? (
+                <AssistantContextCard bundle={{} as AssistantMonthContextBundle} isLoading />
               ) : (
                 <Card>
                   <CardHeader>

@@ -1,42 +1,46 @@
 ## ✨ New Features
 
-- The AI Assistant now renders tables in responses — financial breakdowns with categories and amounts are now properly formatted instead of showing raw pipe characters
-- Added a "taking longer than expected" notice in the assistant that appears after 15 seconds with no response — so you always know the request is still in progress
-- The assistant now shows a skeleton loading state while your conversation history loads, instead of a blank flash
-- The right panel in the AI Assistant (conversations, context, preferences, memory) now stays fixed while you scroll through a long conversation — you no longer lose access to the panel controls mid-read
-- Previous conversations are now shown at the top of the right panel on desktop, and as a compact list above the suggested prompts on mobile — so you can resume a past chat without opening the drawer
-- The AI Assistant is now behind a feature flag (`NEXT_PUBLIC_ASSISTANT_AI_ENABLED`) for controlled rollout — when disabled, the navigation item is hidden and direct URL access returns a 404
+### Assistente AI
 
-- Added an AI Memory panel to the Assistant page: the assistant now remembers goals, preferences, risk profile, and stable facts you declare across conversations — visible in a dedicated "Memoria" panel in the right column
+The AI Assistant is a new section of the app (accessible from the "Analisi" group in the navigation) that lets you have ongoing conversations about your portfolio — either through structured monthly analysis or open-ended chat.
+
+**Monthly analysis**
+- Select any past month and the assistant automatically loads net worth changes, cashflow breakdown, top expense categories, and allocation shifts — presenting them in a readable numeric context panel before writing its commentary
+- The numeric context panel (net worth delta, cashflow, allocation changes) now reappears automatically when you reopen a past monthly analysis thread — no need to rerun the analysis every time
+- The context panel shows a loading skeleton while the data is being fetched, so the layout stays stable as the panel populates
+- The assistant now sees your complete portfolio breakdown by asset class, not just the five that changed the most in the month
+
+**Chat mode**
+- Chat mode has full access to your real portfolio data: selecting a month in the composer gives the assistant the same financial context as a monthly analysis — net worth, cashflow, allocation changes, and top expenses — without forcing the structured report format
+- Web search is available in both modes: the assistant cites specific recent events (geopolitical, central bank decisions, market moves) and links them directly to your portfolio
+
+**Memory**
+- The assistant now remembers goals, preferences, risk profile, and stable facts you declare across conversations — visible in a dedicated "Memoria" panel in the right column
 - Memory items are grouped by type (Obiettivi, Preferenze, Rischio, Fatti utili) and show the date they were learned
 - You can edit any memory item inline, archive it to keep it out of active use, restore it, or delete it permanently
-- Added a full reset option for memory with an explicit confirmation dialog — preferences (style, macro context, learning toggle) are preserved
+- Added a full reset option for memory with an explicit confirmation dialog — preferences (style, macro context, learning toggle) are preserved on reset
 - Added an "Apprendimento automatico" toggle: when off, the assistant stops learning new facts but existing memory remains visible and active
-- Chat mode now has access to your real portfolio data: selecting a month in the composer gives the assistant the same financial context as a monthly analysis — net worth, cashflow, allocation changes, and top expenses — without forcing the structured report format
 
-## 🐛 Bug Fixes
+**Conversations**
+- Every conversation is saved and can be reopened at any time from the "Conversazioni" list — your analysis history is never lost between sessions
+- Past conversations are shown at the top of the right panel on desktop, and as a compact list above the suggested prompts on mobile — resume a past thread without opening the drawer
+- Added a "Conversazioni" button in the assistant header on mobile and tablet that opens a side drawer with your full conversation history
+- Each conversation shows a relative timestamp ("3 ore fa") for recent threads and an absolute date for older ones
+- You can delete individual conversations directly from the list — hover the thread and click the trash icon
+- Added a "Nuova conversazione" button to start a fresh thread for a different month at any time
+- The selected month is visible directly in the thread list, next to the thread type badge
 
-- Fixed the assistant not actually using saved memory when answering questions — goals, preferences, and facts were stored but never sent to Claude, so the assistant answered as if it knew nothing about you
-- Fixed the "Rigenera" (retry) button doing nothing after a failed or interrupted response — it now correctly resends the last message without requiring you to retype it
-- Fixed the month picker not being sent to the server in chat mode — the assistant was receiving no data even after a month was selected
+**UX & presentation**
+- Five suggested prompt chips on the home screen — "Analizza questo mese", "Cosa pesa di più sul patrimonio?", "Spese e risparmio", "Rendimenti recenti", "Contesto geopolitico" — one tap to start any common analysis
+- The assistant renders tables in responses — financial breakdowns with categories and amounts are properly formatted instead of showing raw pipe characters
+- The right panel (conversations, context, preferences, memory) stays fixed while you scroll through a long conversation
+- A "taking longer than expected" notice appears after 15 seconds with no response — so you always know the request is still in progress
+- The page shows a skeleton loading state while your conversation history loads, instead of a blank flash
+- The assistant is behind a feature flag (`NEXT_PUBLIC_ASSISTANT_AI_ENABLED`) for controlled rollout — when disabled, the navigation item is hidden and direct URL access returns a 404
+- Added a graceful unavailable state when AI is not configured, so the page remains accessible and explains what is missing
 
-- AI Assistant conversations are now fully persistent: every thread is saved and can be reopened at any time from the "Conversazioni" list — your analysis history is never lost between sessions
-- The last conversation you had with the assistant automatically reopens when you revisit the page, so you can continue right where you left off
-- Added a "Conversazioni" button in the assistant header on mobile and tablet that opens a side drawer with your full conversation history, making it easy to switch between threads without leaving the page
-- Each conversation in the list now shows a relative timestamp ("3 ore fa") for recent threads and an absolute date for older ones, so you always know when the analysis was done
-- You can now delete individual conversations directly from the list — hover the thread and click the trash icon
+---
 
-- Added a full conversational chat experience to the AI Assistant page, replacing the single-form layout with a persistent thread workspace
-- Added five suggested prompt chips on the assistant home screen: "Analizza questo mese", "Cosa pesa di più sul patrimonio?", "Spese e risparmio", "Rendimenti recenti", and "Contesto geopolitico" — one tap to start any common analysis
-- Added a fixed composer at the bottom of the assistant page with an auto-sizing textarea: press Enter to send, Shift+Enter for a new line
-- Added a "Nuova conversazione" button in the assistant header so you can start a fresh thread for a different month at any time
-- The selected month is now visible directly in the recent threads list, next to the thread type badge
-
-- Added guided monthly analysis to the AI assistant: select any past month and the assistant automatically loads net worth changes, cashflow breakdown, top expense categories, and allocation shifts — presenting them in a readable numeric panel before writing its commentary
-- Added a suggested prompt chip strip to the assistant's month analysis mode, so you can start common analyses (patrimonio, spese, investimenti, dividendi, cashflow) with one tap instead of writing from scratch
-- Added a new `Assistente AI` area in the dashboard navigation, available from both desktop and mobile secondary menus
-- Added the first assistant workspace with suggested prompts, month-aware analysis mode, recent threads, and saved response preferences
-- Added a graceful unavailable state for the assistant when AI is not configured, so the page remains accessible and explains what is missing
 - Added current-period spotlight cards to Hall of Fame, so you can instantly see how the current month and year rank against your personal records
 - Added live values inside Hall of Fame spotlight cards, including percentage context for net worth change rankings when available
 - The Performance page (Rendimenti) now loads with a cleaner, less overwhelming layout: the methodology section is collapsed by default and can be expanded on demand with a single click
@@ -47,6 +51,35 @@
 - Added compact dividend insight cards for portfolio YOC and DPS growth, with inline help explaining how to read the metrics
 - Added a local preview mode to the FIRE calculator, so retirement metrics react immediately to unsaved changes before you decide to save them
 - Added linked focus behavior to Goal-Based Investing, so selecting a goal now highlights the same objective across summary cards, allocation view, and detail sections
+
+## 🐛 Bug Fixes
+
+### Assistente AI
+
+- Fixed the assistant not actually using saved memory when answering questions — goals, preferences, and facts were stored but never sent to Claude, so the assistant answered as if it knew nothing about you
+- Fixed the "Rigenera" (retry) button doing nothing after a failed or interrupted response — it now correctly resends the last message without requiring you to retype it
+- Fixed the month picker not being sent to the server in chat mode — the assistant was receiving no data even after a month was selected
+- Fixed losing previous messages when sending a second question in the same conversation — only the most recent exchange was visible instead of the full history
+- Fixed the assistant page scrolling to the bottom immediately when selecting a thread, before the messages had loaded
+- Fixed the assistant not citing specific recent geopolitical events even when web search was active
+- Fixed macro/geopolitical responses being cut off mid-sentence when web search was used
+- Fixed the "Nuova conversazione" button not working — the assistant was immediately re-selecting the previous thread instead of showing the empty hero state
+- Fixed the assistant conversation area still showing the previous thread's messages after switching to a new thread
+- Fixed clicking the send button throwing a runtime error when using suggested prompt chips
+- Fixed the streaming response disappearing mid-conversation — messages now display correctly as they arrive
+- Fixed the month picker not syncing to the thread's month when switching between past conversations
+- Fixed thread previews showing raw markdown syntax (`**bold**`, `## Heading`) — previews are now plain readable text
+
+---
+
+- Fixed the Performance page (Rendimenti) metric cards not counting up when the page first loads — numbers now animate from zero as expected instead of jumping directly to their final values
+- Fixed a visual flash in the Budget tab when opening the historical analysis for a row, subtotal, or total on desktop
+- Fixed the Cashflow Sankey animation so month and period filter changes animate correctly again instead of appearing static
+- Fixed the Overview summary invalidation flow so asset and cashflow changes no longer trigger a Firestore permissions warning in the browser console
+- Fixed blank vertical gaps appearing on the Assets page when switching between force-mounted tabs
+- Fixed a flash of fully-visible page content appearing for a split second before the entrance animation begins when navigating between pages — now all pages animate in cleanly every time
+- Fixed the sidebar always highlighting "Panoramica" regardless of the current page
+- Fixed a browser console warning on every page load: the Geist Mono font was being preloaded on all pages despite only being used on the FIRE and Hall of Fame pages
 
 ## 🔧 Improvements
 
@@ -138,34 +171,6 @@
 - Performance page section headers are now cleaner — emoji prefixes replaced with a subtle visual accent
 - Each main page now has a breadcrumb label above the title and a separator line between the header area and the data below, giving the interface a more editorial, intentional feel
 - Utility actions (Refresh, Export CSV, Insert Past Snapshot) are visually de-emphasised so the primary action on each page stands out
-
-## 🐛 Bug Fixes
-
-- Fixed the AI assistant losing previous messages when sending a second question in the same conversation — only the most recent exchange was visible instead of the full history
-- Fixed the assistant page scrolling to the bottom immediately when selecting a thread, before the messages had loaded — the page now waits until messages are ready before scrolling
-- Fixed the assistant not citing specific recent geopolitical events (e.g. conflicts, central bank decisions) even when web search was active — the assistant now searches for recent events and links them directly to your portfolio
-- Fixed macro/geopolitical responses from the assistant being cut off mid-sentence when web search was used — the response limit has been raised for web-search answers
-- Fixed the AI assistant not auto-selecting the most recent thread on page load, which previously caused a delayed load and premature scroll — the page now opens to the hero state immediately, letting you choose a thread when you're ready
-
-- Fixed the AI assistant incorrectly labelling real estate, pension funds, and other stable asset classes as "unclassified patrimony" — the assistant now sees your complete portfolio breakdown, not just the five asset classes that changed the most that month
-- Fixed the "Nuova conversazione" button not working — the assistant was immediately re-selecting the previous thread instead of showing the empty hero state
-- Fixed the assistant conversation area still showing the previous thread's messages after switching to a new thread, due to stale React Query cache
-- Fixed clicking the send button in the assistant throwing a runtime error when using suggested prompt chips
-
-
-
-- Fixed the AI assistant streaming response disappearing mid-conversation — messages now display correctly as they arrive instead of vanishing after the first words
-- Fixed the month picker in the AI assistant not syncing to the thread's month when switching between past conversations — the selector and subtitle now always reflect the month that was analysed
-- Fixed AI assistant thread previews showing raw markdown syntax (`**bold**`, `## Heading`) — previews are now plain readable text
-- Fixed the Performance page (Rendimenti) metric cards not counting up when the page first loads — numbers now animate from zero as expected instead of jumping directly to their final values
-- Fixed a visual flash in the Budget tab when opening the historical analysis for a row, subtotal, or total on desktop
-- Fixed the Cashflow Sankey animation so month and period filter changes animate correctly again instead of appearing static
-- Fixed the Overview summary invalidation flow so asset and cashflow changes no longer trigger a Firestore permissions warning in the browser console — the client now invalidates the server-owned summary through an authenticated private API route
-
-- Fixed blank vertical gaps appearing on the Assets page when switching between force-mounted tabs
-- Fixed a flash of fully-visible page content appearing for a split second before the entrance animation begins when navigating between pages — now all pages animate in cleanly every time
-- Fixed the sidebar always highlighting "Panoramica" regardless of the current page
-- Fixed a browser console warning on every page load: the Geist Mono font was being preloaded on all pages despite only being used on the FIRE and Hall of Fame pages
 
 ## 🔒 Security
 

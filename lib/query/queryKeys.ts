@@ -32,5 +32,7 @@ export const queryKeys = {
     threads: (userId: string) => ['assistant', 'threads', userId] as const,
     thread: (threadId: string) => ['assistant', 'thread', threadId] as const,
     memory: (userId: string) => ['assistant', 'memory', userId] as const,
+    context: (userId: string, year: number, month: number) =>
+      ['assistant', 'context', userId, year, month] as const,
   },
 } as const;
