@@ -35,7 +35,8 @@ function buildPrompt(
   contextBundle: AssistantMonthContextBundle | null,
   month: AssistantMonthSelectorValue | null | undefined,
   preferences: AssistantPreferences,
-  memoryItems: AssistantMemoryItem[] = []
+  memoryItems: AssistantMemoryItem[] = [],
+  enableWebSearch = false
 ): string {
   const MONTH_NAMES = [
     'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
@@ -51,7 +52,7 @@ function buildPrompt(
 
   // Chat mode: pass the bundle when available so Claude has real numbers.
   // The prompt builder uses it without forcing a fixed response structure.
-  return buildChatPrompt(prompt, preferences, monthLabel, memoryItems, contextBundle);
+  return buildChatPrompt(prompt, preferences, monthLabel, memoryItems, contextBundle, enableWebSearch);
 }
 
 export async function streamAssistantResponse({
@@ -71,13 +72,18 @@ export async function streamAssistantResponse({
   try {
     onStatus(enableWebSearch ? 'searching' : 'writing');
 
+    // month_analysis uses extended thinking (budget 2000) and more tokens for
+    // the structured breakdown. Chat without web search is light (1500).
+    // When chat triggers web search (macro/geopolitical question) the response
+    // is naturally longer — raise the cap to avoid mid-sentence truncation.
+    const isMonthAnalysis = mode === 'month_analysis';
+    const chatMaxTokens = enableWebSearch ? 2500 : 1500;
     const stream = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 4000,
-      thinking: {
-        type: 'enabled',
-        budget_tokens: 2000,
-      },
+      max_tokens: isMonthAnalysis ? 3500 : chatMaxTokens,
+      ...(isMonthAnalysis
+        ? { thinking: { type: 'enabled', budget_tokens: 2000 } }
+        : {}),
       ...(enableWebSearch
         ? {
             tools: [
@@ -92,7 +98,7 @@ export async function streamAssistantResponse({
       messages: [
         {
           role: 'user',
-          content: buildPrompt(mode, prompt, contextBundle, month, preferences, memoryItems),
+          content: buildPrompt(mode, prompt, contextBundle, month, preferences, memoryItems, enableWebSearch),
         },
       ],
       stream: true,

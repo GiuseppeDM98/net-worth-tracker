@@ -26,7 +26,8 @@ const secondaryHrefs = [
   '/dashboard/allocation',
   '/dashboard/performance',
   '/dashboard/history',
-  '/dashboard/assistant',
+  // Assistente AI is conditionally included so "Altro" active state tracks the flag
+  ...(process.env.NEXT_PUBLIC_ASSISTANT_AI_ENABLED !== 'false' ? ['/dashboard/assistant'] : []),
   '/dashboard/hall-of-fame',
   '/dashboard/fire-simulations',
   '/dashboard/settings',

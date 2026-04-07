@@ -1,6 +1,7 @@
 'use client';
 
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Globe, RefreshCw } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -73,7 +74,36 @@ export function AssistantStreamingResponse({
                 // Full markdown once the stream is done
                 <div className="prose prose-sm dark:prose-invert max-w-none text-foreground prose-headings:text-foreground prose-strong:text-foreground prose-li:text-foreground">
                   {message.content ? (
-                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                    // remarkGfm enables tables, strikethrough, task lists, and autolinks
+                    // — without it markdown tables render as raw pipe characters.
+                    // Table components are overridden to apply explicit borders and padding
+                    // because Tailwind prose does not add cell structure by default.
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        table: ({ children }) => (
+                          <div className="my-3 w-full overflow-x-auto">
+                            <table className="w-full border-collapse text-sm">{children}</table>
+                          </div>
+                        ),
+                        thead: ({ children }) => (
+                          <thead className="border-b border-border">{children}</thead>
+                        ),
+                        th: ({ children }) => (
+                          <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            {children}
+                          </th>
+                        ),
+                        td: ({ children }) => (
+                          <td className="px-3 py-2 text-sm text-foreground">{children}</td>
+                        ),
+                        tr: ({ children }) => (
+                          <tr className="border-b border-border/50 last:border-0">{children}</tr>
+                        ),
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
                   ) : (
                     <span className="italic text-muted-foreground">…</span>
                   )}

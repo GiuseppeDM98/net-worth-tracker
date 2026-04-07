@@ -246,7 +246,8 @@ export function buildChatPrompt(
   preferences: AssistantPreferences,
   monthLabel?: string,
   memoryItems: AssistantMemoryItem[] = [],
-  contextBundle?: AssistantMonthContextBundle | null
+  contextBundle?: AssistantMonthContextBundle | null,
+  enableWebSearch?: boolean
 ): string {
   const responseStyleInstruction =
     preferences.responseStyle === 'concise'
@@ -260,11 +261,19 @@ export function buildChatPrompt(
     ? formatMemoryForPrompt(memoryItems)
     : 'Non fare affidamento su memoria persistente; usa solo il contesto esplicito del messaggio.';
 
+  // When web search is active, instruct Claude to use recent results to cite
+  // specific events (crises, rate decisions, geopolitical developments) and
+  // connect them to the user's actual portfolio composition.
+  const webSearchInstruction = enableWebSearch
+    ? 'Hai accesso a ricerche web recenti. Usale per citare eventi specifici (conflitti, decisioni banche centrali, shock macro) con date precise, e collegali all\'impatto concreto sul portafoglio dell\'utente. Usa al massimo 3 ricerche.'
+    : '';
+
   const sections: string[] = [
     'Sei l\'Assistente AI di Net Worth Tracker per un investitore italiano.',
     'Rispondi sempre in italiano.',
     responseStyleInstruction,
     'Stai rispondendo a una conversazione generale sul portafoglio dell\'utente.',
+    ...(webSearchInstruction ? [webSearchInstruction] : []),
     memoryBlock,
     '',
   ];

@@ -26,7 +26,10 @@ const navigationGroups = [
       { name: 'Allocazione', href: '/dashboard/allocation', icon: PieChart },
       { name: 'Rendimenti', href: '/dashboard/performance', icon: TrendingUp },
       { name: 'Storico', href: '/dashboard/history', icon: History },
-      { name: 'Assistente AI', href: '/dashboard/assistant', icon: Bot },
+      // Assistente AI is conditionally included based on the feature flag.
+      ...(process.env.NEXT_PUBLIC_ASSISTANT_AI_ENABLED !== 'false'
+        ? [{ name: 'Assistente AI', href: '/dashboard/assistant', icon: Bot }]
+        : []),
       // Hall of Fame: kept in English as an intentional premium brand choice
       { name: 'Hall of Fame', href: '/dashboard/hall-of-fame', icon: Trophy },
     ],

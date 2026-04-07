@@ -1,5 +1,12 @@
 ## ✨ New Features
 
+- The AI Assistant now renders tables in responses — financial breakdowns with categories and amounts are now properly formatted instead of showing raw pipe characters
+- Added a "taking longer than expected" notice in the assistant that appears after 15 seconds with no response — so you always know the request is still in progress
+- The assistant now shows a skeleton loading state while your conversation history loads, instead of a blank flash
+- The right panel in the AI Assistant (conversations, context, preferences, memory) now stays fixed while you scroll through a long conversation — you no longer lose access to the panel controls mid-read
+- Previous conversations are now shown at the top of the right panel on desktop, and as a compact list above the suggested prompts on mobile — so you can resume a past chat without opening the drawer
+- The AI Assistant is now behind a feature flag (`NEXT_PUBLIC_ASSISTANT_AI_ENABLED`) for controlled rollout — when disabled, the navigation item is hidden and direct URL access returns a 404
+
 - Added an AI Memory panel to the Assistant page: the assistant now remembers goals, preferences, risk profile, and stable facts you declare across conversations — visible in a dedicated "Memoria" panel in the right column
 - Memory items are grouped by type (Obiettivi, Preferenze, Rischio, Fatti utili) and show the date they were learned
 - You can edit any memory item inline, archive it to keep it out of active use, restore it, or delete it permanently
@@ -133,6 +140,12 @@
 - Utility actions (Refresh, Export CSV, Insert Past Snapshot) are visually de-emphasised so the primary action on each page stands out
 
 ## 🐛 Bug Fixes
+
+- Fixed the AI assistant losing previous messages when sending a second question in the same conversation — only the most recent exchange was visible instead of the full history
+- Fixed the assistant page scrolling to the bottom immediately when selecting a thread, before the messages had loaded — the page now waits until messages are ready before scrolling
+- Fixed the assistant not citing specific recent geopolitical events (e.g. conflicts, central bank decisions) even when web search was active — the assistant now searches for recent events and links them directly to your portfolio
+- Fixed macro/geopolitical responses from the assistant being cut off mid-sentence when web search was used — the response limit has been raised for web-search answers
+- Fixed the AI assistant not auto-selecting the most recent thread on page load, which previously caused a delayed load and premature scroll — the page now opens to the hero state immediately, letting you choose a thread when you're ready
 
 - Fixed the AI assistant incorrectly labelling real estate, pension funds, and other stable asset classes as "unclassified patrimony" — the assistant now sees your complete portfolio breakdown, not just the five asset classes that changed the most that month
 - Fixed the "Nuova conversazione" button not working — the assistant was immediately re-selecting the previous thread instead of showing the empty hero state

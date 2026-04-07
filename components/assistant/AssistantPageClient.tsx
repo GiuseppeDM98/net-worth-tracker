@@ -20,6 +20,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { AssistantComposer } from '@/components/assistant/AssistantComposer';
+import { AssistantPageSkeleton } from '@/components/assistant/AssistantPageSkeleton';
 import { AssistantContextCard } from '@/components/assistant/AssistantContextCard';
 import { AssistantMemoryPanel } from '@/components/assistant/AssistantMemoryPanel';
 import { AssistantPromptChips } from '@/components/assistant/AssistantPromptChips';
@@ -242,10 +243,6 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const conversationEndRef = useRef<HTMLDivElement>(null);
-  // Guards the one-time auto-select of the most recent thread on first load.
-  // Without this, setting selectedThreadId to undefined (new thread) would
-  // immediately re-trigger the effect and re-select the first thread.
-  const hasAutoSelectedRef = useRef(false);
   // Stores the last successfully submitted prompt so retry can re-send it
   // after draft is cleared. Using a ref avoids stale closure issues.
   const lastSentPromptRef = useRef('');
@@ -267,6 +264,9 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   const [streamingMessageId, setStreamingMessageId] = useState<string | undefined>();
   const [isStreaming, setIsStreaming] = useState(false);
   const [isInterrupted, setIsInterrupted] = useState(false);
+  // Shows a "taking longer than expected" nudge after SLOW_RESPONSE_MS with no text received.
+  // Cleared as soon as the first token arrives or streaming ends.
+  const [isSlowResponse, setIsSlowResponse] = useState(false);
   // Context bundle is populated from the SSE 'context' event sent before text streaming
   const [contextBundle, setContextBundle] = useState<AssistantMonthContextBundle | null>(null);
 
@@ -293,16 +293,6 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     return threadDetail?.messages ?? [];
   }, [streamingMessages, selectedThreadId, threadDetail?.messages]);
 
-  // Auto-select the most recent thread on first load only.
-  // The ref guard prevents this from re-firing when the user explicitly
-  // clicks "Nuova conversazione" (which sets selectedThreadId to undefined).
-  useEffect(() => {
-    if (!hasAutoSelectedRef.current && !selectedThreadId && threads.length > 0) {
-      hasAutoSelectedRef.current = true;
-      setSelectedThreadId(threads[0].id);
-    }
-  }, [selectedThreadId, threads]);
-
   // Sync mode and month picker to the loaded thread so the UI stays coherent
   // with the conversation being shown. Runs when threadDetail resolves, but not
   // during streaming (streamingMessages.length > 0) to avoid disrupting active input.
@@ -316,10 +306,24 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     }
   }, [threadDetail]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Scroll the conversation area to the bottom whenever messages change
+  // Scroll to the bottom when messages are available, but not while the thread
+  // is still loading — scrolling to an empty area before content arrives feels jarring.
+  // During streaming we always scroll so new tokens stay visible.
   useEffect(() => {
+    if (renderedMessages.length === 0) return;
+    if (loadingThreadDetail && !isStreaming) return;
     conversationEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [renderedMessages]);
+  }, [renderedMessages, loadingThreadDetail, isStreaming]);
+
+  // Slow-response timeout: shows a gentle nudge after 15 s with no text received.
+  // Timer starts when isStreaming flips true and clears when it flips false.
+  // isSlowResponse resets on every new submission (handled in handleStreamSubmit).
+  useEffect(() => {
+    if (!isStreaming) return;
+    const SLOW_RESPONSE_MS = 15_000;
+    const timer = setTimeout(() => setIsSlowResponse(true), SLOW_RESPONSE_MS);
+    return () => clearTimeout(timer);
+  }, [isStreaming]);
 
   // NOTE: we do NOT clear streamingMessages in a useEffect([selectedThreadId]).
   // The meta event sets selectedThreadId mid-stream; a useEffect dependency on it
@@ -371,10 +375,14 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
 
     setIsStreaming(true);
     setIsInterrupted(false);
+    setIsSlowResponse(false);
     setContextBundle(null);
     setStreamingMessageId(assistantMessageId);
+    // Use renderedMessages (not threadDetail?.messages) as the base so that
+    // messages from the previous stream are preserved even if React Query hasn't
+    // yet reloaded the thread after the last invalidation.
     setStreamingMessages([
-      ...(threadDetail?.messages ?? []),
+      ...renderedMessages,
       userMessage,
       {
         id: assistantMessageId,
@@ -440,6 +448,8 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
           }
 
           if (event.type === 'text') {
+            // First token received — dismiss the slow-response nudge
+            setIsSlowResponse(false);
             setStreamingMessages((current) =>
               current.map((message) =>
                 message.id === assistantMessageId
@@ -483,6 +493,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
       setStreamingMessageId(undefined);
     } finally {
       setIsStreaming(false);
+      setIsSlowResponse(false);
     }
   };
 
@@ -538,6 +549,15 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   const composerErrorHint = isAnalysisBlocked
     ? `Nessun dato disponibile per ${activeMonthLabel}. Seleziona un altro mese.`
     : undefined;
+
+  // Show skeleton while threads resolve on first load
+  if (loadingThreads) {
+    return (
+      <ProtectedRoute>
+        <AssistantPageSkeleton />
+      </ProtectedRoute>
+    );
+  }
 
   return (
     <ProtectedRoute>
@@ -608,7 +628,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                 </Button>
                 <Badge variant="outline" className="w-fit gap-2 text-xs">
                   <Sparkles className="h-3.5 w-3.5" />
-                  Step 5: memoria automatica
+                  Assistente AI
                 </Badge>
               </div>
             </div>
@@ -637,24 +657,67 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
             <div className="flex flex-col gap-0">
               {/* Hero state: shown when no messages exist yet */}
               {renderedMessages.length === 0 && !loadingThreadDetail && (
-                <div className="mb-4 rounded-2xl border border-border bg-muted/20 p-6">
-                  <div className="mb-4 flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                      <Sparkles className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-foreground">Come posso aiutarti?</p>
-                      <p className="text-sm text-muted-foreground">
-                        Scegli un punto di partenza o scrivi direttamente nel composer.
+                <>
+                  {/* Mobile-only thread list: shown in the hero so users can resume
+                      a past conversation without opening the drawer. Hidden on desktop
+                      where the right-column card is always visible. */}
+                  {threads.length > 0 && (
+                    <div className="mb-4 desktop:hidden">
+                      <p className="mb-2 text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                        Conversazioni recenti
                       </p>
+                      <div className="space-y-1.5">
+                        {threads.slice(0, 5).map((thread) => (
+                          <button
+                            key={thread.id}
+                            onClick={() => {
+                              setSelectedThreadId(thread.id);
+                              setStreamingMessages([]);
+                              setStreamingMessageId(undefined);
+                              setIsInterrupted(false);
+                              setContextBundle(null);
+                              setMode(thread.mode);
+                              if (thread.pinnedMonth) setSelectedMonth(thread.pinnedMonth);
+                            }}
+                            disabled={isStreaming}
+                            className="w-full rounded-xl border border-border px-3 py-2.5 text-left transition-colors hover:bg-muted/40"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-medium text-foreground line-clamp-1">{thread.title}</p>
+                              <Badge variant="outline" className="shrink-0 text-[10px] uppercase">
+                                {thread.mode === 'month_analysis' ? 'Mese' : 'Chat'}
+                              </Badge>
+                            </div>
+                            {thread.lastMessagePreview && (
+                              <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                                {stripMarkdown(thread.lastMessagePreview)}
+                              </p>
+                            )}
+                          </button>
+                        ))}
+                      </div>
                     </div>
+                  )}
+
+                  <div className="mb-4 rounded-2xl border border-border bg-muted/20 p-6">
+                    <div className="mb-4 flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                        <Sparkles className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-foreground">Come posso aiutarti?</p>
+                        <p className="text-sm text-muted-foreground">
+                          Scegli un punto di partenza o scrivi direttamente nel composer.
+                        </p>
+                      </div>
+                    </div>
+                    <AssistantPromptChips
+                      chips={assistantPromptChips}
+                      onSelect={handleChipClick}
+                      disabled={isStreaming}
+                    />
                   </div>
-                  <AssistantPromptChips
-                    chips={assistantPromptChips}
-                    onSelect={handleChipClick}
-                    disabled={isStreaming}
-                  />
-                </div>
+                </>
               )}
 
               {/* Conversation area */}
@@ -669,10 +732,16 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    {isStreaming && (
+                    {isStreaming && !isSlowResponse && (
                       <Badge variant="outline" className="gap-1.5 text-xs">
                         <Loader2 className="h-3 w-3 animate-spin" />
                         In scrittura…
+                      </Badge>
+                    )}
+                    {isSlowResponse && (
+                      <Badge variant="outline" className="gap-1.5 text-xs text-muted-foreground">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Sta impiegando più del previsto…
                       </Badge>
                     )}
                     {/* Quick chip access while in conversation */}
@@ -737,8 +806,40 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
               </div>
             </div>
 
-            {/* ── Right column: context panel + preferences + threads ── */}
-            <div className="space-y-4">
+            {/* ── Right column: sticky so panels stay visible while the conversation scrolls.
+                 max-h + overflow-y-auto lets the column scroll internally if content
+                 overflows the viewport (e.g. very long memory list). ── */}
+            <div className="space-y-4 desktop:sticky desktop:top-6 desktop:max-h-[calc(100vh-6rem)] desktop:overflow-y-auto desktop:pr-1">
+              {/* Thread list — on desktop always visible at the top so the user can
+                  jump to a previous conversation without scrolling past other panels.
+                  On mobile the drawer (header button) serves the same purpose. */}
+              <Card className="hidden desktop:block">
+                <CardHeader>
+                  <CardTitle>Conversazioni</CardTitle>
+                  <CardDescription>Ordinate per ultimo aggiornamento.</CardDescription>
+                </CardHeader>
+                <CardContent className="max-h-[400px] overflow-y-auto space-y-2 pr-1">
+                  <ThreadList
+                    threads={threads}
+                    loadingThreads={loadingThreads}
+                    selectedThreadId={selectedThreadId}
+                    isStreaming={isStreaming}
+                    isDeletingId={deleteThreadMutation.variables as string | undefined}
+                    onSelect={(thread) => {
+                      setSelectedThreadId(thread.id);
+                      setStreamingMessages([]);
+                      setStreamingMessageId(undefined);
+                      setIsInterrupted(false);
+                      setContextBundle(null);
+                      setMode(thread.mode);
+                      if (thread.pinnedMonth) setSelectedMonth(thread.pinnedMonth);
+                    }}
+                    onDelete={handleDeleteThread}
+                    onNewThread={handleNewThread}
+                  />
+                </CardContent>
+              </Card>
+
               {/* Context panel: visible after first analysis populates a bundle */}
               {contextBundle ? (
                 <AssistantContextCard bundle={contextBundle} />
@@ -843,38 +944,6 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                   isLoading={loadingMemory}
                 />
               )}
-
-              {/* Thread list — hidden on mobile where the drawer is used instead */}
-              <Card className="hidden desktop:block">
-                <CardHeader>
-                  <CardTitle>Conversazioni</CardTitle>
-                  <CardDescription>Ordinate per ultimo aggiornamento.</CardDescription>
-                </CardHeader>
-                <CardContent className="max-h-[480px] overflow-y-auto space-y-2 pr-1">
-                  <ThreadList
-                    threads={threads}
-                    loadingThreads={loadingThreads}
-                    selectedThreadId={selectedThreadId}
-                    isStreaming={isStreaming}
-                    isDeletingId={deleteThreadMutation.variables as string | undefined}
-                    onSelect={(thread) => {
-                      // Explicit thread switch: clear streaming state before loading
-                      // the new thread. Do NOT do this reactively in a useEffect —
-                      // the meta SSE event updates selectedThreadId mid-stream,
-                      // which would wipe the buffer. See AGENTS.md.
-                      setSelectedThreadId(thread.id);
-                      setStreamingMessages([]);
-                      setStreamingMessageId(undefined);
-                      setIsInterrupted(false);
-                      setContextBundle(null);
-                      setMode(thread.mode);
-                      if (thread.pinnedMonth) setSelectedMonth(thread.pinnedMonth);
-                    }}
-                    onDelete={handleDeleteThread}
-                    onNewThread={handleNewThread}
-                  />
-                </CardContent>
-              </Card>
 
               {(threadsError || threadError || memoryError) && (
                 <p className="text-xs text-destructive">

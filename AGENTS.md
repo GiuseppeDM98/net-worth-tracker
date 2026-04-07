@@ -94,11 +94,12 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - The `context` SSE event fires before text streaming begins; handle it separately from `text` events to populate the numeric panel without touching the message buffer
 - When loading a thread, sync `mode` and `selectedMonth` to `thread.pinnedMonth`/`thread.mode` via a `useEffect([threadDetail])` guarded by `streamingMessages.length === 0`
 - Track `streamingMessageId` (the ID of the assistant message slot currently receiving tokens) and pass it to the message renderer to switch between plain-text and ReactMarkdown — plain text during stream avoids re-parse layout jumps on every chunk; markdown renders on `done`
-- Auto-select the most recent thread on first load using a `hasAutoSelectedRef` guard; without the ref, setting `selectedThreadId` to `undefined` (new thread) re-triggers the effect and immediately re-selects the old thread
+- Do NOT auto-select the most recent thread on first load — it causes a jarring double-load (skeleton → hero → immediate thread fetch). Show the hero state and let the user pick a thread. `hasAutoSelectedRef` has been removed.
 - After "new thread" deselection, React Query keeps the previous thread's data in cache (query disabled but stale data present); guard `renderedMessages` with `!selectedThreadId` to return `[]` and show the hero immediately
 - `handleStreamSubmit` accepts optional `promptOverride`/`modeOverride` so chip clicks can pass values synchronously — React state updates are async; relying on updated state after `setDraft`/`setMode` inside the same handler does not work
 - Button `onClick` always passes the `MouseEvent` as the first argument; if the handler signature accepts an optional string (`promptOverride?`), wrap as `onClick={() => onSubmit()}` — never `onClick={onSubmit}` — or the event object is received as the prompt and `.trim()` throws
-- Chat mode (`mode: 'chat'`) does NOT send numeric context to Claude — only the month label. Real financial data requires `month_analysis` mode or will be addressed in Step 5 (automatic memory). Do not add explorative chips that imply data access while in chat mode.
+- Use `renderedMessages` (not `threadDetail?.messages`) as the base when building `streamingMessages` at submit time — React Query may not have reloaded the thread yet after the previous stream's cache invalidation, so `threadDetail` is stale and excludes the last exchange
+- `scrollIntoView` must be gated on `renderedMessages.length > 0 && !(loadingThreadDetail && !isStreaming)` — without it, selecting a thread scrolls the page to the bottom before any messages arrive, leaving the user staring at empty space
 
 ### Assistant Month Context Service
 - `assistantMonthContextService.ts` runs server-side inside an API route — use `adminDb` (Firebase Admin SDK) directly, not `getUserSnapshots`/`getExpensesByDateRange`/`getSettings` (client SDK, requires browser auth session)
@@ -122,10 +123,12 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - `extractAndSaveMemory` is fire-and-forget: call with `.catch(...)` after `appendAssistantMessage`, never `await` it inside the stream. Errors are logged server-side only.
 - The Anthropic client for memory extraction is instantiated lazily inside `extractAndSaveMemory` (dynamic import), not at module level — module-level `new Anthropic()` breaks test environments where `ANTHROPIC_API_KEY` is absent.
 
-### Assistant Chat Mode Unification (Step 5+)
-- Chat mode and month_analysis mode now share the same `buildAssistantMonthContext` call in the stream route — the mode check was removed. The prompt builder controls format, not data availability.
+### Assistant Chat Mode Unification
+- Chat mode and month_analysis mode share the same `buildAssistantMonthContext` call in the stream route — the prompt builder controls format, not data availability.
 - `month` must always be sent in the SSE request body when the month picker is visible, regardless of mode. Conditioning it on `mode === 'month_analysis'` silently breaks chat mode data injection.
 - The SSE `context` event (numeric panel) is still only sent in `month_analysis` mode — chat mode receives data in the prompt but does not surface the side panel.
+- `enableWebSearch` must be passed from `streamAssistantResponse` through `buildPrompt` → `buildChatPrompt` — without it, the chat prompt has no instruction to use web results for specific recent events even when the tool is active.
+- Chat max_tokens is 1500 normally, 2500 when web search is enabled — macro/geopolitical responses with web search are structurally longer and truncate at 1500.
 
 ### Assistant Retry Pattern
 - `handleRetry` must use a ref (`lastSentPromptRef`) to store the last successfully submitted prompt before `setDraft('')` clears it. Calling `handleStreamSubmit()` without an override after draft is cleared sends an empty string and exits silently — no error, no visible feedback.
@@ -134,6 +137,17 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 ### Assistant Thread List UX
 - Thread dates: use `formatDistanceToNow` (date-fns, Italian locale) for dates within the past 7 days; fall back to `toLocaleDateString('it-IT', {day:'2-digit', month:'2-digit', year:'numeric'})` for older dates. Never use relative-only formatting — absolute dates are more useful for threads weeks old.
 - Mobile thread list: use a `Sheet` (`side="right"`) triggered by a button in the page header (hidden on `desktop:` via `desktop:hidden`). The desktop right panel card uses `hidden desktop:block`. This ensures the same `ThreadList` component is used in both surfaces without duplicating the item render logic.
+- Desktop right column order: Threads → Context panel → Preferences → Memory. Threads first so the user can pick a conversation immediately without scrolling.
+- Desktop right column is `sticky top-6` with `max-h-[calc(100vh-6rem)] overflow-y-auto` so panels remain visible while the conversation scrolls. `overflow-y-auto` on the column itself (not a wrapper) lets the sidebar scroll internally if memory list is very long.
+- Mobile hero shows the last 5 threads above the chip strip (`desktop:hidden`) — allows resuming a past conversation without opening the drawer. Capped at 5 to avoid overwhelming the hero.
+
+### Assistant Markdown Rendering
+- Use `remark-gfm` with `ReactMarkdown` — without it markdown tables (`| col | col |`) render as raw pipe characters. `remark-gfm@4.0.1` is already installed.
+- Override `table`/`thead`/`th`/`td`/`tr` components explicitly — Tailwind `prose` does not add cell borders or padding. `th` must include `text-left` because some browsers default table headers to `text-center`.
+
+### Assistant Rollout Flag
+- `NEXT_PUBLIC_ASSISTANT_AI_ENABLED=false` → `notFound()` in `app/dashboard/assistant/page.tsx` + nav item filtered out of Sidebar, SecondaryMenuDrawer, and `secondaryHrefs` in BottomNavigation. Default is enabled when the variable is absent.
+- The flag is inlined at build time (`NEXT_PUBLIC_`), so filtering the nav arrays at module level is safe and has zero runtime overhead.
 
 ### Private API Authorization
 - Any App Router API route that uses Firebase Admin SDK must authenticate server-side; Firestore rules do not protect Admin SDK calls

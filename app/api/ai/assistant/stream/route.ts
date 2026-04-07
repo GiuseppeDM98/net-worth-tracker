@@ -116,6 +116,16 @@ export async function POST(request: NextRequest) {
       preferences
     );
 
+    // Structured server-side log: route, mode, web-search decision.
+    // Never logs prompt content or financial data — only metadata safe to write to server logs.
+    console.info('[assistant/stream] request', {
+      route: '/api/ai/assistant/stream',
+      mode: body.mode,
+      webSearch: enableWebSearch,
+      hasMonth: Boolean(body.month),
+      hasThreadId: Boolean(body.threadId),
+    });
+
     // Build the numeric context bundle for both modes when a month is selected.
     // Chat mode now receives the same data as month_analysis — the prompt builder
     // controls how it's used (free-form vs. structured analysis).
@@ -235,13 +245,19 @@ export async function POST(request: NextRequest) {
           );
           controller.close();
         } catch (error: any) {
-          console.error('[API /ai/assistant/stream] Stream error:', error);
+          const retryable = Boolean(error?.retryable);
+          // Log with retryable flag so on-call can distinguish overload spikes from bugs
+          console.error('[assistant/stream] stream error', {
+            retryable,
+            status: error?.status,
+            message: error?.message,
+          });
           controller.enqueue(
             encodeAssistantEvent({
               type: 'error',
               error:
                 error?.message ?? "Errore durante la generazione della risposta dell'assistente",
-              retryable: Boolean(error?.retryable),
+              retryable,
             })
           );
           controller.close();
