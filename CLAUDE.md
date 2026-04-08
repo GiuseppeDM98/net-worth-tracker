@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-07, session 66): **Assistente AI — Step 8: annual/YTD/history analyses + sub-allocation context**. New modes: `year_analysis`, `ytd_analysis`, `history_analysis`. `bySubCategoryAllocation` in context bundle (cross-references live assets with snapshot `byAsset`). `selector.month` encoding: `>0`=monthly, `0`=year, `-1`=YTD, `-2`=history. Auto-select existing thread on mode switch. `pinnedYear` on threads. `buildAssistantYearContext`, `buildAssistantYtdContext`, `buildAssistantHistoryContext` in service. Extended thinking + 3500 tokens for all structured modes. Web search policy extended to all analysis modes (not just month_analysis).
+- Latest implementation (2026-04-08, session 67): **Assistente AI — `includeDummySnapshots` preference**. Test accounts with `isDummy: true` snapshots can now include them in all context bundles via a toggle that appears only when dummy snapshots exist. `hasDummySnapshots` computed server-side at GET `/api/ai/assistant/memory` via parallel Firestore `limit(1)` query — never persisted. `includeDummySnapshots` flows through `AssistantPreferences` → `stream/route.ts` → all 4 builders; `context/route.ts` reads it fresh (GET has no body). All 3 snapshot finder functions and 4 builders now accept optional `includeDummySnapshots` param.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -17,7 +17,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Key Features (Active)
 - Portfolio tracking across equities, bonds, crypto, real estate, commodities, and cash
 - Automatic price updates via Yahoo Finance and Borsa Italiana bond support
-- Assistente AI (Step 8, 2026-04-07): 5 modes — `month_analysis`, `year_analysis`, `ytd_analysis`, `history_analysis`, `chat`. Chat mode has `chatContextType` selector (`none | month | year | ytd | history`) so any period bundle can be sent without switching mode. `bySubCategoryAllocation` in context bundle cross-references live assets with snapshot `byAsset`. `selector.month` encoding: `>0`=monthly, `0`=year, `-1`=YTD, `-2`=history. Auto-select existing thread on mode switch. `pinnedYear` on threads. `useAssistantPeriodContext` unifies all 4 context hooks. `includeMacroContext` preference gates web search for all structured modes. Context panel + numeric bundle for all analysis modes. Extended thinking (budget 2000) + 3500 max_tokens for all structured modes. `resolvedThreadId` pattern in `handleStreamSubmit` avoids stale React Query cache on new threads. Feature flag `NEXT_PUBLIC_ASSISTANT_AI_ENABLED`. Persistent conversations, auto-memory, markdown with tables (remark-gfm). Slow-response timeout 15 s.
+- Assistente AI (Step 8+, 2026-04-08): 5 modes — `month_analysis`, `year_analysis`, `ytd_analysis`, `history_analysis`, `chat`. Chat mode has `chatContextType` selector (`none | month | year | ytd | history`). `bySubCategoryAllocation` in context bundle. `selector.month` encoding: `>0`=monthly, `0`=year, `-1`=YTD, `-2`=history. `useAssistantPeriodContext` unifies all 4 context hooks. `includeMacroContext` gates web search. Extended thinking (budget 2000) + 3500 max_tokens. `resolvedThreadId` pattern avoids stale RQ cache. Feature flag `NEXT_PUBLIC_ASSISTANT_AI_ENABLED`. Persistent conversations, auto-memory, markdown with tables. Memory extraction runs in all modes, gated by `memoryEnabled` only. `includeDummySnapshots` preference: toggle visible only when `hasDummySnapshots` (computed fresh at memory GET, never persisted).
 - Login and Register now feel more native to the product, with calmer entry motion, cleaner field focus choreography, keyboard-reachable password toggles, and inline submit status feedback
 - Hall of Fame now reads as an editorial ranking surface with clearer monthly/yearly hierarchy, spotlight cards for the current month/year, and contextual note dialogs tied to the selected record
 - Cashflow "Entrate per categoria" pie chart on mobile now caps legend items at 3 (same as expense chart), preventing overflow when 4+ categories exceed the 5% threshold
@@ -79,7 +79,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-07 (session 64 — Step 6 complete)
+**Last updated**: 2026-04-08 (session 67 — includeDummySnapshots preference)
 
 ## Design Context
 

@@ -15,6 +15,7 @@ function normalizeMemory(payload: AssistantMemoryResponse): AssistantMemoryDocum
       updatedAt: toDate(item.updatedAt),
     })),
     updatedAt: payload.updatedAt ? toDate(payload.updatedAt) : null,
+    hasDummySnapshots: payload.hasDummySnapshots ?? false,
   };
 }
 

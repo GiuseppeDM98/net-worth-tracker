@@ -185,3 +185,7 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - Improved authorization checks for private account actions across snapshots, dividends, performance metrics, price updates, Hall of Fame recalculation, and AI analysis
 - Added stricter ownership validation for sensitive portfolio actions so requests must match the signed-in Firebase user before data is read or changed
 - Preserved scheduled maintenance flows while hardening private API access, so automated snapshot and dividend jobs continue to run normally
+
+## 🏗️ Technical
+
+- Added `includeDummySnapshots` assistant preference: test accounts with synthetic snapshot data can now include those snapshots in AI context bundles. The toggle appears automatically only when dummy snapshots are detected — invisible to all regular users

@@ -144,30 +144,32 @@ export async function POST(request: NextRequest) {
       return settingsSnap.data()?.cashflowHistoryStartYear ?? new Date().getFullYear() - 5;
     };
 
+    const includeDummy = preferences.includeDummySnapshots ?? false;
+
     let contextBundle = null;
     if (body.mode === 'year_analysis' && body.year) {
-      contextBundle = await buildAssistantYearContext(body.userId, body.year);
+      contextBundle = await buildAssistantYearContext(body.userId, body.year, includeDummy);
     } else if (body.mode === 'ytd_analysis') {
-      contextBundle = await buildAssistantYtdContext(body.userId);
+      contextBundle = await buildAssistantYtdContext(body.userId, includeDummy);
     } else if (body.mode === 'history_analysis') {
-      contextBundle = await buildAssistantHistoryContext(body.userId, await getHistoryStartYear());
+      contextBundle = await buildAssistantHistoryContext(body.userId, await getHistoryStartYear(), includeDummy);
     } else if (body.mode === 'chat') {
       // Chat mode: build context only when chatContext is set and not 'none'
       if (body.chatContext === 'year' && body.year) {
-        contextBundle = await buildAssistantYearContext(body.userId, body.year);
+        contextBundle = await buildAssistantYearContext(body.userId, body.year, includeDummy);
       } else if (body.chatContext === 'ytd') {
-        contextBundle = await buildAssistantYtdContext(body.userId);
+        contextBundle = await buildAssistantYtdContext(body.userId, includeDummy);
       } else if (body.chatContext === 'history') {
-        contextBundle = await buildAssistantHistoryContext(body.userId, await getHistoryStartYear());
+        contextBundle = await buildAssistantHistoryContext(body.userId, await getHistoryStartYear(), includeDummy);
       } else if (body.chatContext === 'month' && body.month) {
-        contextBundle = await buildAssistantMonthContext(body.userId, body.month);
+        contextBundle = await buildAssistantMonthContext(body.userId, body.month, includeDummy);
       } else if (!body.chatContext && body.month) {
         // Backwards-compat: old clients that send month without chatContext
-        contextBundle = await buildAssistantMonthContext(body.userId, body.month);
+        contextBundle = await buildAssistantMonthContext(body.userId, body.month, includeDummy);
       }
     } else if (body.month) {
       // month_analysis: always use month context
-      contextBundle = await buildAssistantMonthContext(body.userId, body.month);
+      contextBundle = await buildAssistantMonthContext(body.userId, body.month, includeDummy);
     }
 
     // Load active memory items to inject into the prompt.

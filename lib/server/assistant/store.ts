@@ -100,6 +100,7 @@ async function getSyncedAssistantPreferences(userId: string): Promise<AssistantP
     responseStyle: settings?.assistantResponseStyle ?? defaults.responseStyle,
     includeMacroContext: settings?.assistantMacroContextEnabled ?? defaults.includeMacroContext,
     memoryEnabled: settings?.assistantMemoryEnabled ?? defaults.memoryEnabled,
+    includeDummySnapshots: settings?.assistantIncludeDummySnapshots ?? defaults.includeDummySnapshots,
   };
 }
 
@@ -113,6 +114,7 @@ async function syncAssistantPreferencesToSettings(
       assistantResponseStyle: preferences.responseStyle,
       assistantMacroContextEnabled: preferences.includeMacroContext,
       assistantMemoryEnabled: preferences.memoryEnabled,
+      assistantIncludeDummySnapshots: preferences.includeDummySnapshots,
       updatedAt: Timestamp.now(),
     },
     { merge: true }
@@ -254,6 +256,7 @@ export async function getAssistantMemoryDocument(userId: string): Promise<Assist
       preferences: syncedPreferences,
       items: [],
       updatedAt: null,
+      hasDummySnapshots: false,
     };
   }
 
@@ -266,11 +269,14 @@ export async function getAssistantMemoryDocument(userId: string): Promise<Assist
       includeMacroContext:
         storedPreferences.includeMacroContext ?? syncedPreferences.includeMacroContext,
       memoryEnabled: storedPreferences.memoryEnabled ?? syncedPreferences.memoryEnabled,
+      includeDummySnapshots:
+        storedPreferences.includeDummySnapshots ?? syncedPreferences.includeDummySnapshots,
     },
     items: Array.isArray(data.items)
       ? data.items.map((item: Record<string, any>) => mapMemoryItem(item, userId))
       : [],
     updatedAt: data.updatedAt ? toDate(data.updatedAt) : null,
+    hasDummySnapshots: false,
   };
 }
 
@@ -336,6 +342,7 @@ export async function updateAssistantMemoryDocument(
     preferences,
     items,
     updatedAt: now.toDate(),
+    hasDummySnapshots: false,
   };
 }
 
@@ -350,6 +357,7 @@ export async function deleteAssistantMemoryDocument(
       preferences: current.preferences,
       items: [],
       updatedAt: new Date(),
+      hasDummySnapshots: false,
     };
 
     await adminDb.collection(MEMORY_COLLECTION).doc(userId).set(
@@ -387,6 +395,7 @@ export async function deleteAssistantMemoryDocument(
     preferences: current.preferences,
     items: filteredItems,
     updatedAt: new Date(),
+    hasDummySnapshots: false,
   };
 }
 

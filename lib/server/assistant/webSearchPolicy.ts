@@ -37,6 +37,7 @@ export function getDefaultAssistantPreferences(): AssistantPreferences {
     responseStyle: 'balanced',
     includeMacroContext: false,
     memoryEnabled: true,
+    includeDummySnapshots: false,
   };
 }
 

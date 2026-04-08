@@ -10,6 +10,8 @@ import {
   buildAssistantYtdContext,
   buildAssistantHistoryContext,
 } from '@/lib/services/assistantMonthContextService';
+import { getDefaultAssistantPreferences } from '@/lib/server/assistant/webSearchPolicy';
+import { getAssistantMemoryDocument } from '@/lib/server/assistant/store';
 
 /**
  * GET /api/ai/assistant/context
@@ -42,16 +44,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'userId is required' }, { status: 400 });
     }
 
+    // Load user preferences to honour includeDummySnapshots for test accounts.
+    // Errors are non-fatal — fall back to safe defaults.
+    const memoryDoc = await getAssistantMemoryDocument(userId).catch(() => null);
+    const preferences = {
+      ...getDefaultAssistantPreferences(),
+      ...(memoryDoc?.preferences ?? {}),
+    };
+    const includeDummy = preferences.includeDummySnapshots ?? false;
+
     let bundle;
 
     if (mode === 'ytd_analysis') {
-      bundle = await buildAssistantYtdContext(userId);
+      bundle = await buildAssistantYtdContext(userId, includeDummy);
     } else if (mode === 'history_analysis') {
       // Read cashflowHistoryStartYear from settings; fall back to 5 years ago
       const { adminDb } = await import('@/lib/firebase/admin');
       const settingsSnap = await adminDb.collection('assetAllocationTargets').doc(userId).get();
       const startYear = settingsSnap.data()?.cashflowHistoryStartYear ?? new Date().getFullYear() - 5;
-      bundle = await buildAssistantHistoryContext(userId, startYear);
+      bundle = await buildAssistantHistoryContext(userId, startYear, includeDummy);
     } else if (mode === 'year_analysis') {
       const yearParam = searchParams.get('year');
       if (!yearParam) {
@@ -61,7 +72,7 @@ export async function GET(request: NextRequest) {
       if (isNaN(year)) {
         return NextResponse.json({ error: 'year must be a valid integer' }, { status: 400 });
       }
-      bundle = await buildAssistantYearContext(userId, year);
+      bundle = await buildAssistantYearContext(userId, year, includeDummy);
     } else {
       // Default: month_analysis
       const yearParam = searchParams.get('year');
@@ -80,7 +91,7 @@ export async function GET(request: NextRequest) {
           { status: 400 }
         );
       }
-      bundle = await buildAssistantMonthContext(userId, { year, month });
+      bundle = await buildAssistantMonthContext(userId, { year, month }, includeDummy);
     }
 
     return NextResponse.json({ bundle });

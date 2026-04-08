@@ -26,6 +26,9 @@ export interface AssistantPreferences {
   responseStyle: 'balanced' | 'concise' | 'deep';
   includeMacroContext: boolean;
   memoryEnabled: boolean;
+  // When enabled, dummy (test fixture) snapshots are included in context bundles.
+  // Off by default — intended for test accounts only.
+  includeDummySnapshots: boolean;
 }
 
 export interface AssistantMonthContext {
@@ -100,13 +103,20 @@ export interface AssistantMemoryDocument {
   preferences: AssistantPreferences;
   items: AssistantMemoryItem[];
   updatedAt: Date | null;
+  // Computed server-side: true when the user has at least one dummy snapshot.
+  // Used to conditionally show the "Snapshot di test" toggle in the UI.
+  hasDummySnapshots: boolean;
 }
 
 export interface AssistantThreadsResponse {
   threads: AssistantThread[];
 }
 
-export interface AssistantMemoryResponse extends AssistantMemoryDocument {}
+// Extends the memory document with computed fields returned only by the GET endpoint.
+// hasDummySnapshots is computed server-side to conditionally show the test toggle in the UI.
+export interface AssistantMemoryResponse extends AssistantMemoryDocument {
+  hasDummySnapshots: boolean;
+}
 
 export interface AssistantThreadResponse extends AssistantThreadDetail {}
 

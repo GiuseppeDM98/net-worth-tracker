@@ -16,8 +16,9 @@
  *   are identified by their stored `year`/`month` integer fields.
  * - Month-end date includes the full last day (23:59:59) so Firestore range
  *   queries capture every transaction recorded that day.
- * - Dummy snapshots are excluded because they are synthetic test fixtures that
- *   would distort real portfolio numbers.
+ * - Dummy snapshots are excluded by default because they are synthetic test
+ *   fixtures that would distort real portfolio numbers. They can be included by
+ *   passing includeDummySnapshots = true, intended for test accounts only.
  * - Dividends are separated from other income using dividendIncomeCategoryId
  *   from the user's settings, matching the pattern in performanceService.ts.
  * - allocationChanges is capped at the top 5 by absolute change to keep the
@@ -56,15 +57,17 @@ function getYearDateRange(year: number): { startDate: Date; endDate: Date } {
 }
 
 /**
- * Finds a real (non-dummy) snapshot for the exact year/month.
+ * Finds a snapshot for the exact year/month.
+ * Dummy snapshots are excluded unless includeDummy is true (test accounts only).
  */
 function findSnapshot(
   snapshots: MonthlySnapshot[],
   year: number,
-  month: number
+  month: number,
+  includeDummy = false
 ): MonthlySnapshot | null {
   return (
-    snapshots.find((s) => s.year === year && s.month === month && !s.isDummy) ?? null
+    snapshots.find((s) => s.year === year && s.month === month && (!s.isDummy || includeDummy)) ?? null
   );
 }
 
@@ -79,20 +82,30 @@ function getPreviousMonth(year: number, month: number): { year: number; month: n
 }
 
 /**
- * Returns the latest real (non-dummy) snapshot within the given year, or null.
+ * Returns the latest snapshot within the given year, or null.
  * Snapshots are assumed to be ordered by year/month ascending.
+ * Dummy snapshots are excluded unless includeDummy is true (test accounts only).
  */
-function findLatestSnapshotInYear(snapshots: MonthlySnapshot[], year: number): MonthlySnapshot | null {
-  const inYear = snapshots.filter((s) => s.year === year && !s.isDummy);
+function findLatestSnapshotInYear(
+  snapshots: MonthlySnapshot[],
+  year: number,
+  includeDummy = false
+): MonthlySnapshot | null {
+  const inYear = snapshots.filter((s) => s.year === year && (!s.isDummy || includeDummy));
   if (inYear.length === 0) return null;
   return inYear[inYear.length - 1];
 }
 
 /**
- * Returns the latest real (non-dummy) snapshot at or before the given year, or null.
+ * Returns the latest snapshot at or before the given year, or null.
+ * Dummy snapshots are excluded unless includeDummy is true (test accounts only).
  */
-function findLatestSnapshotAtOrBeforeYear(snapshots: MonthlySnapshot[], maxYear: number): MonthlySnapshot | null {
-  const eligible = snapshots.filter((s) => s.year <= maxYear && !s.isDummy);
+function findLatestSnapshotAtOrBeforeYear(
+  snapshots: MonthlySnapshot[],
+  maxYear: number,
+  includeDummy = false
+): MonthlySnapshot | null {
+  const eligible = snapshots.filter((s) => s.year <= maxYear && (!s.isDummy || includeDummy));
   if (eligible.length === 0) return null;
   return eligible[eligible.length - 1];
 }
@@ -346,7 +359,8 @@ function buildAllocationChanges(
  */
 export async function buildAssistantMonthContext(
   userId: string,
-  selector: AssistantMonthSelectorValue
+  selector: AssistantMonthSelectorValue,
+  includeDummySnapshots = false
 ): Promise<AssistantMonthContextBundle> {
   const { year, month } = selector;
   const { startDate, endDate } = getMonthDateRange(year, month);
@@ -360,8 +374,8 @@ export async function buildAssistantMonthContext(
     fetchAssets(userId),
   ]);
 
-  const currentSnapshot = findSnapshot(allSnapshots, year, month);
-  const previousSnapshot = findSnapshot(allSnapshots, prevYear, prevMonth);
+  const currentSnapshot = findSnapshot(allSnapshots, year, month, includeDummySnapshots);
+  const previousSnapshot = findSnapshot(allSnapshots, prevYear, prevMonth, includeDummySnapshots);
 
   // Derive data quality flags before building any numbers
   const now = new Date();
@@ -456,7 +470,8 @@ export async function buildAssistantMonthContext(
  */
 export async function buildAssistantYearContext(
   userId: string,
-  year: number
+  year: number,
+  includeDummySnapshots = false
 ): Promise<AssistantMonthContextBundle> {
   const now = new Date();
   const { year: italyCurrentYear } = getItalyMonthYear(now);
@@ -474,9 +489,9 @@ export async function buildAssistantYearContext(
   ]);
 
   // Baseline = December of previous year
-  const previousSnapshot = findSnapshot(allSnapshots, year - 1, 12);
+  const previousSnapshot = findSnapshot(allSnapshots, year - 1, 12, includeDummySnapshots);
   // End = latest snapshot within target year
-  const currentSnapshot = findLatestSnapshotInYear(allSnapshots, year);
+  const currentSnapshot = findLatestSnapshotInYear(allSnapshots, year, includeDummySnapshots);
 
   const hasSnapshot = currentSnapshot !== null;
   const hasPreviousBaseline = previousSnapshot !== null;
@@ -557,7 +572,8 @@ export async function buildAssistantYearContext(
  * @param userId - Firebase UID of the authenticated user
  */
 export async function buildAssistantYtdContext(
-  userId: string
+  userId: string,
+  includeDummySnapshots = false
 ): Promise<AssistantMonthContextBundle> {
   const now = new Date();
   const { year: currentYear, month: currentMonth } = getItalyMonthYear(now);
@@ -574,9 +590,9 @@ export async function buildAssistantYtdContext(
   ]);
 
   // Baseline = December of previous year (same as year builder)
-  const previousSnapshot = findSnapshot(allSnapshots, currentYear - 1, 12);
+  const previousSnapshot = findSnapshot(allSnapshots, currentYear - 1, 12, includeDummySnapshots);
   // End = latest snapshot of current year found so far
-  const currentSnapshot = findLatestSnapshotInYear(allSnapshots, currentYear);
+  const currentSnapshot = findLatestSnapshotInYear(allSnapshots, currentYear, includeDummySnapshots);
 
   const hasSnapshot = currentSnapshot !== null;
   const hasPreviousBaseline = previousSnapshot !== null;
@@ -654,7 +670,8 @@ export async function buildAssistantYtdContext(
  */
 export async function buildAssistantHistoryContext(
   userId: string,
-  startYear: number
+  startYear: number,
+  includeDummySnapshots = false
 ): Promise<AssistantMonthContextBundle> {
   const now = new Date();
   const { year: currentYear, month: currentMonth } = getItalyMonthYear(now);
@@ -670,12 +687,14 @@ export async function buildAssistantHistoryContext(
   ]);
 
   // Filter to snapshots within the history window
-  const windowSnapshots = allSnapshots.filter((s) => s.year >= startYear && !s.isDummy);
+  const windowSnapshots = allSnapshots.filter(
+    (s) => s.year >= startYear && (!s.isDummy || includeDummySnapshots)
+  );
 
   // Baseline = first snapshot in or after startYear
   const previousSnapshot = windowSnapshots.length > 0 ? windowSnapshots[0] : null;
   // End = latest snapshot overall
-  const currentSnapshot = findLatestSnapshotAtOrBeforeYear(allSnapshots, currentYear);
+  const currentSnapshot = findLatestSnapshotAtOrBeforeYear(allSnapshots, currentYear, includeDummySnapshots);
 
   const hasSnapshot = currentSnapshot !== null;
   const hasPreviousBaseline = previousSnapshot !== null;

@@ -1095,6 +1095,24 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                       disabled={loadingMemory || updateMemoryMutation.isPending}
                     />
                   </div>
+
+                  {/* Shown only when the user has dummy snapshots — test accounts only.
+                      hasDummySnapshots is a computed field returned by the memory GET endpoint. */}
+                  {memory?.hasDummySnapshots && (
+                    <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">Snapshot di test</p>
+                        <p className="text-xs text-muted-foreground">
+                          Includi snapshot dummy nelle analisi (solo account di test).
+                        </p>
+                      </div>
+                      <Switch
+                        checked={memory?.preferences.includeDummySnapshots ?? false}
+                        onCheckedChange={(checked) => handlePreferencesChange({ includeDummySnapshots: checked })}
+                        disabled={loadingMemory || updateMemoryMutation.isPending}
+                      />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

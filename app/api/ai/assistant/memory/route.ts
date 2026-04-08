@@ -19,8 +19,21 @@ export async function GET(request: NextRequest) {
 
     assertSameUser(decodedToken, userId);
 
-    const memory = await getAssistantMemoryDocument(userId as string);
-    return NextResponse.json(memory);
+    const { adminDb } = await import('@/lib/firebase/admin');
+
+    // Run memory fetch and dummy-snapshot check in parallel.
+    // hasDummySnapshots drives conditional UI — the toggle is only shown when relevant.
+    const [memory, dummySnap] = await Promise.all([
+      getAssistantMemoryDocument(userId as string),
+      adminDb
+        .collection('monthly-snapshots')
+        .where('userId', '==', userId)
+        .where('isDummy', '==', true)
+        .limit(1)
+        .get(),
+    ]);
+
+    return NextResponse.json({ ...memory, hasDummySnapshots: !dummySnap.empty });
   } catch (error) {
     const authErrorResponse = getApiAuthErrorResponse(error);
     if (authErrorResponse) {
