@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-08, session 68c): **Assistente AI layout restructure**. Preferences Card removed from right sidebar → moved into a `Popover` (Settings2 icon) in the page header. Memory panel wrapped in a `Collapsible` (`AssistantMemoryPanel` extended with optional `isOpen`/`onToggle` props, open by default). Right sidebar order: Conversazioni → Contesto numerico → Memoria. Mobile hero: chips card now first, threads ("Riprendi conversazione") below. New `components/ui/popover.tsx` added (`@radix-ui/react-popover`).
+- Latest implementation (2026-04-08, session distill): **Assistente AI composer + preferences cleanup**. Composer toolbar reduced to max 2 controls in the top row (mode selector + period picker); `chatContextType` selector moved to a secondary compact row below the textarea (visible only in chat mode). `chatContextType` default changed from `'month'` to `'none'`. Duplicate "Memoria assistente" switch removed from Preferences popover — the canonical toggle lives in the Memory panel ("Apprendimento automatico"). Mobile header action row now uses `flex-wrap` to prevent overflow on narrow viewports. Previous (session 68c): Preferences Card removed from right sidebar → moved into a `Popover` (Settings2 icon) in the page header. Memory panel wrapped in a `Collapsible`. Right sidebar order: Conversazioni → Contesto numerico → Memoria. Mobile hero: chips card now first, threads below.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -17,7 +17,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Key Features (Active)
 - Portfolio tracking across equities, bonds, crypto, real estate, commodities, and cash
 - Automatic price updates via Yahoo Finance and Borsa Italiana bond support
-- Assistente AI (Step 8+, 2026-04-08): 5 modes — `month_analysis`, `year_analysis`, `ytd_analysis`, `history_analysis`, `chat`. Chat mode has `chatContextType` selector (`none | month | year | ytd | history`). `bySubCategoryAllocation` in context bundle. `selector.month` encoding: `>0`=monthly, `0`=year, `-1`=YTD, `-2`=history. `useAssistantPeriodContext` unifies all 4 context hooks. `includeMacroContext` gates web search. Extended thinking (budget 2000) + 3500 max_tokens. `resolvedThreadId` pattern avoids stale RQ cache. Feature flag `NEXT_PUBLIC_ASSISTANT_AI_ENABLED`. Persistent conversations, auto-memory, markdown with tables. Memory extraction runs in all modes, gated by `memoryEnabled` only. `includeDummySnapshots` preference: toggle visible only when `hasDummySnapshots` (computed fresh at memory GET, never persisted). **Layout (session 68c)**: Preferences in header popover (Settings2), Memory collapsible in sidebar, mobile hero chips-first.
+- Assistente AI (2026-04-08): 5 modes — `month_analysis`, `year_analysis`, `ytd_analysis`, `history_analysis`, `chat`. Chat mode has `chatContextType` selector (`none | month | year | ytd | history`), default `'none'`. `chatContextType` rendered as secondary compact row below the textarea (not in the top toolbar row). `bySubCategoryAllocation` in context bundle. `selector.month` encoding: `>0`=monthly, `0`=year, `-1`=YTD, `-2`=history. `useAssistantPeriodContext` unifies all 4 context hooks. `includeMacroContext` gates web search. Extended thinking (budget 2000) + 3500 max_tokens. `resolvedThreadId` pattern avoids stale RQ cache. Feature flag `NEXT_PUBLIC_ASSISTANT_AI_ENABLED`. Persistent conversations, auto-memory, markdown with tables. Memory extraction runs in all modes, gated by `memoryEnabled` only. `includeDummySnapshots` preference: toggle visible only when `hasDummySnapshots` (computed fresh at memory GET, never persisted). **Layout**: Preferences in header popover (Settings2) — "Stile di risposta" + "Contesto macro" only (memory toggle lives in Memory panel only). Memory collapsible in sidebar. Mobile hero chips-first. Mobile header uses `flex-wrap` on action row.
 - Login and Register now feel more native to the product, with calmer entry motion, cleaner field focus choreography, keyboard-reachable password toggles, and inline submit status feedback
 - Hall of Fame now reads as an editorial ranking surface with clearer monthly/yearly hierarchy, spotlight cards for the current month/year, and contextual note dialogs tied to the selected record
 - Cashflow "Entrate per categoria" pie chart on mobile now caps legend items at 3 (same as expense chart), preventing overflow when 4+ categories exceed the 5% threshold
@@ -80,7 +80,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-08 (session 68c — Assistente AI layout restructure)
+**Last updated**: 2026-04-08 (session distill — Assistente AI composer simplification)
 
 ## Design Context
 

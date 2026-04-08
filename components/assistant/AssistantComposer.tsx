@@ -96,7 +96,8 @@ export function AssistantComposer({
 
   return (
     <div className="border-t border-border bg-background px-4 pb-3 pt-3 max-desktop:portrait:pb-[88px]">
-      {/* Context row: mode selector + optional period picker */}
+      {/* Top row: mode selector + period picker (max 2 controls).
+          Chat context type is a secondary control shown below the input, not here. */}
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <Select value={mode} onValueChange={(v) => onModeChange(v as AssistantMode)} disabled={isStreaming}>
           <SelectTrigger className="h-8 w-auto min-w-[160px] text-xs">
@@ -123,7 +124,7 @@ export function AssistantComposer({
           </div>
         )}
 
-        {/* Year picker: shown for year_analysis mode */}
+        {/* Year picker: shown for year_analysis */}
         {mode === 'year_analysis' && (
           <Select
             value={String(selectedYear)}
@@ -143,69 +144,12 @@ export function AssistantComposer({
           </Select>
         )}
 
-        {/* YTD / history: no picker — the period is fully implicit */}
+        {/* YTD / history: period is fully implicit, show a short label */}
         {mode === 'ytd_analysis' && (
           <span className="text-xs text-muted-foreground">Da inizio anno a oggi</span>
         )}
         {mode === 'history_analysis' && (
           <span className="text-xs text-muted-foreground">Dall'anno di inizio cashflow</span>
-        )}
-
-        {/* Chat mode: context type selector + optional period picker */}
-        {mode === 'chat' && (
-          <>
-            <Select
-              value={chatContextType}
-              onValueChange={(v) => onChatContextTypeChange(v as AssistantChatContextType)}
-              disabled={isStreaming}
-            >
-              <SelectTrigger className="h-8 w-auto min-w-[140px] text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Nessun contesto</SelectItem>
-                <SelectItem value="month">Mese</SelectItem>
-                <SelectItem value="year">Anno</SelectItem>
-                <SelectItem value="ytd">YTD</SelectItem>
-                <SelectItem value="history">Storico totale</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {chatContextType === 'month' && (
-              <div className="w-auto min-w-[160px]">
-                <AssistantMonthPicker
-                  value={selectedMonth}
-                  options={monthOptions}
-                  onChange={onMonthChange}
-                  disabled={isStreaming}
-                />
-              </div>
-            )}
-            {chatContextType === 'year' && (
-              <Select
-                value={String(selectedYear)}
-                onValueChange={(v) => onYearChange(Number(v))}
-                disabled={isStreaming}
-              >
-                <SelectTrigger className="h-8 w-auto min-w-[100px] text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {yearOptions.map((year) => (
-                    <SelectItem key={year} value={String(year)}>
-                      {year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            {chatContextType === 'ytd' && (
-              <span className="text-xs text-muted-foreground">Da inizio anno a oggi</span>
-            )}
-            {chatContextType === 'history' && (
-              <span className="text-xs text-muted-foreground">Dall'anno di inizio cashflow</span>
-            )}
-          </>
         )}
       </div>
 
@@ -250,7 +194,66 @@ export function AssistantComposer({
         </Button>
       </div>
 
-      {/* Inline error / hint below the input row */}
+      {/* Chat mode: context type selector as a secondary compact row.
+          Kept below the input so it doesn't compete with the mode selector in the top row. */}
+      {mode === 'chat' && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">Contesto:</span>
+          <Select
+            value={chatContextType}
+            onValueChange={(v) => onChatContextTypeChange(v as AssistantChatContextType)}
+            disabled={isStreaming}
+          >
+            <SelectTrigger className="h-7 w-auto min-w-[120px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Nessuno</SelectItem>
+              <SelectItem value="month">Mese</SelectItem>
+              <SelectItem value="year">Anno</SelectItem>
+              <SelectItem value="ytd">YTD</SelectItem>
+              <SelectItem value="history">Storico totale</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {chatContextType === 'month' && (
+            <div className="w-auto min-w-[150px]">
+              <AssistantMonthPicker
+                value={selectedMonth}
+                options={monthOptions}
+                onChange={onMonthChange}
+                disabled={isStreaming}
+              />
+            </div>
+          )}
+          {chatContextType === 'year' && (
+            <Select
+              value={String(selectedYear)}
+              onValueChange={(v) => onYearChange(Number(v))}
+              disabled={isStreaming}
+            >
+              <SelectTrigger className="h-7 w-auto min-w-[80px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {yearOptions.map((year) => (
+                  <SelectItem key={year} value={String(year)}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {chatContextType === 'ytd' && (
+            <span className="text-xs text-muted-foreground">Da inizio anno</span>
+          )}
+          {chatContextType === 'history' && (
+            <span className="text-xs text-muted-foreground">Dall'anno di inizio cashflow</span>
+          )}
+        </div>
+      )}
+
+      {/* Inline error / hint */}
       {errorHint ? (
         <p className="mt-2 text-xs text-destructive">{errorHint}</p>
       ) : (

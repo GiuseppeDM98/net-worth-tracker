@@ -310,7 +310,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     () => getItalyMonthYear(new Date())
   );
   const [selectedYear, setSelectedYear] = useState<number>(() => getItalyMonthYear(new Date()).year);
-  const [chatContextType, setChatContextType] = useState<AssistantChatContextType>('month');
+  const [chatContextType, setChatContextType] = useState<AssistantChatContextType>('none');
 
   const [streamingMessages, setStreamingMessages] = useState<AssistantMessage[]>([]);
   // Tracks the ID of the assistant message slot that is currently receiving tokens.
@@ -732,7 +732,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                   Fai domande sul tuo patrimonio, analizza un mese, un anno, il tuo YTD o l'intera storia del portafoglio.
                 </p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2">
                 {/* Mobile-only: opens thread list drawer. Hidden on desktop where the right panel is always visible */}
                 <div className="desktop:hidden">
                   <Sheet>
@@ -834,20 +834,6 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                         <Switch
                           checked={memory?.preferences.includeMacroContext ?? false}
                           onCheckedChange={(checked) => handlePreferencesChange({ includeMacroContext: checked })}
-                          disabled={loadingMemory || updateMemoryMutation.isPending}
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2">
-                        <div>
-                          <p className="text-sm font-medium text-foreground">Memoria assistente</p>
-                          <p className="text-xs text-muted-foreground">
-                            Conserva preferenze e fatti tra i thread.
-                          </p>
-                        </div>
-                        <Switch
-                          checked={memory?.preferences.memoryEnabled ?? true}
-                          onCheckedChange={(checked) => handlePreferencesChange({ memoryEnabled: checked })}
                           disabled={loadingMemory || updateMemoryMutation.isPending}
                         />
                       </div>
