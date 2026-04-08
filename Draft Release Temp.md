@@ -192,9 +192,13 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 
 ---
 
+## ✨ New Features (Patrimonio — history tables)
+
+- Added a new "Includi nelle tabelle storiche" toggle to the asset edit dialog — turn it on for any asset (pension funds, real estate, ETFs, etc.) to include it in the Anno Corrente and Storico price and value history tables, regardless of cost basis settings
+- Sold assets (quantity set to zero) with the toggle enabled now appear in Storico with a "Venduto" badge for the months they were held — historical data is preserved
+
 ## 🐛 Bug Fixes (Patrimonio — history tables)
 
 - Fixed the Anno Corrente and Storico price/value tables showing assets that were sold in a previous year — sold assets from prior years no longer appear as stale rows
-- Fixed assets without cost basis tracking appearing in the Anno Corrente and Storico history tables — only assets with active cost basis tracking (or real estate) are now shown
-- Fixed assets without cost basis tracking incorrectly showing a "Venduto" badge in the history tables after applying filters
+- Fixed assets incorrectly showing a "Venduto" badge in the history tables when they were active — only genuinely sold assets show this label
 - Fixed disabling cost basis tracking on an asset not persisting to the database — clearing the average cost or tax rate fields now correctly removes those values from the asset record

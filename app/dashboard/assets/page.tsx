@@ -127,20 +127,20 @@ export default function AssetsPage() {
     isRefreshing && 'border-primary/30 bg-primary/5 text-foreground'
   );
 
-  // Active assets (quantity > 0) shown in the price/value history tables.
-  // Inclusion criteria (either condition qualifies):
-  //   1. Cost basis tracking enabled: averageCost > 0 and taxRate defined — meaningful
-  //      return-on-investment history is available.
-  //   2. Real estate (assetClass === 'realestate') — properties typically don't carry
-  //      averageCost/taxRate in this system but are still worth tracking historically.
-  // Sold assets (quantity === 0) and untracked non-real-estate assets are excluded.
-  const costBasisAssetsCurrentYear = useMemo(
-    () => assets.filter(
-      (a) => a.quantity > 0 && (
-        a.assetClass === 'realestate' ||
-        !!(a.averageCost && a.averageCost > 0 && a.taxRate !== undefined && a.taxRate >= 0)
-      )
-    ),
+  // Anno Corrente: only active (quantity > 0) assets with the flag enabled.
+  // Sold assets are excluded here — they can't have meaningful current-year data
+  // if sold before this year, and if sold during the year they'd appear via snapshots
+  // anyway (but we keep this strict for simplicity).
+  const historyTableAssets = useMemo(
+    () => assets.filter((a) => a.quantity > 0 && a.includeInHistoryTables === true),
+    [assets]
+  );
+
+  // Storico: includes sold assets (quantity === 0) with the flag enabled so their
+  // historical months still show with a "Venduto" badge. Assets completely removed
+  // from Firestore can't be recovered (flag lost), so only qty=0 ones are preserved.
+  const historyTableAssetsAll = useMemo(
+    () => assets.filter((a) => a.includeInHistoryTables === true),
     [assets]
   );
 
@@ -244,7 +244,7 @@ export default function AssetsPage() {
                     variants={tabPanelSwitch}
                   >
                     <AssetPriceHistoryTable
-                      assets={costBasisAssetsCurrentYear}
+                      assets={historyTableAssets}
                       snapshots={snapshots}
                       filterYear={getCurrentYear()}
                       displayMode="price"
@@ -271,7 +271,7 @@ export default function AssetsPage() {
                     variants={tabPanelSwitch}
                   >
                     <AssetPriceHistoryTable
-                      assets={costBasisAssetsCurrentYear}
+                      assets={historyTableAssets}
                       snapshots={snapshots}
                       filterYear={getCurrentYear()}
                       displayMode="totalValue"
@@ -355,7 +355,7 @@ export default function AssetsPage() {
                     variants={tabPanelSwitch}
                   >
                     <AssetPriceHistoryTable
-                      assets={costBasisAssetsCurrentYear}
+                      assets={historyTableAssetsAll}
                       snapshots={snapshots}
                       filterStartDate={{ year: 2025, month: 11 }}
                       displayMode="price"
@@ -381,7 +381,7 @@ export default function AssetsPage() {
                     variants={tabPanelSwitch}
                   >
                     <AssetPriceHistoryTable
-                      assets={costBasisAssetsCurrentYear}
+                      assets={historyTableAssetsAll}
                       snapshots={snapshots}
                       filterStartDate={{ year: 2025, month: 11 }}
                       displayMode="totalValue"
