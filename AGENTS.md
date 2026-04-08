@@ -151,9 +151,11 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 ### Assistant Thread List UX
 - Thread dates: use `formatDistanceToNow` (date-fns, Italian locale) for dates within the past 7 days; fall back to `toLocaleDateString('it-IT', {day:'2-digit', month:'2-digit', year:'numeric'})` for older dates. Never use relative-only formatting — absolute dates are more useful for threads weeks old.
 - Mobile thread list: use a `Sheet` (`side="right"`) triggered by a button in the page header (hidden on `desktop:` via `desktop:hidden`). The desktop right panel card uses `hidden desktop:block`. This ensures the same `ThreadList` component is used in both surfaces without duplicating the item render logic.
-- Desktop right column order: Threads → Context panel → Preferences → Memory. Threads first so the user can pick a conversation immediately without scrolling.
+- Desktop right column order: Threads → Context panel → Memory (collapsible). Preferences moved to a header popover (Settings2 icon). Threads first so the user can pick a conversation immediately without scrolling.
 - Desktop right column is `sticky top-6` with `max-h-[calc(100vh-6rem)] overflow-y-auto` so panels remain visible while the conversation scrolls. `overflow-y-auto` on the column itself (not a wrapper) lets the sidebar scroll internally if memory list is very long.
-- Mobile hero shows the last 5 threads above the chip strip (`desktop:hidden`) — allows resuming a past conversation without opening the drawer. Capped at 5 to avoid overwhelming the hero.
+- Mobile hero shows chips first, then last 5 threads below as "Riprendi conversazione" (`desktop:hidden`) — chips must be above the fold on mobile. Capped at 5 to avoid overwhelming the hero.
+- **Do not use `DropdownMenu` for panels that contain `Select` or `Switch`** — `DropdownMenu` closes on any click inside, including opening a Select dropdown or toggling a Switch. Use `Popover` (`@radix-ui/react-popover`, `components/ui/popover.tsx`) for self-contained settings panels.
+- `AssistantMemoryPanel` accepts optional `isOpen`/`onToggle` props for controlled collapsible mode. When provided, the `CardHeader` becomes the `CollapsibleTrigger` and a `ChevronDown` chevron appears. Without these props the panel is static (backwards compatible). Buttons inside the header that must not toggle the collapsible need `e.stopPropagation()`.
 
 ### Assistant Markdown Rendering
 - Use `remark-gfm` with `ReactMarkdown` — without it markdown tables (`| col | col |`) render as raw pipe characters. `remark-gfm@4.0.1` is already installed.

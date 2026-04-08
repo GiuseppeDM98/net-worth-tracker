@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Brain, Loader2, RotateCcw, Trash2 } from 'lucide-react';
+import { Brain, ChevronDown, Loader2, RotateCcw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AssistantMemoryItemRow } from '@/components/assistant/AssistantMemoryItemRow';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Dialog,
   DialogContent,
@@ -24,6 +25,9 @@ interface AssistantMemoryPanelProps {
   userId: string;
   memory: AssistantMemoryDocument | undefined;
   isLoading: boolean;
+  /** Controlled open state — when provided, the card header shows a collapse chevron. */
+  isOpen?: boolean;
+  onToggle?: () => void;
 }
 
 type FilterTab = 'active' | 'archived';
@@ -47,7 +51,9 @@ const CATEGORY_GROUP_LABELS: Record<AssistantMemoryItem['category'], string> = {
  * Layout: single-column card, responsive — works in the desktop right panel
  * and also renders correctly in the mobile tab/sheet surfaces.
  */
-export function AssistantMemoryPanel({ userId, memory, isLoading }: AssistantMemoryPanelProps) {
+export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onToggle }: AssistantMemoryPanelProps) {
+  // When isOpen/onToggle are provided the card header acts as a collapsible trigger.
+  const collapsible = isOpen !== undefined && onToggle !== undefined;
   const [filterTab, setFilterTab] = useState<FilterTab>('active');
   const [showResetDialog, setShowResetDialog] = useState(false);
 
@@ -122,40 +128,58 @@ export function AssistantMemoryPanel({ userId, memory, isLoading }: AssistantMem
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between gap-3">
-            <div className="space-y-1">
-              <CardTitle className="flex items-center gap-2">
-                <Brain className="h-4 w-4 text-muted-foreground" />
-                Memoria
-              </CardTitle>
-              <CardDescription>
-                {isLoading
-                  ? 'Caricamento…'
-                  : activeCount > 0
-                  ? `${activeCount} ricord${activeCount === 1 ? 'o' : 'i'} attiv${activeCount === 1 ? 'o' : 'i'}`
-                  : 'Nessun ricordo ancora'}
-              </CardDescription>
-            </div>
+      <Collapsible open={collapsible ? isOpen : true} onOpenChange={collapsible ? onToggle : undefined}>
+        <Card>
+          {/* When collapsible, the header is a toggle trigger; otherwise it's static. */}
+          <CollapsibleTrigger asChild={collapsible} disabled={!collapsible}>
+            <CardHeader className={collapsible ? 'cursor-pointer select-none' : undefined}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <CardTitle className="flex items-center gap-2">
+                    <Brain className="h-4 w-4 text-muted-foreground" />
+                    Memoria
+                  </CardTitle>
+                  <CardDescription>
+                    {isLoading
+                      ? 'Caricamento…'
+                      : activeCount > 0
+                      ? `${activeCount} ricord${activeCount === 1 ? 'o' : 'i'} attiv${activeCount === 1 ? 'o' : 'i'}`
+                      : 'Nessun ricordo ancora'}
+                  </CardDescription>
+                </div>
 
-            {/* Reset button — only shown when there are items */}
-            {totalItems > 0 && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
-                disabled={isMutating}
-                onClick={() => setShowResetDialog(true)}
-                aria-label="Elimina tutta la memoria"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            )}
-          </div>
-        </CardHeader>
+                <div className="flex items-center gap-1">
+                  {/* Reset button — only shown when there are items and panel is open */}
+                  {totalItems > 0 && (!collapsible || isOpen) && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                      disabled={isMutating}
+                      onClick={(e) => {
+                        // Stop propagation so this click doesn't also toggle the collapsible.
+                        e.stopPropagation();
+                        setShowResetDialog(true);
+                      }}
+                      aria-label="Elimina tutta la memoria"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
 
-        <CardContent className="space-y-4">
+                  {/* Collapse chevron — only when controlled from parent */}
+                  {collapsible && (
+                    <ChevronDown
+                      className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                    />
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+          </CollapsibleTrigger>
+
+          <CollapsibleContent>
+            <CardContent className="space-y-4">
           {/* Memory enabled toggle */}
           <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2">
             <div>
@@ -247,8 +271,10 @@ export function AssistantMemoryPanel({ userId, memory, isLoading }: AssistantMem
               )}
             </>
           )}
-        </CardContent>
-      </Card>
+          </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       {/* Reset all confirmation dialog */}
       <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>

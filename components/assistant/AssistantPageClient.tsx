@@ -10,6 +10,7 @@ import {
   MessageSquare,
   MessagesSquare,
   Plus,
+  Settings2,
   Sparkles,
   Trash2,
   WandSparkles,
@@ -31,6 +32,7 @@ import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAssistantMemory, useUpdateAssistantMemory } from '@/lib/hooks/useAssistantMemory';
@@ -321,6 +323,8 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   const [isSlowResponse, setIsSlowResponse] = useState(false);
   // Context bundle is populated from the SSE 'context' event sent before text streaming
   const [contextBundle, setContextBundle] = useState<AssistantMonthContextBundle | null>(null);
+  // Memory panel starts open; user can collapse to reduce sidebar height when list grows long.
+  const [isMemoryPanelOpen, setIsMemoryPanelOpen] = useState(true);
 
   const { data: threads = [], isLoading: loadingThreads, error: threadsError } = useAssistantThreads(user?.uid);
   const { data: threadDetail, isLoading: loadingThreadDetail, error: threadError } = useAssistantThread(
@@ -781,10 +785,93 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                   <Plus className="h-4 w-4" />
                   Nuova conversazione
                 </Button>
-                <Badge variant="outline" className="w-fit gap-2 text-xs">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Assistente AI
-                </Badge>
+
+                {/* Preferences popover — keeps the sidebar lean by moving non-critical
+                    settings out of the scrollable right column and into the header. */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Preferenze assistente">
+                      <Settings2 className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-72">
+                    <p className="mb-3 text-sm font-semibold text-foreground">Preferenze</p>
+
+                    {/* Response style selector */}
+                    <div className="mb-3 space-y-1.5">
+                      <label className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                        Stile di risposta
+                      </label>
+                      <Select
+                        value={memory?.preferences.responseStyle ?? 'balanced'}
+                        onValueChange={(value) =>
+                          handlePreferencesChange({
+                            responseStyle: value as 'balanced' | 'concise' | 'deep',
+                          })
+                        }
+                        disabled={loadingMemory || updateMemoryMutation.isPending}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Stile di risposta" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="balanced">Bilanciato</SelectItem>
+                          <SelectItem value="concise">Conciso</SelectItem>
+                          <SelectItem value="deep">Approfondito</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Toggle switches */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">Contesto macro</p>
+                          <p className="text-xs text-muted-foreground">
+                            Abilita ricerca web nelle analisi.
+                          </p>
+                        </div>
+                        <Switch
+                          checked={memory?.preferences.includeMacroContext ?? false}
+                          onCheckedChange={(checked) => handlePreferencesChange({ includeMacroContext: checked })}
+                          disabled={loadingMemory || updateMemoryMutation.isPending}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">Memoria assistente</p>
+                          <p className="text-xs text-muted-foreground">
+                            Conserva preferenze e fatti tra i thread.
+                          </p>
+                        </div>
+                        <Switch
+                          checked={memory?.preferences.memoryEnabled ?? true}
+                          onCheckedChange={(checked) => handlePreferencesChange({ memoryEnabled: checked })}
+                          disabled={loadingMemory || updateMemoryMutation.isPending}
+                        />
+                      </div>
+
+                      {/* Shown only when the user has dummy snapshots — test accounts only.
+                          hasDummySnapshots is a computed field returned by the memory GET endpoint. */}
+                      {memory?.hasDummySnapshots && (
+                        <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">Snapshot di test</p>
+                            <p className="text-xs text-muted-foreground">
+                              Includi snapshot dummy nelle analisi (solo account di test).
+                            </p>
+                          </div>
+                          <Switch
+                            checked={memory?.preferences.includeDummySnapshots ?? false}
+                            onCheckedChange={(checked) => handlePreferencesChange({ includeDummySnapshots: checked })}
+                            disabled={loadingMemory || updateMemoryMutation.isPending}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
           </div>
@@ -813,13 +900,34 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
               {/* Hero state: shown when no messages exist yet */}
               {renderedMessages.length === 0 && !loadingThreadDetail && (
                 <>
-                  {/* Mobile-only thread list: shown in the hero so users can resume
-                      a past conversation without opening the drawer. Hidden on desktop
-                      where the right-column card is always visible. */}
+                  {/* Chips card comes first so the primary CTA is above the fold on mobile.
+                      On desktop this order is less critical since threads are in the right column. */}
+                  <div className="mb-4 rounded-2xl border border-border bg-muted/20 p-6">
+                    <div className="mb-4 flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                        <Sparkles className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-foreground">Come posso aiutarti?</p>
+                        <p className="text-sm text-muted-foreground">
+                          Scegli un punto di partenza o scrivi direttamente nel composer.
+                        </p>
+                      </div>
+                    </div>
+                    <AssistantPromptChips
+                      chips={assistantPromptChips}
+                      onSelect={handleChipClick}
+                      disabled={isStreaming}
+                    />
+                  </div>
+
+                  {/* Mobile-only thread list: secondary section below chips so the primary
+                      CTA stays above the fold. Hidden on desktop where threads are in the
+                      right-column card. */}
                   {threads.length > 0 && (
                     <div className="mb-4 desktop:hidden">
                       <p className="mb-2 text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                        Conversazioni recenti
+                        Riprendi conversazione
                       </p>
                       <div className="space-y-1.5">
                         {threads.slice(0, 5).map((thread) => (
@@ -854,25 +962,6 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                       </div>
                     </div>
                   )}
-
-                  <div className="mb-4 rounded-2xl border border-border bg-muted/20 p-6">
-                    <div className="mb-4 flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                        <Sparkles className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-foreground">Come posso aiutarti?</p>
-                        <p className="text-sm text-muted-foreground">
-                          Scegli un punto di partenza o scrivi direttamente nel composer.
-                        </p>
-                      </div>
-                    </div>
-                    <AssistantPromptChips
-                      chips={assistantPromptChips}
-                      onSelect={handleChipClick}
-                      disabled={isStreaming}
-                    />
-                  </div>
                 </>
               )}
 
@@ -1035,93 +1124,14 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                 </Card>
               )}
 
-              {/* Preferences */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <WandSparkles className="h-4 w-4 text-muted-foreground" />
-                    Preferenze
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                      Stile di risposta
-                    </label>
-                    <Select
-                      value={memory?.preferences.responseStyle ?? 'balanced'}
-                      onValueChange={(value) =>
-                        handlePreferencesChange({
-                          responseStyle: value as 'balanced' | 'concise' | 'deep',
-                        })
-                      }
-                      disabled={loadingMemory || updateMemoryMutation.isPending}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Stile di risposta" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="balanced">Bilanciato</SelectItem>
-                        <SelectItem value="concise">Conciso</SelectItem>
-                        <SelectItem value="deep">Approfondito</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">Contesto macro</p>
-                      <p className="text-xs text-muted-foreground">
-                        Abilita ricerca web nelle analisi.
-                      </p>
-                    </div>
-                    <Switch
-                      checked={memory?.preferences.includeMacroContext ?? false}
-                      onCheckedChange={(checked) => handlePreferencesChange({ includeMacroContext: checked })}
-                      disabled={loadingMemory || updateMemoryMutation.isPending}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">Memoria assistente</p>
-                      <p className="text-xs text-muted-foreground">
-                        Conserva preferenze e fatti tra i thread.
-                      </p>
-                    </div>
-                    <Switch
-                      checked={memory?.preferences.memoryEnabled ?? true}
-                      onCheckedChange={(checked) => handlePreferencesChange({ memoryEnabled: checked })}
-                      disabled={loadingMemory || updateMemoryMutation.isPending}
-                    />
-                  </div>
-
-                  {/* Shown only when the user has dummy snapshots — test accounts only.
-                      hasDummySnapshots is a computed field returned by the memory GET endpoint. */}
-                  {memory?.hasDummySnapshots && (
-                    <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">Snapshot di test</p>
-                        <p className="text-xs text-muted-foreground">
-                          Includi snapshot dummy nelle analisi (solo account di test).
-                        </p>
-                      </div>
-                      <Switch
-                        checked={memory?.preferences.includeDummySnapshots ?? false}
-                        onCheckedChange={(checked) => handlePreferencesChange({ includeDummySnapshots: checked })}
-                        disabled={loadingMemory || updateMemoryMutation.isPending}
-                      />
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Memory panel */}
+              {/* Memory panel — collapsible to reduce sidebar height when the list grows long. */}
               {user?.uid && (
                 <AssistantMemoryPanel
                   userId={user.uid}
                   memory={memory}
                   isLoading={loadingMemory}
+                  isOpen={isMemoryPanelOpen}
+                  onToggle={() => setIsMemoryPanelOpen((v) => !v)}
                 />
               )}
 
