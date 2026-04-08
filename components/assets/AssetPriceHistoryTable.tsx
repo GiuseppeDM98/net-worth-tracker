@@ -61,6 +61,7 @@ interface AssetPriceHistoryTableProps {
   displayMode?: AssetHistoryDisplayMode; // 'price' or 'totalValue' (default: 'price')
   includePreviousMonthBaseline?: boolean;
   excludeCash?: boolean;
+  restrictToPassedAssets?: boolean;
   showTotalRow?: boolean; // Show total row at bottom (default: false)
   loading: boolean;
   onRefresh: () => Promise<void>;
@@ -87,6 +88,7 @@ export function AssetPriceHistoryTable({
   displayMode = 'price',
   includePreviousMonthBaseline = false,
   excludeCash = false,
+  restrictToPassedAssets = false,
   showTotalRow = false,
   loading,
   onRefresh,
@@ -107,8 +109,9 @@ export function AssetPriceHistoryTable({
       displayMode,
       includePreviousMonthBaseline,
       excludeCash,
+      restrictToPassedAssets,
     }),
-    [snapshots, assets, filterYear, filterStartDate, displayMode, includePreviousMonthBaseline, excludeCash]
+    [snapshots, assets, filterYear, filterStartDate, displayMode, includePreviousMonthBaseline, excludeCash, restrictToPassedAssets]
   );
 
   const { assets: assetRows, monthColumns, totalRow } = tableData;

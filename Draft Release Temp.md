@@ -189,3 +189,12 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 ## 🏗️ Technical
 
 - Added `includeDummySnapshots` assistant preference: test accounts with synthetic snapshot data can now include those snapshots in AI context bundles. The toggle appears automatically only when dummy snapshots are detected — invisible to all regular users
+
+---
+
+## 🐛 Bug Fixes (Patrimonio — history tables)
+
+- Fixed the Anno Corrente and Storico price/value tables showing assets that were sold in a previous year — sold assets from prior years no longer appear as stale rows
+- Fixed assets without cost basis tracking appearing in the Anno Corrente and Storico history tables — only assets with active cost basis tracking (or real estate) are now shown
+- Fixed assets without cost basis tracking incorrectly showing a "Venduto" badge in the history tables after applying filters
+- Fixed disabling cost basis tracking on an asset not persisting to the database — clearing the average cost or tax rate fields now correctly removes those values from the asset record

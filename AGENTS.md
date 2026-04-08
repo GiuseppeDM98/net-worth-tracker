@@ -177,9 +177,18 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Cash asset balance lives in `quantity`, not via price updates
 - Do not filter `cash` out of Patrimonio historical tables unless the product request is explicit; the default behavior keeps liquidity visible in both `Anno Corrente` and `Storico`
 - Borsa Italiana bond prices are `% of par`; store converted EUR values
+- **Cost basis tracking** = `!!(asset.averageCost && asset.averageCost > 0 && asset.taxRate !== undefined && asset.taxRate >= 0)`. Real estate (`assetClass === 'realestate'`) is exempt and always shown in price/value history tables regardless of cost basis fields
+- **Patrimonio history tables** (Anno Corrente + Storico) show only `quantity > 0` assets with active cost basis tracking, or real estate. Pass `restrictToPassedAssets={true}` to `AssetPriceHistoryTable` to prevent snapshot-only (deleted) assets from bypassing the upstream filter — without this flag the transform re-adds them as `isDeleted: true` ("Venduto") from snapshot data
+- **`restrictToPassedAssets` pattern**: when you pre-filter the `assets` array before passing to `AssetPriceHistoryTable`, always set this prop or the transform's second source (historical snapshots) will silently re-introduce excluded assets with the "Venduto" badge
 - FIRE annual expenses must use the last completed year
 - `includePrimaryResidence` must flow through both React Query key and query function
 - FIRE calculator unsaved preview is local-only: metrics may react immediately to form edits, but milestone surfaces like the "FIRE raggiunto" banner should remain anchored to saved/loaded data until persistence completes
+
+### Firestore Optional Field Deletion
+- `updateDoc` only touches fields present in the update object — omitting a field leaves the old value intact in Firestore
+- `removeUndefinedFields` (used before `updateDoc` in `assetService.ts`) strips `undefined` keys, so clearing an optional field by setting it to `undefined` is silently ignored
+- **Pattern**: after `removeUndefinedFields`, explicitly translate `undefined` → `deleteField()` for fields the user can intentionally clear: `if (updates.field === undefined) cleaned.field = deleteField()`
+- Applied in `updateAsset` for `averageCost` and `taxRate`. Follow this pattern for any other nullable asset/settings fields that users can toggle off
 
 ### Formatter Duplication
 - `formatCurrency` and `formatCurrencyCompact` exist in both `lib/utils/formatters.ts` and `lib/services/chartService.ts`

@@ -133,6 +133,7 @@ export function transformPriceHistoryData(
     displayMode = 'price',
     includePreviousMonthBaseline = false,
     excludeCash = false,
+    restrictToPassedAssets = false,
   } = options;
 
   const matchesFilter = (snapshot: MonthlySnapshot) => {
@@ -214,7 +215,13 @@ export function transformPriceHistoryData(
     });
   });
 
-  // Add historical assets from snapshots (only if not already in current portfolio)
+  // Add historical assets from snapshots (only if not already in current portfolio).
+  // When restrictToPassedAssets is true, skip asset names not in the passed currentAssets
+  // array so that deleted/sold assets cannot bypass an upstream filter (e.g. cost-basis-only).
+  const passedAssetNames = restrictToPassedAssets
+    ? new Set(currentAssets.map((a) => a.name))
+    : null;
+
   calculationSnapshots.forEach((snapshot) => {
     snapshot.byAsset.forEach((snapshotAsset) => {
       const isCashAsset =
@@ -230,6 +237,11 @@ export function transformPriceHistoryData(
       const existingMetadata = assetMetadata.get(snapshotAsset.name);
 
       if (!existingMetadata) {
+        // Skip snapshot-only assets when the caller restricts output to the passed list
+        if (passedAssetNames && !passedAssetNames.has(snapshotAsset.name)) {
+          return;
+        }
+
         // New asset name not in current portfolio - add as deleted
         assetMetadata.set(snapshotAsset.name, {
           ticker: snapshotAsset.ticker,

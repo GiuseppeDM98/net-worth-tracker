@@ -127,6 +127,23 @@ export default function AssetsPage() {
     isRefreshing && 'border-primary/30 bg-primary/5 text-foreground'
   );
 
+  // Active assets (quantity > 0) shown in the price/value history tables.
+  // Inclusion criteria (either condition qualifies):
+  //   1. Cost basis tracking enabled: averageCost > 0 and taxRate defined — meaningful
+  //      return-on-investment history is available.
+  //   2. Real estate (assetClass === 'realestate') — properties typically don't carry
+  //      averageCost/taxRate in this system but are still worth tracking historically.
+  // Sold assets (quantity === 0) and untracked non-real-estate assets are excluded.
+  const costBasisAssetsCurrentYear = useMemo(
+    () => assets.filter(
+      (a) => a.quantity > 0 && (
+        a.assetClass === 'realestate' ||
+        !!(a.averageCost && a.averageCost > 0 && a.taxRate !== undefined && a.taxRate >= 0)
+      )
+    ),
+    [assets]
+  );
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -227,11 +244,12 @@ export default function AssetsPage() {
                     variants={tabPanelSwitch}
                   >
                     <AssetPriceHistoryTable
-                      assets={assets}
+                      assets={costBasisAssetsCurrentYear}
                       snapshots={snapshots}
                       filterYear={getCurrentYear()}
                       displayMode="price"
                       includePreviousMonthBaseline={true}
+                      restrictToPassedAssets={true}
                       showTotalRow={false}
                       loading={snapshotsLoading}
                       onRefresh={handleRefresh}
@@ -253,11 +271,12 @@ export default function AssetsPage() {
                     variants={tabPanelSwitch}
                   >
                     <AssetPriceHistoryTable
-                      assets={assets}
+                      assets={costBasisAssetsCurrentYear}
                       snapshots={snapshots}
                       filterYear={getCurrentYear()}
                       displayMode="totalValue"
                       includePreviousMonthBaseline={true}
+                      restrictToPassedAssets={true}
                       showTotalRow={true}
                       loading={snapshotsLoading}
                       onRefresh={handleRefresh}
@@ -336,10 +355,11 @@ export default function AssetsPage() {
                     variants={tabPanelSwitch}
                   >
                     <AssetPriceHistoryTable
-                      assets={assets}
+                      assets={costBasisAssetsCurrentYear}
                       snapshots={snapshots}
                       filterStartDate={{ year: 2025, month: 11 }}
                       displayMode="price"
+                      restrictToPassedAssets={true}
                       showTotalRow={false}
                       loading={snapshotsLoading}
                       onRefresh={handleRefresh}
@@ -361,10 +381,11 @@ export default function AssetsPage() {
                     variants={tabPanelSwitch}
                   >
                     <AssetPriceHistoryTable
-                      assets={assets}
+                      assets={costBasisAssetsCurrentYear}
                       snapshots={snapshots}
                       filterStartDate={{ year: 2025, month: 11 }}
                       displayMode="totalValue"
+                      restrictToPassedAssets={true}
                       showTotalRow={true}
                       loading={snapshotsLoading}
                       onRefresh={handleRefresh}

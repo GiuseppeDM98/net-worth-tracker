@@ -11,7 +11,8 @@ import {
   where,
   limit,
   Timestamp,
-  orderBy
+  orderBy,
+  deleteField
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
@@ -218,6 +219,11 @@ export async function createAsset(
 
 /**
  * Update an existing asset
+ *
+ * Cost-basis fields (averageCost, taxRate) are nullable: when the user disables
+ * cost basis tracking the form sends undefined for these fields. We must translate
+ * undefined → deleteField() so Firestore actually removes the old values instead of
+ * leaving them in place (removeUndefinedFields would just omit them, keeping stale data).
  */
 export async function updateAsset(
   assetId: string,
@@ -227,11 +233,15 @@ export async function updateAsset(
     const assetRef = doc(db, ASSETS_COLLECTION, assetId);
     const existingAsset = await getDoc(assetRef);
 
-    // Remove undefined fields to prevent Firebase errors
-    const cleanedUpdates = removeUndefinedFields({
+    // Remove undefined fields to prevent Firebase errors, then explicitly delete
+    // cost-basis fields that the caller cleared (undefined → deleteField sentinel).
+    const cleanedUpdates: Record<string, unknown> = removeUndefinedFields({
       ...updates,
       updatedAt: Timestamp.now(),
     });
+
+    if (updates.averageCost === undefined) cleanedUpdates.averageCost = deleteField();
+    if (updates.taxRate === undefined) cleanedUpdates.taxRate = deleteField();
 
     await updateDoc(assetRef, cleanedUpdates);
 

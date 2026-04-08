@@ -357,6 +357,11 @@ export interface AssetHistoryTransformOptions {
   filterStartDate?: AssetHistoryDateFilter;
   includePreviousMonthBaseline?: boolean;
   excludeCash?: boolean;
+  // When true, only assets already present in the passed currentAssets array are shown.
+  // Snapshot-only assets (sold/deleted from the portfolio) are not re-introduced from
+  // historical snapshot data. Use this when the caller pre-filters currentAssets (e.g.
+  // to cost-basis-tracked assets only) and doesn't want deleted assets to bypass the filter.
+  restrictToPassedAssets?: boolean;
 }
 
 export interface AssetHistoryTotalRow {
