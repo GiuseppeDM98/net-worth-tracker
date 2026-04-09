@@ -46,6 +46,11 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - The assistant is behind a feature flag (`NEXT_PUBLIC_ASSISTANT_AI_ENABLED`) for controlled rollout — when disabled, the navigation item is hidden and direct URL access returns a 404
 - Added a graceful unavailable state when AI is not configured, so the page remains accessible and explains what is missing
 
+### Patrimonio
+
+- Added a new "Includi nelle tabelle storiche" toggle to the asset edit dialog — turn it on for any asset (pension funds, real estate, ETFs, etc.) to include it in the Anno Corrente and Storico price and value history tables, regardless of cost basis settings
+- Sold assets (quantity set to zero) with the toggle enabled now appear in Storico with a "Venduto" badge for the months they were held — historical data is preserved
+
 ---
 
 - Added current-period spotlight cards to Hall of Fame, so you can instantly see how the current month and year rank against your personal records
@@ -77,6 +82,13 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - Fixed the streaming response disappearing mid-conversation — messages now display correctly as they arrive
 - Fixed the month picker not syncing to the thread's month when switching between past conversations
 - Fixed thread previews showing raw markdown syntax (`**bold**`, `## Heading`) — previews are now plain readable text
+- Fixed the delete button on conversations overlapping the mode badge (CHAT, MESE, ANNO, etc.) — the button is now correctly positioned outside the badge area
+
+### Patrimonio
+
+- Fixed the Anno Corrente and Storico price/value tables showing assets that were sold in a previous year — sold assets from prior years no longer appear as stale rows
+- Fixed assets incorrectly showing a "Venduto" badge in the history tables when they were active — only genuinely sold assets show this label
+- Fixed disabling cost basis tracking on an asset not persisting to the database — clearing the average cost or tax rate fields now correctly removes those values from the asset record
 
 ---
 
@@ -89,6 +101,14 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - Fixed the sidebar always highlighting "Panoramica" regardless of the current page
 - Fixed a browser console warning on every page load: the Geist Mono font was being preloaded on all pages despite only being used on the FIRE and Hall of Fame pages
 
+## 🛡️ Safety & Resilience
+
+### Assistente AI
+
+- Added a stop button to cancel AI responses mid-stream — click the red square icon during any analysis to stop immediately; the partial response stays visible so you don't lose what was already written
+- Deleting a memory item now requires a two-step confirmation — click the trash icon to arm it, then confirm with the checkmark (or cancel with X); the confirmation auto-dismisses after 3 seconds if you do nothing
+- Deleting a conversation now requires the same two-step confirmation, preventing accidental loss of a thread
+
 ## 🔧 Improvements
 
 ### Assistente AI
@@ -100,6 +120,8 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - Simplified the composer toolbar: the mode selector and period picker now occupy the top row only; the chat context type selector moves to a compact secondary row below the input, keeping the toolbar uncluttered in all modes
 - Chat mode now starts with no numeric context by default — select Month, Year, YTD, or Total history only when you want the assistant to reference your portfolio data
 - Removed a duplicate memory on/off toggle from the preferences popover — the toggle lives in the Memory panel where it belongs, next to the memory items it controls
+
+---
 
 - The FIRE "Indennità Annuale" card now shows the Patrimonio FIRE base value directly, so you can immediately see which number the withdrawal rate is applied to without switching tabs
 - Fixed the income category pie chart legend on mobile (Cashflow → Anno Corrente) overflowing its container when four or more categories were above the 5% threshold — now consistently capped at three visible items, matching the expense chart
@@ -190,20 +212,6 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - Each main page now has a breadcrumb label above the title and a separator line between the header area and the data below, giving the interface a more editorial, intentional feel
 - Utility actions (Refresh, Export CSV, Insert Past Snapshot) are visually de-emphasised so the primary action on each page stands out
 
-## 🛡️ Safety & Resilience
-
-### Assistente AI
-
-- Added a stop button to cancel AI responses mid-stream — click the red square icon during any analysis to stop immediately; the partial response stays visible so you don't lose what was already written
-- Deleting a memory item now requires a two-step confirmation — click the trash icon to arm it, then confirm with the checkmark (or cancel with X); the confirmation auto-dismisses after 3 seconds if you do nothing
-- Deleting a conversation now requires the same two-step confirmation, preventing accidental loss of a thread
-
-## 🐛 Bug Fixes
-
-### Assistente AI
-
-- Fixed the delete button on conversations overlapping the mode badge (CHAT, MESE, ANNO, etc.) — the button is now correctly positioned outside the badge area
-
 ## 🔒 Security
 
 - Improved authorization checks for private account actions across snapshots, dividends, performance metrics, price updates, Hall of Fame recalculation, and AI analysis
@@ -213,16 +221,3 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 ## 🏗️ Technical
 
 - Added `includeDummySnapshots` assistant preference: test accounts with synthetic snapshot data can now include those snapshots in AI context bundles. The toggle appears automatically only when dummy snapshots are detected — invisible to all regular users
-
----
-
-## ✨ New Features (Patrimonio — history tables)
-
-- Added a new "Includi nelle tabelle storiche" toggle to the asset edit dialog — turn it on for any asset (pension funds, real estate, ETFs, etc.) to include it in the Anno Corrente and Storico price and value history tables, regardless of cost basis settings
-- Sold assets (quantity set to zero) with the toggle enabled now appear in Storico with a "Venduto" badge for the months they were held — historical data is preserved
-
-## 🐛 Bug Fixes (Patrimonio — history tables)
-
-- Fixed the Anno Corrente and Storico price/value tables showing assets that were sold in a previous year — sold assets from prior years no longer appear as stale rows
-- Fixed assets incorrectly showing a "Venduto" badge in the history tables when they were active — only genuinely sold assets show this label
-- Fixed disabling cost basis tracking on an asset not persisting to the database — clearing the average cost or tax rate fields now correctly removes those values from the asset record
