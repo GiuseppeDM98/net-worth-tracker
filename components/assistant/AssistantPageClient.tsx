@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bot,
+  Brain,
   CalendarDays,
   Check,
   Globe,
@@ -24,7 +25,7 @@ import { toast } from 'sonner';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { AssistantComposer } from '@/components/assistant/AssistantComposer';
 import { AssistantPageSkeleton } from '@/components/assistant/AssistantPageSkeleton';
-import { AssistantContextCard } from '@/components/assistant/AssistantContextCard';
+import { AssistantContextCard, AssistantContextPill } from '@/components/assistant/AssistantContextCard';
 import { AssistantMemoryPanel } from '@/components/assistant/AssistantMemoryPanel';
 import { AssistantPromptChips } from '@/components/assistant/AssistantPromptChips';
 import { AssistantStreamingResponse } from '@/components/assistant/AssistantStreamingResponse';
@@ -382,6 +383,8 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   const [isMemoryPanelOpen, setIsMemoryPanelOpen] = useState(true);
   // Controls the mobile threads Sheet — needed to close it programmatically after thread selection.
   const [isThreadSheetOpen, setIsThreadSheetOpen] = useState(false);
+  // Controls the mobile memory Sheet — keeps the panel accessible without occupying scroll space
+  const [isMemorySheetOpen, setIsMemorySheetOpen] = useState(false);
 
   const { data: threads = [], isLoading: loadingThreads, error: threadsError } = useAssistantThreads(user?.uid);
   const { data: threadDetail, isLoading: loadingThreadDetail, error: threadError } = useAssistantThread(
@@ -812,12 +815,15 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                   Fai domande sul tuo patrimonio, analizza un mese, un anno, il tuo YTD o l'intera storia del portafoglio.
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {/* Mobile-only: opens thread list drawer. Hidden on desktop where the right panel is always visible */}
-                <div className="desktop:hidden">
+              {/* Mobile: two full-width rows so buttons aren't crowded in a wrapping flex.
+                  Desktop: single inline flex row as before. */}
+              <div className="flex flex-col gap-2 desktop:flex-row desktop:flex-wrap desktop:items-center">
+
+                {/* Row 1 (mobile) / inline (desktop): Conversazioni sheet + Brain (memory) sheet */}
+                <div className="flex items-center gap-2">
                   <Sheet open={isThreadSheetOpen} onOpenChange={setIsThreadSheetOpen}>
                     <SheetTrigger asChild>
-                      <Button variant="outline" size="sm" className="gap-2">
+                      <Button variant="outline" size="sm" className="flex-1 gap-2 desktop:flex-none">
                         <MessagesSquare className="h-4 w-4" />
                         Conversazioni
                         {threads.length > 0 && (
@@ -847,7 +853,6 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                             setMode(thread.mode);
                             if (thread.pinnedMonth) setSelectedMonth(thread.pinnedMonth);
                             if (thread.pinnedYear) setSelectedYear(thread.pinnedYear);
-                            // Close the drawer after selection so the user lands directly on the conversation
                             setIsThreadSheetOpen(false);
                           }}
                           onDelete={handleDeleteThread}
@@ -856,21 +861,46 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                       </div>
                     </SheetContent>
                   </Sheet>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleNewThread}
-                  disabled={isStreaming}
-                  className="gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Nuova conversazione
-                </Button>
 
-                {/* Preferences popover — keeps the sidebar lean by moving non-critical
-                    settings out of the scrollable right column and into the header. */}
-                <Popover>
+                  {/* Memory sheet — mobile only; on desktop the panel is in the right column */}
+                  {user?.uid && (
+                    <Sheet open={isMemorySheetOpen} onOpenChange={setIsMemorySheetOpen}>
+                      <SheetTrigger asChild>
+                        <Button variant="outline" size="icon" className="desktop:hidden shrink-0 h-9 w-9" aria-label="Apri memoria">
+                          <Brain className="h-4 w-4" />
+                        </Button>
+                      </SheetTrigger>
+                      <SheetContent side="right" className="w-[340px] overflow-y-auto p-0">
+                        <SheetHeader className="border-b border-border px-4 py-3">
+                          <SheetTitle className="text-left text-sm">Memoria</SheetTitle>
+                        </SheetHeader>
+                        <div className="px-4 py-4">
+                          <AssistantMemoryPanel
+                            userId={user.uid}
+                            memory={memory}
+                            isLoading={loadingMemory}
+                          />
+                        </div>
+                      </SheetContent>
+                    </Sheet>
+                  )}
+                </div>
+
+                {/* Row 2 (mobile) / inline (desktop): Nuova conversazione + Preferenze */}
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleNewThread}
+                    disabled={isStreaming}
+                    className="flex-1 gap-2 desktop:flex-none"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Nuova conversazione
+                  </Button>
+
+                  {/* Preferences popover */}
+                  <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Preferenze assistente">
                       <Settings2 className="h-4 w-4 text-muted-foreground" />
@@ -940,7 +970,8 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                     </div>
                   </PopoverContent>
                 </Popover>
-              </div>
+                </div>{/* end row 2 */}
+              </div>{/* end button group */}
             </div>
           </div>
         </header>
@@ -1039,6 +1070,12 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                 <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
                   <div>
                     <p className="text-sm font-medium text-foreground">{activePeriodLabel}</p>
+                    {/* Mobile context strip: key delta at a glance without scrolling to the full card */}
+                    {contextBundle && (
+                      <div className="desktop:hidden">
+                        <AssistantContextPill bundle={contextBundle} />
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     {isStreaming && !isSlowResponse && (
@@ -1052,20 +1089,6 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                         <Loader2 className="h-3 w-3 animate-spin" />
                         Sta impiegando più del previsto…
                       </Badge>
-                    )}
-                    {/* Quick chip access while in conversation */}
-                    {renderedMessages.length > 0 && !isStreaming && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {assistantPromptChips.slice(0, 2).map((chip) => (
-                          <button
-                            key={chip.id}
-                            onClick={() => handleChipClick(chip)}
-                            className="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                          >
-                            {chip.label}
-                          </button>
-                        ))}
-                      </div>
                     )}
                   </div>
                 </div>
@@ -1156,52 +1179,56 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                 </CardContent>
               </Card>
 
-              {/* Context panel: visible after first analysis or when fetching for a pinned thread.
-                  Priority: SSE bundle > fetched bundle > skeleton (loading) > empty placeholder.
-                  Shown for all analysis modes, not just month_analysis. */}
-              {contextBundle ? (
-                <AssistantContextCard bundle={contextBundle} />
-              ) : loadingContextBundle ? (
-                <AssistantContextCard bundle={{} as AssistantMonthContextBundle} isLoading />
-              ) : (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Contesto numerico</CardTitle>
-                    <CardDescription>
-                      Appare qui al termine della prima analisi.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="rounded-xl border border-border p-3.5">
-                      <div className="mb-1.5 flex items-center gap-2 text-sm font-medium text-foreground">
-                        <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                        Periodo di riferimento
+              {/* Context panel — desktop only. On mobile, the context pill sits in the
+                  conversation header so the user sees the key number without scrolling. */}
+              <div className="hidden desktop:block">
+                {contextBundle ? (
+                  <AssistantContextCard bundle={contextBundle} />
+                ) : loadingContextBundle ? (
+                  <AssistantContextCard bundle={{} as AssistantMonthContextBundle} isLoading />
+                ) : (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Contesto numerico</CardTitle>
+                      <CardDescription>
+                        Appare qui al termine della prima analisi.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="rounded-xl border border-border p-3.5">
+                        <div className="mb-1.5 flex items-center gap-2 text-sm font-medium text-foreground">
+                          <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                          Periodo di riferimento
+                        </div>
+                        <p className="text-sm text-muted-foreground">{activePeriodLabel}</p>
                       </div>
-                      <p className="text-sm text-muted-foreground">{activePeriodLabel}</p>
-                    </div>
-                    <div className="rounded-xl border border-border p-3.5">
-                      <div className="mb-1.5 flex items-center gap-2 text-sm font-medium text-foreground">
-                        <Globe className="h-4 w-4 text-muted-foreground" />
-                        Web search
+                      <div className="rounded-xl border border-border p-3.5">
+                        <div className="mb-1.5 flex items-center gap-2 text-sm font-medium text-foreground">
+                          <Globe className="h-4 w-4 text-muted-foreground" />
+                          Web search
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Attiva nelle analisi solo con contesto macro abilitato.
+                          In chat si attiva per richieste macro esplicite.
+                        </p>
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        Attiva nelle analisi solo con contesto macro abilitato.
-                        In chat si attiva per richieste macro esplicite.
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
 
-              {/* Memory panel — collapsible to reduce sidebar height when the list grows long. */}
+              {/* Memory panel — desktop only. On mobile, accessible via the Brain sheet
+                  button in the page header so it doesn't consume scroll space. */}
               {user?.uid && (
-                <AssistantMemoryPanel
-                  userId={user.uid}
-                  memory={memory}
-                  isLoading={loadingMemory}
-                  isOpen={isMemoryPanelOpen}
-                  onToggle={() => setIsMemoryPanelOpen((v) => !v)}
-                />
+                <div className="hidden desktop:block">
+                  <AssistantMemoryPanel
+                    userId={user.uid}
+                    memory={memory}
+                    isLoading={loadingMemory}
+                    isOpen={isMemoryPanelOpen}
+                    onToggle={() => setIsMemoryPanelOpen((v) => !v)}
+                  />
+                </div>
               )}
 
               {(threadsError || threadError || memoryError) && (

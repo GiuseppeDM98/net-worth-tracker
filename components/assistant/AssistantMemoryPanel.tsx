@@ -131,7 +131,10 @@ export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onTogg
       <Collapsible open={collapsible ? isOpen : true} onOpenChange={collapsible ? onToggle : undefined}>
         <Card>
           {/* When collapsible, the header is a toggle trigger; otherwise it's static. */}
-          <CollapsibleTrigger asChild={collapsible} disabled={!collapsible}>
+          {/* asChild always: CollapsibleTrigger clones CardHeader (a div), so the trash
+              Button inside it is never nested inside a <button>. With asChild={false}
+              Radix would render its own <button> → nested button hydration error. */}
+          <CollapsibleTrigger asChild disabled={!collapsible}>
             <CardHeader className={collapsible ? 'cursor-pointer select-none' : undefined}>
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-1">

@@ -277,3 +277,37 @@ export function AssistantContextCard({ bundle, className, isLoading }: Assistant
     </Card>
   );
 }
+
+/**
+ * Compact single-line context strip for mobile — sits inside the conversation header.
+ * Shows net worth delta + percentage so the user always has the key number at a glance
+ * without having to scroll to the full context card.
+ */
+export function AssistantContextPill({ bundle }: { bundle: AssistantMonthContextBundle }) {
+  const { selector, netWorth } = bundle;
+  const periodLabel = getPeriodLabel(selector);
+  const deltaPositive = netWorth.delta !== null ? netWorth.delta >= 0 : null;
+
+  return (
+    <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
+      {periodLabel}
+      {netWorth.delta !== null && (
+        <>
+          {' · '}
+          <span
+            className={cn(
+              'font-medium',
+              deltaPositive === true && 'text-green-600 dark:text-green-400',
+              deltaPositive === false && 'text-red-600 dark:text-red-400',
+            )}
+          >
+            {netWorth.delta >= 0 ? '+' : ''}{eur(netWorth.delta)}
+          </span>
+          {netWorth.deltaPct !== null && (
+            <span className="ml-1 text-muted-foreground/70">({pct(netWorth.deltaPct)})</span>
+          )}
+        </>
+      )}
+    </p>
+  );
+}

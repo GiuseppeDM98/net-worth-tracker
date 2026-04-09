@@ -111,6 +111,15 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 
 ## 🔧 Improvements
 
+### Assistente AI (mobile)
+
+- The mode selector on mobile is now a row of tappable chips ("Mese", "Anno", "YTD", "Storico", "Chat") instead of a dropdown — no more tap-to-open interaction, modes are immediately visible and switchable with one touch
+- The chat context type selector on mobile is now the same chip strip format, keeping the composer compact and thumb-friendly
+- The Memory panel on mobile is now accessible from a dedicated button in the page header — it opens as a side drawer without requiring any scrolling past the conversation area
+- The net worth delta for the active analysis period (e.g. "+€1.856 (+0,69%)") now appears directly in the conversation header on mobile, so the key number is always visible at a glance without scrolling to the data panel
+- Header action buttons on mobile are now laid out in two full-width rows ("Conversazioni" + memory icon on the first, "Nuova conversazione" + settings on the second) instead of wrapping unpredictably — each button takes its fair share of horizontal space
+- Removed two shortcut chips ("Analizza questo mese", "Analizza questo anno") that appeared inside the conversation header after the first response — mode chips in the composer already cover this and the shortcuts felt redundant
+
 ### Assistente AI (layout & spacing)
 
 - Improved spacing between conversation messages so user and assistant turns are easier to distinguish at a glance
