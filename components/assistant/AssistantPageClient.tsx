@@ -970,7 +970,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                 <>
                   {/* Chips card comes first so the primary CTA is above the fold on mobile.
                       On desktop this order is less critical since threads are in the right column. */}
-                  <div className="mb-4 rounded-2xl border border-border bg-muted/20 p-6">
+                  <div className="mb-6 rounded-2xl border border-border bg-muted/20 p-6">
                     <div className="mb-4 flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
                         <Sparkles className="h-5 w-5 text-primary" />
@@ -993,7 +993,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                       CTA stays above the fold. Hidden on desktop where threads are in the
                       right-column card. */}
                   {threads.length > 0 && (
-                    <div className="mb-4 desktop:hidden">
+                    <div className="mb-6 desktop:hidden">
                       <p className="mb-2 text-xs font-medium uppercase tracking-widest text-muted-foreground">
                         Riprendi conversazione
                       </p>
@@ -1071,7 +1071,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                 </div>
 
                 {/* Messages */}
-                <div className="p-4">
+                <div className="p-5">
                   {loadingThreadDetail ? (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -1124,7 +1124,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
             {/* ── Right column: sticky so panels stay visible while the conversation scrolls.
                  max-h + overflow-y-auto lets the column scroll internally if content
                  overflows the viewport (e.g. very long memory list). ── */}
-            <div className="space-y-4 desktop:sticky desktop:top-6 desktop:max-h-[calc(100vh-6rem)] desktop:overflow-y-auto desktop:pr-1">
+            <div className="space-y-6 desktop:sticky desktop:top-6 desktop:max-h-[calc(100vh-6rem)] desktop:overflow-y-auto desktop:pr-1">
               {/* Thread list — on desktop always visible at the top so the user can
                   jump to a previous conversation without scrolling past other panels.
                   On mobile the drawer (header button) serves the same purpose. */}
@@ -1171,16 +1171,16 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                       Appare qui al termine della prima analisi.
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div className="rounded-xl border border-border p-3">
-                      <div className="mb-1 flex items-center gap-2 text-sm font-medium text-foreground">
+                  <CardContent className="space-y-3">
+                    <div className="rounded-xl border border-border p-3.5">
+                      <div className="mb-1.5 flex items-center gap-2 text-sm font-medium text-foreground">
                         <CalendarDays className="h-4 w-4 text-muted-foreground" />
                         Periodo di riferimento
                       </div>
                       <p className="text-sm text-muted-foreground">{activePeriodLabel}</p>
                     </div>
-                    <div className="rounded-xl border border-border p-3">
-                      <div className="mb-1 flex items-center gap-2 text-sm font-medium text-foreground">
+                    <div className="rounded-xl border border-border p-3.5">
+                      <div className="mb-1.5 flex items-center gap-2 text-sm font-medium text-foreground">
                         <Globe className="h-4 w-4 text-muted-foreground" />
                         Web search
                       </div>

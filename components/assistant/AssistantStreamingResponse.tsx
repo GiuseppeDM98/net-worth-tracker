@@ -69,7 +69,7 @@ export function AssistantStreamingResponse({
     // aria-live="polite" announces new assistant messages to screen readers.
     // aria-atomic="false" lets individual chunks be read as they arrive instead of
     // re-reading the entire region on every update.
-    <div className="space-y-3" aria-live="polite" aria-atomic="false" aria-label="Conversazione con l'assistente">
+    <div className="space-y-4" aria-live="polite" aria-atomic="false" aria-label="Conversazione con l'assistente">
       {messages.map((message) => {
         // An assistant message is "streaming" while its id matches the active stream slot.
         // User messages are never streamed — always plain text.
@@ -79,13 +79,13 @@ export function AssistantStreamingResponse({
           <div
             key={message.id}
             className={cn(
-              'rounded-xl border px-4 py-3 text-sm',
+              'rounded-xl border px-4 py-4 text-sm',
               message.role === 'user'
                 ? 'border-primary/25 bg-primary/5'
                 : 'border-border bg-background',
             )}
           >
-            <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="mb-2.5 flex items-center justify-between gap-3">
               <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                 {message.role === 'user' ? 'Tu' : 'Assistente'}
               </span>

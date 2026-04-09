@@ -179,7 +179,7 @@ export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onTogg
           </CollapsibleTrigger>
 
           <CollapsibleContent>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5">
           {/* Memory enabled toggle */}
           <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2">
             <div>
@@ -252,14 +252,14 @@ export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onTogg
                   className="py-4"
                 />
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-5">
                   {groupedItems.map(({ category, items }) => (
                     <div key={category}>
                       {/* Category section header */}
                       <p className="mb-2 text-xs font-medium uppercase tracking-widest text-muted-foreground">
                         {CATEGORY_GROUP_LABELS[category]}
                       </p>
-                      <div className="space-y-1.5">
+                      <div className="space-y-2">
                         {items.map((item) => (
                           <AssistantMemoryItemRow
                             key={item.id}

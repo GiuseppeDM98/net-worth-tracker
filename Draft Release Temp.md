@@ -111,6 +111,15 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 
 ## 🔧 Improvements
 
+### Assistente AI (layout & spacing)
+
+- Improved spacing between conversation messages so user and assistant turns are easier to distinguish at a glance
+- Improved the composer input area with more breathing room and a subtle shadow that visually separates it from the scrollable conversation above
+- Improved the numeric context panel (net worth delta, cashflow, allocation) with more generous internal padding and clearer section labels
+- Improved the Memory panel so category groups (Goals, Preferences, Risk, Facts) and their items have more readable spacing
+- Improved the right column so the Conversations list, numeric context panel, and Memory panel feel clearly separated instead of uniformly stacked
+- Improved hero state spacing so the suggested prompt chips card transitions more naturally into the conversation area below
+
 ### Assistente AI
 
 - The assistant now remembers the conversation — follow-up messages like "Approfondisci", "Come mai?", or "Riprendiamo da dove eravamo" are answered with full awareness of what was said earlier in the thread, instead of each reply being independent of the previous ones

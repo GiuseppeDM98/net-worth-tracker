@@ -94,10 +94,10 @@ export function AssistantComposer({
   })();
 
   return (
-    <div className="border-t border-border bg-background px-4 pb-3 pt-3 max-desktop:portrait:pb-[88px]">
+    <div className="border-t border-border bg-background px-4 pb-4 pt-4 max-desktop:portrait:pb-[88px] shadow-[0_-4px_16px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_16px_-2px_rgba(0,0,0,0.3)]">
       {/* Top row: mode selector + period picker (max 2 controls).
           Chat context type is a secondary control shown below the input, not here. */}
-      <div className="mb-2 flex flex-wrap items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <Select value={mode} onValueChange={(v) => onModeChange(v as AssistantMode)} disabled={isStreaming}>
           <SelectTrigger className="h-8 w-auto min-w-[160px] text-xs" aria-label="Modalità di analisi">
             <SelectValue />

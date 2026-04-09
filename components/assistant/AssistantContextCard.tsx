@@ -82,7 +82,7 @@ function AssistantContextCardSkeleton({ className }: { className?: string }) {
       <CardHeader className="border-b border-border pb-3 pt-4">
         <div className="h-4 w-36 rounded bg-muted" />
       </CardHeader>
-      <CardContent className="space-y-4 p-4">
+      <CardContent className="space-y-5 p-4">
         {/* Hero KPI placeholder */}
         <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
           <div className="h-3 w-28 rounded bg-muted" />
@@ -148,10 +148,10 @@ export function AssistantContextCard({ bundle, className, isLoading }: Assistant
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-4 p-4">
+      <CardContent className="space-y-5 p-4">
         {/* Hero: net worth delta */}
-        <div className="rounded-lg border border-border bg-muted/30 p-3">
-          <p className="mb-1 text-xs font-medium uppercase tracking-widest text-muted-foreground">
+        <div className="rounded-lg border border-border bg-muted/30 p-4">
+          <p className="mb-2 text-xs font-medium uppercase tracking-widest text-muted-foreground">
             Variazione patrimonio
           </p>
           <div className="flex items-center gap-2">
@@ -188,7 +188,7 @@ export function AssistantContextCard({ bundle, className, isLoading }: Assistant
         {/* Cashflow rows */}
         {dataQuality.hasCashflowData && (
           <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-widest text-muted-foreground">
+            <p className="mb-2 text-xs font-medium uppercase tracking-widest text-muted-foreground">
               Cashflow
             </p>
             <div className="divide-y divide-border/50 rounded-lg border border-border">
@@ -227,7 +227,7 @@ export function AssistantContextCard({ bundle, className, isLoading }: Assistant
         {/* Top allocation changes */}
         {allocationChanges.length > 0 && (
           <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-widest text-muted-foreground">
+            <p className="mb-2 text-xs font-medium uppercase tracking-widest text-muted-foreground">
               Allocazione (top variazioni)
             </p>
             <div className="space-y-1">
