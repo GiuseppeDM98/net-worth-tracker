@@ -380,6 +380,8 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   const [contextBundle, setContextBundle] = useState<AssistantMonthContextBundle | null>(null);
   // Memory panel starts open; user can collapse to reduce sidebar height when list grows long.
   const [isMemoryPanelOpen, setIsMemoryPanelOpen] = useState(true);
+  // Controls the mobile threads Sheet — needed to close it programmatically after thread selection.
+  const [isThreadSheetOpen, setIsThreadSheetOpen] = useState(false);
 
   const { data: threads = [], isLoading: loadingThreads, error: threadsError } = useAssistantThreads(user?.uid);
   const { data: threadDetail, isLoading: loadingThreadDetail, error: threadError } = useAssistantThread(
@@ -463,11 +465,19 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
 
   // Scroll to the bottom when messages are available, but not while the thread
   // is still loading — scrolling to an empty area before content arrives feels jarring.
-  // During streaming we always scroll so new tokens stay visible.
+  // During streaming use instant scroll so new tokens stay visible without jank:
+  // smooth scroll on every token triggers continuous CSS animation on slow devices.
+  // Smooth scroll is reserved for the initial thread load (non-streaming) only.
   useEffect(() => {
     if (renderedMessages.length === 0) return;
     if (loadingThreadDetail && !isStreaming) return;
-    conversationEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = conversationEndRef.current;
+    if (!el) return;
+    if (isStreaming) {
+      el.scrollIntoView({ behavior: 'instant' });
+    } else {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [renderedMessages, loadingThreadDetail, isStreaming]);
 
   // Slow-response timeout: shows a gentle nudge after 15 s with no text received.
@@ -805,7 +815,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
               <div className="flex flex-wrap items-center gap-2">
                 {/* Mobile-only: opens thread list drawer. Hidden on desktop where the right panel is always visible */}
                 <div className="desktop:hidden">
-                  <Sheet>
+                  <Sheet open={isThreadSheetOpen} onOpenChange={setIsThreadSheetOpen}>
                     <SheetTrigger asChild>
                       <Button variant="outline" size="sm" className="gap-2">
                         <MessagesSquare className="h-4 w-4" />
@@ -837,6 +847,8 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                             setMode(thread.mode);
                             if (thread.pinnedMonth) setSelectedMonth(thread.pinnedMonth);
                             if (thread.pinnedYear) setSelectedYear(thread.pinnedYear);
+                            // Close the drawer after selection so the user lands directly on the conversation
+                            setIsThreadSheetOpen(false);
                           }}
                           onDelete={handleDeleteThread}
                           onNewThread={handleNewThread}

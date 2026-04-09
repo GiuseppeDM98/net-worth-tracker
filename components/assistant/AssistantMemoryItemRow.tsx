@@ -121,13 +121,14 @@ export function AssistantMemoryItemRow({
           {CATEGORY_LABELS[item.category]}
         </span>
 
-        {/* Action buttons: visible on hover or during interaction */}
+        {/* Action buttons: visible on hover, focus-within, or on touch (pointer: coarse).
+            opacity-0 is only applied for fine-pointer (mouse) devices so touch users always see actions. */}
         {!isEditing && !isPendingDelete && (
-          <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+          <div className="flex items-center gap-0.5 transition-opacity [@media(pointer:fine)]:opacity-0 [@media(pointer:fine)]:group-hover:opacity-100 [@media(pointer:fine)]:group-focus-within:opacity-100">
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
               disabled={isMutating}
               onClick={() => {
                 setIsEditing(true);
@@ -140,7 +141,7 @@ export function AssistantMemoryItemRow({
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
               disabled={isMutating}
               onClick={() => onArchive(item.id, item.status)}
               aria-label={isArchived ? 'Ripristina' : 'Archivia'}
@@ -155,7 +156,7 @@ export function AssistantMemoryItemRow({
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 text-muted-foreground hover:text-destructive"
+              className="h-8 w-8 text-muted-foreground hover:text-destructive"
               disabled={isMutating}
               onClick={handleDeleteArm}
               aria-label="Elimina"
@@ -173,7 +174,7 @@ export function AssistantMemoryItemRow({
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 text-destructive hover:text-destructive"
+              className="h-8 w-8 text-destructive hover:text-destructive"
               disabled={isMutating}
               onClick={handleDeleteConfirm}
               aria-label="Conferma eliminazione"
@@ -183,7 +184,7 @@ export function AssistantMemoryItemRow({
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
               disabled={isMutating}
               onClick={handleDeleteDisarm}
               aria-label="Annulla eliminazione"
@@ -199,7 +200,7 @@ export function AssistantMemoryItemRow({
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 text-emerald-600 hover:text-emerald-700"
+              className="h-8 w-8 text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
               disabled={isSaving}
               onClick={handleSave}
               aria-label="Salva"
@@ -209,7 +210,7 @@ export function AssistantMemoryItemRow({
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
               disabled={isSaving}
               onClick={handleCancel}
               aria-label="Annulla"

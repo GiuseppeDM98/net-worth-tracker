@@ -99,7 +99,7 @@ export function AssistantComposer({
           Chat context type is a secondary control shown below the input, not here. */}
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <Select value={mode} onValueChange={(v) => onModeChange(v as AssistantMode)} disabled={isStreaming}>
-          <SelectTrigger className="h-8 w-auto min-w-[160px] text-xs">
+          <SelectTrigger className="h-8 w-auto min-w-[160px] text-xs" aria-label="Modalità di analisi">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -155,7 +155,7 @@ export function AssistantComposer({
             onValueChange={(v) => onYearChange(Number(v))}
             disabled={isStreaming}
           >
-            <SelectTrigger className="h-8 w-auto min-w-[100px] text-xs">
+            <SelectTrigger className="h-8 w-auto min-w-[100px] text-xs" aria-label="Anno di riferimento">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -191,6 +191,7 @@ export function AssistantComposer({
             }
           }}
           placeholder={textareaPlaceholder}
+          aria-label="Scrivi un messaggio all'assistente"
           disabled={isStreaming}
           rows={1}
           className={cn(
@@ -238,7 +239,7 @@ export function AssistantComposer({
             onValueChange={(v) => onChatContextTypeChange(v as AssistantChatContextType)}
             disabled={isStreaming}
           >
-            <SelectTrigger className="h-7 w-auto min-w-[120px] text-xs">
+            <SelectTrigger className="h-7 w-auto min-w-[120px] text-xs" aria-label="Tipo di contesto per la chat">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

@@ -222,3 +222,8 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 ## 🏗️ Technical
 
 - Added `includeDummySnapshots` assistant preference: test accounts with synthetic snapshot data can now include those snapshots in AI context bundles. The toggle appears automatically only when dummy snapshots are detected — invisible to all regular users
+- Improved assistant scrolling during long AI responses so the conversation stays smooth and readable on slower devices — previously each word arriving could cause a visible stutter
+- Improved assistant memory panel filter tabs ("Attivi" / "Archiviati") with larger tap areas on mobile, making them easier to switch between on touch screens
+- Improved assistant memory action buttons (edit, archive, delete) so they are always visible on mobile instead of requiring a hover — no interaction is hidden on touch devices
+- Selecting a conversation from the mobile drawer now closes the drawer automatically, landing you directly on the conversation without an extra manual step
+- Improved screen reader support for the AI assistant: new responses are now announced as they stream in, all controls have descriptive labels, and the memory filter tabs are properly identified as navigation tabs

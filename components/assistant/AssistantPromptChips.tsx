@@ -21,6 +21,7 @@ export function AssistantPromptChips({ chips, onSelect, disabled }: AssistantPro
       {chips.map((chip) => (
         <button
           key={chip.id}
+          type="button"
           onClick={() => onSelect(chip)}
           disabled={disabled}
           className={cn(

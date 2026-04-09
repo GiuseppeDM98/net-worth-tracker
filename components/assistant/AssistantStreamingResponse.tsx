@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Globe, RefreshCw } from 'lucide-react';
@@ -27,6 +28,33 @@ interface AssistantStreamingResponseProps {
 }
 
 /**
+ * Custom renderers for ReactMarkdown.
+ * Defined at module level (not inline) so the object reference is stable across renders —
+ * prevents ReactMarkdown from unmounting/remounting when unrelated state changes.
+ */
+const MARKDOWN_COMPONENTS: React.ComponentProps<typeof ReactMarkdown>['components'] = {
+  table: ({ children }) => (
+    <div className="my-3 w-full overflow-x-auto">
+      <table className="w-full border-collapse text-sm">{children}</table>
+    </div>
+  ),
+  thead: ({ children }) => (
+    <thead className="border-b border-border">{children}</thead>
+  ),
+  th: ({ children }) => (
+    <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      {children}
+    </th>
+  ),
+  td: ({ children }) => (
+    <td className="px-3 py-2 text-sm text-foreground">{children}</td>
+  ),
+  tr: ({ children }) => (
+    <tr className="border-b border-border/50 last:border-0">{children}</tr>
+  ),
+};
+
+/**
  * Renders the conversation message list.
  * User messages are always plain text.
  * Assistant messages show plain text while streaming, then switch to ReactMarkdown on completion.
@@ -38,7 +66,10 @@ export function AssistantStreamingResponse({
   streamingMessageId,
 }: AssistantStreamingResponseProps) {
   return (
-    <div className="space-y-3">
+    // aria-live="polite" announces new assistant messages to screen readers.
+    // aria-atomic="false" lets individual chunks be read as they arrive instead of
+    // re-reading the entire region on every update.
+    <div className="space-y-3" aria-live="polite" aria-atomic="false" aria-label="Conversazione con l'assistente">
       {messages.map((message) => {
         // An assistant message is "streaming" while its id matches the active stream slot.
         // User messages are never streamed — always plain text.
@@ -80,27 +111,7 @@ export function AssistantStreamingResponse({
                     // because Tailwind prose does not add cell structure by default.
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
-                      components={{
-                        table: ({ children }) => (
-                          <div className="my-3 w-full overflow-x-auto">
-                            <table className="w-full border-collapse text-sm">{children}</table>
-                          </div>
-                        ),
-                        thead: ({ children }) => (
-                          <thead className="border-b border-border">{children}</thead>
-                        ),
-                        th: ({ children }) => (
-                          <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                            {children}
-                          </th>
-                        ),
-                        td: ({ children }) => (
-                          <td className="px-3 py-2 text-sm text-foreground">{children}</td>
-                        ),
-                        tr: ({ children }) => (
-                          <tr className="border-b border-border/50 last:border-0">{children}</tr>
-                        ),
-                      }}
+                      components={MARKDOWN_COMPONENTS}
                     >
                       {message.content}
                     </ReactMarkdown>

@@ -207,13 +207,19 @@ export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onTogg
 
           {/* Filter tabs: Attivi / Archiviati */}
           {!isLoading && totalItems > 0 && (
-            <div className="flex gap-1 rounded-lg border border-border bg-muted/30 p-0.5">
+            <div
+              role="tablist"
+              aria-label="Filtra ricordi"
+              className="flex gap-1 rounded-lg border border-border bg-muted/30 p-0.5"
+            >
               {(['active', 'archived'] as const).map((tab) => (
                 <button
                   key={tab}
+                  role="tab"
+                  aria-selected={filterTab === tab}
                   onClick={() => setFilterTab(tab)}
                   className={cn(
-                    'flex-1 rounded-md px-2 py-1 text-xs font-medium transition-colors',
+                    'flex-1 rounded-md px-2 py-2.5 text-xs font-medium transition-colors min-h-[36px]',
                     filterTab === tab
                       ? 'bg-background text-foreground shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'

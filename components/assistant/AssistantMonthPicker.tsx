@@ -25,7 +25,7 @@ export function AssistantMonthPicker({ value, options, onChange, disabled }: Ass
       }}
       disabled={disabled}
     >
-      <SelectTrigger className="w-full">
+      <SelectTrigger className="w-full" aria-label="Mese di riferimento">
         <SelectValue placeholder="Seleziona mese" />
       </SelectTrigger>
       <SelectContent>
