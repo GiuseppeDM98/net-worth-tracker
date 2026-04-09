@@ -11,6 +11,7 @@ import {
   createAssistantThread,
   getAssistantMemoryDocument,
   getAssistantThread,
+  getAssistantThreadDetail,
   isAssistantStoreError,
   updateAssistantMemoryDocument,
   updateAssistantThreadMetadata,
@@ -182,6 +183,13 @@ export async function POST(request: NextRequest) {
       ? await getAssistantThread(body.threadId, body.userId)
       : null;
 
+    // Load conversation history BEFORE appending the new user message so the
+    // new message is not included. Loaded only for existing threads — a brand
+    // new thread has no prior exchange to inject.
+    const conversationHistory = existingThread
+      ? (await getAssistantThreadDetail(existingThread.id, body.userId)).messages
+      : [];
+
     const thread =
       existingThread ??
       (await createAssistantThread({
@@ -237,6 +245,7 @@ export async function POST(request: NextRequest) {
             preferences,
             memoryItems: activeMemoryItems,
             enableWebSearch,
+            conversationHistory,
             onStatus: (status) => {
               controller.enqueue(encodeAssistantEvent({ type: 'status', status }));
             },

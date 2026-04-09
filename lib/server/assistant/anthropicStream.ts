@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { AssistantMemoryItem, AssistantMode, AssistantMonthContextBundle, AssistantMonthSelectorValue, AssistantPreferences } from '@/types/assistant';
+import { AssistantMemoryItem, AssistantMessage, AssistantMode, AssistantMonthContextBundle, AssistantMonthSelectorValue, AssistantPreferences } from '@/types/assistant';
 import {
   buildChatPrompt,
   buildHistoryAnalysisPrompt,
@@ -24,6 +24,9 @@ interface StreamAssistantResponseArgs {
   // reference declared goals, preferences, and facts across conversations.
   memoryItems?: AssistantMemoryItem[];
   enableWebSearch: boolean;
+  // Prior messages in the thread, loaded before the new user message is appended.
+  // Injected as a multi-turn history so Claude can follow-up coherently.
+  conversationHistory?: AssistantMessage[];
   onStatus: (status: 'searching' | 'writing' | 'saving') => void;
   onText: (text: string) => void;
 }
@@ -75,6 +78,34 @@ function buildPrompt(
   return buildChatPrompt(prompt, preferences, monthLabel, memoryItems, contextBundle, enableWebSearch);
 }
 
+/**
+ * Builds the multi-turn messages array for the Anthropic API call.
+ *
+ * Prior messages are injected verbatim so Claude can reference earlier exchanges.
+ * Caps vary by mode: chat allows more history (10 pairs) because prompts are
+ * lighter; structured analysis modes are capped at 3 pairs because they include
+ * large numeric context bundles that already consume significant token budget.
+ *
+ * The new user turn always uses the full buildPrompt output (with context + memory).
+ * History messages use raw stored content — no re-injection of context bundles.
+ */
+function buildMessagesArray(
+  mode: AssistantMode,
+  currentUserContent: string,
+  history: AssistantMessage[]
+): Array<{ role: 'user' | 'assistant'; content: string }> {
+  const isStructured = ['month_analysis', 'year_analysis', 'ytd_analysis', 'history_analysis'].includes(mode);
+  // Structured modes cap at 3 pairs (6 msgs); chat allows 10 pairs (20 msgs).
+  const maxMessages = isStructured ? 6 : 20;
+
+  const trimmedHistory = history
+    .filter((m) => m.role === 'user' || m.role === 'assistant')
+    .slice(-maxMessages)
+    .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+
+  return [...trimmedHistory, { role: 'user', content: currentUserContent }];
+}
+
 export async function streamAssistantResponse({
   mode,
   prompt,
@@ -83,6 +114,7 @@ export async function streamAssistantResponse({
   preferences,
   memoryItems = [],
   enableWebSearch,
+  conversationHistory = [],
   onStatus,
   onText,
 }: StreamAssistantResponseArgs): Promise<{ text: string; webSearchUsed: boolean }> {
@@ -115,12 +147,11 @@ export async function streamAssistantResponse({
             ],
           }
         : {}),
-      messages: [
-        {
-          role: 'user',
-          content: buildPrompt(mode, prompt, contextBundle, month, preferences, memoryItems, enableWebSearch),
-        },
-      ],
+      messages: buildMessagesArray(
+        mode,
+        buildPrompt(mode, prompt, contextBundle, month, preferences, memoryItems, enableWebSearch),
+        conversationHistory
+      ),
       stream: true,
     });
 

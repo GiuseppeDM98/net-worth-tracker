@@ -113,6 +113,7 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 
 ### Assistente AI
 
+- The assistant now remembers the conversation — follow-up messages like "Approfondisci", "Come mai?", or "Riprendiamo da dove eravamo" are answered with full awareness of what was said earlier in the thread, instead of each reply being independent of the previous ones
 - Moved assistant preferences (response style, macro context) into a compact settings popover accessible from the page header — the right panel now shows only the context data and memory, with more vertical space for what matters during an analysis
 - The memory panel in the right column is now collapsible — click the header to collapse it when the list is long, keeping the numeric context panel visible without scrolling
 - On mobile, the suggested prompt chips ("Analizza questo mese", etc.) now appear above the recent conversations list — the primary action is immediately visible without scrolling past past threads
