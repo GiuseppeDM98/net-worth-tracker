@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-09, session conversation-history): **Conversation history injection**. `streamAssistantResponse` now receives `conversationHistory: AssistantMessage[]` and builds a multi-turn Anthropic messages array. History loaded in `stream/route.ts` via `getAssistantThreadDetail` BEFORE `appendAssistantMessage` (new user message excluded). Cap: chat → 10 pairs (20 msgs), structured analysis → 3 pairs (6 msgs). `role: 'system'` messages filtered — Anthropic messages array only accepts `user`/`assistant`. Previous session (harden): stop button, delete confirmations, thread item layout fix.
+- Latest implementation (2026-04-09, session polish): **Internal cleanup**. Extracted `MONTH_NAMES` Italian array from 4 assistant components into `lib/constants/months.ts` (single source of truth). Replaced local `eur()` in `AssistantContextCard` with `cachedFormatCurrencyEUR(value, true)` — avoids per-render `Intl.NumberFormat` allocation. Previous session (conversation-history): multi-turn Anthropic messages array; chat cap 10 pairs, structured 3 pairs.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`

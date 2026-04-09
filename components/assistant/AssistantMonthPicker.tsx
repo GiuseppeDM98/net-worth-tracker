@@ -2,11 +2,7 @@
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AssistantMonthSelectorValue } from '@/types/assistant';
-
-const MONTH_NAMES = [
-  'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
-  'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
-];
+import { MONTH_NAMES } from '@/lib/constants/months';
 
 interface AssistantMonthPickerProps {
   value: AssistantMonthSelectorValue;

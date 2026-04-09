@@ -56,15 +56,11 @@ import {
 } from '@/types/assistant';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { useQueryClient } from '@tanstack/react-query';
+import { MONTH_NAMES } from '@/lib/constants/months';
 
 interface AssistantPageClientProps {
   assistantConfigured: boolean;
 }
-
-const MONTH_NAMES = [
-  'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
-  'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
-];
 
 /**
  * Builds the list of selectable months (current month + 3 years back).

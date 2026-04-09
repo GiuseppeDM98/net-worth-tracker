@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AssistantChatContextType, AssistantMode, AssistantMonthSelectorValue } from '@/types/assistant';
 import { cn } from '@/lib/utils';
+import { MONTH_NAMES } from '@/lib/constants/months';
 
 interface AssistantComposerProps {
   draft: string;
@@ -33,11 +34,6 @@ interface AssistantComposerProps {
   /** Error message shown inline above the submit button (e.g. no data for selected month). */
   errorHint?: string;
 }
-
-const MONTH_NAMES = [
-  'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
-  'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
-];
 
 /**
  * Fixed composer area for the assistant chat.

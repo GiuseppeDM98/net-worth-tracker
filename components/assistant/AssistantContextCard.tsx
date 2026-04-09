@@ -6,11 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AssistantMonthContextBundle } from '@/types/assistant';
 import { cn } from '@/lib/utils';
-
-const MONTH_NAMES = [
-  'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
-  'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
-];
+import { MONTH_NAMES } from '@/lib/constants/months';
+import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 
 /**
  * Returns a human-readable label for the period encoded in selector.
@@ -37,13 +34,9 @@ function getPartialLabel(selector: { year: number; month: number }): string {
   return 'In corso';
 }
 
-function eur(value: number): string {
-  return new Intl.NumberFormat('it-IT', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  }).format(value);
-}
+// Reuse the module-level cached formatter instead of allocating a new
+// Intl.NumberFormat instance on every render of the context card.
+const eur = (value: number) => cachedFormatCurrencyEUR(value, true);
 
 function pct(value: number): string {
   return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;

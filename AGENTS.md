@@ -205,6 +205,11 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Use `cachedFormatCurrencyEUR` in components that format inside animation loops (count-up rAF ticks, Recharts tooltips rendered at 60fps)
 - `formatCurrency(amount, 'EUR')` also reuses the cached instance internally — the cache benefit is automatic for the common EUR path
 - Add a new cached instance only for a genuinely distinct locale/format combination; do not cache per-call options objects
+- `compact=true` → `_fmtEURCompact` (0 decimal places, `it-IT`, EUR) — use this for any assistant context panel value that previously used `new Intl.NumberFormat(..., { maximumFractionDigits: 0 })`
+
+### Shared Constants
+- Italian month names live in `lib/constants/months.ts` as `MONTH_NAMES` (`as const` array). Import from there — do not redeclare inline in assistant components
+- Pattern: before duplicating a primitive array in a second file, check `lib/constants/` first
 
 ### Dashboard Data Isolation
 - Do not add `useAllExpenses` or other full-history queries to Overview/Dashboard
