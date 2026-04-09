@@ -65,7 +65,10 @@ export function prepareAssetClassDistributionData(
 /**
  * Prepare data for individual asset distribution pie chart
  */
-export function prepareAssetDistributionData(assets: Asset[]): PieChartData[] {
+export function prepareAssetDistributionData(
+  assets: Asset[],
+  colors?: string[]
+): PieChartData[] {
   const totalValue = calculateTotalValue(assets);
 
   if (totalValue === 0) {
@@ -86,11 +89,14 @@ export function prepareAssetDistributionData(assets: Asset[]): PieChartData[] {
   const top10 = assetValues.slice(0, 10);
   const others = assetValues.slice(10);
 
+  const resolveColor = (index: number) =>
+    colors?.[index] ?? getChartColor(index);
+
   const chartData: PieChartData[] = top10.map((asset, index) => ({
     name: asset.ticker,
     value: asset.value,
     percentage: (asset.value / totalValue) * 100,
-    color: getChartColor(index),
+    color: resolveColor(index),
   }));
 
   // Add "Others" if there are more than 10 assets

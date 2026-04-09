@@ -13,6 +13,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useChartColors } from '@/lib/hooks/useChartColors';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { calculateIncomeExpenseRatio, calculateTotalExpenses, calculateTotalIncome } from '@/lib/services/expenseService';
@@ -53,18 +54,7 @@ interface ChartData {
   color: string;
 }
 
-const COLORS = [
-  '#3b82f6', // blue
-  '#ef4444', // red
-  '#10b981', // green
-  '#f59e0b', // amber
-  '#8b5cf6', // violet
-  '#ec4899', // pink
-  '#06b6d4', // cyan
-  '#f97316', // orange
-  '#6366f1', // indigo
-  '#14b8a6', // teal
-];
+// COLORS is resolved inside the component via useChartColors() — see below
 
 const ITALIAN_MONTHS = [
   'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
@@ -121,6 +111,7 @@ interface TotalHistoryTabProps {
 }
 
 export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 }: TotalHistoryTabProps) {
+  const COLORS = useChartColors();
   const controlClassName = 'transition-colors duration-200 border-border/70 hover:border-primary/40 focus-visible:ring-primary/30 data-[placeholder]:text-muted-foreground';
 
   // Percentage toggles for trend charts

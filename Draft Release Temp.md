@@ -1,5 +1,13 @@
 ## ✨ New Features
 
+### Color Themes
+
+- Added four selectable color themes: **Default** (classic zinc), **Solar Dusk** (warm amber), **Elegant Luxury** (deep burgundy), and **Midnight Bloom** (deep violet/indigo)
+- Theme preference is saved automatically and synced across all your devices
+- Theme selector is available in Settings → Aspetto with a visual light/dark preview swatch for each option
+- Switching between light and dark mode now plays a circle-reveal animation that expands from the toggle button
+- Charts and graphs now update their color palette to match the active color theme
+
 ### Assistente AI
 
 The AI Assistant is a new section of the app (accessible from the "Analisi" group in the navigation) that lets you have ongoing conversations about your portfolio — either through structured monthly analysis or open-ended chat.
@@ -110,6 +118,10 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - Deleting a conversation now requires the same two-step confirmation, preventing accidental loss of a thread
 
 ## 🔧 Improvements
+
+### Themes & Navigation
+
+- The bottom navigation bar on mobile now matches the active color theme — background, border, and active tab highlight all update when you switch themes, consistent with the sidebar on desktop
 
 ### Assistente AI (mobile)
 

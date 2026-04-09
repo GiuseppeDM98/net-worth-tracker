@@ -32,6 +32,7 @@ import { getItalyDate, getItalyMonthYear } from '@/lib/utils/dateHelpers';
 import { getGreeting } from '@/lib/utils/getGreeting';
 import { OverviewAnimatedCurrency } from '@/components/dashboard/OverviewAnimatedCurrency';
 import { OverviewChartsSection } from '@/components/dashboard/OverviewChartsSection';
+import { useChartColors } from '@/lib/hooks/useChartColors';
 
 const MotionButtonShell = motion.div;
 
@@ -74,6 +75,7 @@ export default function DashboardPage() {
   const snapshotDialogRef = useRef<HTMLDivElement | null>(null);
 
   const isMobile = useMediaQuery('(max-width: 1439px)');
+  const chartColors = useChartColors();
 
   // heroSettled becomes true when the Patrimonio Totale Lordo count-up completes.
   // OverviewChartsSection watches this flag to schedule the chart SVG mount via
@@ -215,14 +217,19 @@ export default function DashboardPage() {
     {
       id: 'asset',
       title: 'Distribuzione per Asset',
-      data: overview?.charts.assetData ?? [],
+      // Colors come from the server-cached service; remap here so theme changes
+      // take effect immediately without invalidating the React Query cache.
+      data: (overview?.charts.assetData ?? []).map((d, i) => ({
+        ...d,
+        color: chartColors[i] ?? d.color,
+      })),
     },
     {
       id: 'liquidity',
       title: 'Liquidità Portfolio',
       data: overview?.charts.liquidityData ?? [],
     },
-  ] as const, [overview]);
+  ] as const, [overview, chartColors]);
 
   if (loading) {
     return (

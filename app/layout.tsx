@@ -29,6 +29,7 @@ import { QueryClientProvider } from "@/lib/providers/QueryClientProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { MotionProvider } from "@/components/providers/MotionProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { ColorThemeProvider } from "@/contexts/ColorThemeContext";
 
 // Load Geist fonts with CSS variables for Tailwind integration
 const geistSans = Geist({
@@ -79,10 +80,12 @@ export default function RootLayout({
         <ThemeProvider>
           <MotionProvider>
             <AuthProvider>
-              <QueryClientProvider>
-                {children}
-                <Toaster />
-              </QueryClientProvider>
+              <ColorThemeProvider>
+                <QueryClientProvider>
+                  {children}
+                  <Toaster />
+                </QueryClientProvider>
+              </ColorThemeProvider>
             </AuthProvider>
           </MotionProvider>
         </ThemeProvider>
