@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bot,
   CalendarDays,
+  Check,
   Globe,
   Loader2,
   Lock,
@@ -14,6 +15,7 @@ import {
   Sparkles,
   Trash2,
   WandSparkles,
+  X,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { it } from 'date-fns/locale';
@@ -179,6 +181,11 @@ interface ThreadListProps {
 /**
  * Shared thread list rendered both in the desktop right panel and the mobile Sheet drawer.
  * Keeps selection, date formatting, and delete behaviour in one place to avoid drift.
+ *
+ * Delete is a 2-click flow: first click arms inline confirmation ("Elimina?"),
+ * second click confirms. Auto-disarms after 3 seconds to prevent accidental deletion.
+ * The delete control lives in the normal flex flow (not absolute) so it never
+ * overlaps the mode badge in the top-right corner.
  */
 function ThreadList({
   threads,
@@ -190,6 +197,27 @@ function ThreadList({
   onDelete,
   onNewThread,
 }: ThreadListProps) {
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | undefined>(undefined);
+  const pendingDeleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const armDelete = (threadId: string) => {
+    setPendingDeleteId(threadId);
+    pendingDeleteTimerRef.current = setTimeout(() => {
+      setPendingDeleteId(undefined);
+    }, 3000);
+  };
+
+  const disarmDelete = () => {
+    if (pendingDeleteTimerRef.current) clearTimeout(pendingDeleteTimerRef.current);
+    setPendingDeleteId(undefined);
+  };
+
+  const confirmDelete = (threadId: string) => {
+    if (pendingDeleteTimerRef.current) clearTimeout(pendingDeleteTimerRef.current);
+    setPendingDeleteId(undefined);
+    onDelete(threadId);
+  };
+
   if (loadingThreads) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -215,22 +243,24 @@ function ThreadList({
       {threads.map((thread) => {
         const isActive = selectedThreadId === thread.id;
         const isDeleting = isDeletingId === thread.id;
+        const isPendingDelete = pendingDeleteId === thread.id;
 
         return (
           <div
             key={thread.id}
             className={cn(
-              'group relative w-full rounded-xl border text-left transition-colors',
+              'group flex w-full items-stretch rounded-xl border text-left transition-colors',
               isActive ? 'border-primary/30 bg-primary/5' : 'border-border hover:bg-muted/40'
             )}
           >
+            {/* Main select area — takes all available width */}
             <button
               onClick={() => onSelect(thread)}
               disabled={isStreaming}
-              className="w-full px-3 py-2.5 text-left"
+              className="min-w-0 flex-1 px-3 py-2.5 text-left"
             >
-              <div className="flex items-start justify-between gap-2">
-                <p className="text-sm font-medium leading-snug text-foreground line-clamp-1">
+              <div className="flex items-start gap-2">
+                <p className="flex-1 text-sm font-medium leading-snug text-foreground line-clamp-1">
                   {thread.title}
                 </p>
                 <Badge variant="outline" className="mt-px shrink-0 text-[10px] uppercase">
@@ -259,26 +289,52 @@ function ThreadList({
               </div>
             </button>
 
-            {/* Delete button: shown on hover or while this thread is being deleted */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(thread.id);
-              }}
-              disabled={isStreaming || isDeleting}
-              aria-label="Elimina conversazione"
-              className={cn(
-                'absolute right-2 top-2.5 rounded-md p-1 text-muted-foreground/50 opacity-0 transition-opacity',
-                'hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100',
-                isDeleting && 'opacity-100'
+            {/* Delete control — in normal flow at the right edge, never overlaps the badge.
+                Shows on hover, stays visible while deleting or pending confirmation. */}
+            <div className={cn(
+              'flex shrink-0 items-start pt-2 pr-2 opacity-0 transition-opacity group-hover:opacity-100',
+              (isDeleting || isPendingDelete) && 'opacity-100'
+            )}>
+              {isDeleting && (
+                <div className="p-1">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                </div>
               )}
-            >
-              {isDeleting ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Trash2 className="h-3.5 w-3.5" />
+
+              {/* Inline confirmation: "Elimina?" + confirm/cancel */}
+              {!isDeleting && isPendingDelete && (
+                <div className="flex items-center gap-0.5">
+                  <span className="text-[11px] text-destructive font-medium">Elimina?</span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); confirmDelete(thread.id); }}
+                    disabled={isStreaming}
+                    aria-label="Conferma eliminazione"
+                    className="rounded-md p-1 text-destructive hover:bg-destructive/10"
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); disarmDelete(); }}
+                    aria-label="Annulla eliminazione"
+                    className="rounded-md p-1 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               )}
-            </button>
+
+              {/* Normal trash button — first click arms the confirmation */}
+              {!isDeleting && !isPendingDelete && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); armDelete(thread.id); }}
+                  disabled={isStreaming}
+                  aria-label="Elimina conversazione"
+                  className="rounded-md p-1 text-muted-foreground/50 hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
           </div>
         );
       })}
@@ -294,6 +350,9 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   // Stores the last successfully submitted prompt so retry can re-send it
   // after draft is cleared. Using a ref avoids stale closure issues.
   const lastSentPromptRef = useRef('');
+  // Holds the AbortController for the in-flight SSE request so the stop button
+  // can cancel the stream without navigating away.
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Italy current month/year — stable for the session
   const { year: currentYear, month: currentMonth } = useMemo(() => getItalyMonthYear(new Date()), []);
@@ -521,6 +580,10 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     // identify which message is still streaming and render it as plain text.
     const assistantMessageId = `local-assistant-${Date.now()}`;
 
+    // Create a fresh AbortController for this request; store it so handleStop can cancel it
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     setIsStreaming(true);
     setIsInterrupted(false);
     setIsSlowResponse(false);
@@ -549,6 +612,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
       const response = await authenticatedFetch('/api/ai/assistant/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: abortController.signal,
         body: JSON.stringify({
           userId: user.uid,
           mode: modeToSend,
@@ -644,13 +708,23 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
         ]);
       }
     } catch (error) {
-      toast.error((error as Error).message);
+      // AbortError is a user-initiated stop — keep partial text visible, no toast
+      if ((error as Error).name !== 'AbortError') {
+        toast.error((error as Error).message);
+      }
       setIsInterrupted(true);
       setStreamingMessageId(undefined);
     } finally {
+      abortControllerRef.current = null;
       setIsStreaming(false);
       setIsSlowResponse(false);
     }
+  };
+
+  // Aborts the in-flight SSE stream. The catch block in handleStreamSubmit
+  // detects AbortError and skips the toast, leaving partial text visible.
+  const handleStop = () => {
+    abortControllerRef.current?.abort();
   };
 
   // All chips prefill the composer — none auto-submit.
@@ -1021,6 +1095,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                   draft={draft}
                   onChange={setDraft}
                   onSubmit={handleStreamSubmit}
+                  onStop={handleStop}
                   isStreaming={isStreaming}
                   canSubmit={canSubmit}
                   mode={mode}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Archive, ArchiveRestore, Check, Pencil, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,6 +55,10 @@ export function AssistantMemoryItemRow({
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(item.text);
   const [isSaving, setIsSaving] = useState(false);
+  // Inline delete confirmation: first click arms it, second click confirms.
+  // Auto-disarms after 3 seconds to prevent accidental deletions from stale UI.
+  const [isPendingDelete, setIsPendingDelete] = useState(false);
+  const pendingDeleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleSave = async () => {
     const trimmed = editValue.trim();
@@ -75,6 +79,24 @@ export function AssistantMemoryItemRow({
   const handleCancel = () => {
     setIsEditing(false);
     setEditValue(item.text);
+  };
+
+  // Arm the delete confirmation and auto-disarm after 3 seconds
+  const handleDeleteArm = () => {
+    setIsPendingDelete(true);
+    pendingDeleteTimerRef.current = setTimeout(() => {
+      setIsPendingDelete(false);
+    }, 3000);
+  };
+
+  const handleDeleteDisarm = () => {
+    if (pendingDeleteTimerRef.current) clearTimeout(pendingDeleteTimerRef.current);
+    setIsPendingDelete(false);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (pendingDeleteTimerRef.current) clearTimeout(pendingDeleteTimerRef.current);
+    onDelete(item.id);
   };
 
   const isArchived = item.status === 'archived';
@@ -100,7 +122,7 @@ export function AssistantMemoryItemRow({
         </span>
 
         {/* Action buttons: visible on hover or during interaction */}
-        {!isEditing && (
+        {!isEditing && !isPendingDelete && (
           <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
             <Button
               variant="ghost"
@@ -129,15 +151,44 @@ export function AssistantMemoryItemRow({
                 <Archive className="h-3 w-3" />
               )}
             </Button>
+            {/* First click arms the confirmation; second click (on confirm) deletes */}
             <Button
               variant="ghost"
               size="icon"
               className="h-6 w-6 text-muted-foreground hover:text-destructive"
               disabled={isMutating}
-              onClick={() => onDelete(item.id)}
+              onClick={handleDeleteArm}
               aria-label="Elimina"
             >
               <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
+
+        {/* Inline delete confirmation — shown after the first click on the trash icon.
+            Auto-disarms after 3 seconds so a stale hover state can't cause accidental deletion. */}
+        {!isEditing && isPendingDelete && (
+          <div className="flex items-center gap-1">
+            <span className="text-[11px] text-destructive font-medium">Elimina?</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-destructive hover:text-destructive"
+              disabled={isMutating}
+              onClick={handleDeleteConfirm}
+              aria-label="Conferma eliminazione"
+            >
+              <Check className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+              disabled={isMutating}
+              onClick={handleDeleteDisarm}
+              aria-label="Annulla eliminazione"
+            >
+              <X className="h-3 w-3" />
             </Button>
           </div>
         )}

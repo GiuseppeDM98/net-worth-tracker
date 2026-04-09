@@ -190,6 +190,20 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - Each main page now has a breadcrumb label above the title and a separator line between the header area and the data below, giving the interface a more editorial, intentional feel
 - Utility actions (Refresh, Export CSV, Insert Past Snapshot) are visually de-emphasised so the primary action on each page stands out
 
+## 🛡️ Safety & Resilience
+
+### Assistente AI
+
+- Added a stop button to cancel AI responses mid-stream — click the red square icon during any analysis to stop immediately; the partial response stays visible so you don't lose what was already written
+- Deleting a memory item now requires a two-step confirmation — click the trash icon to arm it, then confirm with the checkmark (or cancel with X); the confirmation auto-dismisses after 3 seconds if you do nothing
+- Deleting a conversation now requires the same two-step confirmation, preventing accidental loss of a thread
+
+## 🐛 Bug Fixes
+
+### Assistente AI
+
+- Fixed the delete button on conversations overlapping the mode badge (CHAT, MESE, ANNO, etc.) — the button is now correctly positioned outside the badge area
+
 ## 🔒 Security
 
 - Improved authorization checks for private account actions across snapshots, dividends, performance metrics, price updates, Hall of Fame recalculation, and AI analysis

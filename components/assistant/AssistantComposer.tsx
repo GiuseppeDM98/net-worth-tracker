@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { Loader2, Send } from 'lucide-react';
+import { Square, Send } from 'lucide-react';
 import { AssistantMonthPicker } from '@/components/assistant/AssistantMonthPicker';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -13,6 +13,8 @@ interface AssistantComposerProps {
   onChange: (value: string) => void;
   /** Called when the user triggers a send (Enter key or button click). */
   onSubmit: () => void;
+  /** Called when the user clicks the stop button during streaming. */
+  onStop: () => void;
   isStreaming: boolean;
   canSubmit: boolean;
   mode: AssistantMode;
@@ -54,6 +56,7 @@ export function AssistantComposer({
   draft,
   onChange,
   onSubmit,
+  onStop,
   isStreaming,
   canSubmit,
   mode,
@@ -204,19 +207,29 @@ export function AssistantComposer({
           )}
         />
 
-        <Button
-          onClick={() => onSubmit()}
-          disabled={!canSubmit}
-          size="icon"
-          className="h-[52px] w-[52px] shrink-0 rounded-xl"
-          aria-label="Invia messaggio"
-        >
-          {isStreaming ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
+        {/* During streaming: stop button (always enabled so the user can abort).
+            At rest: send button (gated on canSubmit). */}
+        {isStreaming ? (
+          <Button
+            onClick={() => onStop()}
+            size="icon"
+            className="h-[52px] w-[52px] shrink-0 rounded-xl"
+            aria-label="Interrompi risposta"
+            variant="destructive"
+          >
+            <Square className="h-4 w-4" />
+          </Button>
+        ) : (
+          <Button
+            onClick={() => onSubmit()}
+            disabled={!canSubmit}
+            size="icon"
+            className="h-[52px] w-[52px] shrink-0 rounded-xl"
+            aria-label="Invia messaggio"
+          >
             <Send className="h-4 w-4" />
-          )}
-        </Button>
+          </Button>
+        )}
       </div>
 
       {/* Chat mode: context type selector as a secondary compact row.
