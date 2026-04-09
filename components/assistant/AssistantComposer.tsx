@@ -104,11 +104,36 @@ export function AssistantComposer({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="month_analysis">Analisi mensile</SelectItem>
-            <SelectItem value="year_analysis">Analisi annuale</SelectItem>
-            <SelectItem value="ytd_analysis">YTD</SelectItem>
-            <SelectItem value="history_analysis">Storico totale</SelectItem>
-            <SelectItem value="chat">Chat libera</SelectItem>
+            <SelectItem value="month_analysis">
+              <div className="flex flex-col gap-0.5">
+                <span>Analisi mensile</span>
+                <span className="text-xs text-muted-foreground font-normal">Patrimonio, cashflow e allocazione del mese</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="year_analysis">
+              <div className="flex flex-col gap-0.5">
+                <span>Analisi annuale</span>
+                <span className="text-xs text-muted-foreground font-normal">Performance, dividendi e crescita dell'anno</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="ytd_analysis">
+              <div className="flex flex-col gap-0.5">
+                <span>YTD</span>
+                <span className="text-xs text-muted-foreground font-normal">Rendimento e cashflow dall'1 gennaio a oggi</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="history_analysis">
+              <div className="flex flex-col gap-0.5">
+                <span>Storico totale</span>
+                <span className="text-xs text-muted-foreground font-normal">Evoluzione del patrimonio da quando hai iniziato</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="chat">
+              <div className="flex flex-col gap-0.5">
+                <span>Chat libera</span>
+                <span className="text-xs text-muted-foreground font-normal">Domanda libera, con o senza dati del portafoglio</span>
+              </div>
+            </SelectItem>
           </SelectContent>
         </Select>
 

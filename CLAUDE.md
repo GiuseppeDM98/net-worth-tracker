@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-08, session distill): **Assistente AI composer + preferences cleanup**. Composer toolbar reduced to max 2 controls in the top row (mode selector + period picker); `chatContextType` selector moved to a secondary compact row below the textarea (visible only in chat mode). `chatContextType` default changed from `'month'` to `'none'`. Duplicate "Memoria assistente" switch removed from Preferences popover — the canonical toggle lives in the Memory panel ("Apprendimento automatico"). Mobile header action row now uses `flex-wrap` to prevent overflow on narrow viewports. Previous (session 68c): Preferences Card removed from right sidebar → moved into a `Popover` (Settings2 icon) in the page header. Memory panel wrapped in a `Collapsible`. Right sidebar order: Conversazioni → Contesto numerico → Memoria. Mobile hero: chips card now first, threads below.
+- Latest implementation (2026-04-09, session clarify): **Assistente AI mode descriptions**. Each `SelectItem` in the mode selector (`AssistantComposer.tsx`) now shows a two-line layout: mode name + a short Italian description of the data scope. Descriptions visible only in the open dropdown, not in the closed trigger (Radix native behavior). Previous (session distill, 2026-04-08): Composer toolbar reduced to max 2 controls in the top row; `chatContextType` moved to secondary row below textarea; duplicate memory toggle removed from Preferences popover. Previous (session 68c): Preferences Card → header popover; Memory panel collapsible; sidebar order Conversazioni → Contesto → Memoria; mobile hero chips-first.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -80,7 +80,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-08 (session distill — Assistente AI composer simplification)
+**Last updated**: 2026-04-09 (session clarify — Assistente AI mode descriptions)
 
 ## Design Context
 

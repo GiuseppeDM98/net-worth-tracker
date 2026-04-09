@@ -96,6 +96,7 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - Moved assistant preferences (response style, macro context) into a compact settings popover accessible from the page header — the right panel now shows only the context data and memory, with more vertical space for what matters during an analysis
 - The memory panel in the right column is now collapsible — click the header to collapse it when the list is long, keeping the numeric context panel visible without scrolling
 - On mobile, the suggested prompt chips ("Analizza questo mese", etc.) now appear above the recent conversations list — the primary action is immediately visible without scrolling past past threads
+- Each analysis mode in the assistant now shows a short description in the selector dropdown — explaining what data it uses (e.g. "Patrimonio, cashflow e allocazione del mese") so you know what to expect before sending
 - Simplified the composer toolbar: the mode selector and period picker now occupy the top row only; the chat context type selector moves to a compact secondary row below the input, keeping the toolbar uncluttered in all modes
 - Chat mode now starts with no numeric context by default — select Month, Year, YTD, or Total history only when you want the assistant to reference your portfolio data
 - Removed a duplicate memory on/off toggle from the preferences popover — the toggle lives in the Memory panel where it belongs, next to the memory items it controls
