@@ -50,6 +50,7 @@ export function useCreateAsset(userId: string) {
     onSuccess: () => {
       // Invalidate assets query to trigger refetch and show new asset in UI
       queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(userId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(userId) });
     },
   });
 }
@@ -69,6 +70,7 @@ export function useUpdateAsset(userId: string) {
     onSuccess: () => {
       // Invalidate to show updated asset data in UI
       queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(userId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(userId) });
     },
   });
 }
@@ -87,6 +89,7 @@ export function useDeleteAsset(userId: string) {
     onSuccess: () => {
       // Invalidate to remove deleted asset from UI
       queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(userId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(userId) });
     },
   });
 }

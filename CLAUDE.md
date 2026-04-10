@@ -5,9 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-05, session 55): **Assets current-year baseline fix**. Patrimonio `Anno Corrente` historical tables now compare the first visible month against the previous month as a hidden baseline, so January can show growth vs previous December without rendering December in the UI. `Mese Prec. %` and `YTD %` now stay meaningful even when only one month is visible.
-- Previous implementation (2026-04-04, session 54): **Cashflow & FIRE small fixes**. Cashflow Anno Corrente income pie chart legend no longer overflows on mobile (capped at 3 items, matching the expense chart). FIRE Indennità Annuale card now shows the Patrimonio FIRE base value at a glance.
-- Previous implementation (2026-04-04, session 53): **Auth polish pass**. Login and Register now enter with a calmer shared motion pattern, keep field focus continuity more refined, and provide clearer inline submit feedback without changing the authentication flows.
+- Latest implementation (2026-04-10, session assistant-polish): **Final polish pass on AI assistant**. Fixed redundant empty state in hero mode (conversation box stays silent when no thread selected; chips card is the sole CTA). Upgraded query-level error display from bare `<p>` to `Alert variant="destructive"`. Unified icon vocabulary: `RotateCcw` for retry/regenerate actions. Previous session (assistant-animations): Framer Motion animations across 5 assistant components + collapsible "Come funziona" guide. Session before that (themes-fix): dark chroma fix, cyberpunk + retro-arcade themes, 6 themes total.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -19,6 +17,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 ## Key Features (Active)
 - Portfolio tracking across equities, bonds, crypto, real estate, commodities, and cash
 - Automatic price updates via Yahoo Finance and Borsa Italiana bond support
+- **Multi-theme color system (2026-04-10)**: 6 selectable themes — `default`, `solar-dusk`, `elegant-luxury`, `midnight-bloom`, `cyberpunk`, `retro-arcade`. Persisted in Firestore `userPreferences/{userId}` + localStorage. `ColorThemeContext` manages `data-theme` on `<html>`, independent of next-themes dark/light. View Transition circle-reveal on dark/light toggle (CSS vars `--vt-cx/cy/r` + `document.startViewTransition`). Chart colors theme-aware via `useChartColors` (reads `--chart-1..5` after paint via `requestAnimationFrame`; oklch luminance filter: L>0.82 light fallback, L<0.30 dark fallback). Bottom navigation uses `--sidebar-*` CSS vars for theme sync. Theme selector in Settings → Aspetto (grid `grid-cols-2 sm:grid-cols-3 desktop:grid-cols-6`). Dark theme chroma must be ≥0.020 to be perceptible on dark backgrounds. Key files: `lib/services/userPreferencesService.ts`, `contexts/ColorThemeContext.tsx`, `lib/hooks/useChartColors.ts`, `app/globals.css` (theme blocks), `components/layout/BottomNavigation.tsx`.
+- Assistente AI (2026-04-10): 5 modes — `month_analysis`, `year_analysis`, `ytd_analysis`, `history_analysis`, `chat`. Chat mode has `chatContextType` selector (`none | month | year | ytd | history`), default `'none'`. `bySubCategoryAllocation` in context bundle. `selector.month` encoding: `>0`=monthly, `0`=year, `-1`=YTD, `-2`=history. `useAssistantPeriodContext` unifies all 4 context hooks. `includeMacroContext` gates web search in analysis modes; chat mode uses keyword-based policy in `webSearchPolicy.ts` (keyword list + explicit phrases). Extended thinking (budget 2000) + 3500 max_tokens. `resolvedThreadId` pattern avoids stale RQ cache. Feature flag `NEXT_PUBLIC_ASSISTANT_AI_ENABLED`. Persistent conversations, auto-memory, markdown with tables. Memory extraction runs in all modes, gated by `memoryEnabled` only. `includeDummySnapshots` preference: toggle visible only when `hasDummySnapshots`. **Stop**: `AbortController` in `abortControllerRef`. **Delete confirmations**: 2-click inline with 3s auto-disarm. **Mobile**: composer chip strip for mode + chat context (`desktop:hidden`); `pb-[env(safe-area-inset-bottom,0px)]` for iPhone home bar; Brain icon Sheet for memory panel; `AssistantContextPill` in conversation header; `flex-col` two-row header buttons on mobile. `CollapsibleTrigger` always `asChild` in `AssistantMemoryPanel`. **Conversation history**: cap chat 10 pairs, structured 3 pairs. **A11y**: `aria-live` on stream container; `role="tablist/tab"` on memory filters; action buttons always visible on touch; `scrollIntoView instant` during streaming. **Animations**: Framer Motion on all 5 assistant components — staggered chip mount, message fade/slide, memory item cascade + height-collapse exit, context card `AnimatePresence mode="wait"` keyed on period, streaming badge fade. `useReducedMotion()` everywhere. **Guide**: collapsible "Come funziona" in page header (below subtitle, above buttons) — content outside flex-row so it spans full width on desktop. Textarea scrollbar hidden via `[&::-webkit-scrollbar]:hidden [scrollbar-width:none]`.
 - Login and Register now feel more native to the product, with calmer entry motion, cleaner field focus choreography, keyboard-reachable password toggles, and inline submit status feedback
 - Hall of Fame now reads as an editorial ranking surface with clearer monthly/yearly hierarchy, spotlight cards for the current month/year, and contextual note dialogs tied to the selected record
 - Cashflow "Entrate per categoria" pie chart on mobile now caps legend items at 3 (same as expense chart), preventing overflow when 4+ categories exceed the 5% threshold
@@ -28,7 +28,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Rendimenti now presents smoother period switching, KPI settling from prior values, staged monthly heatmap reveal, a more legible underwater drawdown surface, and contextual custom-range / AI dialogs
 - Allocazione now presents a more readable drill-down path on desktop and a steadier mobile sheet experience, with each drill-down level reopening from the top and progress bars using centered target markers
 - Patrimonio now preserves visited macro-tab and sub-tab state across `Gestione Asset`, `Anno Corrente`, and `Storico`, with calmer transitions for dense historical tables, scoped refresh feedback on the active view, and a hidden previous-month baseline for `Anno Corrente` so first-month comparisons and summary percentages remain accurate without adding an extra visible column
-- Overview/Dashboard now emphasizes the primary net-worth KPI with a more precise count-up/settle pattern, softer conditional-card reflow, and chart reveals that avoid noisy replay on secondary updates
+- Patrimonio Anno Corrente and Storico tables show only assets with `includeInHistoryTables: true` (toggle in AssetDialog). Anno Corrente: `quantity > 0` only. Storico: includes `quantity === 0` for sold-asset history with "Venduto" badge. `restrictToPassedAssets={true}` on both tables. Disabling cost basis in AssetDialog correctly deletes `averageCost`/`taxRate` from Firestore via `deleteField()`
+- Overview/Panoramica now loads KPI, variations, expense summary, charts, and rendering flags from one authenticated overview query, improving warm loads and keeping related data in sync after asset, cashflow, snapshot, and stamp-duty-setting changes
+- Overview/Dashboard KPI cards all animate on mount via `OverviewAnimatedCurrency` leaf nodes (count-up isolated per card, not page-level). Charts mount after hero settles via `requestIdleCallback`. Formatter cache in `lib/utils/formatters.ts` avoids `Intl.NumberFormat` allocation on every render.
 - Private API actions now require verified Firebase auth server-side, while scheduled maintenance flows continue to authenticate with `CRON_SECRET`
 - Cashflow tracking with categories, filters, Sankey drill-down, budget management, and linked cash-account updates
 - History page with net worth evolution, asset class breakdown, liquidity, YoY variation, savings vs investment growth, `Lavoro & Investimenti`, doubling analysis, and allocation comparison
@@ -49,7 +51,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - `npm test -- <file>`
   - `npx vitest run <file>`
   - `npx tsc --noEmit`
-- Current repo includes targeted tests for pure utilities/services plus private API auth regression coverage in `__tests__/apiAuthRoutes.test.ts`
+- Current repo includes targeted tests for pure utilities/services plus private API auth regression coverage in `__tests__/apiAuthRoutes.test.ts` and assistant auth / policy coverage in `__tests__/assistantRoutes.test.ts`, `__tests__/assistantWebSearchPolicy.test.ts`, `__tests__/assistantPromptRouting.test.ts`, month context bundle coverage in `__tests__/assistantMonthContextService.test.ts`, thread auth + DELETE coverage in `__tests__/assistantThreadRoutes.test.ts`, and memory extraction unit tests in `__tests__/assistantMemoryExtraction.test.ts`
 
 ## Data & Integrations
 - Firestore client + admin
@@ -62,6 +64,10 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - FX conversion depends on Frankfurter API availability, with cache fallback
 
 ## Key Files
+- Overview data pipeline: `app/api/dashboard/overview/route.ts`, `lib/services/dashboardOverviewService.ts`, `lib/hooks/useDashboardOverview.ts`, `types/dashboardOverview.ts`
+- Overview KPI animation: `components/dashboard/OverviewAnimatedCurrency.tsx`, `components/dashboard/OverviewChartsSection.tsx`
+- Formatter cache: `lib/utils/formatters.ts` (`cachedFormatCurrencyEUR`)
+- Assistant: `app/dashboard/assistant/page.tsx`, `components/assistant/AssistantPageClient.tsx`, `components/assistant/AssistantPageSkeleton.tsx`, `components/assistant/AssistantComposer.tsx`, `components/assistant/AssistantPromptChips.tsx`, `components/assistant/AssistantContextCard.tsx`, `components/assistant/AssistantMonthPicker.tsx`, `components/assistant/AssistantStreamingResponse.tsx`, `components/assistant/AssistantMemoryPanel.tsx`, `components/assistant/AssistantMemoryItemRow.tsx`, `lib/constants/assistantPrompts.ts`, `app/api/ai/assistant/*` (incl. `context/route.ts`, `stream/route.ts`), `lib/server/assistant/*` (incl. `memoryExtraction.ts`, `webSearchPolicy.ts`), `lib/services/assistantMonthContextService.ts`, `lib/hooks/useAssistantMonthContext.ts` (exports `useAssistantPeriodContext`), `types/assistant.ts`
 - History: `app/dashboard/history/page.tsx`
 - History components: `components/dashboard/LaborMetricsChart.tsx`, `components/history/*`
 - Chart service: `lib/services/chartService.ts`
@@ -75,7 +81,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-05 (session 55)
+**Last updated**: 2026-04-10 (session themes-fix — dark chroma fix, cyberpunk + retro-arcade themes, settings button cleanup)
 
 ## Design Context
 

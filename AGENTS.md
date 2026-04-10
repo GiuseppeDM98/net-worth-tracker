@@ -12,6 +12,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Use `formatCurrency()` for EUR and `formatDate()` for `DD/MM/YYYY`
 - Use `Sottocategoria` (no hyphen)
 - **Navigation taxonomy (established in session 30):** Panoramica, Patrimonio, Allocazione, Rendimenti, Storico, Impostazioni. The following are kept in English intentionally: `Hall of Fame` (premium brand name), `FIRE e Simulazioni` (acronym), `Cashflow` (established financial term in Italian). Do not translate these back.
+- `Assistente AI` is an established secondary navigation label under `Analisi`; do not rename it to `Chat AI`, `Copilot`, or generic `Assistant`
 - **Performance metric names:** `Time-Weighted Return`, `Money-Weighted Return (IRR)`, `Sharpe Ratio`, `YOC`, `Max Drawdown` are kept as international standard terms. `Recovery Time` → `Tempo di Recupero`, `Current Yield` → `Rendimento Corrente`.
 
 ### Firebase Dates and Timezone
@@ -39,6 +40,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Never remove tabs from `mountedTabs`
 - For state-preserving tab UIs, keep per-scope active tab state explicitly (e.g. separate sub-tab state for `Anno Corrente` and `Storico`) instead of sharing one global sub-tab value
 - Use `useMemo` for derived state; do not use `useEffect + setState` for computed values
+- When a private API returns date-like values for React Query consumers, normalize them at the hook boundary with `toDate()` instead of scattering conversions inside page components
 
 ### Dynamic Imports
 - `next/dynamic` with named exports must unwrap via `.then(m => ({ default: m.Named }))`
@@ -77,6 +79,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 ### Settings Synchronization
 - Every new settings field must be handled in three places: type definition, `getSettings()`, `setSettings()`
 - `setSettings()` has two write branches; update both
+- Assistant preference fields mirrored into settings must stay aligned with the assistant memory document and `AssetAllocationSettings`
 
 ### Settings UX Layer (Overdrive)
 - Unsaved preview in Settings is local-only: use a baseline snapshot key captured on load/save and compare against current state (`hasUnsaved*`) without introducing autosave behavior
@@ -85,35 +88,159 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - For nested allocation editors, prefer `CollapsibleContent` with short, sober transitions over custom animation stacks; keep expand/collapse readable under dense forms
 - Sensitive Settings dialogs (move/delete) should open with trigger continuity via `transform-origin` from the clicked control, and clear custom origin on close
 
+### Assistant SSE Streaming State
+- Never clear `streamingMessages` in a `useEffect([selectedThreadId])` — the SSE `meta` event sets `selectedThreadId` mid-stream, causing the effect to fire and wipe the buffer before text arrives
+- Clear streaming state explicitly only on user-initiated thread switches (click handler), not reactively
+- The `context` SSE event fires before text streaming begins; handle it separately from `text` events to populate the numeric panel without touching the message buffer
+- When loading a thread, sync `mode` and `selectedMonth` to `thread.pinnedMonth`/`thread.mode` via a `useEffect([threadDetail])` guarded by `streamingMessages.length === 0`
+- Track `streamingMessageId` (the ID of the assistant message slot currently receiving tokens) and pass it to the message renderer to switch between plain-text and ReactMarkdown — plain text during stream avoids re-parse layout jumps on every chunk; markdown renders on `done`
+- Do NOT auto-select the most recent thread on first load — it causes a jarring double-load (skeleton → hero → immediate thread fetch). Show the hero state and let the user pick a thread. `hasAutoSelectedRef` has been removed.
+- After "new thread" deselection, React Query keeps the previous thread's data in cache (query disabled but stale data present); guard `renderedMessages` with `!selectedThreadId` to return `[]` and show the hero immediately
+- `handleStreamSubmit` accepts optional `promptOverride`/`modeOverride` so chip clicks can pass values synchronously — React state updates are async; relying on updated state after `setDraft`/`setMode` inside the same handler does not work
+- Button `onClick` always passes the `MouseEvent` as the first argument; if the handler signature accepts an optional string (`promptOverride?`), wrap as `onClick={() => onSubmit()}` — never `onClick={onSubmit}` — or the event object is received as the prompt and `.trim()` throws
+- **AbortController for SSE**: store `new AbortController()` in a ref (`abortControllerRef`) at submit time, pass `signal` via `authenticatedFetch` init. In the catch block, detect user-initiated stops with `(error as Error).name !== 'AbortError'` and skip `toast.error` — partial text stays visible, `isInterrupted` is set. Clear the ref in `finally`. The stop button must be a separate element that is always enabled during streaming (not conditionally disabled via `canSubmit`); swap the send icon for Square and use `variant="destructive"` to signal the destructive action.
+- **React Query stale cache after new thread**: `handleStreamSubmit` captures `selectedThreadId` as a closure value at call time (e.g. `undefined` for a brand-new thread). The SSE `meta` event calls `setSelectedThreadId(newId)` (async React update) but the closure value doesn't change. Post-stream invalidation must use a local `resolvedThreadId` variable updated synchronously from the `meta` event — never `selectedThreadId` from the closure. Otherwise the new thread's React Query cache is never invalidated and shows stale data (missing the assistant message) until a hard refresh.
+- Use `renderedMessages` (not `threadDetail?.messages`) as the base when building `streamingMessages` at submit time — React Query may not have reloaded the thread yet after the previous stream's cache invalidation, so `threadDetail` is stale and excludes the last exchange
+- `scrollIntoView` must be gated on `renderedMessages.length > 0 && !(loadingThreadDetail && !isStreaming)` — without it, selecting a thread scrolls the page to the bottom before any messages arrive, leaving the user staring at empty space
+- **`scrollIntoView` behavior during streaming must be `'instant'`, not `'smooth'`** — `smooth` schedules a CSS scroll animation on every SSE token, saturating the browser's animation thread and causing visible jank on slow devices. Reserve `{ behavior: 'smooth' }` for non-streaming events (initial thread load). Pattern: `if (isStreaming) el.scrollIntoView({ behavior: 'instant' }); else el.scrollIntoView({ behavior: 'smooth' })`
+
+### Assistant Month Context Service
+- `assistantMonthContextService.ts` runs server-side inside an API route — use `adminDb` (Firebase Admin SDK) directly, not `getUserSnapshots`/`getExpensesByDateRange`/`getSettings` (client SDK, requires browser auth session)
+- Pattern: inline Admin SDK queries matching `dashboardOverviewService.ts`; mock `adminDb.collection` in tests, not the service functions
+- The server never trusts client-supplied numbers: always rebuild the bundle from the period selector. For year_analysis/ytd/history the client only supplies the mode + year; the builder fetches everything from Firestore.
+- `bySubCategoryAllocation` is built by fetching live `Asset` records (which have `subCategory`) and cross-referencing with `currentSnapshot.byAsset` (which has `assetId + value`). Slight historical inaccuracy is acceptable — subCategory changes are not tracked historically.
+- All 4 builders (`buildAssistantMonthContext`, `buildAssistantYearContext`, `buildAssistantYtdContext`, `buildAssistantHistoryContext`) return the same `AssistantMonthContextBundle` type; the `selector.month` encoding distinguishes period type downstream.
+- All 4 builders accept an optional `includeDummySnapshots = false` param that propagates to the 3 snapshot finder functions (`findSnapshot`, `findLatestSnapshotInYear`, `findLatestSnapshotAtOrBeforeYear`). Default is false — dummy snapshots are excluded for all real users.
+- `includeDummySnapshots` flows differently between the two context endpoints: `stream/route.ts` receives it from `body.preferences` (client-sent); `context/route.ts` must re-read it from `getAssistantMemoryDocument()` because it is a GET request with no body.
+
+### Assistant Prompt Builder (`formatBundleForPrompt`)
+- Always include a full `--- ALLOCAZIONE CORRENTE (tutte le classi) ---` section built from `currentSnapshot.byAssetClass` before the top-5 movers section. Without it, Claude only sees the 5 largest monthly movers and labels stable asset classes (real estate, pension funds) as "unclassified" patrimony — producing hallucinated gap analysis.
+- `allocationChanges` is already capped at 5 by the context builder; render it as a *separate* section labelled `--- VARIAZIONI ALLOCAZIONE MENSILI (top 5) ---` so the distinction between "current holdings" and "this month's movement" is explicit in the prompt.
+- `currentSnapshot` was already present in `AssistantMonthContextBundle` but `formatBundleForPrompt` was destructuring only named fields — adding a new field to the prompt requires explicitly reading it from `bundle`, not from the destructured const.
+
+### Assistant Thread Store
+- `deleteAssistantThread` must delete the `messages` subcollection in batches (≤400 docs per batch) before deleting the parent document — Firestore Admin SDK does not cascade-delete subcollections automatically.
+- Use `FieldValue.increment(1)` (from `firebase-admin/firestore`) inside `appendAssistantMessage` to atomically increment `messageCount` on the thread document without a separate read-modify-write cycle.
+- `ThreadList` is defined as a module-level component (not nested inside the page component) and rendered both in the desktop right panel and in the mobile `Sheet` drawer — keeps selection, date formatting, and delete behaviour in one place. Never inline it as JSX inside the page or selection updates will remount the whole list.
+- **Conversation history injection**: load `getAssistantThreadDetail` BEFORE `appendAssistantMessage` in `stream/route.ts` — so the new user message is not included in the history passed to Claude. Loading after would include the just-appended message and duplicate it in the Anthropic payload. Pass the result as `conversationHistory` to `streamAssistantResponse`.
+- **Multi-turn messages array**: `buildMessagesArray()` in `anthropicStream.ts` prepends history before the current user turn. Filter to `role === 'user' | 'assistant'` only — Anthropic's messages array does not accept `role: 'system'`. Cap: chat → last 20 msgs (10 pairs); structured analysis → last 6 msgs (3 pairs) because those prompts already carry large context bundles.
+
+### Assistant Memory Injection
+- Saving items to `assistantMemory/{userId}` is not enough — Claude has no implicit access to Firestore. Items must be serialized into the prompt via `formatMemoryForPrompt()` in `prompts.ts`. A generic instruction like "you can reuse saved preferences" without the actual text is useless.
+- Only `status === 'active'` items are injected. Archived items are explicitly excluded.
+- Memory fetch in the stream route is wrapped in `.catch(() => null)` — memory failure must never block the chat stream.
+- `extractAndSaveMemory` is fire-and-forget: call with `.catch(...)` after `appendAssistantMessage`, never `await` it inside the stream. Errors are logged server-side only.
+- Memory extraction runs in **all modes**, not just chat. The only gate is `memoryEnabled` in `AssistantPreferences` — mode is irrelevant.
+- The Anthropic client for memory extraction is instantiated lazily inside `extractAndSaveMemory` (dynamic import), not at module level — module-level `new Anthropic()` breaks test environments where `ANTHROPIC_API_KEY` is absent.
+- `hasDummySnapshots` in `AssistantMemoryDocument` is a computed field injected **only** by `GET /api/ai/assistant/memory` via a parallel Firestore `limit(1)` query — never persisted to Firestore. All return sites in `store.ts` use `hasDummySnapshots: false` as a placeholder; the real value is overlaid by the route handler. Pattern for other computed UI flags: same approach — don't store them, compute at the read boundary.
+
+### Assistant Chat Mode Unification
+- Chat mode can receive numeric context from any period builder. The `chatContext` field in the stream request (`'none' | 'month' | 'year' | 'ytd' | 'history'`) selects the builder; `'none'` skips all context and sends Claude no portfolio data.
+- `enableWebSearch` must be passed from `streamAssistantResponse` through `buildPrompt` → `buildChatPrompt` — without it, the chat prompt has no instruction to use web results for specific recent events even when the tool is active.
+- Chat max_tokens is 1500 normally, 2500 when web search is enabled — macro/geopolitical responses with web search are structurally longer and truncate at 1500.
+- The SSE `context` event (numeric panel) is sent for all analysis modes and for chat when a context bundle was built. Chat mode with `chatContext: 'none'` produces no panel.
+
+### Assistant Context Panel Persistence
+- The context bundle lives in React state, populated by the SSE `context` event during streaming. On reload or thread switch the panel is empty even if the thread has a pinned period.
+- Pattern to repopulate: `GET /api/ai/assistant/context?userId=&mode=&year=&month=` rebuilds the bundle via the matching builder. Hook: `useAssistantPeriodContext(userId, mode, pinnedMonth, pinnedYear, currentYear, 0, enabled)` — calls all 4 specialized hooks always (React hook rules) but enables only the matching one.
+- Enable the fetch only when `shouldFetchContext` is true: thread is loaded + has a pinned period for its mode + `streamingMessages.length === 0` + `contextBundle === null`. All conditions matter — without the `streamingMessages` guard the hook fires while SSE is delivering its own bundle.
+- `selector.month` encoding convention: `>0` = monthly analysis, `0` = full-year (`pinnedYear`), `-1` = YTD, `-2` = total history. `AssistantContextCard.getPeriodLabel` handles all four cases inline (cannot import from `lib/server/assistant/prompts.ts` — server-only module).
+- Never persist the bundle to the thread Firestore document. Rebuilding from source keeps the streaming and storage layers independent.
+- The `AssistantContextCard` renders a skeleton (plain `animate-pulse` divs) when `isLoading` is passed. Pass `bundle={{} as AssistantMonthContextBundle} isLoading` — the prop is safe because `isLoading` short-circuits before any field access.
+
+### Assistant Retry Pattern
+- `handleRetry` must use a ref (`lastSentPromptRef`) to store the last successfully submitted prompt before `setDraft('')` clears it. Calling `handleStreamSubmit()` without an override after draft is cleared sends an empty string and exits silently — no error, no visible feedback.
+- Update `lastSentPromptRef.current` only after `response.ok` — not on click — so a failed network request before the stream starts doesn't overwrite the ref with a prompt that was never sent.
+
+### Assistant Thread List UX
+- Thread dates: use `formatDistanceToNow` (date-fns, Italian locale) for dates within the past 7 days; fall back to `toLocaleDateString('it-IT', {day:'2-digit', month:'2-digit', year:'numeric'})` for older dates. Never use relative-only formatting — absolute dates are more useful for threads weeks old.
+- Mobile thread list: use a `Sheet` (`side="right"`) triggered by a button in the page header (hidden on `desktop:` via `desktop:hidden`). The desktop right panel card uses `hidden desktop:block`. This ensures the same `ThreadList` component is used in both surfaces without duplicating the item render logic.
+- Desktop right column order: Threads → Context panel → Memory (collapsible). Preferences moved to a header popover (Settings2 icon). Threads first so the user can pick a conversation immediately without scrolling.
+- Desktop right column is `sticky top-6` with `max-h-[calc(100vh-6rem)] overflow-y-auto` so panels remain visible while the conversation scrolls. `overflow-y-auto` on the column itself (not a wrapper) lets the sidebar scroll internally if memory list is very long.
+- Mobile hero shows chips first, then last 5 threads below as "Riprendi conversazione" (`desktop:hidden`) — chips must be above the fold on mobile. Capped at 5 to avoid overwhelming the hero.
+- **Do not use `DropdownMenu` for panels that contain `Select` or `Switch`** — `DropdownMenu` closes on any click inside, including opening a Select dropdown or toggling a Switch. Use `Popover` (`@radix-ui/react-popover`, `components/ui/popover.tsx`) for self-contained settings panels.
+- `AssistantMemoryPanel` accepts optional `isOpen`/`onToggle` props for controlled collapsible mode. When provided, the `CardHeader` becomes the `CollapsibleTrigger` and a `ChevronDown` chevron appears. Without these props the panel is static (backwards compatible). Buttons inside the header that must not toggle the collapsible need `e.stopPropagation()`.
+- **Thread list action button layout**: do NOT use `absolute` positioning for the delete/action button in thread list cards when a Badge is already in the top-right corner — they will overlap. Use a `flex shrink-0` sibling div at the right edge of the card row instead. The select button takes `flex-1 min-w-0`; the action column has its own padding.
+- **Mobile Sheet auto-close after thread selection**: the mobile "Conversazioni" Sheet must use controlled state (`open`/`onOpenChange`) so it can be closed programmatically when the user selects a thread. Without this, the drawer stays open after selection and the user must manually dismiss it. Pattern: add `isThreadSheetOpen` state, pass `open={isThreadSheetOpen} onOpenChange={setIsThreadSheetOpen}`, call `setIsThreadSheetOpen(false)` inside the `onSelect` handler.
+- **Mobile memory Sheet**: hide `AssistantMemoryPanel` from the right-column scroll flow on mobile by wrapping it in `hidden desktop:block`. Expose it via a Brain icon button (`desktop:hidden`) in the page header that opens a Sheet. The panel's `isOpen`/`onToggle` props are omitted inside the Sheet (no collapsible needed when the Sheet itself is the container).
+- **Mobile context pill**: `AssistantContextPill` (exported from `AssistantContextCard.tsx`) renders a single-line `period · +€X (+Y%)` strip inside the conversation header, shown only on mobile via `desktop:hidden`. Full `AssistantContextCard` stays in the right column but is wrapped in `hidden desktop:block`. Avoids hiding key financial numbers below the fold on mobile.
+- **Mobile header button layout**: use `flex-col gap-2 desktop:flex-row` on the outer wrapper and split buttons into two `flex` rows on mobile. Text buttons get `flex-1` so they span available width; icon-only buttons (`size="icon"`) are `shrink-0`. On desktop everything becomes one inline flex row via `desktop:flex-none` on the text buttons.
+- **Breakpoint-conditional controls (Select vs chips)**: for controls where a dropdown is fine on desktop but awkward on mobile, render two versions — chips with `desktop:hidden` for mobile, Select with `hidden desktop:flex` for desktop. Share state; only the presentation differs. Keep both in the same component so they stay synchronized. Applied in `AssistantComposer` for mode and chat context type.
+- **Inline destructive confirmation pattern** (both `AssistantMemoryItemRow` and `ThreadList`): first click "arms" — sets `isPendingDelete` state + starts a 3s `setTimeout` auto-disarm stored in a ref. Second click confirms and calls the delete handler. X button or timeout disarms. Use `pendingDeleteId: string | undefined` (not boolean) when multiple items share the same list component, so one state variable handles the whole list. Clear the timer in all branches (confirm, disarm, and on component cleanup if needed).
+
+### Assistant Markdown Rendering
+- Use `remark-gfm` with `ReactMarkdown` — without it markdown tables (`| col | col |`) render as raw pipe characters. `remark-gfm@4.0.1` is already installed.
+- Override `table`/`thead`/`th`/`td`/`tr` components explicitly — Tailwind `prose` does not add cell borders or padding. `th` must include `text-left` because some browsers default table headers to `text-center`.
+- **MARKDOWN_COMPONENTS must be defined at module level** (outside the render function), not inline in JSX. An inline `components={{ table: ..., th: ... }}` object creates a new reference on every render; ReactMarkdown treats it as changed and re-mounts even when message content hasn't changed. On long conversations with many completed messages this causes cascading re-renders. Pattern: `const MARKDOWN_COMPONENTS: React.ComponentProps<typeof ReactMarkdown>['components'] = { ... }` before the export.
+
+### Assistant Rollout Flag
+- `NEXT_PUBLIC_ASSISTANT_AI_ENABLED=false` → `notFound()` in `app/dashboard/assistant/page.tsx` + nav item filtered out of Sidebar, SecondaryMenuDrawer, and `secondaryHrefs` in BottomNavigation. Default is enabled when the variable is absent.
+- The flag is inlined at build time (`NEXT_PUBLIC_`), so filtering the nav arrays at module level is safe and has zero runtime overhead.
+
 ### Private API Authorization
 - Any App Router API route that uses Firebase Admin SDK must authenticate server-side; Firestore rules do not protect Admin SDK calls
 - Private routes must verify the Firebase ID token and bind the request to `decodedToken.uid`, not just a client-supplied `userId`
 - For record-level mutations on Admin SDK routes, enforce ownership after loading the document (e.g. `dividend.userId`, `asset.userId`)
 - Client-side calls to private API routes should use `authenticatedFetch()` so `Authorization: Bearer <idToken>` is sent consistently
+- For server-owned materialized documents such as `dashboardOverviewSummaries/{userId}`, client-side mutations must invalidate via a private authenticated API route; do not write these collections directly from the client SDK
 - Scheduled server-to-server flows are the exception: cron routes authenticate with `CRON_SECRET`, and `/api/portfolio/snapshot` must continue to accept `cronSecret` for internal cron orchestration
+- For user-owned conversational features (assistant threads, messages, memory), generate authoritative thread metadata server-side; do not let the client decide persisted titles or ownership-bound identifiers
 
 ### Asset and FIRE Rules
 - `quantity = 0` is valid and marks sold assets in history logic
 - Cash asset balance lives in `quantity`, not via price updates
 - Do not filter `cash` out of Patrimonio historical tables unless the product request is explicit; the default behavior keeps liquidity visible in both `Anno Corrente` and `Storico`
 - Borsa Italiana bond prices are `% of par`; store converted EUR values
+- **Patrimonio history tables** (Anno Corrente + Storico) show only assets with `includeInHistoryTables === true` (set via "Includi nelle tabelle storiche" toggle in AssetDialog). Anno Corrente additionally requires `quantity > 0`; Storico includes `quantity === 0` so sold assets show historical months with a "Venduto" badge. Assets deleted from Firestore entirely lose the flag and can't be recovered from snapshots.
+- **`restrictToPassedAssets` pattern**: when you pre-filter the `assets` array before passing to `AssetPriceHistoryTable`, always set `restrictToPassedAssets={true}` or the transform's snapshot-scan step will silently re-add excluded assets as `isDeleted: true` ("Venduto"). The two arrays in the page (`historyTableAssets` for Anno Corrente, `historyTableAssetsAll` for Storico) both require this flag.
 - FIRE annual expenses must use the last completed year
 - `includePrimaryResidence` must flow through both React Query key and query function
 - FIRE calculator unsaved preview is local-only: metrics may react immediately to form edits, but milestone surfaces like the "FIRE raggiunto" banner should remain anchored to saved/loaded data until persistence completes
+
+### Firestore Optional Field Deletion
+- `updateDoc` only touches fields present in the update object — omitting a field leaves the old value intact in Firestore
+- `removeUndefinedFields` (used before `updateDoc` in `assetService.ts`) strips `undefined` keys, so clearing an optional field by setting it to `undefined` is silently ignored
+- **Pattern**: after `removeUndefinedFields`, explicitly translate `undefined` → `deleteField()` for fields the user can intentionally clear: `if (updates.field === undefined) cleaned.field = deleteField()`
+- Applied in `updateAsset` for `averageCost` and `taxRate`. Follow this pattern for any other nullable asset/settings fields that users can toggle off
 
 ### Formatter Duplication
 - `formatCurrency` and `formatCurrencyCompact` exist in both `lib/utils/formatters.ts` and `lib/services/chartService.ts`
 - Update both when changing formatting behavior
 
+### Formatter Cache
+- `lib/utils/formatters.ts` exports `cachedFormatCurrencyEUR(amount, compact?)` backed by two module-level `Intl.NumberFormat` instances
+- Use `cachedFormatCurrencyEUR` in components that format inside animation loops (count-up rAF ticks, Recharts tooltips rendered at 60fps)
+- `formatCurrency(amount, 'EUR')` also reuses the cached instance internally — the cache benefit is automatic for the common EUR path
+- Add a new cached instance only for a genuinely distinct locale/format combination; do not cache per-call options objects
+- `compact=true` → `_fmtEURCompact` (0 decimal places, `it-IT`, EUR) — use this for any assistant context panel value that previously used `new Intl.NumberFormat(..., { maximumFractionDigits: 0 })`
+
+### Shared Constants
+- Italian month names live in `lib/constants/months.ts` as `MONTH_NAMES` (`as const` array). Import from there — do not redeclare inline in assistant components
+- Pattern: before duplicating a primitive array in a second file, check `lib/constants/` first
+
 ### Dashboard Data Isolation
 - Do not add `useAllExpenses` or other full-history queries to Overview/Dashboard
 - Full-history expense analysis belongs in History or Cashflow
+- Overview/Panoramica data pipeline should flow through the private `GET /api/dashboard/overview` route and `useDashboardOverview()`; do not reintroduce page-level fan-out queries for assets, snapshots, expense stats, or settings
+- `DashboardOverviewPayload` should stay lean: only KPI, variations, expense stats, chart datasets, flags, and freshness fields actually rendered by Panoramica belong there
+- `dashboardOverviewSummaries/{userId}` is a server-owned materialized summary for warm loads; the client must never read it directly, only the authenticated overview route may do that
+- Overview materialized summaries must have explicit invalidation on overview-relevant mutations plus a short TTL fallback, so stale docs never become a silent source of truth
 
 ### Loading and Skeletons
 - Skeletons should mirror the final layout
 - Reuse the same skeleton across chained loading states
 - Use full-page skeletons only on truly slow pages; otherwise prefer delayed or null loading
-- `Loader2` is for initial loading, `RefreshCw` is for user-triggered refresh
+- `Loader2` is for initial loading; `RefreshCw` is for user-triggered refresh; `RotateCcw` is for retry/regenerate actions — keep these semantics consistent across the app
+
+### Error State Levels
+- **Query-level (blocking)**: use `Alert variant="destructive"` with `AlertCircle` icon — these represent a failure to load the page's primary data and need visible presence
+- **Mutation (transient)**: use `toast.error()` — the user's action failed but the page is still usable; a toast is enough
+- **Never** render a bare `<p class="text-destructive text-xs">` for errors the user must act on — it is invisible at small sizes and especially on dark backgrounds
+
+### Empty State Layering
+- **One CTA surface per screen context** — do not show a hero empty state AND a secondary empty state for the same surface at the same time; they compete and confuse
+- Pattern: if a page-level chips/hero card is already the primary CTA, the conversation/content area inside it must stay silent (no nested `EmptyState`) until the user has selected a specific item to view
+- Reserve the nested empty state for the case where a specific item IS selected but has no content (e.g. thread selected but messages array is empty)
 
 ### Visual Hierarchy Patterns
 - Hero KPI: use `border-l-4 border-l-primary` + `text-3xl desktop:text-4xl tabular-nums` on the single most important card per page (e.g. Patrimonio Totale Lordo on Dashboard, first chart on History)
@@ -121,6 +248,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Section headers in `MetricSection`: left-border accent (`w-[3px] bg-primary opacity-70`) replaces emoji prefixes. Do not use emoji in section titles
 - Page header zone: eyebrow label (`text-xs uppercase tracking-widest text-muted-foreground`) above the `h1` + `border-b border-border` below the full header row separates editorial zone from data grid
 - Action hierarchy: one `variant="default"` CTA per page; utility actions (refresh, CSV export, insert snapshot) use `variant="ghost"` or `variant="outline" size="sm"`
+- **Sticky input panel elevation**: a composer or input bar that sticks to the bottom of a scrollable area should use an upward shadow to signal it "floats" above the content. Use `shadow-[0_-4px_16px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_16px_-2px_rgba(0,0,0,0.3)]` — hardcoded `rgba` because Tailwind v4 has no semantic upward-shadow token. Dark opacity is 5× higher because dark surfaces absorb shadow contrast. Without this the composer reads as "more card" instead of "distinct input plane".
 - Auth pages (`/login`, `/register`): use `bg-background` + `border border-border rounded-xl bg-card p-8` panel — no `Card` component, no hardcoded grays. Top `h-px bg-border` accent line mirrors the dashboard page header separator. Eyebrow label + personal title ("Bentornato." / "Crea il tuo profilo.") apply the same typographic pattern as internal pages. Cross-links use `underline underline-offset-4 text-foreground`, not a colored link
 - Auth form shells: prefer a field wrapper with `focus-within` choreography (border + soft ring on the wrapper, not a louder input-level treatment) so label, input, and password toggle read as one control
 - Password visibility toggles on auth forms should stay keyboard-focusable; keep the field shell active while focus moves between the input and the toggle inside the same container
@@ -139,14 +267,22 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Dividends page pattern: keep calendar, active date filter, stats, and table derived from the same source of truth; the calendar should reflect filter focus instead of running its own separate selection model
 - For Nivo Sankey filter updates, keep the chart instance mounted and let the library animate data diffs; remounting via React `key` or keyed wrapper shells suppresses the native update animation
 - Performance page pattern: derive `chartData`, heatmap data, and underwater data with `useMemo`; do not store them in local state via `useEffect + setState`
-- Performance period morph: do not key KPI sections or metric cards by selected period; KPI values should settle from the previous rendered value (`useCountUp({ fromPrevious: true })`) while chart shells can re-key only when a first-class staged reveal is intentional
+- Performance period morph: do not key KPI sections or metric cards by selected period; on period switches, values jump silently to the new number (no re-animation); chart shells can re-key only when a first-class staged reveal is intentional
+- `useCountUp` on KPI cards: always use `once: true` so the count-up fires exactly once on first meaningful data arrival and does not re-trigger on React Query cache hits. `fromPrevious: true` alone (without `once`) causes a first-load flash — the 60ms `startDelay` window is cancelled and restarted on every value update before the animation can complete
 - Performance staged reveals should run on first mount or major period change only; manual refresh feedback must stay scoped to the page header or active chart shell instead of replaying the whole page
+- Assistant SSE pattern: keep Anthropic orchestration server-side, stream `data: {JSON}\n\n` events with typed envelopes (`meta`, `text`, `status`, `done`, `error`), and let the client progressively append chunks without owning persistence decisions
 - History page pattern: for mode switches (`%`/`€`, annual/monthly, doubling mode), animate the local chart shell or summary row only; avoid remounting or replaying unrelated sections
 - Goal-based investing pattern: drive summary cards, allocation chart, and detail cards from one shared focus state so the relationship between selected goal and resulting allocation stays explicit across the tab
 - For contextual dividend details, prefer a read-only detail surface first and compute `transform-origin` from the clicked row/card; only transition into edit mode when the user explicitly asks to modify the record
 - Hall of Fame notes pattern: note view/edit dialogs should open from the clicked ranking row/card or the "Aggiungi Nota" CTA via contextual `transform-origin`; the note trigger can be local to the page if the older shared cell component becomes too limiting
 - Allocation mobile drill-down pattern: keep the sheet's native bottom-entry animation, but make the sheet body the only scrollable region and reset its scroll to top on each level/content change; this preserves orientation more reliably than custom container-entry choreography
 - Allocation target markers inside progress bars should use a centered dot without a vertical stem; if bar height/border changes, recheck visual centering against the live track
+- **Framer Motion in assistant components**: use `AnimatePresence mode="wait"` + `key={stateValue}` for content that fully swaps (e.g. context card on period change, period label crossfade). Use `AnimatePresence initial={false}` (default popLayout) for lists where items are added/removed (messages, memory items). `initial={false}` prevents entrance animation on items already visible when `AnimatePresence` mounts — only genuinely new items animate in.
+- **Memory item exit animation**: wrap each item in `motion.div` with `exit={{ opacity: 0, height: 0, marginBottom: 0 }}` + `style={{ overflow: 'hidden' }}`. Height collapse on exit prevents the list from leaving a gap after removal. Pair `height: 0` with `marginBottom: 0` or the bottom gap remains.
+- **Collapsible section with Framer Motion**: for height-animated collapsibles outside Radix, use `motion.div` with `initial={{ opacity: 0, height: 0 }}` / `animate={{ opacity: 1, height: 'auto' }}` / `exit={{ opacity: 0, height: 0 }}` + `style={{ overflow: 'hidden' }}`. `height: 'auto'` works in Framer Motion (unlike CSS transitions). Wrap in `AnimatePresence initial={false}`.
+- **Full-width collapsible inside a flex row**: if the expandable content must span the full container width, place the `AnimatePresence` block OUTSIDE the flex-row div (sibling, not child). Content inside a `flex: 1` column won't exceed its column width.
+- **Windows native scrollbar on textarea**: `overflow-y-auto` triggers the scrollbar track on Windows/Chromium even for a single wrapped line. Hide visually with `[&::-webkit-scrollbar]:hidden [scrollbar-width:none]` — scroll remains functional above the height cap.
+- **`useReducedMotion()` pattern**: call once at the component level, then use `prefersReducedMotion ? 0 : <duration>` and `prefersReducedMotion ? 0 : <y>` inline in transition/initial objects. Do not add separate CSS `prefers-reduced-motion` media queries when Framer Motion is already used — the hook is the single source of truth.
 - Do not wrap shadcn `TableRow` with `motion()`; use `motion.tr`
 - Use `motion.create(Component)` — `motion(Component)` is deprecated in Framer Motion v11+ and logs a warning
 - Page-level Framer Motion quality should be validated in production mode (`npm run build` + `npm run start`) before treating desktop smoothness as a regression; `next dev` can noticeably exaggerate count-up and layout-motion cost
@@ -155,7 +291,9 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
   - `Line` / `Area`: `animationDuration={800}` + `animationEasing="ease-out"`
   - `Pie` also needs `animationBegin={0}`
 - Decorative stacked background areas should keep `isAnimationActive={false}`
-- Overview/Panoramica pattern: keep hero KPI motion focused on the primary card, avoid replaying chart animations on every secondary refetch, and prefer one-time chart reveal flags for expensive Recharts mounts
+- Overview/Panoramica pattern: count-up lives in `OverviewAnimatedCurrency` leaf nodes, NOT in the page component — each rAF tick re-renders only that leaf, leaving the chart subtree and all other cards untouched. The page passes final computed values as stable props; display timing is entirely the leaf's concern.
+- Overview/Panoramica chart scheduling: `OverviewChartsSection` is wrapped with `React.memo` and receives `heroSettled: boolean` from the page. When `heroSettled` becomes true, it schedules chart SVG mount via `requestIdleCallback` (with `{ timeout: 800 }`) or `setTimeout(0)` as fallback — never a fixed arbitrary timeout as the primary strategy. On mobile and reduced-motion, `chartRenderReady` starts true immediately.
+- `OverviewAnimatedCurrency` format prop: use `format="integer"` for count-based KPIs (e.g. asset count) to avoid fractional display during rAF interpolation. Default is `"currency"` via `cachedFormatCurrencyEUR`. Add new format values here only if a genuinely distinct format is needed — do not extract a separate component per format.
 - Dialog continuity pattern: for trigger-to-dialog continuity, forward the ref through `DialogContent` and compute a `transform-origin` from the triggering control; clear the custom origin on close so the exit animation stays neutral
 - **Page transitions: use `template.tsx`, NOT `layout.tsx` + `AnimatePresence`**. Next.js App Router wraps navigations in `startTransition` (React 18 concurrent); `AnimatePresence` can inherit the previous variant context ("visible") and skip `initial="hidden"` on the new child, causing a 1-frame flash of fully-visible content. `template.tsx` re-mounts on every navigation, guaranteeing Framer Motion treats each mount as a true first mount. Trade-off: no exit animation (old page unmounts immediately). See `app/dashboard/template.tsx`
 - Page-level `motion.div variants={pageVariants}` wrappers on individual pages are **redundant** when `template.tsx` is in place — remove them to avoid compounded opacity (opacity `t²` instead of `t`)
@@ -163,12 +301,25 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - **Icon swap animation**: use `AnimatePresence mode="wait"` with `key={stateValue}` around a `motion.span` wrapping the icon. Exit/enter with rotate + scale + opacity. `initial={false}` prevents the animation on first mount. `mode="wait"` ensures exit completes before enter starts — without it two icons overlap briefly
 - **`layoutId` inside `position: fixed` containers**: avoid. Framer Motion calculates layout animation coordinates relative to the offset parent; inside a `fixed` container the coordinate system diverges from the viewport, producing incorrect transforms that can displace or hide the element. Use per-element `AnimatePresence` + individual `motion.div` instead
 
+### Color Theme System
+- **Parallel theming**: next-themes controls dark/light (`.dark` class on `<html>`); custom system controls color theme (`data-theme` attribute on `<html>`). They are fully independent — never conflate them.
+- **CSS structure**: `[data-theme="name"]` for light vars, `.dark[data-theme="name"]` for dark overrides in `app/globals.css`. Default theme uses `:root` / `.dark` (no `data-theme`).
+- **`ColorThemeContext`**: manages `data-theme` + localStorage + Firestore sync. Must live inside `AuthProvider`. Uses `syncedUid` ref to avoid re-fetching on re-renders.
+- **Firestore rules for `userPreferences/{userId}`**: use `isOwner(userId)` directly — the document has no `userId` field, the doc ID *is* the userId. Do NOT use `hasValidUserId()` (which checks a field).
+- **`useChartColors` timing**: use `useEffect + useState + requestAnimationFrame` to read CSS vars, NOT `useMemo`. `useMemo` reads `getComputedStyle` synchronously during render, before next-themes has updated the DOM — produces stale colors on dark↔light transitions.
+- **oklch luminance filter**: when adding chart colors from tweakcn themes, check L channel. Thresholds in `useChartColors`: L > 0.82 in light mode → fallback; L < 0.30 in dark mode → fallback. Themes with chart colors at extreme luminance (e.g. L≈0.92 or L≈0.28) will always fall back — avoid or fix at the CSS level.
+- **Server-cached chart data**: `prepareAssetDistributionData` runs server-side; colors are baked into React Query cache. Remap colors at render time in the page component (`assetData.map((d, i) => ({ ...d, color: chartColors[i] ?? d.color }))`); do not invalidate the cache.
+- **View Transition circle-reveal**: remove `disableTransitionOnChange` from `ThemeProvider` or the CSS animation is blocked. Set `--vt-cx`, `--vt-cy`, `--vt-r` inline before calling `document.startViewTransition(() => setTheme(next))`. TypeScript already knows `startViewTransition` — no `@ts-expect-error` needed.
+- **Adding a new theme checklist**: (1) add CSS blocks `[data-theme="name"]` + `.dark[data-theme="name"]` in `globals.css`, (2) add `'name'` to `ColorTheme` union in `userPreferencesService.ts`, (3) add swatch object to the themes array in `settings/page.tsx`, (4) update grid cols if needed, (5) `npx tsc --noEmit`.
+- **Dark theme chroma gotcha**: in oklch, chroma values below ~0.015 are invisible on dark backgrounds — all themes look identical gray. When adding or editing a `.dark[data-theme="..."]` block, verify `--card`, `--background`, and `--muted` have chroma ≥ 0.020. Themes sourced from tweakcn usually have adequate chroma; hand-edited or copy-pasted dark blocks often don't. Also verify the **hue** matches the theme personality — elegant-luxury had hue 56° (amber) instead of ~20° (burgundy) because it was copied from solar-dusk.
+
 ### Mobile Navigation Structure
 - Bottom navigation (portrait mobile): 3 primary routes + "Altro" button (MoreHorizontal icon)
-- "Altro" button shows active state (blue, `text-blue-600 bg-blue-50 dark:bg-blue-950/20`) when current route is any secondary route — same treatment as primary tabs
+- **Bottom nav uses `--sidebar-*` CSS vars** for theme-aware colors — background `var(--sidebar)`, border `var(--sidebar-border)`, active tab `var(--sidebar-primary)` + `var(--sidebar-accent)` bg, inactive `var(--sidebar-foreground)` at opacity 0.65. Use `style={{ ... }}` inline because sidebar vars are not mapped to Tailwind utility classes.
 - **Sidebar active state — Overview exact match**: `Sidebar.tsx` `isActive` for `/dashboard` must use `pathname === item.href` only, never `startsWith`. `startsWith('/dashboard/')` matches every sub-route (`/dashboard/assets`, `/dashboard/history`, etc.) and keeps Panoramica highlighted on all pages. All other routes can use prefix matching safely
 - `secondaryHrefs` array in `BottomNavigation.tsx` must stay in sync with `navigationGroups` hrefs in `SecondaryMenuDrawer.tsx`
 - Secondary drawer uses 3 semantic groups: Analisi (Allocazione, Rendimenti, Storico, Hall of Fame), Pianificazione (FIRE e Simulazioni), Preferenze (Impostazioni)
+- `Assistente AI` belongs in the `Analisi` group and must be included anywhere secondary analytical routes are enumerated
 - Eyebrow label style for group headers: `text-xs font-semibold uppercase tracking-wider text-muted-foreground/60`
 
 ### One-Time UI Effects
@@ -187,6 +338,14 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Dev/internal tool sections in settings pages: isolate with `border-t border-border pt-6` + a `text-xs uppercase tracking-widest` eyebrow label in a distinct color (e.g. orange for dev/danger zones); never co-locate dev tools in a functional product tab (dividendi, spese, etc.)
 - For refresh affordances on dense historical tables, highlight only the active shell/header and timestamp the refresh there; avoid flashing rows or cells broadly
 
+### Accessibility Patterns
+- **`aria-live` on streaming content**: any region that receives dynamically injected text (SSE streams, polling) must have `aria-live="polite"` and `aria-atomic="false"` on its container so screen readers announce content as it arrives. Use `aria-label` to give the region a name (e.g. `aria-label="Conversazione con l'assistente"`).
+- **Action buttons hidden with `opacity-0` are inaccessible on both keyboard and touch**: `opacity-0 group-hover:opacity-100` makes controls unreachable from keyboard (focus lands on invisible buttons) and invisible on touch (no hover state). Fix: use `[@media(pointer:fine)]:opacity-0 [@media(pointer:fine)]:group-hover:opacity-100 [@media(pointer:fine)]:group-focus-within:opacity-100` — actions remain always visible on touch devices and become visible on keyboard focus. Tailwind v4 JIT supports arbitrary `@media` variants.
+- **Tab pattern without ARIA**: `<button>` elements styled as tabs must have `role="tab"`, `aria-selected`, and a `role="tablist"` wrapper to be announced correctly by screen readers.
+- **Touch targets**: minimum 44×44px per Apple HIG and Material Design. `h-6 w-6` (24px) icon-only buttons are below threshold — use at least `h-8 w-8` for action buttons in dense lists; `h-10 w-10` for primary CTAs. Tab filters need at least `min-h-[36px]`.
+- **`type="button"` on `<button>` elements**: always set explicit `type="button"` on buttons that are not form submits to prevent accidental form submission in nested contexts.
+- **`aria-label` on icon-only selects**: `SelectTrigger` without visible label text must have `aria-label` — screen readers will otherwise only announce the current value with no context about what is being selected.
+
 ### Dialog Layout
 - Prefer sticky header + sticky footer dialog layout for long forms
 - Do not use `overflow-y-auto` on dialog bodies that contain absolute-positioned custom dropdowns
@@ -198,6 +357,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 ### Commands
 - `npm test -- <file>` or `npx vitest run <file>` for targeted tests
 - `npx tsc --noEmit` for repo-wide TypeScript checking without generating build output
+- For Overview data-pipeline / materialized-summary changes, run `npx tsc --noEmit`, `npx vitest run __tests__/apiAuthRoutes.test.ts`, and `npx vitest run __tests__/dashboardOverviewService.test.ts`
 - For Patrimonio historical-table baseline changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/assetHistoryUtils.test.ts` before manual validation
 - For auth UX-only changes, run `npx tsc --noEmit` and then manually validate keyboard tab flow, password toggle focus continuity, and inline submit feedback on both `/login` and `/register`
 - For motion/perceived-performance changes, compare `npm run dev` against `npm run build && npm run start` before optimizing away production-safe motion
@@ -207,6 +367,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - For Performance page UX/motion changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/performanceService.test.ts` before manual validation
 - For History page UX/motion changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/chartService.test.ts` before manual validation
 - For private API auth regressions, run `npx vitest run __tests__/apiAuthRoutes.test.ts`
+- For Assistant AI foundation changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/assistantRoutes.test.ts __tests__/assistantWebSearchPolicy.test.ts __tests__/assistantMonthContextService.test.ts` before manual validation
 - For Settings UX-only changes, run `npx tsc --noEmit` plus a targeted smoke/auth check (`npx vitest run __tests__/apiAuthRoutes.test.ts`) before manual UI validation
 
 ### Test Patterns
@@ -271,6 +432,16 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Symptom: a custom "open from tapped point" animation feels worse than the native sheet entry even when `transform-origin` is computed correctly
 - Cause: shadcn/Radix bottom-sheet semantics and the built-in slide-from-bottom expectation on mobile can conflict with bespoke container-entry motion, especially when the content itself already animates
 - Fix: prefer the standard bottom-entry sheet animation and reserve contextual continuity for the internal content/header behavior unless the full container transition is visually verified on device
+
+### Radix CollapsibleTrigger Nested Button
+- Symptom: `<button> cannot be a descendant of <button>` hydration error in console
+- Cause: `CollapsibleTrigger asChild={false}` (the Radix default) renders its own `<button>` element. If the trigger's children contain any `Button` component (another `<button>`), this creates an invalid nested-button DOM tree.
+- Fix: always use `asChild` on `CollapsibleTrigger` so it clones the first child element (typically a `div` or `CardHeader`) as the interactive trigger instead of generating its own `<button>`. The child must be a single non-button React element. `disabled` and other props still work correctly via prop merging.
+- Applied in `AssistantMemoryPanel` — the `CardHeader` (div) becomes the trigger, keeping the inner `Button` (trash icon) at a safe nesting level.
+
+### iOS Safe Area on Sticky Composers
+- Sticky input bars positioned with `bottom-N` in a scrollable layout need `padding-bottom: env(safe-area-inset-bottom, 0px)` for iOS devices with home indicator. Use the CSS property directly (not Tailwind class) for reliable cross-browser support: `style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}` or via arbitrary value `pb-[env(safe-area-inset-bottom,0px)]`. The fallback `0px` ensures no extra padding on non-notched devices.
+- Do NOT add extra bottom padding to account for BottomNav clearance if the sticky wrapper already uses `bottom-N` — that double-counts. Only the iOS safe area needs a top-up beyond the sticky offset.
 
 ### Nullish vs Falsy Fallbacks
 - When `0` is semantically invalid for a snapshot-derived display value, prefer `||` over `??`

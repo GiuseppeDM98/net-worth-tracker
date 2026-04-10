@@ -110,6 +110,7 @@ const assetSchema = z.object({
   taxRate: z.number().min(0, 'Tax rate must be at least 0').max(100, 'Tax rate must be at most 100').optional().or(z.nan()),
   totalExpenseRatio: z.number().min(0, 'TER must be at least 0').max(100, 'TER must be at most 100').optional().or(z.nan()),
   stampDutyExempt: z.boolean().optional(),
+  includeInHistoryTables: z.boolean().optional(),
   isLiquid: z.boolean().optional(),
   autoUpdatePrice: z.boolean().optional(),
   isComposite: z.boolean().optional(),
@@ -329,6 +330,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         taxRate: asset.taxRate || undefined,
         totalExpenseRatio: asset.totalExpenseRatio || undefined,
         stampDutyExempt: asset.stampDutyExempt || false,
+        includeInHistoryTables: asset.includeInHistoryTables || false,
         isLiquid: defaultIsLiquid,
         autoUpdatePrice: asset.autoUpdatePrice !== undefined ? asset.autoUpdatePrice : shouldUpdatePrice(asset.type, asset.subCategory),
         isComposite: !!(asset.composition && asset.composition.length > 0),
@@ -395,6 +397,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         taxRate: undefined,
         totalExpenseRatio: undefined,
         stampDutyExempt: false,
+        includeInHistoryTables: false,
         isLiquid: true,
         autoUpdatePrice: true,
         isComposite: false,
@@ -677,6 +680,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         taxRate: data.taxRate && !isNaN(data.taxRate) && data.taxRate >= 0 ? data.taxRate : undefined,
         totalExpenseRatio: data.totalExpenseRatio && !isNaN(data.totalExpenseRatio) && data.totalExpenseRatio >= 0 ? data.totalExpenseRatio : undefined,
         stampDutyExempt: data.stampDutyExempt || false,
+        includeInHistoryTables: data.includeInHistoryTables || false,
         currentPrice,
         isLiquid: data.isLiquid,
         autoUpdatePrice: data.autoUpdatePrice,
@@ -1755,6 +1759,21 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
               id="stampDutyExempt"
               checked={!!watch('stampDutyExempt')}
               onCheckedChange={(checked) => setValue('stampDutyExempt', checked)}
+            />
+          </div>
+
+          {/* Include in price/value history tables (Anno Corrente + Storico) */}
+          <div className="flex items-center justify-between rounded-lg border p-4">
+            <div className="space-y-0.5">
+              <Label htmlFor="includeInHistoryTables">Includi nelle tabelle storiche</Label>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Se attivo, l&apos;asset appare nelle tabelle Prezzi e Valori di Anno Corrente e Storico anche senza tracciamento cost basis (es. fondi pensione, immobili)
+              </p>
+            </div>
+            <Switch
+              id="includeInHistoryTables"
+              checked={!!watch('includeInHistoryTables')}
+              onCheckedChange={(checked) => setValue('includeInHistoryTables', checked)}
             />
           </div>
 

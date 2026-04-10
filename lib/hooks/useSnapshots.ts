@@ -101,6 +101,10 @@ export function useCreateSnapshot(userId: string) {
       queryClient.invalidateQueries({
         queryKey: queryKeys.assets.all(userId),
       });
+
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.dashboard.overview(userId),
+      });
     },
   });
 }

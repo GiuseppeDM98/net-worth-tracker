@@ -3,17 +3,17 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { PieChart, History, Trophy, Flame, Settings, TrendingUp } from 'lucide-react';
+import { PieChart, History, Trophy, Flame, Settings, TrendingUp, Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { drawerContainer, drawerItem } from '@/lib/utils/motionVariants';
 
 // WARNING: If you add/remove navigation items here, also update:
-// - Sidebar.tsx (9 total items including these 6 secondary routes)
+// - Sidebar.tsx (10 total items including these 7 secondary routes)
 // - BottomNavigation.tsx (secondaryHrefs array must match all hrefs in navigationGroups)
 //
 // Secondary routes are grouped by information architecture:
 // Analisi = analytical/reporting views, Pianificazione = forward-looking simulation,
-// Preferenze = non-financial settings. All 6 routes also appear in Sidebar.
+// Preferenze = non-financial settings. All 7 routes also appear in Sidebar.
 
 // Groups reflect the app's information architecture.
 // Singleton groups (Pianificazione, Preferenze) are intentional:
@@ -26,6 +26,10 @@ const navigationGroups = [
       { name: 'Allocazione', href: '/dashboard/allocation', icon: PieChart },
       { name: 'Rendimenti', href: '/dashboard/performance', icon: TrendingUp },
       { name: 'Storico', href: '/dashboard/history', icon: History },
+      // Assistente AI is conditionally included based on the feature flag.
+      ...(process.env.NEXT_PUBLIC_ASSISTANT_AI_ENABLED !== 'false'
+        ? [{ name: 'Assistente AI', href: '/dashboard/assistant', icon: Bot }]
+        : []),
       // Hall of Fame: kept in English as an intentional premium brand choice
       { name: 'Hall of Fame', href: '/dashboard/hall-of-fame', icon: Trophy },
     ],
@@ -56,7 +60,7 @@ interface SecondaryMenuDrawerProps {
  * Relationship to other navigation components:
  * - Opened by: BottomNavigation "Altro" button
  * - Complements: 3 primary routes in BottomNavigation (Overview, Assets, Cashflow)
- * - Duplicates: All 6 routes also in Sidebar (for desktop/landscape consistency)
+ * - Duplicates: All 7 routes also in Sidebar (for desktop/landscape consistency)
  *
  * Why these 6 routes are "secondary"?
  * They are accessed less frequently than the 3 primary routes in BottomNavigation.

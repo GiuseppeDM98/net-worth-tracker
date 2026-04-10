@@ -12,7 +12,7 @@
 
 Net Worth Tracker is a full-featured personal finance application built for Italian investors. It provides comprehensive portfolio tracking, performance analytics, cashflow management, dividend monitoring, and long-term financial planning tools — all in a single dashboard.
 
-The app integrates with Yahoo Finance for real-time price updates and includes advanced features like Monte Carlo simulations, FIRE (Financial Independence, Retire Early) projections, and AI-powered performance analysis via Claude. The UI is in Italian while the codebase follows English conventions.
+The app integrates with Yahoo Finance for real-time price updates and includes advanced features like Monte Carlo simulations, FIRE (Financial Independence, Retire Early) projections, AI-powered performance analysis, and a dedicated AI assistant foundation via Claude. The UI is in Italian while the codebase follows English conventions.
 
 ## Key Features
 
@@ -32,10 +32,11 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Rolling performance charts
 - Progressive disclosure: methodology section collapsed by default; one-time guide strip for new users; "Avanzato" badge on technical metrics (TWR, IRR, Sharpe, YOC); each chart has an inline 2-line reading hint
 - Animated metric cards: values count up on load and settle more naturally during period changes; staggered entrance cascade per section
-- Dashboard KPI cards (Total Portfolio, Liquid, Net Worth, Unrealized Gains, Taxes) animate their values on page load — numbers count up from zero once on mount
+- Dashboard KPI cards (Total Portfolio, Liquid, Net Worth, Unrealized Gains, Taxes, Asset Count) animate their values on page load — numbers count up from zero once on mount; each card animates independently so the rest of the page stays stable during the animation
 - All major pages (Dashboard, Hall of Fame, History, Performance, Dividends) animate on load with staggered card entrances and smooth expand/collapse transitions; respects system "Reduce Motion" preference
 - All charts animate on load: bars grow up from baseline, lines draw in left to right, area fills expand, pie slices fan out — covers every page with data visualization (History, Performance, Cashflow, Dividends, FIRE, Monte Carlo, Goals)
 - AI-powered analysis using Claude with Extended Thinking and web search
+- **AI Assistant** with persistent conversation history, automatic memory, and five analysis modes: monthly, annual, YTD, total history, and free chat. Each structured mode provides Claude with a full numeric context panel (net worth delta, cashflow, allocation changes, sub-category breakdown) for the selected period. Chat mode has a context type selector to optionally attach any period's data without forcing the structured format. The assistant remembers goals, preferences, risk profile, and stable facts across conversations — visible and editable in a dedicated Memory panel. Full conversation continuity within threads: follow-up messages ("Approfondisci", "Come mai?") are answered with awareness of prior exchanges. Suggested prompt chips, streaming markdown responses (including tables), per-thread period pinning, sticky right panel, and navigable conversation list on desktop and mobile. Web search for macro/geopolitical context with specific event citation. Controlled rollout via feature flag.
 - Fully responsive on mobile and tablet: dropdown period selector, stacked header, color-only heatmap view on small screens
 
 ### Cashflow
@@ -79,6 +80,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Fully responsive on mobile and tablet — percentile table switches to a card layout, scenario parameter cards stack vertically
 
 ### Other
+- **Color Themes** — Six selectable color themes (Default, Solar Dusk, Elegant Luxury, Midnight Bloom, Cyberpunk, Retro Arcade) with per-user persistence in Firestore and localStorage. Theme selector in Settings → Aspetto with light/dark preview swatches. Switching dark/light mode plays a circle-reveal animation from the toggle. Charts update their palette to match the active theme
 - **Dark mode** — Full dark/light/system theme support. The header toggle cycles through three states: Light, Dark, and System (follows OS preference), using Sun, Moon, and Monitor icons. Every page, chart tooltip, and UI component is properly themed
 - **Authentication flow** — Login and registration screens follow the same visual language as the dashboard, with accessible focus states, keyboard-friendly password toggles, and clearer in-place submit feedback
 - **Hall of Fame** — Monthly and annual performance rankings with current-period spotlight cards, contextual notes, and fully responsive mobile/tablet layouts

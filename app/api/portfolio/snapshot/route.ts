@@ -16,6 +16,7 @@ import {
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
+import { invalidateDashboardOverviewSummaryServer } from '@/lib/services/dashboardOverviewInvalidation.server';
 
 const SNAPSHOTS_COLLECTION = 'monthly-snapshots';
 
@@ -205,6 +206,7 @@ export async function POST(request: NextRequest) {
 
     // Save snapshot
     await existingSnapshotRef.set(snapshotData);
+    await invalidateDashboardOverviewSummaryServer(userId, existingSnapshot.exists ? 'snapshot_overwritten' : 'snapshot_created');
 
     // Hall of Fame Integration: Client-side trigger pattern
     //

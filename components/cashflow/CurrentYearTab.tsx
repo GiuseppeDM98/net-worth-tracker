@@ -16,6 +16,7 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { useChartColors } from '@/lib/hooks/useChartColors';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { calculateTotalIncome, calculateTotalExpenses } from '@/lib/services/expenseService';
@@ -56,18 +57,7 @@ interface ChartData {
   color: string;
 }
 
-const COLORS = [
-  '#3b82f6', // blue
-  '#ef4444', // red
-  '#10b981', // green
-  '#f59e0b', // amber
-  '#8b5cf6', // violet
-  '#ec4899', // pink
-  '#06b6d4', // cyan
-  '#f97316', // orange
-  '#6366f1', // indigo
-  '#14b8a6', // teal
-];
+// COLORS is resolved inside the component via useChartColors() — see below
 
 // Italian month names for filter dropdown
 const ITALIAN_MONTHS = [
@@ -124,6 +114,7 @@ interface CurrentYearTabProps {
 }
 
 export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
+  const COLORS = useChartColors();
   const controlClassName = 'transition-colors duration-200 border-border/70 hover:border-primary/40 focus-visible:ring-primary/30 data-[placeholder]:text-muted-foreground';
 
   // Drill-down state

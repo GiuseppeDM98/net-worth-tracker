@@ -1,5 +1,85 @@
 ## ✨ New Features
 
+### Color Themes
+
+- Added two new color themes: **Cyberpunk** (neon pink & electric teal) and **Retro Arcade** (red & teal on a warm yellow-green background) — bringing the total to six selectable themes
+- Added four selectable color themes: **Default** (classic zinc), **Solar Dusk** (warm amber), **Elegant Luxury** (deep burgundy), and **Midnight Bloom** (deep violet/indigo)
+- Theme preference is saved automatically and synced across all your devices
+- Theme selector is available in Settings → Aspetto with a visual light/dark preview swatch for each option
+- Switching between light and dark mode now plays a circle-reveal animation that expands from the toggle button
+- Charts and graphs now update their color palette to match the active color theme
+
+### Assistente AI
+
+The AI Assistant is a new section of the app (accessible from the "Analisi" group in the navigation) that lets you have ongoing conversations about your portfolio — either through structured analysis modes or open-ended chat.
+
+**Analysis modes**
+- Select any past month and the assistant automatically loads net worth changes, cashflow breakdown, top expense categories, and allocation shifts — presenting them in a readable numeric context panel before writing its commentary
+- Added annual analysis mode: ask about any full year — the assistant receives the complete cashflow summary, net worth delta (vs prior December), allocation shifts, and top expenses for the year. When analysing the current year, the assistant knows the period is still in progress
+- Added YTD analysis: covers January 1 to the latest available month of the current year — a single tap gives a year-to-date picture of net worth, cashflow, and portfolio changes
+- Added total history analysis: covers all years from your configured cashflow start year to today — ask long-term questions about your financial trajectory with the full picture
+- The assistant sees your complete portfolio breakdown by asset class, not just the five that changed the most in the period
+- The assistant sees your portfolio breakdown within each asset class (e.g. "Azioni USA €42.000, Azioni Europa €18.000") when subcategory data is available — not just the class total
+- The numeric context panel (net worth delta, cashflow, allocation changes) is automatically restored when you reopen a past analysis thread — no need to rerun the analysis every time
+- The context panel shows a loading skeleton while data is being fetched, keeping the layout stable as the panel populates
+- When you switch to a mode that already has a conversation (e.g. Annual 2025), the existing thread is automatically reopened instead of creating a duplicate
+
+**Chat mode**
+- Chat mode has a context type selector: choose between No context, Month, Year, YTD, or Total history — the assistant receives the same numeric data as the structured analysis modes without a fixed report format. Chat starts with no context by default; select a period only when you want the assistant to reference your portfolio data
+- Web search is available in all modes: the assistant cites specific recent events (geopolitical, central bank decisions, market moves) and links them directly to your portfolio
+- Follow-up messages like "Approfondisci", "Come mai?", or "Riprendiamo da dove eravamo" are answered with full awareness of what was said earlier in the thread — each reply builds on the previous ones
+
+**Memory**
+- The assistant remembers goals, preferences, risk profile, and stable facts you declare across conversations — visible in a dedicated "Memoria" panel in the right column
+- Memory items are grouped by type (Obiettivi, Preferenze, Rischio, Fatti utili) and show the date they were learned
+- You can edit any memory item inline, archive it to keep it out of active use, restore it, or delete it permanently
+- A full reset option is available with an explicit confirmation dialog — preferences (style, macro context, learning toggle) are preserved on reset
+- An "Apprendimento automatico" toggle lets you stop the assistant from learning new facts while keeping existing memory visible and active
+- The memory panel in the right column is collapsible — click the header to collapse it when the list is long, keeping the numeric context panel visible without scrolling
+
+**Conversations**
+- Every conversation is saved and can be reopened at any time from the "Conversazioni" list — your analysis history is never lost between sessions
+- Past conversations are shown at the top of the right panel on desktop, and above the suggested prompts on mobile — resume a past thread without opening a drawer
+- A "Conversazioni" button in the assistant header on mobile and tablet opens a side drawer with your full conversation history; selecting a thread closes the drawer automatically
+- Each conversation shows a relative timestamp ("3 ore fa") for recent threads and an absolute date for older ones
+- You can delete individual conversations directly from the list — hover the thread and click the trash icon
+- A "Nuova conversazione" button starts a fresh thread at any time
+- The selected period is visible directly in the thread list, next to the thread type badge
+
+**Interface & UX**
+- Five suggested prompt chips on the home screen — "Analizza questo mese", "Cosa pesa di più sul patrimonio?", "Spese e risparmio", "Rendimenti recenti", "Contesto geopolitico" — one tap to start any common analysis. Chips appear with a staggered cascade, each fading in sequentially from left to right
+- Each analysis mode shows a short description in the selector — explaining what data it uses (e.g. "Patrimonio, cashflow e allocazione del mese") so you know what to expect before sending
+- Assistant preferences (response style, macro context) are accessible from a compact settings popover in the page header — the right panel shows only context data and memory
+- The composer toolbar is simplified: mode selector and period picker on the top row; chat context type selector on a compact secondary row below the input
+- New conversation messages slide up and fade in as they appear — user and assistant turns feel distinct and less abrupt
+- The numeric context panel crossfades smoothly when switching analysis period or mode, instead of snapping to the new content
+- Memory items animate in on load and slide out with a smooth collapse when archived or deleted — the list never jumps
+- The period label in the conversation header ("Analisi · Aprile 2026") crossfades when switching modes, making context changes feel intentional
+- The "In scrittura…" streaming badge fades in and out instead of appearing and disappearing abruptly
+- A collapsible "Come funziona" guide in the page header explains mode context bundles, web search behaviour in chat mode, how memory works, and tips for better answers — collapsed by default, one click to expand
+- A "taking longer than expected" notice appears after 15 seconds with no response, so you always know the request is still in progress
+- The assistant renders tables in responses — financial breakdowns with categories and amounts are properly formatted instead of showing raw pipe characters
+- The right panel (conversations, context, preferences, memory) stays fixed while you scroll through a long conversation
+- The page shows a skeleton loading state while conversation history loads, instead of a blank flash
+- All animations automatically disable spatial movement when the system "Reduce Motion" setting is active — only opacity transitions remain
+- The assistant is behind a feature flag (`NEXT_PUBLIC_ASSISTANT_AI_ENABLED`) for controlled rollout — when disabled, the navigation item is hidden and direct URL access returns a 404
+- A graceful unavailable state is shown when AI is not configured, so the page remains accessible and explains what is missing
+
+**Mobile**
+- The mode selector on mobile is a row of tappable chips ("Mese", "Anno", "YTD", "Storico", "Chat") — modes are immediately visible and switchable with one touch, no dropdown needed
+- The chat context type selector on mobile uses the same chip strip format, keeping the composer compact and thumb-friendly
+- The Memory panel on mobile is accessible from a dedicated button in the page header — it opens as a side drawer without requiring any scrolling past the conversation area
+- The active analysis period's net worth delta (e.g. "+€1.856 (+0,69%)") appears directly in the conversation header on mobile, so the key number is always visible at a glance
+- Header action buttons on mobile are laid out in two full-width rows ("Conversazioni" + memory icon on the first, "Nuova conversazione" + settings on the second) — each button takes its fair share of horizontal space
+- Suggested prompt chips appear above the recent conversations list on mobile — the primary action is immediately visible without scrolling
+
+### Patrimonio
+
+- Added a new "Includi nelle tabelle storiche" toggle to the asset edit dialog — turn it on for any asset (pension funds, real estate, ETFs, etc.) to include it in the Anno Corrente and Storico price and value history tables, regardless of cost basis settings
+- Sold assets (quantity set to zero) with the toggle enabled now appear in Storico with a "Venduto" badge for the months they were held — historical data is preserved
+
+---
+
 - Added current-period spotlight cards to Hall of Fame, so you can instantly see how the current month and year rank against your personal records
 - Added live values inside Hall of Fame spotlight cards, including percentage context for net worth change rankings when available
 - The Performance page (Rendimenti) now loads with a cleaner, less overwhelming layout: the methodology section is collapsed by default and can be expanded on demand with a single click
@@ -11,7 +91,65 @@
 - Added a local preview mode to the FIRE calculator, so retirement metrics react immediately to unsaved changes before you decide to save them
 - Added linked focus behavior to Goal-Based Investing, so selecting a goal now highlights the same objective across summary cards, allocation view, and detail sections
 
+## 🐛 Bug Fixes
+
+- Fixed a scrollbar icon appearing to the left of the send button in the assistant composer on Windows — the native textarea scrollbar is now hidden while keeping scroll functional for long messages
+- Fixed color themes appearing identical in dark mode — Solar Dusk, Elegant Luxury, and Midnight Bloom now show a clearly visible tint on cards and tables when dark mode is active
+
+
+
+### Assistente AI
+
+- Fixed the assistant home screen showing a redundant "no messages yet" placeholder below the suggested prompt chips — the chips card is now the only prompt on an empty screen
+- Fixed a query error (failed thread or memory load) being displayed as a nearly invisible line of small red text — errors now appear as a clearly visible alert banner so you always know when something failed to load
+- Fixed opening a past annual, YTD, or history analysis thread after navigating away — messages were missing until a hard refresh; the thread now loads correctly on every visit
+- Fixed the assistant not actually using saved memory when answering questions — goals, preferences, and facts were stored but never sent to Claude, so the assistant answered as if it knew nothing about you
+- Fixed the "Rigenera" (retry) button doing nothing after a failed or interrupted response — it now correctly resends the last message without requiring you to retype it
+- Fixed the month picker not being sent to the server in chat mode — the assistant was receiving no data even after a month was selected
+- Fixed losing previous messages when sending a second question in the same conversation — only the most recent exchange was visible instead of the full history
+- Fixed the assistant page scrolling to the bottom immediately when selecting a thread, before the messages had loaded
+- Fixed the assistant not citing specific recent geopolitical events even when web search was active
+- Fixed macro/geopolitical responses being cut off mid-sentence when web search was used
+- Fixed the "Nuova conversazione" button not working — the assistant was immediately re-selecting the previous thread instead of showing the empty hero state
+- Fixed the assistant conversation area still showing the previous thread's messages after switching to a new thread
+- Fixed clicking the send button throwing a runtime error when using suggested prompt chips
+- Fixed the streaming response disappearing mid-conversation — messages now display correctly as they arrive
+- Fixed the month picker not syncing to the thread's month when switching between past conversations
+- Fixed thread previews showing raw markdown syntax (`**bold**`, `## Heading`) — previews are now plain readable text
+- Fixed the delete button on conversations overlapping the mode badge (CHAT, MESE, ANNO, etc.) — the button is now correctly positioned outside the badge area
+
+### Patrimonio
+
+- Fixed the Anno Corrente and Storico price/value tables showing assets that were sold in a previous year — sold assets from prior years no longer appear as stale rows
+- Fixed assets incorrectly showing a "Venduto" badge in the history tables when they were active — only genuinely sold assets show this label
+- Fixed disabling cost basis tracking on an asset not persisting to the database — clearing the average cost or tax rate fields now correctly removes those values from the asset record
+
+---
+
+- Fixed the Performance page (Rendimenti) metric cards not counting up when the page first loads — numbers now animate from zero as expected instead of jumping directly to their final values
+- Fixed a visual flash in the Budget tab when opening the historical analysis for a row, subtotal, or total on desktop
+- Fixed the Cashflow Sankey animation so month and period filter changes animate correctly again instead of appearing static
+- Fixed the Overview summary invalidation flow so asset and cashflow changes no longer trigger a Firestore permissions warning in the browser console
+- Fixed blank vertical gaps appearing on the Assets page when switching between force-mounted tabs
+- Fixed a flash of fully-visible page content appearing for a split second before the entrance animation begins when navigating between pages — now all pages animate in cleanly every time
+- Fixed the sidebar always highlighting "Panoramica" regardless of the current page
+- Fixed a browser console warning on every page load: the Geist Mono font was being preloaded on all pages despite only being used on the FIRE and Hall of Fame pages
+
+## 🛡️ Safety & Resilience
+
+### Assistente AI
+
+- Added a stop button to cancel AI responses mid-stream — click the red square icon during any analysis to stop immediately; the partial response stays visible so you don't lose what was already written
+- Deleting a memory item now requires a two-step confirmation — click the trash icon to arm it, then confirm with the checkmark (or cancel with X); the confirmation auto-dismisses after 3 seconds if you do nothing
+- Deleting a conversation now requires the same two-step confirmation, preventing accidental loss of a thread
+
 ## 🔧 Improvements
+
+### Themes & Navigation
+
+- The bottom navigation bar on mobile now matches the active color theme — background, border, and active tab highlight all update when you switch themes, consistent with the sidebar on desktop
+
+---
 
 - The FIRE "Indennità Annuale" card now shows the Patrimonio FIRE base value directly, so you can immediately see which number the withdrawal rate is applied to without switching tabs
 - Fixed the income category pie chart legend on mobile (Cashflow → Anno Corrente) overflowing its container when four or more categories were above the 5% threshold — now consistently capped at three visible items, matching the expense chart
@@ -55,8 +193,11 @@
 - Improved responsiveness of Settings controls (toggles, selects, and inputs) with more consistent interaction feedback
 - Improved the nested Allocation editor in Settings with smoother expand/collapse behavior, making complex target editing easier to follow
 - Improved contextual safety for category move/delete actions in Settings by making confirmation dialogs feel visually tied to the action that opened them
-- Improved the Overview dashboard with a smoother primary KPI entrance, softer reflow of conditional cards, and subtler chart reveals that feel more polished without getting in the way
+- Improved the Overview dashboard so all KPI values — including asset count — now animate with a count-up on page load, making the numbers feel more alive and satisfying to arrive at
+- Improved the Overview dashboard so portfolio composition charts on desktop appear only after the key numbers have finished animating, reducing visual competition and making the page feel more focused on load
 - Improved the snapshot overwrite flow on the Overview page so the confirmation dialog feels more connected to the "Crea Snapshot" action
+- Improved the Overview dashboard so key metrics, monthly changes, expense summaries, and composition charts now load together in one faster, more consistent response
+- Improved Overview freshness after portfolio, cashflow, snapshot, price-update, and stamp-duty setting changes, reducing cases where the dashboard could briefly feel out of sync
 - Refined the late-night Overview greeting to keep a calmer evening tone while still acknowledging late usage
 - Navigation now feels smoother and more app-like: the active section indicator in the sidebar glides between items instead of snapping — giving the interface a native, polished feel
 - The bottom navigation on mobile now shows an animated accent line that appears on the active tab, making it easier to see where you are at a glance
@@ -99,18 +240,17 @@
 - Each main page now has a breadcrumb label above the title and a separator line between the header area and the data below, giving the interface a more editorial, intentional feel
 - Utility actions (Refresh, Export CSV, Insert Past Snapshot) are visually de-emphasised so the primary action on each page stands out
 
-## 🐛 Bug Fixes
-
-- Fixed a visual flash in the Budget tab when opening the historical analysis for a row, subtotal, or total on desktop
-- Fixed the Cashflow Sankey animation so month and period filter changes animate correctly again instead of appearing static
-
-- Fixed blank vertical gaps appearing on the Assets page when switching between force-mounted tabs
-- Fixed a flash of fully-visible page content appearing for a split second before the entrance animation begins when navigating between pages — now all pages animate in cleanly every time
-- Fixed the sidebar always highlighting "Panoramica" regardless of the current page
-- Fixed a browser console warning on every page load: the Geist Mono font was being preloaded on all pages despite only being used on the FIRE and Hall of Fame pages
-
 ## 🔒 Security
 
 - Improved authorization checks for private account actions across snapshots, dividends, performance metrics, price updates, Hall of Fame recalculation, and AI analysis
 - Added stricter ownership validation for sensitive portfolio actions so requests must match the signed-in Firebase user before data is read or changed
 - Preserved scheduled maintenance flows while hardening private API access, so automated snapshot and dividend jobs continue to run normally
+
+## 🏗️ Technical
+
+- Added `includeDummySnapshots` assistant preference: test accounts with synthetic snapshot data can now include those snapshots in AI context bundles. The toggle appears automatically only when dummy snapshots are detected — invisible to all regular users
+- Improved assistant scrolling during long AI responses so the conversation stays smooth and readable on slower devices — previously each word arriving could cause a visible stutter
+- Improved assistant memory panel filter tabs ("Attivi" / "Archiviati") with larger tap areas on mobile, making them easier to switch between on touch screens
+- Improved assistant memory action buttons (edit, archive, delete) so they are always visible on mobile instead of requiring a hover — no interaction is hidden on touch devices
+- Selecting a conversation from the mobile drawer now closes the drawer automatically, landing you directly on the conversation without an extra manual step
+- Improved screen reader support for the AI assistant: new responses are now announced as they stream in, all controls have descriptive labels, and the memory filter tabs are properly identified as navigation tabs

@@ -127,6 +127,23 @@ export default function AssetsPage() {
     isRefreshing && 'border-primary/30 bg-primary/5 text-foreground'
   );
 
+  // Anno Corrente: only active (quantity > 0) assets with the flag enabled.
+  // Sold assets are excluded here — they can't have meaningful current-year data
+  // if sold before this year, and if sold during the year they'd appear via snapshots
+  // anyway (but we keep this strict for simplicity).
+  const historyTableAssets = useMemo(
+    () => assets.filter((a) => a.quantity > 0 && a.includeInHistoryTables === true),
+    [assets]
+  );
+
+  // Storico: includes sold assets (quantity === 0) with the flag enabled so their
+  // historical months still show with a "Venduto" badge. Assets completely removed
+  // from Firestore can't be recovered (flag lost), so only qty=0 ones are preserved.
+  const historyTableAssetsAll = useMemo(
+    () => assets.filter((a) => a.includeInHistoryTables === true),
+    [assets]
+  );
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -227,11 +244,12 @@ export default function AssetsPage() {
                     variants={tabPanelSwitch}
                   >
                     <AssetPriceHistoryTable
-                      assets={assets}
+                      assets={historyTableAssets}
                       snapshots={snapshots}
                       filterYear={getCurrentYear()}
                       displayMode="price"
                       includePreviousMonthBaseline={true}
+                      restrictToPassedAssets={true}
                       showTotalRow={false}
                       loading={snapshotsLoading}
                       onRefresh={handleRefresh}
@@ -253,11 +271,12 @@ export default function AssetsPage() {
                     variants={tabPanelSwitch}
                   >
                     <AssetPriceHistoryTable
-                      assets={assets}
+                      assets={historyTableAssets}
                       snapshots={snapshots}
                       filterYear={getCurrentYear()}
                       displayMode="totalValue"
                       includePreviousMonthBaseline={true}
+                      restrictToPassedAssets={true}
                       showTotalRow={true}
                       loading={snapshotsLoading}
                       onRefresh={handleRefresh}
@@ -336,10 +355,11 @@ export default function AssetsPage() {
                     variants={tabPanelSwitch}
                   >
                     <AssetPriceHistoryTable
-                      assets={assets}
+                      assets={historyTableAssetsAll}
                       snapshots={snapshots}
                       filterStartDate={{ year: 2025, month: 11 }}
                       displayMode="price"
+                      restrictToPassedAssets={true}
                       showTotalRow={false}
                       loading={snapshotsLoading}
                       onRefresh={handleRefresh}
@@ -361,10 +381,11 @@ export default function AssetsPage() {
                     variants={tabPanelSwitch}
                   >
                     <AssetPriceHistoryTable
-                      assets={assets}
+                      assets={historyTableAssetsAll}
                       snapshots={snapshots}
                       filterStartDate={{ year: 2025, month: 11 }}
                       displayMode="totalValue"
+                      restrictToPassedAssets={true}
                       showTotalRow={true}
                       loading={snapshotsLoading}
                       onRefresh={handleRefresh}

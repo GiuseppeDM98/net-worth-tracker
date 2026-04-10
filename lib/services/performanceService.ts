@@ -1041,7 +1041,7 @@ export function getSnapshotsForPeriod(
       startDate = new Date(now.getFullYear(), now.getMonth() - 60, 1);
       break;
     case 'ALL':
-      return allSnapshots.filter(s => !s.isDummy); // Return all non-dummy snapshots
+      return allSnapshots;
     case 'CUSTOM':
       if (!customStartDate || !customEndDate) return [];
       // Normalize to first day of month in local timezone to align with snapshot storage format
@@ -1054,8 +1054,6 @@ export function getSnapshotsForPeriod(
 
   // Filter snapshots by date range
   return allSnapshots.filter(snapshot => {
-    if (snapshot.isDummy) return false; // Exclude test data
-
     const snapshotDate = new Date(snapshot.year, snapshot.month - 1, 1);
     return snapshotDate >= startDate && snapshotDate <= endDate;
   });
@@ -1437,7 +1435,7 @@ export async function getAllPerformanceData(userId: string): Promise<Performance
   // ==== STEP 2: Pre-fetch optimization ====
   // Fetch ALL expenses once for the entire history to avoid N Firestore queries
   // This single query is then filtered in-memory for each period calculation
-  const sortedSnapshots = snapshots.filter(s => !s.isDummy).sort((a, b) => {
+  const sortedSnapshots = [...snapshots].sort((a, b) => {
     if (a.year !== b.year) return a.year - b.year;
     return a.month - b.month;
   });
@@ -1474,7 +1472,7 @@ export async function getAllPerformanceData(userId: string): Promise<Performance
     rolling12M,
     rolling36M,
     lastUpdated: new Date(),
-    snapshotCount: snapshots.filter(s => !s.isDummy).length,
+    snapshotCount: snapshots.length,
   };
 }
 
@@ -1487,7 +1485,7 @@ export async function getAllPerformanceData(userId: string): Promise<Performance
  * Uses in-memory filtering of pre-fetched expenses to avoid N Firestore queries.
  *
  * @param userId - User ID for data fetching
- * @param allSnapshots - All snapshots (will be filtered for non-dummy data)
+ * @param allSnapshots - All snapshots
  * @param windowMonths - Size of the rolling window in months
  * @param riskFreeRate - Risk-free rate for Sharpe ratio calculation
  * @param dividendCategoryId - Category ID for dividend income (from user settings)
@@ -1500,8 +1498,7 @@ async function calculateRollingPeriods(
   riskFreeRate: number,
   dividendCategoryId?: string
 ): Promise<RollingPeriodPerformance[]> {
-  const sortedSnapshots = allSnapshots
-    .filter(s => !s.isDummy)
+  const sortedSnapshots = [...allSnapshots]
     .sort((a, b) => {
       if (a.year !== b.year) return a.year - b.year;
       return a.month - b.month;

@@ -13,6 +13,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useChartColors } from '@/lib/hooks/useChartColors';
 import { motion } from 'framer-motion';
 import { DividendStatsSkeleton } from './DividendStatsSkeleton';
 import { useAuth } from '@/contexts/AuthContext';
@@ -155,7 +156,7 @@ interface DividendStatsData {
   };
 }
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF6B9D'];
+// COLORS is resolved inside DividendStats via useChartColors() — see below
 
 function SettledPercentValue({
   value,
@@ -220,6 +221,7 @@ function MetricInfoTooltip({ content }: { content: string }) {
 }
 
 export function DividendStats({ startDate, endDate, assetId }: DividendStatsProps) {
+  const COLORS = useChartColors();
   const { user } = useAuth();
   const [stats, setStats] = useState<DividendStatsData | null>(null);
   const [loading, setLoading] = useState(true);

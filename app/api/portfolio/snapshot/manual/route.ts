@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { Timestamp } from 'firebase-admin/firestore';
 import { updateHallOfFame } from '@/lib/services/hallOfFameService.server';
+import { invalidateDashboardOverviewSummaryServer } from '@/lib/services/dashboardOverviewInvalidation.server';
 import {
   assertSameUser,
   getApiAuthErrorResponse,
@@ -176,6 +177,7 @@ export async function POST(request: NextRequest) {
 
     // Save to Firestore
     await adminDb.collection('monthly-snapshots').doc(snapshotId).set(snapshot);
+    await invalidateDashboardOverviewSummaryServer(userId, 'manual_snapshot_created');
 
     // Update Hall of Fame rankings after snapshot creation
     //

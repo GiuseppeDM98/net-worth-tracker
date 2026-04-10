@@ -26,6 +26,8 @@ const secondaryHrefs = [
   '/dashboard/allocation',
   '/dashboard/performance',
   '/dashboard/history',
+  // Assistente AI is conditionally included so "Altro" active state tracks the flag
+  ...(process.env.NEXT_PUBLIC_ASSISTANT_AI_ENABLED !== 'false' ? ['/dashboard/assistant'] : []),
   '/dashboard/hall-of-fame',
   '/dashboard/fire-simulations',
   '/dashboard/settings',
@@ -41,9 +43,9 @@ const secondaryHrefs = [
  *
  * Navigation structure:
  * - 3 primary routes: Overview, Assets, Cashflow (most frequently accessed)
- * - 1 "Altro" button: Opens SecondaryMenuDrawer with 6 additional routes grouped
+ * - 1 "Altro" button: Opens SecondaryMenuDrawer with 7 additional routes grouped
  *   by information architecture (Analisi, Pianificazione, Preferenze)
- * - Total 9 routes accessible: 3 direct + 6 via drawer
+ * - Total 10 routes accessible: 3 direct + 7 via drawer
  * - "Altro" button shows active state when current route is any secondary route,
  *   so users always have a visual cue of where they are in the app
  *
@@ -74,7 +76,9 @@ export function BottomNavigation() {
           Custom Tailwind modifiers combine screen size and orientation:
           - max-desktop:portrait: = @media (max-width: 1439px) and (orientation: portrait)
           - max-desktop:landscape:hidden = hide on landscape even if < 1440px */}
-      <nav className="fixed bottom-0 left-0 right-0 z-30 bg-background border-t border-border desktop:hidden max-desktop:portrait:flex max-desktop:landscape:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-30 border-t desktop:hidden max-desktop:portrait:flex max-desktop:landscape:hidden"
+        style={{ background: 'var(--sidebar)', borderColor: 'var(--sidebar-border)' }}
+      >
         <div className="flex items-center justify-around w-full h-16">
           {primaryNavigation.map((item) => {
             const isActive = pathname === item.href;
@@ -86,9 +90,10 @@ export function BottomNavigation() {
                 className={cn(
                   'relative flex flex-col items-center justify-center flex-1 h-full gap-1 text-xs transition-colors',
                   isActive
-                    ? 'text-blue-600 bg-blue-50 dark:bg-blue-950/20'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    ? 'bg-[var(--sidebar-accent)]'
+                    : 'hover:bg-[var(--sidebar-accent)]/50'
                 )}
+                style={{ color: isActive ? 'var(--sidebar-primary)' : 'var(--sidebar-foreground)', opacity: isActive ? 1 : 0.65 }}
               >
                 {/* Per-tab fade-in indicator — no layoutId here.
                     layoutId requires DOM layout measurement, which breaks inside
@@ -102,7 +107,8 @@ export function BottomNavigation() {
                       animate={{ opacity: 1, scaleX: 1 }}
                       exit={{ opacity: 0, scaleX: 0.5 }}
                       transition={{ duration: 0.2, ease: [0.25, 1, 0.5, 1] }}
-                      className="absolute top-0 left-0 right-0 h-0.5 bg-blue-600 origin-center"
+                      className="absolute top-0 left-0 right-0 h-0.5 origin-center"
+                      style={{ background: 'var(--sidebar-primary)' }}
                     />
                   )}
                 </AnimatePresence>
@@ -120,9 +126,10 @@ export function BottomNavigation() {
             className={cn(
               'relative flex flex-col items-center justify-center flex-1 h-full gap-1 text-xs transition-colors',
               isAltroActive
-                ? 'text-blue-600 bg-blue-50 dark:bg-blue-950/20'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                ? 'bg-[var(--sidebar-accent)]'
+                : 'hover:bg-[var(--sidebar-accent)]/50'
             )}
+            style={{ color: isAltroActive ? 'var(--sidebar-primary)' : 'var(--sidebar-foreground)', opacity: isAltroActive ? 1 : 0.65 }}
           >
             <AnimatePresence>
               {isAltroActive && (
@@ -132,7 +139,8 @@ export function BottomNavigation() {
                   animate={{ opacity: 1, scaleX: 1 }}
                   exit={{ opacity: 0, scaleX: 0.5 }}
                   transition={{ duration: 0.2, ease: [0.25, 1, 0.5, 1] }}
-                  className="absolute top-0 left-0 right-0 h-0.5 bg-blue-600 origin-center"
+                  className="absolute top-0 left-0 right-0 h-0.5 origin-center"
+                  style={{ background: 'var(--sidebar-primary)' }}
                 />
               )}
             </AnimatePresence>

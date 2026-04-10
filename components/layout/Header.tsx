@@ -45,15 +45,34 @@ export function Header() {
   const greeting = getGreeting(getItalyDate(new Date()).getHours());
   const firstName = user?.displayName?.split(' ')[0];
   const greetingLabel = firstName && firstName.length <= 20
-    ? `${greeting.greeting}, ${firstName}`
+    ? `${greeting.greeting} ${firstName}`
     : greeting.greeting;
 
   // Cycle through explicit states so the user can always get back to "follow system".
-  // `theme` (not `resolvedTheme`) preserves the "system" value between renders.
-  const cycleTheme = () => {
-    if (theme === 'light') setTheme('dark');
-    else if (theme === 'dark') setTheme('system');
-    else setTheme('light');
+  // Uses View Transitions API when available for a circle-reveal animation from the
+  // button position. Falls back to instant swap on unsupported browsers.
+  const cycleTheme = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const next = theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light';
+
+    if (!('startViewTransition' in document)) {
+      setTheme(next);
+      return;
+    }
+
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const cx = Math.round(rect.left + rect.width / 2);
+    const cy = Math.round(rect.top + rect.height / 2);
+    const maxR = Math.hypot(
+      Math.max(cx, window.innerWidth - cx),
+      Math.max(cy, window.innerHeight - cy)
+    );
+
+    const root = document.documentElement;
+    root.style.setProperty('--vt-cx', `${cx}px`);
+    root.style.setProperty('--vt-cy', `${cy}px`);
+    root.style.setProperty('--vt-r', `${Math.ceil(maxR)}px`);
+
+    document.startViewTransition(() => setTheme(next));
   };
 
   const ThemeIcon = theme === 'dark' ? Moon : theme === 'light' ? Sun : Monitor;

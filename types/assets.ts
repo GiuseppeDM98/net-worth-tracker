@@ -69,6 +69,7 @@ export interface Asset {
   taxRate?: number; // Tax rate percentage for unrealized gains (e.g., 26 for 26%)
   totalExpenseRatio?: number; // Total Expense Ratio (TER) as a percentage (e.g., 0.20 for 0.20%)
   stampDutyExempt?: boolean; // If true, asset is excluded from stamp duty (imposta di bollo) calculation (e.g. pension funds, real estate)
+  includeInHistoryTables?: boolean; // If true, asset appears in Anno Corrente and Storico price/value tables regardless of cost basis tracking
   currentPrice: number;
   isLiquid?: boolean; // Default: true - indicates whether the asset is liquid or illiquid
   autoUpdatePrice?: boolean; // Default: true - indicates whether price should be automatically updated via Yahoo Finance
@@ -94,6 +95,7 @@ export interface AssetFormData {
   taxRate?: number; // Tax rate percentage for unrealized gains (e.g., 26 for 26%)
   totalExpenseRatio?: number; // Total Expense Ratio (TER) as a percentage (e.g., 0.20 for 0.20%)
   stampDutyExempt?: boolean; // If true, asset is excluded from stamp duty (imposta di bollo) calculation
+  includeInHistoryTables?: boolean; // If true, asset appears in Anno Corrente and Storico price/value tables regardless of cost basis tracking
   currentPrice: number;
   isLiquid?: boolean;
   autoUpdatePrice?: boolean;
@@ -168,6 +170,9 @@ export interface AssetAllocationSettings {
   checkingAccountSubCategory?: string; // Cash subcategory name representing checking accounts (conti correnti); stamp duty applies only if value > 5000€
   cashflowHistoryStartYear?: number; // Min year shown in TotalHistoryTab charts (excludes bulk-imported older data); defaults to 2025
   laborIncomeCategoryIds?: string[]; // Category IDs of type 'income' representing labor/salary income; used for dashboard KPI cards
+  assistantResponseStyle?: 'balanced' | 'concise' | 'deep'; // Mirrors assistant preference for cross-feature defaults
+  assistantMacroContextEnabled?: boolean; // Enables macro/web context in assistant flows when explicitly requested
+  assistantMemoryEnabled?: boolean; // Allows the assistant to persist reusable user context
   targets: AssetAllocationTarget;
 }
 
@@ -354,6 +359,11 @@ export interface AssetHistoryTransformOptions {
   filterStartDate?: AssetHistoryDateFilter;
   includePreviousMonthBaseline?: boolean;
   excludeCash?: boolean;
+  // When true, only assets already present in the passed currentAssets array are shown.
+  // Snapshot-only assets (sold/deleted from the portfolio) are not re-introduced from
+  // historical snapshot data. Use this when the caller pre-filters currentAssets (e.g.
+  // to cost-basis-tracked assets only) and doesn't want deleted assets to bypass the filter.
+  restrictToPassedAssets?: boolean;
 }
 
 export interface AssetHistoryTotalRow {

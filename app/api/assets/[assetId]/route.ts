@@ -6,6 +6,7 @@ import {
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
+import { invalidateDashboardOverviewSummaryServer } from '@/lib/services/dashboardOverviewInvalidation.server';
 
 /**
  * DELETE /api/assets/[assetId]
@@ -131,6 +132,7 @@ export async function DELETE(
 
     // Commit atomically
     await batch.commit();
+    await invalidateDashboardOverviewSummaryServer(userId, 'asset_deleted');
 
     console.log(`Asset ${assetId} deleted with ${dividendsSnapshot.size} future dividends removed`);
 

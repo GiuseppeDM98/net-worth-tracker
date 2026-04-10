@@ -52,7 +52,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Save, RotateCcw, Plus, Trash2, ChevronDown, ChevronUp, Edit, Receipt, FlaskConical, Coins, ArrowRightLeft, Settings, PieChart } from 'lucide-react';
+import { Save, RotateCcw, Plus, Trash2, ChevronDown, ChevronUp, Edit, Receipt, FlaskConical, Coins, ArrowRightLeft, Settings, PieChart, Palette } from 'lucide-react';
+import { useColorTheme, ColorTheme } from '@/contexts/ColorThemeContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
@@ -175,9 +176,10 @@ export default function SettingsPage() {
   const enableTestSnapshots = process.env.NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS === 'true';
 
   // Tab navigation — lazy-loading pattern (same as Assets/Cashflow pages)
-  type SettingsTabId = 'generale' | 'allocazione' | 'spese' | 'dividendi';
+  type SettingsTabId = 'generale' | 'allocazione' | 'spese' | 'dividendi' | 'aspetto';
   const [mountedTabs, setMountedTabs] = useState<Set<SettingsTabId>>(new Set(['allocazione']));
   const [activeTab, setActiveTab] = useState<SettingsTabId>('allocazione');
+  const { colorTheme, setColorTheme } = useColorTheme();
   const [allocationBaselineKey, setAllocationBaselineKey] = useState('');
   const [generalBaselineKey, setGeneralBaselineKey] = useState('');
   const [dividendBaselineKey, setDividendBaselineKey] = useState('');
@@ -1365,12 +1367,12 @@ export default function SettingsPage() {
           </div>
           {/* Reset is only meaningful for allocation targets */}
           {activeTab === 'allocazione' && (
-            <Button variant="outline" onClick={handleReset} className="w-full landscape:w-auto dark:border-gray-600 dark:text-gray-200">
+            <Button variant="outline" onClick={handleReset} className="w-full landscape:w-auto">
               <RotateCcw className="mr-2 h-4 w-4" />
               Ripristina Default
             </Button>
           )}
-          <Button onClick={handleSave} disabled={saving} className="w-full landscape:w-auto dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
+          <Button onClick={handleSave} disabled={saving} className="w-full landscape:w-auto">
             <Save className="mr-2 h-4 w-4" />
             {saving ? 'Salvataggio...' : 'Salva'}
           </Button>
@@ -1389,10 +1391,11 @@ export default function SettingsPage() {
               <SelectItem value="generale">Preferenze</SelectItem>
               <SelectItem value="spese">Spese</SelectItem>
               <SelectItem value="dividendi">Dividendi</SelectItem>
+              <SelectItem value="aspetto">Aspetto</SelectItem>
             </SelectContent>
           </Select>
         </div>
-        <TabsList className="hidden desktop:grid desktop:grid-cols-4 w-full">
+        <TabsList className="hidden desktop:grid desktop:grid-cols-5 w-full">
           <TabsTrigger value="allocazione" className="flex items-center gap-2">
             <PieChart className="h-4 w-4" />
             Allocazione
@@ -1408,6 +1411,10 @@ export default function SettingsPage() {
           <TabsTrigger value="dividendi" className="flex items-center gap-2">
             <Coins className="h-4 w-4" />
             Dividendi
+          </TabsTrigger>
+          <TabsTrigger value="aspetto" className="flex items-center gap-2">
+            <Palette className="h-4 w-4" />
+            Aspetto
           </TabsTrigger>
         </TabsList>
 
@@ -2267,7 +2274,7 @@ export default function SettingsPage() {
               <Receipt className="h-5 w-5" />
               <CardTitle>Impostazioni Tracciamento Spese</CardTitle>
             </div>
-            <Button onClick={handleAddExpenseCategory} size="sm" className="w-full sm:w-auto dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
+            <Button onClick={handleAddExpenseCategory} size="sm" className="w-full sm:w-auto">
               <Plus className="mr-2 h-4 w-4" />
               Nuova Categoria
             </Button>
@@ -2299,7 +2306,7 @@ export default function SettingsPage() {
                           >
                             <div className="flex items-center gap-3">
                               <div
-                                className="w-3 h-3 rounded-full border border-gray-300 dark:border-gray-600"
+                                className="w-3 h-3 rounded-full border border-border"
                                 style={{ backgroundColor: category.color || '#3b82f6' }}
                               />
                               <div>
@@ -2470,7 +2477,7 @@ export default function SettingsPage() {
             <Button
               onClick={handleSaveDividendSettings}
               disabled={saving}
-              className="flex items-center gap-2 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+              className="flex items-center gap-2"
             >
               <Save className="h-4 w-4" />
               {saving ? 'Salvataggio...' : 'Salva Impostazioni'}
@@ -2480,7 +2487,7 @@ export default function SettingsPage() {
               onClick={handleSyncDividends}
               disabled={syncingDividends || !dividendIncomeCategoryId}
               variant="outline"
-              className="flex items-center gap-2 dark:border-gray-600 dark:text-gray-200"
+              className="flex items-center gap-2"
             >
               <Coins className="h-4 w-4" />
               {syncingDividends ? 'Sincronizzazione...' : 'Sincronizza Dividendi Esistenti'}
@@ -2495,6 +2502,144 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+          </TabsContent>
+        )}
+
+        {/* Tab: Aspetto */}
+        {mountedTabs.has('aspetto') && (
+          <TabsContent value="aspetto" className="mt-6 space-y-4 sm:space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Palette className="h-5 w-5 text-primary" />
+                  <CardTitle>Tema Colori</CardTitle>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Scegli la palette cromatica dell&apos;interfaccia. La scelta viene salvata automaticamente e sincronizzata su tutti i dispositivi.
+                </p>
+              </CardHeader>
+              <CardContent className="p-4 sm:p-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 desktop:grid-cols-6 gap-3">
+                  {(
+                    [
+                      {
+                        id: 'default' as ColorTheme,
+                        name: 'Default',
+                        description: 'Zinc classico',
+                        swatchBg: 'oklch(1 0 0)',
+                        swatchBgDark: 'oklch(0.145 0 0)',
+                        swatchPrimary: 'oklch(0.205 0 0)',
+                        swatchPrimaryDark: 'oklch(0.922 0 0)',
+                        swatchAccent: 'oklch(0.97 0 0)',
+                      },
+                      {
+                        id: 'solar-dusk' as ColorTheme,
+                        name: 'Solar Dusk',
+                        description: 'Ambra calda',
+                        swatchBg: 'oklch(0.9885 0.0057 84.5659)',
+                        swatchBgDark: 'oklch(0.2161 0.0061 56.0434)',
+                        swatchPrimary: 'oklch(0.5553 0.1455 48.9975)',
+                        swatchPrimaryDark: 'oklch(0.7049 0.1867 47.6044)',
+                        swatchAccent: 'oklch(0.9000 0.0500 74.9889)',
+                      },
+                      {
+                        id: 'elegant-luxury' as ColorTheme,
+                        name: 'Elegant Luxury',
+                        description: 'Borgogna raffinato',
+                        swatchBg: 'oklch(0.9779 0.0042 56.3756)',
+                        swatchBgDark: 'oklch(0.2161 0.0061 56.0434)',
+                        swatchPrimary: 'oklch(0.4650 0.1470 24.9381)',
+                        swatchPrimaryDark: 'oklch(0.5054 0.1905 27.5181)',
+                        swatchAccent: 'oklch(0.9619 0.0580 95.6174)',
+                      },
+                      {
+                        id: 'midnight-bloom' as ColorTheme,
+                        name: 'Midnight Bloom',
+                        description: 'Viola profondo',
+                        swatchBg: 'oklch(0.9821 0 0)',
+                        swatchBgDark: 'oklch(0.2303 0.0125 264.2926)',
+                        swatchPrimary: 'oklch(0.5676 0.2021 283.0838)',
+                        swatchPrimaryDark: 'oklch(0.5676 0.2021 283.0838)',
+                        swatchAccent: 'oklch(0.8214 0.0720 249.3482)',
+                      },
+                      {
+                        id: 'cyberpunk' as ColorTheme,
+                        name: 'Cyberpunk',
+                        description: 'Neon pink & teal',
+                        swatchBg: 'oklch(0.9816 0.0017 247.8390)',
+                        swatchBgDark: 'oklch(0.1649 0.0352 281.8285)',
+                        swatchPrimary: 'oklch(0.6726 0.2904 341.4084)',
+                        swatchPrimaryDark: 'oklch(0.6726 0.2904 341.4084)',
+                        swatchAccent: 'oklch(0.8903 0.1739 171.2690)',
+                      },
+                      {
+                        id: 'retro-arcade' as ColorTheme,
+                        name: 'Retro Arcade',
+                        description: 'Rosso & teal vintage',
+                        swatchBg: 'oklch(0.9735 0.0261 90.0953)',
+                        swatchBgDark: 'oklch(0.2673 0.0486 219.8169)',
+                        swatchPrimary: 'oklch(0.5924 0.2025 355.8943)',
+                        swatchPrimaryDark: 'oklch(0.5924 0.2025 355.8943)',
+                        swatchAccent: 'oklch(0.6437 0.1019 187.3840)',
+                      },
+                    ] as const
+                  ).map((theme) => {
+                    const isActive = colorTheme === theme.id;
+                    return (
+                      <button
+                        key={theme.id}
+                        onClick={() => setColorTheme(theme.id)}
+                        className={cn(
+                          'relative flex flex-col rounded-lg border-2 p-3 text-left transition-all hover:border-primary/60',
+                          isActive
+                            ? 'border-primary shadow-sm'
+                            : 'border-border'
+                        )}
+                      >
+                        {/* Mini preview */}
+                        <div className="mb-3 overflow-hidden rounded-md border border-border/50 h-16">
+                          {/* Light half */}
+                          <div
+                            className="h-8 w-full flex items-center gap-1.5 px-2"
+                            style={{ background: theme.swatchBg }}
+                          >
+                            <div
+                              className="h-3 w-3 rounded-sm flex-shrink-0"
+                              style={{ background: theme.swatchPrimary }}
+                            />
+                            <div
+                              className="h-2 rounded-full flex-1"
+                              style={{ background: theme.swatchAccent }}
+                            />
+                          </div>
+                          {/* Dark half */}
+                          <div
+                            className="h-8 w-full flex items-center gap-1.5 px-2"
+                            style={{ background: theme.swatchBgDark }}
+                          >
+                            <div
+                              className="h-3 w-3 rounded-sm flex-shrink-0"
+                              style={{ background: theme.swatchPrimaryDark }}
+                            />
+                            <div
+                              className="h-2 rounded-full flex-1 opacity-30"
+                              style={{ background: theme.swatchPrimaryDark }}
+                            />
+                          </div>
+                        </div>
+
+                        <span className="text-sm font-medium leading-none">{theme.name}</span>
+                        <span className="mt-1 text-xs text-muted-foreground">{theme.description}</span>
+
+                        {isActive && (
+                          <div className="absolute top-2 right-2 h-2 w-2 rounded-full bg-primary" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         )}
 
