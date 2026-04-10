@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-10, session assistant-animations): **Framer Motion animations across AI assistant + collapsible guide**. Added purposeful animations to 5 assistant components (staggered chips, message fade/slide, memory item cascade, context card period crossfade, streaming badge). Fixed Windows native scrollbar on composer textarea. Added collapsible "Come funziona" guide in assistant header explaining non-obvious behaviours (mode bundles, web search policy, memory mechanics). Previous session (themes-fix): dark chroma fix, cyberpunk + retro-arcade themes, 6 themes total.
+- Latest implementation (2026-04-10, session assistant-polish): **Final polish pass on AI assistant**. Fixed redundant empty state in hero mode (conversation box stays silent when no thread selected; chips card is the sole CTA). Upgraded query-level error display from bare `<p>` to `Alert variant="destructive"`. Unified icon vocabulary: `RotateCcw` for retry/regenerate actions. Previous session (assistant-animations): Framer Motion animations across 5 assistant components + collapsible "Come funziona" guide. Session before that (themes-fix): dark chroma fix, cyberpunk + retro-arcade themes, 6 themes total.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`

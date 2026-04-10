@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
+  AlertCircle,
   Bot,
   Brain,
   CalendarDays,
@@ -18,7 +19,6 @@ import {
   Settings2,
   Sparkles,
   Trash2,
-  WandSparkles,
   X,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -32,6 +32,7 @@ import { AssistantContextCard, AssistantContextPill } from '@/components/assista
 import { AssistantMemoryPanel } from '@/components/assistant/AssistantMemoryPanel';
 import { AssistantPromptChips } from '@/components/assistant/AssistantPromptChips';
 import { AssistantStreamingResponse } from '@/components/assistant/AssistantStreamingResponse';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -1237,14 +1238,17 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Caricamento conversazione…
                     </div>
-                  ) : renderedMessages.length === 0 ? (
+                  ) : renderedMessages.length === 0 && selectedThreadId ? (
+                    // A thread is selected but its messages haven't arrived yet — show placeholder.
+                    // When no thread is selected the hero chips card above already serves as the CTA,
+                    // so we show nothing here to avoid two competing empty states.
                     <EmptyState
                       icon={<MessageSquare className="h-8 w-8" />}
                       title="Nessun messaggio ancora"
-                      description="Scegli un prompt suggerito o scrivi la tua domanda nel composer in basso."
+                      description="Scrivi la tua domanda nel composer in basso."
                       className="py-10"
                     />
-                  ) : (
+                  ) : renderedMessages.length === 0 ? null : (
                     <AssistantStreamingResponse
                       messages={renderedMessages}
                       isInterrupted={isInterrupted}
@@ -1369,9 +1373,14 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
               )}
 
               {(threadsError || threadError || memoryError) && (
-                <p className="text-xs text-destructive">
-                  {(threadsError || threadError || memoryError)?.message}
-                </p>
+                // Surface query-level errors prominently — a bare <p> is too easy to miss
+                // given that the right column may have other content above it.
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    {(threadsError || threadError || memoryError)?.message}
+                  </AlertDescription>
+                </Alert>
               )}
             </div>
           </div>

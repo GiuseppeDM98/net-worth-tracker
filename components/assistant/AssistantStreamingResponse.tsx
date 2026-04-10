@@ -3,7 +3,7 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Globe, RefreshCw } from 'lucide-react';
+import { Globe, RotateCcw } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -167,7 +167,7 @@ export function AssistantStreamingResponse({
 
       {isInterrupted && (
         <Alert>
-          <RefreshCw className="h-4 w-4" />
+          <RotateCcw className="h-4 w-4" />
           <AlertTitle>Risposta interrotta</AlertTitle>
           <AlertDescription className="mt-1 flex items-center gap-3">
             <span>La risposta parziale è rimasta visibile.</span>

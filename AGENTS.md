@@ -230,7 +230,17 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Skeletons should mirror the final layout
 - Reuse the same skeleton across chained loading states
 - Use full-page skeletons only on truly slow pages; otherwise prefer delayed or null loading
-- `Loader2` is for initial loading, `RefreshCw` is for user-triggered refresh
+- `Loader2` is for initial loading; `RefreshCw` is for user-triggered refresh; `RotateCcw` is for retry/regenerate actions — keep these semantics consistent across the app
+
+### Error State Levels
+- **Query-level (blocking)**: use `Alert variant="destructive"` with `AlertCircle` icon — these represent a failure to load the page's primary data and need visible presence
+- **Mutation (transient)**: use `toast.error()` — the user's action failed but the page is still usable; a toast is enough
+- **Never** render a bare `<p class="text-destructive text-xs">` for errors the user must act on — it is invisible at small sizes and especially on dark backgrounds
+
+### Empty State Layering
+- **One CTA surface per screen context** — do not show a hero empty state AND a secondary empty state for the same surface at the same time; they compete and confuse
+- Pattern: if a page-level chips/hero card is already the primary CTA, the conversation/content area inside it must stay silent (no nested `EmptyState`) until the user has selected a specific item to view
+- Reserve the nested empty state for the case where a specific item IS selected but has no content (e.g. thread selected but messages array is empty)
 
 ### Visual Hierarchy Patterns
 - Hero KPI: use `border-l-4 border-l-primary` + `text-3xl desktop:text-4xl tabular-nums` on the single most important card per page (e.g. Patrimonio Totale Lordo on Dashboard, first chart on History)

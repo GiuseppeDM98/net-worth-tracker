@@ -82,6 +82,8 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 
 ### Assistente AI
 
+- Fixed the assistant home screen showing a redundant "no messages yet" placeholder below the suggested prompt chips — the chips card is now the only prompt on an empty screen
+- Fixed a query error (failed thread or memory load) being displayed as a nearly invisible line of small red text — errors now appear as a clearly visible alert banner so you always know when something failed to load
 - Fixed opening a past annual, YTD, or history analysis thread after navigating away — messages were missing until a hard refresh; the thread now loads correctly on every visit
 - Fixed the assistant not actually using saved memory when answering questions — goals, preferences, and facts were stored but never sent to Claude, so the assistant answered as if it knew nothing about you
 - Fixed the "Rigenera" (retry) button doing nothing after a failed or interrupted response — it now correctly resends the last message without requiring you to retype it
