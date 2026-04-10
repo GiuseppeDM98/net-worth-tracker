@@ -1,7 +1,12 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AssistantMemoryDocument, AssistantMemoryItem, AssistantMemoryResponse, AssistantPreferences } from '@/types/assistant';
+import {
+  AssistantMemoryDocument,
+  AssistantMemoryItem,
+  AssistantMemoryResponse,
+  AssistantPreferences,
+} from '@/types/assistant';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { toDate } from '@/lib/utils/dateHelpers';
@@ -13,6 +18,13 @@ function normalizeMemory(payload: AssistantMemoryResponse): AssistantMemoryDocum
       ...item,
       createdAt: toDate(item.createdAt),
       updatedAt: toDate(item.updatedAt),
+      completedAt: item.completedAt ? toDate(item.completedAt) : undefined,
+      lastEvaluationAt: item.lastEvaluationAt ? toDate(item.lastEvaluationAt) : undefined,
+    })),
+    suggestions: (payload.suggestions ?? []).map((suggestion) => ({
+      ...suggestion,
+      createdAt: toDate(suggestion.createdAt),
+      updatedAt: toDate(suggestion.updatedAt),
     })),
     updatedAt: payload.updatedAt ? toDate(payload.updatedAt) : null,
     hasDummySnapshots: payload.hasDummySnapshots ?? false,
@@ -46,6 +58,10 @@ export function useUpdateAssistantMemory(userId: string) {
     mutationFn: async (updates: {
       preferences?: Partial<AssistantPreferences>;
       item?: Partial<AssistantMemoryItem> & Pick<AssistantMemoryItem, 'id' | 'text' | 'category'>;
+      suggestion?: any;
+      action?: 'acceptSuggestion' | 'ignoreSuggestion' | 'reactivateGoal';
+      suggestionId?: string;
+      itemId?: string;
     }) => {
       const response = await authenticatedFetch('/api/ai/assistant/memory', {
         method: 'PATCH',

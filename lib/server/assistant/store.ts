@@ -1,9 +1,11 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import {
+  AssistantGoalEvaluationResult,
   AssistantCreateThreadInput,
   AssistantMemoryDocument,
   AssistantMemoryItem,
+  AssistantMemorySuggestion,
   AssistantMessage,
   AssistantMode,
   AssistantPreferences,
@@ -12,6 +14,7 @@ import {
 } from '@/types/assistant';
 import { toDate } from '@/lib/utils/dateHelpers';
 import { getDefaultAssistantPreferences } from './webSearchPolicy';
+import { parseStructuredGoalFromText } from './goalEvaluation';
 
 const THREADS_COLLECTION = 'assistantThreads';
 const MEMORY_COLLECTION = 'assistantMemory';
@@ -83,11 +86,65 @@ function mapMemoryItem(doc: Record<string, any>, userId: string): AssistantMemor
     userId,
     category: doc.category,
     text: doc.text,
+    structuredGoal: doc.structuredGoal,
     sourceThreadId: doc.sourceThreadId,
     sourceMessageId: doc.sourceMessageId,
     createdAt: toDate(doc.createdAt),
     updatedAt: toDate(doc.updatedAt),
+    completedAt: doc.completedAt ? toDate(doc.completedAt) : undefined,
+    derivedFromContext: doc.derivedFromContext,
+    evidenceSummary: doc.evidenceSummary,
+    lastEvaluationAt: doc.lastEvaluationAt ? toDate(doc.lastEvaluationAt) : undefined,
+    lastEvaluationResult: doc.lastEvaluationResult,
     status: doc.status,
+  };
+}
+
+function mapMemorySuggestion(doc: Record<string, any>, userId: string): AssistantMemorySuggestion {
+  return {
+    id: doc.id,
+    userId,
+    itemId: doc.itemId,
+    type: doc.type,
+    status: doc.status,
+    createdAt: toDate(doc.createdAt),
+    updatedAt: toDate(doc.updatedAt),
+    evidenceSummary: doc.evidenceSummary,
+    evaluation: doc.evaluation,
+  };
+}
+
+function serializeMemoryItem(item: AssistantMemoryItem) {
+  return {
+    id: item.id,
+    userId: item.userId,
+    category: item.category,
+    text: item.text,
+    status: item.status,
+    createdAt: Timestamp.fromDate(item.createdAt),
+    updatedAt: Timestamp.fromDate(item.updatedAt),
+    ...(item.structuredGoal ? { structuredGoal: item.structuredGoal } : {}),
+    ...(item.sourceThreadId ? { sourceThreadId: item.sourceThreadId } : {}),
+    ...(item.sourceMessageId ? { sourceMessageId: item.sourceMessageId } : {}),
+    ...(item.completedAt ? { completedAt: Timestamp.fromDate(item.completedAt) } : {}),
+    ...(item.derivedFromContext !== undefined ? { derivedFromContext: item.derivedFromContext } : {}),
+    ...(item.evidenceSummary ? { evidenceSummary: item.evidenceSummary } : {}),
+    ...(item.lastEvaluationAt ? { lastEvaluationAt: Timestamp.fromDate(item.lastEvaluationAt) } : {}),
+    ...(item.lastEvaluationResult ? { lastEvaluationResult: item.lastEvaluationResult } : {}),
+  };
+}
+
+function serializeMemorySuggestion(suggestion: AssistantMemorySuggestion) {
+  return {
+    id: suggestion.id,
+    userId: suggestion.userId,
+    itemId: suggestion.itemId,
+    type: suggestion.type,
+    status: suggestion.status,
+    evidenceSummary: suggestion.evidenceSummary,
+    evaluation: suggestion.evaluation,
+    createdAt: Timestamp.fromDate(suggestion.createdAt),
+    updatedAt: Timestamp.fromDate(suggestion.updatedAt),
   };
 }
 
@@ -255,6 +312,7 @@ export async function getAssistantMemoryDocument(userId: string): Promise<Assist
     return {
       preferences: syncedPreferences,
       items: [],
+      suggestions: [],
       updatedAt: null,
       hasDummySnapshots: false,
     };
@@ -275,6 +333,9 @@ export async function getAssistantMemoryDocument(userId: string): Promise<Assist
     items: Array.isArray(data.items)
       ? data.items.map((item: Record<string, any>) => mapMemoryItem(item, userId))
       : [],
+    suggestions: Array.isArray(data.suggestions)
+      ? data.suggestions.map((suggestion: Record<string, any>) => mapMemorySuggestion(suggestion, userId))
+      : [],
     updatedAt: data.updatedAt ? toDate(data.updatedAt) : null,
     hasDummySnapshots: false,
   };
@@ -285,6 +346,7 @@ export async function updateAssistantMemoryDocument(
   updates: {
     preferences?: Partial<AssistantPreferences>;
     item?: Partial<AssistantMemoryItem> & Pick<AssistantMemoryItem, 'id' | 'text' | 'category'>;
+    suggestion?: Partial<AssistantMemorySuggestion> & Pick<AssistantMemorySuggestion, 'id' | 'itemId' | 'type' | 'status' | 'evidenceSummary' | 'evaluation'>;
   }
 ): Promise<AssistantMemoryDocument> {
   const current = await getAssistantMemoryDocument(userId);
@@ -295,18 +357,32 @@ export async function updateAssistantMemoryDocument(
   };
 
   const items = [...current.items];
+  const suggestions = [...current.suggestions];
 
   if (updates.item) {
     const itemIndex = items.findIndex((item) => item.id === updates.item!.id);
+    const structuredGoal =
+      updates.item.category === 'goal'
+        ? (updates.item.structuredGoal ?? parseStructuredGoalFromText(updates.item.text))
+        : undefined;
     const baseItem: AssistantMemoryItem = {
       id: updates.item.id,
       userId,
       category: updates.item.category,
       text: updates.item.text,
+      structuredGoal,
       sourceThreadId: updates.item.sourceThreadId,
       sourceMessageId: updates.item.sourceMessageId,
       createdAt: itemIndex >= 0 ? items[itemIndex].createdAt : now.toDate(),
       updatedAt: now.toDate(),
+      completedAt:
+        updates.item.status === 'completed'
+          ? (updates.item.completedAt ?? now.toDate())
+          : undefined,
+      derivedFromContext: updates.item.derivedFromContext,
+      evidenceSummary: updates.item.evidenceSummary,
+      lastEvaluationAt: updates.item.lastEvaluationAt,
+      lastEvaluationResult: updates.item.lastEvaluationResult,
       status: updates.item.status ?? 'active',
     };
 
@@ -320,17 +396,34 @@ export async function updateAssistantMemoryDocument(
     }
   }
 
-  const serializedItems = items.map((item) => ({
-    ...item,
-    createdAt: Timestamp.fromDate(item.createdAt),
-    updatedAt: Timestamp.fromDate(item.updatedAt),
-  }));
+  if (updates.suggestion) {
+    const suggestionIndex = suggestions.findIndex((suggestion) => suggestion.id === updates.suggestion!.id);
+    const existingSuggestion = suggestionIndex >= 0 ? suggestions[suggestionIndex] : undefined;
+    const suggestion: AssistantMemorySuggestion = {
+      id: updates.suggestion.id,
+      userId,
+      itemId: updates.suggestion.itemId,
+      type: updates.suggestion.type,
+      status: updates.suggestion.status,
+      createdAt: existingSuggestion?.createdAt ?? now.toDate(),
+      updatedAt: now.toDate(),
+      evidenceSummary: updates.suggestion.evidenceSummary,
+      evaluation: updates.suggestion.evaluation,
+    };
+
+    if (suggestionIndex >= 0) {
+      suggestions[suggestionIndex] = suggestion;
+    } else {
+      suggestions.unshift(suggestion);
+    }
+  }
 
   await Promise.all([
     adminDb.collection(MEMORY_COLLECTION).doc(userId).set(
       {
         preferences,
-        items: serializedItems,
+        items: items.map(serializeMemoryItem),
+        suggestions: suggestions.map(serializeMemorySuggestion),
         updatedAt: now,
       },
       { merge: true }
@@ -341,6 +434,7 @@ export async function updateAssistantMemoryDocument(
   return {
     preferences,
     items,
+    suggestions,
     updatedAt: now.toDate(),
     hasDummySnapshots: false,
   };
@@ -356,6 +450,7 @@ export async function deleteAssistantMemoryDocument(
     const cleared = {
       preferences: current.preferences,
       items: [],
+      suggestions: [],
       updatedAt: new Date(),
       hasDummySnapshots: false,
     };
@@ -364,6 +459,7 @@ export async function deleteAssistantMemoryDocument(
       {
         preferences: cleared.preferences,
         items: [],
+        suggestions: [],
         updatedAt: Timestamp.fromDate(cleared.updatedAt),
       },
       { merge: true }
@@ -377,15 +473,13 @@ export async function deleteAssistantMemoryDocument(
   }
 
   const filteredItems = current.items.filter((item) => item.id !== options.itemId);
+  const filteredSuggestions = current.suggestions.filter((suggestion) => suggestion.itemId !== options.itemId);
 
   await adminDb.collection(MEMORY_COLLECTION).doc(userId).set(
     {
       preferences: current.preferences,
-      items: filteredItems.map((item) => ({
-        ...item,
-        createdAt: Timestamp.fromDate(item.createdAt),
-        updatedAt: Timestamp.fromDate(item.updatedAt),
-      })),
+      items: filteredItems.map(serializeMemoryItem),
+      suggestions: filteredSuggestions.map(serializeMemorySuggestion),
       updatedAt: Timestamp.now(),
     },
     { merge: true }
@@ -394,9 +488,31 @@ export async function deleteAssistantMemoryDocument(
   return {
     preferences: current.preferences,
     items: filteredItems,
+    suggestions: filteredSuggestions,
     updatedAt: new Date(),
     hasDummySnapshots: false,
   };
+}
+
+export async function setAssistantGoalEvaluation(
+  userId: string,
+  itemId: string,
+  evaluation: AssistantGoalEvaluationResult
+): Promise<AssistantMemoryDocument> {
+  const current = await getAssistantMemoryDocument(userId);
+  const item = current.items.find((entry) => entry.id === itemId);
+
+  if (!item) {
+    throw new AssistantStoreError(404, 'Obiettivo memoria non trovato');
+  }
+
+  return updateAssistantMemoryDocument(userId, {
+    item: {
+      ...item,
+      lastEvaluationAt: new Date(),
+      lastEvaluationResult: evaluation,
+    },
+  });
 }
 
 /**

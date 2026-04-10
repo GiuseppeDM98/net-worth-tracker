@@ -87,11 +87,47 @@ export interface AssistantMemoryItem {
   userId: string;
   category: 'goal' | 'preference' | 'risk' | 'fact';
   text: string;
+  structuredGoal?: AssistantStructuredGoal;
   sourceThreadId?: string;
   sourceMessageId?: string;
   createdAt: Date;
   updatedAt: Date;
-  status: 'active' | 'archived';
+  completedAt?: Date;
+  derivedFromContext?: boolean;
+  evidenceSummary?: string;
+  lastEvaluationAt?: Date;
+  lastEvaluationResult?: AssistantGoalEvaluationResult;
+  status: 'active' | 'completed' | 'archived';
+}
+
+export interface AssistantStructuredGoal {
+  kind: 'cash_target' | 'liquid_net_worth_target' | 'net_worth_target' | 'asset_class_value_target' | 'sub_category_value_target' | 'asset_class_percentage_target';
+  targetValue: number;
+  unit: 'eur' | 'percent';
+  assetClass?: string;
+  subCategory?: string;
+  periodLabel?: string;
+}
+
+export interface AssistantGoalEvaluationResult {
+  matched: boolean;
+  metricValue: number | null;
+  targetValue: number;
+  unit: 'eur' | 'percent';
+  evaluatedAgainst: 'cash' | 'liquid_net_worth' | 'total_net_worth' | 'asset_class_value' | 'sub_category_value' | 'asset_class_percentage';
+  summary: string;
+}
+
+export interface AssistantMemorySuggestion {
+  id: string;
+  userId: string;
+  itemId: string;
+  type: 'complete_goal';
+  status: 'pending' | 'ignored' | 'accepted';
+  createdAt: Date;
+  updatedAt: Date;
+  evidenceSummary: string;
+  evaluation: AssistantGoalEvaluationResult;
 }
 
 export interface AssistantThreadDetail {
@@ -102,6 +138,7 @@ export interface AssistantThreadDetail {
 export interface AssistantMemoryDocument {
   preferences: AssistantPreferences;
   items: AssistantMemoryItem[];
+  suggestions: AssistantMemorySuggestion[];
   updatedAt: Date | null;
   // Computed server-side: true when the user has at least one dummy snapshot.
   // Used to conditionally show the "Snapshot di test" toggle in the UI.

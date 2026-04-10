@@ -3,6 +3,10 @@ import { NextRequest } from 'next/server';
 
 const {
   verifyIdTokenMock,
+  buildAssistantMonthContextMock,
+  buildAssistantYearContextMock,
+  buildAssistantYtdContextMock,
+  buildAssistantHistoryContextMock,
   listAssistantThreadsMock,
   createAssistantThreadMock,
   getAssistantThreadDetailMock,
@@ -10,11 +14,16 @@ const {
   getAssistantMemoryDocumentMock,
   updateAssistantMemoryDocumentMock,
   deleteAssistantMemoryDocumentMock,
+  setAssistantGoalEvaluationMock,
   appendAssistantMessageMock,
   updateAssistantThreadMetadataMock,
   streamAssistantResponseMock,
 } = vi.hoisted(() => ({
   verifyIdTokenMock: vi.fn(),
+  buildAssistantMonthContextMock: vi.fn(),
+  buildAssistantYearContextMock: vi.fn(),
+  buildAssistantYtdContextMock: vi.fn(),
+  buildAssistantHistoryContextMock: vi.fn(),
   listAssistantThreadsMock: vi.fn(),
   createAssistantThreadMock: vi.fn(),
   getAssistantThreadDetailMock: vi.fn(),
@@ -22,6 +31,7 @@ const {
   getAssistantMemoryDocumentMock: vi.fn(),
   updateAssistantMemoryDocumentMock: vi.fn(),
   deleteAssistantMemoryDocumentMock: vi.fn(),
+  setAssistantGoalEvaluationMock: vi.fn(),
   appendAssistantMessageMock: vi.fn(),
   updateAssistantThreadMetadataMock: vi.fn(),
   streamAssistantResponseMock: vi.fn(),
@@ -33,6 +43,13 @@ vi.mock('@/lib/firebase/admin', () => ({
   },
 }));
 
+vi.mock('@/lib/services/assistantMonthContextService', () => ({
+  buildAssistantMonthContext: buildAssistantMonthContextMock,
+  buildAssistantYearContext: buildAssistantYearContextMock,
+  buildAssistantYtdContext: buildAssistantYtdContextMock,
+  buildAssistantHistoryContext: buildAssistantHistoryContextMock,
+}));
+
 vi.mock('@/lib/server/assistant/store', () => ({
   listAssistantThreads: listAssistantThreadsMock,
   createAssistantThread: createAssistantThreadMock,
@@ -41,6 +58,7 @@ vi.mock('@/lib/server/assistant/store', () => ({
   getAssistantMemoryDocument: getAssistantMemoryDocumentMock,
   updateAssistantMemoryDocument: updateAssistantMemoryDocumentMock,
   deleteAssistantMemoryDocument: deleteAssistantMemoryDocumentMock,
+  setAssistantGoalEvaluation: setAssistantGoalEvaluationMock,
   appendAssistantMessage: appendAssistantMessageMock,
   updateAssistantThreadMetadata: updateAssistantThreadMetadataMock,
   buildThreadTitleFromPrompt: vi.fn(() => 'Titolo server'),
@@ -88,6 +106,38 @@ describe('Assistant private API routes', () => {
     process.env.ANTHROPIC_API_KEY = 'test-key';
 
     verifyIdTokenMock.mockResolvedValue({ uid: 'user-1' });
+    buildAssistantMonthContextMock.mockResolvedValue({
+      selector: { year: 2026, month: 3 },
+      currentSnapshot: null,
+      previousSnapshot: null,
+      cashflow: {
+        totalIncome: 0,
+        totalExpenses: 0,
+        totalDividends: 0,
+        netCashFlow: 0,
+        transactionCount: 0,
+      },
+      netWorth: {
+        start: null,
+        end: null,
+        delta: null,
+        deltaPct: null,
+      },
+      allocationChanges: [],
+      topExpensesByCategory: [],
+      topIndividualExpenses: [],
+      bySubCategoryAllocation: {},
+      dataQuality: {
+        hasSnapshot: false,
+        hasPreviousBaseline: false,
+        hasCashflowData: false,
+        isPartialMonth: true,
+        notes: [],
+      },
+    });
+    buildAssistantYearContextMock.mockResolvedValue(null);
+    buildAssistantYtdContextMock.mockResolvedValue(null);
+    buildAssistantHistoryContextMock.mockResolvedValue(null);
     listAssistantThreadsMock.mockResolvedValue([]);
     createAssistantThreadMock.mockResolvedValue({
       id: 'thread-1',
@@ -127,28 +177,38 @@ describe('Assistant private API routes', () => {
         responseStyle: 'balanced',
         includeMacroContext: false,
         memoryEnabled: true,
+        includeDummySnapshots: false,
       },
       items: [],
+      suggestions: [],
       updatedAt: null,
+      hasDummySnapshots: false,
     });
     updateAssistantMemoryDocumentMock.mockResolvedValue({
       preferences: {
         responseStyle: 'deep',
         includeMacroContext: true,
         memoryEnabled: true,
+        includeDummySnapshots: false,
       },
       items: [],
+      suggestions: [],
       updatedAt: new Date(2026, 3, 5),
+      hasDummySnapshots: false,
     });
     deleteAssistantMemoryDocumentMock.mockResolvedValue({
       preferences: {
         responseStyle: 'balanced',
         includeMacroContext: false,
         memoryEnabled: true,
+        includeDummySnapshots: false,
       },
       items: [],
+      suggestions: [],
       updatedAt: new Date(2026, 3, 5),
+      hasDummySnapshots: false,
     });
+    setAssistantGoalEvaluationMock.mockResolvedValue(undefined);
     appendAssistantMessageMock
       .mockResolvedValueOnce({
         id: 'user-msg-1',
@@ -318,6 +378,64 @@ describe('Assistant private API routes', () => {
       itemId: 'memory-1',
       resetAll: undefined,
     });
+  });
+
+  it('accepts a goal completion suggestion only for the authenticated user', async () => {
+    getAssistantMemoryDocumentMock.mockResolvedValueOnce({
+      preferences: {
+        responseStyle: 'balanced',
+        includeMacroContext: false,
+        memoryEnabled: true,
+        includeDummySnapshots: false,
+      },
+      items: [{
+        id: 'goal-1',
+        userId: 'user-1',
+        category: 'goal',
+        text: 'Liquidità a 40k',
+        createdAt: new Date(2026, 3, 5),
+        updatedAt: new Date(2026, 3, 5),
+        status: 'active',
+      }],
+      suggestions: [{
+        id: 'suggestion-1',
+        userId: 'user-1',
+        itemId: 'goal-1',
+        type: 'complete_goal',
+        status: 'pending',
+        createdAt: new Date(2026, 3, 5),
+        updatedAt: new Date(2026, 3, 5),
+        evidenceSummary: 'Liquidità attuale 45000 EUR su target 40000 EUR',
+        evaluation: {
+          matched: true,
+          metricValue: 45000,
+          targetValue: 40000,
+          unit: 'eur',
+          evaluatedAgainst: 'liquid_net_worth',
+          summary: 'Liquidità attuale 45000 EUR su target 40000 EUR',
+        },
+      }],
+      updatedAt: null,
+      hasDummySnapshots: false,
+    });
+
+    const response = await patchMemoryRoute(
+      createJsonRequest('http://localhost/api/ai/assistant/memory', {
+        method: 'PATCH',
+        headers: {
+          Authorization: 'Bearer valid-token',
+        },
+        body: {
+          userId: 'user-1',
+          action: 'acceptSuggestion',
+          suggestionId: 'suggestion-1',
+          itemId: 'goal-1',
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(updateAssistantMemoryDocumentMock).toHaveBeenCalled();
   });
 
   it('streams assistant data for the authenticated user', async () => {

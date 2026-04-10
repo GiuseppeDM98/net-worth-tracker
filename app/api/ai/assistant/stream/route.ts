@@ -30,7 +30,12 @@ import {
   buildAssistantYtdContext,
   buildAssistantHistoryContext,
 } from '@/lib/services/assistantMonthContextService';
-import { AssistantStreamEvent, AssistantStreamRequest } from '@/types/assistant';
+import { AssistantMonthContextBundle, AssistantStreamEvent, AssistantStreamRequest } from '@/types/assistant';
+import {
+  buildGoalCompletionSuggestions,
+  evaluateStructuredGoal,
+  parseStructuredGoalFromText,
+} from '@/lib/server/assistant/goalEvaluation';
 
 /**
  * Extracts memory candidates from a completed exchange and persists new items.
@@ -45,10 +50,11 @@ async function extractAndSaveMemory(
   threadId: string,
   messageId: string,
   userMessage: string,
-  assistantMessage: string
+  assistantMessage: string,
+  contextBundle: AssistantMonthContextBundle | null
 ): Promise<void> {
   try {
-    const memoryDoc = await getAssistantMemoryDocument(userId);
+    let memoryDoc = await getAssistantMemoryDocument(userId);
 
     // Respect the user's memoryEnabled toggle — never extract when disabled
     if (!memoryDoc.preferences.memoryEnabled) return;
@@ -60,10 +66,7 @@ async function extractAndSaveMemory(
     const anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
     const candidates = await extractMemoryCandidates(userMessage, assistantMessage, anthropicClient);
-    if (candidates.length === 0) return;
-
     const newCandidates = dedupeMemoryItems(candidates, memoryDoc.items);
-    if (newCandidates.length === 0) return;
 
     // Save each new item sequentially to keep Firestore writes simple
     for (const candidate of newCandidates) {
@@ -73,11 +76,49 @@ async function extractAndSaveMemory(
           id: itemId,
           category: candidate.category,
           text: candidate.text,
+          structuredGoal:
+            candidate.category === 'goal'
+              ? parseStructuredGoalFromText(candidate.text)
+              : undefined,
           sourceThreadId: threadId,
           sourceMessageId: messageId,
           status: 'active',
         },
       });
+    }
+
+    memoryDoc = await getAssistantMemoryDocument(userId);
+
+    if (!contextBundle) return;
+
+    const activeStructuredGoals = memoryDoc.items.filter(
+      (item) => item.category === 'goal' && item.status === 'active' && item.structuredGoal
+    );
+
+    for (const item of activeStructuredGoals) {
+      const evaluation = evaluateStructuredGoal(item.structuredGoal!, contextBundle);
+      if (evaluation) {
+        await updateAssistantMemoryDocument(userId, {
+          item: {
+            ...item,
+            lastEvaluationAt: new Date(),
+            lastEvaluationResult: evaluation,
+          },
+        });
+      }
+
+      const suggestion = buildGoalCompletionSuggestions(
+        userId,
+        [item],
+        contextBundle,
+        memoryDoc.suggestions,
+        ({ itemId }) => `goal_suggestion_${itemId}`
+      )[0];
+
+      if (suggestion) {
+        await updateAssistantMemoryDocument(userId, { suggestion });
+        memoryDoc.suggestions = [suggestion, ...memoryDoc.suggestions];
+      }
     }
   } catch (error) {
     // Memory extraction is non-fatal — log server-side only
@@ -271,7 +312,8 @@ export async function POST(request: NextRequest) {
             thread.id,
             assistantMessage.id,
             body.prompt.trim(),
-            result.text
+            result.text,
+            contextBundle
           ).catch((err) => console.error('[stream] extractAndSaveMemory uncaught:', err));
 
           await updateAssistantThreadMetadata(thread.id, {

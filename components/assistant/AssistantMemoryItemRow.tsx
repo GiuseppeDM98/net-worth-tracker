@@ -100,6 +100,7 @@ export function AssistantMemoryItemRow({
   };
 
   const isArchived = item.status === 'archived';
+  const isCompleted = item.status === 'completed';
 
   return (
     <div
@@ -107,6 +108,8 @@ export function AssistantMemoryItemRow({
         'group rounded-xl border px-3 py-2.5 transition-colors',
         isArchived
           ? 'border-border/50 bg-muted/20 opacity-60'
+          : isCompleted
+          ? 'border-emerald-500/20 bg-emerald-500/5'
           : 'border-border bg-background'
       )}
     >
@@ -243,7 +246,9 @@ export function AssistantMemoryItemRow({
 
       {/* Provenance: source thread date */}
       <p className="mt-1 text-[10px] text-muted-foreground/70">
-        da una conversazione del {formatItemDate(item.createdAt)}
+        {isCompleted && item.completedAt
+          ? `Completato il ${formatItemDate(item.completedAt)}`
+          : `da una conversazione del ${formatItemDate(item.createdAt)}`}
       </p>
     </div>
   );

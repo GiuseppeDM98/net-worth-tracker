@@ -36,6 +36,10 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - A full reset option is available with an explicit confirmation dialog — preferences (style, macro context, learning toggle) are preserved on reset
 - An "Apprendimento automatico" toggle lets you stop the assistant from learning new facts while keeping existing memory visible and active
 - The memory panel in the right column is collapsible — click the header to collapse it when the list is long, keeping the numeric context panel visible without scrolling
+- Added assisted goal completion suggestions in the Memory panel, so the assistant can propose marking a goal as completed when your portfolio data shows the numeric target has been reached
+- Added separate Memory tabs for active, completed, and archived items, making it easier to review finished goals without mixing them with open ones
+- Added explicit confirm and ignore actions for goal suggestions, so the assistant never marks a goal as completed without your approval
+- Added support for more natural goal wording in Memory, including targets phrased as cash, equity, bonds, and allocation percentages
 
 **Conversations**
 - Every conversation is saved and can be reopened at any time from the "Conversazioni" list — your analysis history is never lost between sessions

@@ -127,12 +127,15 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 
 ### Assistant Memory Injection
 - Saving items to `assistantMemory/{userId}` is not enough — Claude has no implicit access to Firestore. Items must be serialized into the prompt via `formatMemoryForPrompt()` in `prompts.ts`. A generic instruction like "you can reuse saved preferences" without the actual text is useless.
-- Only `status === 'active'` items are injected. Archived items are explicitly excluded.
+- Only `status === 'active'` items are injected. `completed` and `archived` items are explicitly excluded.
 - Memory fetch in the stream route is wrapped in `.catch(() => null)` — memory failure must never block the chat stream.
 - `extractAndSaveMemory` is fire-and-forget: call with `.catch(...)` after `appendAssistantMessage`, never `await` it inside the stream. Errors are logged server-side only.
 - Memory extraction runs in **all modes**, not just chat. The only gate is `memoryEnabled` in `AssistantPreferences` — mode is irrelevant.
 - The Anthropic client for memory extraction is instantiated lazily inside `extractAndSaveMemory` (dynamic import), not at module level — module-level `new Anthropic()` breaks test environments where `ANTHROPIC_API_KEY` is absent.
 - `hasDummySnapshots` in `AssistantMemoryDocument` is a computed field injected **only** by `GET /api/ai/assistant/memory` via a parallel Firestore `limit(1)` query — never persisted to Firestore. All return sites in `store.ts` use `hasDummySnapshots: false` as a placeholder; the real value is overlaid by the route handler. Pattern for other computed UI flags: same approach — don't store them, compute at the read boundary.
+- Goal lifecycle lives in the same memory document: `AssistantMemoryItem.status` now supports `active | completed | archived`, while pending completion proposals live in a separate `suggestions` array. Do not overload archived items to mean "goal reached".
+- Goal-completion suggestions must come from authoritative portfolio data (`AssistantMonthContextBundle`), never from assistant prose or previously extracted memory facts. Semantic split: `liquidità` means cash only (`currentSnapshot.byAssetClass.cash`), while `patrimonio liquido` / `asset liquidi` use `currentSnapshot.liquidNetWorth`.
+- Structured goal parsing is pattern-based and runs when a goal item is created or updated. If parsing semantics change later, existing saved goals keep their old `structuredGoal` shape until re-saved; during testing, do not mistake that for an evaluation bug.
 
 ### Assistant Chat Mode Unification
 - Chat mode can receive numeric context from any period builder. The `chatContext` field in the stream request (`'none' | 'month' | 'year' | 'ytd' | 'history'`) selects the builder; `'none'` skips all context and sends Claude no portfolio data.

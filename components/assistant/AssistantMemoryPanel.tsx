@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Brain, ChevronDown, Loader2, RotateCcw, Trash2 } from 'lucide-react';
+import { Brain, CheckCircle2, ChevronDown, Loader2, RotateCcw, Trash2, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { toast } from 'sonner';
 import { AssistantMemoryItemRow } from '@/components/assistant/AssistantMemoryItemRow';
@@ -31,7 +31,7 @@ interface AssistantMemoryPanelProps {
   onToggle?: () => void;
 }
 
-type FilterTab = 'active' | 'archived';
+type FilterTab = 'active' | 'completed' | 'archived';
 
 const CATEGORY_ORDER: AssistantMemoryItem['category'][] = ['goal', 'preference', 'risk', 'fact'];
 
@@ -74,6 +74,7 @@ export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onTogg
 
   const isMutating = updateMutation.isPending || deleteMutation.isPending;
   const memoryEnabled = memory?.preferences.memoryEnabled ?? true;
+  const pendingSuggestions = (memory?.suggestions ?? []).filter((suggestion) => suggestion.status === 'pending');
 
   // Group items by category preserving the canonical display order
   const filteredItems = (memory?.items ?? []).filter((item) => item.status === filterTab);
@@ -107,7 +108,7 @@ export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onTogg
     const item = memory?.items.find((i) => i.id === id);
     if (!item) return;
     const newStatus: AssistantMemoryItem['status'] =
-      currentStatus === 'active' ? 'archived' : 'active';
+      currentStatus === 'archived' ? 'active' : 'archived';
     try {
       await updateMutation.mutateAsync({
         item: { id, text: item.text, category: item.category, status: newStatus },
@@ -137,6 +138,32 @@ export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onTogg
 
   const totalItems = memory?.items.length ?? 0;
   const activeCount = (memory?.items ?? []).filter((i) => i.status === 'active').length;
+
+  const handleAcceptSuggestion = async (suggestionId: string, itemId: string) => {
+    try {
+      await updateMutation.mutateAsync({ action: 'acceptSuggestion', suggestionId, itemId });
+      toast.success('Obiettivo segnato come completato');
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  };
+
+  const handleIgnoreSuggestion = async (suggestionId: string) => {
+    try {
+      await updateMutation.mutateAsync({ action: 'ignoreSuggestion', suggestionId });
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  };
+
+  const handleReactivateGoal = async (itemId: string) => {
+    try {
+      await updateMutation.mutateAsync({ action: 'reactivateGoal', itemId });
+      toast.success('Obiettivo riattivato');
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  };
 
   // Build a flat index for stagger delays — flattened across all category groups.
   // Each item gets a delay proportional to its position in the visible list.
@@ -199,6 +226,43 @@ export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onTogg
 
           <CollapsibleContent>
             <CardContent className="space-y-5">
+          {!isLoading && pendingSuggestions.length > 0 && (
+            <div className="space-y-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                <p className="text-sm font-medium text-foreground">Suggerimenti</p>
+              </div>
+              {pendingSuggestions.map((suggestion) => {
+                const linkedItem = memory?.items.find((item) => item.id === suggestion.itemId);
+                if (!linkedItem) return null;
+                return (
+                  <div key={suggestion.id} className="rounded-lg border border-border bg-background px-3 py-2.5">
+                    <p className="text-sm font-medium text-foreground">{linkedItem.text}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{suggestion.evidenceSummary}</p>
+                    <div className="mt-3 flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => handleAcceptSuggestion(suggestion.id, linkedItem.id)}
+                        disabled={isMutating}
+                      >
+                        Segna come completato
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleIgnoreSuggestion(suggestion.id)}
+                        disabled={isMutating}
+                      >
+                        <X className="mr-1 h-3.5 w-3.5" />
+                        Ignora
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {/* Memory enabled toggle */}
           <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2">
             <div>
@@ -231,7 +295,7 @@ export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onTogg
               aria-label="Filtra ricordi"
               className="flex gap-1 rounded-lg border border-border bg-muted/30 p-0.5"
             >
-              {(['active', 'archived'] as const).map((tab) => (
+              {(['active', 'completed', 'archived'] as const).map((tab) => (
                 <button
                   key={tab}
                   role="tab"
@@ -244,7 +308,7 @@ export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onTogg
                       : 'text-muted-foreground hover:text-foreground'
                   )}
                 >
-                  {tab === 'active' ? 'Attivi' : 'Archiviati'}
+                  {tab === 'active' ? 'Attivi' : tab === 'completed' ? 'Completati' : 'Archiviati'}
                 </button>
               ))}
             </div>
@@ -259,6 +323,8 @@ export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onTogg
                   title={
                     filterTab === 'active'
                       ? 'Nessun ricordo attivo'
+                      : filterTab === 'completed'
+                      ? 'Nessun obiettivo completato'
                       : 'Nessun ricordo archiviato'
                   }
                   description={
@@ -266,6 +332,8 @@ export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onTogg
                       ? 'I fatti stabili che dichiari nelle chat verranno salvati qui.'
                       : filterTab === 'active'
                       ? "Attiva l'apprendimento per acquisire nuovi ricordi."
+                      : filterTab === 'completed'
+                      ? 'Gli obiettivi confermati come raggiunti compariranno qui.'
                       : ''
                   }
                   className="py-4"
@@ -320,6 +388,18 @@ export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onTogg
                                   onArchive={handleArchive}
                                   onDelete={handleDelete}
                                 />
+                                {item.status === 'completed' && (
+                                  <div className="px-3 pb-2">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleReactivateGoal(item.id)}
+                                      disabled={isMutating}
+                                    >
+                                      Riattiva obiettivo
+                                    </Button>
+                                  </div>
+                                )}
                               </motion.div>
                             );
                           })}
