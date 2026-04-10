@@ -11,49 +11,67 @@
 
 ### Assistente AI
 
-The AI Assistant is a new section of the app (accessible from the "Analisi" group in the navigation) that lets you have ongoing conversations about your portfolio — either through structured monthly analysis or open-ended chat.
+The AI Assistant is a new section of the app (accessible from the "Analisi" group in the navigation) that lets you have ongoing conversations about your portfolio — either through structured analysis modes or open-ended chat.
 
-**Monthly analysis**
+**Analysis modes**
 - Select any past month and the assistant automatically loads net worth changes, cashflow breakdown, top expense categories, and allocation shifts — presenting them in a readable numeric context panel before writing its commentary
-- The numeric context panel (net worth delta, cashflow, allocation changes) now reappears automatically when you reopen a past monthly analysis thread — no need to rerun the analysis every time
-- The context panel shows a loading skeleton while the data is being fetched, so the layout stays stable as the panel populates
-- The assistant now sees your complete portfolio breakdown by asset class, not just the five that changed the most in the month
-- The assistant now sees your portfolio breakdown within each asset class (e.g. "Azioni USA €42.000, Azioni Europa €18.000") when subcategory data is available — not just the class total
-
-**Annual, YTD, and total history analysis**
-- Added annual analysis mode: ask the assistant about any full year — it receives the complete cashflow summary, net worth delta (vs prior December), allocation shifts, and top expenses for the entire year. When analysing the current year, the assistant knows the period is still in progress
-- Added YTD analysis: covers January 1 to the latest available month of the current year — a single tap gives you a year-to-date picture of net worth, cashflow, and portfolio changes
-- Added total history analysis: covers all years from your configured cashflow start year to today — ask long-term questions about your financial trajectory and the assistant has the full picture
+- Added annual analysis mode: ask about any full year — the assistant receives the complete cashflow summary, net worth delta (vs prior December), allocation shifts, and top expenses for the year. When analysing the current year, the assistant knows the period is still in progress
+- Added YTD analysis: covers January 1 to the latest available month of the current year — a single tap gives a year-to-date picture of net worth, cashflow, and portfolio changes
+- Added total history analysis: covers all years from your configured cashflow start year to today — ask long-term questions about your financial trajectory with the full picture
+- The assistant sees your complete portfolio breakdown by asset class, not just the five that changed the most in the period
+- The assistant sees your portfolio breakdown within each asset class (e.g. "Azioni USA €42.000, Azioni Europa €18.000") when subcategory data is available — not just the class total
+- The numeric context panel (net worth delta, cashflow, allocation changes) is automatically restored when you reopen a past analysis thread — no need to rerun the analysis every time
+- The context panel shows a loading skeleton while data is being fetched, keeping the layout stable as the panel populates
 - When you switch to a mode that already has a conversation (e.g. Annual 2025), the existing thread is automatically reopened instead of creating a duplicate
 
 **Chat mode**
-- Chat mode now has a context type selector: choose between No context, Month, Year, YTD, or Total history — the assistant receives the same numeric data as the structured analysis modes without the fixed report format
+- Chat mode has a context type selector: choose between No context, Month, Year, YTD, or Total history — the assistant receives the same numeric data as the structured analysis modes without a fixed report format. Chat starts with no context by default; select a period only when you want the assistant to reference your portfolio data
 - Web search is available in all modes: the assistant cites specific recent events (geopolitical, central bank decisions, market moves) and links them directly to your portfolio
+- Follow-up messages like "Approfondisci", "Come mai?", or "Riprendiamo da dove eravamo" are answered with full awareness of what was said earlier in the thread — each reply builds on the previous ones
 
 **Memory**
-- The assistant now remembers goals, preferences, risk profile, and stable facts you declare across conversations — visible in a dedicated "Memoria" panel in the right column
+- The assistant remembers goals, preferences, risk profile, and stable facts you declare across conversations — visible in a dedicated "Memoria" panel in the right column
 - Memory items are grouped by type (Obiettivi, Preferenze, Rischio, Fatti utili) and show the date they were learned
 - You can edit any memory item inline, archive it to keep it out of active use, restore it, or delete it permanently
-- Added a full reset option for memory with an explicit confirmation dialog — preferences (style, macro context, learning toggle) are preserved on reset
-- Added an "Apprendimento automatico" toggle: when off, the assistant stops learning new facts but existing memory remains visible and active
+- A full reset option is available with an explicit confirmation dialog — preferences (style, macro context, learning toggle) are preserved on reset
+- An "Apprendimento automatico" toggle lets you stop the assistant from learning new facts while keeping existing memory visible and active
+- The memory panel in the right column is collapsible — click the header to collapse it when the list is long, keeping the numeric context panel visible without scrolling
 
 **Conversations**
 - Every conversation is saved and can be reopened at any time from the "Conversazioni" list — your analysis history is never lost between sessions
-- Past conversations are shown at the top of the right panel on desktop, and as a compact list above the suggested prompts on mobile — resume a past thread without opening the drawer
-- Added a "Conversazioni" button in the assistant header on mobile and tablet that opens a side drawer with your full conversation history
+- Past conversations are shown at the top of the right panel on desktop, and above the suggested prompts on mobile — resume a past thread without opening a drawer
+- A "Conversazioni" button in the assistant header on mobile and tablet opens a side drawer with your full conversation history; selecting a thread closes the drawer automatically
 - Each conversation shows a relative timestamp ("3 ore fa") for recent threads and an absolute date for older ones
 - You can delete individual conversations directly from the list — hover the thread and click the trash icon
-- Added a "Nuova conversazione" button to start a fresh thread for a different month at any time
-- The selected month is visible directly in the thread list, next to the thread type badge
+- A "Nuova conversazione" button starts a fresh thread at any time
+- The selected period is visible directly in the thread list, next to the thread type badge
 
-**UX & presentation**
-- Five suggested prompt chips on the home screen — "Analizza questo mese", "Cosa pesa di più sul patrimonio?", "Spese e risparmio", "Rendimenti recenti", "Contesto geopolitico" — one tap to start any common analysis
+**Interface & UX**
+- Five suggested prompt chips on the home screen — "Analizza questo mese", "Cosa pesa di più sul patrimonio?", "Spese e risparmio", "Rendimenti recenti", "Contesto geopolitico" — one tap to start any common analysis. Chips appear with a staggered cascade, each fading in sequentially from left to right
+- Each analysis mode shows a short description in the selector — explaining what data it uses (e.g. "Patrimonio, cashflow e allocazione del mese") so you know what to expect before sending
+- Assistant preferences (response style, macro context) are accessible from a compact settings popover in the page header — the right panel shows only context data and memory
+- The composer toolbar is simplified: mode selector and period picker on the top row; chat context type selector on a compact secondary row below the input
+- New conversation messages slide up and fade in as they appear — user and assistant turns feel distinct and less abrupt
+- The numeric context panel crossfades smoothly when switching analysis period or mode, instead of snapping to the new content
+- Memory items animate in on load and slide out with a smooth collapse when archived or deleted — the list never jumps
+- The period label in the conversation header ("Analisi · Aprile 2026") crossfades when switching modes, making context changes feel intentional
+- The "In scrittura…" streaming badge fades in and out instead of appearing and disappearing abruptly
+- A collapsible "Come funziona" guide in the page header explains mode context bundles, web search behaviour in chat mode, how memory works, and tips for better answers — collapsed by default, one click to expand
+- A "taking longer than expected" notice appears after 15 seconds with no response, so you always know the request is still in progress
 - The assistant renders tables in responses — financial breakdowns with categories and amounts are properly formatted instead of showing raw pipe characters
 - The right panel (conversations, context, preferences, memory) stays fixed while you scroll through a long conversation
-- A "taking longer than expected" notice appears after 15 seconds with no response — so you always know the request is still in progress
-- The page shows a skeleton loading state while your conversation history loads, instead of a blank flash
+- The page shows a skeleton loading state while conversation history loads, instead of a blank flash
+- All animations automatically disable spatial movement when the system "Reduce Motion" setting is active — only opacity transitions remain
 - The assistant is behind a feature flag (`NEXT_PUBLIC_ASSISTANT_AI_ENABLED`) for controlled rollout — when disabled, the navigation item is hidden and direct URL access returns a 404
-- Added a graceful unavailable state when AI is not configured, so the page remains accessible and explains what is missing
+- A graceful unavailable state is shown when AI is not configured, so the page remains accessible and explains what is missing
+
+**Mobile**
+- The mode selector on mobile is a row of tappable chips ("Mese", "Anno", "YTD", "Storico", "Chat") — modes are immediately visible and switchable with one touch, no dropdown needed
+- The chat context type selector on mobile uses the same chip strip format, keeping the composer compact and thumb-friendly
+- The Memory panel on mobile is accessible from a dedicated button in the page header — it opens as a side drawer without requiring any scrolling past the conversation area
+- The active analysis period's net worth delta (e.g. "+€1.856 (+0,69%)") appears directly in the conversation header on mobile, so the key number is always visible at a glance
+- Header action buttons on mobile are laid out in two full-width rows ("Conversazioni" + memory icon on the first, "Nuova conversazione" + settings on the second) — each button takes its fair share of horizontal space
+- Suggested prompt chips appear above the recent conversations list on mobile — the primary action is immediately visible without scrolling
 
 ### Patrimonio
 
@@ -127,49 +145,9 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 
 ## 🔧 Improvements
 
-### Assistente AI — Animations & UX
-
-- Suggested prompt chips on the assistant home screen now appear with a staggered cascade instead of all at once — each chip fades in sequentially from left to right
-- New conversation messages now slide up and fade in as they appear — user and assistant turns feel more distinct and less abrupt
-- The numeric context panel (net worth delta, cashflow, allocation) now crossfades smoothly when switching analysis period or mode, instead of snapping to the new content
-- Memory items now animate in on load and slide out with a smooth collapse when archived or deleted — the list never jumps
-- The period label in the conversation header ("Analisi · Aprile 2026") now crossfades when switching modes, making context changes feel intentional
-- The "In scrittura…" streaming badge now fades in and out instead of appearing and disappearing abruptly
-- Added a collapsible "Come funziona" guide in the assistant page header — explains mode context bundles, web search behaviour in chat mode, how memory works, and tips for better answers; collapsed by default, one click to expand
-- All assistant animations automatically disable spatial movement when the system "Reduce Motion" setting is active — only opacity transitions remain
-
 ### Themes & Navigation
 
 - The bottom navigation bar on mobile now matches the active color theme — background, border, and active tab highlight all update when you switch themes, consistent with the sidebar on desktop
-
-### Assistente AI (mobile)
-
-- The mode selector on mobile is now a row of tappable chips ("Mese", "Anno", "YTD", "Storico", "Chat") instead of a dropdown — no more tap-to-open interaction, modes are immediately visible and switchable with one touch
-- The chat context type selector on mobile is now the same chip strip format, keeping the composer compact and thumb-friendly
-- The Memory panel on mobile is now accessible from a dedicated button in the page header — it opens as a side drawer without requiring any scrolling past the conversation area
-- The net worth delta for the active analysis period (e.g. "+€1.856 (+0,69%)") now appears directly in the conversation header on mobile, so the key number is always visible at a glance without scrolling to the data panel
-- Header action buttons on mobile are now laid out in two full-width rows ("Conversazioni" + memory icon on the first, "Nuova conversazione" + settings on the second) instead of wrapping unpredictably — each button takes its fair share of horizontal space
-- Removed two shortcut chips ("Analizza questo mese", "Analizza questo anno") that appeared inside the conversation header after the first response — mode chips in the composer already cover this and the shortcuts felt redundant
-
-### Assistente AI (layout & spacing)
-
-- Improved spacing between conversation messages so user and assistant turns are easier to distinguish at a glance
-- Improved the composer input area with more breathing room and a subtle shadow that visually separates it from the scrollable conversation above
-- Improved the numeric context panel (net worth delta, cashflow, allocation) with more generous internal padding and clearer section labels
-- Improved the Memory panel so category groups (Goals, Preferences, Risk, Facts) and their items have more readable spacing
-- Improved the right column so the Conversations list, numeric context panel, and Memory panel feel clearly separated instead of uniformly stacked
-- Improved hero state spacing so the suggested prompt chips card transitions more naturally into the conversation area below
-
-### Assistente AI
-
-- The assistant now remembers the conversation — follow-up messages like "Approfondisci", "Come mai?", or "Riprendiamo da dove eravamo" are answered with full awareness of what was said earlier in the thread, instead of each reply being independent of the previous ones
-- Moved assistant preferences (response style, macro context) into a compact settings popover accessible from the page header — the right panel now shows only the context data and memory, with more vertical space for what matters during an analysis
-- The memory panel in the right column is now collapsible — click the header to collapse it when the list is long, keeping the numeric context panel visible without scrolling
-- On mobile, the suggested prompt chips ("Analizza questo mese", etc.) now appear above the recent conversations list — the primary action is immediately visible without scrolling past past threads
-- Each analysis mode in the assistant now shows a short description in the selector dropdown — explaining what data it uses (e.g. "Patrimonio, cashflow e allocazione del mese") so you know what to expect before sending
-- Simplified the composer toolbar: the mode selector and period picker now occupy the top row only; the chat context type selector moves to a compact secondary row below the input, keeping the toolbar uncluttered in all modes
-- Chat mode now starts with no numeric context by default — select Month, Year, YTD, or Total history only when you want the assistant to reference your portfolio data
-- Removed a duplicate memory on/off toggle from the preferences popover — the toggle lives in the Memory panel where it belongs, next to the memory items it controls
 
 ---
 
