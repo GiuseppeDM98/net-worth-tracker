@@ -278,6 +278,10 @@ export function AssistantComposer({
             'focus:outline-none focus:ring-1 focus:ring-ring',
             'disabled:opacity-50',
             'min-h-[44px] max-h-[200px] overflow-y-auto',
+            // Hide the native scrollbar on WebKit/Chromium — on Windows it appears even
+            // for a single wrapped line because overflow-y-auto triggers the scrollbar track.
+            // Scroll remains functional; only the visual indicator is suppressed.
+            '[&::-webkit-scrollbar]:hidden [scrollbar-width:none]',
           )}
         />
 

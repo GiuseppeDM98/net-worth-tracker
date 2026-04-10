@@ -4,6 +4,7 @@ import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Globe, RefreshCw } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -54,10 +55,21 @@ const MARKDOWN_COMPONENTS: React.ComponentProps<typeof ReactMarkdown>['component
   ),
 };
 
+// Shared spring-style easing for all message entrance animations.
+const EASE_OUT_QUINT = [0.22, 1, 0.36, 1] as const;
+
 /**
  * Renders the conversation message list.
  * User messages are always plain text.
  * Assistant messages show plain text while streaming, then switch to ReactMarkdown on completion.
+ *
+ * Each message fades + slides up on entry so new exchanges feel like they surface naturally
+ * rather than flashing into existence. The animation is intentionally subtle (6 px travel,
+ * 300 ms) — it should be felt rather than noticed.
+ *
+ * NOTE: We deliberately do NOT animate the streaming text container itself (no layout
+ * animations per chunk) — that would re-trigger the animation on every SSE token and
+ * cause jank on slow connections.
  */
 export function AssistantStreamingResponse({
   messages,
@@ -65,74 +77,93 @@ export function AssistantStreamingResponse({
   onRetry,
   streamingMessageId,
 }: AssistantStreamingResponseProps) {
+  const prefersReducedMotion = useReducedMotion();
+
+  // Entrance variants for each message bubble.
+  // Reduced-motion users get an opacity-only transition (no spatial movement).
+  const messageVariants = {
+    hidden: { opacity: 0, y: prefersReducedMotion ? 0 : 6 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: prefersReducedMotion ? 0.15 : 0.30, ease: EASE_OUT_QUINT },
+    },
+  };
+
   return (
     // aria-live="polite" announces new assistant messages to screen readers.
     // aria-atomic="false" lets individual chunks be read as they arrive instead of
     // re-reading the entire region on every update.
     <div className="space-y-4" aria-live="polite" aria-atomic="false" aria-label="Conversazione con l'assistente">
-      {messages.map((message) => {
-        // An assistant message is "streaming" while its id matches the active stream slot.
-        // User messages are never streamed — always plain text.
-        const isActiveStream = message.role === 'assistant' && message.id === streamingMessageId;
+      <AnimatePresence initial={false}>
+        {messages.map((message) => {
+          // An assistant message is "streaming" while its id matches the active stream slot.
+          // User messages are never streamed — always plain text.
+          const isActiveStream = message.role === 'assistant' && message.id === streamingMessageId;
 
-        return (
-          <div
-            key={message.id}
-            className={cn(
-              'rounded-xl border px-4 py-4 text-sm',
-              message.role === 'user'
-                ? 'border-primary/25 bg-primary/5'
-                : 'border-border bg-background',
-            )}
-          >
-            <div className="mb-2.5 flex items-center justify-between gap-3">
-              <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                {message.role === 'user' ? 'Tu' : 'Assistente'}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {formatDate(message.createdAt)}
-              </span>
-            </div>
+          return (
+            <motion.div
+              key={message.id}
+              variants={messageVariants}
+              initial="hidden"
+              animate="visible"
+              // Exit is intentionally absent — messages are permanent once in the list.
+              className={cn(
+                'rounded-xl border px-4 py-4 text-sm',
+                message.role === 'user'
+                  ? 'border-primary/25 bg-primary/5'
+                  : 'border-border bg-background',
+              )}
+            >
+              <div className="mb-2.5 flex items-center justify-between gap-3">
+                <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  {message.role === 'user' ? 'Tu' : 'Assistente'}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {formatDate(message.createdAt)}
+                </span>
+              </div>
 
-            {message.role === 'assistant' ? (
-              isActiveStream ? (
-                // Plain text during streaming: avoids ReactMarkdown re-parse on every chunk
-                // which causes layout jumps when markdown syntax is incomplete mid-stream.
-                <p className="whitespace-pre-wrap text-foreground">
-                  {message.content || <span className="italic text-muted-foreground">…</span>}
-                </p>
+              {message.role === 'assistant' ? (
+                isActiveStream ? (
+                  // Plain text during streaming: avoids ReactMarkdown re-parse on every chunk
+                  // which causes layout jumps when markdown syntax is incomplete mid-stream.
+                  <p className="whitespace-pre-wrap text-foreground">
+                    {message.content || <span className="italic text-muted-foreground">…</span>}
+                  </p>
+                ) : (
+                  // Full markdown once the stream is done
+                  <div className="prose prose-sm dark:prose-invert max-w-none text-foreground prose-headings:text-foreground prose-strong:text-foreground prose-li:text-foreground">
+                    {message.content ? (
+                      // remarkGfm enables tables, strikethrough, task lists, and autolinks
+                      // — without it markdown tables render as raw pipe characters.
+                      // Table components are overridden to apply explicit borders and padding
+                      // because Tailwind prose does not add cell structure by default.
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={MARKDOWN_COMPONENTS}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
+                    ) : (
+                      <span className="italic text-muted-foreground">…</span>
+                    )}
+                  </div>
+                )
               ) : (
-                // Full markdown once the stream is done
-                <div className="prose prose-sm dark:prose-invert max-w-none text-foreground prose-headings:text-foreground prose-strong:text-foreground prose-li:text-foreground">
-                  {message.content ? (
-                    // remarkGfm enables tables, strikethrough, task lists, and autolinks
-                    // — without it markdown tables render as raw pipe characters.
-                    // Table components are overridden to apply explicit borders and padding
-                    // because Tailwind prose does not add cell structure by default.
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={MARKDOWN_COMPONENTS}
-                    >
-                      {message.content}
-                    </ReactMarkdown>
-                  ) : (
-                    <span className="italic text-muted-foreground">…</span>
-                  )}
-                </div>
-              )
-            ) : (
-              <p className="whitespace-pre-wrap text-foreground">{message.content}</p>
-            )}
+                <p className="whitespace-pre-wrap text-foreground">{message.content}</p>
+              )}
 
-            {message.webSearchUsed && (
-              <Badge variant="outline" className="mt-2 gap-1.5 text-[11px]">
-                <Globe className="h-3 w-3" />
-                Web search usata
-              </Badge>
-            )}
-          </div>
-        );
-      })}
+              {message.webSearchUsed && (
+                <Badge variant="outline" className="mt-2 gap-1.5 text-[11px]">
+                  <Globe className="h-3 w-3" />
+                  Web search usata
+                </Badge>
+              )}
+            </motion.div>
+          );
+        })}
+      </AnimatePresence>
 
       {isInterrupted && (
         <Alert>

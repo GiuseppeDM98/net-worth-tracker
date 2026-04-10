@@ -1,12 +1,15 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
   Bot,
   Brain,
   CalendarDays,
   Check,
+  ChevronDown,
   Globe,
+  HelpCircle,
   Loader2,
   Lock,
   MessageSquare,
@@ -343,6 +346,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const prefersReducedMotion = useReducedMotion();
   const conversationEndRef = useRef<HTMLDivElement>(null);
   // Stores the last successfully submitted prompt so retry can re-send it
   // after draft is cleared. Using a ref avoids stale closure issues.
@@ -385,6 +389,8 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   const [isThreadSheetOpen, setIsThreadSheetOpen] = useState(false);
   // Controls the mobile memory Sheet — keeps the panel accessible without occupying scroll space
   const [isMemorySheetOpen, setIsMemorySheetOpen] = useState(false);
+  // Guide section starts collapsed — it's supplementary, not the primary CTA
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   const { data: threads = [], isLoading: loadingThreads, error: threadsError } = useAssistantThreads(user?.uid);
   const { data: threadDetail, isLoading: loadingThreadDetail, error: threadError } = useAssistantThread(
@@ -814,6 +820,23 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                 <p className="max-w-2xl text-sm text-muted-foreground">
                   Fai domande sul tuo patrimonio, analizza un mese, un anno, il tuo YTD o l'intera storia del portafoglio.
                 </p>
+
+                {/* Guide trigger only — content renders below the full-width flex row
+                    so it can span the entire header width on desktop. */}
+                <button
+                  onClick={() => setIsGuideOpen((v) => !v)}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mt-1"
+                  aria-expanded={isGuideOpen}
+                >
+                  <HelpCircle className="h-3.5 w-3.5 shrink-0" />
+                  Come funziona
+                  <ChevronDown
+                    className={cn(
+                      'h-3 w-3 transition-transform duration-200',
+                      isGuideOpen && 'rotate-180'
+                    )}
+                  />
+                </button>
               </div>
               {/* Mobile: two full-width rows so buttons aren't crowded in a wrapping flex.
                   Desktop: single inline flex row as before. */}
@@ -973,6 +996,87 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                 </div>{/* end row 2 */}
               </div>{/* end button group */}
             </div>
+
+            {/* Collapsible guide content — outside the flex row so it spans full width on desktop.
+                Explains non-obvious behaviours: mode bundles, web search policy, memory mechanics. */}
+            <AnimatePresence initial={false}>
+              {isGuideOpen && (
+                <motion.div
+                  key="guide"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: prefersReducedMotion ? 0 : 0.25, ease: [0.22, 1, 0.36, 1] }}
+                  style={{ overflow: 'hidden' }}
+                >
+                  <div className="mt-3 space-y-4 rounded-xl border border-border bg-muted/30 p-4 text-sm">
+
+                    {/* Modes — vertical list, label fixed-width column */}
+                    <div>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                        Modalità di analisi
+                      </p>
+                      <div className="space-y-1.5">
+                        {[
+                          { label: 'Mese', desc: 'Patrimonio netto, cashflow, dividendi e allocazione del mese selezionato.' },
+                          { label: 'Anno', desc: 'Performance annuale, risparmio, crescita investimenti e dividendi totali.' },
+                          { label: 'YTD', desc: "Stesse metriche dall'1 gennaio a oggi — utile per valutare l'andamento in corso d'anno." },
+                          { label: 'Storico', desc: 'Evoluzione completa del patrimonio da quando hai iniziato a tracciare. Ideale per trend a lungo termine.' },
+                          { label: 'Chat', desc: 'Domanda aperta. Puoi aggiungere contesto numerico (mese, anno, YTD, storico) con il selettore Contesto.' },
+                        ].map(({ label, desc }) => (
+                          <div key={label} className="flex gap-3">
+                            <span className="w-14 shrink-0 font-medium text-foreground">{label}</span>
+                            <span className="text-muted-foreground">{desc}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Web search + Memory — side by side on desktop */}
+                    <div className="grid gap-4 desktop:grid-cols-2">
+                      <div>
+                        <p className="mb-1.5 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                          Ricerca web (contesto macro)
+                        </p>
+                        <p className="text-muted-foreground">
+                          Nelle analisi strutturate (Mese, Anno, YTD, Storico) basta il toggle{' '}
+                          <span className="font-medium text-foreground">Contesto macro</span> nelle preferenze.
+                          In Chat libera si attiva solo se la domanda contiene keyword macro — inflazione, tassi,
+                          dazi, BCE, recessione — o frasi come{' '}
+                          <span className="font-medium text-foreground">&ldquo;cerca sul web&rdquo;</span>.
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="mb-1.5 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                          Memoria
+                        </p>
+                        <p className="text-muted-foreground">
+                          Dopo ogni risposta l&apos;assistente estrae fatti stabili che hai dichiarato — obiettivi,
+                          preferenze di rischio, orizzonti temporali — e li salva nel pannello{' '}
+                          <span className="font-medium text-foreground">Memoria</span>. Vengono inclusi
+                          automaticamente nelle analisi successive. Puoi modificare, archiviare o eliminare ogni
+                          ricordo individualmente.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Tips — vertical list, no columns */}
+                    <div>
+                      <p className="mb-1.5 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                        Per risposte migliori
+                      </p>
+                      <ul className="space-y-1 text-muted-foreground">
+                        <li>— Cita gli asset per nome (es. &ldquo;All World ETF&rdquo;) per analisi più precise.</li>
+                        <li>— Fai domande specifiche: &ldquo;Perché il patrimonio è sceso a marzo?&rdquo; funziona meglio di &ldquo;Come sto?&rdquo;</li>
+                        <li>— Dichiara i tuoi obiettivi nella chat — verranno salvati in memoria e influenzeranno le analisi future.</li>
+                      </ul>
+                    </div>
+
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </header>
 
@@ -1069,7 +1173,20 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                 {/* Conversation header */}
                 <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
                   <div>
-                    <p className="text-sm font-medium text-foreground">{activePeriodLabel}</p>
+                    {/* Period label crossfades on mode/period switch so the change
+                        registers as a deliberate context shift, not a text flicker. */}
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.p
+                        key={activePeriodLabel}
+                        className="text-sm font-medium text-foreground"
+                        initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: prefersReducedMotion ? 0 : -4 }}
+                        transition={{ duration: prefersReducedMotion ? 0 : 0.20, ease: [0.22, 1, 0.36, 1] }}
+                      >
+                        {activePeriodLabel}
+                      </motion.p>
+                    </AnimatePresence>
                     {/* Mobile context strip: key delta at a glance without scrolling to the full card */}
                     {contextBundle && (
                       <div className="desktop:hidden">
@@ -1078,18 +1195,38 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    {isStreaming && !isSlowResponse && (
-                      <Badge variant="outline" className="gap-1.5 text-xs">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        In scrittura…
-                      </Badge>
-                    )}
-                    {isSlowResponse && (
-                      <Badge variant="outline" className="gap-1.5 text-xs text-muted-foreground">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        Sta impiegando più del previsto…
-                      </Badge>
-                    )}
+                    {/* Streaming status badges fade in/out — AnimatePresence prevents
+                        abrupt appearance when the first token arrives. */}
+                    <AnimatePresence>
+                      {isStreaming && !isSlowResponse && (
+                        <motion.div
+                          key="streaming-badge"
+                          initial={{ opacity: 0, scale: 0.92 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.92 }}
+                          transition={{ duration: prefersReducedMotion ? 0 : 0.18 }}
+                        >
+                          <Badge variant="outline" className="gap-1.5 text-xs">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            In scrittura…
+                          </Badge>
+                        </motion.div>
+                      )}
+                      {isSlowResponse && (
+                        <motion.div
+                          key="slow-badge"
+                          initial={{ opacity: 0, scale: 0.92 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.92 }}
+                          transition={{ duration: prefersReducedMotion ? 0 : 0.18 }}
+                        >
+                          <Badge variant="outline" className="gap-1.5 text-xs text-muted-foreground">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            Sta impiegando più del previsto…
+                          </Badge>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
 

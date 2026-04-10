@@ -1,6 +1,7 @@
 'use client';
 
 import { TrendingDown, TrendingUp, Minus, AlertCircle } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -8,6 +9,8 @@ import { AssistantMonthContextBundle } from '@/types/assistant';
 import { cn } from '@/lib/utils';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
+
+const EASE_OUT_QUINT = [0.22, 1, 0.36, 1] as const;
 
 /**
  * Returns a human-readable label for the period encoded in selector.
@@ -119,8 +122,14 @@ interface AssistantContextCardProps {
  *
  * Layout: Net worth delta at the top (hero KPI), then cashflow rows, then allocation changes.
  * Data quality notes are rendered as a light callout below.
+ *
+ * Animation: the card content fades + slides up whenever the period key changes
+ * (mode switch or month picker change). The skeleton-to-data transition also
+ * animates so the arrival of numbers feels deliberate rather than sudden.
  */
 export function AssistantContextCard({ bundle, className, isLoading }: AssistantContextCardProps) {
+  const prefersReducedMotion = useReducedMotion();
+
   if (isLoading) {
     return <AssistantContextCardSkeleton className={className} />;
   }
@@ -138,6 +147,17 @@ export function AssistantContextCard({ bundle, className, isLoading }: Assistant
         : Minus;
 
   return (
+    // AnimatePresence + keyed motion.div: the entire card re-animates whenever
+    // periodLabel changes (mode switch, month picker). mode="wait" ensures the old
+    // content fades out fully before the new one fades in, preventing visual overlap.
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={periodLabel}
+        initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: prefersReducedMotion ? 0 : -4 }}
+        transition={{ duration: prefersReducedMotion ? 0 : 0.28, ease: EASE_OUT_QUINT }}
+      >
     <Card className={cn('overflow-hidden', className)}>
       <CardHeader className="border-b border-border pb-3 pt-4">
         <div className="flex items-center justify-between gap-2">
@@ -275,6 +295,8 @@ export function AssistantContextCard({ bundle, className, isLoading }: Assistant
         )}
       </CardContent>
     </Card>
+      </motion.div>
+    </AnimatePresence>
   );
 }
 

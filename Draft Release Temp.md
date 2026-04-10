@@ -75,6 +75,7 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 
 ## 🐛 Bug Fixes
 
+- Fixed a scrollbar icon appearing to the left of the send button in the assistant composer on Windows — the native textarea scrollbar is now hidden while keeping scroll functional for long messages
 - Fixed color themes appearing identical in dark mode — Solar Dusk, Elegant Luxury, and Midnight Bloom now show a clearly visible tint on cards and tables when dark mode is active
 
 
@@ -123,6 +124,17 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - Deleting a conversation now requires the same two-step confirmation, preventing accidental loss of a thread
 
 ## 🔧 Improvements
+
+### Assistente AI — Animations & UX
+
+- Suggested prompt chips on the assistant home screen now appear with a staggered cascade instead of all at once — each chip fades in sequentially from left to right
+- New conversation messages now slide up and fade in as they appear — user and assistant turns feel more distinct and less abrupt
+- The numeric context panel (net worth delta, cashflow, allocation) now crossfades smoothly when switching analysis period or mode, instead of snapping to the new content
+- Memory items now animate in on load and slide out with a smooth collapse when archived or deleted — the list never jumps
+- The period label in the conversation header ("Analisi · Aprile 2026") now crossfades when switching modes, making context changes feel intentional
+- The "In scrittura…" streaming badge now fades in and out instead of appearing and disappearing abruptly
+- Added a collapsible "Come funziona" guide in the assistant page header — explains mode context bundles, web search behaviour in chat mode, how memory works, and tips for better answers; collapsed by default, one click to expand
+- All assistant animations automatically disable spatial movement when the system "Reduce Motion" setting is active — only opacity transitions remain
 
 ### Themes & Navigation
 

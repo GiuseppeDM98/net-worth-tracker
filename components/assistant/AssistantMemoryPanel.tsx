@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Brain, ChevronDown, Loader2, RotateCcw, Trash2 } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { toast } from 'sonner';
 import { AssistantMemoryItemRow } from '@/components/assistant/AssistantMemoryItemRow';
 import { Button } from '@/components/ui/button';
@@ -41,6 +42,11 @@ const CATEGORY_GROUP_LABELS: Record<AssistantMemoryItem['category'], string> = {
   fact: 'Fatti utili',
 };
 
+// Stagger between each memory item — creates a cascade effect on first load.
+const ITEM_STAGGER_MS = 35;
+
+const EASE_OUT_QUINT = [0.22, 1, 0.36, 1] as const;
+
 /**
  * Memory panel for Assistente AI — Step 5.
  *
@@ -50,12 +56,18 @@ const CATEGORY_GROUP_LABELS: Record<AssistantMemoryItem['category'], string> = {
  *
  * Layout: single-column card, responsive — works in the desktop right panel
  * and also renders correctly in the mobile tab/sheet surfaces.
+ *
+ * Animation: memory items stagger in on mount and fade out on removal.
+ * The collapsible content is handled by Radix (CSS data attributes) — we
+ * add a spring-flavoured CSS transition on CollapsibleContent via Tailwind
+ * rather than wrapping with motion to avoid fighting Radix's own height animation.
  */
 export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onToggle }: AssistantMemoryPanelProps) {
   // When isOpen/onToggle are provided the card header acts as a collapsible trigger.
   const collapsible = isOpen !== undefined && onToggle !== undefined;
   const [filterTab, setFilterTab] = useState<FilterTab>('active');
   const [showResetDialog, setShowResetDialog] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
 
   const updateMutation = useUpdateAssistantMemory(userId);
   const deleteMutation = useDeleteAssistantMemory(userId);
@@ -125,6 +137,10 @@ export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onTogg
 
   const totalItems = memory?.items.length ?? 0;
   const activeCount = (memory?.items ?? []).filter((i) => i.status === 'active').length;
+
+  // Build a flat index for stagger delays — flattened across all category groups.
+  // Each item gets a delay proportional to its position in the visible list.
+  let globalItemIndex = 0;
 
   return (
     <>
@@ -263,16 +279,51 @@ export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onTogg
                         {CATEGORY_GROUP_LABELS[category]}
                       </p>
                       <div className="space-y-2">
-                        {items.map((item) => (
-                          <AssistantMemoryItemRow
-                            key={item.id}
-                            item={item}
-                            isMutating={isMutating}
-                            onEdit={handleEdit}
-                            onArchive={handleArchive}
-                            onDelete={handleDelete}
-                          />
-                        ))}
+                        {/* AnimatePresence lets items fade out when archived/deleted
+                            without the list collapsing abruptly. */}
+                        <AnimatePresence initial={false}>
+                          {items.map((item) => {
+                            // Capture stagger index before incrementing — used in closure.
+                            const itemIndex = globalItemIndex++;
+                            return (
+                              <motion.div
+                                key={item.id}
+                                // Staggered entrance: items cascade in top-to-bottom.
+                                // On filter tab switch (initial={false}) items skip entrance.
+                                initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 5 }}
+                                animate={{
+                                  opacity: 1,
+                                  y: 0,
+                                  transition: {
+                                    duration: prefersReducedMotion ? 0 : 0.25,
+                                    delay: prefersReducedMotion ? 0 : itemIndex * (ITEM_STAGGER_MS / 1000),
+                                    ease: EASE_OUT_QUINT,
+                                  },
+                                }}
+                                exit={{
+                                  opacity: 0,
+                                  // Collapse height to zero on exit so the list doesn't leave a gap.
+                                  // marginBottom collapses simultaneously to avoid a jump.
+                                  height: 0,
+                                  marginBottom: 0,
+                                  transition: {
+                                    duration: prefersReducedMotion ? 0 : 0.20,
+                                    ease: [0.25, 1, 0.5, 1],
+                                  },
+                                }}
+                                style={{ overflow: 'hidden' }}
+                              >
+                                <AssistantMemoryItemRow
+                                  item={item}
+                                  isMutating={isMutating}
+                                  onEdit={handleEdit}
+                                  onArchive={handleArchive}
+                                  onDelete={handleDelete}
+                                />
+                              </motion.div>
+                            );
+                          })}
+                        </AnimatePresence>
                       </div>
                     </div>
                   ))}
