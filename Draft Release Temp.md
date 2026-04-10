@@ -100,6 +100,7 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - Fixed a scrollbar icon appearing to the left of the send button in the assistant composer on Windows — the native textarea scrollbar is now hidden while keeping scroll functional for long messages
 - Fixed color themes appearing identical in dark mode — Solar Dusk, Elegant Luxury, and Midnight Bloom now show a clearly visible tint on cards and tables when dark mode is active
 - Fixed sidebar menu item text becoming invisible on hover in dark mode for the Cyberpunk and Solar Dusk themes — hovering a navigation item now keeps text clearly readable
+- Fixed the active tab label and icon in the mobile bottom navigation bar being hard to read in dark mode for the Cyberpunk and Solar Dusk themes — the selected tab is now clearly visible across all themes
 
 
 

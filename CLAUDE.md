@@ -81,7 +81,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-10 (session sidebar-hover-theme-fix — sidebar hover text contrast in dark mode for cyberpunk + solar-dusk themes)
+**Last updated**: 2026-04-10 (session bottom-nav-hover-theme-fix — bottom nav active + hover text contrast in dark mode for cyberpunk + solar-dusk themes; migrated BottomNavigation inline color/opacity styles to Tailwind classes)
 
 ## Design Context
 

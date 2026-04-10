@@ -90,10 +90,19 @@ export function BottomNavigation() {
                 className={cn(
                   'relative flex flex-col items-center justify-center flex-1 h-full gap-1 text-xs transition-colors',
                   isActive
-                    ? 'bg-[var(--sidebar-accent)]'
-                    : 'hover:bg-[var(--sidebar-accent)]/50'
+                    // Active: colored accent pill + primary text
+                    // Active: accent background + accent-foreground text (same as Sidebar.tsx active pill).
+                    // --sidebar-accent-foreground is designed for text on top of --sidebar-accent,
+                    // ensuring contrast on both light-accent themes (cyberpunk, solar-dusk) and
+                    // dark-accent themes. Using --sidebar-primary here would break cyberpunk/solar-dusk
+                    // dark mode where primary is not readable against the bright accent background.
+                    ? 'bg-[var(--sidebar-accent)] text-sidebar-accent-foreground'
+                    // Inactive: muted foreground text; on hover, accent background is applied so
+                    // we switch to accent-foreground to maintain contrast (same fix as Sidebar.tsx —
+                    // --sidebar-accent-foreground is dark, designed for text on the colored accent pill;
+                    // using it on hover here is correct because hover also shows the accent background).
+                    : 'text-sidebar-foreground/65 hover:bg-[var(--sidebar-accent)]/50 hover:text-sidebar-accent-foreground'
                 )}
-                style={{ color: isActive ? 'var(--sidebar-primary)' : 'var(--sidebar-foreground)', opacity: isActive ? 1 : 0.65 }}
               >
                 {/* Per-tab fade-in indicator — no layoutId here.
                     layoutId requires DOM layout measurement, which breaks inside
@@ -126,10 +135,14 @@ export function BottomNavigation() {
             className={cn(
               'relative flex flex-col items-center justify-center flex-1 h-full gap-1 text-xs transition-colors',
               isAltroActive
-                ? 'bg-[var(--sidebar-accent)]'
-                : 'hover:bg-[var(--sidebar-accent)]/50'
+                // Active: accent background + accent-foreground text (same as Sidebar.tsx active pill).
+                    // --sidebar-accent-foreground is designed for text on top of --sidebar-accent,
+                    // ensuring contrast on both light-accent themes (cyberpunk, solar-dusk) and
+                    // dark-accent themes. Using --sidebar-primary here would break cyberpunk/solar-dusk
+                    // dark mode where primary is not readable against the bright accent background.
+                    ? 'bg-[var(--sidebar-accent)] text-sidebar-accent-foreground'
+                : 'text-sidebar-foreground/65 hover:bg-[var(--sidebar-accent)]/50 hover:text-sidebar-accent-foreground'
             )}
-            style={{ color: isAltroActive ? 'var(--sidebar-primary)' : 'var(--sidebar-foreground)', opacity: isAltroActive ? 1 : 0.65 }}
           >
             <AnimatePresence>
               {isAltroActive && (
