@@ -1367,12 +1367,12 @@ export default function SettingsPage() {
           </div>
           {/* Reset is only meaningful for allocation targets */}
           {activeTab === 'allocazione' && (
-            <Button variant="outline" onClick={handleReset} className="w-full landscape:w-auto dark:border-gray-600 dark:text-gray-200">
+            <Button variant="outline" onClick={handleReset} className="w-full landscape:w-auto">
               <RotateCcw className="mr-2 h-4 w-4" />
               Ripristina Default
             </Button>
           )}
-          <Button onClick={handleSave} disabled={saving} className="w-full landscape:w-auto dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
+          <Button onClick={handleSave} disabled={saving} className="w-full landscape:w-auto">
             <Save className="mr-2 h-4 w-4" />
             {saving ? 'Salvataggio...' : 'Salva'}
           </Button>
@@ -2274,7 +2274,7 @@ export default function SettingsPage() {
               <Receipt className="h-5 w-5" />
               <CardTitle>Impostazioni Tracciamento Spese</CardTitle>
             </div>
-            <Button onClick={handleAddExpenseCategory} size="sm" className="w-full sm:w-auto dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
+            <Button onClick={handleAddExpenseCategory} size="sm" className="w-full sm:w-auto">
               <Plus className="mr-2 h-4 w-4" />
               Nuova Categoria
             </Button>
@@ -2306,7 +2306,7 @@ export default function SettingsPage() {
                           >
                             <div className="flex items-center gap-3">
                               <div
-                                className="w-3 h-3 rounded-full border border-gray-300 dark:border-gray-600"
+                                className="w-3 h-3 rounded-full border border-border"
                                 style={{ backgroundColor: category.color || '#3b82f6' }}
                               />
                               <div>
@@ -2477,7 +2477,7 @@ export default function SettingsPage() {
             <Button
               onClick={handleSaveDividendSettings}
               disabled={saving}
-              className="flex items-center gap-2 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+              className="flex items-center gap-2"
             >
               <Save className="h-4 w-4" />
               {saving ? 'Salvataggio...' : 'Salva Impostazioni'}
@@ -2487,7 +2487,7 @@ export default function SettingsPage() {
               onClick={handleSyncDividends}
               disabled={syncingDividends || !dividendIncomeCategoryId}
               variant="outline"
-              className="flex items-center gap-2 dark:border-gray-600 dark:text-gray-200"
+              className="flex items-center gap-2"
             >
               <Coins className="h-4 w-4" />
               {syncingDividends ? 'Sincronizzazione...' : 'Sincronizza Dividendi Esistenti'}
@@ -2519,7 +2519,7 @@ export default function SettingsPage() {
                 </p>
               </CardHeader>
               <CardContent className="p-4 sm:p-6">
-                <div className="grid grid-cols-2 desktop:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 desktop:grid-cols-6 gap-3">
                   {(
                     [
                       {
@@ -2561,6 +2561,26 @@ export default function SettingsPage() {
                         swatchPrimary: 'oklch(0.5676 0.2021 283.0838)',
                         swatchPrimaryDark: 'oklch(0.5676 0.2021 283.0838)',
                         swatchAccent: 'oklch(0.8214 0.0720 249.3482)',
+                      },
+                      {
+                        id: 'cyberpunk' as ColorTheme,
+                        name: 'Cyberpunk',
+                        description: 'Neon pink & teal',
+                        swatchBg: 'oklch(0.9816 0.0017 247.8390)',
+                        swatchBgDark: 'oklch(0.1649 0.0352 281.8285)',
+                        swatchPrimary: 'oklch(0.6726 0.2904 341.4084)',
+                        swatchPrimaryDark: 'oklch(0.6726 0.2904 341.4084)',
+                        swatchAccent: 'oklch(0.8903 0.1739 171.2690)',
+                      },
+                      {
+                        id: 'retro-arcade' as ColorTheme,
+                        name: 'Retro Arcade',
+                        description: 'Rosso & teal vintage',
+                        swatchBg: 'oklch(0.9735 0.0261 90.0953)',
+                        swatchBgDark: 'oklch(0.2673 0.0486 219.8169)',
+                        swatchPrimary: 'oklch(0.5924 0.2025 355.8943)',
+                        swatchPrimaryDark: 'oklch(0.5924 0.2025 355.8943)',
+                        swatchAccent: 'oklch(0.6437 0.1019 187.3840)',
                       },
                     ] as const
                   ).map((theme) => {

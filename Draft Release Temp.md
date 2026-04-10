@@ -2,6 +2,7 @@
 
 ### Color Themes
 
+- Added two new color themes: **Cyberpunk** (neon pink & electric teal) and **Retro Arcade** (red & teal on a warm yellow-green background) — bringing the total to six selectable themes
 - Added four selectable color themes: **Default** (classic zinc), **Solar Dusk** (warm amber), **Elegant Luxury** (deep burgundy), and **Midnight Bloom** (deep violet/indigo)
 - Theme preference is saved automatically and synced across all your devices
 - Theme selector is available in Settings → Aspetto with a visual light/dark preview swatch for each option
@@ -73,6 +74,10 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - Added linked focus behavior to Goal-Based Investing, so selecting a goal now highlights the same objective across summary cards, allocation view, and detail sections
 
 ## 🐛 Bug Fixes
+
+- Fixed color themes appearing identical in dark mode — Solar Dusk, Elegant Luxury, and Midnight Bloom now show a clearly visible tint on cards and tables when dark mode is active
+
+
 
 ### Assistente AI
 

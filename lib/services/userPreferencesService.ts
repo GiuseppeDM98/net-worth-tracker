@@ -3,7 +3,7 @@ import { db } from '@/lib/firebase/config';
 
 const COLLECTION = 'userPreferences';
 
-export type ColorTheme = 'default' | 'solar-dusk' | 'elegant-luxury' | 'midnight-bloom';
+export type ColorTheme = 'default' | 'solar-dusk' | 'elegant-luxury' | 'midnight-bloom' | 'cyberpunk' | 'retro-arcade';
 
 export interface UserPreferences {
   colorTheme?: ColorTheme;
