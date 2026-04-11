@@ -234,7 +234,9 @@ export function CoastFireTab() {
 
           <div className="mt-4 rounded-lg border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
             <p>
-              Base spese: <span className="font-medium text-foreground">{formatCurrency(annualExpenses ?? 0)}</span> dall&apos;ultimo anno completo.
+              Base spese:{' '}
+              <span className="font-medium text-foreground">{formatCurrency(annualExpenses ?? 0)}</span>{' '}
+              dall&apos;ultimo anno completo.
             </p>
             <p className="mt-1">
               Il patrimonio usato nel calcolo è quello FIRE-eligible {includePrimaryResidence ? 'con' : 'senza'} casa di abitazione, in linea con la tua impostazione FIRE corrente.
