@@ -8,8 +8,44 @@ import {
   calculateFIREMetrics,
   calculatePlannedFIREMetrics,
   calculateFIREProjection,
+  calculateHistoricalFIRERunway,
+  calculateFIRESensitivityMatrix,
   getDefaultScenarios,
 } from '@/lib/services/fireService'
+import type { MonthlySnapshot } from '@/types/assets'
+
+function makeSnapshot(
+  year: number,
+  month: number,
+  totalNetWorth: number,
+  liquidNetWorth: number,
+  fireNetWorth?: number
+): MonthlySnapshot {
+  return {
+    userId: 'user-1',
+    year,
+    month,
+    totalNetWorth,
+    liquidNetWorth,
+    illiquidNetWorth: Math.max(totalNetWorth - liquidNetWorth, 0),
+    fireNetWorth,
+    byAssetClass: {},
+    byAsset: [],
+    assetAllocation: {},
+    createdAt: new Date(),
+  }
+}
+
+function buildMonthlyBuckets(startYear: number, startMonth: number, count: number, expenses: number) {
+  const buckets = new Map<string, { income: number; expenses: number }>()
+  for (let index = 0; index < count; index++) {
+    const date = new Date(startYear, startMonth - 1 + index, 1)
+    const year = date.getFullYear()
+    const month = date.getMonth() + 1
+    buckets.set(`${year}-${month}`, { income: 0, expenses: -expenses })
+  }
+  return buckets
+}
 
 describe('calculateFIREMetrics', () => {
   it('should calculate FIRE Number correctly', () => {
@@ -228,5 +264,143 @@ describe('calculateFIREProjection', () => {
       expect(yr.baseFireNumber).toBe(0)
       expect(yr.bullFireNumber).toBe(0)
     })
+  })
+})
+
+describe('calculateHistoricalFIRERunway', () => {
+  it('should skip the first 11 snapshots for rolling 12-month runway', () => {
+    const snapshots = Array.from({ length: 12 }, (_, index) =>
+      makeSnapshot(2024, index + 1, 120000 + index * 5000, 60000 + index * 2000, 100000 + index * 4000)
+    )
+    const buckets = buildMonthlyBuckets(2024, 1, 12, 10000)
+
+    const result = calculateHistoricalFIRERunway(snapshots, buckets, 4, false)
+
+    expect(result.runwayData).toHaveLength(1)
+    expect(result.runwayData[0].month).toBe(12)
+  })
+
+  it('should use fireNetWorth when primary residence is excluded and totalNetWorth when included', () => {
+    const snapshots = Array.from({ length: 12 }, (_, index) =>
+      makeSnapshot(2024, index + 1, 240000, 120000, 180000)
+    )
+    const buckets = buildMonthlyBuckets(2024, 1, 12, 12000)
+
+    const excluded = calculateHistoricalFIRERunway(snapshots, buckets, 4, false)
+    const included = calculateHistoricalFIRERunway(snapshots, buckets, 4, true)
+
+    expect(excluded.runwayData[0].fireNetWorthUsed).toBe(180000)
+    expect(included.runwayData[0].fireNetWorthUsed).toBe(240000)
+  })
+
+  it('should fall back to totalNetWorth when historical fireNetWorth is missing', () => {
+    const snapshots = Array.from({ length: 12 }, (_, index) =>
+      makeSnapshot(2024, index + 1, 200000, 100000)
+    )
+    const buckets = buildMonthlyBuckets(2024, 1, 12, 10000)
+
+    const result = calculateHistoricalFIRERunway(snapshots, buckets, 4, false)
+
+    expect(result.runwayData[0].fireNetWorthUsed).toBe(200000)
+  })
+
+  it('should return null runway values when trailing expenses are zero', () => {
+    const snapshots = Array.from({ length: 12 }, (_, index) =>
+      makeSnapshot(2024, index + 1, 200000, 100000, 180000)
+    )
+    const buckets = buildMonthlyBuckets(2024, 1, 12, 0)
+
+    const result = calculateHistoricalFIRERunway(snapshots, buckets, 4, false)
+
+    expect(result.runwayData[0].yearsOfExpenses).toBeNull()
+    expect(result.runwayData[0].liquidYearsOfExpenses).toBeNull()
+    expect(result.runwayData[0].fireProgressToFI).toBeNull()
+  })
+
+  it('should compute delta vs 12 months ago only when comparison point exists', () => {
+    const snapshots = Array.from({ length: 24 }, (_, index) =>
+      makeSnapshot(2024 + Math.floor(index / 12), (index % 12) + 1, 120000 + index * 10000, 60000 + index * 5000, 100000 + index * 8000)
+    )
+    const buckets = buildMonthlyBuckets(2024, 1, 24, 10000)
+
+    const noComparison = calculateHistoricalFIRERunway(snapshots.slice(0, 23), buckets, 4, false)
+    const withComparison = calculateHistoricalFIRERunway(snapshots, buckets, 4, false)
+
+    expect(noComparison.runwaySummary.totalDeltaVs12Months).toBeNull()
+    expect(withComparison.runwaySummary.totalDeltaVs12Months).not.toBeNull()
+  })
+
+  it('should compute the summary delta from the same one-decimal values shown in the UI', () => {
+    const snapshots = [
+      ...Array.from({ length: 12 }, (_, index) =>
+        makeSnapshot(2024, index + 1, 702000, 300000, 702000)
+      ),
+      ...Array.from({ length: 12 }, (_, index) =>
+        makeSnapshot(2025, index + 1, index === 11 ? 612000 : 702000, 300000, index === 11 ? 612000 : 702000)
+      ),
+    ]
+    const buckets = buildMonthlyBuckets(2024, 1, 24, 10000)
+
+    const result = calculateHistoricalFIRERunway(snapshots, buckets, 4, false)
+
+    expect(result.runwaySummary.currentYearsOfExpenses).toBeCloseTo(5.1, 2)
+    expect(result.runwaySummary.totalDeltaVs12Months).toBe(-0.8)
+  })
+
+  it('should compute a separate liquid delta for the summary card', () => {
+    const snapshots = [
+      ...Array.from({ length: 12 }, (_, index) =>
+        makeSnapshot(2024, index + 1, 702000, 444000, 702000)
+      ),
+      ...Array.from({ length: 12 }, (_, index) =>
+        makeSnapshot(2025, index + 1, 612000, index === 11 ? 528000 : 444000, 612000)
+      ),
+    ]
+    const buckets = buildMonthlyBuckets(2024, 1, 24, 10000)
+
+    const result = calculateHistoricalFIRERunway(snapshots, buckets, 4, false)
+
+    expect(result.runwaySummary.currentLiquidYearsOfExpenses).toBeCloseTo(4.4, 2)
+    expect(result.runwaySummary.liquidDeltaVs12Months).toBe(0.7)
+  })
+})
+
+describe('calculateFIRESensitivityMatrix', () => {
+  const scenarios = getDefaultScenarios()
+
+  it('should align the baseline cell with the base scenario projection', () => {
+    const baselineProjection = calculateFIREProjection(500000, 30000, 20000, 4, scenarios)
+    const matrix = calculateFIRESensitivityMatrix(500000, 30000, 20000, 4, scenarios)
+    const baselineCell = matrix.rows.flatMap((row) => row.cells).find((cell) => cell.isBaseline)
+
+    expect(matrix.baselineYearsToFIRE).toBe(baselineProjection.baseYearsToFIRE)
+    expect(baselineCell?.yearsToFIRE).toBe(baselineProjection.baseYearsToFIRE)
+  })
+
+  it('should improve or hold years-to-fire when annual savings increase', () => {
+    const matrix = calculateFIRESensitivityMatrix(500000, 30000, 20000, 4, scenarios)
+    const baselineRow = matrix.rows.find((row) => row.multiplier === 1)!
+
+    for (let index = 1; index < baselineRow.cells.length; index++) {
+      const previous = baselineRow.cells[index - 1].yearsToFIRE
+      const current = baselineRow.cells[index].yearsToFIRE
+      if (previous !== null && current !== null) {
+        expect(current).toBeLessThanOrEqual(previous)
+      }
+    }
+  })
+
+  it('should worsen or hold years-to-fire when annual expenses increase', () => {
+    const matrix = calculateFIRESensitivityMatrix(500000, 30000, 20000, 4, scenarios)
+    const baselineColumnIndex = matrix.columns.findIndex((column) => column.isBaseline)
+    const columnValues = matrix.rows.map((row) => row.cells[baselineColumnIndex].yearsToFIRE)
+
+    for (let index = 1; index < columnValues.length; index++) {
+      const previous = columnValues[index - 1]
+      const current = columnValues[index]
+      if (previous !== null && current !== null) {
+        expect(current).toBeGreaterThanOrEqual(previous)
+      }
+    }
   })
 })

@@ -201,6 +201,10 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - FIRE annual expenses must use the last completed year
 - `includePrimaryResidence` must flow through both React Query key and query function
 - FIRE calculator unsaved preview is local-only: metrics may react immediately to form edits, but milestone surfaces like the "FIRE raggiunto" banner should remain anchored to saved/loaded data until persistence completes
+- **Historical FIRE runway**: use rolling 12-month expenses, not a fixed annual denominator. The first runway point requires 12 snapshots; same-month YoY delta needs 24 snapshots.
+- Missing cashflow months inside the historical FIRE runway window count as `0`, not as missing data — avoids broken series and matches the intended rolling-spend interpretation.
+- If runway cards show values rounded to 1 decimal, compute summary deltas from the same rounded values. Otherwise users can see `5.9 → 5.1` but a displayed delta of `-0.7`.
+- If the UI exposes both total and liquid runway cards, keep the summary deltas split too (`Totale` and `Liquido`) — a single mixed delta is ambiguous next to the liquid runway card.
 
 ### Firestore Optional Field Deletion
 - `updateDoc` only touches fields present in the update object — omitting a field leaves the old value intact in Firestore
@@ -369,6 +373,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - For motion/perceived-performance changes, compare `npm run dev` against `npm run build && npm run start` before optimizing away production-safe motion
 - For Hall of Fame UX/motion changes, run `npx tsc --noEmit` and then manually validate current-period spotlight cards, ranking highlight continuity, and note dialog trigger continuity on both desktop and mobile
 - For FIRE / Monte Carlo / Goal-based investing UX or motion changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/fireService.test.ts` and `npx vitest run __tests__/goalService.test.ts` before manual validation
+- For FIRE runway / sensitivity matrix changes, manually validate all of: rolling-12M runway card values, total vs liquid deltas, tooltip copy, and desktop/mobile readability of the matrix
 - For Dividendi & Cedole UX/motion changes, run `npx tsc --noEmit` and then manually validate calendar focus, table/detail continuity, and tooltip anchoring in the cashflow dividends tab
 - For Performance page UX/motion changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/performanceService.test.ts` before manual validation
 - For History page UX/motion changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/chartService.test.ts` before manual validation
@@ -434,11 +439,6 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Cause: the same scroll container is reused across levels, and sticky headers inside the scroll region let content pass underneath during transitions
 - Fix: keep the header outside the scrolling region, make only the sheet body scrollable, and reset scroll on level/content key changes
 
-### Custom Sheet Entry Overreach
-- Symptom: a custom "open from tapped point" animation feels worse than the native sheet entry even when `transform-origin` is computed correctly
-- Cause: shadcn/Radix bottom-sheet semantics and the built-in slide-from-bottom expectation on mobile can conflict with bespoke container-entry motion, especially when the content itself already animates
-- Fix: prefer the standard bottom-entry sheet animation and reserve contextual continuity for the internal content/header behavior unless the full container transition is visually verified on device
-
 ### Radix CollapsibleTrigger Nested Button
 - Symptom: `<button> cannot be a descendant of <button>` hydration error in console
 - Cause: `CollapsibleTrigger asChild={false}` (the Radix default) renders its own `<button>` element. If the trigger's children contain any `Button` component (another `<button>`), this creates an invalid nested-button DOM tree.
@@ -448,13 +448,6 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 ### iOS Safe Area on Sticky Composers
 - Sticky input bars positioned with `bottom-N` in a scrollable layout need `padding-bottom: env(safe-area-inset-bottom, 0px)` for iOS devices with home indicator. Use the CSS property directly (not Tailwind class) for reliable cross-browser support: `style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}` or via arbitrary value `pb-[env(safe-area-inset-bottom,0px)]`. The fallback `0px` ensures no extra padding on non-notched devices.
 - Do NOT add extra bottom padding to account for BottomNav clearance if the sticky wrapper already uses `bottom-N` — that double-counts. Only the iOS safe area needs a top-up beyond the sticky offset.
-
-### Nullish vs Falsy Fallbacks
-- When `0` is semantically invalid for a snapshot-derived display value, prefer `||` over `??`
-
-### Sign-Dependent Icons
-- For nullable metrics, define an explicit no-data fallback icon state
-- Default to the neutral/positive visual, not a red negative indicator
 
 ### useMediaQuery — Mobile Re-render Trap
 - `useMediaQuery` initializes with the real `window.matchMedia(query).matches` value, not `false`
@@ -476,8 +469,3 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - **Symptom:** Content flashes at full opacity for ~1 frame before entrance animations begin; only on navigation (not hard refresh); `style={{ opacity: 0 }}` on the `motion.div` does NOT fix it
 - **Cause:** `layout.tsx` persists between navigations. `AnimatePresence mode="wait"` with `key={pathname}` is supposed to handle transitions, but Next.js wraps navigations in `startTransition` (React 18 concurrent). The variant context ("visible") from the completed previous animation can be inherited by the new child, causing Framer Motion to skip `initial="hidden"` and show content at opacity 1 immediately
 - **Fix:** Use `template.tsx` — it re-mounts on every navigation, so Framer Motion always treats the mount as a true first mount. Remove `AnimatePresence` from `layout.tsx`. See `app/dashboard/template.tsx`
-
-### next/font Preload
-- `next/font` with default `preload: true` emits a `<link rel="preload">` on every page using the root layout
-- If a font is only used on a few pages (e.g. `Geist_Mono` via `font-mono` on FIRE and Hall of Fame), add `preload: false` to suppress the browser warning: *"preloaded using link preload but not used within a few seconds"*
-- Revert to default if the font is later added to layout-level or globally shared components

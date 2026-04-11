@@ -23,25 +23,28 @@ import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FIREProjectionScenarios, FIREScenarioParams } from '@/types/assets';
 import { Settings } from '@/types/settings';
-import { getAnnualCashflowData, getDefaultScenarios, calculateFIREProjection } from '@/lib/services/fireService';
+import { getAnnualCashflowData, getDefaultScenarios, calculateFIREProjection, calculateFIRESensitivityMatrix } from '@/lib/services/fireService';
 import { setSettings, getDefaultTargets } from '@/lib/services/assetAllocationService';
 import { formatCurrency } from '@/lib/services/chartService';
+import { getItalyYear } from '@/lib/utils/dateHelpers';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { TrendingUp, TrendingDown, Target, RotateCcw, Save, Info, Wallet } from 'lucide-react';
+import { TrendingUp, TrendingDown, Target, RotateCcw, Save, Info, Wallet, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { FIREProjectionChart } from './FIREProjectionChart';
 import { FIREProjectionTable } from './FIREProjectionTable';
 import { useCountUp } from '@/lib/utils/useCountUp';
 import { metricSettleTransition, simulationShellSettle } from '@/lib/utils/motionVariants';
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 interface FIREProjectionSectionProps {
   userId: string;
   currentNetWorth: number;
   withdrawalRate: number;
   settings: Settings | null | undefined;
+  plannedAnnualExpensesPreview: number | null;
 }
 
 // Scenario display config for consistent UI rendering
@@ -68,6 +71,7 @@ export function FIREProjectionSection({
   currentNetWorth,
   withdrawalRate,
   settings,
+  plannedAnnualExpensesPreview,
 }: FIREProjectionSectionProps) {
   const queryClient = useQueryClient();
   const defaults = getDefaultScenarios();
@@ -95,6 +99,10 @@ export function FIREProjectionSection({
 
   const annualSavings = cashflowData?.annualSavings ?? 0;
   const annualExpenses = cashflowData?.annualExpensesFromCashflow ?? 0;
+  const sensitivityBaselineExpenses =
+    plannedAnnualExpensesPreview && plannedAnnualExpensesPreview > 0
+      ? plannedAnnualExpensesPreview
+      : annualExpenses;
 
   // Calculate projection whenever inputs change
   const projection = useMemo(() => {
@@ -107,6 +115,17 @@ export function FIREProjectionSection({
       scenarios
     );
   }, [currentNetWorth, annualExpenses, annualSavings, withdrawalRate, scenarios]);
+
+  const sensitivityMatrix = useMemo(() => {
+    if (currentNetWorth <= 0 || sensitivityBaselineExpenses <= 0 || withdrawalRate <= 0) return null;
+    return calculateFIRESensitivityMatrix(
+      currentNetWorth,
+      sensitivityBaselineExpenses,
+      annualSavings,
+      withdrawalRate,
+      scenarios
+    );
+  }, [annualSavings, currentNetWorth, scenarios, sensitivityBaselineExpenses, withdrawalRate]);
 
   // Save scenario parameters to Firestore
   const saveMutation = useMutation({
@@ -288,7 +307,7 @@ export function FIREProjectionSection({
                     </div>
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       {years !== null
-                        ? `FIRE raggiunto nel ${new Date().getFullYear() + years}`
+                        ? `FIRE raggiunto nel ${getItalyYear() + years}`
                         : 'Non raggiunto entro 50 anni'
                       }
                     </p>
@@ -319,6 +338,154 @@ export function FIREProjectionSection({
             </CardContent>
           </Card>
           </motion.div>
+
+          {sensitivityMatrix && (
+            <motion.div variants={simulationShellSettle} initial={false} animate={resultsAnimationState}>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    Sensibilità Anni al FIRE
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
+                            aria-label="Spiega come leggere la matrice di sensibilità FIRE"
+                          >
+                            <HelpCircle className="h-4 w-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
+                          Righe = spese annue target. Colonne = risparmio annuo. Ogni cella mostra quanti anni servono per raggiungere il FIRE nello scenario Base. Blu = baseline attuale, verde = meglio del baseline, rosso = peggio.
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </CardTitle>
+                  <CardDescription>
+                    Scenario Base: come cambiano gli anni al FIRE variando spese annue e risparmio annuo.
+                    Baseline spese: {formatCurrency(sensitivityMatrix.baselineAnnualExpenses)}.
+                    Baseline risparmio: {formatCurrency(sensitivityMatrix.baselineAnnualSavings)}.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+                    Leggila cosi: scendi lungo le <span className="font-medium text-foreground">righe</span> per aumentare o ridurre le spese annue, spostati sulle <span className="font-medium text-foreground">colonne</span> per cambiare il risparmio annuo. La <span className="font-medium text-foreground">cella</span> ti dice in quanti anni arrivi al FIRE nello scenario Base.
+                  </div>
+
+                  <div className="grid gap-4 desktop:grid-cols-3">
+                    <Card className="border-border/70 bg-muted/20">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Baseline</CardTitle>
+                        <CardDescription>Scenario Base corrente</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold text-indigo-600">
+                          <SettledYearsToFire years={sensitivityMatrix.baselineYearsToFIRE} />
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="border-border/70 bg-muted/20">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Asse spese</CardTitle>
+                        <CardDescription>Moltiplicatori sul target spese</CardDescription>
+                      </CardHeader>
+                      <CardContent className="text-sm text-muted-foreground">
+                        Da {formatCurrency(sensitivityMatrix.rows[0]?.annualExpenses ?? 0)} a {formatCurrency(sensitivityMatrix.rows[sensitivityMatrix.rows.length - 1]?.annualExpenses ?? 0)}
+                      </CardContent>
+                    </Card>
+                    <Card className="border-border/70 bg-muted/20">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Asse risparmio</CardTitle>
+                        <CardDescription>Leve di accumulo annuo</CardDescription>
+                      </CardHeader>
+                      <CardContent className="text-sm text-muted-foreground">
+                        {sensitivityMatrix.columns.map((column) => column.label).join(' · ')}
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="desktop:hidden space-y-3">
+                    {sensitivityMatrix.rows.map((row) => (
+                      <div key={row.label} className="rounded-lg border border-border bg-card p-3">
+                        <div className="mb-3 flex items-center justify-between gap-2">
+                          <span className="text-sm font-semibold text-foreground">{row.label} spese</span>
+                          <span className="text-xs text-muted-foreground">{formatCurrency(row.annualExpenses)}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {row.cells.map((cell, index) => (
+                            <div
+                              key={`${row.label}-${sensitivityMatrix.columns[index].label}`}
+                              className={
+                                cell.relationToBaseline === 'baseline'
+                                  ? 'rounded-md border border-indigo-300 bg-indigo-50 p-2 dark:border-indigo-700 dark:bg-indigo-950/25'
+                                  : cell.relationToBaseline === 'better'
+                                    ? 'rounded-md border border-green-300 bg-green-50 p-2 dark:border-green-700 dark:bg-green-950/25'
+                                    : cell.relationToBaseline === 'worse'
+                                      ? 'rounded-md border border-red-300 bg-red-50 p-2 dark:border-red-700 dark:bg-red-950/25'
+                                      : 'rounded-md border border-border bg-muted/20 p-2'
+                              }
+                            >
+                              <p className="text-[11px] text-muted-foreground">{sensitivityMatrix.columns[index].label}</p>
+                              <p className="text-xs text-muted-foreground">{formatCurrency(cell.annualSavings)}</p>
+                              <p className="mt-1 font-mono text-base font-semibold text-foreground">
+                                {cell.yearsToFIRE !== null ? `${cell.yearsToFIRE} anni` : '50+ anni'}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="hidden desktop:block overflow-x-auto">
+                    <table className="w-full border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="px-3 py-2 text-left font-medium text-muted-foreground">Spese annue</th>
+                          {sensitivityMatrix.columns.map((column) => (
+                            <th key={column.label} className="px-3 py-2 text-center font-medium text-muted-foreground">
+                              <div>{column.label}</div>
+                              <div className="text-xs font-normal">{formatCurrency(column.annualSavings)}</div>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sensitivityMatrix.rows.map((row) => (
+                          <tr key={row.label} className="border-b border-border/70">
+                            <td className="px-3 py-3">
+                              <div className="font-medium text-foreground">{row.label}</div>
+                              <div className="text-xs text-muted-foreground">{formatCurrency(row.annualExpenses)}</div>
+                            </td>
+                            {row.cells.map((cell, index) => (
+                              <td key={`${row.label}-${sensitivityMatrix.columns[index].label}`} className="px-3 py-3">
+                                <div
+                                  className={
+                                    cell.relationToBaseline === 'baseline'
+                                      ? 'rounded-md border border-indigo-300 bg-indigo-50 px-3 py-2 text-center dark:border-indigo-700 dark:bg-indigo-950/25'
+                                      : cell.relationToBaseline === 'better'
+                                        ? 'rounded-md border border-green-300 bg-green-50 px-3 py-2 text-center dark:border-green-700 dark:bg-green-950/25'
+                                        : cell.relationToBaseline === 'worse'
+                                          ? 'rounded-md border border-red-300 bg-red-50 px-3 py-2 text-center dark:border-red-700 dark:bg-red-950/25'
+                                          : 'rounded-md border border-border bg-muted/20 px-3 py-2 text-center'
+                                  }
+                                >
+                                  <span className="font-mono font-semibold text-foreground">
+                                    {cell.yearsToFIRE !== null ? `${cell.yearsToFIRE} anni` : '50+ anni'}
+                                  </span>
+                                </div>
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
 
           {/* Year-by-Year Table */}
           <FIREProjectionTable yearlyData={projection.yearlyData} />

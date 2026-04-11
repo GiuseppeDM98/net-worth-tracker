@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-10, session assistant-memory-goals): **Goal lifecycle and assisted memory suggestions for Assistente AI**. Memory items now support active/completed/archived states, structured goal parsing, pending completion suggestions, and explicit user confirmation before a goal is marked complete. Goal evaluation uses authoritative portfolio data only. `Liquidità` goals now map to cash, while `patrimonio liquido` remains a separate metric. Previous session (assistant-polish): final empty-state/error/icon polish on the assistant. Session before that (assistant-animations): Framer Motion animations across 5 assistant components + collapsible "Come funziona" guide.
+- Latest implementation (2026-04-11, session fire-runway-sensitivity): **FIRE historical runway and sensitivity analysis**. The FIRE calculator now shows rolling 12-month runway history, split total/liquid year-over-year deltas, and a Base-scenario sensitivity matrix across annual spending and annual savings, with lightweight reading guidance. Previous session (2026-04-10, assistant-memory-goals): goal lifecycle and assisted memory suggestions for Assistente AI.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -40,7 +40,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - monthly chart from `prepareMonthlyLaborMetricsData()`
 - Settings page now offers visible unsaved-state preview and clearer in-context feedback for sensitive configuration changes (without autosave behavior changes)
 - Dividends and coupons tracking with EUR conversion, focused monthly calendar, contextual per-payment detail view, total return per asset, and DPS growth summaries
-- FIRE planning now includes local preview feedback in the calculator, steadier scenario projections, clearer liquid vs illiquid readouts, and the Indennità Annuale card now shows the Patrimonio FIRE base value directly
+- FIRE planning now includes local preview feedback, rolling 12-month runway history, separate total/liquid runway deltas vs the same month a year earlier, a Base-scenario sensitivity matrix for annual spending vs annual savings, steadier scenario projections, and clearer liquid vs illiquid readouts
 - Monte Carlo simulations now preserve result continuity across reruns, with progressive percentile/distribution reveal and more explicit Bear/Base/Bull comparison focus
 - Goal-based investing now links summary cards, allocation chart, and detail cards through a shared focus model for faster visual comprehension
 - PDF export and AI-powered performance analysis
@@ -81,7 +81,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-10 (session bottom-nav-hover-theme-fix — bottom nav active + hover text contrast in dark mode for cyberpunk + solar-dusk themes; migrated BottomNavigation inline color/opacity styles to Tailwind classes)
+**Last updated**: 2026-04-11 (session fire-runway-sensitivity — FIRE calculator historical runway, split total/liquid deltas, sensitivity matrix guidance, and delta rounding consistency)
 
 ## Design Context
 

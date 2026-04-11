@@ -1,6 +1,8 @@
-import { Expense } from '@/types/expenses';
 import { MonthlySnapshot, FIREProjectionScenarios, FIREProjectionYearData, FIREProjectionResult } from '@/types/assets';
-import { getExpensesByDateRange, calculateTotalExpenses, calculateTotalIncome } from './expenseService';
+import { Expense } from '@/types/expenses';
+import { MONTH_NAMES } from '@/lib/constants/months';
+import { getItalyMonth, getItalyMonthYear, getItalyYear } from '@/lib/utils/dateHelpers';
+import { calculateTotalExpenses, calculateTotalIncome, getExpensesByDateRange } from './expenseService';
 import { getUserSnapshots } from './snapshotService';
 
 export interface FIREMetrics {
@@ -47,6 +49,261 @@ export interface MonthlyFIREData {
   netWorth: number;
 }
 
+export interface HistoricalFIRERunwayPoint {
+  year: number;
+  month: number;
+  monthLabel: string;
+  trailing12mExpenses: number;
+  fireNetWorthUsed: number;
+  liquidNetWorth: number;
+  yearsOfExpenses: number | null;
+  liquidYearsOfExpenses: number | null;
+  fireProgressToFI: number | null;
+  targetYearsOfExpenses: number | null;
+}
+
+export interface HistoricalFIRERunwaySummary {
+  currentMonthLabel: string | null;
+  currentYearsOfExpenses: number | null;
+  currentLiquidYearsOfExpenses: number | null;
+  totalDeltaVs12Months: number | null;
+  liquidDeltaVs12Months: number | null;
+  currentProgressToFI: number | null;
+  targetYearsOfExpenses: number | null;
+}
+
+export interface FIRESensitivityCell {
+  annualExpenses: number;
+  annualSavings: number;
+  yearsToFIRE: number | null;
+  isBaseline: boolean;
+  relationToBaseline: 'baseline' | 'better' | 'worse' | 'neutral';
+}
+
+export interface FIRESensitivityColumn {
+  annualSavings: number;
+  label: string;
+  isBaseline: boolean;
+}
+
+export interface FIRESensitivityRow {
+  annualExpenses: number;
+  multiplier: number;
+  label: string;
+  cells: FIRESensitivityCell[];
+}
+
+export interface FIRESensitivityMatrix {
+  columns: FIRESensitivityColumn[];
+  rows: FIRESensitivityRow[];
+  baselineAnnualExpenses: number;
+  baselineAnnualSavings: number;
+  baselineYearsToFIRE: number | null;
+}
+
+interface MonthlyExpenseAggregate {
+  income: number;
+  expenses: number;
+}
+
+const EXPENSE_MULTIPLIERS = [0.8, 0.9, 1.0, 1.1, 1.2] as const;
+const SAVINGS_MULTIPLIERS = [0.75, 1.0, 1.25, 1.5] as const;
+const SAVINGS_FALLBACK_VALUES = [0, 5000, 10000, 20000] as const;
+
+function getYearMonthKey(year: number, month: number): string {
+  return `${year}-${month}`;
+}
+
+function formatSnapshotMonthLabel(year: number, month: number): string {
+  return `${month.toString().padStart(2, '0')}/${year}`;
+}
+
+function formatMonthMultiplier(multiplier: number): string {
+  const percentage = Math.round((multiplier - 1) * 100);
+  if (percentage === 0) return 'Base';
+  return percentage > 0 ? `+${percentage}%` : `${percentage}%`;
+}
+
+function formatSavingsColumnLabel(amount: number): string {
+  if (amount === 0) return '€0';
+  if (amount % 1000 === 0) return `€${amount / 1000}k`;
+  return `€${Math.round(amount)}`;
+}
+
+function roundRunwayYears(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+function calculateRunwayDelta(
+  latestValue: number | null | undefined,
+  comparisonValue: number | null | undefined
+): number | null {
+  if (
+    latestValue === null ||
+    latestValue === undefined ||
+    comparisonValue === null ||
+    comparisonValue === undefined
+  ) {
+    return null;
+  }
+
+  // Keep the summary delta consistent with the one-decimal values shown in the cards/chart tooltips.
+  return roundRunwayYears(roundRunwayYears(latestValue) - roundRunwayYears(comparisonValue));
+}
+
+function getMonthStartDate(year: number, month: number): Date {
+  return new Date(year, month - 1, 1);
+}
+
+function getMonthEndDate(year: number, month: number): Date {
+  return new Date(year, month, 0, 23, 59, 59, 999);
+}
+
+function shiftMonth(year: number, month: number, deltaMonths: number): { year: number; month: number } {
+  const shifted = new Date(year, month - 1 + deltaMonths, 1);
+  return {
+    year: shifted.getFullYear(),
+    month: shifted.getMonth() + 1,
+  };
+}
+
+function getFireNetWorthForSnapshot(snapshot: MonthlySnapshot, includePrimaryResidence: boolean): number {
+  return includePrimaryResidence
+    ? snapshot.totalNetWorth
+    : (snapshot.fireNetWorth ?? snapshot.totalNetWorth);
+}
+
+function buildMonthlyExpenseBuckets(expenses: Expense[]): Map<string, MonthlyExpenseAggregate> {
+  const buckets = new Map<string, MonthlyExpenseAggregate>();
+
+  expenses.forEach((expense) => {
+    const year = getItalyYear(expense.date);
+    const month = getItalyMonth(expense.date);
+    const key = getYearMonthKey(year, month);
+    const current = buckets.get(key) ?? { income: 0, expenses: 0 };
+
+    if (expense.type === 'income') {
+      current.income += expense.amount;
+    } else {
+      current.expenses += expense.amount;
+    }
+
+    buckets.set(key, current);
+  });
+
+  return buckets;
+}
+
+function prepareFIREChartData(
+  snapshots: MonthlySnapshot[],
+  monthlyExpenseBuckets: Map<string, MonthlyExpenseAggregate>,
+  withdrawalRate: number,
+  includePrimaryResidence: boolean = false
+): MonthlyFIREData[] {
+  const wrDecimal = withdrawalRate / 100;
+  const sortedSnapshots = [...snapshots].sort((a, b) => {
+    if (a.year !== b.year) return a.year - b.year;
+    return a.month - b.month;
+  });
+
+  return sortedSnapshots.map((snapshot) => {
+    const bucket = monthlyExpenseBuckets.get(getYearMonthKey(snapshot.year, snapshot.month));
+    const netWorthForAllowance = getFireNetWorthForSnapshot(snapshot, includePrimaryResidence);
+
+    return {
+      year: snapshot.year,
+      month: snapshot.month,
+      monthLabel: formatSnapshotMonthLabel(snapshot.year, snapshot.month),
+      income: bucket?.income ?? 0,
+      expenses: Math.abs(bucket?.expenses ?? 0),
+      monthlyAllowance: (netWorthForAllowance * wrDecimal) / 12,
+      netWorth: netWorthForAllowance,
+    };
+  });
+}
+
+export function calculateHistoricalFIRERunway(
+  snapshots: MonthlySnapshot[],
+  monthlyExpenseBuckets: Map<string, MonthlyExpenseAggregate>,
+  withdrawalRate: number,
+  includePrimaryResidence: boolean = false
+): {
+  runwayData: HistoricalFIRERunwayPoint[];
+  runwaySummary: HistoricalFIRERunwaySummary;
+} {
+  const sortedSnapshots = [...snapshots].sort((a, b) => {
+    if (a.year !== b.year) return a.year - b.year;
+    return a.month - b.month;
+  });
+
+  const targetYearsOfExpenses = withdrawalRate > 0 ? 100 / withdrawalRate : null;
+  const runwayData: HistoricalFIRERunwayPoint[] = [];
+
+  for (const [index, snapshot] of sortedSnapshots.entries()) {
+    if (index < 11) {
+      continue;
+    }
+
+    const trailingMonths: number[] = [];
+
+    for (let offset = 0; offset < 12; offset++) {
+      const targetMonth = shiftMonth(snapshot.year, snapshot.month, -offset);
+      const bucket = monthlyExpenseBuckets.get(getYearMonthKey(targetMonth.year, targetMonth.month));
+      trailingMonths.push(Math.abs(bucket?.expenses ?? 0));
+    }
+
+    if (trailingMonths.length !== 12) {
+      continue;
+    }
+
+    const trailing12mExpenses = trailingMonths.reduce((sum, value) => sum + value, 0);
+    const fireNetWorthUsed = getFireNetWorthForSnapshot(snapshot, includePrimaryResidence);
+    const yearsOfExpenses = trailing12mExpenses > 0 ? fireNetWorthUsed / trailing12mExpenses : null;
+    const liquidYearsOfExpenses = trailing12mExpenses > 0 ? snapshot.liquidNetWorth / trailing12mExpenses : null;
+    const fireProgressToFI =
+      trailing12mExpenses > 0 && withdrawalRate > 0
+        ? (fireNetWorthUsed / (trailing12mExpenses / (withdrawalRate / 100))) * 100
+        : null;
+
+    runwayData.push({
+      year: snapshot.year,
+      month: snapshot.month,
+      monthLabel: formatSnapshotMonthLabel(snapshot.year, snapshot.month),
+      trailing12mExpenses,
+      fireNetWorthUsed,
+      liquidNetWorth: snapshot.liquidNetWorth,
+      yearsOfExpenses,
+      liquidYearsOfExpenses,
+      fireProgressToFI,
+      targetYearsOfExpenses,
+    });
+  }
+
+  const latestPoint = runwayData[runwayData.length - 1] ?? null;
+  const comparisonPoint = latestPoint
+    ? runwayData.find((point) => point.year === latestPoint.year - 1 && point.month === latestPoint.month) ?? null
+    : null;
+
+  return {
+    runwayData,
+    runwaySummary: {
+      currentMonthLabel: latestPoint?.monthLabel ?? null,
+      currentYearsOfExpenses: latestPoint?.yearsOfExpenses ?? null,
+      currentLiquidYearsOfExpenses: latestPoint?.liquidYearsOfExpenses ?? null,
+      totalDeltaVs12Months: calculateRunwayDelta(
+        latestPoint?.yearsOfExpenses,
+        comparisonPoint?.yearsOfExpenses
+      ),
+      liquidDeltaVs12Months: calculateRunwayDelta(
+        latestPoint?.liquidYearsOfExpenses,
+        comparisonPoint?.liquidYearsOfExpenses
+      ),
+      currentProgressToFI: latestPoint?.fireProgressToFI ?? null,
+      targetYearsOfExpenses: latestPoint?.targetYearsOfExpenses ?? targetYearsOfExpenses,
+    },
+  };
+}
+
 /**
  * Calculate annual expenses for the last fully completed year.
  *
@@ -57,10 +314,10 @@ export interface MonthlyFIREData {
  */
 export async function getAnnualExpenses(userId: string): Promise<number> {
   try {
-    const now = new Date();
-    const lastYear = now.getFullYear() - 1;
-    const startDate = new Date(lastYear, 0, 1); // January 1st of last year
-    const endDate = new Date(lastYear, 11, 31, 23, 59, 59, 999); // December 31st of last year
+    const { year: currentYear } = getItalyMonthYear();
+    const lastYear = currentYear - 1;
+    const startDate = new Date(lastYear, 0, 1);
+    const endDate = new Date(lastYear, 11, 31, 23, 59, 59, 999);
 
     const expenses = await getExpensesByDateRange(userId, startDate, endDate);
     return calculateTotalExpenses(expenses);
@@ -76,11 +333,10 @@ export async function getAnnualExpenses(userId: string): Promise<number> {
 export async function getAnnualIncome(userId: string): Promise<number> {
   try {
     const now = new Date();
-    const currentYear = now.getFullYear();
-    const startDate = new Date(currentYear, 0, 1); // January 1st
-    const endDate = now;
+    const { year: currentYear } = getItalyMonthYear(now);
+    const startDate = new Date(currentYear, 0, 1);
 
-    const expenses = await getExpensesByDateRange(userId, startDate, endDate);
+    const expenses = await getExpensesByDateRange(userId, startDate, now);
     return calculateTotalIncome(expenses);
   } catch (error) {
     console.error('Error calculating annual income:', error);
@@ -98,33 +354,17 @@ export function calculateFIREMetrics(
   liquidNetWorth: number = 0,
   illiquidNetWorth: number = 0
 ): FIREMetrics {
-  // FIRE Number = Annual Expenses / Withdrawal Rate (as decimal)
   const wrDecimal = withdrawalRate / 100;
   const fireNumber = wrDecimal > 0 ? annualExpenses / wrDecimal : 0;
-
-  // Progress to FI = (Current Net Worth / FIRE Number) * 100
   const progressToFI = fireNumber > 0 ? (currentNetWorth / fireNumber) * 100 : 0;
-
-  // Annual Allowance = Current Net Worth * Withdrawal Rate
   const annualAllowance = currentNetWorth * wrDecimal;
-
-  // Monthly Allowance = Annual Allowance / 12
   const monthlyAllowance = annualAllowance / 12;
-
-  // Daily Allowance = Annual Allowance / 365
   const dailyAllowance = annualAllowance / 365;
-
-  // Current WR = (Annual Expenses / Current Net Worth) * 100
   const currentWR = currentNetWorth > 0 ? (annualExpenses / currentNetWorth) * 100 : 0;
-
-  // Years of Expenses = 1 / Current WR (as decimal)
   const currentWRDecimal = currentWR / 100;
   const yearsOfExpenses = currentWRDecimal > 0 ? 1 / currentWRDecimal : 0;
-
-  // Liquid/illiquid breakdown allowances and runway
   const liquidAnnualAllowance = liquidNetWorth * wrDecimal;
   const illiquidAnnualAllowance = illiquidNetWorth * wrDecimal;
-  // yearsOfExpenses = netWorth / annualExpenses (equivalent to 1 / currentWR, simplified)
   const liquidYearsOfExpenses = liquidNetWorth > 0 && annualExpenses > 0 ? liquidNetWorth / annualExpenses : 0;
   const illiquidYearsOfExpenses = illiquidNetWorth > 0 && annualExpenses > 0 ? illiquidNetWorth / annualExpenses : 0;
 
@@ -156,11 +396,8 @@ export function calculatePlannedFIREMetrics(
   plannedAnnualExpenses: number,
   withdrawalRate: number
 ): PlannedFIREMetrics {
-  // Planned FIRE Number = Planned Annual Expenses / Withdrawal Rate (as decimal)
   const wrDecimal = withdrawalRate / 100;
   const plannedFireNumber = wrDecimal > 0 ? plannedAnnualExpenses / wrDecimal : 0;
-
-  // Planned Progress to FI = (Current Net Worth / Planned FIRE Number) * 100
   const plannedProgressToFI = plannedFireNumber > 0 ? (currentNetWorth / plannedFireNumber) * 100 : 0;
 
   return {
@@ -172,78 +409,7 @@ export function calculatePlannedFIREMetrics(
 }
 
 /**
- * Get expenses for a specific month
- */
-async function getMonthlyExpenses(userId: string, year: number, month: number): Promise<{ income: number; expenses: number }> {
-  try {
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0, 23, 59, 59);
-
-    const expensesList = await getExpensesByDateRange(userId, startDate, endDate);
-    const income = calculateTotalIncome(expensesList);
-    const expenses = calculateTotalExpenses(expensesList);
-
-    return { income, expenses };
-  } catch (error) {
-    console.error(`Error getting monthly expenses for ${year}-${month}:`, error);
-    return { income: 0, expenses: 0 };
-  }
-}
-
-/**
- * Prepare data for FIRE chart (income, expenses, monthly allowance evolution)
- */
-export async function prepareFIREChartData(
-  userId: string,
-  snapshots: MonthlySnapshot[],
-  withdrawalRate: number,
-  includePrimaryResidence: boolean = false
-): Promise<MonthlyFIREData[]> {
-  try {
-    const wrDecimal = withdrawalRate / 100;
-    const chartData: MonthlyFIREData[] = [];
-
-    // Sort snapshots by date
-    const sortedSnapshots = [...snapshots].sort((a, b) => {
-      if (a.year !== b.year) return a.year - b.year;
-      return a.month - b.month;
-    });
-
-    // For each snapshot, get the corresponding month's expenses and income
-    for (const snapshot of sortedSnapshots) {
-      const { income, expenses } = await getMonthlyExpenses(userId, snapshot.year, snapshot.month);
-
-      // Mirror the same logic used in FireCalculatorTab for currentNetWorth:
-      // - includePrimaryResidence=true  → use totalNetWorth (house included)
-      // - includePrimaryResidence=false → use fireNetWorth (house excluded) when available,
-      //   fall back to totalNetWorth for snapshots created before this field was added.
-      const netWorthForAllowance = includePrimaryResidence
-        ? snapshot.totalNetWorth
-        : (snapshot.fireNetWorth ?? snapshot.totalNetWorth);
-      const monthlyAllowance = (netWorthForAllowance * wrDecimal) / 12;
-
-      const monthLabel = `${snapshot.month.toString().padStart(2, '0')}/${snapshot.year}`;
-
-      chartData.push({
-        year: snapshot.year,
-        month: snapshot.month,
-        monthLabel,
-        income,
-        expenses,
-        monthlyAllowance,
-        netWorth: snapshot.totalNetWorth,
-      });
-    }
-
-    return chartData;
-  } catch (error) {
-    console.error('Error preparing FIRE chart data:', error);
-    throw new Error('Failed to prepare FIRE chart data');
-  }
-}
-
-/**
- * Get all FIRE data for the user (metrics + chart data)
+ * Get all FIRE data for the user (metrics + chart data + runway data)
  */
 export async function getFIREData(
   userId: string,
@@ -253,23 +419,55 @@ export async function getFIREData(
 ): Promise<{
   metrics: FIREMetrics;
   chartData: MonthlyFIREData[];
+  runwayData: HistoricalFIRERunwayPoint[];
+  runwaySummary: HistoricalFIRERunwaySummary;
 }> {
   try {
-    // Get annual expenses
-    const annualExpenses = await getAnnualExpenses(userId);
+    const [annualExpenses, snapshots] = await Promise.all([
+      getAnnualExpenses(userId),
+      getUserSnapshots(userId),
+    ]);
 
-    // Calculate metrics
     const metrics = calculateFIREMetrics(currentNetWorth, annualExpenses, withdrawalRate);
 
-    // Get snapshots for chart
-    const snapshots = await getUserSnapshots(userId);
+    if (snapshots.length === 0) {
+      return {
+        metrics,
+        chartData: [],
+        runwayData: [],
+        runwaySummary: {
+          currentMonthLabel: null,
+          currentYearsOfExpenses: null,
+          currentLiquidYearsOfExpenses: null,
+          totalDeltaVs12Months: null,
+          liquidDeltaVs12Months: null,
+          currentProgressToFI: null,
+          targetYearsOfExpenses: withdrawalRate > 0 ? 100 / withdrawalRate : null,
+        },
+      };
+    }
 
-    // Prepare chart data
-    const chartData = await prepareFIREChartData(userId, snapshots, withdrawalRate, includePrimaryResidence);
+    const firstSnapshot = snapshots[0];
+    const lastSnapshot = snapshots[snapshots.length - 1];
+    const expenseWindowStart = shiftMonth(firstSnapshot.year, firstSnapshot.month, -11);
+    const expenseRangeStart = getMonthStartDate(expenseWindowStart.year, expenseWindowStart.month);
+    const expenseRangeEnd = getMonthEndDate(lastSnapshot.year, lastSnapshot.month);
+    const expenses = await getExpensesByDateRange(userId, expenseRangeStart, expenseRangeEnd);
+    const monthlyExpenseBuckets = buildMonthlyExpenseBuckets(expenses);
+
+    const chartData = prepareFIREChartData(snapshots, monthlyExpenseBuckets, withdrawalRate, includePrimaryResidence);
+    const { runwayData, runwaySummary } = calculateHistoricalFIRERunway(
+      snapshots,
+      monthlyExpenseBuckets,
+      withdrawalRate,
+      includePrimaryResidence
+    );
 
     return {
       metrics,
       chartData,
+      runwayData,
+      runwaySummary,
     };
   } catch (error) {
     console.error('Error getting FIRE data:', error);
@@ -289,19 +487,18 @@ export async function getFIREData(
  * period to avoid inconsistencies (e.g., current year expenses with last year savings).
  */
 export interface AnnualCashflowData {
-  annualSavings: number;  // Net savings (income - expenses), clamped to 0 minimum
+  annualSavings: number; // Net savings (income - expenses), clamped to 0 minimum
   annualExpensesFromCashflow: number; // Total expenses from the reference year
-  referenceYear: number;  // Which year the data comes from
-  isAnnualized: boolean;  // True if current year data was scaled to full year
+  referenceYear: number; // Which year the data comes from
+  isAnnualized: boolean; // True if current year data was scaled to full year
 }
 
 export async function getAnnualCashflowData(userId: string): Promise<AnnualCashflowData> {
   try {
     const now = new Date();
-    const currentYear = now.getFullYear();
+    const { year: currentYear } = getItalyMonthYear(now);
     const lastYear = currentYear - 1;
 
-    // Try last complete calendar year first
     const lastYearStart = new Date(lastYear, 0, 1);
     const lastYearEnd = new Date(lastYear, 11, 31, 23, 59, 59, 999);
     const lastYearExpenses = await getExpensesByDateRange(userId, lastYearStart, lastYearEnd);
@@ -317,7 +514,6 @@ export async function getAnnualCashflowData(userId: string): Promise<AnnualCashf
       };
     }
 
-    // Fallback: annualize current year data
     const currentYearStart = new Date(currentYear, 0, 1);
     const currentYearExpenses = await getExpensesByDateRange(userId, currentYearStart, now);
 
@@ -328,9 +524,8 @@ export async function getAnnualCashflowData(userId: string): Promise<AnnualCashf
     const income = calculateTotalIncome(currentYearExpenses);
     const expenses = calculateTotalExpenses(currentYearExpenses);
     const savings = income - expenses;
+    const monthsElapsed = Math.max(getItalyMonth(now), 1);
 
-    // Annualize: scale partial year to full year
-    const monthsElapsed = now.getMonth() + 1;
     return {
       annualSavings: Math.max((savings / monthsElapsed) * 12, 0),
       annualExpensesFromCashflow: (expenses / monthsElapsed) * 12,
@@ -339,7 +534,7 @@ export async function getAnnualCashflowData(userId: string): Promise<AnnualCashf
     };
   } catch (error) {
     console.error('Error calculating annual cashflow data:', error);
-    return { annualSavings: 0, annualExpensesFromCashflow: 0, referenceYear: new Date().getFullYear(), isAnnualized: true };
+    return { annualSavings: 0, annualExpensesFromCashflow: 0, referenceYear: getItalyYear(), isAnnualized: true };
   }
 }
 
@@ -384,14 +579,13 @@ export function calculateFIREProjection(
   maxYears: number = 50
 ): FIREProjectionResult {
   const wrDecimal = withdrawalRate / 100;
-  const currentYear = new Date().getFullYear();
+  const currentYear = getItalyYear();
 
   const yearlyData: FIREProjectionYearData[] = [];
   let bearYearsToFIRE: number | null = null;
   let baseYearsToFIRE: number | null = null;
   let bullYearsToFIRE: number | null = null;
 
-  // Track portfolio and expenses per scenario independently
   let bearNW = initialNetWorth;
   let baseNW = initialNetWorth;
   let bullNW = initialNetWorth;
@@ -400,27 +594,22 @@ export function calculateFIREProjection(
   let bullExpenses = annualExpenses;
 
   for (let year = 1; year <= maxYears; year++) {
-    // Step 1: Apply market growth
     bearNW *= (1 + scenarios.bear.growthRate / 100);
     baseNW *= (1 + scenarios.base.growthRate / 100);
     bullNW *= (1 + scenarios.bull.growthRate / 100);
 
-    // Step 2: Add annual savings (only if FIRE not yet reached — retirement stops income)
     if (bearYearsToFIRE === null) bearNW += annualSavings;
     if (baseYearsToFIRE === null) baseNW += annualSavings;
     if (bullYearsToFIRE === null) bullNW += annualSavings;
 
-    // Step 3: Inflate expenses per scenario
     bearExpenses *= (1 + scenarios.bear.inflationRate / 100);
     baseExpenses *= (1 + scenarios.base.inflationRate / 100);
     bullExpenses *= (1 + scenarios.bull.inflationRate / 100);
 
-    // Step 4: Calculate FIRE Number per scenario
     const bearFireNumber = wrDecimal > 0 ? bearExpenses / wrDecimal : 0;
     const baseFireNumber = wrDecimal > 0 ? baseExpenses / wrDecimal : 0;
     const bullFireNumber = wrDecimal > 0 ? bullExpenses / wrDecimal : 0;
 
-    // Step 5: Check FIRE reached
     const bearReached = bearNW >= bearFireNumber;
     const baseReached = baseNW >= baseFireNumber;
     const bullReached = bullNW >= bullFireNumber;
@@ -446,9 +635,7 @@ export function calculateFIREProjection(
       bullFireReached: bullReached,
     });
 
-    // Stop early if all scenarios reached FIRE
     if (bearYearsToFIRE !== null && baseYearsToFIRE !== null && bullYearsToFIRE !== null) {
-      // Add a few more years to show post-FIRE growth in chart
       if (year >= Math.max(bearYearsToFIRE, baseYearsToFIRE, bullYearsToFIRE) + 5) break;
     }
   }
@@ -463,4 +650,106 @@ export function calculateFIREProjection(
     initialExpenses: annualExpenses,
     scenarios,
   };
+}
+
+export function calculateFIRESensitivityMatrix(
+  initialNetWorth: number,
+  baselineAnnualExpenses: number,
+  baselineAnnualSavings: number,
+  withdrawalRate: number,
+  scenarios: FIREProjectionScenarios
+): FIRESensitivityMatrix {
+  const baselineProjection =
+    initialNetWorth > 0 && baselineAnnualExpenses > 0 && withdrawalRate > 0
+      ? calculateFIREProjection(
+          initialNetWorth,
+          baselineAnnualExpenses,
+          baselineAnnualSavings,
+          withdrawalRate,
+          scenarios
+        )
+      : null;
+  const baselineYearsToFIRE = baselineProjection?.baseYearsToFIRE ?? null;
+
+  const columns = baselineAnnualSavings > 0
+    ? SAVINGS_MULTIPLIERS.map((multiplier) => {
+        const annualSavings = baselineAnnualSavings * multiplier;
+        return {
+          annualSavings,
+          label: formatMonthMultiplier(multiplier),
+          isBaseline: multiplier === 1,
+        };
+      })
+    : SAVINGS_FALLBACK_VALUES.map((amount) => ({
+        annualSavings: amount,
+        label: formatSavingsColumnLabel(amount),
+        isBaseline: amount === 0,
+      }));
+
+  const rows = EXPENSE_MULTIPLIERS.map((multiplier) => {
+    const annualExpenses = baselineAnnualExpenses * multiplier;
+
+    const cells = columns.map((column) => {
+      const projection =
+        initialNetWorth > 0 && annualExpenses > 0 && withdrawalRate > 0
+          ? calculateFIREProjection(
+              initialNetWorth,
+              annualExpenses,
+              column.annualSavings,
+              withdrawalRate,
+              scenarios
+            )
+          : null;
+      const yearsToFIRE = projection?.baseYearsToFIRE ?? null;
+      let relationToBaseline: FIRESensitivityCell['relationToBaseline'] = 'neutral';
+      const isBaseline = multiplier === 1 && column.isBaseline;
+
+      if (isBaseline) {
+        relationToBaseline = 'baseline';
+      } else if (baselineYearsToFIRE !== null && yearsToFIRE !== null) {
+        if (yearsToFIRE < baselineYearsToFIRE) {
+          relationToBaseline = 'better';
+        } else if (yearsToFIRE > baselineYearsToFIRE) {
+          relationToBaseline = 'worse';
+        }
+      }
+
+      return {
+        annualExpenses,
+        annualSavings: column.annualSavings,
+        yearsToFIRE,
+        isBaseline,
+        relationToBaseline,
+      };
+    });
+
+    return {
+      annualExpenses,
+      multiplier,
+      label: formatMonthMultiplier(multiplier),
+      cells,
+    };
+  });
+
+  return {
+    columns,
+    rows,
+    baselineAnnualExpenses,
+    baselineAnnualSavings,
+    baselineYearsToFIRE,
+  };
+}
+
+export function prepareRunwaySummaryLabel(monthLabel: string | null): string {
+  if (!monthLabel) return 'Nessun dato storico';
+
+  const [monthText, yearText] = monthLabel.split('/');
+  const monthIndex = Number.parseInt(monthText, 10) - 1;
+  const year = Number.parseInt(yearText, 10);
+
+  if (!Number.isFinite(monthIndex) || monthIndex < 0 || monthIndex >= MONTH_NAMES.length || !Number.isFinite(year)) {
+    return monthLabel;
+  }
+
+  return `${MONTH_NAMES[monthIndex]} ${year}`;
 }

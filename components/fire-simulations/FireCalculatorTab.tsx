@@ -55,7 +55,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getAllAssets, calculateTotalValue, calculateFIRENetWorth, calculateLiquidFIRENetWorth, calculateIlliquidFIRENetWorth } from '@/lib/services/assetService';
 import { getItalyYear } from '@/lib/utils/dateHelpers';
 import { getSettings, setSettings, getDefaultTargets } from '@/lib/services/assetAllocationService';
-import { getFIREData, calculatePlannedFIREMetrics, calculateFIREMetrics } from '@/lib/services/fireService';
+import { getFIREData, calculatePlannedFIREMetrics, calculateFIREMetrics, prepareRunwaySummaryLabel } from '@/lib/services/fireService';
 import { formatCurrency, formatCurrencyCompact, formatPercentage } from '@/lib/services/chartService';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -74,6 +74,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  ReferenceLine,
 } from 'recharts';
 import { Settings } from '@/types/settings';
 import { FIREProjectionSection } from './FIREProjectionSection';
@@ -104,6 +105,44 @@ function SettledPercentageValue({
 }) {
   const animatedValue = useCountUp(value, { fromPrevious: true, duration: 520, startDelay: 0 });
   return <span className={className}>{formatPercentage(animatedValue ?? value ?? 0)}</span>;
+}
+
+function SettledYearsValue({
+  value,
+  className,
+  decimals = 1,
+}: {
+  value: number | null;
+  className?: string;
+  decimals?: number;
+}) {
+  const animatedValue = useCountUp(value, { fromPrevious: true, duration: 520, startDelay: 0 });
+
+  if (value === null) {
+    return <span className={className}>—</span>;
+  }
+
+  return <span className={className}>{(animatedValue ?? value).toFixed(decimals)}</span>;
+}
+
+function roundRunwayYears(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+function calculateDisplayedRunwayDelta(
+  latestValue: number | null | undefined,
+  comparisonValue: number | null | undefined
+): number | null {
+  if (
+    latestValue === null ||
+    latestValue === undefined ||
+    comparisonValue === null ||
+    comparisonValue === undefined
+  ) {
+    return null;
+  }
+
+  return roundRunwayYears(roundRunwayYears(latestValue) - roundRunwayYears(comparisonValue));
 }
 
 export function FireCalculatorTab() {
@@ -152,6 +191,7 @@ export function FireCalculatorTab() {
     ? calculateFIREMetrics(currentNetWorth, fireData.metrics.annualExpenses, withdrawalRate, liquidNetWorth, illiquidNetWorth)
     : null;
   const chartData = fireData?.chartData ?? [];
+  const rawRunwayData = fireData?.runwayData ?? [];
 
   const parsedPreviewWithdrawalRate = Number.parseFloat(tempWithdrawalRate);
   const previewWithdrawalRate =
@@ -186,6 +226,42 @@ export function FireCalculatorTab() {
     }
     return calculatePlannedFIREMetrics(currentNetWorth, previewPlannedAnnualExpenses, previewWithdrawalRate);
   }, [currentNetWorth, previewPlannedAnnualExpenses, previewWithdrawalRate]);
+
+  const displayedRunwayData = useMemo(() => {
+    const targetYearsOfExpenses = previewWithdrawalRate > 0 ? 100 / previewWithdrawalRate : null;
+
+    return rawRunwayData.map((point) => ({
+      ...point,
+      targetYearsOfExpenses,
+      fireProgressToFI:
+        point.trailing12mExpenses > 0 && previewWithdrawalRate > 0
+          ? (point.fireNetWorthUsed / (point.trailing12mExpenses / (previewWithdrawalRate / 100))) * 100
+          : null,
+    }));
+  }, [previewWithdrawalRate, rawRunwayData]);
+
+  const displayedRunwaySummary = useMemo(() => {
+    const latestPoint = displayedRunwayData[displayedRunwayData.length - 1] ?? null;
+    const comparisonPoint = latestPoint
+      ? displayedRunwayData.find((point) => point.year === latestPoint.year - 1 && point.month === latestPoint.month) ?? null
+      : null;
+
+    return {
+      currentMonthLabel: latestPoint?.monthLabel ?? null,
+      currentYearsOfExpenses: latestPoint?.yearsOfExpenses ?? null,
+      currentLiquidYearsOfExpenses: latestPoint?.liquidYearsOfExpenses ?? null,
+      totalDeltaVs12Months: calculateDisplayedRunwayDelta(
+        latestPoint?.yearsOfExpenses,
+        comparisonPoint?.yearsOfExpenses
+      ),
+      liquidDeltaVs12Months: calculateDisplayedRunwayDelta(
+        latestPoint?.liquidYearsOfExpenses,
+        comparisonPoint?.liquidYearsOfExpenses
+      ),
+      currentProgressToFI: latestPoint?.fireProgressToFI ?? null,
+      targetYearsOfExpenses: latestPoint?.targetYearsOfExpenses ?? (previewWithdrawalRate > 0 ? 100 / previewWithdrawalRate : null),
+    };
+  }, [displayedRunwayData, previewWithdrawalRate]);
 
   useEffect(() => {
     if (settings) {
@@ -668,10 +744,201 @@ export function FireCalculatorTab() {
         </>
       )}
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Anni di Spesa Coperti nel Tempo</CardTitle>
+          <CardDescription>
+            Runway FIRE storica basata sulle spese rolling 12 mesi. La linea tratteggiata mostra il target implicito del tuo Safe Withdrawal Rate.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {displayedRunwayData.length === 0 ? (
+            <div className="flex h-64 items-center justify-center text-gray-500 dark:text-gray-400">
+              Servono almeno 12 snapshot mensili per calcolare la runway storica.
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-4 desktop:grid-cols-3">
+                <Card className="border-border/70 bg-muted/20">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Runway totale attuale</CardTitle>
+                    <CardDescription>{prepareRunwaySummaryLabel(displayedRunwaySummary.currentMonthLabel)}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-baseline gap-2">
+                      <SettledYearsValue
+                        value={displayedRunwaySummary.currentYearsOfExpenses}
+                        className="font-mono text-3xl font-bold tabular-nums text-sky-600"
+                      />
+                      {displayedRunwaySummary.currentYearsOfExpenses !== null && (
+                        <span className="text-sm font-medium text-sky-600">anni</span>
+                      )}
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Include tutto il patrimonio FIRE usato nel calcolo storico del mese piu recente.
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border/70 bg-muted/20">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Runway liquida</CardTitle>
+                    <CardDescription>Solo asset immediatamente spendibili</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-baseline gap-2">
+                      <SettledYearsValue
+                        value={displayedRunwaySummary.currentLiquidYearsOfExpenses}
+                        className="font-mono text-3xl font-bold tabular-nums text-emerald-600"
+                      />
+                      {displayedRunwaySummary.currentLiquidYearsOfExpenses !== null && (
+                        <span className="text-sm font-medium text-emerald-600">anni</span>
+                      )}
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Misura quanta spesa puoi coprire senza vendere asset illiquidi.
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border/70 bg-muted/20">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Delta vs 12 mesi fa</CardTitle>
+                    <CardDescription>
+                      {displayedRunwaySummary.targetYearsOfExpenses !== null
+                        ? `Target corrente: ${displayedRunwaySummary.targetYearsOfExpenses.toFixed(1)} anni`
+                        : 'Target non disponibile'}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center justify-between gap-4 border-b border-border/60 pb-3">
+                      <span className="text-sm text-muted-foreground">Totale</span>
+                      <div className="flex items-baseline gap-2">
+                        <span
+                          className={cn(
+                            'font-mono text-2xl font-bold tabular-nums',
+                            displayedRunwaySummary.totalDeltaVs12Months === null
+                              ? 'text-muted-foreground'
+                              : displayedRunwaySummary.totalDeltaVs12Months >= 0
+                                ? 'text-green-600'
+                                : 'text-red-600'
+                          )}
+                        >
+                          {displayedRunwaySummary.totalDeltaVs12Months === null
+                            ? '—'
+                            : `${displayedRunwaySummary.totalDeltaVs12Months >= 0 ? '+' : ''}${displayedRunwaySummary.totalDeltaVs12Months.toFixed(1)}`}
+                        </span>
+                        {displayedRunwaySummary.totalDeltaVs12Months !== null && (
+                          <span className="text-sm font-medium text-muted-foreground">anni</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-sm text-muted-foreground">Liquido</span>
+                      <div className="flex items-baseline gap-2">
+                        <span
+                          className={cn(
+                            'font-mono text-2xl font-bold tabular-nums',
+                            displayedRunwaySummary.liquidDeltaVs12Months === null
+                              ? 'text-muted-foreground'
+                              : displayedRunwaySummary.liquidDeltaVs12Months >= 0
+                                ? 'text-green-600'
+                                : 'text-red-600'
+                          )}
+                        >
+                          {displayedRunwaySummary.liquidDeltaVs12Months === null
+                            ? '—'
+                            : `${displayedRunwaySummary.liquidDeltaVs12Months >= 0 ? '+' : ''}${displayedRunwaySummary.liquidDeltaVs12Months.toFixed(1)}`}
+                        </span>
+                        {displayedRunwaySummary.liquidDeltaVs12Months !== null && (
+                          <span className="text-sm font-medium text-muted-foreground">anni</span>
+                        )}
+                      </div>
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Confronto con lo stesso mese di un anno fa, disponibile solo quando esiste il punto storico corrispondente.
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <ResponsiveContainer width="100%" height={isMobile ? 300 : 400}>
+                <LineChart data={displayedRunwayData} margin={{ left: isMobile ? 10 : 50, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="monthLabel" tick={{ fontSize: isMobile ? 10 : 12 }} />
+                  <YAxis
+                    width={isMobile ? 70 : 100}
+                    tickFormatter={(value) => `${Number(value).toFixed(0)}a`}
+                    tick={{ fontSize: isMobile ? 10 : 12 }}
+                  />
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload || payload.length === 0) return null;
+                      const point = payload[0]?.payload;
+                      if (!point) return null;
+
+                      return (
+                        <div className="rounded-lg border border-border bg-card p-3 text-sm shadow-sm">
+                          <p className="font-semibold text-foreground">{label}</p>
+                          <div className="mt-2 space-y-1 text-muted-foreground">
+                            <p>Runway totale: <span className="font-medium text-sky-600">{point.yearsOfExpenses !== null ? `${point.yearsOfExpenses.toFixed(1)} anni` : '—'}</span></p>
+                            <p>Runway liquida: <span className="font-medium text-emerald-600">{point.liquidYearsOfExpenses !== null ? `${point.liquidYearsOfExpenses.toFixed(1)} anni` : '—'}</span></p>
+                            <p>Spese rolling 12M: <span className="font-medium text-foreground">{formatCurrency(point.trailing12mExpenses)}</span></p>
+                            <p>Patrimonio FIRE usato: <span className="font-medium text-foreground">{formatCurrency(point.fireNetWorthUsed)}</span></p>
+                            <p>Progresso FIRE: <span className="font-medium text-foreground">{point.fireProgressToFI !== null ? formatPercentage(point.fireProgressToFI) : '—'}</span></p>
+                          </div>
+                        </div>
+                      );
+                    }}
+                  />
+                  <Legend />
+                  <ReferenceLine
+                    y={displayedRunwaySummary.targetYearsOfExpenses ?? undefined}
+                    stroke="#F59E0B"
+                    strokeWidth={1.5}
+                    strokeDasharray="6 4"
+                    label={
+                      displayedRunwaySummary.targetYearsOfExpenses !== null
+                        ? { value: `Target ${displayedRunwaySummary.targetYearsOfExpenses.toFixed(1)} anni`, position: 'insideTopRight', fill: '#F59E0B', fontSize: 11 }
+                        : undefined
+                    }
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="yearsOfExpenses"
+                    stroke="#0EA5E9"
+                    strokeWidth={2.5}
+                    name="Totale FIRE"
+                    dot={{ r: 3 }}
+                    connectNulls={false}
+                    animationDuration={800}
+                    animationEasing="ease-out"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="liquidYearsOfExpenses"
+                    stroke="#10B981"
+                    strokeWidth={2.5}
+                    name="Solo liquido"
+                    dot={{ r: 3 }}
+                    connectNulls={false}
+                    animationDuration={800}
+                    animationEasing="ease-out"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Chart: Income, Expenses, Monthly Allowance Evolution */}
       <Card>
         <CardHeader>
-          <CardTitle>Evoluzione Storica: Entrate, Uscite e Indennità Mensile</CardTitle>
+          <CardTitle>Cashflow e Indennità nel Tempo</CardTitle>
+          <CardDescription>
+            Vista di contesto: confronta entrate, uscite e indennità mensile derivata dal patrimonio FIRE dello stesso mese.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {chartData.length === 0 ? (
@@ -737,6 +1004,7 @@ export function FireCalculatorTab() {
           currentNetWorth={currentNetWorth}
           withdrawalRate={previewWithdrawalRate}
           settings={settings}
+          plannedAnnualExpensesPreview={previewPlannedAnnualExpenses}
         />
       )}
 

@@ -93,6 +93,9 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - Added a contextual dividend detail view in `Dividendi & Cedole`, so selecting a row or mobile card opens a readable payment summary before entering edit mode
 - Added compact dividend insight cards for portfolio YOC and DPS growth, with inline help explaining how to read the metrics
 - Added a local preview mode to the FIRE calculator, so retirement metrics react immediately to unsaved changes before you decide to save them
+- Added a historical runway view to the FIRE calculator, showing how many years of expenses your FIRE portfolio and liquid assets would have covered over time
+- Added a FIRE sensitivity matrix that compares how changes in annual spending and annual savings affect years to FIRE in the Base scenario
+- Added separate 12-month delta indicators for total and liquid FIRE runway, so sustainability and immediately spendable runway are easier to compare
 - Added linked focus behavior to Goal-Based Investing, so selecting a goal now highlights the same objective across summary cards, allocation view, and detail sections
 
 ## 🐛 Bug Fixes
@@ -101,6 +104,7 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - Fixed color themes appearing identical in dark mode — Solar Dusk, Elegant Luxury, and Midnight Bloom now show a clearly visible tint on cards and tables when dark mode is active
 - Fixed sidebar menu item text becoming invisible on hover in dark mode for the Cyberpunk and Solar Dusk themes — hovering a navigation item now keeps text clearly readable
 - Fixed the active tab label and icon in the mobile bottom navigation bar being hard to read in dark mode for the Cyberpunk and Solar Dusk themes — the selected tab is now clearly visible across all themes
+- Fixed the FIRE runway year-over-year delta so it matches the one-decimal values shown in the cards
 
 
 
@@ -158,6 +162,7 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 ---
 
 - The FIRE "Indennità Annuale" card now shows the Patrimonio FIRE base value directly, so you can immediately see which number the withdrawal rate is applied to without switching tabs
+- Improved the FIRE sensitivity section with a lightweight explainer and tooltip that clarify how to read rows, columns, colors, and the baseline cell
 - Fixed the income category pie chart legend on mobile (Cashflow → Anno Corrente) overflowing its container when four or more categories were above the 5% threshold — now consistently capped at three visible items, matching the expense chart
 
 - Improved the login and registration pages with a calmer first-load entrance, so authentication feels more consistent with the rest of the app
