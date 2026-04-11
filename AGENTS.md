@@ -201,10 +201,11 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - FIRE annual expenses must use the last completed year
 - `includePrimaryResidence` must flow through both React Query key and query function
 - FIRE calculator unsaved preview is local-only: metrics may react immediately to form edits, but milestone surfaces like the "FIRE raggiunto" banner should remain anchored to saved/loaded data until persistence completes
-- **Historical FIRE runway**: use rolling 12-month expenses, not a fixed annual denominator. The first runway point requires 12 snapshots; same-month YoY delta needs 24 snapshots.
-- Missing cashflow months inside the historical FIRE runway window count as `0`, not as missing data — avoids broken series and matches the intended rolling-spend interpretation.
-- If runway cards show values rounded to 1 decimal, compute summary deltas from the same rounded values. Otherwise users can see `5.9 → 5.1` but a displayed delta of `-0.7`.
-- If the UI exposes both total and liquid runway cards, keep the summary deltas split too (`Totale` and `Liquido`) — a single mixed delta is ambiguous next to the liquid runway card.
+- **Historical FIRE runway**: use rolling 12-month expenses, not a fixed annual denominator. The first runway point requires 12 snapshots; same-month YoY delta needs 24 snapshots; missing cashflow months inside the window count as `0`.
+- If runway cards show values rounded to 1 decimal, compute summary deltas from the same rounded values. If the UI exposes both total and liquid runway cards, keep the deltas split too (`Totale` and `Liquido`).
+- **Coast FIRE inputs**: current age comes from `settings.userAge`; retirement age is a separate persisted field (`coastFireRetirementAge`) with an initial fallback of `60`. If `userAge` is missing, keep the input blank and do not run the calculation.
+- **Coast FIRE methodology**: use real annual expenses from the last completed year, not planned FIRE expenses. Scenario math reuses FIRE Bear/Base/Bull with `real return = growthRate - inflationRate`.
+- **Coast FIRE outputs**: `Valore stimato a pensione` is only the future value of the current FIRE-eligible patrimonio without new contributions; `gap residuo` clamps at `0` once Coast FIRE is reached, while progress `%` may exceed `100`.
 
 ### Firestore Optional Field Deletion
 - `updateDoc` only touches fields present in the update object — omitting a field leaves the old value intact in Firestore

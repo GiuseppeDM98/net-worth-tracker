@@ -5,6 +5,7 @@
  *
  * TAB STRUCTURE:
  * - FIRE Calculator: Calculate retirement readiness
+ * - Coast FIRE: Measure whether current FIRE patrimonio can compound to the full target
  * - Monte Carlo: Probabilistic portfolio simulations
  * - Obiettivi: Goal-based investing (mental allocation of portfolio to financial goals)
  *
@@ -16,17 +17,19 @@
 'use client';
 
 import { useState } from 'react';
-import { Flame, Dices, Target } from 'lucide-react';
+import { Flame, Dices, Mountain, Target } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FireCalculatorTab } from '@/components/fire-simulations/FireCalculatorTab';
+import { CoastFireTab } from '@/components/fire-simulations/CoastFireTab';
 import { MonteCarloTab } from '@/components/fire-simulations/MonteCarloTab';
 import { GoalBasedInvestingTab } from '@/components/fire-simulations/GoalBasedInvestingTab';
 
-type TabValue = 'fire' | 'montecarlo' | 'goals';
+type TabValue = 'fire' | 'coast' | 'montecarlo' | 'goals';
 
 const TAB_LABELS: Record<TabValue, string> = {
   fire: 'Calcolatore FIRE',
+  coast: 'Coast FIRE',
   montecarlo: 'Monte Carlo',
   goals: 'Obiettivi',
 };
@@ -62,6 +65,12 @@ export default function FireSimulationsPage() {
                   Calcolatore FIRE
                 </span>
               </SelectItem>
+              <SelectItem value="coast">
+                <span className="flex items-center gap-2">
+                  <Mountain className="h-4 w-4" />
+                  Coast FIRE
+                </span>
+              </SelectItem>
               <SelectItem value="montecarlo">
                 <span className="flex items-center gap-2">
                   <Dices className="h-4 w-4" />
@@ -80,10 +89,14 @@ export default function FireSimulationsPage() {
 
         {/* Desktop: standard TabsList */}
         <div className="hidden desktop:block mb-4">
-          <TabsList className="grid w-full max-w-lg grid-cols-3">
+          <TabsList className="grid w-full max-w-3xl grid-cols-4">
             <TabsTrigger value="fire" className="flex items-center gap-2">
               <Flame className="h-4 w-4" />
               Calcolatore FIRE
+            </TabsTrigger>
+            <TabsTrigger value="coast" className="flex items-center gap-2">
+              <Mountain className="h-4 w-4" />
+              Coast FIRE
             </TabsTrigger>
             <TabsTrigger value="montecarlo" className="flex items-center gap-2">
               <Dices className="h-4 w-4" />
@@ -98,6 +111,10 @@ export default function FireSimulationsPage() {
 
         <TabsContent value="fire" className="mt-0">
           <FireCalculatorTab />
+        </TabsContent>
+
+        <TabsContent value="coast" className="mt-0">
+          <CoastFireTab />
         </TabsContent>
 
         <TabsContent value="montecarlo" className="mt-0">

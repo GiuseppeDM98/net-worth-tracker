@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-11, session fire-runway-sensitivity): **FIRE historical runway and sensitivity analysis**. The FIRE calculator now shows rolling 12-month runway history, split total/liquid year-over-year deltas, and a Base-scenario sensitivity matrix across annual spending and annual savings, with lightweight reading guidance. Previous session (2026-04-10, assistant-memory-goals): goal lifecycle and assisted memory suggestions for Assistente AI.
+- Latest implementation (2026-04-11, session coast-fire-tab): **Coast FIRE planning tab**. `FIRE e Simulazioni` now includes a dedicated `Coast FIRE` tab with explicit age inputs, a saved retirement-age target, Base/Bear/Bull real-return scenarios, and a no-new-contributions projection chart. The previous FIRE runway and sensitivity analysis remains part of the classic FIRE tab.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -40,7 +40,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - monthly chart from `prepareMonthlyLaborMetricsData()`
 - Settings page now offers visible unsaved-state preview and clearer in-context feedback for sensitive configuration changes (without autosave behavior changes)
 - Dividends and coupons tracking with EUR conversion, focused monthly calendar, contextual per-payment detail view, total return per asset, and DPS growth summaries
-- FIRE planning now includes local preview feedback, rolling 12-month runway history, separate total/liquid runway deltas vs the same month a year earlier, a Base-scenario sensitivity matrix for annual spending vs annual savings, steadier scenario projections, and clearer liquid vs illiquid readouts
+- FIRE planning now includes local preview feedback, rolling 12-month runway history, separate total/liquid runway deltas vs the same month a year earlier, a Base-scenario sensitivity matrix for annual spending vs annual savings, steadier scenario projections, clearer liquid vs illiquid readouts, and a dedicated `Coast FIRE` tab. Coast FIRE reuses `userAge`, persists `coastFireRetirementAge`, uses real annual expenses from the last completed year, and models Bear/Base/Bull outcomes with `real return = growth - inflation`
 - Monte Carlo simulations now preserve result continuity across reruns, with progressive percentile/distribution reveal and more explicit Bear/Base/Bull comparison focus
 - Goal-based investing now links summary cards, allocation chart, and detail cards through a shared focus model for faster visual comprehension
 - PDF export and AI-powered performance analysis
@@ -81,7 +81,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-11 (session fire-runway-sensitivity — FIRE calculator historical runway, split total/liquid deltas, sensitivity matrix guidance, and delta rounding consistency)
+**Last updated**: 2026-04-11 (session coast-fire-tab — dedicated Coast FIRE tab, saved retirement age, and no-new-contributions projection chart)
 
 ## Design Context
 

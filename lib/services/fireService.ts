@@ -101,6 +101,46 @@ export interface FIRESensitivityMatrix {
   baselineYearsToFIRE: number | null;
 }
 
+export interface CoastFIREMetrics {
+  yearsToRetirement: number;
+  fireNumberAtRetirement: number;
+  coastFireNumberToday: number;
+  progressToCoastFI: number;
+  gapToCoastFI: number;
+  futureValueAtRetirementWithoutNewContributions: number;
+  isCoastReached: boolean;
+}
+
+export interface CoastFIREScenarioMetrics extends CoastFIREMetrics {
+  scenarioKey: 'bear' | 'base' | 'bull';
+  label: string;
+  realReturnRate: number;
+}
+
+export interface CoastFIREProjectionPoint {
+  yearOffset: number;
+  calendarYear: number;
+  age: number;
+  bearPortfolioValue: number;
+  basePortfolioValue: number;
+  bullPortfolioValue: number;
+  fireNumberTarget: number;
+}
+
+export interface CoastFIREProjectionResult {
+  currentAge: number;
+  retirementAge: number;
+  annualExpenses: number;
+  withdrawalRate: number;
+  currentNetWorth: number;
+  scenarios: {
+    bear: CoastFIREScenarioMetrics;
+    base: CoastFIREScenarioMetrics;
+    bull: CoastFIREScenarioMetrics;
+  };
+  projectionData: CoastFIREProjectionPoint[];
+}
+
 interface MonthlyExpenseAggregate {
   income: number;
   expenses: number;
@@ -128,6 +168,11 @@ function formatSavingsColumnLabel(amount: number): string {
   if (amount === 0) return '€0';
   if (amount % 1000 === 0) return `€${amount / 1000}k`;
   return `€${Math.round(amount)}`;
+}
+
+function growValueByRealReturn(value: number, realReturnRate: number, years: number): number {
+  if (years <= 0) return value;
+  return value * Math.pow(1 + (realReturnRate / 100), years);
 }
 
 function roundRunwayYears(value: number): number {
@@ -549,6 +594,138 @@ export function getDefaultScenarios(): FIREProjectionScenarios {
     bear: { growthRate: 4.0, inflationRate: 3.5 },
     base: { growthRate: 7.0, inflationRate: 2.5 },
     bull: { growthRate: 10.0, inflationRate: 1.5 },
+  };
+}
+
+/**
+ * Calculates the Coast FIRE threshold for one scenario using real returns.
+ *
+ * Coast FIRE answers a specific question: if the user stopped making new
+ * retirement contributions today, would the current FIRE-eligible patrimonio
+ * still compound enough to reach the full retirement FIRE number by the target
+ * retirement age?
+ */
+export function calculateCoastFIREMetrics(
+  currentNetWorth: number,
+  annualExpenses: number,
+  withdrawalRate: number,
+  currentAge: number,
+  retirementAge: number,
+  realReturnRate: number
+): CoastFIREMetrics {
+  const yearsToRetirement = Math.max(retirementAge - currentAge, 0);
+  const wrDecimal = withdrawalRate / 100;
+  const fireNumberAtRetirement = wrDecimal > 0 ? annualExpenses / wrDecimal : 0;
+  const coastFireNumberToday =
+    yearsToRetirement === 0
+      ? fireNumberAtRetirement
+      : fireNumberAtRetirement / Math.pow(1 + (realReturnRate / 100), yearsToRetirement);
+  const futureValueAtRetirementWithoutNewContributions = growValueByRealReturn(
+    currentNetWorth,
+    realReturnRate,
+    yearsToRetirement
+  );
+  const progressToCoastFI =
+    coastFireNumberToday > 0 ? (currentNetWorth / coastFireNumberToday) * 100 : 0;
+  const gapToCoastFI = Math.max(coastFireNumberToday - currentNetWorth, 0);
+
+  return {
+    yearsToRetirement,
+    fireNumberAtRetirement,
+    coastFireNumberToday,
+    progressToCoastFI,
+    gapToCoastFI,
+    futureValueAtRetirementWithoutNewContributions,
+    isCoastReached: currentNetWorth >= coastFireNumberToday,
+  };
+}
+
+/**
+ * Builds the 3-scenario Coast FIRE summary from the existing FIRE scenario settings.
+ *
+ * Reusing Bear/Base/Bull keeps Coast FIRE aligned with the deterministic
+ * projection model the user already configures elsewhere in the FIRE area.
+ * Each scenario converts nominal growth and inflation into a single real-return
+ * assumption because the Coast FIRE math is expressed in today's money.
+ */
+export function calculateCoastFIREProjection(
+  currentNetWorth: number,
+  annualExpenses: number,
+  withdrawalRate: number,
+  currentAge: number,
+  retirementAge: number,
+  scenarios: FIREProjectionScenarios
+): CoastFIREProjectionResult {
+  const currentYear = getItalyYear();
+  const bearRealReturn = scenarios.bear.growthRate - scenarios.bear.inflationRate;
+  const baseRealReturn = scenarios.base.growthRate - scenarios.base.inflationRate;
+  const bullRealReturn = scenarios.bull.growthRate - scenarios.bull.inflationRate;
+
+  const result = {
+    bear: {
+      scenarioKey: 'bear' as const,
+      label: 'Scenario Orso',
+      realReturnRate: bearRealReturn,
+      ...calculateCoastFIREMetrics(
+        currentNetWorth,
+        annualExpenses,
+        withdrawalRate,
+        currentAge,
+        retirementAge,
+        bearRealReturn
+      ),
+    },
+    base: {
+      scenarioKey: 'base' as const,
+      label: 'Scenario Base',
+      realReturnRate: baseRealReturn,
+      ...calculateCoastFIREMetrics(
+        currentNetWorth,
+        annualExpenses,
+        withdrawalRate,
+        currentAge,
+        retirementAge,
+        baseRealReturn
+      ),
+    },
+    bull: {
+      scenarioKey: 'bull' as const,
+      label: 'Scenario Toro',
+      realReturnRate: bullRealReturn,
+      ...calculateCoastFIREMetrics(
+        currentNetWorth,
+        annualExpenses,
+        withdrawalRate,
+        currentAge,
+        retirementAge,
+        bullRealReturn
+      ),
+    },
+  };
+
+  const maxYears = Math.max(retirementAge - currentAge, 0);
+  const fireNumberTarget = result.base.fireNumberAtRetirement;
+  const projectionData: CoastFIREProjectionPoint[] = Array.from(
+    { length: maxYears + 1 },
+    (_, index) => ({
+      yearOffset: index,
+      calendarYear: currentYear + index,
+      age: currentAge + index,
+      bearPortfolioValue: growValueByRealReturn(currentNetWorth, bearRealReturn, index),
+      basePortfolioValue: growValueByRealReturn(currentNetWorth, baseRealReturn, index),
+      bullPortfolioValue: growValueByRealReturn(currentNetWorth, bullRealReturn, index),
+      fireNumberTarget,
+    })
+  );
+
+  return {
+    currentAge,
+    retirementAge,
+    annualExpenses,
+    withdrawalRate,
+    currentNetWorth,
+    scenarios: result,
+    projectionData,
   };
 }
 

@@ -66,6 +66,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 
 ### FIRE Planning
 - FIRE calculator with primary residence exclusion
+- Dedicated Coast FIRE tab with saved retirement age, no-new-contributions projections, and Bear / Base / Bull real-return scenarios
 - Multi-scenario projections (Bear / Base / Bull) with inflation adjustment
 - Per-scenario FIRE numbers with automatic savings stop at FIRE reached
 - Historical FIRE runway view with rolling 12-month expenses, separate total/liquid deltas, and a sensitivity matrix for annual spending vs annual savings

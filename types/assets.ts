@@ -156,6 +156,7 @@ export interface AssetAllocationSettings {
   riskFreeRate?: number;
   withdrawalRate?: number; // Safe withdrawal rate for FIRE calculations (e.g., 4.0 for 4%)
   plannedAnnualExpenses?: number; // Planned annual expenses for FIRE projections
+  coastFireRetirementAge?: number; // Target age at which Coast FIRE should mature into the full FIRE number
   includePrimaryResidenceInFIRE?: boolean; // If true, include primary residences in FIRE calculations; if false, exclude them (FIRE standard)
   dividendIncomeCategoryId?: string; // Category ID for automatic dividend income entries
   dividendIncomeSubCategoryId?: string; // Subcategory ID for automatic dividend income entries

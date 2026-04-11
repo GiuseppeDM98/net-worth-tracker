@@ -96,6 +96,8 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - Added a historical runway view to the FIRE calculator, showing how many years of expenses your FIRE portfolio and liquid assets would have covered over time
 - Added a FIRE sensitivity matrix that compares how changes in annual spending and annual savings affect years to FIRE in the Base scenario
 - Added separate 12-month delta indicators for total and liquid FIRE runway, so sustainability and immediately spendable runway are easier to compare
+- Added a dedicated Coast FIRE tab, so you can see whether your current FIRE portfolio could reach your retirement target age without new retirement contributions
+- Added Coast FIRE projections across Bear, Base, and Bull scenarios, including progress, remaining gap, and projected retirement value
 - Added linked focus behavior to Goal-Based Investing, so selecting a goal now highlights the same objective across summary cards, allocation view, and detail sections
 
 ## 🐛 Bug Fixes

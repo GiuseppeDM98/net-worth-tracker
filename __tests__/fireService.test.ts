@@ -5,6 +5,8 @@ vi.mock('@/lib/services/expenseService', () => ({}))
 vi.mock('@/lib/services/snapshotService', () => ({}))
 
 import {
+  calculateCoastFIREMetrics,
+  calculateCoastFIREProjection,
   calculateFIREMetrics,
   calculatePlannedFIREMetrics,
   calculateFIREProjection,
@@ -126,6 +128,69 @@ describe('calculatePlannedFIREMetrics', () => {
     const result = calculatePlannedFIREMetrics(500000, 30000, 0)
     expect(result.plannedFireNumber).toBe(0)
     expect(result.plannedProgressToFI).toBe(0)
+  })
+})
+
+describe('calculateCoastFIREMetrics', () => {
+  it('should calculate the Coast FIRE number using the discounted FIRE target', () => {
+    const result = calculateCoastFIREMetrics(300000, 40000, 4, 35, 65, 5)
+    const expectedFireNumber = 1000000
+    const expectedCoastNumber = expectedFireNumber / Math.pow(1.05, 30)
+
+    expect(result.fireNumberAtRetirement).toBe(expectedFireNumber)
+    expect(result.coastFireNumberToday).toBeCloseTo(expectedCoastNumber, 2)
+  })
+
+  it('should calculate progress and residual gap correctly', () => {
+    const result = calculateCoastFIREMetrics(200000, 40000, 4, 35, 65, 5)
+
+    expect(result.progressToCoastFI).toBeCloseTo((200000 / result.coastFireNumberToday) * 100, 6)
+    expect(result.gapToCoastFI).toBeCloseTo(result.coastFireNumberToday - 200000, 6)
+  })
+
+  it('should treat retirement age at or below current age as zero years to retirement', () => {
+    const result = calculateCoastFIREMetrics(800000, 40000, 4, 60, 60, 5)
+
+    expect(result.yearsToRetirement).toBe(0)
+    expect(result.coastFireNumberToday).toBe(result.fireNumberAtRetirement)
+    expect(result.futureValueAtRetirementWithoutNewContributions).toBe(800000)
+  })
+
+  it('should allow progress to exceed 100% once Coast FIRE is reached', () => {
+    const result = calculateCoastFIREMetrics(500000, 40000, 4, 35, 65, 5)
+
+    expect(result.isCoastReached).toBe(true)
+    expect(result.progressToCoastFI).toBeGreaterThan(100)
+    expect(result.gapToCoastFI).toBe(0)
+  })
+})
+
+describe('calculateCoastFIREProjection', () => {
+  const scenarios = getDefaultScenarios()
+
+  it('should reuse FIRE scenarios through real return = growth - inflation', () => {
+    const result = calculateCoastFIREProjection(250000, 30000, 4, 35, 60, scenarios)
+
+    expect(result.scenarios.bear.realReturnRate).toBe(0.5)
+    expect(result.scenarios.base.realReturnRate).toBe(4.5)
+    expect(result.scenarios.bull.realReturnRate).toBe(8.5)
+  })
+
+  it('should expose a projection series through the retirement age', () => {
+    const result = calculateCoastFIREProjection(250000, 30000, 4, 35, 38, scenarios)
+
+    expect(result.projectionData).toHaveLength(4)
+    expect(result.projectionData[0].age).toBe(35)
+    expect(result.projectionData[3].age).toBe(38)
+  })
+
+  it('should allow liquid progress to be derived externally from the coast number', () => {
+    const result = calculateCoastFIREProjection(250000, 30000, 4, 35, 60, scenarios)
+    const liquidNetWorth = 150000
+    const liquidProgress = (liquidNetWorth / result.scenarios.base.coastFireNumberToday) * 100
+
+    expect(liquidProgress).toBeGreaterThan(0)
+    expect(liquidProgress).toBeLessThan(result.scenarios.base.progressToCoastFI)
   })
 })
 
