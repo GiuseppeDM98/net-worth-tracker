@@ -98,6 +98,8 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - Added separate 12-month delta indicators for total and liquid FIRE runway, so sustainability and immediately spendable runway are easier to compare
 - Added a dedicated Coast FIRE tab, so you can see whether your current FIRE portfolio could reach your retirement target age without new retirement contributions
 - Added Coast FIRE projections across Bear, Base, and Bull scenarios, including progress, remaining gap, and projected retirement value
+- Added state pension support to Coast FIRE, with one or more pensions, editable IRPEF brackets, annual payment frequency, and exact pension start dates
+- Added pension-aware Coast FIRE summaries that separate the situation at your target retirement age from the steady state after pensions start
 - Added linked focus behavior to Goal-Based Investing, so selecting a goal now highlights the same objective across summary cards, allocation view, and detail sections
 
 ## 🐛 Bug Fixes
@@ -107,6 +109,8 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - Fixed sidebar menu item text becoming invisible on hover in dark mode for the Cyberpunk and Solar Dusk themes — hovering a navigation item now keeps text clearly readable
 - Fixed the active tab label and icon in the mobile bottom navigation bar being hard to read in dark mode for the Cyberpunk and Solar Dusk themes — the selected tab is now clearly visible across all themes
 - Fixed the FIRE runway year-over-year delta so it matches the one-decimal values shown in the cards
+- Fixed Coast FIRE state pension settings not persisting reliably after a page refresh
+- Fixed Coast FIRE pension details showing unreadable decimal values for years until pension start
 
 
 
@@ -165,6 +169,7 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 
 - The FIRE "Indennità Annuale" card now shows the Patrimonio FIRE base value directly, so you can immediately see which number the withdrawal rate is applied to without switching tabs
 - Improved the FIRE sensitivity section with a lightweight explainer and tooltip that clarify how to read rows, columns, colors, and the baseline cell
+- Improved Coast FIRE with contextual explanations that clarify bridge years, delayed pension starts, and how multiple pensions reduce the portfolio need over time
 - Fixed the income category pie chart legend on mobile (Cashflow → Anno Corrente) overflowing its container when four or more categories were above the 5% threshold — now consistently capped at three visible items, matching the expense chart
 
 - Improved the login and registration pages with a calmer first-load entrance, so authentication feels more consistent with the rest of the app

@@ -5,13 +5,16 @@ vi.mock('@/lib/services/expenseService', () => ({}))
 vi.mock('@/lib/services/snapshotService', () => ({}))
 
 import {
+  calculateCoastFireNetRealAnnualPension,
   calculateCoastFIREMetrics,
   calculateCoastFIREProjection,
+  calculateProgressiveTax,
   calculateFIREMetrics,
   calculatePlannedFIREMetrics,
   calculateFIREProjection,
   calculateHistoricalFIRERunway,
   calculateFIRESensitivityMatrix,
+  getDefaultCoastFireTaxBrackets,
   getDefaultScenarios,
 } from '@/lib/services/fireService'
 import type { MonthlySnapshot } from '@/types/assets'
@@ -48,6 +51,11 @@ function buildMonthlyBuckets(startYear: number, startMonth: number, count: numbe
   }
   return buckets
 }
+
+const FIXED_CURRENT_DATE = new Date('2026-04-12T00:00:00')
+const RETIREMENT_DATE_65 = '2056-04-12'
+const RETIREMENT_DATE_67 = '2058-04-12'
+const RETIREMENT_DATE_68 = '2059-04-12'
 
 describe('calculateFIREMetrics', () => {
   it('should calculate FIRE Number correctly', () => {
@@ -132,8 +140,10 @@ describe('calculatePlannedFIREMetrics', () => {
 })
 
 describe('calculateCoastFIREMetrics', () => {
+  const defaultTaxBrackets = getDefaultCoastFireTaxBrackets()
+
   it('should calculate the Coast FIRE number using the discounted FIRE target', () => {
-    const result = calculateCoastFIREMetrics(300000, 40000, 4, 35, 65, 5)
+    const result = calculateCoastFIREMetrics(300000, 40000, 4, 35, 65, 5, 2.5)
     const expectedFireNumber = 1000000
     const expectedCoastNumber = expectedFireNumber / Math.pow(1.05, 30)
 
@@ -142,14 +152,14 @@ describe('calculateCoastFIREMetrics', () => {
   })
 
   it('should calculate progress and residual gap correctly', () => {
-    const result = calculateCoastFIREMetrics(200000, 40000, 4, 35, 65, 5)
+    const result = calculateCoastFIREMetrics(200000, 40000, 4, 35, 65, 5, 2.5)
 
     expect(result.progressToCoastFI).toBeCloseTo((200000 / result.coastFireNumberToday) * 100, 6)
     expect(result.gapToCoastFI).toBeCloseTo(result.coastFireNumberToday - 200000, 6)
   })
 
   it('should treat retirement age at or below current age as zero years to retirement', () => {
-    const result = calculateCoastFIREMetrics(800000, 40000, 4, 60, 60, 5)
+    const result = calculateCoastFIREMetrics(800000, 40000, 4, 60, 60, 5, 2.5)
 
     expect(result.yearsToRetirement).toBe(0)
     expect(result.coastFireNumberToday).toBe(result.fireNumberAtRetirement)
@@ -157,11 +167,99 @@ describe('calculateCoastFIREMetrics', () => {
   })
 
   it('should allow progress to exceed 100% once Coast FIRE is reached', () => {
-    const result = calculateCoastFIREMetrics(500000, 40000, 4, 35, 65, 5)
+    const result = calculateCoastFIREMetrics(500000, 40000, 4, 35, 65, 5, 2.5)
 
     expect(result.isCoastReached).toBe(true)
     expect(result.progressToCoastFI).toBeGreaterThan(100)
     expect(result.gapToCoastFI).toBe(0)
+  })
+
+  it('should reduce the retirement capital immediately when a pension starts at retirement age', () => {
+    const result = calculateCoastFIREMetrics(
+      250000,
+      40000,
+      4,
+      35,
+      65,
+      5,
+      2.5,
+      [
+        {
+          id: 'p1',
+          label: 'INPS',
+          grossMonthlyAmount: 3000,
+          monthsPerYear: 13,
+          startDate: RETIREMENT_DATE_65,
+        },
+      ],
+      defaultTaxBrackets,
+      FIXED_CURRENT_DATE
+    )
+
+    expect(result.totalNetAnnualPensionAtRetirement).toBeGreaterThan(0)
+    expect(result.retirementCapitalRequired).toBeLessThan(1000000)
+    expect(result.annualPortfolioNeedAtRetirement).toBeLessThan(40000)
+  })
+
+  it('should require extra bridge capital when a pension starts after retirement age', () => {
+    const result = calculateCoastFIREMetrics(
+      250000,
+      40000,
+      4,
+      35,
+      60,
+      4.5,
+      2.5,
+      [
+        {
+          id: 'p1',
+          label: 'INPS',
+          grossMonthlyAmount: 2500,
+          monthsPerYear: 13,
+          startDate: RETIREMENT_DATE_67,
+        },
+      ],
+      defaultTaxBrackets,
+      FIXED_CURRENT_DATE
+    )
+
+    expect(result.latestPensionStartDate).toBe(RETIREMENT_DATE_67)
+    expect(result.retirementCapitalRequired).toBeGreaterThan(result.steadyStatePortfolioNeed)
+  })
+
+  it('should sum multiple pensions after calculating tax for each one separately', () => {
+    const result = calculateCoastFIREMetrics(
+      250000,
+      40000,
+      4,
+      35,
+      65,
+      4.5,
+      2.5,
+      [
+        {
+          id: 'p1',
+          label: 'Persona 1',
+          grossMonthlyAmount: 2000,
+          monthsPerYear: 13,
+          startDate: RETIREMENT_DATE_65,
+        },
+        {
+          id: 'p2',
+          label: 'Persona 2',
+          grossMonthlyAmount: 1500,
+          monthsPerYear: 13,
+          startDate: RETIREMENT_DATE_65,
+        },
+      ],
+      defaultTaxBrackets,
+      FIXED_CURRENT_DATE
+    )
+
+    const pensionTotal = result.totalNetAnnualPensionAtRetirement
+    expect(pensionTotal).toBeGreaterThan(0)
+    expect(result.totalNetAnnualPensionAtSteadyState).toBeCloseTo(pensionTotal, 6)
+    expect(result.annualPortfolioNeedAtRetirement).toBeCloseTo(40000 - pensionTotal, 6)
   })
 })
 
@@ -191,6 +289,93 @@ describe('calculateCoastFIREProjection', () => {
 
     expect(liquidProgress).toBeGreaterThan(0)
     expect(liquidProgress).toBeLessThan(result.scenarios.base.progressToCoastFI)
+  })
+
+  it('should keep Coast FIRE unchanged when no pensions are configured', () => {
+    const baseWithoutPension = calculateCoastFIREMetrics(250000, 30000, 4, 35, 60, 4.5, 2.5)
+    const result = calculateCoastFIREProjection(250000, 30000, 4, 35, 60, scenarios)
+
+    expect(result.scenarios.base.retirementCapitalRequired).toBeCloseTo(baseWithoutPension.retirementCapitalRequired, 6)
+    expect(result.scenarios.base.coastFireNumberToday).toBeCloseTo(baseWithoutPension.coastFireNumberToday, 6)
+  })
+
+  it('should deflate pension income differently across scenarios', () => {
+    const pension = [
+      {
+        id: 'p1',
+        label: 'INPS',
+        grossMonthlyAmount: 4242,
+        monthsPerYear: 13,
+        startDate: RETIREMENT_DATE_68,
+      },
+    ]
+    const result = calculateCoastFIREProjection(
+      250000,
+      30000,
+      4,
+      35,
+      60,
+      scenarios,
+      pension,
+      getDefaultCoastFireTaxBrackets(),
+      FIXED_CURRENT_DATE
+    )
+
+    expect(result.scenarios.bear.totalNetAnnualPensionAtSteadyState).toBeLessThan(
+      result.scenarios.base.totalNetAnnualPensionAtSteadyState
+    )
+    expect(result.scenarios.base.totalNetAnnualPensionAtSteadyState).toBeLessThan(
+      result.scenarios.bull.totalNetAnnualPensionAtSteadyState
+    )
+  })
+})
+
+describe('state pension tax helpers', () => {
+  it('should apply progressive tax brackets correctly', () => {
+    const brackets = getDefaultCoastFireTaxBrackets()
+    const tax = calculateProgressiveTax(60000, brackets)
+
+    expect(tax).toBe(15000 * 0.23 + 13000 * 0.25 + 22000 * 0.35 + 10000 * 0.43)
+  })
+
+  it('should convert a future nominal pension into a net real annual amount', () => {
+    const result = calculateCoastFireNetRealAnnualPension(
+      {
+        id: 'p1',
+        label: 'INPS',
+        grossMonthlyAmount: 4242,
+        monthsPerYear: 13,
+        startDate: RETIREMENT_DATE_68,
+      },
+      35,
+      2.5,
+      getDefaultCoastFireTaxBrackets(),
+      FIXED_CURRENT_DATE
+    )
+
+    expect(result.grossAnnualFutureNominal).toBe(4242 * 13)
+    expect(result.grossAnnualRealAtStart).toBeLessThan(result.grossAnnualFutureNominal)
+    expect(result.netAnnualRealAtStart).toBeLessThan(result.grossAnnualRealAtStart)
+  })
+
+  it('should respect custom tax brackets', () => {
+    const pension = calculateCoastFireNetRealAnnualPension(
+      {
+        id: 'p1',
+        label: 'INPS',
+        grossMonthlyAmount: 3000,
+        monthsPerYear: 13,
+        startDate: RETIREMENT_DATE_65,
+      },
+      35,
+      2.5,
+      [
+        { id: 'flat', upTo: null, rate: 10 },
+      ],
+      FIXED_CURRENT_DATE
+    )
+
+    expect(pension.netAnnualRealAtStart).toBeCloseTo(pension.grossAnnualRealAtStart * 0.9, 6)
   })
 })
 

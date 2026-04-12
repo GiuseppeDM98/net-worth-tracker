@@ -92,7 +92,7 @@ export function CoastFireProjectionChart({
           stroke="#F59E0B"
           strokeWidth={2}
           strokeDasharray="8 4"
-          name="Target FIRE a pensione"
+          name="Capitale richiesto a pensione"
           dot={false}
           animationDuration={800}
           animationEasing="ease-out"

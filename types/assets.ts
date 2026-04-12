@@ -151,12 +151,29 @@ export interface AssetAllocationTarget {
   };
 }
 
+export interface CoastFirePensionInput {
+  id: string;
+  label: string;
+  grossMonthlyAmount: number; // Monthly gross pension, nominal future amount from the source estimate
+  monthsPerYear: number; // Annual payment count (e.g. 13 in Italy)
+  startDate?: string; // Retirement start date in YYYY-MM-DD format
+  startAge?: number; // Legacy fallback kept for backward compatibility with previously saved rows
+}
+
+export interface CoastFireTaxBracket {
+  id: string;
+  upTo: number | null; // Null = no upper bound (top bracket)
+  rate: number; // Percentage rate (e.g. 23 for 23%)
+}
+
 export interface AssetAllocationSettings {
   userAge?: number;
   riskFreeRate?: number;
   withdrawalRate?: number; // Safe withdrawal rate for FIRE calculations (e.g., 4.0 for 4%)
   plannedAnnualExpenses?: number; // Planned annual expenses for FIRE projections
   coastFireRetirementAge?: number; // Target age at which Coast FIRE should mature into the full FIRE number
+  coastFirePensions?: CoastFirePensionInput[]; // Optional state-pension inputs used only by the Coast FIRE tab
+  coastFireTaxBrackets?: CoastFireTaxBracket[]; // Progressive IRPEF brackets used to estimate state-pension net income
   includePrimaryResidenceInFIRE?: boolean; // If true, include primary residences in FIRE calculations; if false, exclude them (FIRE standard)
   dividendIncomeCategoryId?: string; // Category ID for automatic dividend income entries
   dividendIncomeSubCategoryId?: string; // Subcategory ID for automatic dividend income entries

@@ -1,4 +1,11 @@
-import { MonthlySnapshot, FIREProjectionScenarios, FIREProjectionYearData, FIREProjectionResult } from '@/types/assets';
+import {
+  CoastFirePensionInput,
+  CoastFireTaxBracket,
+  MonthlySnapshot,
+  FIREProjectionScenarios,
+  FIREProjectionYearData,
+  FIREProjectionResult,
+} from '@/types/assets';
 import { Expense } from '@/types/expenses';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import { getItalyMonth, getItalyMonthYear, getItalyYear } from '@/lib/utils/dateHelpers';
@@ -103,18 +110,39 @@ export interface FIRESensitivityMatrix {
 
 export interface CoastFIREMetrics {
   yearsToRetirement: number;
-  fireNumberAtRetirement: number;
+  fireNumberAtRetirement: number; // Legacy alias kept aligned with retirementCapitalRequired
   coastFireNumberToday: number;
   progressToCoastFI: number;
   gapToCoastFI: number;
   futureValueAtRetirementWithoutNewContributions: number;
+  retirementCapitalRequired: number;
+  steadyStatePortfolioNeed: number;
+  totalNetAnnualPensionAtRetirement: number;
+  totalNetAnnualPensionAtSteadyState: number;
+  annualPortfolioNeedAtRetirement: number;
+  annualPortfolioNeedAtSteadyState: number;
+  latestPensionStartAge: number;
+  latestPensionStartDate: string | null;
   isCoastReached: boolean;
+}
+
+export interface CoastFIREPensionBreakdown {
+  id: string;
+  label: string;
+  startDate: string | null;
+  startAge: number;
+  yearsUntilStart: number;
+  grossAnnualFutureNominal: number;
+  grossAnnualRealAtStart: number;
+  netAnnualRealAtStart: number;
+  isActiveAtRetirement: boolean;
 }
 
 export interface CoastFIREScenarioMetrics extends CoastFIREMetrics {
   scenarioKey: 'bear' | 'base' | 'bull';
   label: string;
   realReturnRate: number;
+  pensionBreakdown: CoastFIREPensionBreakdown[];
 }
 
 export interface CoastFIREProjectionPoint {
@@ -149,6 +177,24 @@ interface MonthlyExpenseAggregate {
 const EXPENSE_MULTIPLIERS = [0.8, 0.9, 1.0, 1.1, 1.2] as const;
 const SAVINGS_MULTIPLIERS = [0.75, 1.0, 1.25, 1.5] as const;
 const SAVINGS_FALLBACK_VALUES = [0, 5000, 10000, 20000] as const;
+const DEFAULT_COAST_FIRE_TAX_BRACKETS: CoastFireTaxBracket[] = [
+  { id: 'irpef-23', upTo: 15000, rate: 23 },
+  { id: 'irpef-25', upTo: 28000, rate: 25 },
+  { id: 'irpef-35', upTo: 50000, rate: 35 },
+  { id: 'irpef-43', upTo: null, rate: 43 },
+];
+
+interface CoastFIRERetirementNeeds {
+  retirementCapitalRequired: number;
+  steadyStatePortfolioNeed: number;
+  totalNetAnnualPensionAtRetirement: number;
+  totalNetAnnualPensionAtSteadyState: number;
+  annualPortfolioNeedAtRetirement: number;
+  annualPortfolioNeedAtSteadyState: number;
+  latestPensionStartAge: number;
+  latestPensionStartDate: string | null;
+  pensionBreakdown: CoastFIREPensionBreakdown[];
+}
 
 function getYearMonthKey(year: number, month: number): string {
   return `${year}-${month}`;
@@ -168,6 +214,226 @@ function formatSavingsColumnLabel(amount: number): string {
   if (amount === 0) return '€0';
   if (amount % 1000 === 0) return `€${amount / 1000}k`;
   return `€${Math.round(amount)}`;
+}
+
+export function getDefaultCoastFireTaxBrackets(): CoastFireTaxBracket[] {
+  return DEFAULT_COAST_FIRE_TAX_BRACKETS.map((bracket) => ({ ...bracket }));
+}
+
+export function normalizeCoastFireTaxBrackets(
+  brackets?: CoastFireTaxBracket[]
+): CoastFireTaxBracket[] {
+  if (!Array.isArray(brackets) || brackets.length === 0) {
+    return getDefaultCoastFireTaxBrackets();
+  }
+
+  const cleaned = brackets
+    .map((bracket, index) => {
+      const hasFiniteUpperBound =
+        bracket.upTo !== null && bracket.upTo !== undefined && Number.isFinite(bracket.upTo);
+      const upTo = hasFiniteUpperBound ? Math.max(Number(bracket.upTo), 0) : null;
+      const rate = Number.isFinite(bracket.rate) ? Math.min(Math.max(Number(bracket.rate), 0), 100) : NaN;
+
+      if (!Number.isFinite(rate)) return null;
+      if (upTo !== null && upTo <= 0) return null;
+
+      return {
+        id: bracket.id || `coast-fire-tax-${index + 1}`,
+        upTo,
+        rate,
+      };
+    })
+    .filter((bracket): bracket is CoastFireTaxBracket => bracket !== null);
+
+  if (cleaned.length === 0) {
+    return getDefaultCoastFireTaxBrackets();
+  }
+
+  const bounded = cleaned
+    .filter((bracket) => bracket.upTo !== null)
+    .sort((left, right) => (left.upTo ?? 0) - (right.upTo ?? 0));
+  const openEnded = cleaned.filter((bracket) => bracket.upTo === null);
+  const normalized: CoastFireTaxBracket[] = [];
+  let previousUpperBound = 0;
+
+  bounded.forEach((bracket, index) => {
+    if ((bracket.upTo ?? 0) <= previousUpperBound) return;
+    normalized.push({
+      id: bracket.id || `coast-fire-tax-bounded-${index + 1}`,
+      upTo: bracket.upTo,
+      rate: bracket.rate,
+    });
+    previousUpperBound = bracket.upTo ?? previousUpperBound;
+  });
+
+  const topRate =
+    openEnded[openEnded.length - 1]?.rate ??
+    normalized[normalized.length - 1]?.rate ??
+    DEFAULT_COAST_FIRE_TAX_BRACKETS[DEFAULT_COAST_FIRE_TAX_BRACKETS.length - 1].rate;
+
+  normalized.push({
+    id: openEnded[openEnded.length - 1]?.id || 'coast-fire-tax-top',
+    upTo: null,
+    rate: topRate,
+  });
+
+  return normalized;
+}
+
+export function normalizeCoastFirePensions(
+  pensions?: CoastFirePensionInput[]
+): CoastFirePensionInput[] {
+  if (!Array.isArray(pensions) || pensions.length === 0) {
+    return [];
+  }
+
+  const validIsoDatePattern = /^\d{4}-\d{2}-\d{2}$/;
+
+  return pensions
+    .map((pension, index) => ({
+      id: pension.id || `coast-fire-pension-${index + 1}`,
+      label: pension.label?.trim() || `Pensione ${index + 1}`,
+      grossMonthlyAmount: Number.isFinite(pension.grossMonthlyAmount)
+        ? Math.max(Number(pension.grossMonthlyAmount), 0)
+        : 0,
+      monthsPerYear: Number.isFinite(pension.monthsPerYear)
+        ? Math.max(Math.round(Number(pension.monthsPerYear)), 0)
+        : 0,
+      startDate:
+        typeof pension.startDate === 'string' && validIsoDatePattern.test(pension.startDate.trim())
+          ? pension.startDate.trim()
+          : undefined,
+      startAge: Number.isFinite(pension.startAge) ? Math.round(Number(pension.startAge)) : undefined,
+    }))
+    .filter(
+      (pension) =>
+        pension.grossMonthlyAmount > 0 &&
+        pension.monthsPerYear > 0 &&
+        (
+          pension.startDate !== undefined ||
+          (pension.startAge !== undefined && pension.startAge >= 18 && pension.startAge <= 100)
+        )
+    );
+}
+
+function addYearsToDate(date: Date, years: number): Date {
+  const nextDate = new Date(date);
+  nextDate.setFullYear(nextDate.getFullYear() + years);
+  return nextDate;
+}
+
+function parseIsoDate(dateString: string | undefined): Date | null {
+  if (!dateString) return null;
+  const parsed = new Date(`${dateString}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function calculateYearsDifference(date: Date, referenceDate: Date): number {
+  const millisecondsPerYear = 1000 * 60 * 60 * 24 * 365.2425;
+  return (date.getTime() - referenceDate.getTime()) / millisecondsPerYear;
+}
+
+function resolveCoastFirePensionStart(
+  pension: CoastFirePensionInput,
+  currentAge: number,
+  currentDate: Date
+): { startDate: Date | null; startDateIso: string | null; startAge: number } {
+  const explicitStartDate = parseIsoDate(pension.startDate);
+
+  if (explicitStartDate) {
+    return {
+      startDate: explicitStartDate,
+      startDateIso: pension.startDate ?? null,
+      startAge: currentAge + Math.max(calculateYearsDifference(explicitStartDate, currentDate), 0),
+    };
+  }
+
+  const legacyStartAge = Number.isFinite(pension.startAge) ? Number(pension.startAge) : currentAge;
+  const derivedStartDate = addYearsToDate(currentDate, Math.max(legacyStartAge - currentAge, 0));
+
+  return {
+    startDate: derivedStartDate,
+    startDateIso: derivedStartDate.toISOString().slice(0, 10),
+    startAge: legacyStartAge,
+  };
+}
+
+export function calculateProgressiveTax(
+  annualGrossIncome: number,
+  taxBrackets: CoastFireTaxBracket[]
+): number {
+  if (!Number.isFinite(annualGrossIncome) || annualGrossIncome <= 0) {
+    return 0;
+  }
+
+  const normalizedBrackets = normalizeCoastFireTaxBrackets(taxBrackets);
+  let tax = 0;
+  let previousUpperBound = 0;
+
+  for (const bracket of normalizedBrackets) {
+    const currentUpperBound = bracket.upTo ?? annualGrossIncome;
+    const taxableAmount = Math.max(Math.min(annualGrossIncome, currentUpperBound) - previousUpperBound, 0);
+
+    if (taxableAmount > 0) {
+      tax += taxableAmount * (bracket.rate / 100);
+    }
+
+    if (bracket.upTo === null || annualGrossIncome <= currentUpperBound) {
+      break;
+    }
+
+    previousUpperBound = currentUpperBound;
+  }
+
+  return tax;
+}
+
+export function calculateCoastFireNetRealAnnualPension(
+  pension: CoastFirePensionInput,
+  currentAge: number,
+  inflationRate: number,
+  taxBrackets: CoastFireTaxBracket[],
+  currentDate: Date = new Date()
+): CoastFIREPensionBreakdown {
+  const normalizedPension = normalizeCoastFirePensions([pension])[0];
+
+  if (!normalizedPension) {
+    return {
+      id: pension.id,
+      label: pension.label || 'Pensione',
+      startDate: pension.startDate ?? null,
+      startAge: pension.startAge ?? currentAge,
+      yearsUntilStart: 0,
+      grossAnnualFutureNominal: 0,
+      grossAnnualRealAtStart: 0,
+      netAnnualRealAtStart: 0,
+      isActiveAtRetirement: false,
+    };
+  }
+
+  const resolvedStart = resolveCoastFirePensionStart(normalizedPension, currentAge, currentDate);
+  const yearsUntilStart =
+    resolvedStart.startDate !== null
+      ? Math.max(calculateYearsDifference(resolvedStart.startDate, currentDate), 0)
+      : Math.max(resolvedStart.startAge - currentAge, 0);
+  const grossAnnualFutureNominal = normalizedPension.grossMonthlyAmount * normalizedPension.monthsPerYear;
+  const inflationMultiplier =
+    yearsUntilStart > 0 ? Math.pow(1 + (inflationRate / 100), yearsUntilStart) : 1;
+  const grossAnnualRealAtStart =
+    inflationMultiplier > 0 ? grossAnnualFutureNominal / inflationMultiplier : grossAnnualFutureNominal;
+  const annualTax = calculateProgressiveTax(grossAnnualRealAtStart, taxBrackets);
+
+  return {
+    id: normalizedPension.id,
+    label: normalizedPension.label,
+    startDate: resolvedStart.startDateIso,
+    startAge: resolvedStart.startAge,
+    yearsUntilStart,
+    grossAnnualFutureNominal,
+    grossAnnualRealAtStart,
+    netAnnualRealAtStart: Math.max(grossAnnualRealAtStart - annualTax, 0),
+    isActiveAtRetirement: false,
+  };
 }
 
 function growValueByRealReturn(value: number, realReturnRate: number, years: number): number {
@@ -605,17 +871,130 @@ export function getDefaultScenarios(): FIREProjectionScenarios {
  * still compound enough to reach the full retirement FIRE number by the target
  * retirement age?
  */
+function buildCoastFIRERetirementNeeds(
+  annualExpenses: number,
+  withdrawalRate: number,
+  currentAge: number,
+  retirementAge: number,
+  realReturnRate: number,
+  inflationRate: number,
+  pensions: CoastFirePensionInput[],
+  taxBrackets: CoastFireTaxBracket[],
+  currentDate: Date
+): CoastFIRERetirementNeeds {
+  const normalizedPensions = normalizeCoastFirePensions(pensions);
+  const normalizedTaxBrackets = normalizeCoastFireTaxBrackets(taxBrackets);
+  const pensionBreakdown = normalizedPensions.map((pension) =>
+    calculateCoastFireNetRealAnnualPension(
+      pension,
+      currentAge,
+      inflationRate,
+      normalizedTaxBrackets,
+      currentDate
+    )
+  );
+  const latestPensionStartAge =
+    pensionBreakdown.length > 0
+      ? Math.max(...pensionBreakdown.map((pension) => pension.startAge))
+      : retirementAge;
+  const retirementDate = addYearsToDate(currentDate, Math.max(retirementAge - currentAge, 0));
+  const latestPensionStartDate =
+    pensionBreakdown.length > 0
+      ? pensionBreakdown
+          .map((pension) => pension.startDate)
+          .filter((date): date is string => typeof date === 'string')
+          .sort()
+          .at(-1) ?? null
+      : null;
+  const totalNetAnnualPensionAtRetirement = pensionBreakdown
+    .filter((pension) => {
+      const pensionStartDate = parseIsoDate(pension.startDate ?? undefined);
+      return pensionStartDate ? pensionStartDate <= retirementDate : pension.startAge <= retirementAge;
+    })
+    .reduce((sum, pension) => sum + pension.netAnnualRealAtStart, 0);
+  const totalNetAnnualPensionAtSteadyState = pensionBreakdown.reduce(
+    (sum, pension) => sum + pension.netAnnualRealAtStart,
+    0
+  );
+  const annualPortfolioNeedAtRetirement = Math.max(annualExpenses - totalNetAnnualPensionAtRetirement, 0);
+  const annualPortfolioNeedAtSteadyState = Math.max(annualExpenses - totalNetAnnualPensionAtSteadyState, 0);
+  const withdrawalRateDecimal = withdrawalRate / 100;
+  const steadyStatePortfolioNeed =
+    withdrawalRateDecimal > 0 ? annualPortfolioNeedAtSteadyState / withdrawalRateDecimal : 0;
+
+  let retirementCapitalRequired = steadyStatePortfolioNeed;
+  const yearlyGrowthFactor = 1 + (realReturnRate / 100);
+  const bridgeYears = latestPensionStartDate
+    ? Math.max(
+        Math.ceil(calculateYearsDifference(parseIsoDate(latestPensionStartDate) ?? retirementDate, retirementDate)),
+        0
+      )
+    : Math.max(Math.ceil(latestPensionStartAge - retirementAge), 0);
+
+  // Work backward from the last pension start date. The model is annual, so a
+  // pension that starts even a few months after the target retirement date
+  // still requires funding the full bridge year.
+  for (let step = bridgeYears - 1; step >= 0; step -= 1) {
+    const age = retirementAge + step;
+    const bridgeDate = addYearsToDate(retirementDate, step);
+    const activePensionsAtAge = pensionBreakdown
+      .filter((pension) => {
+        const pensionStartDate = parseIsoDate(pension.startDate ?? undefined);
+        return pensionStartDate ? pensionStartDate <= bridgeDate : pension.startAge <= age;
+      })
+      .reduce((sum, pension) => sum + pension.netAnnualRealAtStart, 0);
+    const annualPortfolioNeedAtAge = Math.max(annualExpenses - activePensionsAtAge, 0);
+
+    retirementCapitalRequired =
+      yearlyGrowthFactor > 0
+        ? (retirementCapitalRequired + annualPortfolioNeedAtAge) / yearlyGrowthFactor
+        : retirementCapitalRequired + annualPortfolioNeedAtAge;
+  }
+
+  return {
+    retirementCapitalRequired,
+    steadyStatePortfolioNeed,
+    totalNetAnnualPensionAtRetirement,
+    totalNetAnnualPensionAtSteadyState,
+    annualPortfolioNeedAtRetirement,
+    annualPortfolioNeedAtSteadyState,
+    latestPensionStartAge,
+    latestPensionStartDate,
+    pensionBreakdown: pensionBreakdown.map((pension) => ({
+      ...pension,
+      isActiveAtRetirement: (() => {
+        const pensionStartDate = parseIsoDate(pension.startDate ?? undefined);
+        return pensionStartDate ? pensionStartDate <= retirementDate : pension.startAge <= retirementAge;
+      })(),
+    })),
+  };
+}
+
 export function calculateCoastFIREMetrics(
   currentNetWorth: number,
   annualExpenses: number,
   withdrawalRate: number,
   currentAge: number,
   retirementAge: number,
-  realReturnRate: number
+  realReturnRate: number,
+  inflationRate: number,
+  pensions: CoastFirePensionInput[] = [],
+  taxBrackets: CoastFireTaxBracket[] = getDefaultCoastFireTaxBrackets(),
+  currentDate: Date = new Date()
 ): CoastFIREMetrics {
   const yearsToRetirement = Math.max(retirementAge - currentAge, 0);
-  const wrDecimal = withdrawalRate / 100;
-  const fireNumberAtRetirement = wrDecimal > 0 ? annualExpenses / wrDecimal : 0;
+  const retirementNeeds = buildCoastFIRERetirementNeeds(
+    annualExpenses,
+    withdrawalRate,
+    currentAge,
+    retirementAge,
+    realReturnRate,
+    inflationRate,
+    pensions,
+    taxBrackets,
+    currentDate
+  );
+  const fireNumberAtRetirement = retirementNeeds.retirementCapitalRequired;
   const coastFireNumberToday =
     yearsToRetirement === 0
       ? fireNumberAtRetirement
@@ -636,6 +1015,14 @@ export function calculateCoastFIREMetrics(
     progressToCoastFI,
     gapToCoastFI,
     futureValueAtRetirementWithoutNewContributions,
+    retirementCapitalRequired: retirementNeeds.retirementCapitalRequired,
+    steadyStatePortfolioNeed: retirementNeeds.steadyStatePortfolioNeed,
+    totalNetAnnualPensionAtRetirement: retirementNeeds.totalNetAnnualPensionAtRetirement,
+    totalNetAnnualPensionAtSteadyState: retirementNeeds.totalNetAnnualPensionAtSteadyState,
+    annualPortfolioNeedAtRetirement: retirementNeeds.annualPortfolioNeedAtRetirement,
+    annualPortfolioNeedAtSteadyState: retirementNeeds.annualPortfolioNeedAtSteadyState,
+    latestPensionStartAge: retirementNeeds.latestPensionStartAge,
+    latestPensionStartDate: retirementNeeds.latestPensionStartDate,
     isCoastReached: currentNetWorth >= coastFireNumberToday,
   };
 }
@@ -654,12 +1041,51 @@ export function calculateCoastFIREProjection(
   withdrawalRate: number,
   currentAge: number,
   retirementAge: number,
-  scenarios: FIREProjectionScenarios
+  scenarios: FIREProjectionScenarios,
+  pensions: CoastFirePensionInput[] = [],
+  taxBrackets: CoastFireTaxBracket[] = getDefaultCoastFireTaxBrackets(),
+  currentDate: Date = new Date()
 ): CoastFIREProjectionResult {
   const currentYear = getItalyYear();
   const bearRealReturn = scenarios.bear.growthRate - scenarios.bear.inflationRate;
   const baseRealReturn = scenarios.base.growthRate - scenarios.base.inflationRate;
   const bullRealReturn = scenarios.bull.growthRate - scenarios.bull.inflationRate;
+  const normalizedPensions = normalizeCoastFirePensions(pensions);
+  const normalizedTaxBrackets = normalizeCoastFireTaxBrackets(taxBrackets);
+
+  const bearNeeds = buildCoastFIRERetirementNeeds(
+    annualExpenses,
+    withdrawalRate,
+    currentAge,
+    retirementAge,
+    bearRealReturn,
+    scenarios.bear.inflationRate,
+    normalizedPensions,
+    normalizedTaxBrackets,
+    currentDate
+  );
+  const baseNeeds = buildCoastFIRERetirementNeeds(
+    annualExpenses,
+    withdrawalRate,
+    currentAge,
+    retirementAge,
+    baseRealReturn,
+    scenarios.base.inflationRate,
+    normalizedPensions,
+    normalizedTaxBrackets,
+    currentDate
+  );
+  const bullNeeds = buildCoastFIRERetirementNeeds(
+    annualExpenses,
+    withdrawalRate,
+    currentAge,
+    retirementAge,
+    bullRealReturn,
+    scenarios.bull.inflationRate,
+    normalizedPensions,
+    normalizedTaxBrackets,
+    currentDate
+  );
 
   const result = {
     bear: {
@@ -672,8 +1098,13 @@ export function calculateCoastFIREProjection(
         withdrawalRate,
         currentAge,
         retirementAge,
-        bearRealReturn
+        bearRealReturn,
+        scenarios.bear.inflationRate,
+        normalizedPensions,
+        normalizedTaxBrackets,
+        currentDate
       ),
+      pensionBreakdown: bearNeeds.pensionBreakdown,
     },
     base: {
       scenarioKey: 'base' as const,
@@ -685,8 +1116,13 @@ export function calculateCoastFIREProjection(
         withdrawalRate,
         currentAge,
         retirementAge,
-        baseRealReturn
+        baseRealReturn,
+        scenarios.base.inflationRate,
+        normalizedPensions,
+        normalizedTaxBrackets,
+        currentDate
       ),
+      pensionBreakdown: baseNeeds.pensionBreakdown,
     },
     bull: {
       scenarioKey: 'bull' as const,
@@ -698,8 +1134,13 @@ export function calculateCoastFIREProjection(
         withdrawalRate,
         currentAge,
         retirementAge,
-        bullRealReturn
+        bullRealReturn,
+        scenarios.bull.inflationRate,
+        normalizedPensions,
+        normalizedTaxBrackets,
+        currentDate
       ),
+      pensionBreakdown: bullNeeds.pensionBreakdown,
     },
   };
 
