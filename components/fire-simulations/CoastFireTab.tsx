@@ -173,7 +173,7 @@ function buildPensionDraftIssues(
         pensionId: draft.id,
         severity: 'info',
         kind: 'informational',
-        message: `${label}: la decorrenza e' nel passato. Verifica che la data sia coerente con la tua stima.`,
+        message: `${label}: la data di decorrenza è nel passato — verifica che rispecchi la tua stima effettiva.`,
       });
     }
 
@@ -188,7 +188,7 @@ function buildPensionDraftIssues(
           pensionId: draft.id,
           severity: 'info',
           kind: 'informational',
-          message: `${label}: parte dopo l'eta target e crea circa ${bridgeYears} ${bridgeYears === 1 ? 'anno ponte' : 'anni ponte'} da finanziare col portafoglio.`,
+          message: `${label}: decorre ${bridgeYears} ${bridgeYears === 1 ? 'anno' : 'anni'} dopo il target — nel periodo ponte il portafoglio copre ancora il fabbisogno per intero.`,
         });
       }
     }
@@ -562,21 +562,21 @@ export function CoastFireTab() {
         ? 'border-amber-500/20 bg-amber-500/10 text-amber-200 dark:text-amber-200'
         : 'border-border/70 bg-background/60 text-muted-foreground';
   const pensionStateLabel =
-    pensionConfigurationState === 'valid'
-      ? 'Configurazione valida'
-      : pensionConfigurationState === 'informational'
-        ? 'Configurazione valida con avviso'
-        : pensionConfigurationState === 'incomplete'
-          ? 'Configurazione incompleta'
-          : 'Nessuna pensione';
+    pensionConfigurationState === "valid"
+      ? "Pensioni configurate"
+      : pensionConfigurationState === "informational"
+        ? "Configurazione con avviso"
+        : pensionConfigurationState === "incomplete"
+          ? "Dati incompleti"
+          : "Nessuna pensione";
   const pensionStateDescription =
-    pensionConfigurationState === 'valid'
-      ? 'Le pensioni sono tutte pronte per entrare nel calcolo.'
-      : pensionConfigurationState === 'informational'
-        ? 'I dati sono coerenti, ma c’è almeno un avviso informativo sul timing della pensione.'
-        : pensionConfigurationState === 'incomplete'
-          ? 'I dati presenti non bastano ancora per stimare l’impatto pensionistico.'
-          : 'Il portafoglio copre da solo tutte le spese anche dopo la target age.';
+    pensionConfigurationState === "valid"
+      ? "Tutte le pensioni hanno importo, mensilità e decorrenza: entrano nel calcolo."
+      : pensionConfigurationState === "informational"
+        ? "I dati sono completi, ma almeno una pensione decorre dopo il target \u2014 leggi gli avvisi."
+        : pensionConfigurationState === "incomplete"
+          ? "Mancano dati obbligatori su almeno una pensione: non può ancora ridurre il fabbisogno."
+          : "Nessuna pensione inserita: il calcolo assume che il portafoglio debba coprire per intero le spese in pensione.";
   const primaryInformationalIssue =
     pensionDraftIssues.find((issue) => issue.kind === 'informational') ?? null;
   const primaryIncompleteIssue =
@@ -588,7 +588,7 @@ export function CoastFireTab() {
 
     if (baseScenario.pensionBreakdown.length === 0) {
       return [
-        'Non hai inserito pensioni statali: il Coast FIRE coincide con il caso in cui il portafoglio deve coprire tutte le spese anche in pensione.',
+        'Nessuna pensione configurata: il portafoglio deve sostenere per intero il fabbisogno annuo anche dopo il target Coast FIRE.',
       ];
     }
 
@@ -627,13 +627,13 @@ export function CoastFireTab() {
   }, [annualExpenses, baseScenario, bridgeYears, resolvedRetirementAge]);
   const incompleteReason =
     currentNetWorth <= 0
-      ? 'Serve un patrimonio FIRE positivo per calcolare il Coast FIRE.'
+      ? "Serve un patrimonio FIRE positivo per calcolare il Coast FIRE."
       : annualExpenses === undefined || annualExpenses <= 0
-        ? 'Servono spese reali dell’ultimo anno completo per stimare il target Coast FIRE.'
+        ? "Servono le spese reali dell’ultimo anno completo per stimare il target Coast FIRE."
         : currentAge === null
-          ? 'Inserisci la tua età attuale per attivare il calcolo.'
+          ? "Inserisci la tua età attuale: serve a calcolare quanti anni ha il capitale per crescere fino al target."
           : retirementAge === null
-            ? 'Inserisci l’età di pensionamento target per attivare il calcolo.'
+            ? "Inserisci l’età target Coast FIRE: è il momento in cui il capitale deve essere sufficiente."
             : null;
   const timelineSteps = baseScenario
     ? [
@@ -649,13 +649,13 @@ export function CoastFireTab() {
           detail: pension.isActiveAtRetirement && index === 0
             ? `E' gia' attiva all'eta target e copre ${formatCurrency(pension.netAnnualRealAtStart)} netti reali l'anno.`
             : `Da qui aggiunge ${formatCurrency(pension.netAnnualRealAtStart)} netti reali l'anno alla copertura.`,
-          badge: pension.isActiveAtRetirement ? 'Gia attiva' : `Parte a ${formatAgeYears(pension.startAge)}`,
+          badge: pension.isActiveAtRetirement ? 'Già attiva' : `Parte a ${formatAgeYears(pension.startAge)}`,
         })),
         {
           id: 'steady-state',
           label: 'A regime',
           detail: `Dopo l'ultima decorrenza il portafoglio deve coprire ${formatCurrencyPerYear(baseScenario.annualPortfolioNeedAtSteadyState)}.`,
-          badge: `${formatCurrency(baseScenario.steadyStatePortfolioNeed)} steady-state`,
+          badge: `${formatCurrency(baseScenario.steadyStatePortfolioNeed)} a regime`,
         },
       ]
     : [];
@@ -719,12 +719,11 @@ export function CoastFireTab() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <TrendingUp className="h-5 w-5 text-primary" />
-                    <CardTitle className="text-xl">Lettura pensione statale</CardTitle>
+                    <CardTitle className="text-xl">Effetto della pensione sul Coast FIRE</CardTitle>
                   </div>
                   <CardDescription className="max-w-[72ch]">
-                    Coast FIRE qui risponde a una domanda precisa: puoi arrivare all&apos;eta target con il tuo
-                    capitale attuale, sapendo che una o piu&apos; pensioni ridurranno il fabbisogno solo dalla loro
-                    decorrenza effettiva.
+                    Il tuo capitale attuale può bastare a raggiungere il target Coast FIRE, anche se le pensioni
+                    entrano in gioco solo dalla loro data di decorrenza — che può essere anni dopo il target.
                   </CardDescription>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -795,10 +794,10 @@ export function CoastFireTab() {
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <CalendarRange className="h-4 w-4 text-primary" />
-                  Prima e dopo pensione
+                  Fasi di copertura
                 </CardTitle>
                 <CardDescription>
-                  La timeline mostra quando il carico passa dal solo portafoglio a una copertura mista con pensioni.
+                  Come cambia il fabbisogno che resta al portafoglio man mano che le pensioni diventano attive.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -826,8 +825,8 @@ export function CoastFireTab() {
 
             <Card className="border-border/70">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Sintesi decisionale</CardTitle>
-                <CardDescription>La lettura da usare per capire se puoi smettere prima sapendo che la pensione coprira&apos; dopo.</CardDescription>
+                <CardTitle className="text-base">Coast Number</CardTitle>
+                <CardDescription>Capitale minimo da avere oggi per poter smettere di contribuire, sapendo che il portafoglio cresce da solo fino al target.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <div className="rounded-xl border border-border bg-background/50 p-4">
@@ -835,7 +834,7 @@ export function CoastFireTab() {
                   <p className="mt-2 font-mono text-lg font-semibold text-foreground desktop:text-2xl">
                     {formatCurrency(baseScenario.coastFireNumberToday)}
                   </p>
-                  <p className="mt-2 text-muted-foreground">E' il patrimonio FIRE-eligible minimo richiesto oggi per arrivare all&apos;obiettivo senza nuovi contributi pensionistici.</p>
+                  <p className="mt-2 text-muted-foreground">Patrimonio FIRE-eligible minimo che, senza nuovi versamenti, cresce fino a coprire il fabbisogno all&apos;età target.</p>
                 </div>
                 <div className="rounded-xl border border-border bg-background/50 p-4">
                   <div className="flex items-center justify-between gap-3">
@@ -863,10 +862,10 @@ export function CoastFireTab() {
                     )}
                   >
                     <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>{primaryIncompleteIssue ? 'Dati da completare' : 'Avviso informativo'}</AlertTitle>
+                    <AlertTitle>{primaryIncompleteIssue ? 'Pensione incompleta' : 'Nota sulla decorrenza'}</AlertTitle>
                     <AlertDescription>
                       {primaryPensionIssue.message}
-                      {remainingPensionIssues > 0 ? ` Ci sono altri ${remainingPensionIssues} avvisi nella configurazione.` : ''}
+                      {remainingPensionIssues > 0 ? ` Altri ${remainingPensionIssues} avvisi nella configurazione.` : ''}
                     </AlertDescription>
                   </Alert>
                 ) : null}
@@ -994,7 +993,7 @@ export function CoastFireTab() {
               <div className="space-y-1">
                 <p className="text-sm font-semibold text-foreground">2. Assunzioni già attive</p>
                 <p className="text-sm text-muted-foreground">
-                  Questi valori cambiano il numero finale anche se non dipendono dalla pensione.
+                  SWR, spese e patrimonio vengono dalle impostazioni generali: cambiano il Coast Number anche senza pensioni configurate.
                 </p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -1023,8 +1022,8 @@ export function CoastFireTab() {
               <div>
                 <h3 className="text-sm font-semibold text-foreground">3. Pensioni statali</h3>
                 <p className="text-sm text-muted-foreground">
-                  Per 1-2 pensioni la lettura resta ampia. Da 3 in su il layout diventa più denso per mantenere il
-                  confronto leggibile.
+                  Ogni pensione riduce il fabbisogno del portafoglio solo dalla sua data di decorrenza. Puoi
+                  inserirne più di una se hai contributi in casse diverse.
                 </p>
               </div>
               <Button type="button" variant="outline" size="sm" onClick={addPensionRow}>
@@ -1044,14 +1043,14 @@ export function CoastFireTab() {
               >
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>
-                  {primaryIncompleteIssue ? 'Dati da completare' : 'Avvisi informativi'}
+                  {primaryIncompleteIssue ? 'Dati mancanti' : 'Note sulla decorrenza'}
                 </AlertTitle>
                 <AlertDescription className="space-y-1">
                   {pensionDraftIssues.slice(0, 3).map((issue) => (
                     <p key={`${issue.pensionId}-${issue.message}`}>{issue.message}</p>
                   ))}
                   {pensionDraftIssues.length > 3 ? (
-                    <p>Altre segnalazioni: {pensionDraftIssues.length - 3}.</p>
+                    <p>Altri avvisi: {pensionDraftIssues.length - 3}.</p>
                   ) : null}
                 </AlertDescription>
               </Alert>
@@ -1059,8 +1058,8 @@ export function CoastFireTab() {
 
             {tempPensions.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
-                Nessuna pensione inserita. Stai simulando il caso in cui il portafoglio debba coprire tutte le spese
-                anche dopo la target age.
+                Nessuna pensione inserita. Il calcolo assume che il portafoglio debba sostenere per intero le spese
+                annue anche dopo il target Coast FIRE.
               </div>
             ) : (
               <div className="space-y-3">
@@ -1101,7 +1100,7 @@ export function CoastFireTab() {
                       }
                     >
                       <div>
-                        <Label htmlFor={`coast-pension-label-${pension.id}`}>Etichetta</Label>
+                        <Label htmlFor={`coast-pension-label-${pension.id}`}>Nome</Label>
                         <Input
                           id={`coast-pension-label-${pension.id}`}
                           value={pension.label}
@@ -1111,7 +1110,7 @@ export function CoastFireTab() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor={`coast-pension-gross-${pension.id}`}>Lordo mensile futuro</Label>
+                        <Label htmlFor={`coast-pension-gross-${pension.id}`}>Importo lordo mensile</Label>
                         <Input
                           id={`coast-pension-gross-${pension.id}`}
                           type="number"
@@ -1126,7 +1125,7 @@ export function CoastFireTab() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor={`coast-pension-months-${pension.id}`}>Mensilità</Label>
+                        <Label htmlFor={`coast-pension-months-${pension.id}`}>Mensilità annue</Label>
                         <Input
                           id={`coast-pension-months-${pension.id}`}
                           type="number"
@@ -1161,9 +1160,11 @@ export function CoastFireTab() {
                   <ChevronDown className="h-4 w-4 text-muted-foreground" />
                 </Button>
               </CollapsibleTrigger>
-              <CollapsibleContent className="px-4 pb-4 text-sm text-muted-foreground">
-                L&apos;importo che inserisci è un <span className="font-medium text-foreground">lordo mensile futuro nominale</span>.
-                Il modello lo annualizza, lo deflaziona in termini reali, applica l&apos;IRPEF pensione e riduce il fabbisogno del portafoglio solo dalla data di decorrenza.
+              <CollapsibleContent className="space-y-2 px-4 pb-4 text-sm text-muted-foreground">
+                <p><span className="font-medium text-foreground">Importo lordo mensile</span>: è la stima dell&apos;importo che riceverai alla decorrenza, espresso in euro di quell&apos;anno (nominale futuro). Non è il netto che spendi oggi.</p>
+                <p><span className="font-medium text-foreground">Deflazione</span>: il modello converte il lordo nominale in potere d&apos;acquisto ai prezzi di oggi, usando il rendimento reale dello scenario (crescita − inflazione).</p>
+                <p><span className="font-medium text-foreground">IRPEF</span>: l&apos;imposta viene calcolata sul lordo annuo reale con gli scaglioni che configuri sotto. Il netto reale è ciò che abbatte il fabbisogno del portafoglio.</p>
+                <p><span className="font-medium text-foreground">Decorrenza</span>: prima di quella data la pensione non riduce nulla — il portafoglio copre da solo.</p>
               </CollapsibleContent>
             </Collapsible>
           </div>
@@ -1173,7 +1174,7 @@ export function CoastFireTab() {
               <div>
                 <h3 className="text-sm font-semibold text-foreground">Scaglioni IRPEF</h3>
                 <p className="text-sm text-muted-foreground">
-                  Gli scaglioni sono modificabili e vengono applicati al lordo annuo reale di ciascuna pensione.
+                  Applicati al lordo annuo reale di ciascuna pensione. Modificali se la normativa cambia o se usi un&apos;aliquota media personalizzata.
                 </p>
               </div>
               <Button type="button" variant="outline" size="sm" onClick={addTaxBracketRow}>
@@ -1234,7 +1235,7 @@ export function CoastFireTab() {
 
           <Button onClick={handleSave} disabled={saveMutation.isPending} className="mt-6 w-full desktop:w-auto">
             <Save className="mr-2 h-4 w-4" />
-            {saveMutation.isPending ? 'Salvataggio...' : hasUnsavedChanges ? 'Salva anteprima' : 'Salva impostazioni'}
+            {saveMutation.isPending ? 'Salvataggio...' : 'Salva'}
           </Button>
             </CardContent>
           </CollapsibleContent>
@@ -1244,10 +1245,9 @@ export function CoastFireTab() {
       {!coastProjection || !baseScenario ? (
         <Card className="border-border/70">
           <CardHeader>
-            <CardTitle>Calcolo non ancora disponibile</CardTitle>
+            <CardTitle>Dati insufficienti per il calcolo</CardTitle>
             <CardDescription>
-              Il tab Coast FIRE mostra risultati solo quando sono presenti età valide, spese annuali e patrimonio FIRE
-              positivo.
+              Servono età attuale, età target, spese annuali dell&apos;ultimo anno completato e patrimonio FIRE positivo.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">{incompleteReason}</CardContent>
@@ -1257,8 +1257,8 @@ export function CoastFireTab() {
           <div className="grid gap-4 sm:grid-cols-2 desktop:grid-cols-4">
             <Card className="border-border/70">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Coast Number oggi</CardTitle>
-                <CardDescription>Capitale minimo richiesto oggi</CardDescription>
+                <CardTitle className="text-base">Capitale Coast FIRE oggi</CardTitle>
+                <CardDescription>Minimo richiesto per smettere di contribuire</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="font-mono text-lg font-semibold text-foreground desktop:text-2xl">
@@ -1295,8 +1295,8 @@ export function CoastFireTab() {
 
             <Card className="border-border/70">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Gap residuo</CardTitle>
-                <CardDescription>Quanto manca oggi</CardDescription>
+                <CardTitle className="text-base">Mancante al target</CardTitle>
+                <CardDescription>Differenza rispetto al capitale richiesto oggi</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="font-mono text-lg font-semibold text-foreground desktop:text-2xl">
@@ -1338,7 +1338,7 @@ export function CoastFireTab() {
                   <span className="font-semibold text-foreground">{formatCurrency(annualExpenses ?? 0)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Pensione netta reale a pensione</span>
+                  <span className="text-muted-foreground">Pensione netta reale all&apos;età target</span>
                   <span className="font-semibold text-foreground">
                     {formatCurrency(baseScenario.totalNetAnnualPensionAtRetirement)}
                   </span>
@@ -1382,7 +1382,7 @@ export function CoastFireTab() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Capitale steady-state</span>
+                  <span className="text-muted-foreground">Capitale a regime</span>
                   <span className="font-semibold text-foreground">
                     {formatCurrency(baseScenario.steadyStatePortfolioNeed)}
                   </span>
@@ -1434,7 +1434,7 @@ export function CoastFireTab() {
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-medium text-foreground">{pension.label}</p>
                         <Badge variant={pension.isActiveAtRetirement ? 'secondary' : 'outline'}>
-                          {pension.isActiveAtRetirement ? 'Attiva alla target age' : `Parte a ${formatAgeYears(pension.startAge)}`}
+                          {pension.isActiveAtRetirement ? 'Già attiva al target' : `Parte a ${formatAgeYears(pension.startAge)}`}
                         </Badge>
                       </div>
                       <p className="text-muted-foreground">
@@ -1494,7 +1494,7 @@ export function CoastFireTab() {
                       <span className="font-semibold text-foreground">{formatPercentage(liquidProgress)}</span>
                     </div>
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-muted-foreground">Pensione netta a target</span>
+                      <span className="text-muted-foreground">Pensione netta all&apos;età target</span>
                       <span className="font-semibold text-foreground">
                         {formatCurrency(scenario.totalNetAnnualPensionAtRetirement)}
                       </span>
@@ -1521,7 +1521,7 @@ export function CoastFireTab() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Clock3 className="h-5 w-5 text-primary" />
-                Proiezione senza Nuovi Contributi
+                Proiezione senza nuovi contributi
               </CardTitle>
               <CardDescription>
                 Le tre linee mostrano il patrimonio FIRE-eligible che cresce da solo fino all&apos;età target. La linea tratteggiata è il capitale reale richiesto a pensione.

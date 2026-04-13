@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-13, session coast-fire-pensione-statale-ui-rationalization): **Refined state-pension UX in Coast FIRE**. The `Coast FIRE` tab now separates summary, configuration, and results more clearly: a compact summary-first reading explains target-age capital, bridge years, and steady-state coverage; the configuration surface is collapsible with a visible snapshot of the active inputs; and pension feedback now distinguishes informational timing notes from genuinely incomplete data.
+- Latest implementation (2026-04-13, session coast-fire-pension-microcopy): **Overhauled all user-facing microcopy in the Coast FIRE state pension feature**. Every label, helper text, status description, alert title, and contextual message has been rewritten for precision and tone: field labels renamed (`Etichetta` → `Nome`, `Mensilità` → `Mensilità annue`), English terms removed (`Gap residuo` → `Mancante al target`, `Capitale steady-state` → `Capitale a regime`), the `pensionStateDescription 'empty'` corrected (previously falsely implied full portfolio coverage), `pensionStateDescription` states disambiguated across all four states, the assumptions collapsible expanded from one dense line to four distinct explanations, section descriptions replaced with model-behaviour copy instead of layout hints, and a typo fixed (`"la decorrenza e' nel passato"` → `"è"`). Key file: `components/fire-simulations/CoastFireTab.tsx`.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
