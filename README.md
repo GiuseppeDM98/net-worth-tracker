@@ -44,7 +44,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - **Budget tab**: automatic budget tracking for all expense categories — items auto-generated from your categories with no manual setup; annual view with progress bars comparing current year vs budget, previous year, and historical average; click any row (category, section subtotal, or Total Expenses/Income) to open a historical year×month panel with min/max month highlights; Total Expenses also shows a per-type breakdown (Fixed / Variable / Debt) as separate month-by-month tables; collapsible sections with reordering; fully responsive on mobile with tappable cards and a per-item detail dialog
 - Bulk move transactions between categories/subcategories (cross-type supported)
 - 5-layer Sankey diagram visualization
-- 4-level drill-down for detailed expense analysis
+- 4-level drill-down for detailed expense analysis with hierarchical back-navigation that returns to the immediate parent view before the full flow
 - Period analysis with year and month filters — filtered sections include expense type breakdown (Fixed / Variable / Debt) pie chart that updates with the active filter
 - CSV export
 
@@ -67,6 +67,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 ### FIRE Planning
 - FIRE calculator with primary residence exclusion
 - Dedicated Coast FIRE tab with saved retirement age, no-new-contributions projections, and Bear / Base / Bull real-return scenarios
+- Coast FIRE supports one or more state pensions with editable IRPEF brackets, exact pension start dates, scenario-specific real net conversion, a guided summary that separates target-age need, bridge years, and post-pension steady state, plus a collapsible configuration panel that keeps the active inputs visible
 - Multi-scenario projections (Bear / Base / Bull) with inflation adjustment
 - Per-scenario FIRE numbers with automatic savings stop at FIRE reached
 - Historical FIRE runway view with rolling 12-month expenses, separate total/liquid deltas, and a sensitivity matrix for annual spending vs annual savings

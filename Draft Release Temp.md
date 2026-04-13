@@ -96,8 +96,25 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - Added a historical runway view to the FIRE calculator, showing how many years of expenses your FIRE portfolio and liquid assets would have covered over time
 - Added a FIRE sensitivity matrix that compares how changes in annual spending and annual savings affect years to FIRE in the Base scenario
 - Added separate 12-month delta indicators for total and liquid FIRE runway, so sustainability and immediately spendable runway are easier to compare
-- Added a dedicated Coast FIRE tab, so you can see whether your current FIRE portfolio could reach your retirement target age without new retirement contributions
-- Added Coast FIRE projections across Bear, Base, and Bull scenarios, including progress, remaining gap, and projected retirement value
+
+### Coast FIRE
+
+A dedicated tab that answers a simple question: could your current FIRE portfolio already grow to your retirement target without new retirement contributions — no additional saving needed, just time and compounding? The calculator uses real annual expenses from your last completed year and models Bear, Base, and Bull scenarios with real returns (growth minus inflation), showing progress toward the coast number, remaining gap, and projected portfolio value at retirement.
+
+- Added a "Custom expenses" toggle in the Coast FIRE configuration panel — when enabled, enter your desired annual retirement spending instead of using last year's actual expenses. Useful when your target lifestyle in retirement differs from your current spending
+
+**Pensioni statali**
+- Configure one or more state pensions as gross nominal future monthly amounts, with exact start dates and annual payment frequency (13 or 14 instalments for *tredicesima*/*quattordicesima*)
+- An editable IRPEF bracket table derives the after-tax pension for each entry — the net amount feeds directly into the retirement portfolio need calculation
+- Pension-aware summaries separate the picture at your target retirement age from the steady state once all pensions are active
+- A dedicated before/after pension timeline makes staggered start dates easy to read: bridge years, pension phases, and steady state are each clearly labelled
+- When the coast FIRE target is already reached, the gap card shows "Target raggiunto" with a confirmation mark instead of €0, making it immediately clear that this is a milestone, not a missing value
+
+**Configurazione**
+- The configuration panel is collapsible and stays open after saving — key inputs remain visible at a glance without needing to reopen the panel after every change
+- A local preview mode lets retirement metrics react immediately to unsaved changes before you commit
+- Contextual warnings flag incomplete or inconsistent pension inputs; delayed pension start dates are shown as informational guidance rather than errors
+- The calculator is fully responsive: pension inputs use a 2-column grid on mobile, scenario cards display in a 2-column grid on tablet, and all remove buttons meet a 40 × 40 px touch target
 - Added linked focus behavior to Goal-Based Investing, so selecting a goal now highlights the same objective across summary cards, allocation view, and detail sections
 
 ## 🐛 Bug Fixes
@@ -107,6 +124,10 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - Fixed sidebar menu item text becoming invisible on hover in dark mode for the Cyberpunk and Solar Dusk themes — hovering a navigation item now keeps text clearly readable
 - Fixed the active tab label and icon in the mobile bottom navigation bar being hard to read in dark mode for the Cyberpunk and Solar Dusk themes — the selected tab is now clearly visible across all themes
 - Fixed the FIRE runway year-over-year delta so it matches the one-decimal values shown in the cards
+- Fixed Coast FIRE state pension settings not persisting after a page refresh — configuration is now correctly saved and restored on reload
+- Fixed display issues in Coast FIRE pension summaries: unreadable decimal values for years until pension start, and broken `€l'anno` wording in cards and timeline descriptions
+- Fixed the Overview greeting showing a stray comma before your first name in the dashboard welcome message
+- Fixed Cashflow Sankey back navigation so going back from a subcategory returns to its category first instead of jumping straight to the full overview
 
 
 

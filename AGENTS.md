@@ -9,8 +9,9 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 
 ### Italian Localization
 - All user-facing text in Italian, all code comments in English only
+- **Microcopy in TSX gotcha — curly apostrophes**: the Edit tool can introduce typographic Unicode apostrophes (`'`, `'`) instead of ASCII straight single quotes (`'`). In `.tsx` files TypeScript treats them as invalid characters and throws `TS1127: Invalid character` on the affected lines. The error points at the string but looks like a syntax problem — not obvious until you inspect the raw bytes. Fix: rewrite the affected string constants using double-quote delimiters (`"..."`) or explicitly replace the curly characters. Apply this check after any session that edits Italian prose strings in TypeScript files.
 - Use `formatCurrency()` for EUR and `formatDate()` for `DD/MM/YYYY`
-- Use `Sottocategoria` (no hyphen)
+- Use `Sottocategoria` (no hyphen). For overview/header greetings, keep `Buongiorno Giuseppe` / `Buonasera Giuseppe` without a comma before the first name.
 - **Navigation taxonomy (established in session 30):** Panoramica, Patrimonio, Allocazione, Rendimenti, Storico, Impostazioni. The following are kept in English intentionally: `Hall of Fame` (premium brand name), `FIRE e Simulazioni` (acronym), `Cashflow` (established financial term in Italian). Do not translate these back.
 - `Assistente AI` is an established secondary navigation label under `Analisi`; do not rename it to `Chat AI`, `Copilot`, or generic `Assistant`
 - **Performance metric names:** `Time-Weighted Return`, `Money-Weighted Return (IRR)`, `Sharpe Ratio`, `YOC`, `Max Drawdown` are kept as international standard terms. `Recovery Time` → `Tempo di Recupero`, `Current Yield` → `Rendimento Corrente`.
@@ -25,6 +26,9 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Dialog-internal responsive layouts use `sm:`
 - Bottom page wrappers on portrait mobile should use `max-desktop:portrait:pb-20`
 - Currency values in compact KPI grids should use `text-lg desktop:text-2xl`
+- **Multi-card grid breakpoint decision**: adding `sm:grid-cols-2` to a 3-item row leaves the third card alone on a half-width row at 640px — often worse than a full-width stack. Prefer no `sm:` breakpoint (full-width stack on mobile) → `desktop:grid-cols-3` directly. Reserve `sm:grid-cols-2` for content where 2 columns genuinely helps at 640px (e.g. Bear/Base/Bull scenario cards where any pairing is better than a single tall column).
+- **`items-end` for mixed-height label rows**: only use `items-end` on a form grid when ALL cells have the same structure (label + input, nothing else). `items-end` aligns the bottom edge of the entire cell div — if any cell has hint text below its input, the hint becomes the new "bottom", so cells without hint text float their input down to match the hint height of the taller cell. In that case use `items-start` instead and shorten long labels so they don't cause height divergence. Rule: hint text in any cell → `items-start`; uniform label+input only → `items-end` is safe.
+- **Nested Radix collapsible chevron rotation**: `CollapsibleTrigger asChild` propagates `data-state="open|closed"` to its child element. Add `group` to the child Button, then `group-data-[state=open]:rotate-180 transition-transform duration-200 motion-reduce:transition-none` to the `ChevronDown` inside. No extra React state needed. Works in Tailwind v4.
 
 ### Layout Tokens
 - Never hardcode structural layout colors in shell components
@@ -204,18 +208,22 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - **Historical FIRE runway**: use rolling 12-month expenses, not a fixed annual denominator. The first runway point requires 12 snapshots; same-month YoY delta needs 24 snapshots; missing cashflow months inside the window count as `0`.
 - If runway cards show values rounded to 1 decimal, compute summary deltas from the same rounded values. If the UI exposes both total and liquid runway cards, keep the deltas split too (`Totale` and `Liquido`).
 - **Coast FIRE inputs**: current age comes from `settings.userAge`; retirement age is a separate persisted field (`coastFireRetirementAge`) with an initial fallback of `60`. If `userAge` is missing, keep the input blank and do not run the calculation.
-- **Coast FIRE methodology**: use real annual expenses from the last completed year, not planned FIRE expenses. Scenario math reuses FIRE Bear/Base/Bull with `real return = growthRate - inflationRate`.
+- **Coast FIRE methodology**: use real annual expenses from the last completed year by default; override with `coastFireCustomExpenses` when the user wants to model different retirement spending. The effective value is resolved once as `effectiveAnnualExpenses` and used everywhere — calculations, display cards, and interpretation text. Scenario math reuses FIRE Bear/Base/Bull with `real return = growthRate - inflationRate`.
+- **Coast FIRE state pensions**: pensions live only in the `Coast FIRE` tab, use `startDate` as the canonical retirement-start field, and keep `startAge` only as a legacy read fallback. Pension inputs are gross future nominal monthly amounts; the model annualizes them, deflates them to real terms, applies progressive IRPEF per pension, and reduces the portfolio need only from each pension's own start date onward.
+- **Coast FIRE persistence gotcha**: nested pension rows must be serialized without `undefined` fields before writing settings to Firestore. Leaving legacy keys like `startAge: undefined` inside `coastFirePensions[]` can break persistence silently on refresh.
 - **Coast FIRE outputs**: `Valore stimato a pensione` is only the future value of the current FIRE-eligible patrimonio without new contributions; `gap residuo` clamps at `0` once Coast FIRE is reached, while progress `%` may exceed `100`.
+- **Coast FIRE UX copy**: when pensions start after the target age or multiple pensions start at different dates, add contextual explanatory text in-page. Treat delayed pension starts as informational, not invalid — users need a dynamic explanation of bridge years, target-age coverage, and post-pension steady state.
+- **Coast FIRE pension hierarchy**: inside `Coast FIRE`, the `pensione statale` surface should be summary-first, not form-first. Keep a compact summary visible, place `Configurazione Coast FIRE` immediately after it, and make the editor collapsible with auto-open on empty / incomplete / unsaved states.
+- **Coast FIRE multi-pension density**: optimize the editor for 1-2 pensions; for 3+ pensions switch to a denser presentation and keep explanatory detail progressive instead of always expanded.
+- **Coast FIRE warning policy**: separate `avvisi informativi` (e.g. pensione dopo la target age, bridge years) from truly incomplete data (missing start date, zero amount, invalid mensilita). Hard-stop only on missing core prerequisites (`userAge`, target age, annual expenses, positive FIRE patrimonio).
+- **Annual-need wording**: when UI copy appends `l'anno` to a formatted amount, prefer a dedicated helper such as `formatCurrencyPerYear()` instead of manual JSX concatenation. This avoids regressions like `€l'anno`.
 
 ### Firestore Optional Field Deletion
 - `updateDoc` only touches fields present in the update object — omitting a field leaves the old value intact in Firestore
 - `removeUndefinedFields` (used before `updateDoc` in `assetService.ts`) strips `undefined` keys, so clearing an optional field by setting it to `undefined` is silently ignored
-- **Pattern**: after `removeUndefinedFields`, explicitly translate `undefined` → `deleteField()` for fields the user can intentionally clear: `if (updates.field === undefined) cleaned.field = deleteField()`
+- **Pattern for `updateDoc`**: after `removeUndefinedFields`, explicitly translate `undefined` → `deleteField()` for fields the user can intentionally clear: `if (updates.field === undefined) cleaned.field = deleteField()`
 - Applied in `updateAsset` for `averageCost` and `taxRate`. Follow this pattern for any other nullable asset/settings fields that users can toggle off
-
-### Formatter Duplication
-- `formatCurrency` and `formatCurrencyCompact` exist in both `lib/utils/formatters.ts` and `lib/services/chartService.ts`
-- Update both when changing formatting behavior
+- **`deleteField()` is NOT allowed with `setDoc()` without `merge:true`** — calling it throws `FirebaseError: deleteField() cannot be used with set() unless you pass {merge:true}`. The settings save path in `assetAllocationService.ts` uses full `setDoc` (no merge), so omitting the field from `docData` is the correct deletion strategy: `delete docData.fieldName`. The full overwrite drops fields that are absent from the written object.
 
 ### Formatter Cache
 - `lib/utils/formatters.ts` exports `cachedFormatCurrencyEUR(amount, compact?)` backed by two module-level `Intl.NumberFormat` instances
@@ -241,6 +249,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Reuse the same skeleton across chained loading states
 - Use full-page skeletons only on truly slow pages; otherwise prefer delayed or null loading
 - `Loader2` is for initial loading; `RefreshCw` is for user-triggered refresh; `RotateCcw` is for retry/regenerate actions — keep these semantics consistent across the app
+- **Unsaved-state banners**: use `Info` icon (static) when the form has unsaved local changes but no async operation is in progress. Switch to `Loader2 animate-spin` only while the save mutation is actually pending. Do not dim `Loader2` with `opacity-60` as a substitute for a semantically different icon — it reads as a stuck spinner.
 
 ### Error State Levels
 - **Query-level (blocking)**: use `Alert variant="destructive"` with `AlertCircle` icon — these represent a failure to load the page's primary data and need visible presence
@@ -275,7 +284,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Monte Carlo pattern: when re-running a simulation or switching scenario assumptions, keep the previous valid result shell mounted until the new computation completes; the update should read as a data morph, not an empty/reset state
 - Monte Carlo build pattern: percentile bands and histogram bins may reveal sequentially on first result entry or scenario rerun, but keep the underlying Recharts decorative areas non-animated to avoid chaotic multi-layer motion
 - Dividends page pattern: keep calendar, active date filter, stats, and table derived from the same source of truth; the calendar should reflect filter focus instead of running its own separate selection model
-- For Nivo Sankey filter updates, keep the chart instance mounted and let the library animate data diffs; remounting via React `key` or keyed wrapper shells suppresses the native update animation
+- For Nivo Sankey filter updates, keep the chart instance mounted and let the library animate data diffs; remounting via React `key` or keyed wrapper shells suppresses the native update animation. In drill-down back-navigation, restore the immediate parent level first (`categoria` before root, `tipo` before root) instead of jumping straight to the top-level view.
 - Performance page pattern: derive `chartData`, heatmap data, and underwater data with `useMemo`; do not store them in local state via `useEffect + setState`
 - Performance period morph: do not key KPI sections or metric cards by selected period; on period switches, values jump silently to the new number (no re-animation); chart shells can re-key only when a first-class staged reveal is intentional
 - `useCountUp` on KPI cards: always use `once: true` so the count-up fires exactly once on first meaningful data arrival and does not re-trigger on React Query cache hits. `fromPrevious: true` alone (without `once`) causes a first-load flash — the 60ms `startDelay` window is cancelled and restarted on every value update before the animation can complete
@@ -291,7 +300,6 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - **Memory item exit animation**: wrap each item in `motion.div` with `exit={{ opacity: 0, height: 0, marginBottom: 0 }}` + `style={{ overflow: 'hidden' }}`. Height collapse on exit prevents the list from leaving a gap after removal. Pair `height: 0` with `marginBottom: 0` or the bottom gap remains.
 - **Collapsible section with Framer Motion**: for height-animated collapsibles outside Radix, use `motion.div` with `initial={{ opacity: 0, height: 0 }}` / `animate={{ opacity: 1, height: 'auto' }}` / `exit={{ opacity: 0, height: 0 }}` + `style={{ overflow: 'hidden' }}`. `height: 'auto'` works in Framer Motion (unlike CSS transitions). Wrap in `AnimatePresence initial={false}`.
 - **Full-width collapsible inside a flex row**: if the expandable content must span the full container width, place the `AnimatePresence` block OUTSIDE the flex-row div (sibling, not child). Content inside a `flex: 1` column won't exceed its column width.
-- **Windows native scrollbar on textarea**: `overflow-y-auto` triggers the scrollbar track on Windows/Chromium even for a single wrapped line. Hide visually with `[&::-webkit-scrollbar]:hidden [scrollbar-width:none]` — scroll remains functional above the height cap.
 - **`useReducedMotion()` pattern**: call once at the component level, then use `prefersReducedMotion ? 0 : <duration>` and `prefersReducedMotion ? 0 : <y>` inline in transition/initial objects. Do not add separate CSS `prefers-reduced-motion` media queries when Framer Motion is already used — the hook is the single source of truth.
 - Do not wrap shadcn `TableRow` with `motion()`; use `motion.tr`
 - Use `motion.create(Component)` — `motion(Component)` is deprecated in Framer Motion v11+ and logs a warning
@@ -304,12 +312,9 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Overview/Panoramica pattern: count-up lives in `OverviewAnimatedCurrency` leaf nodes, NOT in the page component — each rAF tick re-renders only that leaf, leaving the chart subtree and all other cards untouched. The page passes final computed values as stable props; display timing is entirely the leaf's concern.
 - Overview/Panoramica chart scheduling: `OverviewChartsSection` is wrapped with `React.memo` and receives `heroSettled: boolean` from the page. When `heroSettled` becomes true, it schedules chart SVG mount via `requestIdleCallback` (with `{ timeout: 800 }`) or `setTimeout(0)` as fallback — never a fixed arbitrary timeout as the primary strategy. On mobile and reduced-motion, `chartRenderReady` starts true immediately.
 - `OverviewAnimatedCurrency` format prop: use `format="integer"` for count-based KPIs (e.g. asset count) to avoid fractional display during rAF interpolation. Default is `"currency"` via `cachedFormatCurrencyEUR`. Add new format values here only if a genuinely distinct format is needed — do not extract a separate component per format.
-- Dialog continuity pattern: for trigger-to-dialog continuity, forward the ref through `DialogContent` and compute a `transform-origin` from the triggering control; clear the custom origin on close so the exit animation stays neutral
 - **Page transitions: use `template.tsx`, NOT `layout.tsx` + `AnimatePresence`**. Next.js App Router wraps navigations in `startTransition` (React 18 concurrent); `AnimatePresence` can inherit the previous variant context ("visible") and skip `initial="hidden"` on the new child, causing a 1-frame flash of fully-visible content. `template.tsx` re-mounts on every navigation, guaranteeing Framer Motion treats each mount as a true first mount. Trade-off: no exit animation (old page unmounts immediately). See `app/dashboard/template.tsx`
 - Page-level `motion.div variants={pageVariants}` wrappers on individual pages are **redundant** when `template.tsx` is in place — remove them to avoid compounded opacity (opacity `t²` instead of `t`)
 - **`prefers-reduced-motion`**: add `<MotionConfig reducedMotion="user">` at the layout root (`app/dashboard/layout.tsx`) — propagates to the entire tree, no per-component guards needed
-- **Icon swap animation**: use `AnimatePresence mode="wait"` with `key={stateValue}` around a `motion.span` wrapping the icon. Exit/enter with rotate + scale + opacity. `initial={false}` prevents the animation on first mount. `mode="wait"` ensures exit completes before enter starts — without it two icons overlap briefly
-- **`layoutId` inside `position: fixed` containers**: avoid. Framer Motion calculates layout animation coordinates relative to the offset parent; inside a `fixed` container the coordinate system diverges from the viewport, producing incorrect transforms that can displace or hide the element. Use per-element `AnimatePresence` + individual `motion.div` instead
 
 ### Color Theme System
 - **`--sidebar-accent-foreground` dual-use**: this variable is used for text color in TWO contexts in `Sidebar.tsx` — (1) active item, where text sits on top of the `bg-sidebar-accent` pill (dark text on colored bg works fine), and (2) hover on inactive items, where ONLY the text color changes (no background applied). Setting it to a dark color satisfies active but makes hover text invisible on dark sidebars. Fix: use `hover:text-sidebar-foreground` for hover (not `hover:text-sidebar-accent-foreground`) — `sidebar-foreground` is always readable regardless of theme. Only `text-sidebar-accent-foreground` stays on the active state.
@@ -333,12 +338,6 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - `Assistente AI` belongs in the `Analisi` group and must be included anywhere secondary analytical routes are enumerated
 - Eyebrow label style for group headers: `text-xs font-semibold uppercase tracking-wider text-muted-foreground/60`
 
-### One-Time UI Effects
-- Use `localStorage` helpers for once-ever UI (guide strips, celebrations)
-- Use `sessionStorage` plus an internal `useRef` guard for once-per-session notifications
-- localStorage key convention for guide strips: `{page}_guide_dismissed` (e.g. `perf_guide_dismissed`)
-- Init localStorage reads inside `useEffect(() => {}, [])` — not during render — to avoid hydration mismatch on `'use client'` pages
-
 ### Progressive Disclosure on Data-Dense Pages
 - Collapsible methodology/reference blocks: use `Collapsible` (shadcn, from `@/components/ui/collapsible`) with `open` state defaulting to `false`; wrap the trigger around `CardHeader` via `asChild` for a large click target
 - `cn` is NOT auto-imported in page files — add `import { cn } from '@/lib/utils'` explicitly when using conditional class logic in pages (it is already available in all component files)
@@ -349,17 +348,25 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Dev/internal tool sections in settings pages: isolate with `border-t border-border pt-6` + a `text-xs uppercase tracking-widest` eyebrow label in a distinct color (e.g. orange for dev/danger zones); never co-locate dev tools in a functional product tab (dividendi, spese, etc.)
 - For refresh affordances on dense historical tables, highlight only the active shell/header and timestamp the refresh there; avoid flashing rows or cells broadly
 
+### Mobile Header Trash Icon Pattern
+- In a card header that has a title/subtitle block on the left and a destructive icon button on the right, always use `flex items-start justify-between` (not `flex-col` + `sm:flex-row`). `flex-col` puts the trash button on its own row on mobile, wasting vertical space and breaking visual grouping. The subtitle text stays under the title in the left block; the button stays top-right in all viewports.
+
+### Pure Functions and Testability
+- If a utility function calls `new Date()` internally to get "now", it is impure and cannot be tested for time-sensitive branches without fake timers. Pass `now: Date` as an explicit parameter. The call site passes `new Date()` — the function stays pure and test code can inject any date. Applied to `buildPensionDraftIssues(drafts, currentAge, retirementAge, now)`.
+
+### Collapsible Config Panel Auto-Open
+- When a config panel uses a `useEffect` to auto-open based on a `shouldAutoOpen` condition, only ever call `setIsOpen(true)` — never `setIsOpen(shouldAutoOpen)`. Setting to `false` causes the panel to collapse silently after save (when `hasUnsavedChanges` turns false), which is disorienting if the user wants to continue editing.
+
+### Progress Bar ARIA
+- A visual progress bar (`<div>` animated with Framer Motion) has no semantic meaning to screen readers. Always add `role="progressbar"`, `aria-valuenow={Math.round(value)}`, `aria-valuemin={0}`, `aria-valuemax={100}`, and `aria-label` describing what is being measured.
+
 ### Accessibility Patterns
 - **`aria-live` on streaming content**: any region that receives dynamically injected text (SSE streams, polling) must have `aria-live="polite"` and `aria-atomic="false"` on its container so screen readers announce content as it arrives. Use `aria-label` to give the region a name (e.g. `aria-label="Conversazione con l'assistente"`).
 - **Action buttons hidden with `opacity-0` are inaccessible on both keyboard and touch**: `opacity-0 group-hover:opacity-100` makes controls unreachable from keyboard (focus lands on invisible buttons) and invisible on touch (no hover state). Fix: use `[@media(pointer:fine)]:opacity-0 [@media(pointer:fine)]:group-hover:opacity-100 [@media(pointer:fine)]:group-focus-within:opacity-100` — actions remain always visible on touch devices and become visible on keyboard focus. Tailwind v4 JIT supports arbitrary `@media` variants.
 - **Tab pattern without ARIA**: `<button>` elements styled as tabs must have `role="tab"`, `aria-selected`, and a `role="tablist"` wrapper to be announced correctly by screen readers.
-- **Touch targets**: minimum 44×44px per Apple HIG and Material Design. `h-6 w-6` (24px) icon-only buttons are below threshold — use at least `h-8 w-8` for action buttons in dense lists; `h-10 w-10` for primary CTAs. Tab filters need at least `min-h-[36px]`.
+- **Touch targets**: minimum 44×44px per Apple HIG and Material Design. `h-6 w-6` (24px) icon-only buttons are below threshold — use at least `h-8 w-8` for action buttons in dense lists; `h-10 w-10` for primary CTAs and destructive icon buttons (trash, remove). Tab filters need at least `min-h-[36px]`. shadcn `size="icon"` defaults to 36px — always override with `className="h-10 w-10"` on touch-critical controls.
 - **`type="button"` on `<button>` elements**: always set explicit `type="button"` on buttons that are not form submits to prevent accidental form submission in nested contexts.
 - **`aria-label` on icon-only selects**: `SelectTrigger` without visible label text must have `aria-label` — screen readers will otherwise only announce the current value with no context about what is being selected.
-
-### Dialog Layout
-- Prefer sticky header + sticky footer dialog layout for long forms
-- Do not use `overflow-y-auto` on dialog bodies that contain absolute-positioned custom dropdowns
 
 ---
 
@@ -419,27 +426,6 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Always set `fill` on `<Bar>` even when per-bar colors are overridden by `<Cell>`
 - Do not set text `color` globally in tooltip style for line/area/bar charts
 
-### Pie Chart Legend Cap on Mobile
-- `renderLegendItems()` in cashflow tabs accepts a `maxItems` param — always pass `isMobile ? 3 : undefined` on **all** pie charts (category and subcategory drill-downs) to prevent legend overflow on mobile
-- The cap must be applied consistently: missing it on a single chart level (e.g. income but not expense) causes asymmetric overflow behavior across tabs
-
-### Recharts Conditional Props via Spread
-- `{...(condition && { prop: value })}` does **not** work reliably on Recharts components — when `condition` is `false` the spread evaluates to `{...false}`, which is silently ignored by React but can cause Recharts to misread the prop tree
-- Pattern: compute `domain` and `allowDataOverflow` as plain variables outside JSX, then pass them directly as props
-
-### ResponsiveContainer in Hidden Tabs
-- Symptom: `width(-1)` / `height(-1)` warnings
-- Fix: use explicit pixel heights, not `height="100%"`
-
-### Overflow Traps
-- `overflow-x-visible` disables useful table scrolling; use `overflow-x-auto`
-- `overflow-y-auto` clips absolute overlays such as custom dropdowns
-
-### Bottom Sheet Continuity Trap
-- Symptom: mobile drill-down sheets open at the previous level's scroll offset or content appears to slide behind the sticky header
-- Cause: the same scroll container is reused across levels, and sticky headers inside the scroll region let content pass underneath during transitions
-- Fix: keep the header outside the scrolling region, make only the sheet body scrollable, and reset scroll on level/content key changes
-
 ### Radix CollapsibleTrigger Nested Button
 - Symptom: `<button> cannot be a descendant of <button>` hydration error in console
 - Cause: `CollapsibleTrigger asChild={false}` (the Radix default) renders its own `<button>` element. If the trigger's children contain any `Button` component (another `<button>`), this creates an invalid nested-button DOM tree.
@@ -466,7 +452,3 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Cause: a large subtree renderer is defined inside the parent component and used as JSX (`<InnerComponent />`), so every parent re-render gives React a new component identity and remounts the subtree
 - Fix: move the subtree to a top-level component or invoke it as a pure render helper (`InnerComponent()`) when it intentionally closes over local state
 
-### AnimatePresence + Next.js App Router Flash
-- **Symptom:** Content flashes at full opacity for ~1 frame before entrance animations begin; only on navigation (not hard refresh); `style={{ opacity: 0 }}` on the `motion.div` does NOT fix it
-- **Cause:** `layout.tsx` persists between navigations. `AnimatePresence mode="wait"` with `key={pathname}` is supposed to handle transitions, but Next.js wraps navigations in `startTransition` (React 18 concurrent). The variant context ("visible") from the completed previous animation can be inherited by the new child, causing Framer Motion to skip `initial="hidden"` and show content at opacity 1 immediately
-- **Fix:** Use `template.tsx` — it re-mounts on every navigation, so Framer Motion always treats the mount as a true first mount. Remove `AnimatePresence` from `layout.tsx`. See `app/dashboard/template.tsx`

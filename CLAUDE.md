@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-11, session coast-fire-tab): **Coast FIRE planning tab**. `FIRE e Simulazioni` now includes a dedicated `Coast FIRE` tab with explicit age inputs, a saved retirement-age target, Base/Bear/Bull real-return scenarios, and a no-new-contributions projection chart. The previous FIRE runway and sensitivity analysis remains part of the classic FIRE tab.
+- Latest implementation (2026-04-13, session coast-fire-custom-expenses): **Coast FIRE custom annual expenses**. Toggle "Spese personalizzate" in the config panel lets users override the last-year actuals with a manually entered amount. Persisted as `coastFireCustomExpenses` in `assetAllocationTargets/{userId}`. Removing the value uses `delete docData.field` (NOT `deleteField()`) because the save path uses `setDoc` without `merge:true`. All calculations, texts, and the "Spese usate" summary card use `effectiveAnnualExpenses` (resolves custom vs auto in one place). Key files: `types/assets.ts`, `lib/services/assetAllocationService.ts`, `components/fire-simulations/CoastFireTab.tsx`.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -23,6 +23,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Hall of Fame now reads as an editorial ranking surface with clearer monthly/yearly hierarchy, spotlight cards for the current month/year, and contextual note dialogs tied to the selected record
 - Cashflow "Entrate per categoria" pie chart on mobile now caps legend items at 3 (same as expense chart), preventing overflow when 4+ categories exceed the 5% threshold
 - Cashflow now preserves context better across `Tracciamento`, `Dividendi & Cedole`, `Anno Corrente`, `Storico Totale`, and `Budget`, with calmer filter feedback and a steadier Budget deep-dive flow
+- Cashflow Sankey back-navigation now restores the immediate parent drill-down level first, so moving back from a subcategory returns to the category view before the full flow
 - Dividendi & Cedole now keeps calendar day focus, active date filtering, table/detail context, and summary cards more tightly in sync, with a read-only contextual detail step before edit mode
 - Storico now reads more like a guided analysis surface: main sections enter as chapters, dense blocks are separated more clearly, chart mode switches feel local instead of page-wide, and doubling milestones build progressively
 - Rendimenti now presents smoother period switching, KPI settling from prior values, staged monthly heatmap reveal, a more legible underwater drawdown surface, and contextual custom-range / AI dialogs
@@ -31,6 +32,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Patrimonio Anno Corrente and Storico tables show only assets with `includeInHistoryTables: true` (toggle in AssetDialog). Anno Corrente: `quantity > 0` only. Storico: includes `quantity === 0` for sold-asset history with "Venduto" badge. `restrictToPassedAssets={true}` on both tables. Disabling cost basis in AssetDialog correctly deletes `averageCost`/`taxRate` from Firestore via `deleteField()`
 - Overview/Panoramica now loads KPI, variations, expense summary, charts, and rendering flags from one authenticated overview query, improving warm loads and keeping related data in sync after asset, cashflow, snapshot, and stamp-duty-setting changes
 - Overview/Dashboard KPI cards all animate on mount via `OverviewAnimatedCurrency` leaf nodes (count-up isolated per card, not page-level). Charts mount after hero settles via `requestIdleCallback`. Formatter cache in `lib/utils/formatters.ts` avoids `Intl.NumberFormat` allocation on every render.
+- Overview/Panoramica greeting is now consistent with the shared header format, showing the first name without a comma
 - Private API actions now require verified Firebase auth server-side, while scheduled maintenance flows continue to authenticate with `CRON_SECRET`
 - Cashflow tracking with categories, filters, Sankey drill-down, budget management, and linked cash-account updates
 - History page with net worth evolution, asset class breakdown, liquidity, YoY variation, savings vs investment growth, `Lavoro & Investimenti`, doubling analysis, and allocation comparison
@@ -40,7 +42,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - monthly chart from `prepareMonthlyLaborMetricsData()`
 - Settings page now offers visible unsaved-state preview and clearer in-context feedback for sensitive configuration changes (without autosave behavior changes)
 - Dividends and coupons tracking with EUR conversion, focused monthly calendar, contextual per-payment detail view, total return per asset, and DPS growth summaries
-- FIRE planning now includes local preview feedback, rolling 12-month runway history, separate total/liquid runway deltas vs the same month a year earlier, a Base-scenario sensitivity matrix for annual spending vs annual savings, steadier scenario projections, clearer liquid vs illiquid readouts, and a dedicated `Coast FIRE` tab. Coast FIRE reuses `userAge`, persists `coastFireRetirementAge`, uses real annual expenses from the last completed year, and models Bear/Base/Bull outcomes with `real return = growth - inflation`
+- FIRE planning now includes local preview feedback, rolling 12-month runway history, separate total/liquid runway deltas vs the same month a year earlier, a Base-scenario sensitivity matrix for annual spending vs annual savings, steadier scenario projections, clearer liquid vs illiquid readouts, and a dedicated `Coast FIRE` tab. Coast FIRE reuses `userAge`, persists `coastFireRetirementAge`, uses real annual expenses from the last completed year (or user-defined custom expenses via `coastFireCustomExpenses`), models Bear/Base/Bull outcomes with `real return = growth - inflation`, and optionally reduces retirement portfolio needs with one or more state pensions entered as gross future nominal monthly amounts, exact pension dates, and editable IRPEF brackets. The state-pension area now combines a compact summary-first explanation, a collapsible configuration panel with visible key inputs, and separate informational vs incomplete-state messaging for pension timing. The pension UI is fully responsive: 2-col input grid on mobile (pairing Nome+Lordo / Mensilità+Decorrenza) with `items-start` (hint text below inputs prevents `items-end` baseline trick), compact breakdown table, inline tax bracket rows with `items-end` (no hint text), and 40px touch targets on all destructive buttons. Pension card header always `flex-row` so trash icon stays top-right. Config section for Scaglioni IRPEF stacks on mobile (text above, full-width button below). `buildPensionDraftIssues` is a pure function receiving `now: Date` as explicit param.
 - Monte Carlo simulations now preserve result continuity across reruns, with progressive percentile/distribution reveal and more explicit Bear/Base/Bull comparison focus
 - Goal-based investing now links summary cards, allocation chart, and detail cards through a shared focus model for faster visual comprehension
 - PDF export and AI-powered performance analysis
@@ -81,7 +83,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-11 (session coast-fire-tab — dedicated Coast FIRE tab, saved retirement age, and no-new-contributions projection chart)
+**Last updated**: 2026-04-13 (session coast-fire-custom-expenses — Coast FIRE custom annual expenses toggle)
 
 ## Design Context
 

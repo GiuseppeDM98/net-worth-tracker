@@ -934,20 +934,24 @@ export function CashflowSankeyChart({
   // Handle back button click for multi-level navigation
   const handleBack = () => {
     if (selectedCategory?.mode === 'transactions') {
-      // Check if we came from 5-layer view (direct subcategory click)
-      const cameFrom5LayerView = !selectedCategory.parentType && selectedCategory.selectedSubcategory;
+      const categoryName = selectedCategory.parentCategory || selectedCategory.name;
+      const hasSubcategories = checkIfCategoryHasSubcategories(categoryName);
+      const cameFromDirectCategoryPath =
+        !selectedCategory.parentType && !!selectedCategory.selectedSubcategory;
 
-      if (cameFrom5LayerView) {
-        // Return directly to budget view (skip category drill-down)
-        setSelectedCategory(null);
+      // Direct category → subcategory drill-down should step back to the category view first.
+      // Skipping that intermediate state makes the back action feel like a context reset.
+      if (cameFromDirectCategoryPath && hasSubcategories) {
+        setSelectedCategory(prev => prev ? {
+          ...prev,
+          mode: 'category',
+          selectedSubcategory: undefined,
+        } : null);
       } else {
         // Why: Prevent back navigation to empty category drill-down
         // Before returning to 'category' mode, verify the category has real subcategories.
         // Without this check, categories with only "Altro" would show a drill-down with
         // a single "Altro" node instead of returning to budget/type view.
-        const categoryName = selectedCategory.parentCategory || selectedCategory.name;
-        const hasSubcategories = checkIfCategoryHasSubcategories(categoryName);
-
         if (hasSubcategories) {
           // Return to category drill-down view
           setSelectedCategory(prev => prev ? {

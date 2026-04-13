@@ -15,12 +15,27 @@ function settingsAffectDashboardOverview(settings: AssetAllocationSettings): boo
   );
 }
 
+function serializeCoastFirePensions(
+  pensions: AssetAllocationSettings['coastFirePensions']
+) {
+  if (!pensions) return pensions;
+
+  return pensions.map((pension) => ({
+    id: pension.id,
+    label: pension.label,
+    grossMonthlyAmount: pension.grossMonthlyAmount,
+    monthsPerYear: pension.monthsPerYear,
+    ...(pension.startDate ? { startDate: pension.startDate } : {}),
+    ...(pension.startAge !== undefined ? { startAge: pension.startAge } : {}),
+  }));
+}
+
 /**
  * Get allocation settings for a user
  *
  * Includes: targets, userAge, riskFreeRate, withdrawalRate, plannedAnnualExpenses,
- * coastFireRetirementAge, includePrimaryResidenceInFIRE, dividendIncomeCategoryId,
- * dividendIncomeSubCategoryId
+ * coastFireRetirementAge, coastFirePensions, coastFireTaxBrackets,
+ * includePrimaryResidenceInFIRE, dividendIncomeCategoryId, dividendIncomeSubCategoryId
  */
 export async function getSettings(
   userId: string
@@ -42,6 +57,9 @@ export async function getSettings(
       withdrawalRate: data.withdrawalRate,
       plannedAnnualExpenses: data.plannedAnnualExpenses,
       coastFireRetirementAge: data.coastFireRetirementAge,
+      coastFireCustomExpenses: data.coastFireCustomExpenses,
+      coastFirePensions: data.coastFirePensions,
+      coastFireTaxBrackets: data.coastFireTaxBrackets,
       includePrimaryResidenceInFIRE: data.includePrimaryResidenceInFIRE,
       dividendIncomeCategoryId: data.dividendIncomeCategoryId,
       dividendIncomeSubCategoryId: data.dividendIncomeSubCategoryId,
@@ -122,6 +140,21 @@ export async function setSettings(
       if (settings.coastFireRetirementAge !== undefined) {
         docData.coastFireRetirementAge = settings.coastFireRetirementAge;
       }
+      // When the key is present but undefined, remove the field from docData so setDoc drops it.
+      // deleteField() is not allowed with setDoc() without merge:true; omitting the key achieves the same result.
+      if ('coastFireCustomExpenses' in settings) {
+        if (settings.coastFireCustomExpenses !== undefined) {
+          docData.coastFireCustomExpenses = settings.coastFireCustomExpenses;
+        } else {
+          delete docData.coastFireCustomExpenses;
+        }
+      }
+      if (settings.coastFirePensions !== undefined) {
+        docData.coastFirePensions = serializeCoastFirePensions(settings.coastFirePensions);
+      }
+      if (settings.coastFireTaxBrackets !== undefined) {
+        docData.coastFireTaxBrackets = settings.coastFireTaxBrackets;
+      }
       if (settings.includePrimaryResidenceInFIRE !== undefined) {
         docData.includePrimaryResidenceInFIRE = settings.includePrimaryResidenceInFIRE;
       }
@@ -197,6 +230,21 @@ export async function setSettings(
       }
       if (settings.coastFireRetirementAge !== undefined) {
         docData.coastFireRetirementAge = settings.coastFireRetirementAge;
+      }
+      // When the key is present but undefined, remove the field from docData so setDoc drops it.
+      // deleteField() is not allowed with setDoc() without merge:true; omitting the key achieves the same result.
+      if ('coastFireCustomExpenses' in settings) {
+        if (settings.coastFireCustomExpenses !== undefined) {
+          docData.coastFireCustomExpenses = settings.coastFireCustomExpenses;
+        } else {
+          delete docData.coastFireCustomExpenses;
+        }
+      }
+      if (settings.coastFirePensions !== undefined) {
+        docData.coastFirePensions = serializeCoastFirePensions(settings.coastFirePensions);
+      }
+      if (settings.coastFireTaxBrackets !== undefined) {
+        docData.coastFireTaxBrackets = settings.coastFireTaxBrackets;
       }
       if (settings.includePrimaryResidenceInFIRE !== undefined) {
         docData.includePrimaryResidenceInFIRE = settings.includePrimaryResidenceInFIRE;
