@@ -60,6 +60,7 @@ import { Settings } from '@/types/settings';
 import { CoastFirePensionInput, CoastFireTaxBracket } from '@/types/assets';
 import { formatDate } from '@/lib/utils/formatters';
 import { toDate } from '@/lib/utils/dateHelpers';
+import { cn } from '@/lib/utils';
 
 const COAST_CONTROL_CLASSNAME =
   'mt-1 transition-[border-color,background-color,box-shadow] duration-200 focus-visible:ring-2 focus-visible:ring-primary/25 motion-reduce:transition-none';
@@ -80,9 +81,12 @@ interface CoastFireTaxBracketDraft {
 
 interface PensionDraftIssue {
   pensionId: string;
-  severity: 'warning' | 'error';
+  severity: 'info' | 'warning' | 'error';
+  kind: 'informational' | 'incomplete';
   message: string;
 }
+
+type PensionConfigurationState = 'empty' | 'incomplete' | 'informational' | 'valid';
 
 function parseOptionalInteger(value: string): number | null {
   const trimmed = value.trim();
@@ -140,6 +144,7 @@ function buildPensionDraftIssues(
       issues.push({
         pensionId: draft.id,
         severity: 'warning',
+        kind: 'incomplete',
         message: `${label}: inserisci un lordo mensile maggiore di zero per includerla nel calcolo.`,
       });
     }
@@ -148,6 +153,7 @@ function buildPensionDraftIssues(
       issues.push({
         pensionId: draft.id,
         severity: 'warning',
+        kind: 'incomplete',
         message: `${label}: le mensilità annue devono essere maggiori di zero.`,
       });
     }
@@ -156,6 +162,7 @@ function buildPensionDraftIssues(
       issues.push({
         pensionId: draft.id,
         severity: 'warning',
+        kind: 'incomplete',
         message: `${label}: aggiungi una data di decorrenza per stimarne l'impatto nel tempo.`,
       });
       return;
@@ -164,7 +171,8 @@ function buildPensionDraftIssues(
     if (startDate < new Date(now.getFullYear(), now.getMonth(), now.getDate())) {
       issues.push({
         pensionId: draft.id,
-        severity: 'warning',
+        severity: 'info',
+        kind: 'informational',
         message: `${label}: la decorrenza e' nel passato. Verifica che la data sia coerente con la tua stima.`,
       });
     }
@@ -178,7 +186,8 @@ function buildPensionDraftIssues(
         );
         issues.push({
           pensionId: draft.id,
-          severity: 'warning',
+          severity: 'info',
+          kind: 'informational',
           message: `${label}: parte dopo l'eta target e crea circa ${bridgeYears} ${bridgeYears === 1 ? 'anno ponte' : 'anni ponte'} da finanziare col portafoglio.`,
         });
       }
@@ -194,6 +203,19 @@ function formatCurrencyPerYear(value: number): string {
 
 function formatAgeYears(age: number): string {
   return `${Math.round(age)} anni`;
+}
+
+function getPensionConfigurationState(
+  pensions: CoastFirePensionInput[],
+  issues: PensionDraftIssue[]
+): PensionConfigurationState {
+  if (pensions.length === 0) return 'empty';
+  if (issues.length === 0) return 'valid';
+
+  const hasIncompleteIssues = issues.some((issue) => issue.kind === 'incomplete');
+  if (!hasIncompleteIssues) return 'informational';
+
+  return 'incomplete';
 }
 
 function createPensionDraft(defaultStartDate: string): CoastFirePensionDraft {
@@ -302,6 +324,7 @@ export function CoastFireTab() {
   const [tempRetirementAge, setTempRetirementAge] = useState('60');
   const [tempPensions, setTempPensions] = useState<CoastFirePensionDraft[]>([]);
   const [tempTaxBrackets, setTempTaxBrackets] = useState<CoastFireTaxBracketDraft[]>([]);
+  const [isConfigOpen, setIsConfigOpen] = useState(true);
 
   const { data: settings, isLoading: isLoadingSettings } = useQuery<Settings | null>({
     queryKey: ['settings', user?.uid],
@@ -526,8 +549,40 @@ export function CoastFireTab() {
   const steadyStateCoverageDelta = baseScenario
     ? Math.max((annualExpenses ?? 0) - baseScenario.annualPortfolioNeedAtSteadyState, 0)
     : 0;
-  const primaryPensionWarning = pensionDraftIssues[0] ?? null;
-  const remainingPensionWarnings = Math.max(pensionDraftIssues.length - 1, 0);
+  const pensionConfigurationState = useMemo(
+    () => getPensionConfigurationState(previewPensions, pensionDraftIssues),
+    [pensionDraftIssues, previewPensions]
+  );
+  const pensionStateTone =
+    pensionConfigurationState === 'valid'
+      ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-200 dark:text-emerald-200'
+      : pensionConfigurationState === 'informational'
+        ? 'border-sky-500/20 bg-sky-500/10 text-sky-200 dark:text-sky-200'
+        : pensionConfigurationState === 'incomplete'
+        ? 'border-amber-500/20 bg-amber-500/10 text-amber-200 dark:text-amber-200'
+        : 'border-border/70 bg-background/60 text-muted-foreground';
+  const pensionStateLabel =
+    pensionConfigurationState === 'valid'
+      ? 'Configurazione valida'
+      : pensionConfigurationState === 'informational'
+        ? 'Configurazione valida con avviso'
+        : pensionConfigurationState === 'incomplete'
+          ? 'Configurazione incompleta'
+          : 'Nessuna pensione';
+  const pensionStateDescription =
+    pensionConfigurationState === 'valid'
+      ? 'Le pensioni sono tutte pronte per entrare nel calcolo.'
+      : pensionConfigurationState === 'informational'
+        ? 'I dati sono coerenti, ma c’è almeno un avviso informativo sul timing della pensione.'
+        : pensionConfigurationState === 'incomplete'
+          ? 'I dati presenti non bastano ancora per stimare l’impatto pensionistico.'
+          : 'Il portafoglio copre da solo tutte le spese anche dopo la target age.';
+  const primaryInformationalIssue =
+    pensionDraftIssues.find((issue) => issue.kind === 'informational') ?? null;
+  const primaryIncompleteIssue =
+    pensionDraftIssues.find((issue) => issue.kind === 'incomplete') ?? null;
+  const primaryPensionIssue = primaryIncompleteIssue ?? primaryInformationalIssue;
+  const remainingPensionIssues = Math.max(pensionDraftIssues.length - (primaryPensionIssue ? 1 : 0), 0);
   const baseScenarioInterpretation = useMemo(() => {
     if (!baseScenario) return [];
 
@@ -604,6 +659,51 @@ export function CoastFireTab() {
         },
       ]
     : [];
+  const targetAgeLabel = currentAge !== null ? formatAgeYears(currentAge) : 'Da impostare';
+  const retirementAgeLabel = retirementAge !== null ? formatAgeYears(retirementAge) : 'Da impostare';
+  const firstPensionStartLabel = sortedPensionBreakdown[0]?.startDate
+    ? formatDate(toDate(sortedPensionBreakdown[0].startDate))
+    : tempPensions[0]?.startDate
+      ? formatDate(toDate(tempPensions[0].startDate))
+      : 'Da impostare';
+  const changeDrivers = baseScenario
+    ? [
+        {
+          label: 'All’età target',
+          value: formatCurrencyPerYear(baseScenario.annualPortfolioNeedAtRetirement),
+          detail:
+            retirementCoverageDelta > 0
+              ? `Le pensioni già attive coprono ${formatCurrencyPerYear(retirementCoverageDelta)}.`
+              : 'Il portafoglio copre ancora da solo tutto il fabbisogno.',
+        },
+        {
+          label: bridgeYears > 0 ? 'Durante gli anni ponte' : 'Transizione',
+          value: bridgeYears > 0 ? `${bridgeYears} ${bridgeYears === 1 ? 'anno' : 'anni'}` : 'Nessun ponte',
+          detail:
+            bridgeYears > 0
+              ? 'Finché non parte l’ultima pensione, il capitale richiesto resta più alto del regime finale.'
+              : 'La situazione a pensione e quella a regime sono quasi allineate.',
+        },
+        {
+          label: 'A regime',
+          value: formatCurrencyPerYear(baseScenario.annualPortfolioNeedAtSteadyState),
+          detail:
+            steadyStateCoverageDelta > 0
+              ? `La copertura pensionistica sale a ${formatCurrencyPerYear(steadyStateCoverageDelta)}.`
+              : 'La pensione non riduce il fabbisogno del portafoglio.',
+        },
+      ]
+    : [];
+  const shouldAutoOpenConfig =
+    hasUnsavedChanges ||
+    pensionConfigurationState === 'empty' ||
+    pensionConfigurationState === 'incomplete' ||
+    currentAge === null ||
+    retirementAge === null;
+
+  useEffect(() => {
+    setIsConfigOpen(shouldAutoOpenConfig);
+  }, [shouldAutoOpenConfig]);
 
   if (isLoadingSettings || isLoadingAssets || isLoadingAnnualExpenses) {
     return <FireCalculatorSkeleton />;
@@ -627,47 +727,64 @@ export function CoastFireTab() {
                     decorrenza effettiva.
                   </CardDescription>
                 </div>
-                <Badge variant="secondary" className="w-fit">
-                  Scenario Base
-                </Badge>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary" className="w-fit">
+                    Scenario Base
+                  </Badge>
+                  <Badge variant="outline" className="w-fit">
+                    {pensionStateLabel}
+                  </Badge>
+                </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 desktop:grid-cols-4">
+              <div className="grid gap-3 sm:grid-cols-2 desktop:grid-cols-[minmax(0,1.05fr)_minmax(0,1.05fr)_minmax(0,0.9fr)]">
                 <div className="rounded-xl border border-border bg-background/60 p-4">
-                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Capitale richiesto alla target age</p>
-                  <p className="mt-2 font-mono text-lg font-semibold text-foreground desktop:text-2xl">
-                    {formatCurrency(baseScenario.retirementCapitalRequired)}
-                  </p>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    A {resolvedRetirementAge} anni il portafoglio deve coprire {formatCurrencyPerYear(baseScenario.annualPortfolioNeedAtRetirement)}.
-                  </p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Timeline minima</p>
+                  <div className="mt-3 space-y-3 text-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-muted-foreground">Età attuale</span>
+                      <span className="font-mono text-foreground">{targetAgeLabel}</span>
+                    </div>
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-muted-foreground">Età target Coast FIRE</span>
+                      <span className="font-mono text-foreground">{retirementAgeLabel}</span>
+                    </div>
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-muted-foreground">Prima decorrenza</span>
+                      <span className="font-mono text-foreground">{firstPensionStartLabel}</span>
+                    </div>
+                  </div>
                 </div>
                 <div className="rounded-xl border border-border bg-background/60 p-4">
-                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Anni ponte</p>
-                  <p className="mt-2 font-mono text-lg font-semibold text-foreground desktop:text-2xl">
-                    {bridgeYears > 0 ? `${bridgeYears} ${bridgeYears === 1 ? 'anno' : 'anni'}` : 'Nessuno'}
-                  </p>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Misurano il tratto tra target age e assetto stabile dopo l&apos;ultima decorrenza pensionistica.
-                  </p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Perché il numero cambia</p>
+                  <div className="mt-3 space-y-3">
+                    {changeDrivers.map((item) => (
+                      <div key={item.label} className="border-b border-border/50 pb-3 last:border-b-0 last:pb-0">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm font-medium text-foreground">{item.label}</span>
+                          <span className="font-mono text-sm text-foreground">{item.value}</span>
+                        </div>
+                        <p className="mt-1 text-sm text-muted-foreground">{item.detail}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="rounded-xl border border-border bg-background/60 p-4">
-                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Copertura gia attiva alla target age</p>
-                  <p className="mt-2 font-mono text-lg font-semibold text-foreground desktop:text-2xl">
-                    {formatCurrency(retirementCoverageDelta)}
-                  </p>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Riduce il fabbisogno iniziale da {formatCurrency(annualExpenses ?? 0)} a {formatCurrency(baseScenario.annualPortfolioNeedAtRetirement)}.
-                  </p>
-                </div>
-                <div className="rounded-xl border border-border bg-background/60 p-4">
-                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Copertura a regime</p>
-                  <p className="mt-2 font-mono text-lg font-semibold text-foreground desktop:text-2xl">
-                    {formatCurrency(steadyStateCoverageDelta)}
-                  </p>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Dopo tutte le decorrenze il fabbisogno scende a {formatCurrencyPerYear(baseScenario.annualPortfolioNeedAtSteadyState)}.
-                  </p>
+                <div className={cn('rounded-xl border p-4', pensionStateTone)}>
+                  <p className="text-xs uppercase tracking-[0.18em]">Stato configurazione</p>
+                  <p className="mt-2 text-lg font-semibold text-foreground desktop:text-2xl">{pensionStateLabel}</p>
+                  <p className="mt-2 text-sm text-muted-foreground">{pensionStateDescription}</p>
+                  {primaryPensionIssue ? (
+                    <p className="mt-3 rounded-lg border border-current/10 bg-background/70 p-3 text-sm text-foreground">
+                      {primaryPensionIssue.message}
+                      {remainingPensionIssues > 0 ? ` Altri avvisi: ${remainingPensionIssues}.` : ''}
+                    </p>
+                  ) : (
+                    <p className="mt-3 rounded-lg border border-current/10 bg-background/70 p-3 text-sm text-muted-foreground">
+                      {pensionCount > 0
+                        ? `${pensionCount} pension${pensionCount === 1 ? 'e pronta' : 'i in anteprima'} nel calcolo locale.`
+                        : 'Aggiungi una pensione solo se vuoi ridurre il fabbisogno dopo la decorrenza.'}
+                    </p>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -737,13 +854,19 @@ export function CoastFireTab() {
                     Patrimonio FIRE attuale {formatCurrency(currentNetWorth)}. Quota liquida {formatPercentage(liquidProgressBase)}.
                   </p>
                 </div>
-                {primaryPensionWarning ? (
-                  <Alert className="border-amber-500/30 bg-amber-500/10">
+                {primaryPensionIssue ? (
+                  <Alert
+                    className={cn(
+                      primaryIncompleteIssue
+                        ? 'border-amber-500/30 bg-amber-500/10'
+                        : 'border-sky-500/30 bg-sky-500/10'
+                    )}
+                  >
                     <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Risultato parziale</AlertTitle>
+                    <AlertTitle>{primaryIncompleteIssue ? 'Dati da completare' : 'Avviso informativo'}</AlertTitle>
                     <AlertDescription>
-                      {primaryPensionWarning.message}
-                      {remainingPensionWarnings > 0 ? ` Ci sono altre ${remainingPensionWarnings} segnalazioni nella configurazione.` : ''}
+                      {primaryPensionIssue.message}
+                      {remainingPensionIssues > 0 ? ` Ci sono altri ${remainingPensionIssues} avvisi nella configurazione.` : ''}
                     </AlertDescription>
                   </Alert>
                 ) : null}
@@ -753,18 +876,50 @@ export function CoastFireTab() {
         </>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Mountain className="h-5 w-5" />
-            Configurazione Coast FIRE
-          </CardTitle>
-          <CardDescription>
-            Il Coast FIRE usa sempre le spese reali dell&apos;ultimo anno completo e riutilizza gli scenari
-            Bear/Base/Bull già configurati nel FIRE classico.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <Collapsible open={isConfigOpen} onOpenChange={setIsConfigOpen}>
+        <Card className="border-border/70">
+          <CardHeader className="gap-4">
+            <div className="flex flex-col gap-3 desktop:flex-row desktop:items-start desktop:justify-between">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Mountain className="h-5 w-5" />
+                  <CardTitle>Configurazione Coast FIRE</CardTitle>
+                </div>
+                <CardDescription>
+                  Dati inseriti e assunzioni operative. Apri questa sezione per modificare età target, pensioni e
+                  scaglioni.
+                </CardDescription>
+              </div>
+              <CollapsibleTrigger asChild>
+                <Button variant="outline" className="w-full justify-between desktop:w-auto">
+                  <span>{isConfigOpen ? 'Nascondi configurazione' : 'Mostra configurazione'}</span>
+                  <ChevronDown className={cn('h-4 w-4 transition-transform', isConfigOpen ? 'rotate-180' : '')} />
+                </Button>
+              </CollapsibleTrigger>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 desktop:grid-cols-4">
+              <div className="rounded-lg border border-border bg-background/60 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Età attuale</p>
+                <p className="mt-2 font-mono text-lg font-semibold text-foreground">{targetAgeLabel}</p>
+              </div>
+              <div className="rounded-lg border border-border bg-background/60 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Target Coast FIRE</p>
+                <p className="mt-2 font-mono text-lg font-semibold text-foreground">{retirementAgeLabel}</p>
+              </div>
+              <div className="rounded-lg border border-border bg-background/60 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Pensioni</p>
+                <p className="mt-2 font-mono text-lg font-semibold text-foreground">{pensionCount}</p>
+              </div>
+              <div className="rounded-lg border border-border bg-background/60 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Stato</p>
+                <p className="mt-2 text-lg font-semibold text-foreground">{pensionStateLabel}</p>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CollapsibleContent>
+            <CardContent>
           {hasUnsavedChanges && (
             <div className="mb-4 rounded-lg border border-border bg-muted/40 p-4 text-sm">
               <div className="flex items-start gap-2">
@@ -782,55 +937,94 @@ export function CoastFireTab() {
             </div>
           )}
 
-          <div className="grid gap-4 desktop:grid-cols-2">
-            <div>
-              <Label htmlFor="coastCurrentAge">Età attuale</Label>
-              <Input
-                id="coastCurrentAge"
-                type="number"
-                min="18"
-                max="100"
-                step="1"
-                value={tempUserAge}
-                onChange={(event) => setTempUserAge(event.target.value)}
-                className={COAST_CONTROL_CLASSNAME}
-                placeholder="Es. 35"
-              />
+          <div className="grid gap-6 desktop:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-foreground">1. Timeline personale</p>
+                <p className="text-sm text-muted-foreground">
+                  Questi punti definiscono la distanza tra oggi, target Coast FIRE e decorrenza pensione.
+                </p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="coastCurrentAge">Età attuale</Label>
+                  <Input
+                    id="coastCurrentAge"
+                    type="number"
+                    min="18"
+                    max="100"
+                    step="1"
+                    value={tempUserAge}
+                    onChange={(event) => setTempUserAge(event.target.value)}
+                    className={COAST_CONTROL_CLASSNAME}
+                    placeholder="Es. 35"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="coastRetirementAge">Età target Coast FIRE</Label>
+                  <Input
+                    id="coastRetirementAge"
+                    type="number"
+                    min="18"
+                    max="100"
+                    step="1"
+                    value={tempRetirementAge}
+                    onChange={(event) => setTempRetirementAge(event.target.value)}
+                    className={COAST_CONTROL_CLASSNAME}
+                  />
+                </div>
+              </div>
+              <div className="rounded-lg border border-border bg-muted/20 p-4 text-sm text-muted-foreground">
+                <p>
+                  <span className="font-medium text-foreground">Età attuale</span>: punto di partenza del capitale che
+                  cresce senza nuovi contributi pensionistici.
+                </p>
+                <p className="mt-2">
+                  <span className="font-medium text-foreground">Età target Coast FIRE</span>: età in cui il capitale
+                  deve essere sufficiente, anche se alcune pensioni partono dopo.
+                </p>
+                <p className="mt-2">
+                  <span className="font-medium text-foreground">Decorrenza pensione</span>: momento in cui la singola
+                  pensione inizia davvero a ridurre il fabbisogno annuo.
+                </p>
+              </div>
             </div>
-            <div>
-              <Label htmlFor="coastRetirementAge">Età pensionamento</Label>
-              <Input
-                id="coastRetirementAge"
-                type="number"
-                min="18"
-                max="100"
-                step="1"
-                value={tempRetirementAge}
-                onChange={(event) => setTempRetirementAge(event.target.value)}
-                className={COAST_CONTROL_CLASSNAME}
-              />
-            </div>
-          </div>
 
-          <div className="mt-4 rounded-lg border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
-            <p>
-              Base spese:{' '}
-              <span className="font-medium text-foreground">{formatCurrency(annualExpenses ?? 0)}</span>{' '}
-              dall&apos;ultimo anno completo.
-            </p>
-            <p className="mt-1">
-              Il patrimonio usato nel calcolo è quello FIRE-eligible{' '}
-              {includePrimaryResidence ? 'con' : 'senza'} casa di abitazione, in linea con la tua impostazione FIRE
-              corrente.
-            </p>
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-foreground">2. Assunzioni già attive</p>
+                <p className="text-sm text-muted-foreground">
+                  Questi valori cambiano il numero finale anche se non dipendono dalla pensione.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border border-border bg-background/60 p-4">
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Spese usate</p>
+                  <p className="mt-2 font-mono text-lg font-semibold text-foreground desktop:text-2xl">
+                    {formatCurrency(annualExpenses ?? 0)}
+                  </p>
+                  <p className="mt-2 text-sm text-muted-foreground">Ultimo anno completo, non le spese FIRE pianificate.</p>
+                </div>
+                <div className="rounded-lg border border-border bg-background/60 p-4">
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Base di patrimonio</p>
+                  <p className="mt-2 text-sm font-medium text-foreground">
+                    SWR {formatPercentage(withdrawalRate)} · {includePrimaryResidence ? 'Con' : 'Senza'} prima casa
+                  </p>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Patrimonio FIRE attuale {formatCurrency(currentNetWorth)}. Liquidità {formatCurrency(liquidNetWorth)}.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="mt-6 space-y-4 border-t border-border/40 pt-4">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-col gap-3 desktop:flex-row desktop:items-start desktop:justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-foreground">Pensioni statali</h3>
+                <h3 className="text-sm font-semibold text-foreground">3. Pensioni statali</h3>
                 <p className="text-sm text-muted-foreground">
-                  Inserisci pensioni lorde mensili future. La sezione sopra ti mostra subito cosa cambia alla target age e cosa cambia dopo ogni decorrenza.
+                  Per 1-2 pensioni la lettura resta ampia. Da 3 in su il layout diventa più denso per mantenere il
+                  confronto leggibile.
                 </p>
               </div>
               <Button type="button" variant="outline" size="sm" onClick={addPensionRow}>
@@ -840,9 +1034,18 @@ export function CoastFireTab() {
             </div>
 
             {pensionDraftIssues.length > 0 ? (
-              <Alert className="border-amber-500/30 bg-amber-500/10 text-foreground">
+              <Alert
+                className={cn(
+                  'text-foreground',
+                  primaryIncompleteIssue
+                    ? 'border-amber-500/30 bg-amber-500/10'
+                    : 'border-sky-500/30 bg-sky-500/10'
+                )}
+              >
                 <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Segnalazioni sulla configurazione</AlertTitle>
+                <AlertTitle>
+                  {primaryIncompleteIssue ? 'Dati da completare' : 'Avvisi informativi'}
+                </AlertTitle>
                 <AlertDescription className="space-y-1">
                   {pensionDraftIssues.slice(0, 3).map((issue) => (
                     <p key={`${issue.pensionId}-${issue.message}`}>{issue.message}</p>
@@ -856,7 +1059,8 @@ export function CoastFireTab() {
 
             {tempPensions.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
-                Nessuna pensione inserita. In questo caso il portafoglio deve coprire tutte le spese anche dopo la target age.
+                Nessuna pensione inserita. Stai simulando il caso in cui il portafoglio debba coprire tutte le spese
+                anche dopo la target age.
               </div>
             ) : (
               <div className="space-y-3">
@@ -865,17 +1069,35 @@ export function CoastFireTab() {
                     key={pension.id}
                     className="rounded-lg border border-border bg-background/60 p-4"
                   >
-                    <div className="mb-3 flex flex-wrap items-center gap-2">
-                      <Badge variant="outline">{pension.label.trim() || `Pensione ${index + 1}`}</Badge>
-                      {hasCompactPensionEditor ? (
-                        <Badge variant="secondary">Vista compatta {tempPensions.length} pensioni</Badge>
-                      ) : null}
+                    <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline">{pension.label.trim() || `Pensione ${index + 1}`}</Badge>
+                          {hasCompactPensionEditor ? (
+                            <Badge variant="secondary">Vista compatta</Badge>
+                          ) : null}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {pension.startDate
+                            ? `Decorrenza prevista ${formatDate(toDate(pension.startDate))}.`
+                            : 'Decorrenza non ancora impostata.'}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removePensionRow(pension.id)}
+                        aria-label="Rimuovi pensione"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                     <div
                       className={
                         hasCompactPensionEditor
-                          ? 'grid gap-3 sm:grid-cols-2 desktop:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_140px_160px_52px]'
-                          : 'grid gap-3 desktop:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_160px_160px_52px]'
+                          ? 'grid gap-3 sm:grid-cols-2 desktop:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_140px_160px]'
+                          : 'grid gap-3 desktop:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_160px_160px]'
                       }
                     >
                       <div>
@@ -889,7 +1111,7 @@ export function CoastFireTab() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor={`coast-pension-gross-${pension.id}`}>Lordo mensile</Label>
+                        <Label htmlFor={`coast-pension-gross-${pension.id}`}>Lordo mensile futuro</Label>
                         <Input
                           id={`coast-pension-gross-${pension.id}`}
                           type="number"
@@ -904,7 +1126,7 @@ export function CoastFireTab() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor={`coast-pension-months-${pension.id}`}>Mensilità annue</Label>
+                        <Label htmlFor={`coast-pension-months-${pension.id}`}>Mensilità</Label>
                         <Input
                           id={`coast-pension-months-${pension.id}`}
                           type="number"
@@ -926,17 +1148,6 @@ export function CoastFireTab() {
                           className={COAST_CONTROL_CLASSNAME}
                         />
                       </div>
-                      <div className="flex items-end">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removePensionRow(pension.id)}
-                          aria-label="Rimuovi pensione"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
                     </div>
                   </div>
                 ))}
@@ -946,12 +1157,12 @@ export function CoastFireTab() {
             <Collapsible className="rounded-lg border border-border bg-muted/20">
               <CollapsibleTrigger asChild>
                 <Button variant="ghost" className="flex w-full items-center justify-between rounded-lg px-4 py-3 text-left">
-                  <span className="text-sm font-medium text-foreground">Come trattiamo il dato pensione</span>
+                  <span className="text-sm font-medium text-foreground">4. Assunzioni del modello pensione</span>
                   <ChevronDown className="h-4 w-4 text-muted-foreground" />
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="px-4 pb-4 text-sm text-muted-foreground">
-                L&apos;importo che inserisci e&apos; un <span className="font-medium text-foreground">lordo mensile futuro nominale</span>.
+                L&apos;importo che inserisci è un <span className="font-medium text-foreground">lordo mensile futuro nominale</span>.
                 Il modello lo annualizza, lo deflaziona in termini reali, applica l&apos;IRPEF pensione e riduce il fabbisogno del portafoglio solo dalla data di decorrenza.
               </CollapsibleContent>
             </Collapsible>
@@ -1023,10 +1234,12 @@ export function CoastFireTab() {
 
           <Button onClick={handleSave} disabled={saveMutation.isPending} className="mt-6 w-full desktop:w-auto">
             <Save className="mr-2 h-4 w-4" />
-            {saveMutation.isPending ? 'Salvataggio...' : hasUnsavedChanges ? 'Salva Anteprima' : 'Salva Impostazioni'}
+            {saveMutation.isPending ? 'Salvataggio...' : hasUnsavedChanges ? 'Salva anteprima' : 'Salva impostazioni'}
           </Button>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       {!coastProjection || !baseScenario ? (
         <Card className="border-border/70">
@@ -1044,11 +1257,11 @@ export function CoastFireTab() {
           <div className="grid gap-4 sm:grid-cols-2 desktop:grid-cols-4">
             <Card className="border-border/70">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Coast Number Oggi</CardTitle>
+                <CardTitle className="text-base">Coast Number oggi</CardTitle>
                 <CardDescription>Capitale minimo richiesto oggi</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-lg font-bold text-indigo-600 desktop:text-2xl">
+                <div className="font-mono text-lg font-semibold text-foreground desktop:text-2xl">
                   {formatCurrency(baseScenario.coastFireNumberToday)}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -1059,34 +1272,34 @@ export function CoastFireTab() {
 
             <Card className="border-border/70">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Progresso verso Coast FIRE</CardTitle>
+                <CardTitle className="text-base">Progresso</CardTitle>
                 <CardDescription>Totale e quota liquida</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-lg font-bold text-green-600 desktop:text-2xl">
+                <div className="font-mono text-lg font-semibold text-foreground desktop:text-2xl">
                   {formatPercentage(baseScenario.progressToCoastFI)}
                 </div>
                 <div className="mt-3 h-3 w-full overflow-hidden rounded-full bg-muted">
                   <motion.div
-                    className="h-full bg-gradient-to-r from-green-400 to-green-600"
+                    className="h-full bg-primary"
                     initial={false}
                     animate={{ width: `${Math.min(baseScenario.progressToCoastFI, 100)}%` }}
                     transition={{ duration: 0.35, ease: 'easeOut' }}
                   />
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Progresso liquidità: {formatPercentage(liquidProgressBase)}
+                  Quota liquida: {formatPercentage(liquidProgressBase)}
                 </p>
               </CardContent>
             </Card>
 
             <Card className="border-border/70">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Gap Residuo</CardTitle>
+                <CardTitle className="text-base">Gap residuo</CardTitle>
                 <CardDescription>Quanto manca oggi</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-lg font-bold text-amber-600 desktop:text-2xl">
+                <div className="font-mono text-lg font-semibold text-foreground desktop:text-2xl">
                   {formatCurrency(baseScenario.gapToCoastFI)}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -1097,11 +1310,11 @@ export function CoastFireTab() {
 
             <Card className="border-border/70">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Valore Stimato a Pensione</CardTitle>
+                <CardTitle className="text-base">Valore stimato a pensione</CardTitle>
                 <CardDescription>Senza nuovi contributi</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-lg font-bold text-blue-600 desktop:text-2xl">
+                <div className="font-mono text-lg font-semibold text-foreground desktop:text-2xl">
                   {formatCurrency(baseScenario.futureValueAtRetirementWithoutNewContributions)}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -1111,12 +1324,12 @@ export function CoastFireTab() {
             </Card>
           </div>
 
-          <div className="grid gap-4 desktop:grid-cols-2">
+          <div className="grid gap-4 desktop:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
             <Card className="border-border/70">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Situazione all'età target</CardTitle>
                 <CardDescription>
-                  Scenario Base: cosa deve coprire il portafoglio quando arrivi all&apos;età Coast FIRE
+                  Cosa deve coprire il portafoglio quando arrivi all&apos;età Coast FIRE
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
@@ -1147,9 +1360,9 @@ export function CoastFireTab() {
 
             <Card className="border-border/70">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Situazione dopo l'avvio della pensione</CardTitle>
+                <CardTitle className="text-base">Situazione a regime</CardTitle>
                 <CardDescription>
-                  Scenario Base: assetto stabile dopo l&apos;ultima decorrenza pensionistica{' '}
+                  Assetto stabile dopo l&apos;ultima decorrenza pensionistica{' '}
                   {baseScenario.latestPensionStartDate
                     ? `(${formatDate(toDate(baseScenario.latestPensionStartDate))})`
                     : ''}
@@ -1189,7 +1402,7 @@ export function CoastFireTab() {
           {baseScenarioInterpretation.length > 0 && (
             <Card className="border-border/70 bg-muted/20">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Come leggere questo scenario</CardTitle>
+                <CardTitle className="text-base">Perché cambia il numero finale</CardTitle>
                 <CardDescription>Interpretazione automatica dello Scenario Base con i tuoi dati attuali</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 text-sm text-foreground/90">
@@ -1205,24 +1418,27 @@ export function CoastFireTab() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Landmark className="h-5 w-5 text-primary" />
-                  Dettaglio pensioni nello Scenario Base
+                  Impatto delle singole pensioni
                 </CardTitle>
                 <CardDescription>
-                  Ogni pensione viene deflazionata con l&apos;inflazione dello scenario e poi tassata con gli scaglioni IRPEF correnti.
+                  Ogni pensione entra nella timeline solo dalla sua decorrenza, senza essere sommata in anticipo.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {baseScenario.pensionBreakdown.map((pension) => (
+                {sortedPensionBreakdown.map((pension) => (
                   <div
                     key={pension.id}
                     className="grid gap-3 rounded-lg border border-border bg-background/60 p-4 text-sm desktop:grid-cols-[minmax(0,1.2fr)_140px_repeat(3,minmax(0,1fr))]"
                   >
                     <div>
-                      <p className="font-medium text-foreground">{pension.label}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium text-foreground">{pension.label}</p>
+                        <Badge variant={pension.isActiveAtRetirement ? 'secondary' : 'outline'}>
+                          {pension.isActiveAtRetirement ? 'Attiva alla target age' : `Parte a ${formatAgeYears(pension.startAge)}`}
+                        </Badge>
+                      </div>
                       <p className="text-muted-foreground">
-                        Decorrenza{' '}
-                        {pension.startDate ? formatDate(toDate(pension.startDate)) : 'non disponibile'}{' '}
-                        {pension.isActiveAtRetirement ? '· attiva a pensione' : '· parte dopo il target Coast'}
+                        Decorrenza {pension.startDate ? formatDate(toDate(pension.startDate)) : 'non disponibile'}
                       </p>
                     </div>
                     <div>
@@ -1278,7 +1494,7 @@ export function CoastFireTab() {
                       <span className="font-semibold text-foreground">{formatPercentage(liquidProgress)}</span>
                     </div>
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-muted-foreground">Pensione netta reale a pensione</span>
+                      <span className="text-muted-foreground">Pensione netta a target</span>
                       <span className="font-semibold text-foreground">
                         {formatCurrency(scenario.totalNetAnnualPensionAtRetirement)}
                       </span>

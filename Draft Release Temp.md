@@ -174,6 +174,8 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - Improved the Coast FIRE state pension section with a clearer guided reading before the form, so you can immediately understand target-age capital, bridge years, and what changes after pensions begin
 - Improved Coast FIRE with a dedicated before/after pension timeline, making staggered pension start dates much easier to read
 - Improved Coast FIRE pension configuration feedback with clearer warnings and partial-result guidance when some pension inputs are incomplete or inconsistent
+- Improved Coast FIRE so delayed pension start dates are shown as informational guidance rather than as broken or doubtful inputs
+- Improved Coast FIRE with a collapsible configuration panel that keeps key inputs visible while reducing page length when everything is already set up
 - The FIRE "Indennità Annuale" card now shows the Patrimonio FIRE base value directly, so you can immediately see which number the withdrawal rate is applied to without switching tabs
 - Improved the FIRE sensitivity section with a lightweight explainer and tooltip that clarify how to read rows, columns, colors, and the baseline cell
 - Improved Coast FIRE with contextual explanations that clarify bridge years, delayed pension starts, and how multiple pensions reduce the portfolio need over time

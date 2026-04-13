@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-13, session coast-fire-pensione-statale-ui-rationalization): **Guided state-pension UX in Coast FIRE**. The `Coast FIRE` tab now leads with a summary-first reading of state pensions: target-age capital, bridge years, coverage already active at target age, coverage at steady state, and a clear `before / after pension` timeline. Pension rows now surface warnings with partial results when inputs are incomplete or suspicious, multi-pension setups stay readable, and methodology is moved into on-demand disclosure instead of competing with the main decision view.
+- Latest implementation (2026-04-13, session coast-fire-pensione-statale-ui-rationalization): **Refined state-pension UX in Coast FIRE**. The `Coast FIRE` tab now separates summary, configuration, and results more clearly: a compact summary-first reading explains target-age capital, bridge years, and steady-state coverage; the configuration surface is collapsible with a visible snapshot of the active inputs; and pension feedback now distinguishes informational timing notes from genuinely incomplete data.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -42,7 +42,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - monthly chart from `prepareMonthlyLaborMetricsData()`
 - Settings page now offers visible unsaved-state preview and clearer in-context feedback for sensitive configuration changes (without autosave behavior changes)
 - Dividends and coupons tracking with EUR conversion, focused monthly calendar, contextual per-payment detail view, total return per asset, and DPS growth summaries
-- FIRE planning now includes local preview feedback, rolling 12-month runway history, separate total/liquid runway deltas vs the same month a year earlier, a Base-scenario sensitivity matrix for annual spending vs annual savings, steadier scenario projections, clearer liquid vs illiquid readouts, and a dedicated `Coast FIRE` tab. Coast FIRE reuses `userAge`, persists `coastFireRetirementAge`, uses real annual expenses from the last completed year, models Bear/Base/Bull outcomes with `real return = growth - inflation`, and optionally reduces retirement portfolio needs with one or more state pensions entered as gross future nominal monthly amounts, exact pension dates, and editable IRPEF brackets. The state-pension area now opens with a guided summary and temporal timeline so users can read target-age need, bridge years, and post-pension steady state before touching the form.
+- FIRE planning now includes local preview feedback, rolling 12-month runway history, separate total/liquid runway deltas vs the same month a year earlier, a Base-scenario sensitivity matrix for annual spending vs annual savings, steadier scenario projections, clearer liquid vs illiquid readouts, and a dedicated `Coast FIRE` tab. Coast FIRE reuses `userAge`, persists `coastFireRetirementAge`, uses real annual expenses from the last completed year, models Bear/Base/Bull outcomes with `real return = growth - inflation`, and optionally reduces retirement portfolio needs with one or more state pensions entered as gross future nominal monthly amounts, exact pension dates, and editable IRPEF brackets. The state-pension area now combines a compact summary-first explanation, a collapsible configuration panel with visible key inputs, and separate informational vs incomplete-state messaging for pension timing.
 - Monte Carlo simulations now preserve result continuity across reruns, with progressive percentile/distribution reveal and more explicit Bear/Base/Bull comparison focus
 - Goal-based investing now links summary cards, allocation chart, and detail cards through a shared focus model for faster visual comprehension
 - PDF export and AI-powered performance analysis
@@ -83,7 +83,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-13 (session coast-fire-pensione-statale-ui-rationalization — guided Coast FIRE pension UX and clearer before/after pension reading)
+**Last updated**: 2026-04-13 (session coast-fire-pensione-statale-ui-rationalization — Coast FIRE pension UX, clearer state semantics, collapsible configuration)
 
 ## Design Context
 
