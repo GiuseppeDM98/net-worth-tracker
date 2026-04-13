@@ -282,6 +282,8 @@ A dedicated tab that answers a simple question: could your current FIRE portfoli
 
 ## 🏗️ Technical
 
+- Reduced Firestore reads on the Performance page (Rendimenti): repeated visits now serve pre-computed metrics from a server-side cache instead of re-reading the full snapshot and expense history. The cache updates automatically when your portfolio snapshot changes, and the Refresh button always forces a full recalculation
+- Fixed the Performance page making three separate database reads for expense history on every load — now a single read is shared across all calculations
 - Added `includeDummySnapshots` assistant preference: test accounts with synthetic snapshot data can now include those snapshots in AI context bundles. The toggle appears automatically only when dummy snapshots are detected — invisible to all regular users
 - Improved assistant scrolling during long AI responses so the conversation stays smooth and readable on slower devices — previously each word arriving could cause a visible stutter
 - Improved assistant memory panel filter tabs ("Attivi" / "Archiviati") with larger tap areas on mobile, making them easier to switch between on touch screens

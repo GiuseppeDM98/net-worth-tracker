@@ -182,6 +182,15 @@ service cloud.firestore {
       allow delete: if isOwner(userId);
     }
 
+    // Collezione performance-cache - cache pre-calcolata dei dati Rendimenti
+    // Document ID == userId; nessun campo userId nel documento (pattern come userPreferences)
+    match /performance-cache/{userId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId) &&
+                               request.resource.data.userId == userId;
+      allow delete: if isOwner(userId);
+    }
+
     // Blocca tutto il resto per sicurezza
     match /{document=**} {
       allow read, write: if false;

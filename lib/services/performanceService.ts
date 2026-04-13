@@ -1,3 +1,5 @@
+import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
 import { MonthlySnapshot } from '@/types/assets';
 import { Expense } from '@/types/expenses';
 import {
@@ -8,11 +10,18 @@ import {
   RollingPeriodPerformance,
   PerformanceChartData,
   MonthlyReturnHeatmapData,
-  UnderwaterDrawdownData
+  UnderwaterDrawdownData,
+  PerformanceCacheDocument,
+  FirestorePerformanceData,
+  FirestorePerformanceMetrics,
+  FirestoreCashFlowData,
+  FirestoreRollingPeriodPerformance,
 } from '@/types/performance';
 import { getExpensesByDateRange } from './expenseService';
 import { getUserSnapshots } from './snapshotService';
 import { getSettings } from './assetAllocationService';
+
+const PERFORMANCE_CACHE_COLLECTION = 'performance-cache';
 
 /**
  * Format month and year to MM/YY format (e.g., "04/25")
@@ -1412,6 +1421,118 @@ export async function calculatePerformanceForPeriod(
   };
 }
 
+// ===== PERFORMANCE CACHE HELPERS =====
+
+function serializeCashFlow(cf: CashFlowData): FirestoreCashFlowData {
+  return { ...cf, date: Timestamp.fromDate(cf.date) };
+}
+
+function deserializeCashFlow(cf: FirestoreCashFlowData): CashFlowData {
+  return { ...cf, date: cf.date.toDate() };
+}
+
+function serializeMetrics(m: PerformanceMetrics): FirestorePerformanceMetrics {
+  return {
+    ...m,
+    startDate: Timestamp.fromDate(m.startDate),
+    endDate: Timestamp.fromDate(m.endDate),
+    dividendEndDate: Timestamp.fromDate(m.dividendEndDate),
+    cashFlows: m.cashFlows.map(serializeCashFlow),
+  };
+}
+
+function deserializeMetrics(m: FirestorePerformanceMetrics): PerformanceMetrics {
+  return {
+    ...m,
+    startDate: m.startDate.toDate(),
+    endDate: m.endDate.toDate(),
+    dividendEndDate: m.dividendEndDate.toDate(),
+    cashFlows: m.cashFlows.map(deserializeCashFlow),
+  };
+}
+
+function serializeRolling(r: RollingPeriodPerformance): FirestoreRollingPeriodPerformance {
+  return {
+    ...r,
+    periodStartDate: Timestamp.fromDate(r.periodStartDate),
+    periodEndDate: Timestamp.fromDate(r.periodEndDate),
+  };
+}
+
+function deserializeRolling(r: FirestoreRollingPeriodPerformance): RollingPeriodPerformance {
+  return {
+    ...r,
+    periodStartDate: r.periodStartDate.toDate(),
+    periodEndDate: r.periodEndDate.toDate(),
+  };
+}
+
+function serializePerformanceData(data: PerformanceData): FirestorePerformanceData {
+  return {
+    ytd: serializeMetrics(data.ytd),
+    oneYear: serializeMetrics(data.oneYear),
+    threeYear: serializeMetrics(data.threeYear),
+    fiveYear: serializeMetrics(data.fiveYear),
+    allTime: serializeMetrics(data.allTime),
+    rolling12M: data.rolling12M.map(serializeRolling),
+    rolling36M: data.rolling36M.map(serializeRolling),
+    lastUpdated: Timestamp.fromDate(data.lastUpdated),
+    snapshotCount: data.snapshotCount,
+  };
+}
+
+function deserializePerformanceData(raw: FirestorePerformanceData): PerformanceData {
+  return {
+    ytd: deserializeMetrics(raw.ytd),
+    oneYear: deserializeMetrics(raw.oneYear),
+    threeYear: deserializeMetrics(raw.threeYear),
+    fiveYear: deserializeMetrics(raw.fiveYear),
+    allTime: deserializeMetrics(raw.allTime),
+    custom: null,
+    rolling12M: raw.rolling12M.map(deserializeRolling),
+    rolling36M: raw.rolling36M.map(deserializeRolling),
+    lastUpdated: raw.lastUpdated.toDate(),
+    snapshotCount: raw.snapshotCount,
+  };
+}
+
+async function readPerformanceCache(userId: string): Promise<PerformanceCacheDocument | null> {
+  try {
+    const snap = await getDoc(doc(db, PERFORMANCE_CACHE_COLLECTION, userId));
+    if (!snap.exists()) return null;
+    return snap.data() as PerformanceCacheDocument;
+  } catch {
+    // Cache read failure is non-fatal — fall through to full computation
+    return null;
+  }
+}
+
+async function writePerformanceCache(userId: string, cacheKey: string, data: PerformanceData): Promise<void> {
+  try {
+    const document: PerformanceCacheDocument = {
+      userId,
+      cacheKey,
+      cachedAt: Timestamp.now(),
+      data: serializePerformanceData(data),
+    };
+    await setDoc(doc(db, PERFORMANCE_CACHE_COLLECTION, userId), document);
+  } catch {
+    // Cache write failure is non-fatal — page still works with freshly computed data
+  }
+}
+
+function buildCacheKey(snapshots: MonthlySnapshot[]): string {
+  if (snapshots.length === 0) return '0';
+  const sorted = [...snapshots].sort((a, b) => {
+    if (a.year !== b.year) return b.year - a.year;
+    return b.month - a.month;
+  });
+  const last = sorted[0];
+  // Include totalNetWorth so that updating an existing snapshot (same count/date)
+  // still produces a different key and forces a cache miss.
+  return `${snapshots.length}-${last.year}-${last.month}-${Math.round(last.totalNetWorth)}`;
+}
+
 /**
  * Get all performance data for the page
  *
@@ -1419,22 +1540,42 @@ export async function calculatePerformanceForPeriod(
  * - YTD, 1Y, 3Y, 5Y, ALL time periods
  * - Rolling 12M and 36M periods
  *
+ * On repeated visits with unchanged snapshots, returns cached data from
+ * Firestore (performance-cache collection) to avoid re-reading all expenses.
+ *
  * @param userId - User ID for fetching data
+ * @param forceRefresh - Skip cache and recompute (used by the refresh button)
  * @returns Complete performance data for all periods
  */
-export async function getAllPerformanceData(userId: string): Promise<PerformanceData> {
-  // ==== STEP 1: Fetch all required data ====
+export async function getAllPerformanceData(userId: string, forceRefresh = false): Promise<PerformanceData> {
+  // ==== STEP 1: Fetch snapshots and settings in parallel ====
   const [snapshots, settings] = await Promise.all([
     getUserSnapshots(userId),
     getSettings(userId),
   ]);
 
-  const riskFreeRate = settings?.riskFreeRate || 2.5; // Default to 2.5%
-  const dividendCategoryId = settings?.dividendIncomeCategoryId; // For separating dividend income
+  const riskFreeRate = settings?.riskFreeRate || 2.5;
+  const dividendCategoryId = settings?.dividendIncomeCategoryId;
 
-  // ==== STEP 2: Pre-fetch optimization ====
-  // Fetch ALL expenses once for the entire history to avoid N Firestore queries
-  // This single query is then filtered in-memory for each period calculation
+  // ==== STEP 2: Check cache before fetching expenses ====
+  // Cache key encodes snapshot count + last snapshot date.
+  // If snapshots haven't changed since last computation, skip the expensive expense fetch.
+  const cacheKey = buildCacheKey(snapshots);
+  if (!forceRefresh) {
+    const cached = await readPerformanceCache(userId);
+    if (cached && cached.cacheKey === cacheKey) {
+      // Expire cache after 6 hours so expense-only changes don't stay stale indefinitely.
+      // Snapshot changes still invalidate immediately via cacheKey mismatch.
+      const ageMs = Date.now() - cached.cachedAt.toDate().getTime();
+      const maxAgeMs = 6 * 60 * 60 * 1000;
+      if (ageMs < maxAgeMs) {
+        return deserializePerformanceData(cached.data);
+      }
+    }
+  }
+
+  // ==== STEP 3: Pre-fetch all expenses once for entire history ====
+  // Single Firestore query, then filtered in-memory for each period calculation.
   const sortedSnapshots = [...snapshots].sort((a, b) => {
     if (a.year !== b.year) return a.year - b.year;
     return a.month - b.month;
@@ -1449,7 +1590,7 @@ export async function getAllPerformanceData(userId: string): Promise<Performance
     allExpenses = await getExpensesByDateRange(userId, overallStartDate, overallEndDate);
   }
 
-  // ==== STEP 3: Calculate metrics for all time periods ====
+  // ==== STEP 4: Calculate metrics for all time periods ====
   const [ytd, oneYear, threeYear, fiveYear, allTime] = await Promise.all([
     calculatePerformanceForPeriod(userId, snapshots, 'YTD', riskFreeRate, undefined, undefined, allExpenses, dividendCategoryId),
     calculatePerformanceForPeriod(userId, snapshots, '1Y', riskFreeRate, undefined, undefined, allExpenses, dividendCategoryId),
@@ -1458,22 +1599,28 @@ export async function getAllPerformanceData(userId: string): Promise<Performance
     calculatePerformanceForPeriod(userId, snapshots, 'ALL', riskFreeRate, undefined, undefined, allExpenses, dividendCategoryId),
   ]);
 
-  // ==== STEP 4: Calculate rolling periods ====
-  const rolling12M = await calculateRollingPeriods(userId, snapshots, 12, riskFreeRate, dividendCategoryId);
-  const rolling36M = await calculateRollingPeriods(userId, snapshots, 36, riskFreeRate, dividendCategoryId);
+  // ==== STEP 5: Calculate rolling periods (reuse allExpenses — no extra Firestore queries) ====
+  const rolling12M = await calculateRollingPeriods(userId, snapshots, 12, riskFreeRate, dividendCategoryId, allExpenses);
+  const rolling36M = await calculateRollingPeriods(userId, snapshots, 36, riskFreeRate, dividendCategoryId, allExpenses);
 
-  return {
+  const result: PerformanceData = {
     ytd,
     oneYear,
     threeYear,
     fiveYear,
     allTime,
-    custom: null, // User hasn't selected custom range yet
+    custom: null,
     rolling12M,
     rolling36M,
     lastUpdated: new Date(),
     snapshotCount: snapshots.length,
   };
+
+  // Persist to cache so the next page load skips expense fetch when snapshots are unchanged.
+  // Fire-and-forget: cache write failure must not break the page.
+  void writePerformanceCache(userId, cacheKey, result);
+
+  return result;
 }
 
 /**
@@ -1496,7 +1643,8 @@ async function calculateRollingPeriods(
   allSnapshots: MonthlySnapshot[],
   windowMonths: number,
   riskFreeRate: number,
-  dividendCategoryId?: string
+  dividendCategoryId?: string,
+  prefetchedExpenses?: Expense[]
 ): Promise<RollingPeriodPerformance[]> {
   const sortedSnapshots = [...allSnapshots]
     .sort((a, b) => {
@@ -1508,13 +1656,13 @@ async function calculateRollingPeriods(
     return [];
   }
 
-  // OPTIMIZATION: Fetch ALL expenses once for the entire period range
   const firstSnapshot = sortedSnapshots[0];
   const lastSnapshot = sortedSnapshots[sortedSnapshots.length - 1];
   const overallStartDate = new Date(firstSnapshot.year, firstSnapshot.month - 1, 1);
   const overallEndDate = new Date(lastSnapshot.year, lastSnapshot.month, 0, 23, 59, 59, 999); // Last day of month
 
-  const allExpenses = await getExpensesByDateRange(userId, overallStartDate, overallEndDate);
+  // Reuse caller-supplied expenses to avoid a redundant Firestore query
+  const allExpenses = prefetchedExpenses ?? await getExpensesByDateRange(userId, overallStartDate, overallEndDate);
 
   const rollingPeriods: RollingPeriodPerformance[] = [];
 

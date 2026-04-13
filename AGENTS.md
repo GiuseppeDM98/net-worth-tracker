@@ -236,6 +236,19 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Italian month names live in `lib/constants/months.ts` as `MONTH_NAMES` (`as const` array). Import from there — do not redeclare inline in assistant components
 - Pattern: before duplicating a primitive array in a second file, check `lib/constants/` first
 
+### Firestore Pre-Computed Cache Pattern
+For pages that aggregate large collections (many snapshots + all expenses) on every load, store pre-computed results in a dedicated Firestore collection rather than re-reading and re-calculating each visit.
+
+**Pattern (applied to `performance-cache/{userId}`):**
+- Cache key encodes the inputs that determine the result: `{snapshotCount}-{lastYear}-{lastMonth}-{Math.round(lastTotalNetWorth)}`. Changing any of these triggers a cache miss automatically.
+- TTL fallback (6h) handles mutations to other collections (e.g. expenses) that don't appear in the cache key — stale data decays without explicit invalidation.
+- `forceRefresh` param on the main fetch function lets the UI bypass the cache on explicit user action (refresh button) and rewrite it with fresh data.
+- Cache reads/writes are wrapped in `try/catch` and fire-and-forget on write — cache failure must never break the page.
+- `Date` ↔ Firestore `Timestamp` serialization: write helpers convert each known `Date` field before `setDoc`; read helpers reverse on `getDoc`. Do this field-by-field with explicit types (`FirestorePerformanceMetrics`, `FirestoreCashFlowData`, etc.) — do not JSON-stringify the whole object.
+- Firestore rule for the cache collection uses `isOwner(userId)` with doc ID == userId (same pattern as `userPreferences`, `hall-of-fame`, `budgets`). No `userId` field check needed on reads since doc ID is the auth guard.
+
+**Cache key design rule:** include every input that changes the computed output. A key based only on `{count}-{year}-{month}` misses snapshot *value* updates (same month, different net worth). Including `Math.round(totalNetWorth)` catches those. Sub-cent rounding is intentional — avoid floating-point instability in the key string.
+
 ### Dashboard Data Isolation
 - Do not add `useAllExpenses` or other full-history queries to Overview/Dashboard
 - Full-history expense analysis belongs in History or Cashflow

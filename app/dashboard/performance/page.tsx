@@ -177,7 +177,9 @@ export default function PerformancePage() {
       const snapshots = await getUserSnapshots(user.uid);
       setCachedSnapshots(snapshots);
 
-      const data = await getAllPerformanceData(user.uid);
+      // forceRefresh on explicit button click so the cache is bypassed and rewritten
+      const isRefresh = hasLoadedOnceRef.current;
+      const data = await getAllPerformanceData(user.uid, isRefresh);
 
       // Fetch YOC and Current Yield metrics for all periods in parallel
       // Both require server-side calculation due to Firebase Admin SDK usage

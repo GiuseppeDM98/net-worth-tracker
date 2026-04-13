@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-13, session coast-fire-custom-expenses): **Coast FIRE custom annual expenses**. Toggle "Spese personalizzate" in the config panel lets users override the last-year actuals with a manually entered amount. Persisted as `coastFireCustomExpenses` in `assetAllocationTargets/{userId}`. Removing the value uses `delete docData.field` (NOT `deleteField()`) because the save path uses `setDoc` without `merge:true`. All calculations, texts, and the "Spese usate" summary card use `effectiveAnnualExpenses` (resolves custom vs auto in one place). Key files: `types/assets.ts`, `lib/services/assetAllocationService.ts`, `components/fire-simulations/CoastFireTab.tsx`.
+- Latest implementation (2026-04-13, session performance-firebase-reads): **Rendimenti Firestore cache**. `performance-cache/{userId}` stores pre-computed `PerformanceData` so repeated page visits skip the expense collection read entirely. Cache key: `{snapshotCount}-{lastYear}-{lastMonth}-{Math.round(lastTotalNetWorth)}`. TTL: 6 hours (covers expense-only changes). `forceRefresh=true` passed from the Aggiorna button bypasses and rewrites the cache. Dates serialized as Firestore Timestamps. Also fixed: `calculateRollingPeriods` was fetching `allExpenses` independently twice (12M + 36M windows) — now receives pre-fetched expenses from `getAllPerformanceData`. Key files: `lib/services/performanceService.ts`, `types/performance.ts`, `firestore.rules`, `app/dashboard/performance/page.tsx`.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -73,7 +73,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - History: `app/dashboard/history/page.tsx`
 - History components: `components/dashboard/LaborMetricsChart.tsx`, `components/history/*`
 - Chart service: `lib/services/chartService.ts`
-- Performance: `app/dashboard/performance/page.tsx`, `lib/services/performanceService.ts`
+- Performance: `app/dashboard/performance/page.tsx`, `lib/services/performanceService.ts`, `performance-cache/{userId}` (Firestore cache collection)
 - Cashflow and budget: `components/cashflow/*`, `lib/utils/budgetUtils.ts`, `types/budget.ts`
 - FIRE: `components/fire-simulations/*`, `lib/services/fireService.ts`
 - Dividends: `components/dividends/*`
@@ -83,7 +83,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-13 (session coast-fire-custom-expenses — Coast FIRE custom annual expenses toggle)
+**Last updated**: 2026-04-13 (session performance-firebase-reads — Rendimenti Firestore cache + duplicate expense query fix)
 
 ## Design Context
 
