@@ -104,6 +104,7 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 
 ## 🐛 Bug Fixes
 
+- Fixed Coast FIRE crashing when opening the tab after the latest pension UI update
 - Fixed a scrollbar icon appearing to the left of the send button in the assistant composer on Windows — the native textarea scrollbar is now hidden while keeping scroll functional for long messages
 - Fixed color themes appearing identical in dark mode — Solar Dusk, Elegant Luxury, and Midnight Bloom now show a clearly visible tint on cards and tables when dark mode is active
 - Fixed sidebar menu item text becoming invisible on hover in dark mode for the Cyberpunk and Solar Dusk themes — hovering a navigation item now keeps text clearly readable
@@ -111,6 +112,7 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - Fixed the FIRE runway year-over-year delta so it matches the one-decimal values shown in the cards
 - Fixed Coast FIRE state pension settings not persisting reliably after a page refresh
 - Fixed Coast FIRE pension details showing unreadable decimal values for years until pension start
+- Fixed Coast FIRE pension summaries showing broken yearly wording like `€l'anno` in some cards and timeline descriptions
 - Fixed the Overview greeting showing a stray comma before your first name in the dashboard welcome message
 - Fixed Cashflow Sankey back navigation so going back from a subcategory returns to its category first instead of jumping straight to the full overview
 
@@ -169,6 +171,9 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 
 ---
 
+- Improved the Coast FIRE state pension section with a clearer guided reading before the form, so you can immediately understand target-age capital, bridge years, and what changes after pensions begin
+- Improved Coast FIRE with a dedicated before/after pension timeline, making staggered pension start dates much easier to read
+- Improved Coast FIRE pension configuration feedback with clearer warnings and partial-result guidance when some pension inputs are incomplete or inconsistent
 - The FIRE "Indennità Annuale" card now shows the Patrimonio FIRE base value directly, so you can immediately see which number the withdrawal rate is applied to without switching tabs
 - Improved the FIRE sensitivity section with a lightweight explainer and tooltip that clarify how to read rows, columns, colors, and the baseline cell
 - Improved Coast FIRE with contextual explanations that clarify bridge years, delayed pension starts, and how multiple pensions reduce the portfolio need over time

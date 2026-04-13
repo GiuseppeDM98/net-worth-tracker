@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-12, session coast-fire-pensione-statale): **Coast FIRE with state pension support**. `FIRE e Simulazioni` now lets users configure one or more state pensions inside the `Coast FIRE` tab, use pension start dates, convert gross future nominal pension estimates into scenario-specific net real income via editable IRPEF brackets, and distinguish target-age capital from post-pension steady-state capital. The tab now also explains bridge years and staggered pension starts directly in-page. The classic FIRE tab remains unchanged.
+- Latest implementation (2026-04-13, session coast-fire-pensione-statale-ui-rationalization): **Guided state-pension UX in Coast FIRE**. The `Coast FIRE` tab now leads with a summary-first reading of state pensions: target-age capital, bridge years, coverage already active at target age, coverage at steady state, and a clear `before / after pension` timeline. Pension rows now surface warnings with partial results when inputs are incomplete or suspicious, multi-pension setups stay readable, and methodology is moved into on-demand disclosure instead of competing with the main decision view.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -42,7 +42,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - monthly chart from `prepareMonthlyLaborMetricsData()`
 - Settings page now offers visible unsaved-state preview and clearer in-context feedback for sensitive configuration changes (without autosave behavior changes)
 - Dividends and coupons tracking with EUR conversion, focused monthly calendar, contextual per-payment detail view, total return per asset, and DPS growth summaries
-- FIRE planning now includes local preview feedback, rolling 12-month runway history, separate total/liquid runway deltas vs the same month a year earlier, a Base-scenario sensitivity matrix for annual spending vs annual savings, steadier scenario projections, clearer liquid vs illiquid readouts, and a dedicated `Coast FIRE` tab. Coast FIRE reuses `userAge`, persists `coastFireRetirementAge`, uses real annual expenses from the last completed year, models Bear/Base/Bull outcomes with `real return = growth - inflation`, and optionally reduces retirement portfolio needs with one or more state pensions entered as gross future nominal monthly amounts, exact pension dates, and editable IRPEF brackets, with contextual guidance when pensions start after the target age
+- FIRE planning now includes local preview feedback, rolling 12-month runway history, separate total/liquid runway deltas vs the same month a year earlier, a Base-scenario sensitivity matrix for annual spending vs annual savings, steadier scenario projections, clearer liquid vs illiquid readouts, and a dedicated `Coast FIRE` tab. Coast FIRE reuses `userAge`, persists `coastFireRetirementAge`, uses real annual expenses from the last completed year, models Bear/Base/Bull outcomes with `real return = growth - inflation`, and optionally reduces retirement portfolio needs with one or more state pensions entered as gross future nominal monthly amounts, exact pension dates, and editable IRPEF brackets. The state-pension area now opens with a guided summary and temporal timeline so users can read target-age need, bridge years, and post-pension steady state before touching the form.
 - Monte Carlo simulations now preserve result continuity across reruns, with progressive percentile/distribution reveal and more explicit Bear/Base/Bull comparison focus
 - Goal-based investing now links summary cards, allocation chart, and detail cards through a shared focus model for faster visual comprehension
 - PDF export and AI-powered performance analysis
@@ -83,7 +83,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-13 (session greeting-sankey-back-fix — Overview greeting consistency and hierarchical Cashflow Sankey back-navigation)
+**Last updated**: 2026-04-13 (session coast-fire-pensione-statale-ui-rationalization — guided Coast FIRE pension UX and clearer before/after pension reading)
 
 ## Design Context
 
