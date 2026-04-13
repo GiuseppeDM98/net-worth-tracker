@@ -57,6 +57,7 @@ export async function getSettings(
       withdrawalRate: data.withdrawalRate,
       plannedAnnualExpenses: data.plannedAnnualExpenses,
       coastFireRetirementAge: data.coastFireRetirementAge,
+      coastFireCustomExpenses: data.coastFireCustomExpenses,
       coastFirePensions: data.coastFirePensions,
       coastFireTaxBrackets: data.coastFireTaxBrackets,
       includePrimaryResidenceInFIRE: data.includePrimaryResidenceInFIRE,
@@ -139,6 +140,15 @@ export async function setSettings(
       if (settings.coastFireRetirementAge !== undefined) {
         docData.coastFireRetirementAge = settings.coastFireRetirementAge;
       }
+      // When the key is present but undefined, remove the field from docData so setDoc drops it.
+      // deleteField() is not allowed with setDoc() without merge:true; omitting the key achieves the same result.
+      if ('coastFireCustomExpenses' in settings) {
+        if (settings.coastFireCustomExpenses !== undefined) {
+          docData.coastFireCustomExpenses = settings.coastFireCustomExpenses;
+        } else {
+          delete docData.coastFireCustomExpenses;
+        }
+      }
       if (settings.coastFirePensions !== undefined) {
         docData.coastFirePensions = serializeCoastFirePensions(settings.coastFirePensions);
       }
@@ -220,6 +230,15 @@ export async function setSettings(
       }
       if (settings.coastFireRetirementAge !== undefined) {
         docData.coastFireRetirementAge = settings.coastFireRetirementAge;
+      }
+      // When the key is present but undefined, remove the field from docData so setDoc drops it.
+      // deleteField() is not allowed with setDoc() without merge:true; omitting the key achieves the same result.
+      if ('coastFireCustomExpenses' in settings) {
+        if (settings.coastFireCustomExpenses !== undefined) {
+          docData.coastFireCustomExpenses = settings.coastFireCustomExpenses;
+        } else {
+          delete docData.coastFireCustomExpenses;
+        }
       }
       if (settings.coastFirePensions !== undefined) {
         docData.coastFirePensions = serializeCoastFirePensions(settings.coastFirePensions);

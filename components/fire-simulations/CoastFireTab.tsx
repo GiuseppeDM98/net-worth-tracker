@@ -54,6 +54,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Switch } from '@/components/ui/switch';
 import { FireCalculatorSkeleton } from '@/components/fire-simulations/FireCalculatorSkeleton';
 import { CoastFireProjectionChart } from './CoastFireProjectionChart';
 import { Settings } from '@/types/settings';
@@ -325,6 +326,8 @@ export function CoastFireTab() {
 
   const [tempUserAge, setTempUserAge] = useState('');
   const [tempRetirementAge, setTempRetirementAge] = useState('60');
+  const [tempUseCustomExpenses, setTempUseCustomExpenses] = useState(false);
+  const [tempCustomExpenses, setTempCustomExpenses] = useState('');
   const [tempPensions, setTempPensions] = useState<CoastFirePensionDraft[]>([]);
   const [tempTaxBrackets, setTempTaxBrackets] = useState<CoastFireTaxBracketDraft[]>([]);
   const [isConfigOpen, setIsConfigOpen] = useState(true);
@@ -361,6 +364,8 @@ export function CoastFireTab() {
 
     setTempUserAge(settings?.userAge !== undefined ? String(settings.userAge) : '');
     setTempRetirementAge(String(settings?.coastFireRetirementAge ?? 60));
+    setTempUseCustomExpenses(settings?.coastFireCustomExpenses !== undefined);
+    setTempCustomExpenses(settings?.coastFireCustomExpenses?.toString() ?? '');
     setTempPensions(toPensionDrafts(settings?.coastFirePensions, settings?.userAge));
     setTempTaxBrackets(toTaxBracketDrafts(settings?.coastFireTaxBrackets));
   }, [isLoadingSettings, settings]);
@@ -370,6 +375,14 @@ export function CoastFireTab() {
   const currentAge = isValidAge(parsedCurrentAge) ? parsedCurrentAge : null;
   const retirementAge = isValidAge(parsedRetirementAge) ? parsedRetirementAge : null;
   const withdrawalRate = settings?.withdrawalRate ?? 4.0;
+
+  // Use user-defined expenses when the toggle is on and the value parses to a positive number;
+  // otherwise fall back to the last-year actuals from the query.
+  const parsedCustomExpenses = parseFloat(tempCustomExpenses);
+  const effectiveAnnualExpenses =
+    tempUseCustomExpenses && !isNaN(parsedCustomExpenses) && parsedCustomExpenses > 0
+      ? parsedCustomExpenses
+      : annualExpenses;
 
   const previewPensions = useMemo(() => parsePensionDrafts(tempPensions), [tempPensions]);
   const previewTaxBrackets = useMemo(() => parseTaxBracketDrafts(tempTaxBrackets), [tempTaxBrackets]);
@@ -398,6 +411,8 @@ export function CoastFireTab() {
   const hasUnsavedChanges =
     tempUserAge !== (settings?.userAge !== undefined ? String(settings.userAge) : '') ||
     tempRetirementAge !== String(effectiveSavedRetirementAge) ||
+    tempUseCustomExpenses !== (settings?.coastFireCustomExpenses !== undefined) ||
+    (tempUseCustomExpenses && parsedCustomExpenses !== settings?.coastFireCustomExpenses) ||
     previewPensionSnapshotKey !== savedPensionSnapshotKey ||
     previewTaxBracketSnapshotKey !== savedTaxBracketSnapshotKey;
 
@@ -405,8 +420,8 @@ export function CoastFireTab() {
     if (
       currentAge === null ||
       retirementAge === null ||
-      annualExpenses === undefined ||
-      annualExpenses <= 0 ||
+      effectiveAnnualExpenses === undefined ||
+      effectiveAnnualExpenses <= 0 ||
       withdrawalRate <= 0 ||
       currentNetWorth <= 0
     ) {
@@ -415,7 +430,7 @@ export function CoastFireTab() {
 
     return calculateCoastFIREProjection(
       currentNetWorth,
-      annualExpenses,
+      effectiveAnnualExpenses,
       withdrawalRate,
       currentAge,
       retirementAge,
@@ -424,7 +439,7 @@ export function CoastFireTab() {
       previewTaxBrackets
     );
   }, [
-    annualExpenses,
+    effectiveAnnualExpenses,
     currentAge,
     currentNetWorth,
     previewPensions,
@@ -443,6 +458,7 @@ export function CoastFireTab() {
     mutationFn: (nextSettings: {
       userAge: number;
       coastFireRetirementAge: number;
+      coastFireCustomExpenses?: number;
       coastFirePensions: CoastFirePensionInput[];
       coastFireTaxBrackets: CoastFireTaxBracket[];
     }) =>
@@ -475,6 +491,11 @@ export function CoastFireTab() {
     saveMutation.mutate({
       userAge: currentAge,
       coastFireRetirementAge: retirementAge,
+      // Undefined removes the field from Firestore; the service handles the deleteField() call.
+      coastFireCustomExpenses:
+        tempUseCustomExpenses && !isNaN(parsedCustomExpenses) && parsedCustomExpenses > 0
+          ? parsedCustomExpenses
+          : undefined,
       coastFirePensions: previewPensions,
       coastFireTaxBrackets: previewTaxBrackets,
     });
@@ -547,10 +568,10 @@ export function CoastFireTab() {
     [baseScenario]
   );
   const retirementCoverageDelta = baseScenario
-    ? Math.max((annualExpenses ?? 0) - baseScenario.annualPortfolioNeedAtRetirement, 0)
+    ? Math.max((effectiveAnnualExpenses ?? 0) - baseScenario.annualPortfolioNeedAtRetirement, 0)
     : 0;
   const steadyStateCoverageDelta = baseScenario
-    ? Math.max((annualExpenses ?? 0) - baseScenario.annualPortfolioNeedAtSteadyState, 0)
+    ? Math.max((effectiveAnnualExpenses ?? 0) - baseScenario.annualPortfolioNeedAtSteadyState, 0)
     : 0;
   const pensionConfigurationState = useMemo(
     () => getPensionConfigurationState(previewPensions, pensionDraftIssues),
@@ -621,21 +642,21 @@ export function CoastFireTab() {
 
     if (baseScenario.totalNetAnnualPensionAtRetirement > 0 && bridgeYears > 0) {
       return [
-        `Al target Coast FIRE una parte delle tue spese è già coperta dalla pensione statale: il portafoglio deve sostenere ${formatCurrencyPerYear(baseScenario.annualPortfolioNeedAtRetirement)} invece di ${formatCurrencyPerYear(annualExpenses ?? 0)}.`,
+        `Al target Coast FIRE una parte delle tue spese è già coperta dalla pensione statale: il portafoglio deve sostenere ${formatCurrencyPerYear(baseScenario.annualPortfolioNeedAtRetirement)} invece di ${formatCurrencyPerYear(effectiveAnnualExpenses ?? 0)}.`,
         `Hai comunque un ponte di ${bridgeYears} ${bridgeYears === 1 ? 'anno' : 'anni'} prima che tutte le pensioni siano attive, quindi il capitale richiesto a pensione resta più alto del capitale steady-state.`,
       ];
     }
 
     return [
-      `Alla decorrenza pensionistica il tuo fabbisogno annuo scende da ${formatCurrency(annualExpenses ?? 0)} a ${formatCurrency(baseScenario.annualPortfolioNeedAtSteadyState)} grazie alla pensione netta reale stimata di ${formatCurrency(baseScenario.totalNetAnnualPensionAtSteadyState)}.`,
+      `Alla decorrenza pensionistica il tuo fabbisogno annuo scende da ${formatCurrency(effectiveAnnualExpenses ?? 0)} a ${formatCurrency(baseScenario.annualPortfolioNeedAtSteadyState)} grazie alla pensione netta reale stimata di ${formatCurrency(baseScenario.totalNetAnnualPensionAtSteadyState)}.`,
       'In questo caso il capitale richiesto a pensione e il capitale a regime sono molto vicini perché non c’è un lungo periodo ponte da finanziare prima della pensione statale.',
     ];
-  }, [annualExpenses, baseScenario, bridgeYears, resolvedRetirementAge]);
+  }, [effectiveAnnualExpenses, baseScenario, bridgeYears, resolvedRetirementAge]);
   const incompleteReason =
     currentNetWorth <= 0
       ? "Serve un patrimonio FIRE positivo per calcolare il Coast FIRE."
-      : annualExpenses === undefined || annualExpenses <= 0
-        ? "Servono le spese reali dell’ultimo anno completo per stimare il target Coast FIRE."
+      : effectiveAnnualExpenses === undefined || effectiveAnnualExpenses <= 0
+        ? "Servono le spese annue per stimare il target Coast FIRE."
         : currentAge === null
           ? "Inserisci la tua età attuale: serve a calcolare quanti anni ha il capitale per crescere fino al target."
           : retirementAge === null
@@ -1006,13 +1027,59 @@ export function CoastFireTab() {
                   SWR, spese e patrimonio vengono dalle impostazioni generali: cambiano il Coast Number anche senza pensioni configurate.
                 </p>
               </div>
+
+              {/* Custom expenses toggle — lets the user model retirement spending that differs from last-year actuals */}
+              <div className="space-y-3 rounded-lg border border-border bg-background/60 p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Spese personalizzate</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {tempUseCustomExpenses
+                        ? 'Importo inserito manualmente: sostituisce le spese rilevate.'
+                        : "Spese rilevate dall'ultimo anno completo."}
+                    </p>
+                  </div>
+                  <Switch
+                    id="coastUseCustomExpenses"
+                    checked={tempUseCustomExpenses}
+                    onCheckedChange={(checked) => {
+                      setTempUseCustomExpenses(checked);
+                      if (!checked) setTempCustomExpenses('');
+                    }}
+                    aria-label="Usa spese personalizzate"
+                  />
+                </div>
+                {tempUseCustomExpenses && (
+                  <div className="space-y-1">
+                    <Label htmlFor="coastCustomExpenses">Spese annue desiderate (€)</Label>
+                    <Input
+                      id="coastCustomExpenses"
+                      type="number"
+                      min="0"
+                      step="100"
+                      value={tempCustomExpenses}
+                      onChange={(event) => setTempCustomExpenses(event.target.value)}
+                      className={COAST_CONTROL_CLASSNAME}
+                      placeholder="Es. 30000"
+                    />
+                    {annualExpenses !== undefined && annualExpenses > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Ultimo anno rilevato: {formatCurrency(annualExpenses)}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-lg border border-border bg-background/60 p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Spese usate</p>
                   <p className="mt-2 font-mono text-lg font-semibold text-foreground desktop:text-2xl">
-                    {formatCurrency(annualExpenses ?? 0)}
+                    {formatCurrency(effectiveAnnualExpenses ?? 0)}
                   </p>
-                  <p className="mt-2 text-sm text-muted-foreground">Ultimo anno completo, non le spese FIRE pianificate.</p>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {tempUseCustomExpenses ? 'Importo personalizzato.' : 'Ultimo anno completo, non le spese FIRE pianificate.'}
+                  </p>
                 </div>
                 <div className="rounded-lg border border-border bg-background/60 p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Base di patrimonio</p>
@@ -1373,7 +1440,7 @@ export function CoastFireTab() {
               <CardContent className="space-y-3 text-sm">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-muted-foreground">Spese reali annue</span>
-                  <span className="font-semibold text-foreground">{formatCurrency(annualExpenses ?? 0)}</span>
+                  <span className="font-semibold text-foreground">{formatCurrency(effectiveAnnualExpenses ?? 0)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-muted-foreground">Pensione netta reale all&apos;età target</span>

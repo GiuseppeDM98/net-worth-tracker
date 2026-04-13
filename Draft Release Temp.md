@@ -96,9 +96,12 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - Added a historical runway view to the FIRE calculator, showing how many years of expenses your FIRE portfolio and liquid assets would have covered over time
 - Added a FIRE sensitivity matrix that compares how changes in annual spending and annual savings affect years to FIRE in the Base scenario
 - Added separate 12-month delta indicators for total and liquid FIRE runway, so sustainability and immediately spendable runway are easier to compare
+
 ### Coast FIRE
 
 A dedicated tab that answers a simple question: could your current FIRE portfolio already grow to your retirement target without new retirement contributions — no additional saving needed, just time and compounding? The calculator uses real annual expenses from your last completed year and models Bear, Base, and Bull scenarios with real returns (growth minus inflation), showing progress toward the coast number, remaining gap, and projected portfolio value at retirement.
+
+- Added a "Custom expenses" toggle in the Coast FIRE configuration panel — when enabled, enter your desired annual retirement spending instead of using last year's actual expenses. Useful when your target lifestyle in retirement differs from your current spending
 
 **Pensioni statali**
 - Configure one or more state pensions as gross nominal future monthly amounts, with exact start dates and annual payment frequency (13 or 14 instalments for *tredicesima*/*quattordicesima*)

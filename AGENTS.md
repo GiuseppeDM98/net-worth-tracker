@@ -208,7 +208,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - **Historical FIRE runway**: use rolling 12-month expenses, not a fixed annual denominator. The first runway point requires 12 snapshots; same-month YoY delta needs 24 snapshots; missing cashflow months inside the window count as `0`.
 - If runway cards show values rounded to 1 decimal, compute summary deltas from the same rounded values. If the UI exposes both total and liquid runway cards, keep the deltas split too (`Totale` and `Liquido`).
 - **Coast FIRE inputs**: current age comes from `settings.userAge`; retirement age is a separate persisted field (`coastFireRetirementAge`) with an initial fallback of `60`. If `userAge` is missing, keep the input blank and do not run the calculation.
-- **Coast FIRE methodology**: use real annual expenses from the last completed year, not planned FIRE expenses. Scenario math reuses FIRE Bear/Base/Bull with `real return = growthRate - inflationRate`.
+- **Coast FIRE methodology**: use real annual expenses from the last completed year by default; override with `coastFireCustomExpenses` when the user wants to model different retirement spending. The effective value is resolved once as `effectiveAnnualExpenses` and used everywhere — calculations, display cards, and interpretation text. Scenario math reuses FIRE Bear/Base/Bull with `real return = growthRate - inflationRate`.
 - **Coast FIRE state pensions**: pensions live only in the `Coast FIRE` tab, use `startDate` as the canonical retirement-start field, and keep `startAge` only as a legacy read fallback. Pension inputs are gross future nominal monthly amounts; the model annualizes them, deflates them to real terms, applies progressive IRPEF per pension, and reduces the portfolio need only from each pension's own start date onward.
 - **Coast FIRE persistence gotcha**: nested pension rows must be serialized without `undefined` fields before writing settings to Firestore. Leaving legacy keys like `startAge: undefined` inside `coastFirePensions[]` can break persistence silently on refresh.
 - **Coast FIRE outputs**: `Valore stimato a pensione` is only the future value of the current FIRE-eligible patrimonio without new contributions; `gap residuo` clamps at `0` once Coast FIRE is reached, while progress `%` may exceed `100`.
@@ -221,8 +221,9 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 ### Firestore Optional Field Deletion
 - `updateDoc` only touches fields present in the update object — omitting a field leaves the old value intact in Firestore
 - `removeUndefinedFields` (used before `updateDoc` in `assetService.ts`) strips `undefined` keys, so clearing an optional field by setting it to `undefined` is silently ignored
-- **Pattern**: after `removeUndefinedFields`, explicitly translate `undefined` → `deleteField()` for fields the user can intentionally clear: `if (updates.field === undefined) cleaned.field = deleteField()`
+- **Pattern for `updateDoc`**: after `removeUndefinedFields`, explicitly translate `undefined` → `deleteField()` for fields the user can intentionally clear: `if (updates.field === undefined) cleaned.field = deleteField()`
 - Applied in `updateAsset` for `averageCost` and `taxRate`. Follow this pattern for any other nullable asset/settings fields that users can toggle off
+- **`deleteField()` is NOT allowed with `setDoc()` without `merge:true`** — calling it throws `FirebaseError: deleteField() cannot be used with set() unless you pass {merge:true}`. The settings save path in `assetAllocationService.ts` uses full `setDoc` (no merge), so omitting the field from `docData` is the correct deletion strategy: `delete docData.fieldName`. The full overwrite drops fields that are absent from the written object.
 
 ### Formatter Cache
 - `lib/utils/formatters.ts` exports `cachedFormatCurrencyEUR(amount, compact?)` backed by two module-level `Intl.NumberFormat` instances

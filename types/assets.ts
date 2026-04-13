@@ -172,6 +172,7 @@ export interface AssetAllocationSettings {
   withdrawalRate?: number; // Safe withdrawal rate for FIRE calculations (e.g., 4.0 for 4%)
   plannedAnnualExpenses?: number; // Planned annual expenses for FIRE projections
   coastFireRetirementAge?: number; // Target age at which Coast FIRE should mature into the full FIRE number
+  coastFireCustomExpenses?: number; // User-defined annual retirement expenses for Coast FIRE; undefined = derive from last complete year
   coastFirePensions?: CoastFirePensionInput[]; // Optional state-pension inputs used only by the Coast FIRE tab
   coastFireTaxBrackets?: CoastFireTaxBracket[]; // Progressive IRPEF brackets used to estimate state-pension net income
   includePrimaryResidenceInFIRE?: boolean; // If true, include primary residences in FIRE calculations; if false, exclude them (FIRE standard)
