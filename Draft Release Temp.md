@@ -96,23 +96,33 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - Added a historical runway view to the FIRE calculator, showing how many years of expenses your FIRE portfolio and liquid assets would have covered over time
 - Added a FIRE sensitivity matrix that compares how changes in annual spending and annual savings affect years to FIRE in the Base scenario
 - Added separate 12-month delta indicators for total and liquid FIRE runway, so sustainability and immediately spendable runway are easier to compare
-- Added a dedicated Coast FIRE tab, so you can see whether your current FIRE portfolio could reach your retirement target age without new retirement contributions
-- Added Coast FIRE projections across Bear, Base, and Bull scenarios, including progress, remaining gap, and projected retirement value
-- Added state pension support to Coast FIRE, with one or more pensions, editable IRPEF brackets, annual payment frequency, and exact pension start dates
-- Added pension-aware Coast FIRE summaries that separate the situation at your target retirement age from the steady state after pensions start
+### Coast FIRE
+
+A dedicated tab that answers a simple question: could your current FIRE portfolio already grow to your retirement target without new retirement contributions — no additional saving needed, just time and compounding? The calculator uses real annual expenses from your last completed year and models Bear, Base, and Bull scenarios with real returns (growth minus inflation), showing progress toward the coast number, remaining gap, and projected portfolio value at retirement.
+
+**Pensioni statali**
+- Configure one or more state pensions as gross nominal future monthly amounts, with exact start dates and annual payment frequency (13 or 14 instalments for *tredicesima*/*quattordicesima*)
+- An editable IRPEF bracket table derives the after-tax pension for each entry — the net amount feeds directly into the retirement portfolio need calculation
+- Pension-aware summaries separate the picture at your target retirement age from the steady state once all pensions are active
+- A dedicated before/after pension timeline makes staggered start dates easy to read: bridge years, pension phases, and steady state are each clearly labelled
+- When the coast FIRE target is already reached, the gap card shows "Target raggiunto" with a confirmation mark instead of €0, making it immediately clear that this is a milestone, not a missing value
+
+**Configurazione**
+- The configuration panel is collapsible and stays open after saving — key inputs remain visible at a glance without needing to reopen the panel after every change
+- A local preview mode lets retirement metrics react immediately to unsaved changes before you commit
+- Contextual warnings flag incomplete or inconsistent pension inputs; delayed pension start dates are shown as informational guidance rather than errors
+- The calculator is fully responsive: pension inputs use a 2-column grid on mobile, scenario cards display in a 2-column grid on tablet, and all remove buttons meet a 40 × 40 px touch target
 - Added linked focus behavior to Goal-Based Investing, so selecting a goal now highlights the same objective across summary cards, allocation view, and detail sections
 
 ## 🐛 Bug Fixes
 
-- Fixed Coast FIRE crashing when opening the tab after the latest pension UI update
 - Fixed a scrollbar icon appearing to the left of the send button in the assistant composer on Windows — the native textarea scrollbar is now hidden while keeping scroll functional for long messages
 - Fixed color themes appearing identical in dark mode — Solar Dusk, Elegant Luxury, and Midnight Bloom now show a clearly visible tint on cards and tables when dark mode is active
 - Fixed sidebar menu item text becoming invisible on hover in dark mode for the Cyberpunk and Solar Dusk themes — hovering a navigation item now keeps text clearly readable
 - Fixed the active tab label and icon in the mobile bottom navigation bar being hard to read in dark mode for the Cyberpunk and Solar Dusk themes — the selected tab is now clearly visible across all themes
 - Fixed the FIRE runway year-over-year delta so it matches the one-decimal values shown in the cards
-- Fixed Coast FIRE state pension settings not persisting reliably after a page refresh
-- Fixed Coast FIRE pension details showing unreadable decimal values for years until pension start
-- Fixed Coast FIRE pension summaries showing broken yearly wording like `€l'anno` in some cards and timeline descriptions
+- Fixed Coast FIRE state pension settings not persisting after a page refresh — configuration is now correctly saved and restored on reload
+- Fixed display issues in Coast FIRE pension summaries: unreadable decimal values for years until pension start, and broken `€l'anno` wording in cards and timeline descriptions
 - Fixed the Overview greeting showing a stray comma before your first name in the dashboard welcome message
 - Fixed Cashflow Sankey back navigation so going back from a subcategory returns to its category first instead of jumping straight to the full overview
 
@@ -165,43 +175,14 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 
 ## 🔧 Improvements
 
-### Coast FIRE
-
-- Fixed Italian copy in the Coast FIRE timeline: pension phases that are already active at the target age are now correctly labelled "È già attiva all'età target" instead of the placeholder text with incorrect apostrophes
-- The "Model assumptions" section in Coast FIRE configuration now correctly animates its expand/collapse arrow, so it's always clear whether the panel is open or closed
-- The unsaved-changes notice in the Coast FIRE configuration panel now shows a neutral info icon at rest, switching to a spinner only while the save is actually in progress — eliminating the misleading "stuck loading" appearance
-- Added a clarifying note under the pension amount field explaining that the value should be entered as a **future nominal gross amount** (euros at the pension start date), not today's equivalent — preventing a silent calculation error that could distort Coast FIRE results
-- Added helper text under the annual payments field ("13 con tredicesima, 14 con quattordicesima") to remove ambiguity for users unfamiliar with Italian pension payment conventions
-- The "Steady state" card description now reads accurately when no pensions are configured — previously it incorrectly referred to a "last pension start date" even when no pensions existed
-- When the Coast FIRE target is already reached, the gap card now reads "Target raggiunto" with a confirmation mark instead of showing €0 — making it immediately clear that this is a positive milestone rather than a missing value
-- The configuration panel no longer closes automatically after saving — it now stays open so you can continue editing without having to reopen it
-- The "A regime" (steady state) phase no longer appears in the pension timeline when there are no bridge years — eliminating a redundant row that repeated the same information as the target age step
-- The "Scaglioni IRPEF" section header now stacks its description above the "Add bracket" button on mobile, matching the layout of the pension section and making the button easier to tap
-- Pension input fields on mobile are now top-aligned instead of bottom-aligned, resolving a layout issue where helper text under some fields caused adjacent inputs to float out of position
-- The pension card header (name badge and remove button) is now always laid out side by side, so the delete button no longer appears on its own row below the pension name on small screens
-- Tax bracket rows now consistently align their inputs and delete button to the same baseline on all screen sizes, including when the last bracket shows the "unlimited" label
-
 ### Themes & Navigation
 
 - The bottom navigation bar on mobile now matches the active color theme — background, border, and active tab highlight all update when you switch themes, consistent with the sidebar on desktop
 
 ---
 
-- Improved the Coast FIRE state pension section on mobile: pension inputs are now arranged in a 2×2 grid (Name + Amount on one row, Months + Start Date on the next) instead of a single vertical column, making them easier to fill in on a small screen
-- Improved the pension timeline breakdown on mobile: each pension now shows a compact header line with name, status badge, start date, and years to start, followed by a clean 2-column metric grid (Gross Nominal, Gross Real, Net Real) — reducing the vertical space significantly without hiding any data
-- Improved tax bracket rows so they display as an inline 3-column row on all screen sizes, instead of stacking on mobile
-- Improved Bear, Base, and Bull scenario cards to display in a 2-column grid on tablet-sized screens, instead of a single column
-- Improved the "Add pension" button to be full-width on mobile for easier tapping
-- Improved touch target size on all remove buttons in the pension editor and tax bracket sections (now 40×40 px)
-- Improved the Coast FIRE state pension section with a clearer guided reading before the form, so you can immediately understand target-age capital, bridge years, and what changes after pensions begin
-- Improved Coast FIRE with a dedicated before/after pension timeline, making staggered pension start dates much easier to read
-- Improved Coast FIRE pension configuration feedback with clearer warnings and partial-result guidance when some pension inputs are incomplete or inconsistent
-- Improved Coast FIRE so delayed pension start dates are shown as informational guidance rather than as broken or doubtful inputs
-- Improved Coast FIRE with a collapsible configuration panel that keeps key inputs visible while reducing page length when everything is already set up
 - The FIRE "Indennità Annuale" card now shows the Patrimonio FIRE base value directly, so you can immediately see which number the withdrawal rate is applied to without switching tabs
 - Improved the FIRE sensitivity section with a lightweight explainer and tooltip that clarify how to read rows, columns, colors, and the baseline cell
-- Improved Coast FIRE with contextual explanations that clarify bridge years, delayed pension starts, and how multiple pensions reduce the portfolio need over time
-- Improved all labels, helper text, and status messages in the Coast FIRE state pension section: field names are clearer (`Importo lordo mensile`, `Mensilità annue`), status descriptions now accurately reflect what each state means, the model assumptions panel explains deflation, IRPEF, and decorrenza in plain language, and bridge-year notices describe the actual portfolio impact instead of using unexplained jargon
 - Fixed the income category pie chart legend on mobile (Cashflow → Anno Corrente) overflowing its container when four or more categories were above the 5% threshold — now consistently capped at three visible items, matching the expense chart
 
 - Improved the login and registration pages with a calmer first-load entrance, so authentication feels more consistent with the rest of the app
