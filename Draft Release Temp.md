@@ -111,6 +111,8 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - Fixed the FIRE runway year-over-year delta so it matches the one-decimal values shown in the cards
 - Fixed Coast FIRE state pension settings not persisting reliably after a page refresh
 - Fixed Coast FIRE pension details showing unreadable decimal values for years until pension start
+- Fixed the Overview greeting showing a stray comma before your first name in the dashboard welcome message
+- Fixed Cashflow Sankey back navigation so going back from a subcategory returns to its category first instead of jumping straight to the full overview
 
 
 

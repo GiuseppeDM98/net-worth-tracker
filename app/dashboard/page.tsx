@@ -58,7 +58,7 @@ export default function DashboardPage() {
     const result = getGreeting(italyHour);
     const firstName = user?.displayName?.split(' ')[0];
     const label = firstName && firstName.length <= 20
-      ? `${result.greeting}, ${firstName}`
+      ? `${result.greeting} ${firstName}`
       : result.greeting;
     return { label, subtitle: result.subtitle };
   }, [user?.displayName]);
