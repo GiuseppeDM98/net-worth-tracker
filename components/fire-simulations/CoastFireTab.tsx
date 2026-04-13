@@ -124,12 +124,14 @@ function isPensionDraftStarted(draft: CoastFirePensionDraft): boolean {
   );
 }
 
+// Receives `now` as an explicit parameter so callers control the reference date.
+// This makes the function pure and easier to test in isolation.
 function buildPensionDraftIssues(
   drafts: CoastFirePensionDraft[],
   currentAge: number | null,
-  retirementAge: number | null
+  retirementAge: number | null,
+  now: Date
 ): PensionDraftIssue[] {
-  const now = new Date();
   const issues: PensionDraftIssue[] = [];
 
   drafts.forEach((draft, index) => {
@@ -319,6 +321,7 @@ export function CoastFireTab() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 767px)');
+  const isTablet = useMediaQuery('(max-width: 1023px)');
 
   const [tempUserAge, setTempUserAge] = useState('');
   const [tempRetirementAge, setTempRetirementAge] = useState('60');
@@ -371,7 +374,7 @@ export function CoastFireTab() {
   const previewPensions = useMemo(() => parsePensionDrafts(tempPensions), [tempPensions]);
   const previewTaxBrackets = useMemo(() => parseTaxBracketDrafts(tempTaxBrackets), [tempTaxBrackets]);
   const pensionDraftIssues = useMemo(
-    () => buildPensionDraftIssues(tempPensions, currentAge, retirementAge),
+    () => buildPensionDraftIssues(tempPensions, currentAge, retirementAge, new Date()),
     [currentAge, retirementAge, tempPensions]
   );
 
@@ -553,13 +556,16 @@ export function CoastFireTab() {
     () => getPensionConfigurationState(previewPensions, pensionDraftIssues),
     [pensionDraftIssues, previewPensions]
   );
+  // text-*-300 sits at a luminosity that's readable on both light and dark backgrounds
+  // without relying on color-theme-specific overrides. -200 was too close to white on
+  // light themes; -400 too saturated on some of the 6 custom themes.
   const pensionStateTone =
     pensionConfigurationState === 'valid'
-      ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-200 dark:text-emerald-200'
+      ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
       : pensionConfigurationState === 'informational'
-        ? 'border-sky-500/20 bg-sky-500/10 text-sky-200 dark:text-sky-200'
+        ? 'border-sky-500/20 bg-sky-500/10 text-sky-300'
         : pensionConfigurationState === 'incomplete'
-        ? 'border-amber-500/20 bg-amber-500/10 text-amber-200 dark:text-amber-200'
+        ? 'border-amber-500/20 bg-amber-500/10 text-amber-300'
         : 'border-border/70 bg-background/60 text-muted-foreground';
   const pensionStateLabel =
     pensionConfigurationState === "valid"
@@ -651,12 +657,18 @@ export function CoastFireTab() {
             : `Da qui aggiunge ${formatCurrency(pension.netAnnualRealAtStart)} netti reali l'anno alla copertura.`,
           badge: pension.isActiveAtRetirement ? 'Già attiva' : `Parte a ${formatAgeYears(pension.startAge)}`,
         })),
-        {
-          id: 'steady-state',
-          label: 'A regime',
-          detail: `Dopo l'ultima decorrenza il portafoglio deve coprire ${formatCurrencyPerYear(baseScenario.annualPortfolioNeedAtSteadyState)}.`,
-          badge: `${formatCurrency(baseScenario.steadyStatePortfolioNeed)} a regime`,
-        },
+        // Show the "a regime" step only when there's a bridge: without it, steady-state
+        // and retirement values are essentially the same row, creating redundant reading.
+        ...(bridgeYears > 0
+          ? [
+              {
+                id: 'steady-state',
+                label: 'A regime',
+                detail: `Dopo l'ultima decorrenza il portafoglio deve coprire ${formatCurrencyPerYear(baseScenario.annualPortfolioNeedAtSteadyState)}.`,
+                badge: `${formatCurrency(baseScenario.steadyStatePortfolioNeed)} a regime`,
+              },
+            ]
+          : []),
       ]
     : [];
   const targetAgeLabel = currentAge !== null ? formatAgeYears(currentAge) : 'Da impostare';
@@ -701,8 +713,10 @@ export function CoastFireTab() {
     currentAge === null ||
     retirementAge === null;
 
+  // Only auto-open when the user needs to act (missing data, unsaved changes, incomplete pensions).
+  // Never auto-close: collapsing after save is disorienting if the user wants to keep editing.
   useEffect(() => {
-    setIsConfigOpen(shouldAutoOpenConfig);
+    if (shouldAutoOpenConfig) setIsConfigOpen(true);
   }, [shouldAutoOpenConfig]);
 
   if (isLoadingSettings || isLoadingAssets || isLoadingAnnualExpenses) {
@@ -842,14 +856,6 @@ export function CoastFireTab() {
                     <span className="text-muted-foreground">Progresso totale</span>
                     <span className="font-semibold text-foreground">{formatPercentage(baseScenario.progressToCoastFI)}</span>
                   </div>
-                  <div className="mt-3 h-3 w-full overflow-hidden rounded-full bg-muted">
-                    <motion.div
-                      className="h-full bg-primary"
-                      initial={false}
-                      animate={{ width: `${Math.min(baseScenario.progressToCoastFI, 100)}%` }}
-                      transition={{ duration: 0.35, ease: 'easeOut' }}
-                    />
-                  </div>
                   <p className="mt-2 text-muted-foreground">
                     Patrimonio FIRE attuale {formatCurrency(currentNetWorth)}. Quota liquida {formatPercentage(liquidProgressBase)}.
                   </p>
@@ -921,7 +927,7 @@ export function CoastFireTab() {
           <CollapsibleContent>
             <CardContent>
           {hasUnsavedChanges && (
-            <div className="mb-4 rounded-lg border border-border bg-muted/40 p-4 text-sm">
+            <div role="status" aria-live="polite" className="mb-4 rounded-lg border border-border bg-muted/40 p-4 text-sm">
               <div className="flex items-start gap-2">
                 {/* Show spinner only while the mutation is in flight; otherwise a neutral info icon */}
                 {saveMutation.isPending ? (
@@ -1072,7 +1078,7 @@ export function CoastFireTab() {
                     key={pension.id}
                     className="rounded-lg border border-border bg-background/60 p-4"
                   >
-                    <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="mb-3 flex items-start justify-between gap-3">
                       <div className="space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <Badge variant="outline">{pension.label.trim() || `Pensione ${index + 1}`}</Badge>
@@ -1096,13 +1102,14 @@ export function CoastFireTab() {
                       </Button>
                     </div>
                     {/* Always 2-col on mobile so inputs are paired (Name+Amount, Months+Date),
-                        then expand to 4-col at desktop. items-end aligns inputs at the same
-                        baseline even when labels wrap to different heights. */}
+                        then expand to 4-col at desktop. items-start rather than items-end:
+                        hint text under some fields makes bottom-alignment impossible without
+                        a subgrid, and top-alignment is cleaner and more readable. */}
                     <div
                       className={
                         hasCompactPensionEditor
-                          ? 'grid grid-cols-2 items-end gap-3 desktop:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_140px_160px]'
-                          : 'grid grid-cols-2 items-end gap-3 desktop:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_160px_160px]'
+                          ? 'grid grid-cols-2 items-start gap-3 desktop:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_140px_160px]'
+                          : 'grid grid-cols-2 items-start gap-3 desktop:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_160px_160px]'
                       }
                     >
                       <div>
@@ -1116,7 +1123,7 @@ export function CoastFireTab() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor={`coast-pension-gross-${pension.id}`}>Importo lordo mensile</Label>
+                        <Label htmlFor={`coast-pension-gross-${pension.id}`}>Lordo mensile</Label>
                         <Input
                           id={`coast-pension-gross-${pension.id}`}
                           type="number"
@@ -1129,6 +1136,12 @@ export function CoastFireTab() {
                           className={COAST_CONTROL_CLASSNAME}
                           placeholder="Es. 4242"
                         />
+                        {/* Critical: the model expects a future nominal amount (euros at the pension
+                            start date), not today's equivalent. Getting this wrong silently distorts
+                            the entire calculation without any validation error. */}
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Lordo stimato alla decorrenza, in euro di quell&apos;anno (nominale futuro).
+                        </p>
                       </div>
                       <div>
                         <Label htmlFor={`coast-pension-months-${pension.id}`}>Mensilità annue</Label>
@@ -1141,14 +1154,19 @@ export function CoastFireTab() {
                           value={pension.monthsPerYear}
                           onChange={(event) => updatePensionRow(pension.id, 'monthsPerYear', event.target.value)}
                           className={COAST_CONTROL_CLASSNAME}
+                          placeholder="Es. 13"
                         />
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          13 con tredicesima, 14 con quattordicesima.
+                        </p>
                       </div>
                       <div>
-                        <Label htmlFor={`coast-pension-date-${pension.id}`}>Decorrenza pensione</Label>
+                        <Label htmlFor={`coast-pension-date-${pension.id}`}>Decorrenza</Label>
                         <Input
                           id={`coast-pension-date-${pension.id}`}
                           type="date"
                           value={pension.startDate}
+                          min={new Date().toISOString().slice(0, 10)}
                           onChange={(event) => updatePensionRow(pension.id, 'startDate', event.target.value)}
                           className={COAST_CONTROL_CLASSNAME}
                         />
@@ -1176,14 +1194,14 @@ export function CoastFireTab() {
           </div>
 
           <div className="mt-6 space-y-4 border-t border-border/40 pt-4">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-col gap-3 desktop:flex-row desktop:items-start desktop:justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-foreground">Scaglioni IRPEF</h3>
                 <p className="text-sm text-muted-foreground">
                   Applicati al lordo annuo reale di ciascuna pensione. Modificali se la normativa cambia o se usi un&apos;aliquota media personalizzata.
                 </p>
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={addTaxBracketRow}>
+              <Button type="button" variant="outline" size="sm" onClick={addTaxBracketRow} className="w-full desktop:w-auto">
                 <Plus className="mr-2 h-4 w-4" />
                 Aggiungi scaglione
               </Button>
@@ -1194,7 +1212,7 @@ export function CoastFireTab() {
                 <div key={bracket.id} className="rounded-lg border border-border bg-background/60 p-4">
                   {/* Inline 3-col on all viewports: "Fino a" gets most space, Aliquota is narrow, delete is icon-only.
                       On mobile 100px for rate is enough; desktop can afford the wider 200px column. */}
-                  <div className="grid grid-cols-[minmax(0,1fr)_100px_44px] gap-3 desktop:grid-cols-[minmax(0,1fr)_200px_52px]">
+                  <div className="grid grid-cols-[minmax(0,1fr)_100px_44px] items-end gap-3 desktop:grid-cols-[minmax(0,1fr)_200px_52px]">
                     <div>
                       <Label htmlFor={`coast-tax-limit-${bracket.id}`}>
                         {index === tempTaxBrackets.length - 1 ? 'Fino a (vuoto = illimitato)' : 'Fino a (€ annui)'}
@@ -1223,19 +1241,17 @@ export function CoastFireTab() {
                         className={COAST_CONTROL_CLASSNAME}
                       />
                     </div>
-                    <div className="flex items-end">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeTaxBracketRow(bracket.id)}
-                        disabled={tempTaxBrackets.length === 1}
-                        aria-label="Rimuovi scaglione"
-                        className="h-10 w-10"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeTaxBracketRow(bracket.id)}
+                      disabled={tempTaxBrackets.length === 1}
+                      aria-label="Rimuovi scaglione"
+                      className="h-10 w-10"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -1288,7 +1304,14 @@ export function CoastFireTab() {
                 <div className="font-mono text-lg font-semibold text-foreground desktop:text-2xl">
                   {formatPercentage(baseScenario.progressToCoastFI)}
                 </div>
-                <div className="mt-3 h-3 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  role="progressbar"
+                  aria-valuenow={Math.min(Math.round(baseScenario.progressToCoastFI), 100)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label="Progresso verso il Coast FIRE"
+                  className="mt-3 h-3 w-full overflow-hidden rounded-full bg-muted"
+                >
                   <motion.div
                     className="h-full bg-primary"
                     initial={false}
@@ -1304,12 +1327,18 @@ export function CoastFireTab() {
 
             <Card className="border-border/70">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Mancante al target</CardTitle>
-                <CardDescription>Differenza rispetto al capitale richiesto oggi</CardDescription>
+                <CardTitle className="text-base">
+                  {baseScenario.isCoastReached ? 'Target raggiunto' : 'Mancante al target'}
+                </CardTitle>
+                <CardDescription>
+                  {baseScenario.isCoastReached
+                    ? 'Il tuo patrimonio supera già il Coast Number nello scenario Base'
+                    : 'Differenza rispetto al capitale richiesto oggi'}
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="font-mono text-lg font-semibold text-foreground desktop:text-2xl">
-                  {formatCurrency(baseScenario.gapToCoastFI)}
+                  {baseScenario.isCoastReached ? '✓ Coast FIRE' : formatCurrency(baseScenario.gapToCoastFI)}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Patrimonio FIRE attuale: {formatCurrency(currentNetWorth)}
@@ -1371,10 +1400,14 @@ export function CoastFireTab() {
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Situazione a regime</CardTitle>
                 <CardDescription>
-                  Assetto stabile dopo l&apos;ultima decorrenza pensionistica{' '}
-                  {baseScenario.latestPensionStartDate
-                    ? `(${formatDate(toDate(baseScenario.latestPensionStartDate))})`
-                    : ''}
+                  {baseScenario.pensionBreakdown.length > 0
+                    ? <>
+                        Assetto stabile dopo l&apos;ultima decorrenza pensionistica{' '}
+                        {baseScenario.latestPensionStartDate
+                          ? `(${formatDate(toDate(baseScenario.latestPensionStartDate))})`
+                          : ''}
+                      </>
+                    : 'Nessuna pensione configurata: il fabbisogno a regime coincide con il fabbisogno al target.'}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
@@ -1542,7 +1575,7 @@ export function CoastFireTab() {
               <CoastFireProjectionChart
                 projectionData={coastProjection.projectionData}
                 height={isMobile ? 280 : 360}
-                marginLeft={isMobile ? 10 : 50}
+                marginLeft={isMobile ? 10 : isTablet ? 30 : 50}
               />
             </CardContent>
           </Card>

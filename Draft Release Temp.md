@@ -170,6 +170,16 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 - Fixed Italian copy in the Coast FIRE timeline: pension phases that are already active at the target age are now correctly labelled "È già attiva all'età target" instead of the placeholder text with incorrect apostrophes
 - The "Model assumptions" section in Coast FIRE configuration now correctly animates its expand/collapse arrow, so it's always clear whether the panel is open or closed
 - The unsaved-changes notice in the Coast FIRE configuration panel now shows a neutral info icon at rest, switching to a spinner only while the save is actually in progress — eliminating the misleading "stuck loading" appearance
+- Added a clarifying note under the pension amount field explaining that the value should be entered as a **future nominal gross amount** (euros at the pension start date), not today's equivalent — preventing a silent calculation error that could distort Coast FIRE results
+- Added helper text under the annual payments field ("13 con tredicesima, 14 con quattordicesima") to remove ambiguity for users unfamiliar with Italian pension payment conventions
+- The "Steady state" card description now reads accurately when no pensions are configured — previously it incorrectly referred to a "last pension start date" even when no pensions existed
+- When the Coast FIRE target is already reached, the gap card now reads "Target raggiunto" with a confirmation mark instead of showing €0 — making it immediately clear that this is a positive milestone rather than a missing value
+- The configuration panel no longer closes automatically after saving — it now stays open so you can continue editing without having to reopen it
+- The "A regime" (steady state) phase no longer appears in the pension timeline when there are no bridge years — eliminating a redundant row that repeated the same information as the target age step
+- The "Scaglioni IRPEF" section header now stacks its description above the "Add bracket" button on mobile, matching the layout of the pension section and making the button easier to tap
+- Pension input fields on mobile are now top-aligned instead of bottom-aligned, resolving a layout issue where helper text under some fields caused adjacent inputs to float out of position
+- The pension card header (name badge and remove button) is now always laid out side by side, so the delete button no longer appears on its own row below the pension name on small screens
+- Tax bracket rows now consistently align their inputs and delete button to the same baseline on all screen sizes, including when the last bracket shows the "unlimited" label
 
 ### Themes & Navigation
 
