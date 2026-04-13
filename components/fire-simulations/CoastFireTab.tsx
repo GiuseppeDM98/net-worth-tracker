@@ -173,7 +173,7 @@ function buildPensionDraftIssues(
         pensionId: draft.id,
         severity: 'info',
         kind: 'informational',
-        message: `${label}: la data di decorrenza è nel passato — verifica che rispecchi la tua stima effettiva.`,
+        message: `${label}: la data di decorrenza è nel passato, verifica che rispecchi la tua stima effettiva.`,
       });
     }
 
@@ -188,7 +188,7 @@ function buildPensionDraftIssues(
           pensionId: draft.id,
           severity: 'info',
           kind: 'informational',
-          message: `${label}: decorre ${bridgeYears} ${bridgeYears === 1 ? 'anno' : 'anni'} dopo il target — nel periodo ponte il portafoglio copre ancora il fabbisogno per intero.`,
+          message: `${label}: decorre ${bridgeYears} ${bridgeYears === 1 ? 'anno' : 'anni'} dopo il target, nel periodo ponte il portafoglio copre ancora il fabbisogno per intero.`,
         });
       }
     }
@@ -736,7 +736,8 @@ export function CoastFireTab() {
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 desktop:grid-cols-[minmax(0,1.05fr)_minmax(0,1.05fr)_minmax(0,0.9fr)]">
+              {/* Stack on mobile, side-by-side only at desktop — the 3rd card (stato) stands alone at sm which is worse than stacking */}
+              <div className="grid gap-3 desktop:grid-cols-[minmax(0,1.05fr)_minmax(0,1.05fr)_minmax(0,0.9fr)]">
                 <div className="rounded-xl border border-border bg-background/60 p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Timeline minima</p>
                   <div className="mt-3 space-y-3 text-sm">
@@ -1026,7 +1027,7 @@ export function CoastFireTab() {
                   inserirne più di una se hai contributi in casse diverse.
                 </p>
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={addPensionRow}>
+              <Button type="button" variant="outline" size="sm" onClick={addPensionRow} className="w-full desktop:w-auto">
                 <Plus className="mr-2 h-4 w-4" />
                 Aggiungi pensione
               </Button>
@@ -1082,21 +1083,26 @@ export function CoastFireTab() {
                             : 'Decorrenza non ancora impostata.'}
                         </p>
                       </div>
+                      {/* h-10 w-10 ensures a 40px touch target — closer to the 44px minimum on mobile */}
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
                         onClick={() => removePensionRow(pension.id)}
                         aria-label="Rimuovi pensione"
+                        className="h-10 w-10 shrink-0"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
+                    {/* Always 2-col on mobile so inputs are paired (Name+Amount, Months+Date),
+                        then expand to 4-col at desktop. items-end aligns inputs at the same
+                        baseline even when labels wrap to different heights. */}
                     <div
                       className={
                         hasCompactPensionEditor
-                          ? 'grid gap-3 sm:grid-cols-2 desktop:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_140px_160px]'
-                          : 'grid gap-3 desktop:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_160px_160px]'
+                          ? 'grid grid-cols-2 items-end gap-3 desktop:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_140px_160px]'
+                          : 'grid grid-cols-2 items-end gap-3 desktop:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_160px_160px]'
                       }
                     >
                       <div>
@@ -1186,10 +1192,12 @@ export function CoastFireTab() {
             <div className="space-y-3">
               {tempTaxBrackets.map((bracket, index) => (
                 <div key={bracket.id} className="rounded-lg border border-border bg-background/60 p-4">
-                  <div className="grid gap-3 desktop:grid-cols-[minmax(0,1fr)_200px_52px]">
+                  {/* Inline 3-col on all viewports: "Fino a" gets most space, Aliquota is narrow, delete is icon-only.
+                      On mobile 100px for rate is enough; desktop can afford the wider 200px column. */}
+                  <div className="grid grid-cols-[minmax(0,1fr)_100px_44px] gap-3 desktop:grid-cols-[minmax(0,1fr)_200px_52px]">
                     <div>
                       <Label htmlFor={`coast-tax-limit-${bracket.id}`}>
-                        {index === tempTaxBrackets.length - 1 ? 'Fino a (€ annui, vuoto = illimitato)' : 'Fino a (€ annui)'}
+                        {index === tempTaxBrackets.length - 1 ? 'Fino a (vuoto = illimitato)' : 'Fino a (€ annui)'}
                       </Label>
                       <Input
                         id={`coast-tax-limit-${bracket.id}`}
@@ -1223,6 +1231,7 @@ export function CoastFireTab() {
                         onClick={() => removeTaxBracketRow(bracket.id)}
                         disabled={tempTaxBrackets.length === 1}
                         aria-label="Rimuovi scaglione"
+                        className="h-10 w-10"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -1428,34 +1437,35 @@ export function CoastFireTab() {
                 {sortedPensionBreakdown.map((pension) => (
                   <div
                     key={pension.id}
-                    className="grid gap-3 rounded-lg border border-border bg-background/60 p-4 text-sm desktop:grid-cols-[minmax(0,1.2fr)_140px_repeat(3,minmax(0,1fr))]"
+                    className="rounded-lg border border-border bg-background/60 p-4 text-sm"
                   >
-                    <div>
+                    {/* Header row: name, badge and start date — always visible */}
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-medium text-foreground">{pension.label}</p>
                         <Badge variant={pension.isActiveAtRetirement ? 'secondary' : 'outline'}>
                           {pension.isActiveAtRetirement ? 'Già attiva al target' : `Parte a ${formatAgeYears(pension.startAge)}`}
                         </Badge>
                       </div>
-                      <p className="text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         Decorrenza {pension.startDate ? formatDate(toDate(pension.startDate)) : 'non disponibile'}
+                        {' · '}{Math.ceil(pension.yearsUntilStart)} anni
                       </p>
                     </div>
-                    <div>
-                      <p className="text-muted-foreground">Anni alla decorrenza</p>
-                      <p className="font-medium text-foreground">{Math.ceil(pension.yearsUntilStart)}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Lordo annuo nominale</p>
-                      <p className="font-medium text-foreground">{formatCurrency(pension.grossAnnualFutureNominal)}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Lordo annuo reale</p>
-                      <p className="font-medium text-foreground">{formatCurrency(pension.grossAnnualRealAtStart)}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Netto annuo reale</p>
-                      <p className="font-medium text-foreground">{formatCurrency(pension.netAnnualRealAtStart)}</p>
+                    {/* Metrics: 2-col on mobile keeps labels and values paired without a vertical wall of 5 blocks */}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 desktop:grid-cols-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Lordo nominale</p>
+                        <p className="font-medium text-foreground">{formatCurrency(pension.grossAnnualFutureNominal)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Lordo reale</p>
+                        <p className="font-medium text-foreground">{formatCurrency(pension.grossAnnualRealAtStart)}</p>
+                      </div>
+                      <div className="col-span-2 desktop:col-span-1">
+                        <p className="text-xs text-muted-foreground">Netto reale</p>
+                        <p className="font-medium text-foreground">{formatCurrency(pension.netAnnualRealAtStart)}</p>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1463,7 +1473,8 @@ export function CoastFireTab() {
             </Card>
           )}
 
-          <div className="grid gap-4 desktop:grid-cols-3">
+          {/* sm:grid-cols-2 gives a 2-col layout on landscape mobile / tablet before the full 3-col at desktop */}
+          <div className="grid gap-4 sm:grid-cols-2 desktop:grid-cols-3">
             {(['bear', 'base', 'bull'] as const).map((key) => {
               const scenario = coastProjection.scenarios[key];
               const liquidProgress =

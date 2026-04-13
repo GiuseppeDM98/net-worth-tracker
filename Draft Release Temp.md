@@ -171,6 +171,12 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 
 ---
 
+- Improved the Coast FIRE state pension section on mobile: pension inputs are now arranged in a 2×2 grid (Name + Amount on one row, Months + Start Date on the next) instead of a single vertical column, making them easier to fill in on a small screen
+- Improved the pension timeline breakdown on mobile: each pension now shows a compact header line with name, status badge, start date, and years to start, followed by a clean 2-column metric grid (Gross Nominal, Gross Real, Net Real) — reducing the vertical space significantly without hiding any data
+- Improved tax bracket rows so they display as an inline 3-column row on all screen sizes, instead of stacking on mobile
+- Improved Bear, Base, and Bull scenario cards to display in a 2-column grid on tablet-sized screens, instead of a single column
+- Improved the "Add pension" button to be full-width on mobile for easier tapping
+- Improved touch target size on all remove buttons in the pension editor and tax bracket sections (now 40×40 px)
 - Improved the Coast FIRE state pension section with a clearer guided reading before the form, so you can immediately understand target-age capital, bridge years, and what changes after pensions begin
 - Improved Coast FIRE with a dedicated before/after pension timeline, making staggered pension start dates much easier to read
 - Improved Coast FIRE pension configuration feedback with clearer warnings and partial-result guidance when some pension inputs are incomplete or inconsistent
