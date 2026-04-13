@@ -1111,6 +1111,10 @@ export default function PerformancePage() {
             <CardDescription>
               Verde = mese positivo, rosso = negativo; l&apos;intensità cresce con l&apos;ampiezza (±5% soglia).
               Utile per identificare mesi storicamente forti o deboli del portafoglio.
+              <br />
+              <span className="text-xs">
+                I rendimenti isolano il contributo del singolo mese sottraendo solo il cashflow di quel mese, {' '}<strong>non</strong>{' '} il cumulativo. Per questo i valori mensili possono differire dal Grafico Underwater qui sotto, che usa il cashflow cumulativo dall&apos;inizio.
+              </span>
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -1127,6 +1131,10 @@ export default function PerformancePage() {
             <CardDescription>
               L&apos;area rossa mostra quanto il portafoglio è sotto il suo massimo storico in quel momento.
               Quando tocca 0% è stato raggiunto un nuovo massimo; si collega a Durata Drawdown e Tempo di Recupero.
+              <br />
+              <span className="text-xs">
+                Aggiustato per il cashflow{' '}<strong>cumulativo</strong>{' '}dall&apos;inizio, ogni punto mostra la performance pura degli investimenti isolata dai contributi/prelievi. Questo può produrre valori molto diversi dalla heatmap mensile sopra, che considera solo il cashflow del singolo mese.
+              </span>
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -1203,15 +1211,19 @@ export default function PerformancePage() {
             <div>
               <h4 className="font-semibold mb-1">Grafico: Heatmap Rendimenti Mensili</h4>
               <p className="text-muted-foreground">
-                <strong>Calcolo:</strong> ((Patrimonio fine mese − Flussi di cassa) / Patrimonio inizio mese − 1) × 100. I flussi sono sottratti per isolare la performance degli investimenti.
+                <strong>Calcolo:</strong> ((Patrimonio fine mese − Flussi di cassa del mese) / Patrimonio inizio mese − 1) × 100. Si sottrae solo il cashflow del <em>singolo mese</em> — <strong>non</strong> quello cumulativo — per isolare la performance mensile degli investimenti.
                 <br />
                 <strong>Colori:</strong> Verde = positivo, rosso = negativo. Intensità più scura oltre ±5%.
+                <br />
+                <strong>Differenza con il Grafico Underwater:</strong> la heatmap misura la variazione mese-su-mese; il drawdown misura quanto sei sotto il picco storico su base cumulativa. I due valori rispondono a domande diverse e non sono direttamente confrontabili.
               </p>
             </div>
             <div>
               <h4 className="font-semibold mb-1">Grafico: Underwater (Drawdown)</h4>
               <p className="text-muted-foreground">
-                <strong>Funzionamento:</strong> A ogni nuovo massimo storico il grafico torna a 0%. Quando il portafoglio scende, mostra la perdita percentuale dal picco. Aggiustato per flussi di cassa.
+                <strong>Funzionamento:</strong> A ogni nuovo massimo storico il grafico torna a 0%. Quando il portafoglio scende, mostra la perdita percentuale dal picco.
+                <br />
+                <strong>Aggiustamento cashflow:</strong> Usa il cashflow <em>cumulativo dall&apos;inizio</em> — la somma di tutti i contributi e prelievi fino a quel momento viene sottratta dal patrimonio. Il picco storico è calcolato sullo stesso valore aggiustato. Questo isola la performance pura degli investimenti eliminando l&apos;effetto dei versamenti. È la ragione per cui i valori possono differire significativamente dalla heatmap mensile sopra.
                 <br />
                 <strong>Collegamento:</strong> Si integra con le metriche Durata Drawdown e Recovery Time visibili sopra.
               </p>

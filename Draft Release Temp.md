@@ -280,6 +280,10 @@ A dedicated tab that answers a simple question: could your current FIRE portfoli
 - Added stricter ownership validation for sensitive portfolio actions so requests must match the signed-in Firebase user before data is read or changed
 - Preserved scheduled maintenance flows while hardening private API access, so automated snapshot and dividend jobs continue to run normally
 
+## 📚 Documentation
+
+- Added inline explanations to the Performance page clarifying why the Monthly Returns Heatmap and the Underwater Drawdown chart can show very different values for the same month — each chart answers a different question and uses a different cashflow methodology
+
 ## 🏗️ Technical
 
 - Reduced Firestore reads on the Performance page (Rendimenti): repeated visits now serve pre-computed metrics from a server-side cache instead of re-reading the full snapshot and expense history. The cache updates automatically when your portfolio snapshot changes, and the Refresh button always forces a full recalculation
