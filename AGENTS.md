@@ -28,6 +28,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Currency values in compact KPI grids should use `text-lg desktop:text-2xl`
 - **Multi-card grid breakpoint decision**: adding `sm:grid-cols-2` to a 3-item row leaves the third card alone on a half-width row at 640px — often worse than a full-width stack. Prefer no `sm:` breakpoint (full-width stack on mobile) → `desktop:grid-cols-3` directly. Reserve `sm:grid-cols-2` for content where 2 columns genuinely helps at 640px (e.g. Bear/Base/Bull scenario cards where any pairing is better than a single tall column).
 - **`items-end` for mixed-height label rows**: in a `grid-cols-2` form grid, if labels can wrap to different heights (e.g. "Nome" vs "Importo lordo mensile"), add `items-end` to the grid container. Without it, the inputs in each column sit at different vertical positions and look misaligned even though the grid is technically correct.
+- **Nested Radix collapsible chevron rotation**: `CollapsibleTrigger asChild` propagates `data-state="open|closed"` to its child element. Add `group` to the child Button, then `group-data-[state=open]:rotate-180 transition-transform duration-200 motion-reduce:transition-none` to the `ChevronDown` inside. No extra React state needed. Works in Tailwind v4.
 
 ### Layout Tokens
 - Never hardcode structural layout colors in shell components
@@ -247,6 +248,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Reuse the same skeleton across chained loading states
 - Use full-page skeletons only on truly slow pages; otherwise prefer delayed or null loading
 - `Loader2` is for initial loading; `RefreshCw` is for user-triggered refresh; `RotateCcw` is for retry/regenerate actions — keep these semantics consistent across the app
+- **Unsaved-state banners**: use `Info` icon (static) when the form has unsaved local changes but no async operation is in progress. Switch to `Loader2 animate-spin` only while the save mutation is actually pending. Do not dim `Loader2` with `opacity-60` as a substitute for a semantically different icon — it reads as a stuck spinner.
 
 ### Error State Levels
 - **Query-level (blocking)**: use `Alert variant="destructive"` with `AlertCircle` icon — these represent a failure to load the page's primary data and need visible presence

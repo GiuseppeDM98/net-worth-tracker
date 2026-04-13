@@ -460,12 +460,12 @@ export function CoastFireTab() {
 
   const handleSave = () => {
     if (currentAge === null) {
-      toast.error("Inserisci un'eta attuale valida tra 18 e 100 anni");
+      toast.error("Inserisci un'età attuale valida tra 18 e 100 anni");
       return;
     }
 
     if (retirementAge === null) {
-      toast.error("Inserisci un'eta di pensionamento valida tra 18 e 100 anni");
+      toast.error("Inserisci un'età di pensionamento valida tra 18 e 100 anni");
       return;
     }
 
@@ -647,7 +647,7 @@ export function CoastFireTab() {
           id: pension.id,
           label: `${pension.label} ${pension.startDate ? `· ${formatDate(toDate(pension.startDate))}` : ''}`.trim(),
           detail: pension.isActiveAtRetirement && index === 0
-            ? `E' gia' attiva all'eta target e copre ${formatCurrency(pension.netAnnualRealAtStart)} netti reali l'anno.`
+            ? `È già attiva all'età target e copre ${formatCurrency(pension.netAnnualRealAtStart)} netti reali l'anno.`
             : `Da qui aggiunge ${formatCurrency(pension.netAnnualRealAtStart)} netti reali l'anno alla copertura.`,
           badge: pension.isActiveAtRetirement ? 'Già attiva' : `Parte a ${formatAgeYears(pension.startAge)}`,
         })),
@@ -723,7 +723,7 @@ export function CoastFireTab() {
                   </div>
                   <CardDescription className="max-w-[72ch]">
                     Il tuo capitale attuale può bastare a raggiungere il target Coast FIRE, anche se le pensioni
-                    entrano in gioco solo dalla loro data di decorrenza — che può essere anni dopo il target.
+                    entrano in gioco solo dalla loro data di decorrenza, che può essere anni dopo il target.
                   </CardDescription>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -923,9 +923,12 @@ export function CoastFireTab() {
           {hasUnsavedChanges && (
             <div className="mb-4 rounded-lg border border-border bg-muted/40 p-4 text-sm">
               <div className="flex items-start gap-2">
-                <Loader2
-                  className={`mt-0.5 h-4 w-4 shrink-0 ${saveMutation.isPending ? 'animate-spin' : 'opacity-60'}`}
-                />
+                {/* Show spinner only while the mutation is in flight; otherwise a neutral info icon */}
+                {saveMutation.isPending ? (
+                  <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin" />
+                ) : (
+                  <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                )}
                 <div className="space-y-1">
                   <p className="font-medium text-foreground">Anteprima locale attiva</p>
                   <p className="text-muted-foreground">
@@ -1073,9 +1076,6 @@ export function CoastFireTab() {
                       <div className="space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <Badge variant="outline">{pension.label.trim() || `Pensione ${index + 1}`}</Badge>
-                          {hasCompactPensionEditor ? (
-                            <Badge variant="secondary">Vista compatta</Badge>
-                          ) : null}
                         </div>
                         <p className="text-sm text-muted-foreground">
                           {pension.startDate
@@ -1161,9 +1161,9 @@ export function CoastFireTab() {
 
             <Collapsible className="rounded-lg border border-border bg-muted/20">
               <CollapsibleTrigger asChild>
-                <Button variant="ghost" className="flex w-full items-center justify-between rounded-lg px-4 py-3 text-left">
+                <Button variant="ghost" className="group flex w-full items-center justify-between rounded-lg px-4 py-3 text-left">
                   <span className="text-sm font-medium text-foreground">4. Assunzioni del modello pensione</span>
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180 motion-reduce:transition-none" />
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-2 px-4 pb-4 text-sm text-muted-foreground">
@@ -1528,7 +1528,7 @@ export function CoastFireTab() {
             })}
           </div>
 
-          <Card>
+          <Card className="border-border/70">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Clock3 className="h-5 w-5 text-primary" />

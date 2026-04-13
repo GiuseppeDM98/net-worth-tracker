@@ -165,6 +165,12 @@ The AI Assistant is a new section of the app (accessible from the "Analisi" grou
 
 ## 🔧 Improvements
 
+### Coast FIRE
+
+- Fixed Italian copy in the Coast FIRE timeline: pension phases that are already active at the target age are now correctly labelled "È già attiva all'età target" instead of the placeholder text with incorrect apostrophes
+- The "Model assumptions" section in Coast FIRE configuration now correctly animates its expand/collapse arrow, so it's always clear whether the panel is open or closed
+- The unsaved-changes notice in the Coast FIRE configuration panel now shows a neutral info icon at rest, switching to a spinner only while the save is actually in progress — eliminating the misleading "stuck loading" appearance
+
 ### Themes & Navigation
 
 - The bottom navigation bar on mobile now matches the active color theme — background, border, and active tab highlight all update when you switch themes, consistent with the sidebar on desktop
