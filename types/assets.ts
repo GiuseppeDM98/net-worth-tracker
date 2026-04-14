@@ -192,6 +192,7 @@ export interface AssetAllocationSettings {
   assistantResponseStyle?: 'balanced' | 'concise' | 'deep'; // Mirrors assistant preference for cross-feature defaults
   assistantMacroContextEnabled?: boolean; // Enables macro/web context in assistant flows when explicitly requested
   assistantMemoryEnabled?: boolean; // Allows the assistant to persist reusable user context
+  costCentersEnabled?: boolean; // When true, Centri di Costo tab appears in Cashflow and the cost center selector appears in ExpenseDialog
   targets: AssetAllocationTarget;
 }
 

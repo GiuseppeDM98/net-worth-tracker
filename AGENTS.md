@@ -87,6 +87,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Every new settings field must be handled in three places: type definition, `getSettings()`, `setSettings()`
 - `setSettings()` has two write branches; update both
 - Assistant preference fields mirrored into settings must stay aligned with the assistant memory document and `AssetAllocationSettings`
+- **Feature toggle placement**: all feature toggles (`costCentersEnabled`, `goalBasedInvestingEnabled`, `stampDutyEnabled`, etc.) live in `AssetAllocationSettings` (`types/assets.ts` + `assetAllocationService.ts`). Do NOT add them to `UserPreferences` / `userPreferencesService.ts`. The 3-place rule applies here too.
 
 ### Settings UX Layer (Overdrive)
 - Unsaved preview in Settings is local-only: use a baseline snapshot key captured on load/save and compare against current state (`hasUnsaved*`) without introducing autosave behavior
@@ -439,6 +440,24 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - `Legend` reads `<Bar fill>`, not `<Cell>`
 - Always set `fill` on `<Bar>` even when per-bar colors are overridden by `<Cell>`
 - Do not set text `color` globally in tooltip style for line/area/bar charts
+- **Tooltip label invisible in dark mode**: the native Recharts tooltip always uses a white background. If `labelStyle` has no `color`, the label inherits the page's CSS color (light in dark mode) and becomes invisible. Always set `labelStyle={{ fontWeight: 600, color: '#111827' }}`. Same issue applies to `contentStyle` text.
+- **BarChart hover cursor overlay**: the default cursor is an opaque light rectangle — too visible in dark mode. Set `cursor={{ fill: 'rgba(128, 128, 128, 0.1)' }}` on `<Tooltip>` for a subtle semi-transparent overlay that works in both modes.
+
+### Recharts ResponsiveContainer -1 Warning
+- Symptom: `The width(-1) and height(-1) of chart should be greater than 0` (fires twice) when a chart appears after an async state change (e.g. after a fetch completes and `loading` flips to `false`).
+- Cause: React mounts the chart section in one render cycle; `ResizeObserver` fires immediately before the browser completes layout, measuring `-1`.
+- Fix: defer mount with `requestAnimationFrame`. Pattern:
+  ```tsx
+  const [chartReady, setChartReady] = useState(false);
+  const rafRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (loading) return;
+    rafRef.current = requestAnimationFrame(() => setChartReady(true));
+    return () => { if (rafRef.current !== null) cancelAnimationFrame(rafRef.current); };
+  }, [loading]);
+  // In JSX: {chartReady && <ResponsiveContainer ...>}
+  ```
+- `minWidth={0}` alone is not sufficient — it only prevents negative width assertions, not the timing issue.
 
 ### Radix CollapsibleTrigger Nested Button
 - Symptom: `<button> cannot be a descendant of <button>` hydration error in console
@@ -460,6 +479,16 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - On mobile, CPU budget is ~3–5x tighter. Multiple concurrent tasks at mount (re-renders, Recharts SVG, Framer Motion stagger, rAF loops) can exceed the 16ms/frame budget and cause visible animation jank
 - When a page uses `useCountUp` for mount-time KPI animations, avoid simultaneously rendering heavy components (Recharts charts, large lists) that aren't immediately visible
 - Pattern: start collapsible/below-fold Recharts components as collapsed on mobile, let users expand — use `isMobile` from `useMediaQuery` in the `useState` initializer for the expanded state
+
+### createExpense Field Enumeration Trap
+- `createExpense` in `expenseService.ts` explicitly enumerates every field in `removeUndefinedFields({...})` before `addDoc`. `updateExpense` spreads `...updates`, so new fields work automatically there.
+- **Symptom**: a new field saved correctly on edit but silently missing on create.
+- **Fix**: whenever you add a field to `ExpenseFormData`, also add it to the `cleanedData` object in ALL three creation paths: single expense, recurring expenses (the batch loop), and installment expenses (the batch loop). Search for `linkedCashAssetId: expenseData.linkedCashAssetId` — all three occurrences need the new field right next to it.
+
+### Async Tab Count: boolean | null Pattern
+- When the number of visible tabs depends on an async settings fetch, initializing the state as `false` causes the TabsList to mount twice (5 cols → 6 cols), producing a visible reflow flash on desktop.
+- Fix: use `boolean | null` as the initial state (`null` = not yet loaded). While `null`, render an `animate-pulse` placeholder div with the same height as the TabsList (`h-10`). Mount the real TabsList only after the settings are known, so the correct column count is set in one paint.
+- Pattern: `const [featureEnabled, setFeatureEnabled] = useState<boolean | null>(null)` → `{featureEnabled === null ? <div className="hidden desktop:block h-10 animate-pulse rounded-md bg-muted" /> : <TabsList ...>}`
 
 ### Nested Component Remount Trap
 - Symptom: clicking a row or toggling local state causes an entire dense table below to flash or look recreated, even in production

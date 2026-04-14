@@ -77,6 +77,7 @@ export async function getSettings(
       assistantResponseStyle: data.assistantResponseStyle,
       assistantMacroContextEnabled: data.assistantMacroContextEnabled,
       assistantMemoryEnabled: data.assistantMemoryEnabled,
+      costCentersEnabled: data.costCentersEnabled,
       targets: data.targets as AssetAllocationTarget,
     };
   } catch (error) {
@@ -206,6 +207,9 @@ export async function setSettings(
       if (settings.assistantMemoryEnabled !== undefined) {
         docData.assistantMemoryEnabled = settings.assistantMemoryEnabled;
       }
+      if (settings.costCentersEnabled !== undefined) {
+        docData.costCentersEnabled = settings.costCentersEnabled;
+      }
 
       // Use setDoc WITHOUT merge to completely replace targets
       await setDoc(targetRef, docData);
@@ -296,6 +300,9 @@ export async function setSettings(
       }
       if (settings.assistantMemoryEnabled !== undefined) {
         docData.assistantMemoryEnabled = settings.assistantMemoryEnabled;
+      }
+      if (settings.costCentersEnabled !== undefined) {
+        docData.costCentersEnabled = settings.costCentersEnabled;
       }
 
       // Use merge: true to preserve existing fields

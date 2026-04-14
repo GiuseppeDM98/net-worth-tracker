@@ -1,5 +1,17 @@
 ## ✨ New Features
 
+### Cost Centers (Centri di Costo)
+
+- Added a new optional **Cost Centers** tab in the Cashflow section — group expenses under named objects or projects (e.g. "Automobile Dacia") to track their total cost over time
+- Each cost center shows lifetime total spent, number of transactions, and average monthly cost
+- A monthly spending chart lets you see how spending on any object has evolved over time, with a toggle to show the full history or just the last 12 months
+- A transaction table lists all expenses linked to the cost center, sorted by date
+- Cost centers can be assigned a custom color to make them easy to distinguish at a glance
+- When creating or editing an expense, a new optional selector lets you assign it to any existing cost center
+- Renaming a cost center automatically updates all linked expenses — no manual cleanup needed
+- Deleting a cost center removes its association from all linked expenses
+- Cost Centers is an opt-in feature — enable it in Settings → Preferenze with a single toggle; the tab and the selector in expenses are hidden until enabled
+
 ### Color Themes
 
 - Added two new color themes: **Cyberpunk** (neon pink & electric teal) and **Retro Arcade** (red & teal on a warm yellow-green background) — bringing the total to six selectable themes

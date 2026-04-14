@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-13, session performance-heatmap-explanation): Added inline explanatory text to the Performance page clarifying the methodological difference between the Monthly Returns Heatmap (single-month cashflow) and the Underwater Drawdown chart (cumulative cashflow from portfolio start). Text added to both CardDescriptions and the Note Metodologiche section. No logic changes. Key file: `app/dashboard/performance/page.tsx`.
-- Previous implementation (2026-04-13, session performance-firebase-reads): **Rendimenti Firestore cache**. `performance-cache/{userId}` stores pre-computed `PerformanceData` so repeated page visits skip the expense collection read entirely. Cache key: `{snapshotCount}-{lastYear}-{lastMonth}-{Math.round(lastTotalNetWorth)}`. TTL: 6 hours (covers expense-only changes). `forceRefresh=true` passed from the Aggiorna button bypasses and rewrites the cache. Dates serialized as Firestore Timestamps. Also fixed: `calculateRollingPeriods` was fetching `allExpenses` independently twice (12M + 36M windows) — now receives pre-fetched expenses from `getAllPerformanceData`. Key files: `lib/services/performanceService.ts`, `types/performance.ts`, `firestore.rules`, `app/dashboard/performance/page.tsx`.
+- Latest implementation (2026-04-14, session cost-centers): **Centri di Costo** feature. New optional 6th tab in Cashflow (gated by `costCentersEnabled` toggle in Settings → Preferenze). Collection `costCenters/{id}` stores name/description/color. `Expense` has new optional fields `costCenterId`/`costCenterName` (denormalized, same pattern as `categoryName`). Cost center selector in `ExpenseDialog` (visible only when feature enabled + centers exist). Detail view: KPI cards, monthly BarChart, linked transaction table. Delete cascades via `writeBatch` to clear `costCenterId`/`costCenterName` from all linked expenses. Rename similarly bulk-updates `costCenterName`. Key files: `types/costCenters.ts`, `lib/services/costCenterService.ts`, `components/cashflow/CostCentersTab.tsx`, `components/cashflow/CostCenterDialog.tsx`, `components/cashflow/CostCenterDetail.tsx`.
+- Previous implementation (2026-04-13, session performance-firebase-reads): **Rendimenti Firestore cache**. `performance-cache/{userId}` stores pre-computed `PerformanceData` so repeated page visits skip the expense collection read entirely. Cache key: `{snapshotCount}-{lastYear}-{lastMonth}-{Math.round(lastTotalNetWorth)}`. TTL: 6 hours. `forceRefresh=true` from the Aggiorna button bypasses and rewrites the cache. Key files: `lib/services/performanceService.ts`, `types/performance.ts`, `firestore.rules`, `app/dashboard/performance/page.tsx`.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -35,6 +35,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Overview/Dashboard KPI cards all animate on mount via `OverviewAnimatedCurrency` leaf nodes (count-up isolated per card, not page-level). Charts mount after hero settles via `requestIdleCallback`. Formatter cache in `lib/utils/formatters.ts` avoids `Intl.NumberFormat` allocation on every render.
 - Overview/Panoramica greeting is now consistent with the shared header format, showing the first name without a comma
 - Private API actions now require verified Firebase auth server-side, while scheduled maintenance flows continue to authenticate with `CRON_SECRET`
+- **Cost Centers (2026-04-14)**: optional 6th tab in Cashflow (`costCentersEnabled` toggle in Settings → Preferenze). Group expenses by object/project (e.g. "Automobile Dacia"). Per-center KPI cards, monthly spend chart, linked transaction table. Assignment via `ExpenseDialog` selector. Delete/rename cascade to linked expenses via `writeBatch`. Firestore collection: `costCenters`. New composite indexes: `costCenters/{userId+createdAt}`, `expenses/{userId+costCenterId+date}`.
 - Cashflow tracking with categories, filters, Sankey drill-down, budget management, and linked cash-account updates
 - History page with net worth evolution, asset class breakdown, liquidity, YoY variation, savings vs investment growth, `Lavoro & Investimenti`, doubling analysis, and allocation comparison
 - `Lavoro & Investimenti` in History now includes:
@@ -75,7 +76,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - History components: `components/dashboard/LaborMetricsChart.tsx`, `components/history/*`
 - Chart service: `lib/services/chartService.ts`
 - Performance: `app/dashboard/performance/page.tsx`, `lib/services/performanceService.ts`, `performance-cache/{userId}` (Firestore cache collection)
-- Cashflow and budget: `components/cashflow/*`, `lib/utils/budgetUtils.ts`, `types/budget.ts`
+- Cashflow, budget, cost centers: `components/cashflow/*`, `lib/utils/budgetUtils.ts`, `types/budget.ts`, `types/costCenters.ts`, `lib/services/costCenterService.ts`
 - FIRE: `components/fire-simulations/*`, `lib/services/fireService.ts`
 - Dividends: `components/dividends/*`
 - Settings: `app/dashboard/settings/page.tsx`, `lib/services/assetAllocationService.ts`
@@ -84,7 +85,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-13 (session performance-firebase-reads — Rendimenti Firestore cache + duplicate expense query fix)
+**Last updated**: 2026-04-14 (session cost-centers — Centri di Costo feature)
 
 ## Design Context
 

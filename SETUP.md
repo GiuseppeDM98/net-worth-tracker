@@ -83,6 +83,22 @@ firebase deploy --only firestore:rules
 
 If you prefer using the Firebase Console UI, copy the contents of [firestore.rules](./firestore.rules) exactly as-is.
 
+### Step 4b: Deploy Firestore Indexes
+
+The app requires composite indexes for multi-field queries (e.g. filtering by `userId` and ordering by `date`). These are defined in [firestore.indexes.json](./firestore.indexes.json) and must be deployed alongside the rules:
+
+```bash
+firebase deploy --only firestore:indexes
+```
+
+Or deploy rules and indexes together in one command:
+
+```bash
+firebase deploy --only firestore
+```
+
+Index creation can take a few minutes. You can monitor progress in Firebase Console → **Firestore Database** → **Indexes**. Queries that depend on a missing index will fail with an error that includes a direct link to create it — if you see that in the browser console, it means this step was skipped.
+
 ### Step 5: Get Firebase Configuration
 
 1. In the Firebase Console, click the **gear icon** → **Project settings**

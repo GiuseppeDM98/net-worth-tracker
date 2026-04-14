@@ -42,6 +42,8 @@ import {
   EXPENSE_TYPE_LABELS,
   ExpenseCategory
 } from '@/types/expenses';
+import { CostCenter } from '@/types/costCenters';
+import { getCostCenters } from '@/lib/services/costCenterService';
 import { Asset } from '@/types/assets';
 import { createExpense, updateExpense } from '@/lib/services/expenseService';
 import { getAllAssets, updateCashAssetBalance } from '@/lib/services/assetService';
@@ -159,6 +161,9 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
   const [cashAssets, setCashAssets] = useState<Asset[]>([]);
   const [defaultDebitCashAssetId, setDefaultDebitCashAssetId] = useState<string>('__none__');
   const [defaultCreditCashAssetId, setDefaultCreditCashAssetId] = useState<string>('__none__');
+  const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
+  const [costCentersEnabled, setCostCentersEnabledState] = useState(false);
+  const [selectedCostCenterId, setSelectedCostCenterId] = useState<string>('__none__');
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [newSubCategoryName, setNewSubCategoryName] = useState('');
   const [addingSubCategory, setAddingSubCategory] = useState(false);
@@ -230,15 +235,19 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
   const loadCashAssets = async () => {
     if (!user) return;
     try {
-      const [allAssets, settings] = await Promise.all([
+      const [allAssets, settings, centers] = await Promise.all([
         getAllAssets(user.uid),
         getSettings(user.uid),
+        getCostCenters(user.uid),
       ]);
       setCashAssets(allAssets.filter(a => a.assetClass === 'cash'));
       const debitId = settings?.defaultDebitCashAssetId || '__none__';
       const creditId = settings?.defaultCreditCashAssetId || '__none__';
       setDefaultDebitCashAssetId(debitId);
       setDefaultCreditCashAssetId(creditId);
+      // Load cost center feature flag and available centers
+      setCostCentersEnabledState(settings?.costCentersEnabled ?? false);
+      setCostCenters(centers);
 
       // Apply default immediately for new expenses using the current form type.
       // This handles the initial open case where selectedType hasn't changed
@@ -272,6 +281,8 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
         recurringMonths: 1,
         linkedCashAssetId: expense.linkedCashAssetId || '__none__',
       });
+      // Pre-select the cost center if the expense already has one
+      setSelectedCostCenterId(expense.costCenterId || '__none__');
     } else {
       reset({
         type: 'variable',
@@ -287,6 +298,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
         recurringMonths: 12,
         linkedCashAssetId: '__none__',
       });
+      setSelectedCostCenterId('__none__');
     }
   }, [expense, reset, open]);
 
@@ -393,6 +405,12 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
     // Resolve sentinel '__none__' to undefined — no linked account selected
     const linkedCashAssetId = data.linkedCashAssetId !== '__none__' ? data.linkedCashAssetId : undefined;
 
+    // Resolve cost center: sentinel '__none__' means no assignment
+    const resolvedCostCenterId = selectedCostCenterId !== '__none__' ? selectedCostCenterId : undefined;
+    const resolvedCostCenterName = resolvedCostCenterId
+      ? costCenters.find(c => c.id === resolvedCostCenterId)?.name
+      : undefined;
+
     try {
       const expenseData: ExpenseFormData = {
         type: data.type,
@@ -421,6 +439,10 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
 
         // Linked cash account for automatic balance updates
         linkedCashAssetId,
+
+        // Optional cost center assignment (undefined clears the field on update)
+        costCenterId: resolvedCostCenterId,
+        costCenterName: resolvedCostCenterName,
       };
 
       if (expense) {
@@ -766,6 +788,34 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
                   </p>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Centro di Costo — visible only when the feature is enabled in Settings → Preferenze */}
+          {costCentersEnabled && costCenters.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="costCenter">Centro di Costo</Label>
+              <Select value={selectedCostCenterId} onValueChange={setSelectedCostCenterId}>
+                <SelectTrigger id="costCenter">
+                  <SelectValue placeholder="Nessun centro di costo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Nessun centro di costo</SelectItem>
+                  {costCenters.map(center => (
+                    <SelectItem key={center.id} value={center.id}>
+                      <span className="flex items-center gap-2">
+                        {center.color && (
+                          <span
+                            className="inline-block h-2.5 w-2.5 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: center.color }}
+                          />
+                        )}
+                        {center.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
 

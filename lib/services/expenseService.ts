@@ -250,6 +250,8 @@ export async function createExpense(
       link: expenseData.link,
       isRecurring: false,
       linkedCashAssetId: expenseData.linkedCashAssetId,
+      costCenterId: expenseData.costCenterId,
+      costCenterName: expenseData.costCenterName,
       createdAt: now,
       updatedAt: now,
     });
@@ -321,6 +323,8 @@ async function createRecurringExpenses(
         // Only store on the first entry — balance update applies to current payment only,
         // not to future-dated recurring instances.
         linkedCashAssetId: i === 0 ? expenseData.linkedCashAssetId : undefined,
+        costCenterId: expenseData.costCenterId,
+        costCenterName: expenseData.costCenterName,
         createdAt: now,
         updatedAt: now,
       });
@@ -435,6 +439,8 @@ async function createInstallmentExpenses(
         // Only store on the first installment — balance update applies to the immediate
         // payment only, not to future-dated installments.
         linkedCashAssetId: i === 0 ? expenseData.linkedCashAssetId : undefined,
+        costCenterId: expenseData.costCenterId,
+        costCenterName: expenseData.costCenterName,
 
         createdAt: now,
         updatedAt: now,

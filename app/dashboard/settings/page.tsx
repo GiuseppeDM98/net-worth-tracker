@@ -132,6 +132,7 @@ export default function SettingsPage() {
   const [checkingAccountSubCategory, setCheckingAccountSubCategory] = useState<string>('__none__');
   const [cashflowHistoryStartYear, setCashflowHistoryStartYear] = useState<number>(2025);
   const [laborIncomeCategoryIds, setLaborIncomeCategoryIds] = useState<string[]>([]);
+  const [costCentersEnabled, setCostCentersEnabled] = useState<boolean>(false);
   const [assetClassStates, setAssetClassStates] = useState<
     Record<AssetClass, AssetClassState>
   >({} as Record<AssetClass, AssetClassState>);
@@ -338,6 +339,7 @@ export default function SettingsPage() {
         setCheckingAccountSubCategory(settingsData.checkingAccountSubCategory || '__none__');
         setCashflowHistoryStartYear(settingsData.cashflowHistoryStartYear ?? 2025);
         setLaborIncomeCategoryIds(settingsData.laborIncomeCategoryIds ?? []);
+        setCostCentersEnabled(settingsData.costCentersEnabled ?? false);
         // Load dividend settings
         setDividendIncomeCategoryId(settingsData.dividendIncomeCategoryId || '');
         setDividendIncomeSubCategoryId(settingsData.dividendIncomeSubCategoryId || '');
@@ -452,6 +454,7 @@ export default function SettingsPage() {
             settingsData?.defaultCreditCashAssetId || '__none__',
           cashflowHistoryStartYear: settingsData?.cashflowHistoryStartYear ?? 2025,
           laborIncomeCategoryIds: [...(settingsData?.laborIncomeCategoryIds ?? [])].sort(),
+          costCentersEnabled: settingsData?.costCentersEnabled ?? false,
         })
       );
 
@@ -981,6 +984,7 @@ export default function SettingsPage() {
         checkingAccountSubCategory,
         cashflowHistoryStartYear,
         laborIncomeCategoryIds,
+        costCentersEnabled,
       });
       toast.success('Impostazioni salvate con successo');
       setAllocationBaselineKey(allocationSnapshotKey);
@@ -1292,6 +1296,7 @@ export default function SettingsPage() {
         defaultCreditCashAssetId,
         cashflowHistoryStartYear,
         laborIncomeCategoryIds: [...laborIncomeCategoryIds].sort(),
+        costCentersEnabled,
       }),
     [
       includePrimaryResidenceInFIRE,
@@ -1304,6 +1309,7 @@ export default function SettingsPage() {
       defaultCreditCashAssetId,
       cashflowHistoryStartYear,
       laborIncomeCategoryIds,
+      costCentersEnabled,
     ]
   );
 
@@ -1700,6 +1706,25 @@ export default function SettingsPage() {
                   setCashflowHistoryStartYear(parseInt(e.target.value, 10) || 2025)
                 }
                 className={cn('w-32', interactiveControlClass)}
+              />
+            </div>
+
+            {/* Cost centers toggle — optional feature for tracking expenses by object/project */}
+            <div className="flex items-center justify-between border-t pt-4">
+              <div>
+                <Label htmlFor="costCentersEnabled" className="text-sm font-medium">
+                  Centri di Costo
+                </Label>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Raggruppa le spese per oggetto o progetto (es. &quot;Automobile Dacia&quot;) e
+                  visualizza il costo totale nel tempo con grafici e storico transazioni
+                </p>
+              </div>
+              <Switch
+                id="costCentersEnabled"
+                checked={costCentersEnabled}
+                onCheckedChange={setCostCentersEnabled}
+                className={interactiveControlClass}
               />
             </div>
           </div>

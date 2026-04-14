@@ -76,6 +76,11 @@ export interface Expense {
   // Optional link to a cash-class asset whose balance is updated when this expense is saved.
   // Only stored on single expenses or the first entry of a recurring/installment series.
   linkedCashAssetId?: string;
+  // Optional cost center assignment for grouping expenses by object/project (e.g. "Automobile Dacia").
+  // costCenterName is denormalized for query performance — same pattern as categoryName.
+  // WARNING: If a cost center is renamed, bulk-update all linked expenses via costCenterService.renameCostCenter.
+  costCenterId?: string;
+  costCenterName?: string;
   createdAt: Date | Timestamp;
   updatedAt: Date | Timestamp;
 }
@@ -99,6 +104,8 @@ export interface ExpenseFormData {
   installmentAmounts?: number[]; // Individual amounts for each installment (manual mode)
   installmentStartDate?: Date; // Date of first installment
   linkedCashAssetId?: string; // ID of cash asset whose balance is updated on save
+  costCenterId?: string;    // Optional cost center assignment
+  costCenterName?: string;  // Denormalized name, must be kept in sync via costCenterService
 }
 
 export interface MonthlyExpenseSummary {
