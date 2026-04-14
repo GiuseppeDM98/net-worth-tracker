@@ -7,10 +7,11 @@ This guide covers how to self-host Net Worth Tracker using Docker on any VPS or 
 1. [Prerequisites](#prerequisites)
 2. [Build and Run](#build-and-run)
 3. [Environment Variables](#environment-variables)
-4. [Cron Jobs](#cron-jobs)
-5. [Reverse Proxy with Nginx](#reverse-proxy-with-nginx)
-6. [Keeping the Container Updated](#keeping-the-container-updated)
-7. [Troubleshooting](#troubleshooting)
+4. [Stopping the Stack](#stopping-the-stack)
+5. [Cron Jobs](#cron-jobs)
+6. [Reverse Proxy with Nginx](#reverse-proxy-with-nginx)
+7. [Keeping the Container Updated](#keeping-the-container-updated)
+8. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -36,7 +37,9 @@ cp .env.local.example .env.local
 # Fill in .env.local with your Firebase credentials and secrets (see below)
 
 # 3. Build and start
-docker compose up -d --build
+# IMPORTANT: Compose does not use .env.local for build-time variable substitution
+# unless you pass it explicitly with --env-file.
+docker compose --env-file .env.local up -d --build
 
 # 4. Check logs
 docker compose logs -f app
@@ -92,7 +95,13 @@ Next.js `NEXT_PUBLIC_*` variables are inlined into the JavaScript bundle **at bu
 | `NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS` | No | Enable dummy data in Settings (default: `false`) |
 | `NEXT_PUBLIC_ASSISTANT_AI_ENABLED` | No | Enable AI assistant (default: `true`) |
 
-When using docker-compose, these are picked up from `.env.local` automatically via the `args` block in `docker-compose.yml`. You do **not** need to pass them separately.
+When using docker-compose, these are picked up from `.env.local` via the `args` block in `docker-compose.yml` only if you pass the env file explicitly:
+
+```bash
+docker compose --env-file .env.local up -d --build
+```
+
+Without `--env-file .env.local`, Docker Compose only uses `.env` automatically for variable substitution in `build.args`. The `env_file:` section in `docker-compose.yml` applies only to container runtime variables, not to the image build step.
 
 ### Runtime variables (in `.env.local`)
 
@@ -107,6 +116,31 @@ When using docker-compose, these are picked up from `.env.local` automatically v
 *Use either `FIREBASE_SERVICE_ACCOUNT_KEY` **or** the three separate `FIREBASE_ADMIN_*` vars.
 
 > **Security**: Never commit `.env.local` to Git. The `.gitignore` already excludes it. Make sure Docker build context does not include it either — `.dockerignore` excludes `.env*` files.
+
+---
+
+## Stopping the Stack
+
+Useful docker-compose commands when you want to stop or remove the app:
+
+```bash
+# Stop containers without removing them
+docker compose stop
+
+# Stop and remove containers, networks, and the default Compose resources
+docker compose down
+
+# Stop and remove everything including named volumes
+# Use this only if you explicitly want to delete persisted Docker volume data
+docker compose down -v
+```
+
+If you started the stack with `.env.local`, it is safest to keep using the same flag consistently:
+
+```bash
+docker compose --env-file .env.local stop
+docker compose --env-file .env.local down
+```
 
 ---
 
@@ -237,7 +271,7 @@ When you pull new code and want to redeploy:
 git pull
 
 # Rebuild and restart with zero downtime (compose replaces the old container)
-docker compose up -d --build
+docker compose --env-file .env.local up -d --build
 
 # Clean up old images to free disk space
 docker image prune -f
