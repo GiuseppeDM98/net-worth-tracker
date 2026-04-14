@@ -449,9 +449,13 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
         // === EDIT: Update existing expense ===
         // For edit, pass null explicitly to clear the linked asset if user deselected it.
         // null persists to Firestore (removing the field), whereas undefined would be stripped.
+        // null persists to Firestore (clears the field), whereas undefined is stripped by removeUndefinedFields.
+        // Apply this to both linkedCashAssetId and costCenter fields so deselecting them actually clears the DB value.
         const updatesWithLink = {
           ...expenseData,
           linkedCashAssetId: linkedCashAssetId ?? null,
+          costCenterId: resolvedCostCenterId ?? null,
+          costCenterName: resolvedCostCenterName ?? null,
         };
         await updateExpense(
           expense.id,
