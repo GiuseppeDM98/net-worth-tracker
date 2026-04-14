@@ -298,6 +298,7 @@ A dedicated tab that answers a simple question: could your current FIRE portfoli
 
 ## 🏗️ Technical
 
+- Added Docker support for self-hosted deployment: the app can now be deployed on any VPS or server using Docker, without relying on Vercel. Firebase still handles authentication and the database. A new `DOCKER.md` guide covers setup, cron jobs, nginx with HTTPS, and troubleshooting.
 - Reduced Firestore reads on the Performance page (Rendimenti): repeated visits now serve pre-computed metrics from a server-side cache instead of re-reading the full snapshot and expense history. The cache updates automatically when your portfolio snapshot changes, and the Refresh button always forces a full recalculation
 - Fixed the Performance page making three separate database reads for expense history on every load — now a single read is shared across all calculations
 - Added `includeDummySnapshots` assistant preference: test accounts with synthetic snapshot data can now include those snapshots in AI context bundles. The toggle appears automatically only when dummy snapshots are detected — invisible to all regular users

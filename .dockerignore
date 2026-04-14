@@ -1,0 +1,38 @@
+# Dependencies — reinstalled inside the container
+node_modules
+
+# Build output — rebuilt inside the container
+.next
+
+# Git history — not needed at runtime
+.git
+.gitignore
+
+# Local environment files — secrets must be injected at runtime, never baked in
+.env
+.env.local
+.env*.local
+
+# Editor artifacts
+.DS_Store
+*.swp
+*.swo
+.vscode
+.idea
+
+# Test artifacts
+coverage
+__tests__
+
+# Documentation
+*.md
+!README.md
+
+# Firebase emulator data
+.firebase
+firebase-debug.log
+firestore-debug.log
+
+# TypeScript incremental build info
+*.tsbuildinfo
+next-env.d.ts

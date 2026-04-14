@@ -1,0 +1,37 @@
+# Docker Compose loads .env by default for variable substitution.
+# Since this project uses .env.local, always pass the flag explicitly:
+#   docker compose --env-file .env.local up -d --build
+#   docker compose --env-file .env.local build
+
+services:
+  app:
+    build:
+      context: .
+      # NEXT_PUBLIC_* vars are baked into the JS bundle at build time.
+      # Pass them here so the builder stage can embed them correctly.
+      args:
+        NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY}
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${NEXT_PUBLIC_FIREBASE_PROJECT_ID}
+        NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}
+        NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}
+        NEXT_PUBLIC_FIREBASE_APP_ID: ${NEXT_PUBLIC_FIREBASE_APP_ID}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+        NEXT_PUBLIC_REGISTRATIONS_ENABLED: ${NEXT_PUBLIC_REGISTRATIONS_ENABLED:-true}
+        NEXT_PUBLIC_REGISTRATION_WHITELIST_ENABLED: ${NEXT_PUBLIC_REGISTRATION_WHITELIST_ENABLED:-false}
+        NEXT_PUBLIC_REGISTRATION_WHITELIST: ${NEXT_PUBLIC_REGISTRATION_WHITELIST:-}
+        NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS: ${NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS:-false}
+        NEXT_PUBLIC_ASSISTANT_AI_ENABLED: ${NEXT_PUBLIC_ASSISTANT_AI_ENABLED:-true}
+    ports:
+      - "3000:3000"
+    # Server-side secrets — injected at runtime, not baked into the image.
+    # Copy .env.local.example to .env.local and fill in your values.
+    env_file:
+      - .env.local
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

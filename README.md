@@ -115,7 +115,7 @@ npm run dev
 
 - **Node.js** 18.x or higher
 - **Firebase project** with Firestore + Authentication enabled (free tier is sufficient)
-- **Vercel account** (recommended for deployment and cron jobs)
+- **Vercel account** (recommended for deployment and cron jobs) or **Docker** for self-hosting
 - **Anthropic API key** (optional — enables AI performance analysis)
 
 ## Environment Variables
@@ -210,7 +210,7 @@ npm run test:watch # Run tests in watch mode
 
 ## Deployment
 
-The recommended deployment target is **Vercel**:
+### Vercel (recommended)
 
 1. Import the repository on [vercel.com](https://vercel.com)
 2. Add all environment variables from `.env.local`
@@ -220,7 +220,18 @@ Two cron jobs run daily at 18:00 UTC:
 - `/api/cron/monthly-snapshot` — Automatic monthly portfolio snapshots
 - `/api/cron/daily-dividend-processing` — Dividend data processing
 
-> For detailed deployment instructions, see [VERCEL_SETUP.md](VERCEL_SETUP.md).
+> For detailed instructions, see [VERCEL_SETUP.md](VERCEL_SETUP.md).
+
+### Docker (self-hosted)
+
+Run the app on any VPS or server with Docker. Firebase still handles authentication and the database.
+
+```bash
+cp .env.local.example .env.local  # fill in your Firebase credentials
+docker compose up -d --build
+```
+
+> For the full guide including cron job setup and nginx/HTTPS configuration, see [DOCKER.md](DOCKER.md).
 
 ## Project Structure
 
