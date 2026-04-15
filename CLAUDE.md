@@ -5,8 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-14, session cost-centers): **Centri di Costo** feature. New optional 6th tab in Cashflow (gated by `costCentersEnabled` toggle in Settings → Preferenze). Collection `costCenters/{id}` stores name/description/color. `Expense` has new optional fields `costCenterId`/`costCenterName` (denormalized, same pattern as `categoryName`). Cost center selector in `ExpenseDialog` (visible only when feature enabled + centers exist). Detail view: KPI cards, monthly BarChart, linked transaction table. Delete cascades via `writeBatch` to clear `costCenterId`/`costCenterName` from all linked expenses. Rename similarly bulk-updates `costCenterName`. Key files: `types/costCenters.ts`, `lib/services/costCenterService.ts`, `components/cashflow/CostCentersTab.tsx`, `components/cashflow/CostCenterDialog.tsx`, `components/cashflow/CostCenterDetail.tsx`.
-- Previous implementation (2026-04-13, session performance-firebase-reads): **Rendimenti Firestore cache**. `performance-cache/{userId}` stores pre-computed `PerformanceData` so repeated page visits skip the expense collection read entirely. Cache key: `{snapshotCount}-{lastYear}-{lastMonth}-{Math.round(lastTotalNetWorth)}`. TTL: 6 hours. `forceRefresh=true` from the Aggiorna button bypasses and rewrites the cache. Key files: `lib/services/performanceService.ts`, `types/performance.ts`, `firestore.rules`, `app/dashboard/performance/page.tsx`.
+- Latest implementation (2026-04-14, session docker-support): **Docker self-hosting support**. `next.config.ts` now uses `output: "standalone"` for minimal image size. Multi-stage `Dockerfile` (deps → builder → runner on Alpine, non-root user). `docker-compose.yml` wires `NEXT_PUBLIC_*` as build-args from `.env.local`. Full deployment guide in `DOCKER.md` (cron options, nginx+HTTPS, troubleshooting). Key gotcha: Docker Compose reads `.env` not `.env.local` — always use `docker compose --env-file .env.local up -d --build`.
+- Previous implementation (2026-04-14, session cost-centers): **Centri di Costo** feature. New optional 6th tab in Cashflow (gated by `costCentersEnabled` toggle in Settings → Preferenze). Collection `costCenters/{id}` stores name/description/color. `Expense` has new optional fields `costCenterId`/`costCenterName` (denormalized, same pattern as `categoryName`). Cost center selector in `ExpenseDialog` (visible only when feature enabled + centers exist). Detail view: KPI cards, monthly BarChart, linked transaction table. Delete cascades via `writeBatch` to clear `costCenterId`/`costCenterName` from all linked expenses. Rename similarly bulk-updates `costCenterName`. Key files: `types/costCenters.ts`, `lib/services/costCenterService.ts`, `components/cashflow/CostCentersTab.tsx`, `components/cashflow/CostCenterDialog.tsx`, `components/cashflow/CostCenterDetail.tsx`.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -85,7 +85,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-14 (session cost-centers — Centri di Costo feature)
+**Last updated**: 2026-04-14 (session docker-support — Docker self-hosting)
 
 ## Design Context
 

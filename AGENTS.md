@@ -490,6 +490,11 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - Fix: use `boolean | null` as the initial state (`null` = not yet loaded). While `null`, render an `animate-pulse` placeholder div with the same height as the TabsList (`h-10`). Mount the real TabsList only after the settings are known, so the correct column count is set in one paint.
 - Pattern: `const [featureEnabled, setFeatureEnabled] = useState<boolean | null>(null)` → `{featureEnabled === null ? <div className="hidden desktop:block h-10 animate-pulse rounded-md bg-muted" /> : <TabsList ...>}`
 
+### Docker — NEXT_PUBLIC_* Must Be Build Args
+- `NEXT_PUBLIC_*` variables are inlined into the JS bundle by Next.js at compile time. In Docker, they must be passed as `--build-arg` to `docker build` (declared as `ARG`/`ENV` in the builder stage) — setting them only as runtime `-e` or `env_file` values has no effect; the client bundle already has empty strings baked in.
+- Docker Compose reads `.env` by default for variable substitution in the YAML (`${VAR}`). It does NOT read `.env.local`. Always run with `--env-file .env.local`: `docker compose --env-file .env.local up -d --build`.
+- Firebase Authorized Domains must include any custom self-hosted domain. `*.vercel.app` is pre-authorized by Firebase; all other domains (including Docker/VPS deployments) must be added manually in Firebase Console → Authentication → Settings → Authorized domains.
+
 ### Nested Component Remount Trap
 - Symptom: clicking a row or toggling local state causes an entire dense table below to flash or look recreated, even in production
 - Cause: a large subtree renderer is defined inside the parent component and used as JSX (`<InnerComponent />`), so every parent re-render gives React a new component identity and remounts the subtree

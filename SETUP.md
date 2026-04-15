@@ -539,20 +539,15 @@ While this guide focuses on Firebase + Vercel, the application architecture is f
 
 #### 3. **Self-Hosted (Docker + VPS)**
 - **Pricing**: VPS cost (e.g., DigitalOcean from $5/month)
-- **Cron Jobs**: Standard Linux cron
-- **Migration effort**: Medium
+- **Cron Jobs**: External scheduler (cron-job.org) or Linux crontab
+- **Migration effort**: Low — the repo already ships a production-ready `Dockerfile` and `docker-compose.yml`
 
-**Requirements**:
-- Create Dockerfile for Next.js app
-- Set up reverse proxy (nginx)
-- Configure systemd or docker-compose for auto-restart
-- Set up cron jobs in Linux crontab
+```bash
+cp .env.local.example .env.local  # fill in your Firebase credentials
+docker compose up -d --build
+```
 
-**Changes required**:
-- Create production `Dockerfile`
-- Configure PM2 or similar process manager
-- Set up SSL certificates (Let's Encrypt)
-- Manual deployment process
+> See [DOCKER.md](DOCKER.md) for the full guide: environment variable setup, cron job options, nginx + Let's Encrypt configuration, and troubleshooting.
 
 ### Recommendation
 
