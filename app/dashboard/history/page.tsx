@@ -1006,7 +1006,7 @@ export default function HistoryPage() {
                 animate="visible"
                 exit="hidden"
               >
-            <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-asset-class-evolution">
+            <ResponsiveContainer key={isLandscape ? 'landscape' : 'portrait'} width="100%" height={getChartHeight()} id="chart-asset-class-evolution">
               {/*
                 CHART MODE SWITCHING: Percentage vs Absolute Values
 
@@ -1281,7 +1281,7 @@ export default function HistoryPage() {
                 animate="visible"
                 exit="hidden"
               >
-            <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-liquidity">
+            <ResponsiveContainer key={isLandscape ? 'landscape' : 'portrait'} width="100%" height={getChartHeight()} id="chart-liquidity">
               {showLiquidityPercentage ? (
                 // Percentage mode: Use LineChart with separate lines
                 <LineChart data={liquidityHistory} margin={getChartMargins()}>
