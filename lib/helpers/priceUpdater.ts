@@ -5,6 +5,7 @@ import {
   shouldUpdatePrice,
 } from '@/lib/services/yahooFinanceService';
 import { getBondPriceByIsin } from '@/lib/services/borsaItalianaBondScraperService';
+import { convertToEur } from '@/lib/services/currencyConversionService';
 
 export interface PriceUpdateResult {
   updated: number;
@@ -160,11 +161,38 @@ export async function updateUserAssetPrices(
       if (quote && quote.price !== null && quote.price > 0) {
         try {
           const assetRef = adminDb.collection('assets').doc((asset as any).id);
-          await assetRef.update({
-            currentPrice: quote.price,
+
+          // Build the update payload. Always write price and currency from Yahoo.
+          // For non-EUR assets, also convert to EUR so that calculateAssetValue()
+          // can return a correct EUR total without async FX calls at read time.
+
+          // Yahoo Finance returns LSE prices in GBp (pence), not GBP (pounds).
+          // Normalize to GBP by dividing by 100 so the FX conversion and stored
+          // price are in the correct unit (e.g. SWDA.L: 4874 GBp → 48.74 GBP).
+          const isGBp = quote.currency === 'GBp';
+          const normalizedPrice = isGBp ? quote.price / 100 : quote.price;
+          const normalizedCurrency = isGBp ? 'GBP' : quote.currency;
+
+          const updatePayload: Record<string, unknown> = {
+            currentPrice: normalizedPrice,
+            currency: normalizedCurrency,
             lastPriceUpdate: new Date(),
             updatedAt: new Date(),
-          });
+          };
+
+          if (normalizedCurrency && normalizedCurrency.toUpperCase() !== 'EUR') {
+            try {
+              updatePayload.currentPriceEur = await convertToEur(normalizedPrice, normalizedCurrency);
+            } catch (fxError) {
+              // FX conversion failure must not abort the price update.
+              // The stale or missing currentPriceEur means the portfolio total
+              // will fall back to the native price, which is wrong but recoverable
+              // on the next successful price update.
+              console.warn(`[Price Update] FX conversion failed for ${(asset as any).ticker} (${normalizedCurrency}→EUR):`, fxError);
+            }
+          }
+
+          await assetRef.update(updatePayload);
           updated.push((asset as any).ticker);
         } catch (error) {
           console.error(`Failed to update ${(asset as any).ticker}:`, error);

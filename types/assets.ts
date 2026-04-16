@@ -71,6 +71,7 @@ export interface Asset {
   stampDutyExempt?: boolean; // If true, asset is excluded from stamp duty (imposta di bollo) calculation (e.g. pension funds, real estate)
   includeInHistoryTables?: boolean; // If true, asset appears in Anno Corrente and Storico price/value tables regardless of cost basis tracking
   currentPrice: number;
+  currentPriceEur?: number; // currentPrice converted to EUR via Frankfurter FX; populated during price updates for non-EUR assets
   isLiquid?: boolean; // Default: true - indicates whether the asset is liquid or illiquid
   autoUpdatePrice?: boolean; // Default: true - indicates whether price should be automatically updated via Yahoo Finance
   composition?: AssetComposition[]; // For composite assets (e.g., pension funds with mixed allocation: 60% equity, 40% bonds)
@@ -97,6 +98,7 @@ export interface AssetFormData {
   stampDutyExempt?: boolean; // If true, asset is excluded from stamp duty (imposta di bollo) calculation
   includeInHistoryTables?: boolean; // If true, asset appears in Anno Corrente and Storico price/value tables regardless of cost basis tracking
   currentPrice: number;
+  currentPriceEur?: number; // currentPrice converted to EUR via FX; set at creation for non-EUR assets
   isLiquid?: boolean;
   autoUpdatePrice?: boolean;
   composition?: AssetComposition[];

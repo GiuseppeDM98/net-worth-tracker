@@ -557,6 +557,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
 
       // Step 1: Determine current price using resolution strategy
       let currentPrice = 1; // Default for cash and fixed-price assets
+      let fetchedCurrentPriceEur: number | undefined; // EUR-converted price for non-EUR assets
 
       // Determine bond type once — used in both Path 1 (manual) and Path 2 (auto-fetch)
       // to apply the % of par → EUR conversion consistently.
@@ -610,6 +611,16 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
             if (isBondWithIsin && data.bondNominalValue && !isNaN(data.bondNominalValue) && data.bondNominalValue > 1) {
               currentPrice = currentPrice * (data.bondNominalValue / 100);
             }
+
+            // The /api/prices/quote route already normalizes GBp → GBP and provides
+            // currentPriceEur via server-side Frankfurter conversion. Use both directly.
+            if (quote.currency && quote.currency.trim() !== '') {
+              data.currency = quote.currency;
+            }
+            if (quote.currentPriceEur && quote.currentPriceEur > 0) {
+              fetchedCurrentPriceEur = quote.currentPriceEur;
+            }
+
             toast.success(
               `Prezzo recuperato da ${source}: ${currentPrice.toFixed(2)} ${quote.currency}`
             );
@@ -682,6 +693,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         stampDutyExempt: data.stampDutyExempt || false,
         includeInHistoryTables: data.includeInHistoryTables || false,
         currentPrice,
+        currentPriceEur: fetchedCurrentPriceEur,
         isLiquid: data.isLiquid,
         autoUpdatePrice: data.autoUpdatePrice,
         composition: isComposite && composition.length > 0 ? composition : undefined,

@@ -197,6 +197,13 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Scheduled server-to-server flows are the exception: cron routes authenticate with `CRON_SECRET`, and `/api/portfolio/snapshot` must continue to accept `cronSecret` for internal cron orchestration
 - For user-owned conversational features (assistant threads, messages, memory), generate authoritative thread metadata server-side; do not let the client decide persisted titles or ownership-bound identifiers
 
+### FX Conversion for Non-EUR Assets
+- `Asset.currentPriceEur` stores the EUR-converted price, populated server-side during price updates (`priceUpdater.ts`) and at creation (`/api/prices/quote`). `calculateAssetValue()` uses it for non-EUR assets; falls back to `currentPrice` for EUR assets and pre-migration docs.
+- **GBp (pence) ≠ GBP**: Yahoo Finance returns LSE prices in pence (`quote.currency === 'GBp'`). Normalize with `price / 100` and treat currency as `'GBP'` before any FX call. Failing to do this inflates values 100×. Applied in both `priceUpdater.ts` and `/api/prices/quote/route.ts`.
+- **Never call Frankfurter from the browser**: client-side `fetch('https://api.frankfurter.app/...')` is silently blocked by Next.js security headers / network policy. All FX calls must be server-side. Pattern: extend the existing `/api/prices/quote` route to return `currentPriceEur` alongside `price` and `currency`; the client reads from the API response, never calls Frankfurter directly.
+- `priceUpdater.ts` always overwrites the asset's `currency` field from `quote.currency` (after GBp normalization) — this self-corrects assets created with the wrong currency in the form.
+- Cron (`monthly-snapshot` → `portfolio/snapshot` → `priceUpdater`) propagates the fix automatically to all users on each snapshot run.
+
 ### Asset and FIRE Rules
 - `quantity = 0` is valid and marks sold assets in history logic
 - Cash asset balance lives in `quantity`, not via price updates

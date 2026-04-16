@@ -356,9 +356,20 @@ export async function deleteAsset(assetId: string, userId: string): Promise<void
  * @returns Total asset value (quantity × price, minus outstanding debt for real estate)
  */
 export function calculateAssetValue(asset: Asset): number {
-  const baseValue = asset.quantity * asset.currentPrice;
+  // For non-EUR assets, prefer the pre-converted EUR price stored during price updates.
+  // This avoids async FX calls at read time while keeping portfolio totals in EUR.
+  // Falls back to currentPrice for EUR assets and pre-migration documents that
+  // were not yet updated after this change was deployed.
+  const priceInEur =
+    asset.currency &&
+    asset.currency.toUpperCase() !== 'EUR' &&
+    asset.currentPriceEur !== undefined
+      ? asset.currentPriceEur
+      : asset.currentPrice;
 
-  // For real estate with outstanding debt, subtract the debt to get net equity
+  const baseValue = asset.quantity * priceInEur;
+
+  // For real estate with outstanding debt, subtract the debt to get net equity.
   // Use Math.max(0, ...) to prevent negative values for underwater mortgages
   // (where debt > property value). Negative net worth is tracked at portfolio level.
   if (asset.assetClass === 'realestate' && asset.outstandingDebt) {

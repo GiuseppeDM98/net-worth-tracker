@@ -5,9 +5,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-15, session legend-landscape-fix): **History chart legend overlap fix on mobile landscape**. Charts "Patrimonio Netto per Asset Class" and "Evoluzione Liquidità vs Illiquidità" now correctly show legend below X-axis when rotating from portrait to landscape. Root cause: Recharts stale SVG measurement when legend visibility toggles with `isMobile`. Fix: `key={isLandscape ? 'landscape' : 'portrait'}` on both `ResponsiveContainer` components forces remount on orientation change. File: `app/dashboard/history/page.tsx`.
+- Latest implementation (2026-04-16, session fx-currency-conversion): **FX currency conversion for non-EUR assets**. Assets priced in USD, GBP, etc. by Yahoo Finance are now correctly converted to EUR for all portfolio calculations. `currentPriceEur` field added to `Asset`/`AssetFormData`; populated server-side during price updates (`priceUpdater.ts`) and at asset creation (`/api/prices/quote`). `calculateAssetValue()` uses `currentPriceEur` when available, falls back to `currentPrice` for EUR assets and pre-migration docs. GBp (pence) normalized to GBP by dividing by 100 — affects all LSE tickers (e.g. SWDA.L). `currency` field on asset is now always overwritten from Yahoo's response. G/P absolute in AssetCard shows native currency symbol. Key files: `types/assets.ts`, `lib/helpers/priceUpdater.ts`, `lib/services/assetService.ts`, `app/api/prices/quote/route.ts`, `components/assets/AssetCard.tsx`, `components/assets/AssetDialog.tsx`.
+- Previous implementation (2026-04-15, session legend-landscape-fix): **History chart legend overlap fix on mobile landscape**. Charts "Patrimonio Netto per Asset Class" and "Evoluzione Liquidità vs Illiquidità" now correctly show legend below X-axis when rotating from portrait to landscape. Root cause: Recharts stale SVG measurement when legend visibility toggles with `isMobile`. Fix: `key={isLandscape ? 'landscape' : 'portrait'}` on both `ResponsiveContainer` components forces remount on orientation change. File: `app/dashboard/history/page.tsx`.
 - Previous implementation (2026-04-14, session docker-support): **Docker self-hosting support**. `next.config.ts` now uses `output: "standalone"` for minimal image size. Multi-stage `Dockerfile` (deps → builder → runner on Alpine, non-root user). `docker-compose.yml` wires `NEXT_PUBLIC_*` as build-args from `.env.local`. Full deployment guide in `DOCKER.md` (cron options, nginx+HTTPS, troubleshooting). Key gotcha: Docker Compose reads `.env` not `.env.local` — always use `docker compose --env-file .env.local up -d --build`.
-- Previous implementation (2026-04-14, session cost-centers): **Centri di Costo** feature. New optional 6th tab in Cashflow (gated by `costCentersEnabled` toggle in Settings → Preferenze). Collection `costCenters/{id}` stores name/description/color. `Expense` has new optional fields `costCenterId`/`costCenterName` (denormalized, same pattern as `categoryName`). Cost center selector in `ExpenseDialog` (visible only when feature enabled + centers exist). Detail view: KPI cards, monthly BarChart, linked transaction table. Delete cascades via `writeBatch` to clear `costCenterId`/`costCenterName` from all linked expenses. Rename similarly bulk-updates `costCenterName`. Key files: `types/costCenters.ts`, `lib/services/costCenterService.ts`, `components/cashflow/CostCentersTab.tsx`, `components/cashflow/CostCenterDialog.tsx`, `components/cashflow/CostCenterDetail.tsx`.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -66,7 +66,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Anthropic for AI analysis
 
 ## Known Issues (Active)
-- FX conversion depends on Frankfurter API availability, with cache fallback
+- FX conversion depends on Frankfurter API availability; cache fallback (24h TTL) is used on failure — pre-migration assets without `currentPriceEur` will show native price until first price update
 
 ## Key Files
 - Overview data pipeline: `app/api/dashboard/overview/route.ts`, `lib/services/dashboardOverviewService.ts`, `lib/hooks/useDashboardOverview.ts`, `types/dashboardOverview.ts`
@@ -86,7 +86,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-15 (session legend-landscape-fix — History chart legend mobile landscape fix)
+**Last updated**: 2026-04-16 (session fx-currency-conversion — FX conversion for non-EUR assets)
 
 ## Design Context
 

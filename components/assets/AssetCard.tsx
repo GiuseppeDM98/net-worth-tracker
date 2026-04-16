@@ -179,7 +179,7 @@ export function AssetCard({
                 <div className={`font-semibold ${gainLossColor}`}>
                   <div className="text-base">
                     {isPositive ? '+' : ''}
-                    {formatCurrency(gainLoss)}
+                    {formatCurrency(gainLoss, asset.currency)}
                   </div>
                   <div className="text-xs">
                     {isPositive ? '+' : ''}
