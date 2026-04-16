@@ -33,6 +33,7 @@ import { getGreeting } from '@/lib/utils/getGreeting';
 import { OverviewAnimatedCurrency } from '@/components/dashboard/OverviewAnimatedCurrency';
 import { OverviewChartsSection } from '@/components/dashboard/OverviewChartsSection';
 import { useChartColors } from '@/lib/hooks/useChartColors';
+import { useDemoMode } from '@/lib/hooks/useDemoMode';
 
 const MotionButtonShell = motion.div;
 
@@ -49,6 +50,7 @@ const MotionButtonShell = motion.div;
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const isDemo = useDemoMode();
   const prefersReducedMotion = useReducedMotion();
 
   // Calculated once at mount — no need to re-evaluate on every render.
@@ -265,7 +267,8 @@ export default function DashboardPage() {
             <Button
               ref={snapshotButtonRef}
               onClick={handleCreateSnapshot}
-              disabled={creatingSnapshot || (overview?.flags.assetCount ?? 0) === 0}
+              disabled={isDemo || creatingSnapshot || (overview?.flags.assetCount ?? 0) === 0}
+              title={isDemo ? 'Non disponibile in modalità demo' : undefined}
               variant="default"
               className="w-full sm:w-auto"
             >

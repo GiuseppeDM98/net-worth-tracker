@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import {
   calculateCoastFIREProjection,
@@ -320,6 +321,7 @@ function buildTaxBracketSnapshotKey(brackets: CoastFireTaxBracket[]): string {
 
 export function CoastFireTab() {
   const { user } = useAuth();
+  const isDemo = useDemoMode();
   const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 767px)');
   const isTablet = useMediaQuery('(max-width: 1023px)');
@@ -1325,7 +1327,7 @@ export function CoastFireTab() {
             </div>
           </div>
 
-          <Button onClick={handleSave} disabled={saveMutation.isPending} className="mt-6 w-full desktop:w-auto">
+          <Button onClick={handleSave} disabled={isDemo || saveMutation.isPending} title={isDemo ? 'Non disponibile in modalità demo' : undefined} className="mt-6 w-full desktop:w-auto">
             <Save className="mr-2 h-4 w-4" />
             {saveMutation.isPending ? 'Salvataggio...' : 'Salva'}
           </Button>

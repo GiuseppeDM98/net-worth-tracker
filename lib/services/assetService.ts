@@ -360,12 +360,23 @@ export function calculateAssetValue(asset: Asset): number {
   // This avoids async FX calls at read time while keeping portfolio totals in EUR.
   // Falls back to currentPrice for EUR assets and pre-migration documents that
   // were not yet updated after this change was deployed.
+  //
+  // GBp safety guard: Yahoo Finance returns LSE prices in pence (GBp), not pounds.
+  // priceUpdater.ts normalises GBp→GBP (÷100) before writing to Firestore, but
+  // legacy assets or assets whose price was never refreshed may still carry the
+  // raw pence value with currency='GBp'. Dividing by 100 here keeps the fallback
+  // path safe even for those documents.
+  const isGBpFallback = asset.currency === 'GBp'; // lowercase 'p' = pence
+  const normalizedFallbackPrice = isGBpFallback
+    ? asset.currentPrice / 100
+    : asset.currentPrice;
+
   const priceInEur =
     asset.currency &&
     asset.currency.toUpperCase() !== 'EUR' &&
     asset.currentPriceEur !== undefined
       ? asset.currentPriceEur
-      : asset.currentPrice;
+      : normalizedFallbackPrice;
 
   const baseValue = asset.quantity * priceInEur;
 
@@ -529,7 +540,12 @@ export function calculateUnrealizedGains(asset: Asset): number {
     return 0;
   }
 
-  const currentValue = asset.quantity * asset.currentPrice;
+  // Use calculateAssetValue() for the current side so the price is always
+  // EUR-normalised (via currentPriceEur when available, or the GBp-safe fallback).
+  // averageCost is stored in the asset's native currency as entered by the user,
+  // so gains for non-EUR assets are expressed in the native currency — a known
+  // display-only limitation that is acceptable and consistent with AssetCard.
+  const currentValue = calculateAssetValue(asset);
   const costBasis = asset.quantity * asset.averageCost;
   return currentValue - costBasis;
 }

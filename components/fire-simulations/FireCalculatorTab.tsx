@@ -52,6 +52,7 @@ import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { getAllAssets, calculateTotalValue, calculateFIRENetWorth, calculateLiquidFIRENetWorth, calculateIlliquidFIRENetWorth } from '@/lib/services/assetService';
 import { getItalyYear } from '@/lib/utils/dateHelpers';
 import { getSettings, setSettings, getDefaultTargets } from '@/lib/services/assetAllocationService';
@@ -147,6 +148,7 @@ function calculateDisplayedRunwayDelta(
 
 export function FireCalculatorTab() {
   const { user } = useAuth();
+  const isDemo = useDemoMode();
   const queryClient = useQueryClient();
   // Responsive chart sizing: reduce height and margins on mobile
   const isMobile = useMediaQuery('(max-width: 767px)');
@@ -412,7 +414,8 @@ export function FireCalculatorTab() {
 
           <Button
             onClick={handleSaveSettings}
-            disabled={mutation.isPending}
+            disabled={isDemo || mutation.isPending}
+            title={isDemo ? 'Non disponibile in modalità demo' : undefined}
             className="w-full desktop:w-auto dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
           >
             {mutation.isPending ? 'Salvataggio...' : hasUnsavedChanges ? 'Salva Anteprima' : 'Salva Impostazioni'}

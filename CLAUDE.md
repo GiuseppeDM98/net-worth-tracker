@@ -5,9 +5,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-16, session fx-currency-conversion): **FX currency conversion for non-EUR assets**. Assets priced in USD, GBP, etc. by Yahoo Finance are now correctly converted to EUR for all portfolio calculations. `currentPriceEur` field added to `Asset`/`AssetFormData`; populated server-side during price updates (`priceUpdater.ts`) and at asset creation (`/api/prices/quote`). `calculateAssetValue()` uses `currentPriceEur` when available, falls back to `currentPrice` for EUR assets and pre-migration docs. GBp (pence) normalized to GBP by dividing by 100 — affects all LSE tickers (e.g. SWDA.L). `currency` field on asset is now always overwritten from Yahoo's response. G/P absolute in AssetCard shows native currency symbol. Key files: `types/assets.ts`, `lib/helpers/priceUpdater.ts`, `lib/services/assetService.ts`, `app/api/prices/quote/route.ts`, `components/assets/AssetCard.tsx`, `components/assets/AssetDialog.tsx`.
-- Previous implementation (2026-04-15, session legend-landscape-fix): **History chart legend overlap fix on mobile landscape**. Charts "Patrimonio Netto per Asset Class" and "Evoluzione Liquidità vs Illiquidità" now correctly show legend below X-axis when rotating from portrait to landscape. Root cause: Recharts stale SVG measurement when legend visibility toggles with `isMobile`. Fix: `key={isLandscape ? 'landscape' : 'portrait'}` on both `ResponsiveContainer` components forces remount on orientation change. File: `app/dashboard/history/page.tsx`.
-- Previous implementation (2026-04-14, session docker-support): **Docker self-hosting support**. `next.config.ts` now uses `output: "standalone"` for minimal image size. Multi-stage `Dockerfile` (deps → builder → runner on Alpine, non-root user). `docker-compose.yml` wires `NEXT_PUBLIC_*` as build-args from `.env.local`. Full deployment guide in `DOCKER.md` (cron options, nginx+HTTPS, troubleshooting). Key gotcha: Docker Compose reads `.env` not `.env.local` — always use `docker compose --env-file .env.local up -d --build`.
+- Latest implementation (2026-04-16, session demo-account-landing-page): **Public demo account + landing page**. `app/page.tsx` rewritten as a landing page (hero, 6 feature cards, footer) with "Prova la Demo" auto-login CTA that signs in to a shared read-only Firebase account via `NEXT_PUBLIC_DEMO_EMAIL` / `NEXT_PUBLIC_DEMO_PASSWORD`. Same button added to `/login`. `useDemoMode()` hook (`lib/hooks/useDemoMode.ts`) gates all mutation buttons across every page/component. Demo banner in `app/dashboard/layout.tsx`. Also fixed GBp (pence) 100× value inflation in `calculateAssetValue()` fallback path when `currentPriceEur` is absent; `calculateUnrealizedGains()` now delegates to `calculateAssetValue()` for consistency. New env vars: `NEXT_PUBLIC_DEMO_USER_ID`, `NEXT_PUBLIC_DEMO_EMAIL`, `NEXT_PUBLIC_DEMO_PASSWORD`.
+- Previous implementation (2026-04-16, session fx-currency-conversion): **FX currency conversion for non-EUR assets**. `currentPriceEur` field added to `Asset`/`AssetFormData`; populated server-side during price updates and at asset creation. `calculateAssetValue()` uses `currentPriceEur` when available, falls back to `currentPrice` for EUR assets and pre-migration docs. GBp (pence) normalized to GBP by dividing by 100. Key files: `types/assets.ts`, `lib/helpers/priceUpdater.ts`, `lib/services/assetService.ts`, `app/api/prices/quote/route.ts`.
+- Previous implementation (2026-04-14, session docker-support): **Docker self-hosting support**. `next.config.ts` now uses `output: "standalone"`. Multi-stage `Dockerfile` (deps → builder → runner on Alpine, non-root user). `docker-compose.yml` wires `NEXT_PUBLIC_*` as build-args. Full deployment guide in `DOCKER.md`. Key gotcha: Docker Compose reads `.env` not `.env.local` — always use `docker compose --env-file .env.local up -d --build`.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -17,6 +17,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Italy timezone helpers in `lib/utils/dateHelpers.ts`
 
 ## Key Features (Active)
+- **Demo mode (2026-04-16)**: `app/page.tsx` is now a landing page with "Prova la Demo" auto-login and feature overview. Same CTA on `/login`. `useDemoMode()` hook (`lib/hooks/useDemoMode.ts`) — compares `user.uid` against `NEXT_PUBLIC_DEMO_USER_ID`; returns `false` if either is absent. All mutation buttons across every page use `disabled={isDemo}` + `title` tooltip. Demo banner in dashboard layout (`FlaskConical` amber strip). `NEXT_PUBLIC_ASSISTANT_AI_ENABLED=false` should be set for the demo Firebase project. Credentials (`NEXT_PUBLIC_DEMO_EMAIL/PASSWORD`) are baked into the bundle — acceptable for a non-sensitive public demo; leave vars empty to hide the CTA on self-hosted deploys.
 - Portfolio tracking across equities, bonds, crypto, real estate, commodities, and cash
 - Automatic price updates via Yahoo Finance and Borsa Italiana bond support
 - **Multi-theme color system (2026-04-10)**: 6 selectable themes — `default`, `solar-dusk`, `elegant-luxury`, `midnight-bloom`, `cyberpunk`, `retro-arcade`. Persisted in Firestore `userPreferences/{userId}` + localStorage. `ColorThemeContext` manages `data-theme` on `<html>`, independent of next-themes dark/light. View Transition circle-reveal on dark/light toggle (CSS vars `--vt-cx/cy/r` + `document.startViewTransition`). Chart colors theme-aware via `useChartColors` (reads `--chart-1..5` after paint via `requestAnimationFrame`; oklch luminance filter: L>0.82 light fallback, L<0.30 dark fallback). Bottom navigation uses `--sidebar-*` CSS vars for theme sync. Theme selector in Settings → Aspetto (grid `grid-cols-2 sm:grid-cols-3 desktop:grid-cols-6`). Dark theme chroma must be ≥0.020 to be perceptible on dark backgrounds. Key files: `lib/services/userPreferencesService.ts`, `contexts/ColorThemeContext.tsx`, `lib/hooks/useChartColors.ts`, `app/globals.css` (theme blocks), `components/layout/BottomNavigation.tsx`.
@@ -66,7 +67,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Anthropic for AI analysis
 
 ## Known Issues (Active)
-- FX conversion depends on Frankfurter API availability; cache fallback (24h TTL) is used on failure — pre-migration assets without `currentPriceEur` will show native price until first price update
+- FX conversion depends on Frankfurter API availability; cache fallback (24h TTL) is used on failure — pre-migration non-EUR assets (USD, CHF, etc.) without `currentPriceEur` will show native price as EUR until first price update. GBp assets are safe: the pence→GBP fallback (`currentPrice / 100`) prevents the 100× inflation even without `currentPriceEur`.
+- Demo account requires manual Firebase setup (create user, populate Firestore with realistic fake data, set three env vars)
 
 ## Key Files
 - Overview data pipeline: `app/api/dashboard/overview/route.ts`, `lib/services/dashboardOverviewService.ts`, `lib/hooks/useDashboardOverview.ts`, `types/dashboardOverview.ts`
@@ -86,7 +88,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-16 (session fx-currency-conversion — FX conversion for non-EUR assets)
+**Last updated**: 2026-04-16 (session demo-account-landing-page — public demo mode + landing page + GBp fallback fix)
 
 ## Design Context
 

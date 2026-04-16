@@ -20,6 +20,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { Expense, ExpenseCategory, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import {
   calculateTotalIncome,
@@ -75,6 +76,7 @@ interface ExpenseTrackingTabProps {
  */
 export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh }: ExpenseTrackingTabProps) {
   const { user } = useAuth();
+  const isDemo = useDemoMode();
   const queryClient = useQueryClient();
   const currentYear = new Date().getFullYear();
   const currentMonth = String(new Date().getMonth() + 1); // 1-based month (1-12)
@@ -543,7 +545,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
             Gestisci le tue entrate e uscite
           </p>
         </div>
-        <Button onClick={handleAddExpense} className="hidden desktop:flex dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
+        <Button onClick={handleAddExpense} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined} className="hidden desktop:flex dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
           <Plus className="mr-2 h-4 w-4" />
           Nuova Spesa
         </Button>
@@ -552,6 +554,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
       {/* Mobile FAB - Fixed bottom-right */}
       <Button
         onClick={handleAddExpense}
+        disabled={isDemo}
         className="fixed bottom-24 right-4 z-40 h-14 w-14 rounded-full shadow-lg desktop:hidden"
         aria-label="Nuova Spesa"
       >
@@ -948,6 +951,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
               expenses={filteredExpenses}
               onEdit={handleEditExpense}
               onRefresh={onRefresh}
+              isDemo={isDemo}
             />
           </div>
 
@@ -968,6 +972,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                     expense={expense}
                     onEdit={handleEditExpense}
                     onDelete={handleDeleteExpense}
+                    isDemo={isDemo}
                   />
                 ))}
                 {filteredExpenses.length > 20 && (

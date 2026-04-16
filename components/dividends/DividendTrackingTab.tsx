@@ -16,6 +16,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { cardItem, pageVariants, tableShellSettle } from '@/lib/utils/motionVariants';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { Dividend, DividendType } from '@/types/dividend';
 import { Asset } from '@/types/assets';
@@ -60,6 +61,7 @@ interface DividendTrackingTabProps {
 
 export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: DividendTrackingTabProps) {
   const { user } = useAuth();
+  const isDemo = useDemoMode();
   const [scraping, setScraping] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedDividend, setSelectedDividend] = useState<Dividend | null>(null);
@@ -367,15 +369,15 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
       {/* Action Buttons Row */}
       <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0 }} className="space-y-2">
         <div className="flex flex-col desktop:flex-row desktop:flex-wrap desktop:items-center gap-2">
-          <Button onClick={handleCreate} className="dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
+          <Button onClick={handleCreate} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined} className="dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
             <Plus className="h-4 w-4 mr-2" />
             Aggiungi Dividendo
           </Button>
           <Button
             onClick={handleScrapeAll}
             variant="outline"
-            disabled={scraping}
-            title="Scarica manualmente tutti i dividendi storici per i tuoi asset con ISIN"
+            disabled={isDemo || scraping}
+            title={isDemo ? 'Non disponibile in modalità demo' : 'Scarica manualmente tutti i dividendi storici per i tuoi asset con ISIN'}
           >
             {scraping ? (
               <>
@@ -589,6 +591,7 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
             onRefresh={onRefresh}
             showTotals={hasActiveFilters}
             activeDividendId={detailDividend?.id ?? null}
+            isDemo={isDemo}
           />
         ) : (
           <DividendCalendar

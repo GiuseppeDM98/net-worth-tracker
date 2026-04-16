@@ -49,6 +49,7 @@ interface AssetCardProps {
   onDelete: (assetId: string) => void;
   onCalculateTaxes?: (asset: Asset) => void;
   isManualPrice: boolean;
+  isDemo?: boolean;
 }
 
 const formatAssetName = (name: string): string => {
@@ -70,6 +71,7 @@ export function AssetCard({
   onDelete,
   onCalculateTaxes,
   isManualPrice,
+  isDemo = false,
 }: AssetCardProps) {
   const [showDetails, setShowDetails] = useState(false);
 
@@ -293,6 +295,8 @@ export function AssetCard({
               variant="outline"
               size="default"
               onClick={() => onEdit(asset)}
+              disabled={isDemo}
+              title={isDemo ? 'Non disponibile in modalità demo' : undefined}
               className="w-full"
             >
               <Pencil className="h-4 w-4" />
@@ -306,6 +310,8 @@ export function AssetCard({
                   onDelete(asset.id);
                 }
               }}
+              disabled={isDemo}
+              title={isDemo ? 'Non disponibile in modalità demo' : undefined}
               className="w-full"
             >
               <Trash2 className="h-4 w-4 text-red-500" />

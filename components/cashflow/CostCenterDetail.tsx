@@ -48,6 +48,7 @@ interface CostCenterDetailProps {
   onBack: () => void;
   onEdit: (costCenter: CostCenter) => void;
   onDelete: (costCenter: CostCenter) => void;
+  isDemo?: boolean;
 }
 
 export function CostCenterDetail({
@@ -55,6 +56,7 @@ export function CostCenterDetail({
   onBack,
   onEdit,
   onDelete,
+  isDemo = false,
 }: CostCenterDetailProps) {
   const { user } = useAuth();
   const chartColors = useChartColors();
@@ -183,7 +185,7 @@ export function CostCenterDetail({
           )}
         </div>
         <div className="flex gap-2 sm:shrink-0">
-          <Button variant="outline" size="sm" className="flex-1 sm:flex-none" onClick={() => onEdit(costCenter)}>
+          <Button variant="outline" size="sm" className="flex-1 sm:flex-none" onClick={() => onEdit(costCenter)} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined}>
             <Pencil className="h-4 w-4 mr-1" />
             Modifica
           </Button>
@@ -191,6 +193,8 @@ export function CostCenterDetail({
             variant={deleteArmed ? 'destructive' : 'outline'}
             size="sm"
             className="flex-1 sm:flex-none"
+            disabled={isDemo}
+            title={isDemo ? 'Non disponibile in modalità demo' : undefined}
             onClick={() => {
               if (deleteArmed) {
                 onDelete(costCenter);

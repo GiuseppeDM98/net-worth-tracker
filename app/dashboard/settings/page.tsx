@@ -31,6 +31,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import {
   getSettings,
@@ -117,6 +118,7 @@ const roundToTwoDecimals = (value: number): number => {
 
 export default function SettingsPage() {
   const { user } = useAuth();
+  const isDemo = useDemoMode();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [userAge, setUserAge] = useState<number | undefined>(undefined);
@@ -1373,12 +1375,12 @@ export default function SettingsPage() {
           </div>
           {/* Reset is only meaningful for allocation targets */}
           {activeTab === 'allocazione' && (
-            <Button variant="outline" onClick={handleReset} className="w-full landscape:w-auto">
+            <Button variant="outline" onClick={handleReset} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined} className="w-full landscape:w-auto">
               <RotateCcw className="mr-2 h-4 w-4" />
               Ripristina Default
             </Button>
           )}
-          <Button onClick={handleSave} disabled={saving} className="w-full landscape:w-auto">
+          <Button onClick={handleSave} disabled={isDemo || saving} title={isDemo ? 'Non disponibile in modalità demo' : undefined} className="w-full landscape:w-auto">
             <Save className="mr-2 h-4 w-4" />
             {saving ? 'Salvataggio...' : 'Salva'}
           </Button>
@@ -2501,7 +2503,8 @@ export default function SettingsPage() {
           <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
             <Button
               onClick={handleSaveDividendSettings}
-              disabled={saving}
+              disabled={isDemo || saving}
+              title={isDemo ? 'Non disponibile in modalità demo' : undefined}
               className="flex items-center gap-2"
             >
               <Save className="h-4 w-4" />

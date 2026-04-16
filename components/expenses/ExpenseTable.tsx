@@ -60,9 +60,10 @@ interface ExpenseTableProps {
   expenses: Expense[];
   onEdit: (expense: Expense) => void;
   onRefresh: () => void;
+  isDemo?: boolean;
 }
 
-export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps) {
+export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false }: ExpenseTableProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -456,7 +457,8 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
                     onClick={() => onEdit(expense)}
                     // Why disable during deletion: Prevents concurrent edit/delete operations
                     // that could cause data inconsistency or race conditions
-                    disabled={deletingId === expense.id || deletingId === expense.recurringParentId || deletingId === expense.installmentParentId}
+                    disabled={isDemo || deletingId === expense.id || deletingId === expense.recurringParentId || deletingId === expense.installmentParentId}
+                    title={isDemo ? 'Non disponibile in modalità demo' : undefined}
                   >
                     <Edit className="h-4 w-4" />
                   </Button>
@@ -464,7 +466,8 @@ export function ExpenseTable({ expenses, onEdit, onRefresh }: ExpenseTableProps)
                     variant="ghost"
                     size="sm"
                     onClick={() => handleDelete(expense)}
-                    disabled={deletingId === expense.id || deletingId === expense.recurringParentId || deletingId === expense.installmentParentId}
+                    disabled={isDemo || deletingId === expense.id || deletingId === expense.recurringParentId || deletingId === expense.installmentParentId}
+                    title={isDemo ? 'Non disponibile in modalità demo' : undefined}
                   >
                     <Trash2 className="h-4 w-4 text-red-500" />
                   </Button>

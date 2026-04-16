@@ -23,8 +23,9 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, FlaskConical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useDemoMode } from '@/lib/hooks/useDemoMode';
 
 export default function DashboardLayout({
   children,
@@ -32,6 +33,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isDemo = useDemoMode();
 
   return (
     // MotionConfig propagates to the entire dashboard tree — all Framer Motion
@@ -65,6 +67,14 @@ export default function DashboardLayout({
             <h1 className="text-lg font-semibold">Portfolio Tracker</h1>
           </div>
 
+          {/* Demo banner — shown only for the shared demo account */}
+          {isDemo && (
+            <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800/60 px-4 py-2 text-xs text-amber-800 dark:text-amber-300">
+              <FlaskConical className="h-3.5 w-3.5 shrink-0" />
+              <span className="font-medium">Modalità Demo</span>
+              <span className="text-amber-700 dark:text-amber-400 hidden sm:inline">— sola lettura, i dati non possono essere modificati</span>
+            </div>
+          )}
           <Header />
           {/* Page transition is handled by template.tsx which re-mounts on every
               navigation — see app/dashboard/template.tsx for the rationale */}

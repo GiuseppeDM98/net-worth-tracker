@@ -26,6 +26,7 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { Asset } from '@/types/assets';
 import {
   calculateAssetValue,
@@ -85,6 +86,7 @@ interface AssetManagementTabProps {
 
 export function AssetManagementTab({ assets, loading, onRefresh }: AssetManagementTabProps) {
   const { user } = useAuth();
+  const isDemo = useDemoMode();
   const queryClient = useQueryClient();
 
   const deleteAssetMutation = useDeleteAsset(user?.uid || '');
@@ -253,13 +255,14 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
           <Button
             variant="outline"
             onClick={handleUpdatePrices}
-            disabled={updating || assets.length === 0}
+            disabled={isDemo || updating || assets.length === 0}
+            title={isDemo ? 'Non disponibile in modalità demo' : undefined}
             className="w-full landscape:w-auto dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${updating ? 'animate-spin' : ''}`} />
             Aggiorna Prezzi
           </Button>
-          <Button onClick={() => setDialogOpen(true)} className="w-full landscape:w-auto dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
+          <Button onClick={() => setDialogOpen(true)} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined} className="w-full landscape:w-auto dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
             <Plus className="mr-2 h-4 w-4" />
             Aggiungi Asset
           </Button>
@@ -335,6 +338,7 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
                     onDelete={handleDelete}
                     onCalculateTaxes={hasCostBasisTracking(asset) ? handleCalculateTaxes : undefined}
                     isManualPrice={requiresManualPricing(asset)}
+                    isDemo={isDemo}
                   />
                 ))}
               </div>
@@ -497,10 +501,10 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
                                   <Calculator className="h-4 w-4 text-blue-600" />
                                 </Button>
                               )}
-                              <Button variant="ghost" size="sm" onClick={() => handleEdit(asset)}>
+                              <Button variant="ghost" size="sm" onClick={() => handleEdit(asset)} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined}>
                                 <Pencil className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleDelete(asset.id)}>
+                              <Button variant="ghost" size="sm" onClick={() => handleDelete(asset.id)} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined}>
                                 <Trash2 className="h-4 w-4 text-red-500" />
                               </Button>
                             </div>

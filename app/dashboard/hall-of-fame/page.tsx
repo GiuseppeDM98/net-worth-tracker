@@ -19,6 +19,7 @@ import {
 } from '@/lib/utils/motionVariants';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { formatCurrency } from '@/lib/utils/formatters';
 import {
@@ -340,6 +341,7 @@ function buildYearlySpotlight(data: HallOfFameData | null): SpotlightSummary {
 
 export default function HallOfFamePage() {
   const { user } = useAuth();
+  const isDemo = useDemoMode();
   const [data, setData] = useState<HallOfFameData | null>(null);
   const [loading, setLoading] = useState(true);
   const [recalculating, setRecalculating] = useState(false);
@@ -545,7 +547,8 @@ export default function HallOfFamePage() {
         <div className="flex justify-end">
           <Button
             onClick={handleRecalculate}
-            disabled={recalculating}
+            disabled={isDemo || recalculating}
+            title={isDemo ? 'Non disponibile in modalità demo' : undefined}
             variant="outline"
             className="gap-2"
           >
@@ -598,13 +601,14 @@ export default function HallOfFamePage() {
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row desktop:shrink-0">
-            <Button ref={addNoteButtonRef} onClick={handleAddNoteClick} className="gap-2">
+            <Button ref={addNoteButtonRef} onClick={handleAddNoteClick} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined} className="gap-2">
               <Plus className="h-4 w-4" />
               Aggiungi Nota
             </Button>
             <Button
               onClick={handleRecalculate}
-              disabled={recalculating}
+              disabled={isDemo || recalculating}
+              title={isDemo ? 'Non disponibile in modalità demo' : undefined}
               variant="outline"
               className="gap-2"
             >

@@ -10,6 +10,7 @@ import {
   sectionRefreshPulse,
 } from '@/lib/utils/motionVariants';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { getAllPerformanceData, calculatePerformanceForPeriod, preparePerformanceChartData, getSnapshotsForPeriod, prepareMonthlyReturnsHeatmap, prepareUnderwaterDrawdownData } from '@/lib/services/performanceService';
 import { getUserSnapshots } from '@/lib/services/snapshotService';
@@ -87,6 +88,7 @@ import { authenticatedFetch } from '@/lib/utils/authFetch';
 
 export default function PerformancePage() {
   const { user } = useAuth();
+  const isDemo = useDemoMode();
   const [isPendingPeriodChange, startPeriodTransition] = useTransition();
   const [performanceData, setPerformanceData] = useState<PerformanceData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -624,7 +626,8 @@ export default function PerformancePage() {
                 setCustomDialogOrigin(calculateDialogOrigin(event.currentTarget));
                 setShowCustomDateDialog(true);
               }}
-              title="Periodo Personalizzato"
+              disabled={isDemo}
+              title={isDemo ? 'Non disponibile in modalità demo' : 'Periodo Personalizzato'}
             >
               {isMobile ? <CalendarDays className="h-4 w-4" /> : 'Periodo Personalizzato'}
             </Button>
@@ -635,7 +638,8 @@ export default function PerformancePage() {
                 setAiDialogOrigin(calculateDialogOrigin(event.currentTarget));
                 setShowAIAnalysisDialog(true);
               }}
-              disabled={!metrics || metrics.hasInsufficientData}
+              disabled={isDemo || !metrics || metrics.hasInsufficientData}
+              title={isDemo ? 'Non disponibile in modalità demo' : undefined}
               className="group gap-2 transition-[border-color,color,box-shadow] duration-200 hover:border-purple-400 hover:text-purple-600 hover:shadow-[0_0_14px_rgba(139,92,246,0.35)] dark:hover:text-purple-400 dark:hover:border-purple-500"
             >
               <Sparkles className="h-4 w-4 transition-transform duration-200 group-hover:rotate-12 group-hover:scale-110" />
@@ -645,7 +649,8 @@ export default function PerformancePage() {
               variant="ghost"
               size="sm"
               onClick={loadPerformanceData}
-              disabled={isRefreshing}
+              disabled={isDemo || isRefreshing}
+              title={isDemo ? 'Non disponibile in modalità demo' : undefined}
               className="text-muted-foreground hover:text-foreground"
             >
               <RefreshCw className={cn('mr-2 h-4 w-4', isRefreshing && 'animate-spin')} />

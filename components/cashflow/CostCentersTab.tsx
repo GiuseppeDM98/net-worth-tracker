@@ -21,6 +21,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { CostCenter } from '@/types/costCenters';
 import {
   getCostCenters,
@@ -46,6 +47,7 @@ interface CenterStats {
 
 export function CostCentersTab() {
   const { user } = useAuth();
+  const isDemo = useDemoMode();
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   const [centerStats, setCenterStats] = useState<Record<string, CenterStats>>({});
   const [loading, setLoading] = useState(true);
@@ -161,6 +163,7 @@ export function CostCentersTab() {
           onBack={() => setSelectedCenter(null)}
           onEdit={handleOpenEdit}
           onDelete={handleDelete}
+          isDemo={isDemo}
         />
         <CostCenterDialog
           open={dialogOpen}
@@ -183,7 +186,7 @@ export function CostCentersTab() {
             Raggruppa le spese per oggetto o progetto e monitora il costo totale nel tempo
           </p>
         </div>
-        <Button onClick={handleOpenCreate} className="w-full sm:w-auto sm:shrink-0" size="sm">
+        <Button onClick={handleOpenCreate} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined} className="w-full sm:w-auto sm:shrink-0" size="sm">
           <Plus className="h-4 w-4 mr-1" />
           Nuovo centro
         </Button>
@@ -212,7 +215,7 @@ export function CostCentersTab() {
               Crea il primo centro per raggruppare spese per oggetto o progetto (es. &quot;Automobile Dacia&quot;).
             </p>
           </div>
-          <Button onClick={handleOpenCreate} variant="outline" size="sm">
+          <Button onClick={handleOpenCreate} disabled={isDemo} variant="outline" size="sm">
             <Plus className="h-4 w-4 mr-1" />
             Crea il primo centro
           </Button>

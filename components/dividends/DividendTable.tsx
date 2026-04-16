@@ -52,6 +52,7 @@ interface DividendTableProps {
   onRefresh: () => void;
   showTotals?: boolean; // Show totals row at bottom when filtering
   activeDividendId?: string | null;
+  isDemo?: boolean;
 }
 
 // WARNING: If you add a DividendType, update both maps below.
@@ -81,6 +82,7 @@ export function DividendTable({
   onRefresh,
   showTotals = false,
   activeDividendId,
+  isDemo = false,
 }: DividendTableProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -321,13 +323,13 @@ export function DividendTable({
                 <Button variant="ghost" size="sm" onClick={(event) => {
                   event.stopPropagation();
                   onEdit(dividend);
-                }} disabled={deletingId === dividend.id} title="Modifica">
+                }} disabled={isDemo || deletingId === dividend.id} title={isDemo ? 'Non disponibile in modalità demo' : 'Modifica'}>
                   <Edit className="h-4 w-4" />
                 </Button>
                 <Button variant="ghost" size="sm" onClick={(event) => {
                   event.stopPropagation();
                   handleDelete(dividend);
-                }} disabled={deletingId === dividend.id} title="Elimina">
+                }} disabled={isDemo || deletingId === dividend.id} title={isDemo ? 'Non disponibile in modalità demo' : 'Elimina'}>
                   <Trash2 className="h-4 w-4 text-red-500" />
                 </Button>
               </div>
@@ -470,8 +472,8 @@ export function DividendTable({
                         event.stopPropagation();
                         onEdit(dividend);
                       }}
-                      disabled={deletingId === dividend.id}
-                      title="Modifica"
+                      disabled={isDemo || deletingId === dividend.id}
+                      title={isDemo ? 'Non disponibile in modalità demo' : 'Modifica'}
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -482,8 +484,8 @@ export function DividendTable({
                         event.stopPropagation();
                         handleDelete(dividend);
                       }}
-                      disabled={deletingId === dividend.id}
-                      title="Elimina"
+                      disabled={isDemo || deletingId === dividend.id}
+                      title={isDemo ? 'Non disponibile in modalità demo' : 'Elimina'}
                     >
                       <Trash2 className="h-4 w-4 text-red-500" />
                     </Button>

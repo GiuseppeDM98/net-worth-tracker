@@ -42,6 +42,7 @@ import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { useAssistantMemory, useUpdateAssistantMemory } from '@/lib/hooks/useAssistantMemory';
 import { useAssistantPeriodContext } from '@/lib/hooks/useAssistantMonthContext';
 import { useAssistantThread, useAssistantThreads, useDeleteAssistantThread } from '@/lib/hooks/useAssistantThreads';
@@ -347,6 +348,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const isDemo = useDemoMode();
   const prefersReducedMotion = useReducedMotion();
   const conversationEndRef = useRef<HTMLDivElement>(null);
   // Stores the last successfully submitted prompt so retry can re-send it
@@ -847,7 +849,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                 <div className="flex items-center gap-2">
                   <Sheet open={isThreadSheetOpen} onOpenChange={setIsThreadSheetOpen}>
                     <SheetTrigger asChild>
-                      <Button variant="outline" size="sm" className="flex-1 gap-2 desktop:flex-none">
+                      <Button variant="outline" size="sm" disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined} className="flex-1 gap-2 desktop:flex-none">
                         <MessagesSquare className="h-4 w-4" />
                         Conversazioni
                         {threads.length > 0 && (
@@ -916,7 +918,8 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                     variant="outline"
                     size="sm"
                     onClick={handleNewThread}
-                    disabled={isStreaming}
+                    disabled={isDemo || isStreaming}
+                    title={isDemo ? 'Non disponibile in modalità demo' : undefined}
                     className="flex-1 gap-2 desktop:flex-none"
                   >
                     <Plus className="h-4 w-4" />
@@ -926,7 +929,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                   {/* Preferences popover */}
                   <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Preferenze assistente">
+                    <Button variant="ghost" size="icon" disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined} className="h-8 w-8" aria-label="Preferenze assistente">
                       <Settings2 className="h-4 w-4 text-muted-foreground" />
                     </Button>
                   </PopoverTrigger>
@@ -1081,7 +1084,23 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
           </div>
         </header>
 
-        {!assistantConfigured ? (
+        {isDemo ? (
+          <Card>
+            <CardContent className="py-10">
+              <EmptyState
+                icon={<Lock className="h-10 w-10" />}
+                title="Non disponibile in modalità demo"
+                description="L'Assistente AI non è accessibile nell'account demo."
+                action={
+                  <Button variant="outline" onClick={() => router.back()}>
+                    Torna indietro
+                  </Button>
+                }
+                className="py-4"
+              />
+            </CardContent>
+          </Card>
+        ) : !assistantConfigured ? (
           <Card>
             <CardContent className="py-10">
               <EmptyState

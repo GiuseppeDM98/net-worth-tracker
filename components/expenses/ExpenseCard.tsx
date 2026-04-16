@@ -40,6 +40,7 @@ interface ExpenseCardProps {
   expense: Expense;
   onEdit: (expense: Expense) => void;
   onDelete: (expense: Expense) => void;
+  isDemo?: boolean;
 }
 
 const formatCurrency = (amount: number): string => {
@@ -86,7 +87,7 @@ const getTypeLabel = (type: ExpenseType): string => {
   return EXPENSE_TYPE_LABELS[type];
 };
 
-export function ExpenseCard({ expense, onEdit, onDelete }: ExpenseCardProps) {
+export function ExpenseCard({ expense, onEdit, onDelete, isDemo = false }: ExpenseCardProps) {
   const [showDetails, setShowDetails] = useState(false);
 
   return (
@@ -190,11 +191,11 @@ export function ExpenseCard({ expense, onEdit, onDelete }: ExpenseCardProps) {
 
         {/* Action buttons */}
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => onEdit(expense)} className="flex-1">
+          <Button variant="outline" size="sm" onClick={() => onEdit(expense)} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined} className="flex-1">
             <Pencil className="mr-2 h-4 w-4" />
             Modifica
           </Button>
-          <Button variant="outline" size="sm" onClick={() => onDelete(expense)} className="flex-1">
+          <Button variant="outline" size="sm" onClick={() => onDelete(expense)} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined} className="flex-1">
             <Trash2 className="mr-2 h-4 w-4 text-red-500" />
             Elimina
           </Button>

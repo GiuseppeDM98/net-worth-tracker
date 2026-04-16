@@ -19,6 +19,7 @@ import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { getSettings } from '@/lib/services/assetAllocationService';
 import { getAllAssets } from '@/lib/services/assetService';
 import {
@@ -44,6 +45,7 @@ import { goalLinkSettle } from '@/lib/utils/motionVariants';
 
 export function GoalBasedInvestingTab() {
   const { user } = useAuth();
+  const isDemo = useDemoMode();
   const queryClient = useQueryClient();
   const userId = user?.uid;
 
@@ -240,7 +242,7 @@ export function GoalBasedInvestingTab() {
             Alloca mentalmente il tuo portafoglio verso obiettivi finanziari
           </p>
         </div>
-        <Button onClick={handleCreateGoal} className="w-full sm:w-auto dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
+        <Button onClick={handleCreateGoal} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined} className="w-full sm:w-auto dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
           <Plus className="mr-2 h-4 w-4" />
           Nuovo Obiettivo
         </Button>
@@ -273,7 +275,7 @@ export function GoalBasedInvestingTab() {
             <p className="text-sm text-gray-500 mb-4">
               Nessun obiettivo creato. Inizia creando il tuo primo obiettivo di investimento.
             </p>
-            <Button variant="outline" onClick={handleCreateGoal}>
+            <Button variant="outline" onClick={handleCreateGoal} disabled={isDemo}>
               <Plus className="mr-2 h-4 w-4" />
               Crea Primo Obiettivo
             </Button>

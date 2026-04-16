@@ -197,6 +197,13 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Scheduled server-to-server flows are the exception: cron routes authenticate with `CRON_SECRET`, and `/api/portfolio/snapshot` must continue to accept `cronSecret` for internal cron orchestration
 - For user-owned conversational features (assistant threads, messages, memory), generate authoritative thread metadata server-side; do not let the client decide persisted titles or ownership-bound identifiers
 
+### Demo Mode
+- **`useDemoMode()` hook** (`lib/hooks/useDemoMode.ts`): compares `user.uid` against `NEXT_PUBLIC_DEMO_USER_ID`. Returns `false` if either is absent — safe on self-hosted deploys without a demo account.
+- **Button disable pattern**: `disabled={isDemo || <other conditions>}` + `title={isDemo ? 'Non disponibile in modalità demo' : <other title or undefined>}`. When a button already has a `title`, merge into a single ternary to avoid duplicate JSX attributes (`TS17001`).
+- **Header buttons outside conditional blocks**: if a page renders `{isDemo ? <LockScreen /> : <Content />}`, buttons in the `<header>` above that conditional are still rendered and must be disabled explicitly — they are NOT covered by the conditional.
+- **Credentials in bundle**: `NEXT_PUBLIC_DEMO_EMAIL` / `NEXT_PUBLIC_DEMO_PASSWORD` are baked into the JS bundle at build time. Acceptable for a non-sensitive public demo. Leave vars empty to hide the CTA automatically (`DEMO_ENABLED = Boolean(DEMO_EMAIL && DEMO_PASSWORD)`).
+- The demo user owns their own Firestore data — Firestore rules already protect other users. Client-side `disabled` is the only guard needed; no server-side role system is required.
+
 ### FX Conversion for Non-EUR Assets
 - `Asset.currentPriceEur` stores the EUR-converted price, populated server-side during price updates (`priceUpdater.ts`) and at creation (`/api/prices/quote`). `calculateAssetValue()` uses it for non-EUR assets; falls back to `currentPrice` for EUR assets and pre-migration docs.
 - **GBp (pence) ≠ GBP**: Yahoo Finance returns LSE prices in pence (`quote.currency === 'GBp'`). Normalize with `price / 100` and treat currency as `'GBP'` before any FX call. Failing to do this inflates values 100×. Applied in both `priceUpdater.ts` and `/api/prices/quote/route.ts`.
@@ -221,10 +228,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - **Coast FIRE state pensions**: pensions live only in the `Coast FIRE` tab, use `startDate` as the canonical retirement-start field, and keep `startAge` only as a legacy read fallback. Pension inputs are gross future nominal monthly amounts; the model annualizes them, deflates them to real terms, applies progressive IRPEF per pension, and reduces the portfolio need only from each pension's own start date onward.
 - **Coast FIRE persistence gotcha**: nested pension rows must be serialized without `undefined` fields before writing settings to Firestore. Leaving legacy keys like `startAge: undefined` inside `coastFirePensions[]` can break persistence silently on refresh.
 - **Coast FIRE outputs**: `Valore stimato a pensione` is only the future value of the current FIRE-eligible patrimonio without new contributions; `gap residuo` clamps at `0` once Coast FIRE is reached, while progress `%` may exceed `100`.
-- **Coast FIRE UX copy**: when pensions start after the target age or multiple pensions start at different dates, add contextual explanatory text in-page. Treat delayed pension starts as informational, not invalid — users need a dynamic explanation of bridge years, target-age coverage, and post-pension steady state.
-- **Coast FIRE pension hierarchy**: inside `Coast FIRE`, the `pensione statale` surface should be summary-first, not form-first. Keep a compact summary visible, place `Configurazione Coast FIRE` immediately after it, and make the editor collapsible with auto-open on empty / incomplete / unsaved states.
-- **Coast FIRE multi-pension density**: optimize the editor for 1-2 pensions; for 3+ pensions switch to a denser presentation and keep explanatory detail progressive instead of always expanded.
-- **Coast FIRE warning policy**: separate `avvisi informativi` (e.g. pensione dopo la target age, bridge years) from truly incomplete data (missing start date, zero amount, invalid mensilita). Hard-stop only on missing core prerequisites (`userAge`, target age, annual expenses, positive FIRE patrimonio).
+- **Coast FIRE pension UX**: summary-first layout; configuration collapsible (auto-open when empty/incomplete/unsaved); separate informational warnings (pension after target age, bridge years) from hard-stop errors (missing start date, zero amount). `buildPensionDraftIssues` is a pure function — pass `now: Date` explicitly.
 - **Annual-need wording**: when UI copy appends `l'anno` to a formatted amount, prefer a dedicated helper such as `formatCurrencyPerYear()` instead of manual JSX concatenation. This avoids regressions like `€l'anno`.
 
 ### Firestore Optional Field Deletion

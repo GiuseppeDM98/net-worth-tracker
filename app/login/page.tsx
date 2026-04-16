@@ -9,12 +9,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { Eye, EyeOff, Loader2, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, ArrowRight, CheckCircle2, FlaskConical } from 'lucide-react';
 import { cardItem, staggerContainer } from '@/lib/utils/motionVariants';
 import { cn } from '@/lib/utils';
 
 type LoginField = 'email' | 'password' | null;
 type SubmitState = 'idle' | 'submitting' | 'success' | 'error';
+
+const DEMO_EMAIL = process.env.NEXT_PUBLIC_DEMO_EMAIL ?? '';
+const DEMO_PASSWORD = process.env.NEXT_PUBLIC_DEMO_PASSWORD ?? '';
+const DEMO_ENABLED = Boolean(DEMO_EMAIL && DEMO_PASSWORD);
 
 // Login page component with email/password and Google OAuth authentication.
 // Redirects to /dashboard on successful login.
@@ -22,6 +26,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [activeField, setActiveField] = useState<LoginField>(null);
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
@@ -65,6 +70,17 @@ export default function LoginPage() {
       toast.error(error.message || 'Errore durante l\'accesso');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDemoLogin = async () => {
+    if (!DEMO_ENABLED) return;
+    setDemoLoading(true);
+    try {
+      await signIn(DEMO_EMAIL, DEMO_PASSWORD);
+    } catch {
+      toast.error('Impossibile accedere alla demo. Riprova più tardi.');
+      setDemoLoading(false);
     }
   };
 
@@ -300,6 +316,25 @@ export default function LoginPage() {
                 <span className="bg-card px-2 tracking-widest text-muted-foreground">Oppure</span>
               </div>
             </motion.div>
+
+            {DEMO_ENABLED && (
+              <motion.div variants={cardItem} transition={{ delay: 0.09 }}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full gap-2 motion-reduce:hover:translate-y-0 motion-reduce:active:translate-y-0 motion-reduce:active:scale-100"
+                  onClick={handleDemoLogin}
+                  disabled={loading || demoLoading}
+                >
+                  {demoLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <FlaskConical className="h-4 w-4" />
+                  )}
+                  Prova la Demo
+                </Button>
+              </motion.div>
+            )}
 
             <motion.div variants={cardItem} transition={{ delay: 0.1 }}>
               <Button
