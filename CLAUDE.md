@@ -5,9 +5,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-16, session demo-account-landing-page): **Public demo account + landing page**. `app/page.tsx` rewritten as a landing page (hero, 6 feature cards, footer) with "Prova la Demo" auto-login CTA that signs in to a shared read-only Firebase account via `NEXT_PUBLIC_DEMO_EMAIL` / `NEXT_PUBLIC_DEMO_PASSWORD`. Same button added to `/login`. `useDemoMode()` hook (`lib/hooks/useDemoMode.ts`) gates all mutation buttons across every page/component. Demo banner in `app/dashboard/layout.tsx`. Also fixed GBp (pence) 100× value inflation in `calculateAssetValue()` fallback path when `currentPriceEur` is absent; `calculateUnrealizedGains()` now delegates to `calculateAssetValue()` for consistency. New env vars: `NEXT_PUBLIC_DEMO_USER_ID`, `NEXT_PUBLIC_DEMO_EMAIL`, `NEXT_PUBLIC_DEMO_PASSWORD`.
+- Latest implementation (2026-04-17, session pie-chart-legend-cap): **Pie chart legend cap on mobile**. `components/ui/pie-chart.tsx` — added `MAX_MOBILE_LEGEND = 5`; on mobile, legend now filters `>= 7%` first, then `.slice(0, 5)`. Prevents the fixed-height `ResponsiveContainer` (350px) from being clipped when portfolios with many assets produce 7+ legend items. Desktop unaffected (vertical legend on right, no clipping risk). Synthetic "Altri" entries from `chartService` count against the cap normally.
+- Previous implementation (2026-04-16, session demo-account-landing-page): **Public demo account + landing page**. `app/page.tsx` rewritten as a landing page (hero, 6 feature cards, footer) with "Prova la Demo" auto-login CTA that signs in to a shared read-only Firebase account via `NEXT_PUBLIC_DEMO_EMAIL` / `NEXT_PUBLIC_DEMO_PASSWORD`. Same button added to `/login`. `useDemoMode()` hook (`lib/hooks/useDemoMode.ts`) gates all mutation buttons across every page/component. Demo banner in `app/dashboard/layout.tsx`. Also fixed GBp (pence) 100× value inflation in `calculateAssetValue()` fallback path when `currentPriceEur` is absent; `calculateUnrealizedGains()` now delegates to `calculateAssetValue()` for consistency. New env vars: `NEXT_PUBLIC_DEMO_USER_ID`, `NEXT_PUBLIC_DEMO_EMAIL`, `NEXT_PUBLIC_DEMO_PASSWORD`.
 - Previous implementation (2026-04-16, session fx-currency-conversion): **FX currency conversion for non-EUR assets**. `currentPriceEur` field added to `Asset`/`AssetFormData`; populated server-side during price updates and at asset creation. `calculateAssetValue()` uses `currentPriceEur` when available, falls back to `currentPrice` for EUR assets and pre-migration docs. GBp (pence) normalized to GBP by dividing by 100. Key files: `types/assets.ts`, `lib/helpers/priceUpdater.ts`, `lib/services/assetService.ts`, `app/api/prices/quote/route.ts`.
-- Previous implementation (2026-04-14, session docker-support): **Docker self-hosting support**. `next.config.ts` now uses `output: "standalone"`. Multi-stage `Dockerfile` (deps → builder → runner on Alpine, non-root user). `docker-compose.yml` wires `NEXT_PUBLIC_*` as build-args. Full deployment guide in `DOCKER.md`. Key gotcha: Docker Compose reads `.env` not `.env.local` — always use `docker compose --env-file .env.local up -d --build`.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -25,6 +25,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Login and Register now feel more native to the product, with calmer entry motion, cleaner field focus choreography, keyboard-reachable password toggles, and inline submit status feedback
 - Hall of Fame now reads as an editorial ranking surface with clearer monthly/yearly hierarchy, spotlight cards for the current month/year, and contextual note dialogs tied to the selected record
 - Cashflow "Entrate per categoria" pie chart on mobile now caps legend items at 3 (same as expense chart), preventing overflow when 4+ categories exceed the 5% threshold
+- Overview "Distribuzione per Asset" pie chart on mobile now caps legend items at 5 (`>= 7%` filter then `.slice(0, 5)`), preventing the fixed 350px container from clipping the pie when a portfolio has many assets
 - Cashflow now preserves context better across `Tracciamento`, `Dividendi & Cedole`, `Anno Corrente`, `Storico Totale`, and `Budget`, with calmer filter feedback and a steadier Budget deep-dive flow
 - Cashflow Sankey back-navigation now restores the immediate parent drill-down level first, so moving back from a subcategory returns to the category view before the full flow
 - Dividendi & Cedole now keeps calendar day focus, active date filtering, table/detail context, and summary cards more tightly in sync, with a read-only contextual detail step before edit mode
@@ -88,7 +89,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-16 (session demo-account-landing-page — public demo mode + landing page + GBp fallback fix)
+**Last updated**: 2026-04-17 (session pie-chart-legend-cap — pie chart mobile legend cap on Panoramica)
 
 ## Design Context
 

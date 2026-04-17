@@ -111,9 +111,11 @@ export function PieChart({
           align={chartConfig.legendAlign as any}
           verticalAlign={chartConfig.legendVerticalAlign as any}
           content={() => {
-            // On mobile, filter legend to show only items >= 7%
+            // On mobile, cap to the top 5 items (>= 7% first, then slice) to prevent
+            // the legend from overflowing the fixed-height container and clipping the pie.
+            const MAX_MOBILE_LEGEND = 5;
             const legendData = isMobile
-              ? sortedData.filter(entry => entry.percentage >= 7)
+              ? sortedData.filter(entry => entry.percentage >= 7).slice(0, MAX_MOBILE_LEGEND)
               : sortedData;
 
             return (
