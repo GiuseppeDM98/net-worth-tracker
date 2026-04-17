@@ -77,6 +77,10 @@ import { cn } from '@/lib/utils';
 
 // ==================== Constants ====================
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 const MONTH_LABELS = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
 const MONTH_LETTERS = ['G', 'F', 'M', 'A', 'M', 'G', 'L', 'A', 'S', 'O', 'N', 'D'];
 
@@ -249,7 +253,14 @@ export function BudgetTab({
     if (!userId) return;
     getBudgetConfig(userId)
       .then((cfg) => { if (cfg) setSavedItems(cfg.items); })
-      .catch(() => toast.error('Errore nel caricamento del budget'))
+      .catch((error) => {
+        console.error('Failed to load budget configuration', {
+          userId,
+          operation: 'getBudgetConfig',
+          error: getErrorMessage(error),
+        });
+        toast.error('Errore nel caricamento del budget');
+      })
       .finally(() => setBudgetLoading(false));
   }, [userId]);
 
@@ -491,7 +502,13 @@ export function BudgetTab({
       setDraftItems([]);
       setSubForm(null);
       toast.success('Budget salvato');
-    } catch {
+    } catch (error) {
+      console.error('Failed to save budget configuration', {
+        userId,
+        operation: 'saveBudgetConfig',
+        itemCount: draftItems.length,
+        error: getErrorMessage(error),
+      });
       toast.error('Errore nel salvataggio del budget');
     } finally {
       setSaving(false);

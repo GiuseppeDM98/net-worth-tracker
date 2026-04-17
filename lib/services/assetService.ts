@@ -21,6 +21,10 @@ import { Asset, AssetFormData } from '@/types/assets';
 
 const ASSETS_COLLECTION = 'assets';
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 /**
  * Define asset class ordering priority
  * Order: Azioni → Obbligazioni → Commodities → Real Estate → Cash → Crypto
@@ -84,8 +88,12 @@ export async function getAllAssets(userId: string): Promise<Asset[]> {
       return a.name.localeCompare(b.name);
     });
   } catch (error) {
-    console.error('Error getting assets:', error);
-    throw new Error('Failed to fetch assets');
+    console.error('Failed to fetch assets', {
+      userId,
+      operation: 'getAllAssets',
+      error: getErrorMessage(error),
+    });
+    throw new Error(`Failed to fetch assets for user ${userId}`, { cause: error });
   }
 }
 
@@ -121,8 +129,12 @@ export async function getAssetsWithIsin(userId: string): Promise<Asset[]> {
 
     return assets;
   } catch (error) {
-    console.error('Error getting assets with ISIN:', error);
-    throw new Error('Failed to fetch assets with ISIN');
+    console.error('Failed to fetch assets with ISIN', {
+      userId,
+      operation: 'getAssetsWithIsin',
+      error: getErrorMessage(error),
+    });
+    throw new Error(`Failed to fetch assets with ISIN for user ${userId}`, { cause: error });
   }
 }
 
@@ -146,8 +158,12 @@ export async function getAssetById(assetId: string): Promise<Asset | null> {
       updatedAt: assetDoc.data().updatedAt?.toDate() || new Date(),
     } as Asset;
   } catch (error) {
-    console.error('Error getting asset:', error);
-    throw new Error('Failed to fetch asset');
+    console.error('Failed to fetch asset', {
+      assetId,
+      operation: 'getAssetById',
+      error: getErrorMessage(error),
+    });
+    throw new Error(`Failed to fetch asset ${assetId}`, { cause: error });
   }
 }
 
@@ -184,7 +200,11 @@ export async function createAsset(
         const existingDividend = dividendsSnapshot.docs[0].data();
         assetId = existingDividend.assetId;
 
-        console.log(`Reusing existing assetId ${assetId} for ISIN ${assetData.isin}`);
+        console.log('Reusing existing asset ID for ISIN continuity', {
+          userId,
+          assetId,
+          isin: assetData.isin,
+        });
       }
     }
 
@@ -202,18 +222,30 @@ export async function createAsset(
       const assetRef = doc(db, ASSETS_COLLECTION, assetId);
       await setDoc(assetRef, cleanedData);
       await invalidateDashboardOverviewSummary(userId, 'asset_created');
-      console.log(`Asset created with existing ID: ${assetId}`);
+      console.log('Asset created with existing ID', {
+        userId,
+        assetId,
+      });
       return assetId;
     } else {
       // Generate new ID
       const docRef = await addDoc(assetsRef, cleanedData);
       await invalidateDashboardOverviewSummary(userId, 'asset_created');
-      console.log(`Asset created with new ID: ${docRef.id}`);
+      console.log('Asset created with new ID', {
+        userId,
+        assetId: docRef.id,
+      });
       return docRef.id;
     }
   } catch (error) {
-    console.error('Error creating asset:', error);
-    throw new Error('Failed to create asset');
+    console.error('Failed to create asset', {
+      userId,
+      operation: 'createAsset',
+      assetName: assetData.name,
+      assetClass: assetData.assetClass,
+      error: getErrorMessage(error),
+    });
+    throw new Error(`Failed to create asset for user ${userId}`, { cause: error });
   }
 }
 
@@ -250,8 +282,13 @@ export async function updateAsset(
       await invalidateDashboardOverviewSummary(userId, 'asset_updated');
     }
   } catch (error) {
-    console.error('Error updating asset:', error);
-    throw new Error('Failed to update asset');
+    console.error('Failed to update asset', {
+      assetId,
+      operation: 'updateAsset',
+      updateKeys: Object.keys(updates),
+      error: getErrorMessage(error),
+    });
+    throw new Error(`Failed to update asset ${assetId}`, { cause: error });
   }
 }
 
@@ -277,8 +314,13 @@ export async function updateAssetPrice(
       await invalidateDashboardOverviewSummary(userId, 'asset_price_updated');
     }
   } catch (error) {
-    console.error('Error updating asset price:', error);
-    throw new Error('Failed to update asset price');
+    console.error('Failed to update asset price', {
+      assetId,
+      operation: 'updateAssetPrice',
+      price,
+      error: getErrorMessage(error),
+    });
+    throw new Error(`Failed to update asset price for ${assetId}`, { cause: error });
   }
 }
 
@@ -299,8 +341,12 @@ export async function updateCashAssetBalance(assetId: string, signedDelta: numbe
   try {
     const asset = await getAssetById(assetId);
     if (!asset) {
-      // Asset may have been deleted — silently skip to avoid blocking the expense operation
-      console.warn(`updateCashAssetBalance: asset ${assetId} not found, skipping balance update`);
+      // Asset may have been deleted — keep the expense flow non-blocking but make the fallback explicit.
+      console.warn('Skipping cash asset balance update because linked asset was not found', {
+        assetId,
+        operation: 'updateCashAssetBalance',
+        signedDelta,
+      });
       return;
     }
 
@@ -313,8 +359,13 @@ export async function updateCashAssetBalance(assetId: string, signedDelta: numbe
     });
     await invalidateDashboardOverviewSummary(asset.userId, 'cash_asset_balance_updated');
   } catch (error) {
-    console.error('Error updating cash asset balance:', error);
-    throw new Error('Failed to update cash asset balance');
+    console.error('Failed to update cash asset balance', {
+      assetId,
+      operation: 'updateCashAssetBalance',
+      signedDelta,
+      error: getErrorMessage(error),
+    });
+    throw new Error(`Failed to update cash asset balance for ${assetId}`, { cause: error });
   }
 }
 
@@ -333,16 +384,53 @@ export async function deleteAsset(assetId: string, userId: string): Promise<void
       body: JSON.stringify({ userId }),
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to delete asset');
+    let responseBody: unknown = null;
+    try {
+      responseBody = await response.json();
+    } catch (error) {
+      console.error('Failed to parse delete asset response body', {
+        userId,
+        assetId,
+        operation: 'deleteAsset',
+        status: response.status,
+        error: getErrorMessage(error),
+      });
+      throw new Error(`Failed to parse delete asset response for ${assetId}`, { cause: error });
     }
 
-    const result = await response.json();
-    console.log(`Asset ${assetId} deleted with ${result.deletedFutureDividends} future dividends removed`);
+    if (!response.ok) {
+      const apiError =
+        typeof responseBody === 'object' &&
+        responseBody !== null &&
+        'error' in responseBody &&
+        typeof responseBody.error === 'string'
+          ? responseBody.error
+          : 'Failed to delete asset';
+
+      throw new Error(apiError);
+    }
+
+    const deletedFutureDividends =
+      typeof responseBody === 'object' &&
+      responseBody !== null &&
+      'deletedFutureDividends' in responseBody &&
+      typeof responseBody.deletedFutureDividends === 'number'
+        ? responseBody.deletedFutureDividends
+        : null;
+
+    console.log('Asset deleted successfully', {
+      userId,
+      assetId,
+      deletedFutureDividends,
+    });
   } catch (error) {
-    console.error('Error deleting asset:', error);
-    throw new Error('Failed to delete asset');
+    console.error('Failed to delete asset', {
+      userId,
+      assetId,
+      operation: 'deleteAsset',
+      error: getErrorMessage(error),
+    });
+    throw new Error(`Failed to delete asset ${assetId}`, { cause: error });
   }
 }
 

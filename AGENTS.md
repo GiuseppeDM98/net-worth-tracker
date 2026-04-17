@@ -89,6 +89,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - `setSettings()` has two write branches; update both
 - Assistant preference fields mirrored into settings must stay aligned with the assistant memory document and `AssetAllocationSettings`
 - **Feature toggle placement**: all feature toggles (`costCentersEnabled`, `goalBasedInvestingEnabled`, `stampDutyEnabled`, etc.) live in `AssetAllocationSettings` (`types/assets.ts` + `assetAllocationService.ts`). Do NOT add them to `UserPreferences` / `userPreferencesService.ts`. The 3-place rule applies here too.
+- **Cashflow settings fallback semantics**: `cashflowHistoryStartYear` may bootstrap from a hardcoded default, but that value is only a non-fatal fallback; preserve the saved settings value whenever `getSettings()` succeeds and log fallback activation explicitly.
 
 ### Settings UX Layer (Overdrive)
 - Unsaved preview in Settings is local-only: use a baseline snapshot key captured on load/save and compare against current state (`hasUnsaved*`) without introducing autosave behavior
@@ -354,7 +355,6 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 ---
 
 ## Testing and Workflow
-
 ### Commands
 - `npm test -- <file>` or `npx vitest run <file>` for targeted tests
 - `npx tsc --noEmit` for repo-wide TypeScript checking without generating build output
@@ -368,9 +368,7 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - For Dividendi & Cedole UX/motion changes, run `npx tsc --noEmit` and then manually validate calendar focus, table/detail continuity, and tooltip anchoring in the cashflow dividends tab
 - For Performance page UX/motion changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/performanceService.test.ts` before manual validation
 - For History page UX/motion changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/chartService.test.ts` before manual validation
-- For private API auth regressions, run `npx vitest run __tests__/apiAuthRoutes.test.ts`
 - For Assistant AI foundation changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/assistantRoutes.test.ts __tests__/assistantWebSearchPolicy.test.ts __tests__/assistantMonthContextService.test.ts` before manual validation
-- For Settings UX-only changes, run `npx tsc --noEmit` plus a targeted smoke/auth check (`npx vitest run __tests__/apiAuthRoutes.test.ts`) before manual UI validation
 
 ### Test Patterns
 - Use local `new Date(year, monthIndex, day)` in tests, not ISO strings
@@ -379,11 +377,10 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - Keep test fixtures aligned with current required types, especially `BudgetItem.order`
 - For private route auth tests, prefer route-handler unit tests with mocked `adminAuth.verifyIdToken` and Admin SDK service calls over heavier browser/E2E coverage
 - For Cashflow/Budget UX changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/budgetUtils.test.ts` before manual validation
-
+- If a test imports a service that transitively pulls in `lib/firebase/config.ts`, mock `@/lib/firebase/config` at the test boundary; otherwise Firebase client init runs during import and fails on missing/invalid test env vars.
+- Materialized-summary tests must keep `updatedAt`/`computedAt` inside the 5-minute TTL when the intent is to exercise the cached branch; older dates intentionally force live recompute and require fuller Admin SDK query mocks.
 ---
-
 ## Common Errors to Avoid
-
 ### Timezone Boundary Bugs
 - Symptom: entries appear in the wrong month near midnight
 - Fix: group with Italy timezone helpers, never native `Date.getMonth()`
@@ -462,6 +459,7 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - `NEXT_PUBLIC_*` variables are inlined into the JS bundle by Next.js at compile time. In Docker, they must be passed as `--build-arg` to `docker build` (declared as `ARG`/`ENV` in the builder stage) — setting them only as runtime `-e` or `env_file` values has no effect; the client bundle already has empty strings baked in.
 - Docker Compose reads `.env` by default for variable substitution in the YAML (`${VAR}`). It does NOT read `.env.local`. Always run with `--env-file .env.local`: `docker compose --env-file .env.local up -d --build`.
 - Firebase Authorized Domains must include any custom self-hosted domain. `*.vercel.app` is pre-authorized by Firebase; all other domains (including Docker/VPS deployments) must be added manually in Firebase Console → Authentication → Settings → Authorized domains.
+
 
 ### Nested Component Remount Trap
 - Symptom: clicking a row or toggling local state causes an entire dense table below to flash or look recreated, even in production

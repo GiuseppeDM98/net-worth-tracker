@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // Mock Firebase-dependent modules to prevent initialization errors in tests
+vi.mock('@/lib/firebase/config', () => ({
+  auth: {
+    currentUser: null,
+  },
+  db: {},
+}))
 vi.mock('@/lib/services/expenseService', () => ({}))
 vi.mock('@/lib/services/snapshotService', () => ({}))
 vi.mock('@/lib/services/assetAllocationService', () => ({}))

@@ -44,6 +44,10 @@ import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { tabPanelSwitch } from '@/lib/utils/motionVariants';
 import { toast } from 'sonner';
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export default function CashflowPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -87,7 +91,11 @@ export default function CashflowPage() {
       setAssets(assetsData.filter(a => a.assetClass === 'equity' || a.assetClass === 'bonds'));
       setOtherDataLoaded(true);
     } catch (error) {
-      console.error('Error loading dividend/asset data:', error);
+      console.error('Failed to load cashflow secondary data', {
+        userId: user.uid,
+        operation: 'loadOtherData',
+        error: getErrorMessage(error),
+      });
       toast.error('Errore nel caricamento dei dati');
     } finally {
       setOtherDataLoading(false);
@@ -104,14 +112,28 @@ export default function CashflowPage() {
   // Load cashflow history start year from user settings (one-time read per session)
   useEffect(() => {
     if (!user) return;
-    getSettings(user.uid)
-      .then(s => {
-        if (s?.cashflowHistoryStartYear !== undefined) {
-          setCashflowHistoryStartYear(s.cashflowHistoryStartYear);
+    const loadSettings = async () => {
+      try {
+        const settings = await getSettings(user.uid);
+
+        if (settings?.cashflowHistoryStartYear !== undefined) {
+          setCashflowHistoryStartYear(settings.cashflowHistoryStartYear);
         }
-        setCostCentersEnabled(s?.costCentersEnabled ?? false);
-      })
-      .catch(() => {});
+        setCostCentersEnabled(settings?.costCentersEnabled ?? false);
+      } catch (error) {
+        // Settings bootstrap is non-fatal for the page: keep safe defaults and log explicitly.
+        console.error('Failed to load cashflow settings, using fallback defaults', {
+          userId: user.uid,
+          operation: 'loadCashflowSettings',
+          fallbackHistoryStartYear: 2025,
+          fallbackCostCentersEnabled: false,
+          error: getErrorMessage(error),
+        });
+        setCostCentersEnabled(false);
+      }
+    };
+
+    void loadSettings();
   }, [user]);
 
   const handleRefresh = async () => {

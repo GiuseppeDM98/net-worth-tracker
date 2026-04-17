@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-17, session a-naming): **Naming alignment cleanup**. Local semantic renames in assistant hooks and snapshot/performance API routes made request/response contracts more explicit (`requestBody`, `errorResponse`, `performanceMetrics`, `anthropicStream`, `monthlySnapshotDocument`) without changing runtime behavior.
+- Latest implementation (2026-04-17, session b-error-handling): **Error-handling alignment for Cashflow, Budget, assets, performance cache, and overview invalidation**. Silent catches were removed in the touched files, non-fatal fallbacks are now explicit and logged, service-level rethrows carry more context, and the targeted verification set now passes (`tsc`, `performanceService`, `apiAuthRoutes`, `budgetUtils`).
 - Latest implementation (2026-04-17, session pie-chart-legend-cap): **Pie chart legend cap on mobile**. `components/ui/pie-chart.tsx` — added `MAX_MOBILE_LEGEND = 5`; on mobile, legend now filters `>= 7%` first, then `.slice(0, 5)`. Prevents the fixed-height `ResponsiveContainer` (350px) from being clipped when portfolios with many assets produce 7+ legend items. Desktop unaffected (vertical legend on right, no clipping risk). Synthetic "Altri" entries from `chartService` count against the cap normally.
 
 ## Architecture Snapshot
@@ -57,7 +57,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - `npm test -- <file>`
   - `npx vitest run <file>`
   - `npx tsc --noEmit`
-- Current repo includes targeted tests for pure utilities/services plus private API auth regression coverage in `__tests__/apiAuthRoutes.test.ts` and assistant auth / policy coverage in `__tests__/assistantRoutes.test.ts`, `__tests__/assistantWebSearchPolicy.test.ts`, `__tests__/assistantPromptRouting.test.ts`, month context bundle coverage in `__tests__/assistantMonthContextService.test.ts`, thread auth + DELETE coverage in `__tests__/assistantThreadRoutes.test.ts`, and memory extraction unit tests in `__tests__/assistantMemoryExtraction.test.ts`
+- Current repo includes targeted tests for pure utilities/services plus private API auth regression coverage in `__tests__/apiAuthRoutes.test.ts`, overview/materialized-summary coverage in `__tests__/dashboardOverviewService.test.ts`, performance utilities in `__tests__/performanceService.test.ts`, and assistant auth / policy coverage in `__tests__/assistantRoutes.test.ts`, `__tests__/assistantWebSearchPolicy.test.ts`, `__tests__/assistantPromptRouting.test.ts`, `__tests__/assistantMonthContextService.test.ts`, `__tests__/assistantThreadRoutes.test.ts`, and `__tests__/assistantMemoryExtraction.test.ts`
 
 ## Data & Integrations
 - Firestore client + admin
