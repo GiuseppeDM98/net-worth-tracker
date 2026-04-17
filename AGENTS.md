@@ -232,6 +232,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - **Coast FIRE outputs**: `Valore stimato a pensione` is only the future value of the current FIRE-eligible patrimonio without new contributions; `gap residuo` clamps at `0` once Coast FIRE is reached, while progress `%` may exceed `100`.
 - **Coast FIRE pension UX**: summary-first layout; configuration collapsible (auto-open when empty/incomplete/unsaved); separate informational warnings (pension after target age, bridge years) from hard-stop errors (missing start date, zero amount). `buildPensionDraftIssues` is a pure function — pass `now: Date` explicitly.
 - **Annual-need wording**: when UI copy appends `l'anno` to a formatted amount, prefer a dedicated helper such as `formatCurrencyPerYear()` instead of manual JSX concatenation. This avoids regressions like `€l'anno`.
+- **`resolveBondPrice` centralizes % of par conversion**: `rawPrice * (nominalValue / 100)`, file-scope in `AssetDialog.tsx`. The `nominalValue <= 1` check is intentional — retail bonds with par=1 don't use the Borsa Italiana convention and passthrough unchanged. Both manual entry (Path 1) and auto-fetch (Path 2) call the same helper so the conversion can never diverge.
 
 ### Firestore Optional Field Deletion
 - `updateDoc` only touches fields present in the update object — omitting a field leaves the old value intact in Firestore
@@ -377,6 +378,8 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - Keep test fixtures aligned with current required types, especially `BudgetItem.order`
 - For private route auth tests, prefer route-handler unit tests with mocked `adminAuth.verifyIdToken` and Admin SDK service calls over heavier browser/E2E coverage
 - For Cashflow/Budget UX changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/budgetUtils.test.ts` before manual validation
+- For asset creation / bond dialog changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/assetDialogHelpers.test.ts __tests__/couponUtils.test.ts` before manual validation of the create-bond-with-ISIN flow
+- For snapshot route changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/snapshotHelpers.test.ts` before manual validation
 - If a test imports a service that transitively pulls in `lib/firebase/config.ts`, mock `@/lib/firebase/config` at the test boundary; otherwise Firebase client init runs during import and fails on missing/invalid test env vars.
 - Materialized-summary tests must keep `updatedAt`/`computedAt` inside the 5-minute TTL when the intent is to exercise the cached branch; older dates intentionally force live recompute and require fuller Admin SDK query mocks.
 ---
@@ -461,8 +464,4 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - Firebase Authorized Domains must include any custom self-hosted domain. `*.vercel.app` is pre-authorized by Firebase; all other domains (including Docker/VPS deployments) must be added manually in Firebase Console → Authentication → Settings → Authorized domains.
 
 
-### Nested Component Remount Trap
-- Symptom: clicking a row or toggling local state causes an entire dense table below to flash or look recreated, even in production
-- Cause: a large subtree renderer is defined inside the parent component and used as JSX (`<InnerComponent />`), so every parent re-render gives React a new component identity and remounts the subtree
-- Fix: move the subtree to a top-level component or invoke it as a pure render helper (`InnerComponent()`) when it intentionally closes over local state
 

@@ -5,8 +5,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-17, session b-error-handling): **Error-handling alignment for Cashflow, Budget, assets, performance cache, and overview invalidation**. Silent catches were removed in the touched files, non-fatal fallbacks are now explicit and logged, service-level rethrows carry more context, and the targeted verification set now passes (`tsc`, `performanceService`, `apiAuthRoutes`, `budgetUtils`).
-- Latest implementation (2026-04-17, session pie-chart-legend-cap): **Pie chart legend cap on mobile**. `components/ui/pie-chart.tsx` — added `MAX_MOBILE_LEGEND = 5`; on mobile, legend now filters `>= 7%` first, then `.slice(0, 5)`. Prevents the fixed-height `ResponsiveContainer` (350px) from being clipped when portfolios with many assets produce 7+ legend items. Desktop unaffected (vertical legend on right, no clipping risk). Synthetic "Altri" entries from `chartService` count against the cap normally.
+- Latest implementation (2026-04-17, session c-refactoring-funzioni): **SRP refactoring of large functions**. `AssetDialog.tsx` `onSubmit` (274 → 55 lines) split into 5 file-scope helpers: `resolveBondPrice`, `fetchMarketPrice`, `buildBondDetailsFromForm`, `buildAssetFormDataFromValues`, `scheduleCouponDividends`. `analyze-performance/route.ts` POST extracted into `callAnthropicForPerformanceAnalysis` + `buildPerformanceSseStream`. `snapshot/route.ts` inline transforms extracted into `buildAllocationPercentages` + `buildByAssetBreakdown`. Added `__tests__/assetDialogHelpers.test.ts` (18 tests) and `__tests__/snapshotHelpers.test.ts` (9 tests) as characterization anchors. `BudgetTab.tsx` nested components (AnnualTable, CategoryDeepDive, EditPanel, MobileAnnualView) deferred to Session D (require separate files + state redistribution).
+- Previous (2026-04-17, session b-error-handling): **Error-handling alignment for Cashflow, Budget, assets, performance cache, and overview invalidation**. Silent catches removed, non-fatal fallbacks explicit and logged, service-level rethrows carry more context.
+- Previous (2026-04-17, session pie-chart-legend-cap): **Pie chart legend cap on mobile**. `components/ui/pie-chart.tsx` — `MAX_MOBILE_LEGEND = 5`; filters `>= 7%` first, then `.slice(0, 5)`. Prevents 350px `ResponsiveContainer` from being clipped on multi-asset portfolios.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -57,7 +58,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - `npm test -- <file>`
   - `npx vitest run <file>`
   - `npx tsc --noEmit`
-- Current repo includes targeted tests for pure utilities/services plus private API auth regression coverage in `__tests__/apiAuthRoutes.test.ts`, overview/materialized-summary coverage in `__tests__/dashboardOverviewService.test.ts`, performance utilities in `__tests__/performanceService.test.ts`, and assistant auth / policy coverage in `__tests__/assistantRoutes.test.ts`, `__tests__/assistantWebSearchPolicy.test.ts`, `__tests__/assistantPromptRouting.test.ts`, `__tests__/assistantMonthContextService.test.ts`, `__tests__/assistantThreadRoutes.test.ts`, and `__tests__/assistantMemoryExtraction.test.ts`
+- Current repo includes targeted tests for pure utilities/services plus private API auth regression coverage in `__tests__/apiAuthRoutes.test.ts`, overview/materialized-summary coverage in `__tests__/dashboardOverviewService.test.ts`, performance utilities in `__tests__/performanceService.test.ts`, assistant auth / policy coverage in `__tests__/assistantRoutes.test.ts`, `__tests__/assistantWebSearchPolicy.test.ts`, `__tests__/assistantPromptRouting.test.ts`, `__tests__/assistantMonthContextService.test.ts`, `__tests__/assistantThreadRoutes.test.ts`, `__tests__/assistantMemoryExtraction.test.ts`, and SRP characterization tests in `__tests__/assetDialogHelpers.test.ts` and `__tests__/snapshotHelpers.test.ts`
 
 ## Data & Integrations
 - Firestore client + admin
@@ -88,7 +89,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 
-**Last updated**: 2026-04-17 (session pie-chart-legend-cap — pie chart mobile legend cap on Panoramica)
+**Last updated**: 2026-04-17 (session c-refactoring-funzioni — SRP function refactoring across AssetDialog, snapshot, and analyze-performance routes)
 
 ## Design Context
 

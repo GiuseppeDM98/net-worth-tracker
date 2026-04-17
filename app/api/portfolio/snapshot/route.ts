@@ -20,6 +20,28 @@ import { invalidateDashboardOverviewSummaryServer } from '@/lib/services/dashboa
 
 const SNAPSHOTS_COLLECTION = 'monthly-snapshots';
 
+function buildAllocationPercentages(
+  byAssetClass: Record<string, number>,
+  totalNetWorth: number
+): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const assetClass of Object.keys(byAssetClass)) {
+    result[assetClass] = totalNetWorth > 0 ? (byAssetClass[assetClass] / totalNetWorth) * 100 : 0;
+  }
+  return result;
+}
+
+function buildByAssetBreakdown(assets: Asset[]) {
+  return assets.map((asset) => ({
+    assetId: asset.id,
+    ticker: asset.ticker,
+    name: asset.name,
+    quantity: asset.quantity,
+    price: asset.currentPrice,
+    totalValue: calculateAssetValue(asset),
+  }));
+}
+
 /**
  * POST /api/portfolio/snapshot
  *
@@ -150,35 +172,13 @@ export async function POST(request: NextRequest) {
     const fireNetWorth = calculateFIRENetWorth(assets, false);
     const allocation = calculateCurrentAllocation(assets);
 
-    // Convert absolute allocation values to percentages for historical charts
-    //
-    // Data transformation:
-    //   Input:  allocation.byAssetClass = { equity: 50000, bonds: 30000, cash: 20000 }
-    //   Output: assetAllocation = { equity: 50, bonds: 30, cash: 20 }
-    //
-    // Why store both absolute and percentage?
-    //   - byAssetClass: Absolute values for net worth calculations
-    //   - assetAllocation: Percentages for allocation drift charts over time
-    //
-    // Historical context: Early versions only stored percentages
-    // Added absolute values in v2 to enable net worth trend charts
-    // Kept percentages for backward compatibility and chart simplicity
-    const assetAllocation: { [assetClass: string]: number } = {};
-    Object.keys(allocation.byAssetClass).forEach((assetClass) => {
-      assetAllocation[assetClass] =
-        totalNetWorth > 0
-          ? (allocation.byAssetClass[assetClass] / totalNetWorth) * 100
-          : 0;
-    });
-
-    const byAsset = assets.map((asset) => ({
-      assetId: asset.id,
-      ticker: asset.ticker,
-      name: asset.name,
-      quantity: asset.quantity,
-      price: asset.currentPrice,
-      totalValue: calculateAssetValue(asset),
-    }));
+    // Convert absolute allocation values to percentages for historical charts.
+    // Why store both absolute and percentage:
+    //   - byAssetClass: absolute values for net worth calculations
+    //   - assetAllocation: percentages for allocation drift charts over time
+    // Kept percentages for backward compatibility (early versions stored only percentages).
+    const assetAllocation = buildAllocationPercentages(allocation.byAssetClass, totalNetWorth);
+    const byAsset = buildByAssetBreakdown(assets);
 
     const snapshotId = `${userId}-${snapshotYear}-${snapshotMonth}`;
 

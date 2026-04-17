@@ -41,10 +41,75 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
 });
 
+/**
+ * Calls the Anthropic API with the performance analysis config.
+ * May throw — caller catches and maps the error to an HTTP response.
+ *
+ * MODEL CONFIG:
+ * - claude-sonnet-4-6 for optimal cost/quality balance
+ * - Extended Thinking (10k budget) for deeper financial reasoning
+ * - web_search_20250305: Claude autonomously searches for market events (max 3 uses)
+ */
+async function callAnthropicForPerformanceAnalysis(prompt: string) {
+  return anthropic.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 16000, // thinking 10k + output ~6k max
+    thinking: {
+      type: 'enabled',
+      budget_tokens: 10000,
+    },
+    tools: [
+      {
+        // Native web search — no external API key needed; billed at $10/1000 searches + token costs.
+        type: 'web_search_20250305',
+        name: 'web_search',
+        max_uses: 3, // limit to keep latency reasonable
+      } as any,
+    ],
+    messages: [{ role: 'user', content: prompt }],
+    stream: true,
+  });
+}
+
+/**
+ * Wraps an Anthropic stream in a ReadableStream formatted as Server-Sent Events.
+ *
+ * SSE FORMAT: `data: {JSON}\n\n` chunks, terminated by `data: [DONE]\n\n`.
+ * Tool use and thinking blocks are silently skipped — only text_delta chunks
+ * (Claude's written response) are forwarded to the client.
+ */
+function buildPerformanceSseStream(anthropicStream: AsyncIterable<any>): ReadableStream {
+  const encoder = new TextEncoder();
+  return new ReadableStream({
+    async start(controller) {
+      try {
+        for await (const chunk of anthropicStream) {
+          if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ text: chunk.delta.text })}\n\n`)
+            );
+          }
+        }
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+      } catch (streamError: any) {
+        console.error('[API /ai/analyze-performance] Stream error:', streamError);
+        const errorMsg =
+          streamError?.error?.type === 'overloaded_error'
+            ? 'I server AI sono temporaneamente sovraccarichi. Clicca "Rigenera" per riprovare.'
+            : (streamError?.error?.message || streamError.message || 'Errore durante la generazione');
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: errorMsg })}\n\n`));
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+      }
+    },
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const decodedToken = await requireFirebaseAuth(request);
-    // Verify API key is configured
+
     if (!process.env.ANTHROPIC_API_KEY) {
       console.error('[API /ai/analyze-performance] ANTHROPIC_API_KEY not configured');
       return NextResponse.json(
@@ -53,18 +118,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Parse request body
     const requestBody = await request.json();
     const { userId, metrics: performanceMetrics, timePeriod } = requestBody;
 
     assertSameUser(decodedToken, userId);
 
-    // Validate required parameters
     if (!userId || !performanceMetrics || !timePeriod) {
       console.error('[API /ai/analyze-performance] Missing parameters:', {
         userId: !!userId,
         metrics: !!performanceMetrics,
-        timePeriod: !!timePeriod
+        timePeriod: !!timePeriod,
       });
       return NextResponse.json(
         { error: 'Missing required parameters: userId, metrics, timePeriod' },
@@ -74,115 +137,26 @@ export async function POST(request: NextRequest) {
 
     console.log('[API /ai/analyze-performance] Request received for user:', userId, 'period:', timePeriod);
 
-    // Build Italian prompt with performance metrics
     const prompt = buildAnalysisPrompt(performanceMetrics, timePeriod);
 
-    // Call Anthropic API with streaming enabled
-    // Uses claude-sonnet-4-6 (latest Sonnet model with optimal cost/quality balance)
-    // Extended Thinking enabled for deeper analysis (10k token budget)
-    // web_search_20250305 tool: Claude autonomously searches for market events in the period
     let anthropicStream;
     try {
-      anthropicStream = await anthropic.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 16000, // Total tokens (thinking 10k + output ~6k max)
-        thinking: {
-          type: 'enabled',
-          budget_tokens: 10000, // Budget for internal reasoning (~10k tokens for deep analysis)
-        },
-        tools: [
-          {
-            // Native Anthropic web search — Claude decides what to search and when.
-            // No external API key needed; billed at $10/1000 searches + token costs.
-            type: 'web_search_20250305',
-            name: 'web_search',
-            max_uses: 3, // Limit searches to keep latency reasonable
-          } as any,
-        ],
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        stream: true,
-      });
+      anthropicStream = await callAnthropicForPerformanceAnalysis(prompt);
     } catch (apiError: any) {
-      // Handle Anthropic API-specific errors
       console.error('[API /ai/analyze-performance] Anthropic API error:', apiError);
-
       if (apiError?.error?.type === 'overloaded_error') {
         return NextResponse.json(
-          {
-            error: 'I server AI sono temporaneamente sovraccarichi. Riprova tra qualche secondo.',
-            retryable: true
-          },
+          { error: 'I server AI sono temporaneamente sovraccarichi. Riprova tra qualche secondo.', retryable: true },
           { status: 503 }
         );
       }
-
       return NextResponse.json(
-        {
-          error: 'Errore nella chiamata AI: ' + (apiError?.error?.message || apiError.message),
-          retryable: false
-        },
+        { error: 'Errore nella chiamata AI: ' + (apiError?.error?.message || apiError.message), retryable: false },
         { status: 500 }
       );
     }
 
-    // Create ReadableStream for Server-Sent Events (SSE)
-    // Converts Anthropic stream chunks into SSE format for client consumption.
-    // Tool use blocks (server_tool_use, web_search_tool_result) are silently skipped —
-    // only text_delta chunks (Claude's written response) are forwarded to the client.
-    const encoder = new TextEncoder();
-    const sseResponseStream = new ReadableStream({
-      async start(controller) {
-        try {
-          // Iterate through Anthropic stream chunks
-          for await (const chunk of anthropicStream) {
-            // Filter for text delta events only (skip tool use, thinking, etc.)
-            if (
-              chunk.type === 'content_block_delta' &&
-              chunk.delta.type === 'text_delta'
-            ) {
-              const text = chunk.delta.text;
-
-              // Encode as SSE format: `data: {JSON}\n\n`
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ text })}\n\n`)
-              );
-            }
-          }
-
-          // Send [DONE] signal to indicate stream completion
-          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-          controller.close();
-        } catch (streamError: any) {
-          console.error('[API /ai/analyze-performance] Stream error:', streamError);
-
-          // Send error message to client via SSE
-          if (streamError?.error?.type === 'overloaded_error') {
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({
-                error: 'I server AI sono temporaneamente sovraccarichi. Clicca "Rigenera" per riprovare.'
-              })}\n\n`)
-            );
-          } else {
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({
-                error: streamError?.error?.message || streamError.message || 'Errore durante la generazione'
-              })}\n\n`)
-            );
-          }
-
-          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-          controller.close();
-        }
-      },
-    });
-
-    // Return SSE response with appropriate headers
-    return new NextResponse(sseResponseStream, {
+    return new NextResponse(buildPerformanceSseStream(anthropicStream), {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
@@ -194,13 +168,9 @@ export async function POST(request: NextRequest) {
     if (authErrorResponse) {
       return authErrorResponse;
     }
-
     console.error('[API /ai/analyze-performance] Error:', error);
     return NextResponse.json(
-      {
-        error: 'Failed to generate AI analysis',
-        details: (error as Error).message,
-      },
+      { error: 'Failed to generate AI analysis', details: (error as Error).message },
       { status: 500 }
     );
   }
