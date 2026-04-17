@@ -20,10 +20,10 @@ function normalizeThread(thread: any): AssistantThread {
   };
 }
 
-function normalizeThreadDetail(detail: AssistantThreadResponse): AssistantThreadDetail {
+function normalizeThreadDetail(threadResponse: AssistantThreadResponse): AssistantThreadDetail {
   return {
-    thread: normalizeThread(detail.thread),
-    messages: detail.messages.map((message) => ({
+    thread: normalizeThread(threadResponse.thread),
+    messages: threadResponse.messages.map((message) => ({
       ...message,
       createdAt: toDate(message.createdAt),
     })),
@@ -34,12 +34,12 @@ async function fetchThreads(userId: string): Promise<AssistantThread[]> {
   const response = await authenticatedFetch(`/api/ai/assistant/threads?userId=${userId}`);
 
   if (!response.ok) {
-    const payload = await response.json().catch(() => null);
-    throw new Error(payload?.error ?? 'Impossibile caricare i thread dell’assistente');
+    const errorResponse = await response.json().catch(() => null);
+    throw new Error(errorResponse?.error ?? 'Impossibile caricare i thread dell’assistente');
   }
 
-  const payload = (await response.json()) as AssistantThreadsResponse;
-  return payload.threads.map(normalizeThread);
+  const threadsResponse = (await response.json()) as AssistantThreadsResponse;
+  return threadsResponse.threads.map(normalizeThread);
 }
 
 async function fetchThread(threadId: string, userId: string): Promise<AssistantThreadDetail> {
@@ -48,12 +48,12 @@ async function fetchThread(threadId: string, userId: string): Promise<AssistantT
   );
 
   if (!response.ok) {
-    const payload = await response.json().catch(() => null);
-    throw new Error(payload?.error ?? 'Impossibile caricare la conversazione');
+    const errorResponse = await response.json().catch(() => null);
+    throw new Error(errorResponse?.error ?? 'Impossibile caricare la conversazione');
   }
 
-  const payload = (await response.json()) as AssistantThreadResponse;
-  return normalizeThreadDetail(payload);
+  const threadResponse = (await response.json()) as AssistantThreadResponse;
+  return normalizeThreadDetail(threadResponse);
 }
 
 export function useAssistantThreads(userId: string | undefined) {
@@ -83,8 +83,8 @@ export function useDeleteAssistantThread(userId: string) {
       );
 
       if (!response.ok) {
-        const payload = await response.json().catch(() => null);
-        throw new Error(payload?.error ?? 'Impossibile eliminare il thread');
+        const errorResponse = await response.json().catch(() => null);
+        throw new Error(errorResponse?.error ?? 'Impossibile eliminare il thread');
       }
     },
     onSuccess: () => {
@@ -112,12 +112,12 @@ export function useCreateAssistantThread(userId: string) {
       });
 
       if (!response.ok) {
-        const payload = await response.json().catch(() => null);
-        throw new Error(payload?.error ?? 'Impossibile creare il thread');
+        const errorResponse = await response.json().catch(() => null);
+        throw new Error(errorResponse?.error ?? 'Impossibile creare il thread');
       }
 
-      const payload = (await response.json()) as { thread: AssistantThread };
-      return normalizeThread(payload.thread);
+      const createThreadResponse = (await response.json()) as { thread: AssistantThread };
+      return normalizeThread(createThreadResponse.thread);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({

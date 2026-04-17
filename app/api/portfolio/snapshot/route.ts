@@ -62,8 +62,8 @@ const SNAPSHOTS_COLLECTION = 'monthly-snapshots';
 export async function POST(request: NextRequest) {
   try {
     // Get user ID and optional year/month from request
-    const body = await request.json();
-    const { userId, year, month, cronSecret } = body;
+    const requestBody = await request.json();
+    const { userId, year, month, cronSecret } = requestBody;
 
     // Verify cron secret if provided (for scheduled jobs)
     if (cronSecret && cronSecret !== process.env.CRON_SECRET) {
@@ -110,9 +110,9 @@ export async function POST(request: NextRequest) {
 
     // Get all assets for the user using Firebase Admin SDK
     const assetsRef = adminDb.collection('assets');
-    const snapshot = await assetsRef.where('userId', '==', userId).get();
+    const assetsSnapshot = await assetsRef.where('userId', '==', userId).get();
 
-    if (snapshot.empty) {
+    if (assetsSnapshot.empty) {
       return NextResponse.json({
         success: false,
         message: 'No assets found for user',
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const assets: Asset[] = snapshot.docs.map((doc) => ({
+    const assets: Asset[] = assetsSnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     })) as Asset[];
@@ -183,12 +183,12 @@ export async function POST(request: NextRequest) {
     const snapshotId = `${userId}-${snapshotYear}-${snapshotMonth}`;
 
     // Check if snapshot already exists
-    const existingSnapshotRef = adminDb
+    const existingSnapshotDocumentRef = adminDb
       .collection(SNAPSHOTS_COLLECTION)
       .doc(snapshotId);
-    const existingSnapshot = await existingSnapshotRef.get();
+    const existingSnapshotDocument = await existingSnapshotDocumentRef.get();
 
-    const snapshotData: Omit<MonthlySnapshot, 'createdAt'> & {
+    const monthlySnapshotDocument: Omit<MonthlySnapshot, 'createdAt'> & {
       createdAt: FirebaseFirestore.Timestamp;
     } = {
       userId,
@@ -205,8 +205,11 @@ export async function POST(request: NextRequest) {
     };
 
     // Save snapshot
-    await existingSnapshotRef.set(snapshotData);
-    await invalidateDashboardOverviewSummaryServer(userId, existingSnapshot.exists ? 'snapshot_overwritten' : 'snapshot_created');
+    await existingSnapshotDocumentRef.set(monthlySnapshotDocument);
+    await invalidateDashboardOverviewSummaryServer(
+      userId,
+      existingSnapshotDocument.exists ? 'snapshot_overwritten' : 'snapshot_created'
+    );
 
     // Hall of Fame Integration: Client-side trigger pattern
     //
@@ -228,7 +231,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: existingSnapshot.exists
+      message: existingSnapshotDocument.exists
         ? 'Snapshot aggiornato con successo'
         : 'Snapshot creato con successo',
       snapshotId,

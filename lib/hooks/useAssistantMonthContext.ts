@@ -27,12 +27,12 @@ async function fetchMonthContext(
   );
 
   if (!response.ok) {
-    const payload = await response.json().catch(() => null);
-    throw new Error(payload?.error ?? 'Impossibile caricare il contesto mensile');
+    const errorResponse = await response.json().catch(() => null);
+    throw new Error(errorResponse?.error ?? 'Impossibile caricare il contesto mensile');
   }
 
-  const payload = await response.json();
-  return payload.bundle as AssistantMonthContextBundle;
+  const contextResponse = await response.json();
+  return contextResponse.bundle as AssistantMonthContextBundle;
 }
 
 async function fetchYearContext(userId: string, year: number): Promise<AssistantMonthContextBundle> {
@@ -41,12 +41,12 @@ async function fetchYearContext(userId: string, year: number): Promise<Assistant
   );
 
   if (!response.ok) {
-    const payload = await response.json().catch(() => null);
-    throw new Error(payload?.error ?? 'Impossibile caricare il contesto annuale');
+    const errorResponse = await response.json().catch(() => null);
+    throw new Error(errorResponse?.error ?? 'Impossibile caricare il contesto annuale');
   }
 
-  const payload = await response.json();
-  return payload.bundle as AssistantMonthContextBundle;
+  const contextResponse = await response.json();
+  return contextResponse.bundle as AssistantMonthContextBundle;
 }
 
 async function fetchYtdContext(userId: string, currentYear: number): Promise<AssistantMonthContextBundle> {
@@ -55,12 +55,12 @@ async function fetchYtdContext(userId: string, currentYear: number): Promise<Ass
   );
 
   if (!response.ok) {
-    const payload = await response.json().catch(() => null);
-    throw new Error(payload?.error ?? 'Impossibile caricare il contesto YTD');
+    const errorResponse = await response.json().catch(() => null);
+    throw new Error(errorResponse?.error ?? 'Impossibile caricare il contesto YTD');
   }
 
-  const payload = await response.json();
-  return payload.bundle as AssistantMonthContextBundle;
+  const contextResponse = await response.json();
+  return contextResponse.bundle as AssistantMonthContextBundle;
 }
 
 async function fetchHistoryContext(userId: string, startYear: number): Promise<AssistantMonthContextBundle> {
@@ -69,12 +69,12 @@ async function fetchHistoryContext(userId: string, startYear: number): Promise<A
   );
 
   if (!response.ok) {
-    const payload = await response.json().catch(() => null);
-    throw new Error(payload?.error ?? 'Impossibile caricare il contesto storico');
+    const errorResponse = await response.json().catch(() => null);
+    throw new Error(errorResponse?.error ?? 'Impossibile caricare il contesto storico');
   }
 
-  const payload = await response.json();
-  return payload.bundle as AssistantMonthContextBundle;
+  const contextResponse = await response.json();
+  return contextResponse.bundle as AssistantMonthContextBundle;
 }
 
 // ─── Month context hook ───────────────────────────────────────────────────────
