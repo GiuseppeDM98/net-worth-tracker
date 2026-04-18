@@ -85,7 +85,15 @@ CRON_SECRET=your_secure_random_string
 
 # App URL
 NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
+
+# Resend — Monthly email summaries (optional)
+# Required only if you want automatic monthly portfolio report emails.
+# Get a free API key at https://resend.com/api-keys
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=onboarding@resend.dev
 ```
+
+> **Note on `RESEND_FROM_EMAIL`**: `onboarding@resend.dev` (Resend's shared domain) delivers only to the email address of your Resend account — ideal for personal deployments. To send to arbitrary recipients you must verify a custom domain you own under Resend → Domains. `*.vercel.app` subdomains cannot be used as sending domains since Vercel controls that DNS.
 
 ## Cron Authentication Note
 

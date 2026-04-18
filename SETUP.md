@@ -180,6 +180,12 @@ NEXT_PUBLIC_REGISTRATION_WHITELIST=
 
 # Development Features (optional - for testing/demo)
 NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS=false
+
+# Resend — Monthly email summaries (optional)
+# Required only if you want to receive automatic monthly portfolio reports.
+# Sign up for free at https://resend.com (free tier: 3000 emails/month).
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=onboarding@resend.dev
 ```
 
 **How to get the values:**
@@ -188,6 +194,10 @@ NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS=false
 - `CRON_SECRET`: Generate a random string (e.g., use `openssl rand -hex 32`)
 - `NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS`: Set to `true` to enable dummy data generation in Settings page (for development, testing, or demo purposes). **Warning**: Test data is saved to the same Firebase collections as real data. You can delete all dummy data using the "Elimina Tutti i Dati Dummy" button in Settings. See [README.md](./README.md) for full feature documentation. **Recommended**: Keep `false` in production environments.
 - `ANTHROPIC_API_KEY` (optional): Enables AI-powered performance analysis. If omitted, the rest of the app still works normally.
+- `RESEND_API_KEY` (optional): Enables monthly email summaries. Create a free API key at [resend.com/api-keys](https://resend.com/api-keys). If omitted, the email feature is silently disabled.
+- `RESEND_FROM_EMAIL` (optional): Sender address for monthly emails. Options:
+  - `onboarding@resend.dev` — Resend shared domain, no setup required. Delivers only to your Resend account's email address (suitable for personal/single-user deployments).
+  - A verified custom domain address (e.g. `noreply@yourdomain.com`) — required to deliver to arbitrary recipients. Add your domain under Resend → Domains and configure the provided DNS records. Note: `*.vercel.app` subdomains cannot be verified as sending domains.
 
 **For detailed Firebase Admin SDK configuration on Vercel, see [VERCEL_SETUP.md](./VERCEL_SETUP.md)**
 

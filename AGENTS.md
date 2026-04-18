@@ -337,6 +337,14 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 ### Mobile Header Trash Icon Pattern
 - In a card header that has a title/subtitle block on the left and a destructive icon button on the right, always use `flex items-start justify-between` (not `flex-col` + `sm:flex-row`). `flex-col` puts the trash button on its own row on mobile, wasting vertical space and breaking visual grouping. The subtitle text stays under the title in the left block; the button stays top-right in all viewports.
 
+### Resend Integration
+- Use a **static import** (`import { Resend } from 'resend'`) not a dynamic one (`await import('resend')`). `vi.mock` only intercepts static imports — dynamic imports bypass the mock and cause `TypeError: X is not a constructor` in tests.
+- `onboarding@resend.dev` (Resend shared domain) delivers only to the Resend account owner's email. To send to arbitrary recipients a verified custom domain is required. `*.vercel.app` subdomains cannot be verified as sending domains — Vercel controls that DNS zone.
+
+### Firestore Query Chain Depth in Tests
+- Keep Admin SDK query chains to **3 `.where()` calls max** when the function will be unit-tested. A 4th `.where()` (e.g. `isDummy != true`) causes `TypeError: .where(...).where(...).where(...).where is not a function` in tests because the mock chain only goes 3 levels deep.
+- Workaround: apply the 4th condition as a post-fetch code filter (`docs.filter(d => !d.data().isDummy)`) — one extra doc fetched at most (with `.limit(1)` the cost is negligible).
+
 ### Server-Side Layer Separation (`lib/server/`)
 - `lib/server/` hosts server-only modules that sit between API routes and services: use cases, processors, and Admin SDK repositories
 - `lib/server/assetAdminRepository.ts` — canonical Admin SDK asset fetch (`getUserAssetsAdmin`). Import from here in all API routes that need server-side asset access; do not re-declare the function inline
@@ -379,6 +387,7 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - For History page UX/motion changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/chartService.test.ts` before manual validation
 - For Assistant AI foundation changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/assistantRoutes.test.ts __tests__/assistantWebSearchPolicy.test.ts __tests__/assistantMonthContextService.test.ts` before manual validation
 - For dividend route / cron handler changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/dividendUseCase.test.ts __tests__/dividendProcessor.test.ts` before manual validation
+- For monthly email changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/monthlyEmailService.test.ts` before manual validation
 
 ### Test Patterns
 - Use local `new Date(year, monthIndex, day)` in tests, not ISO strings

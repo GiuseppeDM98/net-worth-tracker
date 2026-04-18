@@ -53,7 +53,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Save, RotateCcw, Plus, Trash2, ChevronDown, ChevronUp, Edit, Receipt, FlaskConical, Coins, ArrowRightLeft, Settings, PieChart, Palette } from 'lucide-react';
+import { Save, RotateCcw, Plus, Trash2, ChevronDown, ChevronUp, Edit, Receipt, FlaskConical, Coins, ArrowRightLeft, Settings, PieChart, Palette, Mail, X, Send } from 'lucide-react';
 import { useColorTheme, ColorTheme } from '@/contexts/ColorThemeContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -135,6 +135,10 @@ export default function SettingsPage() {
   const [cashflowHistoryStartYear, setCashflowHistoryStartYear] = useState<number>(2025);
   const [laborIncomeCategoryIds, setLaborIncomeCategoryIds] = useState<string[]>([]);
   const [costCentersEnabled, setCostCentersEnabled] = useState<boolean>(false);
+  const [monthlyEmailEnabled, setMonthlyEmailEnabled] = useState<boolean>(false);
+  const [monthlyEmailRecipients, setMonthlyEmailRecipients] = useState<string[]>([]);
+  const [newEmailInput, setNewEmailInput] = useState<string>('');
+  const [sendingTestEmail, setSendingTestEmail] = useState<boolean>(false);
   const [assetClassStates, setAssetClassStates] = useState<
     Record<AssetClass, AssetClassState>
   >({} as Record<AssetClass, AssetClassState>);
@@ -342,6 +346,8 @@ export default function SettingsPage() {
         setCashflowHistoryStartYear(settingsData.cashflowHistoryStartYear ?? 2025);
         setLaborIncomeCategoryIds(settingsData.laborIncomeCategoryIds ?? []);
         setCostCentersEnabled(settingsData.costCentersEnabled ?? false);
+        setMonthlyEmailEnabled(settingsData.monthlyEmailEnabled ?? false);
+        setMonthlyEmailRecipients(settingsData.monthlyEmailRecipients ?? []);
         // Load dividend settings
         setDividendIncomeCategoryId(settingsData.dividendIncomeCategoryId || '');
         setDividendIncomeSubCategoryId(settingsData.dividendIncomeSubCategoryId || '');
@@ -457,6 +463,8 @@ export default function SettingsPage() {
           cashflowHistoryStartYear: settingsData?.cashflowHistoryStartYear ?? 2025,
           laborIncomeCategoryIds: [...(settingsData?.laborIncomeCategoryIds ?? [])].sort(),
           costCentersEnabled: settingsData?.costCentersEnabled ?? false,
+          monthlyEmailEnabled: settingsData?.monthlyEmailEnabled ?? false,
+          monthlyEmailRecipients: [...(settingsData?.monthlyEmailRecipients ?? [])].sort(),
         })
       );
 
@@ -987,6 +995,8 @@ export default function SettingsPage() {
         cashflowHistoryStartYear,
         laborIncomeCategoryIds,
         costCentersEnabled,
+        monthlyEmailEnabled,
+        monthlyEmailRecipients,
       });
       toast.success('Impostazioni salvate con successo');
       setAllocationBaselineKey(allocationSnapshotKey);
@@ -1299,6 +1309,8 @@ export default function SettingsPage() {
         cashflowHistoryStartYear,
         laborIncomeCategoryIds: [...laborIncomeCategoryIds].sort(),
         costCentersEnabled,
+        monthlyEmailEnabled,
+        monthlyEmailRecipients: [...monthlyEmailRecipients].sort(),
       }),
     [
       includePrimaryResidenceInFIRE,
@@ -1312,6 +1324,8 @@ export default function SettingsPage() {
       cashflowHistoryStartYear,
       laborIncomeCategoryIds,
       costCentersEnabled,
+      monthlyEmailEnabled,
+      monthlyEmailRecipients,
     ]
   );
 
@@ -1730,6 +1744,164 @@ export default function SettingsPage() {
               />
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Monthly email summary configuration */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Mail className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-base">Report Email Mensili</CardTitle>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Ricevi un riepilogo automatico del patrimonio, cashflow e dividendi via email
+            l&apos;ultimo giorno di ogni mese.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor="monthlyEmailEnabled" className="text-sm font-medium">
+                Attiva report mensile
+              </Label>
+              <p className="text-sm text-muted-foreground mt-1">
+                Inviato automaticamente l&apos;ultimo giorno del mese
+              </p>
+            </div>
+            <Switch
+              id="monthlyEmailEnabled"
+              checked={monthlyEmailEnabled}
+              onCheckedChange={setMonthlyEmailEnabled}
+              disabled={isDemo}
+              className={interactiveControlClass}
+            />
+          </div>
+
+          {monthlyEmailEnabled && (
+            <div className="space-y-3 border-t pt-4">
+              <Label className="text-sm font-medium">Destinatari</Label>
+
+              {/* Add new recipient */}
+              <div className="flex gap-2">
+                <Input
+                  type="email"
+                  placeholder="email@esempio.com"
+                  value={newEmailInput}
+                  onChange={(e) => setNewEmailInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const email = newEmailInput.trim();
+                      if (email && !monthlyEmailRecipients.includes(email)) {
+                        setMonthlyEmailRecipients([...monthlyEmailRecipients, email]);
+                        setNewEmailInput('');
+                      }
+                    }
+                  }}
+                  disabled={isDemo}
+                  className={interactiveControlClass}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={
+                    isDemo ||
+                    !newEmailInput.trim() ||
+                    monthlyEmailRecipients.includes(newEmailInput.trim())
+                  }
+                  onClick={() => {
+                    const email = newEmailInput.trim();
+                    if (email && !monthlyEmailRecipients.includes(email)) {
+                      setMonthlyEmailRecipients([...monthlyEmailRecipients, email]);
+                      setNewEmailInput('');
+                    }
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Aggiungi
+                </Button>
+              </div>
+
+              {/* Recipient list */}
+              {monthlyEmailRecipients.length > 0 && (
+                <ul className="space-y-2">
+                  {monthlyEmailRecipients.map((email) => (
+                    <li
+                      key={email}
+                      className="flex items-center justify-between rounded-md border border-border bg-muted/30 px-3 py-2 text-sm"
+                    >
+                      <span className="text-foreground">{email}</span>
+                      <button
+                        type="button"
+                        aria-label={`Rimuovi ${email}`}
+                        disabled={isDemo}
+                        onClick={() =>
+                          setMonthlyEmailRecipients(
+                            monthlyEmailRecipients.filter((r) => r !== email)
+                          )
+                        }
+                        className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-40"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {/* Manual send button */}
+              <div className="pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={
+                    isDemo ||
+                    monthlyEmailRecipients.length === 0 ||
+                    sendingTestEmail
+                  }
+                  title="Invia subito il riepilogo del mese corrente agli indirizzi configurati"
+                  onClick={async () => {
+                    setSendingTestEmail(true);
+                    try {
+                      const res = await authenticatedFetch(
+                        '/api/user/monthly-email/send',
+                        { method: 'POST' }
+                      );
+                      if (res.ok) {
+                        toast.success('Email inviata con successo!');
+                      } else {
+                        const body = await res.json().catch(() => ({}));
+                        toast.error(body.error ?? "Errore durante l'invio");
+                      }
+                    } catch {
+                      toast.error("Errore durante l'invio dell'email");
+                    } finally {
+                      setSendingTestEmail(false);
+                    }
+                  }}
+                >
+                  {sendingTestEmail ? (
+                    <span className="flex items-center gap-2">
+                      <span className="h-3 w-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                      Invio in corso...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <Send className="h-4 w-4" />
+                      Invia riepilogo ora
+                    </span>
+                  )}
+                </Button>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Invia il riepilogo del mese corrente per verificare il formato dell&apos;email.
+                  Ricorda di salvare prima le impostazioni.
+                </p>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

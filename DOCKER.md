@@ -112,6 +112,8 @@ Without `--env-file .env.local`, Docker Compose only uses `.env` automatically f
 | `FIREBASE_ADMIN_CLIENT_EMAIL` | Yes* | Service account email (alternative) |
 | `FIREBASE_ADMIN_PRIVATE_KEY` | Yes* | Private key (alternative) |
 | `CRON_SECRET` | Yes | Random secret for authenticating cron calls |
+| `RESEND_API_KEY` | No | Resend API key for monthly email summaries. Get one free at [resend.com](https://resend.com). If omitted, the email feature is disabled. |
+| `RESEND_FROM_EMAIL` | No | Sender address for monthly emails (e.g. `onboarding@resend.dev` for personal use, or a verified custom domain address for multi-user deployments). |
 
 *Use either `FIREBASE_SERVICE_ACCOUNT_KEY` **or** the three separate `FIREBASE_ADMIN_*` vars.
 

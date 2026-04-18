@@ -84,6 +84,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Fully responsive on mobile and tablet — percentile table switches to a card layout, scenario parameter cards stack vertically
 
 ### Other
+- **Monthly email summary** — Automatic portfolio recap email sent on the last day of each month. Includes net worth change, asset class breakdown, income vs expenses, top spending categories, and dividends received. Recipients configured in Settings → Preferenze. Manual send button for on-demand previews. Powered by [Resend](https://resend.com) (free tier sufficient for personal use)
 - **Public demo mode** — "Try the Demo" button on the login page and landing page auto-logs visitors into a shared read-only account. All mutation actions are disabled; the AI Assistant is fully blocked. Set `NEXT_PUBLIC_DEMO_*` env vars to enable; leave them empty to hide the CTA on self-hosted deploys
 - **Color Themes** — Six selectable color themes (Default, Solar Dusk, Elegant Luxury, Midnight Bloom, Cyberpunk, Retro Arcade) with per-user persistence in Firestore and localStorage. Theme selector in Settings → Aspetto with light/dark preview swatches. Switching dark/light mode plays a circle-reveal animation from the toggle. Charts update their palette to match the active theme
 - **Dark mode** — Full dark/light/system theme support. The header toggle cycles through three states: Light, Dark, and System (follows OS preference), using Sun, Moon, and Monitor icons. Every page, chart tooltip, and UI component is properly themed
@@ -134,6 +135,8 @@ Copy `.env.local.example` to `.env.local` and fill in your values:
 | `NEXT_PUBLIC_REGISTRATION_WHITELIST_ENABLED` | No | Enable email whitelist for registration |
 | `NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS` | No | Enable test snapshot generation in Settings |
 | `ANTHROPIC_API_KEY` | No | Enables AI-powered performance analysis |
+| `RESEND_API_KEY` | No | Enables automatic monthly portfolio summary emails (via [Resend](https://resend.com)) |
+| `RESEND_FROM_EMAIL` | No | Sender address for monthly emails (e.g. `onboarding@resend.dev` for personal use) |
 | `NEXT_PUBLIC_DEMO_USER_ID` | No | Firebase UID of the shared demo account |
 | `NEXT_PUBLIC_DEMO_EMAIL` | No | Email for demo auto-login (shown on landing page) |
 | `NEXT_PUBLIC_DEMO_PASSWORD` | No | Password for demo auto-login |

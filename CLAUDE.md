@@ -5,7 +5,8 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-18, session d-separazione-layer): **Layer separation across API routes and cron handler**. New server modules: `lib/server/assetAdminRepository.ts` (shared Admin SDK asset fetch), `lib/server/dividendUseCase.ts` (dividend creation orchestration), `lib/server/dividendProcessor.ts` (3 cron phases as typed functions). Cron handler: 340 → 80 lines. `POST /api/dividends`: 130 → 50 lines. Also fixed pre-existing bug: `paymentDate` from JSON body was a string, `string <= Date` always returned `false`, blocking automatic expense creation for past dividends. Fix: `new Date(dividendData.paymentDate)`. Added `__tests__/dividendUseCase.test.ts` (7 tests) and `__tests__/dividendProcessor.test.ts` (8 tests).
+- Latest implementation (2026-04-18, session monthly-email-summary): **Monthly email summary**. Users configure recipients in Settings → Preferenze (`monthlyEmailEnabled`, `monthlyEmailRecipients` in `AssetAllocationSettings`). Cron `monthly-snapshot` (daily, 18:00 UTC) checks `isLastDayOfMonthItaly(now)` — if true, builds data via `buildMonthlyEmailData` (Admin SDK: snapshots, expenses, dividends) and sends via Resend. Manual send via `POST /api/user/monthly-email/send` (authenticated). Email: self-contained inline-CSS HTML with net worth KPI, asset class table, cashflow summary, top 3 expense categories, dividends. Env vars: `RESEND_API_KEY`, `RESEND_FROM_EMAIL`. New server module: `lib/server/monthlyEmailService.ts`. Tests: `__tests__/monthlyEmailService.test.ts` (23 tests).
+- Previous (2026-04-18, session d-separazione-layer): **Layer separation across API routes and cron handler**. New server modules: `lib/server/assetAdminRepository.ts` (shared Admin SDK asset fetch), `lib/server/dividendUseCase.ts` (dividend creation orchestration), `lib/server/dividendProcessor.ts` (3 cron phases as typed functions). Cron handler: 340 → 80 lines. `POST /api/dividends`: 130 → 50 lines. Also fixed pre-existing bug: `paymentDate` from JSON body was a string, `string <= Date` always returned `false`, blocking automatic expense creation for past dividends. Fix: `new Date(dividendData.paymentDate)`. Added `__tests__/dividendUseCase.test.ts` (7 tests) and `__tests__/dividendProcessor.test.ts` (8 tests).
 - Previous (2026-04-18, session fix-chart-line-style): **Evoluzione Patrimonio Netto line style**. `CustomChartDot` else branch changed from blue circle to `null` — line renders clean/continuous without per-point markers. Amber note-indicators preserved. File: `components/history/CustomChartDot.tsx`.
 - Previous (2026-04-17, session c-refactoring-funzioni): **SRP refactoring of large functions**. `AssetDialog.tsx` `onSubmit` (274 → 55 lines) split into 5 file-scope helpers. `analyze-performance/route.ts` and `snapshot/route.ts` similarly extracted. Added `__tests__/assetDialogHelpers.test.ts` (18 tests) and `__tests__/snapshotHelpers.test.ts` (9 tests).
 
@@ -89,9 +90,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Assets: `app/dashboard/assets/page.tsx`, `components/assets/AssetPriceHistoryTable.tsx`, `components/assets/AssetClassHistoryTable.tsx`
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
-- Server-side use cases / processors: `lib/server/assetAdminRepository.ts`, `lib/server/dividendUseCase.ts`, `lib/server/dividendProcessor.ts`
+- Server-side use cases / processors: `lib/server/assetAdminRepository.ts`, `lib/server/dividendUseCase.ts`, `lib/server/dividendProcessor.ts`, `lib/server/monthlyEmailService.ts`
 
-**Last updated**: 2026-04-18 (session d-separazione-layer — layer separation, new lib/server modules, dividend expense bug fix)
+**Last updated**: 2026-04-18 (session monthly-email-summary — monthly email via Resend, Settings UI, manual send route)
 
 ## Design Context
 

@@ -78,6 +78,8 @@ export async function getSettings(
       assistantMacroContextEnabled: data.assistantMacroContextEnabled,
       assistantMemoryEnabled: data.assistantMemoryEnabled,
       costCentersEnabled: data.costCentersEnabled,
+      monthlyEmailEnabled: data.monthlyEmailEnabled,
+      monthlyEmailRecipients: data.monthlyEmailRecipients,
       targets: data.targets as AssetAllocationTarget,
     };
   } catch (error) {
@@ -210,6 +212,12 @@ export async function setSettings(
       if (settings.costCentersEnabled !== undefined) {
         docData.costCentersEnabled = settings.costCentersEnabled;
       }
+      if (settings.monthlyEmailEnabled !== undefined) {
+        docData.monthlyEmailEnabled = settings.monthlyEmailEnabled;
+      }
+      if (settings.monthlyEmailRecipients !== undefined) {
+        docData.monthlyEmailRecipients = settings.monthlyEmailRecipients;
+      }
 
       // Use setDoc WITHOUT merge to completely replace targets
       await setDoc(targetRef, docData);
@@ -303,6 +311,12 @@ export async function setSettings(
       }
       if (settings.costCentersEnabled !== undefined) {
         docData.costCentersEnabled = settings.costCentersEnabled;
+      }
+      if (settings.monthlyEmailEnabled !== undefined) {
+        docData.monthlyEmailEnabled = settings.monthlyEmailEnabled;
+      }
+      if (settings.monthlyEmailRecipients !== undefined) {
+        docData.monthlyEmailRecipients = settings.monthlyEmailRecipients;
       }
 
       // Use merge: true to preserve existing fields

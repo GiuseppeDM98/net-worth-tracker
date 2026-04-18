@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { updateHallOfFame } from '@/lib/services/hallOfFameService.server';
+import {
+  isLastDayOfMonthItaly,
+  getSettingsAdmin,
+  buildMonthlyEmailData,
+  sendMonthlyEmail,
+} from '@/lib/server/monthlyEmailService';
+import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
 
 /**
  * GET /api/cron/monthly-snapshot
@@ -110,6 +117,45 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Phase 2: Send monthly summary emails (only on the last day of the month)
+    const emailResults = { sent: 0, skipped: 0, errors: 0 };
+    if (isLastDayOfMonthItaly(new Date())) {
+      const { year, month } = getItalyMonthYear(new Date());
+      console.log(`Last day of month detected — sending summary emails for ${month}/${year}`);
+
+      for (const userDoc of usersSnapshot.docs) {
+        const userId = userDoc.id;
+
+        // Skip demo user — its data is synthetic
+        if (userId === process.env.NEXT_PUBLIC_DEMO_USER_ID) {
+          emailResults.skipped++;
+          continue;
+        }
+
+        try {
+          const settings = await getSettingsAdmin(userId);
+          if (!settings?.monthlyEmailEnabled || !settings.monthlyEmailRecipients?.length) {
+            emailResults.skipped++;
+            continue;
+          }
+
+          const emailData = await buildMonthlyEmailData(userId, year, month);
+          if (!emailData) {
+            console.warn(`No snapshot found for user ${userId} — skipping email`);
+            emailResults.skipped++;
+            continue;
+          }
+
+          await sendMonthlyEmail(settings.monthlyEmailRecipients, emailData);
+          emailResults.sent++;
+          console.log(`Monthly email sent for user ${userId}`);
+        } catch (emailError) {
+          console.error(`Monthly email failed for user ${userId}:`, emailError);
+          emailResults.errors++;
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: `Monthly snapshots job completed`,
@@ -118,6 +164,7 @@ export async function GET(request: NextRequest) {
       errors: errors.length,
       results,
       errorDetails: errors,
+      emailSummary: emailResults,
     });
   } catch (error) {
     console.error('Error in monthly snapshot cron job:', error);
