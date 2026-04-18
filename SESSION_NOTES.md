@@ -22,3 +22,13 @@ No change was needed in `page.tsx` — the `dot` prop already goes through `Cust
 
 ## Files Changed
 - `components/history/CustomChartDot.tsx` — removed blue dot render for non-note points
+
+---
+
+## Riepilogo sessione
+
+- **Cosa**: Rimosso il rendering dei pallini blu sui singoli punti del grafico "Evoluzione Patrimonio Netto". La linea ora è continua e pulita, identica allo stile del grafico "Patrimonio Netto per Asset Class" sottostante. Gli indicatori ambra per le snapshot con nota restano visibili.
+
+- **Perché**: I pallini su ogni punto rendevano il grafico visivamente affollato su serie lunghe (40+ rilevazioni). Una linea continua è più leggibile e coerente con il linguaggio visivo del resto della pagina Storico, dove i grafici ad area non usano marker su ogni punto.
+
+- **Nota**: `CustomChartDot` gestisce due casi — nota presente (amber marker) e nota assente (prima: cerchio blu, ora: `null`). Il prop `activeDot={{ r: 6 }}` sulla `<Line>` è stato mantenuto intenzionalmente: al hover Recharts mostra comunque un punto, utile per capire il valore esatto su cui si sta puntando. Non è stato necessario toccare `page.tsx` perché il prop `dot` era già delegato al componente.
