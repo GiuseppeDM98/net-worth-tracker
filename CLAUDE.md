@@ -5,9 +5,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-17, session pie-chart-legend-cap): **Pie chart legend cap on mobile**. `components/ui/pie-chart.tsx` — added `MAX_MOBILE_LEGEND = 5`; on mobile, legend now filters `>= 7%` first, then `.slice(0, 5)`. Prevents the fixed-height `ResponsiveContainer` (350px) from being clipped when portfolios with many assets produce 7+ legend items. Desktop unaffected (vertical legend on right, no clipping risk). Synthetic "Altri" entries from `chartService` count against the cap normally.
-- Previous implementation (2026-04-16, session demo-account-landing-page): **Public demo account + landing page**. `app/page.tsx` rewritten as a landing page (hero, 6 feature cards, footer) with "Prova la Demo" auto-login CTA that signs in to a shared read-only Firebase account via `NEXT_PUBLIC_DEMO_EMAIL` / `NEXT_PUBLIC_DEMO_PASSWORD`. Same button added to `/login`. `useDemoMode()` hook (`lib/hooks/useDemoMode.ts`) gates all mutation buttons across every page/component. Demo banner in `app/dashboard/layout.tsx`. Also fixed GBp (pence) 100× value inflation in `calculateAssetValue()` fallback path when `currentPriceEur` is absent; `calculateUnrealizedGains()` now delegates to `calculateAssetValue()` for consistency. New env vars: `NEXT_PUBLIC_DEMO_USER_ID`, `NEXT_PUBLIC_DEMO_EMAIL`, `NEXT_PUBLIC_DEMO_PASSWORD`.
-- Previous implementation (2026-04-16, session fx-currency-conversion): **FX currency conversion for non-EUR assets**. `currentPriceEur` field added to `Asset`/`AssetFormData`; populated server-side during price updates and at asset creation. `calculateAssetValue()` uses `currentPriceEur` when available, falls back to `currentPrice` for EUR assets and pre-migration docs. GBp (pence) normalized to GBP by dividing by 100. Key files: `types/assets.ts`, `lib/helpers/priceUpdater.ts`, `lib/services/assetService.ts`, `app/api/prices/quote/route.ts`.
+- Latest implementation (2026-04-18, session d-separazione-layer): **Layer separation across API routes and cron handler**. New server modules: `lib/server/assetAdminRepository.ts` (shared Admin SDK asset fetch), `lib/server/dividendUseCase.ts` (dividend creation orchestration), `lib/server/dividendProcessor.ts` (3 cron phases as typed functions). Cron handler: 340 → 80 lines. `POST /api/dividends`: 130 → 50 lines. Also fixed pre-existing bug: `paymentDate` from JSON body was a string, `string <= Date` always returned `false`, blocking automatic expense creation for past dividends. Fix: `new Date(dividendData.paymentDate)`. Added `__tests__/dividendUseCase.test.ts` (7 tests) and `__tests__/dividendProcessor.test.ts` (8 tests).
+- Previous (2026-04-18, session fix-chart-line-style): **Evoluzione Patrimonio Netto line style**. `CustomChartDot` else branch changed from blue circle to `null` — line renders clean/continuous without per-point markers. Amber note-indicators preserved. File: `components/history/CustomChartDot.tsx`.
+- Previous (2026-04-17, session c-refactoring-funzioni): **SRP refactoring of large functions**. `AssetDialog.tsx` `onSubmit` (274 → 55 lines) split into 5 file-scope helpers. `analyze-performance/route.ts` and `snapshot/route.ts` similarly extracted. Added `__tests__/assetDialogHelpers.test.ts` (18 tests) and `__tests__/snapshotHelpers.test.ts` (9 tests).
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -29,6 +29,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Cashflow now preserves context better across `Tracciamento`, `Dividendi & Cedole`, `Anno Corrente`, `Storico Totale`, and `Budget`, with calmer filter feedback and a steadier Budget deep-dive flow
 - Cashflow Sankey back-navigation now restores the immediate parent drill-down level first, so moving back from a subcategory returns to the category view before the full flow
 - Dividendi & Cedole now keeps calendar day focus, active date filtering, table/detail context, and summary cards more tightly in sync, with a read-only contextual detail step before edit mode
+- Storico "Evoluzione Patrimonio Netto" line chart now renders as a clean continuous line — per-point dots removed; amber note-indicator markers are preserved for snapshots with notes (`CustomChartDot`, `activeDot` hover still active)
 - Storico now reads more like a guided analysis surface: main sections enter as chapters, dense blocks are separated more clearly, chart mode switches feel local instead of page-wide, and doubling milestones build progressively
 - Rendimenti now presents smoother period switching, KPI settling from prior values, staged monthly heatmap reveal, a more legible underwater drawdown surface, and contextual custom-range / AI dialogs
 - Allocazione now presents a more readable drill-down path on desktop and a steadier mobile sheet experience, with each drill-down level reopening from the top and progress bars using centered target markers
@@ -58,7 +59,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - `npm test -- <file>`
   - `npx vitest run <file>`
   - `npx tsc --noEmit`
-- Current repo includes targeted tests for pure utilities/services plus private API auth regression coverage in `__tests__/apiAuthRoutes.test.ts` and assistant auth / policy coverage in `__tests__/assistantRoutes.test.ts`, `__tests__/assistantWebSearchPolicy.test.ts`, `__tests__/assistantPromptRouting.test.ts`, month context bundle coverage in `__tests__/assistantMonthContextService.test.ts`, thread auth + DELETE coverage in `__tests__/assistantThreadRoutes.test.ts`, and memory extraction unit tests in `__tests__/assistantMemoryExtraction.test.ts`
+- Current repo includes targeted tests for pure utilities/services plus private API auth regression coverage in `__tests__/apiAuthRoutes.test.ts`, overview/materialized-summary coverage in `__tests__/dashboardOverviewService.test.ts`, performance utilities in `__tests__/performanceService.test.ts`, assistant auth / policy coverage in `__tests__/assistantRoutes.test.ts`, `__tests__/assistantWebSearchPolicy.test.ts`, `__tests__/assistantPromptRouting.test.ts`, `__tests__/assistantMonthContextService.test.ts`, `__tests__/assistantThreadRoutes.test.ts`, `__tests__/assistantMemoryExtraction.test.ts`, SRP characterization tests in `__tests__/assetDialogHelpers.test.ts` and `__tests__/snapshotHelpers.test.ts`, and layer-separation tests in `__tests__/dividendUseCase.test.ts` and `__tests__/dividendProcessor.test.ts`
 
 ## Data & Integrations
 - Firestore client + admin
@@ -88,8 +89,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Assets: `app/dashboard/assets/page.tsx`, `components/assets/AssetPriceHistoryTable.tsx`, `components/assets/AssetClassHistoryTable.tsx`
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
+- Server-side use cases / processors: `lib/server/assetAdminRepository.ts`, `lib/server/dividendUseCase.ts`, `lib/server/dividendProcessor.ts`
 
-**Last updated**: 2026-04-17 (session pie-chart-legend-cap — pie chart mobile legend cap on Panoramica)
+**Last updated**: 2026-04-18 (session d-separazione-layer — layer separation, new lib/server modules, dividend expense bug fix)
 
 ## Design Context
 

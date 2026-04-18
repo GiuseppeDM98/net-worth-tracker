@@ -48,6 +48,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - For state-preserving tab UIs, keep per-scope active tab state explicitly (e.g. separate sub-tab state for `Anno Corrente` and `Storico`) instead of sharing one global sub-tab value
 - Use `useMemo` for derived state; do not use `useEffect + setState` for computed values
 - When a private API returns date-like values for React Query consumers, normalize them at the hook boundary with `toDate()` instead of scattering conversions inside page components
+- **Naming-only cleanup rule**: for sessions scoped to naming/readability, prefer local semantic renames (`payload` → domain-specific response name, `body` → `requestBody`, `stream` → typed stream role) and avoid cross-file renames or structural extractions unless the runtime contract is already unclear
 
 ### Dynamic Imports
 - `next/dynamic` with named exports must unwrap via `.then(m => ({ default: m.Named }))`
@@ -88,6 +89,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - `setSettings()` has two write branches; update both
 - Assistant preference fields mirrored into settings must stay aligned with the assistant memory document and `AssetAllocationSettings`
 - **Feature toggle placement**: all feature toggles (`costCentersEnabled`, `goalBasedInvestingEnabled`, `stampDutyEnabled`, etc.) live in `AssetAllocationSettings` (`types/assets.ts` + `assetAllocationService.ts`). Do NOT add them to `UserPreferences` / `userPreferencesService.ts`. The 3-place rule applies here too.
+- **Cashflow settings fallback semantics**: `cashflowHistoryStartYear` may bootstrap from a hardcoded default, but that value is only a non-fatal fallback; preserve the saved settings value whenever `getSettings()` succeeds and log fallback activation explicitly.
 
 ### Settings UX Layer (Overdrive)
 - Unsaved preview in Settings is local-only: use a baseline snapshot key captured on load/save and compare against current state (`hasUnsaved*`) without introducing autosave behavior
@@ -230,6 +232,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - **Coast FIRE outputs**: `Valore stimato a pensione` is only the future value of the current FIRE-eligible patrimonio without new contributions; `gap residuo` clamps at `0` once Coast FIRE is reached, while progress `%` may exceed `100`.
 - **Coast FIRE pension UX**: summary-first layout; configuration collapsible (auto-open when empty/incomplete/unsaved); separate informational warnings (pension after target age, bridge years) from hard-stop errors (missing start date, zero amount). `buildPensionDraftIssues` is a pure function — pass `now: Date` explicitly.
 - **Annual-need wording**: when UI copy appends `l'anno` to a formatted amount, prefer a dedicated helper such as `formatCurrencyPerYear()` instead of manual JSX concatenation. This avoids regressions like `€l'anno`.
+- **`resolveBondPrice` centralizes % of par conversion**: `rawPrice * (nominalValue / 100)`, file-scope in `AssetDialog.tsx`. The `nominalValue <= 1` check is intentional — retail bonds with par=1 don't use the Borsa Italiana convention and passthrough unchanged. Both manual entry (Path 1) and auto-fetch (Path 2) call the same helper so the conversion can never diverge.
 
 ### Firestore Optional Field Deletion
 - `updateDoc` only touches fields present in the update object — omitting a field leaves the old value intact in Firestore
@@ -247,7 +250,6 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 
 ### Shared Constants
 - Italian month names live in `lib/constants/months.ts` as `MONTH_NAMES` (`as const` array). Import from there — do not redeclare inline in assistant components
-- Pattern: before duplicating a primitive array in a second file, check `lib/constants/` first
 
 ### Firestore Pre-Computed Cache Pattern
 For pages that aggregate large collections (many snapshots + all expenses) on every load, store pre-computed results in a dedicated Firestore collection rather than re-reading and re-calculating each visit.
@@ -270,59 +272,15 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - `dashboardOverviewSummaries/{userId}` is a server-owned materialized summary for warm loads; the client must never read it directly, only the authenticated overview route may do that
 - Overview materialized summaries must have explicit invalidation on overview-relevant mutations plus a short TTL fallback, so stale docs never become a silent source of truth
 
-### Loading and Skeletons
-- Skeletons should mirror the final layout
-- Reuse the same skeleton across chained loading states
-- Use full-page skeletons only on truly slow pages; otherwise prefer delayed or null loading
-- `Loader2` is for initial loading; `RefreshCw` is for user-triggered refresh; `RotateCcw` is for retry/regenerate actions — keep these semantics consistent across the app
-- **Unsaved-state banners**: use `Info` icon (static) when the form has unsaved local changes but no async operation is in progress. Switch to `Loader2 animate-spin` only while the save mutation is actually pending. Do not dim `Loader2` with `opacity-60` as a substitute for a semantically different icon — it reads as a stuck spinner.
-
-### Error State Levels
-- **Query-level (blocking)**: use `Alert variant="destructive"` with `AlertCircle` icon — these represent a failure to load the page's primary data and need visible presence
-- **Mutation (transient)**: use `toast.error()` — the user's action failed but the page is still usable; a toast is enough
-- **Never** render a bare `<p class="text-destructive text-xs">` for errors the user must act on — it is invisible at small sizes and especially on dark backgrounds
-
-### Empty State Layering
-- **One CTA surface per screen context** — do not show a hero empty state AND a secondary empty state for the same surface at the same time; they compete and confuse
-- Pattern: if a page-level chips/hero card is already the primary CTA, the conversation/content area inside it must stay silent (no nested `EmptyState`) until the user has selected a specific item to view
-- Reserve the nested empty state for the case where a specific item IS selected but has no content (e.g. thread selected but messages array is empty)
-
-### Visual Hierarchy Patterns
-- Hero KPI: use `border-l-4 border-l-primary` + `text-3xl desktop:text-4xl tabular-nums` on the single most important card per page (e.g. Patrimonio Totale Lordo on Dashboard, first chart on History)
-- Primary MetricCards (`isPrimary`): value renders at `text-3xl`; secondary cards at `text-2xl`. Use `isPrimary` sparingly — max 2 per MetricSection cluster
-- Section headers in `MetricSection`: left-border accent (`w-[3px] bg-primary opacity-70`) replaces emoji prefixes. Do not use emoji in section titles
-- Page header zone: eyebrow label (`text-xs uppercase tracking-widest text-muted-foreground`) above the `h1` + `border-b border-border` below the full header row separates editorial zone from data grid
-- Action hierarchy: one `variant="default"` CTA per page; utility actions (refresh, CSV export, insert snapshot) use `variant="ghost"` or `variant="outline" size="sm"`
-- **Sticky input panel elevation**: a composer or input bar that sticks to the bottom of a scrollable area should use an upward shadow to signal it "floats" above the content. Use `shadow-[0_-4px_16px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_16px_-2px_rgba(0,0,0,0.3)]` — hardcoded `rgba` because Tailwind v4 has no semantic upward-shadow token. Dark opacity is 5× higher because dark surfaces absorb shadow contrast. Without this the composer reads as "more card" instead of "distinct input plane".
-- Auth pages (`/login`, `/register`): use `bg-background` + `border border-border rounded-xl bg-card p-8` panel — no `Card` component, no hardcoded grays. Top `h-px bg-border` accent line mirrors the dashboard page header separator. Eyebrow label + personal title ("Bentornato." / "Crea il tuo profilo.") apply the same typographic pattern as internal pages. Cross-links use `underline underline-offset-4 text-foreground`, not a colored link
-- Auth form shells: prefer a field wrapper with `focus-within` choreography (border + soft ring on the wrapper, not a louder input-level treatment) so label, input, and password toggle read as one control
-- Password visibility toggles on auth forms should stay keyboard-focusable; keep the field shell active while focus moves between the input and the toggle inside the same container
-- Auth submit feedback should be local and additive: keep existing toast behavior, and pair it with a short inline status line plus button label/icon state (`idle` / `submitting` / `success` / `error`) instead of introducing modal or page-level feedback
-- Secondary rhythm on long pages: wrap secondary card clusters in `<div className="space-y-4">` nested inside the page's `space-y-6` container — the 16px vs 24px ratio visually subordinates the group without adding decoration. Use `border-t border-border/40 pt-4` (or `pt-6` when adding an eyebrow label) on a `motion.div` to signal a zone transition; the divider animates with the content automatically
-- Section zone eyebrows (e.g. "Composizione"): `text-xs font-medium uppercase tracking-widest text-muted-foreground` — same pattern as page header eyebrows but inside a `pt-6 border-t border-border/40` wrapper to act as a section separator
-
 ### Motion and Charts
 - Shared variants live in `lib/utils/motionVariants.ts`
 - For long, data-dense pages like History, prefer chapter-level reveals (`chapterReveal`) over one global stagger; reveal only the main sections on first entry
 - For dense tabbed data views, prefer short container transitions (`tabPanelSwitch`, `tableShellSettle`) and scoped refresh feedback on the active panel only; do not animate table geometry or whole row sets
-- Hall of Fame pattern: drive monthly/yearly ranking surfaces from shared config objects so mobile cards, desktop tables, and current-period spotlights stay aligned without duplicating labels or section logic
-- Hall of Fame spotlight pattern: the current month/year summary should show both ranking position and actual value; the summary must answer "where is the current period?" and "with what number?" at a glance
-- Monte Carlo pattern: when re-running a simulation or switching scenario assumptions, keep the previous valid result shell mounted until the new computation completes; the update should read as a data morph, not an empty/reset state
-- Monte Carlo build pattern: percentile bands and histogram bins may reveal sequentially on first result entry or scenario rerun, but keep the underlying Recharts decorative areas non-animated to avoid chaotic multi-layer motion
-- Dividends page pattern: keep calendar, active date filter, stats, and table derived from the same source of truth; the calendar should reflect filter focus instead of running its own separate selection model
-- For Nivo Sankey filter updates, keep the chart instance mounted and let the library animate data diffs; remounting via React `key` or keyed wrapper shells suppresses the native update animation. In drill-down back-navigation, restore the immediate parent level first (`categoria` before root, `tipo` before root) instead of jumping straight to the top-level view.
-- **Recharts legend overlap on orientation change**: if a `<Legend />` is conditionally hidden (`display:none`) on mount (e.g. `isMobile=true` in portrait) and then revealed after orientation flip (`isMobile=false` in landscape), Recharts' SVG layout is stale — the legend overlaps the X-axis. Fix: add `key={isLandscape ? 'landscape' : 'portrait'}` to the `ResponsiveContainer`. The key change forces a full remount and fresh measurement. Only needed on charts that toggle legend visibility based on `isMobile`; charts with a static legend are unaffected. Applied to `chart-asset-class-evolution` and `chart-liquidity` in `app/dashboard/history/page.tsx`.
 - Performance page pattern: derive `chartData`, heatmap data, and underwater data with `useMemo`; do not store them in local state via `useEffect + setState`
 - Performance period morph: do not key KPI sections or metric cards by selected period; on period switches, values jump silently to the new number (no re-animation); chart shells can re-key only when a first-class staged reveal is intentional
 - `useCountUp` on KPI cards: always use `once: true` so the count-up fires exactly once on first meaningful data arrival and does not re-trigger on React Query cache hits. `fromPrevious: true` alone (without `once`) causes a first-load flash — the 60ms `startDelay` window is cancelled and restarted on every value update before the animation can complete
 - Performance staged reveals should run on first mount or major period change only; manual refresh feedback must stay scoped to the page header or active chart shell instead of replaying the whole page
 - Assistant SSE pattern: keep Anthropic orchestration server-side, stream `data: {JSON}\n\n` events with typed envelopes (`meta`, `text`, `status`, `done`, `error`), and let the client progressively append chunks without owning persistence decisions
-- History page pattern: for mode switches (`%`/`€`, annual/monthly, doubling mode), animate the local chart shell or summary row only; avoid remounting or replaying unrelated sections
-- Goal-based investing pattern: drive summary cards, allocation chart, and detail cards from one shared focus state so the relationship between selected goal and resulting allocation stays explicit across the tab
-- For contextual dividend details, prefer a read-only detail surface first and compute `transform-origin` from the clicked row/card; only transition into edit mode when the user explicitly asks to modify the record
-- Hall of Fame notes pattern: note view/edit dialogs should open from the clicked ranking row/card or the "Aggiungi Nota" CTA via contextual `transform-origin`; the note trigger can be local to the page if the older shared cell component becomes too limiting
-- Allocation mobile drill-down pattern: keep the sheet's native bottom-entry animation, but make the sheet body the only scrollable region and reset its scroll to top on each level/content change; this preserves orientation more reliably than custom container-entry choreography
-- Allocation target markers inside progress bars should use a centered dot without a vertical stem; if bar height/border changes, recheck visual centering against the live track
 - **Framer Motion in assistant components**: use `AnimatePresence mode="wait"` + `key={stateValue}` for content that fully swaps (e.g. context card on period change, period label crossfade). Use `AnimatePresence initial={false}` (default popLayout) for lists where items are added/removed (messages, memory items). `initial={false}` prevents entrance animation on items already visible when `AnimatePresence` mounts — only genuinely new items animate in.
 - **Memory item exit animation**: wrap each item in `motion.div` with `exit={{ opacity: 0, height: 0, marginBottom: 0 }}` + `style={{ overflow: 'hidden' }}`. Height collapse on exit prevents the list from leaving a gap after removal. Pair `height: 0` with `marginBottom: 0` or the bottom gap remains.
 - **Collapsible section with Framer Motion**: for height-animated collapsibles outside Radix, use `motion.div` with `initial={{ opacity: 0, height: 0 }}` / `animate={{ opacity: 1, height: 'auto' }}` / `exit={{ opacity: 0, height: 0 }}` + `style={{ overflow: 'hidden' }}`. `height: 'auto'` works in Framer Motion (unlike CSS transitions). Wrap in `AnimatePresence initial={false}`.
@@ -336,6 +294,7 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
   - `Line` / `Area`: `animationDuration={800}` + `animationEasing="ease-out"`
   - `Pie` also needs `animationBegin={0}`
 - Decorative stacked background areas should keep `isAnimationActive={false}`
+- **Recharts conditional dot markers**: for a `<Line>` where most points need no dot but specific points need a custom marker (e.g. note indicators), use a custom `dot` renderer that returns `null` for the default case and renders the marker only when the condition is met (`hasNote`). Pair with `activeDot={{ r: 6 }}` so the hover dot still works. Applied in `components/history/CustomChartDot.tsx`.
 - Overview/Panoramica pattern: count-up lives in `OverviewAnimatedCurrency` leaf nodes, NOT in the page component — each rAF tick re-renders only that leaf, leaving the chart subtree and all other cards untouched. The page passes final computed values as stable props; display timing is entirely the leaf's concern.
 - Overview/Panoramica chart scheduling: `OverviewChartsSection` is wrapped with `React.memo` and receives `heroSettled: boolean` from the page. When `heroSettled` becomes true, it schedules chart SVG mount via `requestIdleCallback` (with `{ timeout: 800 }`) or `setTimeout(0)` as fallback — never a fixed arbitrary timeout as the primary strategy. On mobile and reduced-motion, `chartRenderReady` starts true immediately.
 - `OverviewAnimatedCurrency` format prop: use `format="integer"` for count-based KPIs (e.g. asset count) to avoid fractional display during rAF interpolation. Default is `"currency"` via `cachedFormatCurrencyEUR`. Add new format values here only if a genuinely distinct format is needed — do not extract a separate component per format.
@@ -378,6 +337,13 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 ### Mobile Header Trash Icon Pattern
 - In a card header that has a title/subtitle block on the left and a destructive icon button on the right, always use `flex items-start justify-between` (not `flex-col` + `sm:flex-row`). `flex-col` puts the trash button on its own row on mobile, wasting vertical space and breaking visual grouping. The subtitle text stays under the title in the left block; the button stays top-right in all viewports.
 
+### Server-Side Layer Separation (`lib/server/`)
+- `lib/server/` hosts server-only modules that sit between API routes and services: use cases, processors, and Admin SDK repositories
+- `lib/server/assetAdminRepository.ts` — canonical Admin SDK asset fetch (`getUserAssetsAdmin`). Import from here in all API routes that need server-side asset access; do not re-declare the function inline
+- `lib/server/dividendUseCase.ts` — dividend creation orchestration (`createDividendWithOptionalExpense`). Contains coupon cleanup, costPerShare enrichment, and conditional expense creation. Route retains only auth, validation, asset fetch, and ownership check
+- `lib/server/dividendProcessor.ts` — 3 cron phases (`runDividendScraping`, `runExpenseCreation`, `runNextCouponScheduling`) with explicit typed result interfaces. Cron route delegates to these; do not add phase logic back into the route handler
+- Pattern rule: API route = auth → validate → fetch → ownership check → delegate to use case/processor → return response. No Firestore queries, business logic, or multi-step orchestration in the handler body itself
+
 ### Pure Functions and Testability
 - If a utility function calls `new Date()` internally to get "now", it is impure and cannot be tested for time-sensitive branches without fake timers. Pass `now: Date` as an explicit parameter. The call site passes `new Date()` — the function stays pure and test code can inject any date. Applied to `buildPensionDraftIssues(drafts, currentAge, retirementAge, now)`.
 
@@ -398,7 +364,6 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 ---
 
 ## Testing and Workflow
-
 ### Commands
 - `npm test -- <file>` or `npx vitest run <file>` for targeted tests
 - `npx tsc --noEmit` for repo-wide TypeScript checking without generating build output
@@ -412,9 +377,8 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - For Dividendi & Cedole UX/motion changes, run `npx tsc --noEmit` and then manually validate calendar focus, table/detail continuity, and tooltip anchoring in the cashflow dividends tab
 - For Performance page UX/motion changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/performanceService.test.ts` before manual validation
 - For History page UX/motion changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/chartService.test.ts` before manual validation
-- For private API auth regressions, run `npx vitest run __tests__/apiAuthRoutes.test.ts`
 - For Assistant AI foundation changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/assistantRoutes.test.ts __tests__/assistantWebSearchPolicy.test.ts __tests__/assistantMonthContextService.test.ts` before manual validation
-- For Settings UX-only changes, run `npx tsc --noEmit` plus a targeted smoke/auth check (`npx vitest run __tests__/apiAuthRoutes.test.ts`) before manual UI validation
+- For dividend route / cron handler changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/dividendUseCase.test.ts __tests__/dividendProcessor.test.ts` before manual validation
 
 ### Test Patterns
 - Use local `new Date(year, monthIndex, day)` in tests, not ISO strings
@@ -423,11 +387,12 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - Keep test fixtures aligned with current required types, especially `BudgetItem.order`
 - For private route auth tests, prefer route-handler unit tests with mocked `adminAuth.verifyIdToken` and Admin SDK service calls over heavier browser/E2E coverage
 - For Cashflow/Budget UX changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/budgetUtils.test.ts` before manual validation
-
+- For asset creation / bond dialog changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/assetDialogHelpers.test.ts __tests__/couponUtils.test.ts` before manual validation of the create-bond-with-ISIN flow
+- For snapshot route changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/snapshotHelpers.test.ts` before manual validation
+- If a test imports a service that transitively pulls in `lib/firebase/config.ts`, mock `@/lib/firebase/config` at the test boundary; otherwise Firebase client init runs during import and fails on missing/invalid test env vars.
+- Materialized-summary tests must keep `updatedAt`/`computedAt` inside the 5-minute TTL when the intent is to exercise the cached branch; older dates intentionally force live recompute and require fuller Admin SDK query mocks.
 ---
-
 ## Common Errors to Avoid
-
 ### Timezone Boundary Bugs
 - Symptom: entries appear in the wrong month near midnight
 - Fix: group with Italy timezone helpers, never native `Date.getMonth()`
@@ -492,6 +457,12 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - When a page uses `useCountUp` for mount-time KPI animations, avoid simultaneously rendering heavy components (Recharts charts, large lists) that aren't immediately visible
 - Pattern: start collapsible/below-fold Recharts components as collapsed on mobile, let users expand — use `isMobile` from `useMediaQuery` in the `useState` initializer for the expanded state
 
+### JSON Date Deserialization in API Route Bodies
+- `Date` fields in `request.json()` bodies arrive as ISO strings (`"2024-04-10T..."`), not `Date` objects
+- Comparing a string to a `Date` with `<=` / `>=` always returns `false` in JavaScript — the string coerces to `NaN` via `Number()`
+- **Always wrap**: `const paymentDate = new Date(dividendData.paymentDate)` before any date comparison in a route or use case that receives data from the client
+- Applied in `lib/server/dividendUseCase.ts` — the bug caused automatic expense creation to silently never trigger for past dividends
+
 ### createExpense Field Enumeration Trap
 - `createExpense` in `expenseService.ts` explicitly enumerates every field in `removeUndefinedFields({...})` before `addDoc`. `updateExpense` spreads `...updates`, so new fields work automatically there.
 - **Symptom**: a new field saved correctly on edit but silently missing on create.
@@ -507,8 +478,5 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - Docker Compose reads `.env` by default for variable substitution in the YAML (`${VAR}`). It does NOT read `.env.local`. Always run with `--env-file .env.local`: `docker compose --env-file .env.local up -d --build`.
 - Firebase Authorized Domains must include any custom self-hosted domain. `*.vercel.app` is pre-authorized by Firebase; all other domains (including Docker/VPS deployments) must be added manually in Firebase Console → Authentication → Settings → Authorized domains.
 
-### Nested Component Remount Trap
-- Symptom: clicking a row or toggling local state causes an entire dense table below to flash or look recreated, even in production
-- Cause: a large subtree renderer is defined inside the parent component and used as JSX (`<InnerComponent />`), so every parent re-render gives React a new component identity and remounts the subtree
-- Fix: move the subtree to a top-level component or invoke it as a pure render helper (`InnerComponent()`) when it intentionally closes over local state
+
 

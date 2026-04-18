@@ -94,6 +94,234 @@ function shouldUpdatePrice(assetType: string, subCategory?: string): boolean {
   return true;
 }
 
+/**
+ * Converts a raw price to EUR for bonds using Borsa Italiana's % of par convention.
+ * Example: rawPrice=104.2, nominalValue=1000 → 1042€
+ * Passthrough for all other asset types or bonds without a qualifying nominal value.
+ */
+function resolveBondPrice(
+  rawPrice: number,
+  nominalValue: number | undefined,
+  isBondWithIsin: boolean
+): number {
+  if (isBondWithIsin && nominalValue && !isNaN(nominalValue) && nominalValue > 1) {
+    return rawPrice * (nominalValue / 100);
+  }
+  return rawPrice;
+}
+
+/**
+ * Fetches the current market price for an asset from either Borsa Italiana (bonds with ISIN)
+ * or Yahoo Finance (all other assets). Shows toast feedback on success or failure.
+ * Returns price=0 when the quote cannot be retrieved, signalling that a manual update is needed.
+ */
+async function fetchMarketPrice(
+  ticker: string,
+  isin: string | undefined,
+  bondNominalValue: number | undefined,
+  isBondWithIsin: boolean
+): Promise<{ price: number; currency?: string; priceEur?: number }> {
+  try {
+    let response: Response;
+    let source: string;
+
+    if (isBondWithIsin) {
+      response = await fetch(`/api/prices/bond-quote?isin=${encodeURIComponent(isin!.trim())}`);
+      source = 'Borsa Italiana';
+    } else {
+      response = await fetch(`/api/prices/quote?ticker=${encodeURIComponent(ticker)}`);
+      source = 'Yahoo Finance';
+    }
+
+    const quote = await response.json();
+
+    if (quote.price && quote.price > 0) {
+      const price = resolveBondPrice(quote.price, bondNominalValue, isBondWithIsin);
+      const currency: string | undefined = quote.currency?.trim() || undefined;
+      const priceEur: number | undefined = quote.currentPriceEur > 0 ? quote.currentPriceEur : undefined;
+      toast.success(`Prezzo recuperato da ${source}: ${price.toFixed(2)} ${quote.currency}`);
+      return { price, currency, priceEur };
+    }
+
+    toast.error(
+      isBondWithIsin
+        ? `Impossibile recuperare il prezzo per ISIN ${isin}. Puoi inserire manualmente il prezzo nel campo apposito.`
+        : `Impossibile recuperare il prezzo per ${ticker}. Puoi inserire manualmente il prezzo nel campo apposito.`
+    );
+    return { price: 0 };
+  } catch (error) {
+    console.error('Error fetching quote:', error);
+    toast.error('Errore nel recupero del prezzo. Puoi inserire manualmente il prezzo nel campo apposito.');
+    return { price: 0 };
+  }
+}
+
+/**
+ * Assembles a BondDetails object from validated form values.
+ * Returns undefined when the bond details section is hidden or required fields are missing.
+ */
+function buildBondDetailsFromForm(
+  data: AssetFormValues,
+  showBondDetails: boolean,
+  showStepUp: boolean
+): BondDetails | undefined {
+  if (
+    !showBondDetails ||
+    !data.bondCouponRate || isNaN(data.bondCouponRate) ||
+    !data.bondCouponFrequency ||
+    !data.bondIssueDate ||
+    !data.bondMaturityDate
+  ) {
+    return undefined;
+  }
+
+  return {
+    couponRate: data.bondCouponRate,
+    couponFrequency: data.bondCouponFrequency,
+    issueDate: new Date(data.bondIssueDate),
+    maturityDate: new Date(data.bondMaturityDate),
+    ...(data.bondNominalValue && !isNaN(data.bondNominalValue) ? { nominalValue: data.bondNominalValue } : {}),
+    ...(showStepUp && data.bondCouponRateSchedule && data.bondCouponRateSchedule.length > 0
+      ? { couponRateSchedule: data.bondCouponRateSchedule as CouponRateTier[] }
+      : {}),
+    ...(data.bondFinalPremiumRate && !isNaN(data.bondFinalPremiumRate)
+      ? { finalPremiumRate: data.bondFinalPremiumRate }
+      : {}),
+  };
+}
+
+/**
+ * Builds the AssetFormData payload from resolved form values and price data.
+ * averageCost uses the same Borsa Italiana % of par convention as currentPrice:
+ * entered as BI price, stored in EUR (e.g. user enters 100 → stored as nominalValue€).
+ */
+function buildAssetFormDataFromValues(
+  data: AssetFormValues,
+  currentPrice: number,
+  fetchedCurrentPriceEur: number | undefined,
+  isComposite: boolean,
+  composition: AssetComposition[],
+  isBondWithIsin: boolean
+): AssetFormData {
+  return {
+    ticker: data.ticker,
+    name: data.name,
+    isin: data.isin && data.isin.trim() !== '' ? data.isin.trim().toUpperCase() : undefined,
+    type: data.type,
+    assetClass: data.assetClass,
+    subCategory: data.subCategory || undefined,
+    currency: data.currency,
+    quantity: data.quantity,
+    averageCost:
+      data.averageCost && !isNaN(data.averageCost) && data.averageCost > 0
+        ? resolveBondPrice(data.averageCost, data.bondNominalValue, isBondWithIsin)
+        : undefined,
+    taxRate: data.taxRate && !isNaN(data.taxRate) && data.taxRate >= 0 ? data.taxRate : undefined,
+    totalExpenseRatio:
+      data.totalExpenseRatio && !isNaN(data.totalExpenseRatio) && data.totalExpenseRatio >= 0
+        ? data.totalExpenseRatio
+        : undefined,
+    stampDutyExempt: data.stampDutyExempt || false,
+    includeInHistoryTables: data.includeInHistoryTables || false,
+    currentPrice,
+    currentPriceEur: fetchedCurrentPriceEur,
+    isLiquid: data.isLiquid,
+    autoUpdatePrice: data.autoUpdatePrice,
+    composition: isComposite && composition.length > 0 ? composition : undefined,
+    outstandingDebt:
+      data.outstandingDebt && !isNaN(data.outstandingDebt) && data.outstandingDebt > 0
+        ? data.outstandingDebt
+        : undefined,
+    isPrimaryResidence: data.isPrimaryResidence || false,
+  };
+}
+
+/**
+ * Generates the next coupon dividend and optional final premium for a bond asset
+ * via POST /api/dividends. Non-critical: a failure here does not roll back the asset save.
+ */
+async function scheduleCouponDividends(
+  bondDetails: BondDetails,
+  data: AssetFormValues,
+  savedAssetId: string,
+  userId: string
+): Promise<void> {
+  const issueDate = bondDetails.issueDate as Date;
+  const maturityDate = bondDetails.maturityDate as Date;
+  const nominalValue = bondDetails.nominalValue ?? 1;
+  // Use asset tax rate if set (e.g. 12.5% for BTPs), otherwise default 26%
+  const taxRate = data.taxRate && !isNaN(data.taxRate) && data.taxRate > 0 ? data.taxRate : 26;
+
+  const nextDate = getNextCouponDate(issueDate, bondDetails.couponFrequency, maturityDate);
+
+  if (nextDate) {
+    const effectiveRate = getApplicableCouponRate(
+      nextDate,
+      issueDate,
+      bondDetails.couponRate,
+      bondDetails.couponRateSchedule
+    );
+    const perShare = calculateCouponPerShare(effectiveRate, nominalValue, bondDetails.couponFrequency);
+    const gross = perShare * data.quantity;
+    const tax = gross * (taxRate / 100);
+
+    const couponResponse = await authenticatedFetch('/api/dividends', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId,
+        dividendData: {
+          assetId: savedAssetId,
+          exDate: nextDate,
+          paymentDate: nextDate,
+          dividendPerShare: perShare,
+          quantity: data.quantity,
+          grossAmount: gross,
+          taxAmount: tax,
+          netAmount: gross - tax,
+          currency: data.currency,
+          dividendType: 'coupon',
+          isAutoGenerated: true,
+          notes: `Cedola ${data.bondCouponFrequency} — tasso annuo ${effectiveRate}%`,
+        },
+      }),
+    });
+
+    if (couponResponse.ok) {
+      const formattedDate = nextDate.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      toast.success(`Prossima cedola programmata: ${formattedDate}`);
+    }
+  }
+
+  if (bondDetails.finalPremiumRate && maturityDate > new Date()) {
+    const premiumPerShare = (bondDetails.finalPremiumRate / 100) * nominalValue;
+    const premiumGross = premiumPerShare * data.quantity;
+    const premiumTax = premiumGross * (taxRate / 100);
+
+    await authenticatedFetch('/api/dividends', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId,
+        dividendData: {
+          assetId: savedAssetId,
+          exDate: maturityDate,
+          paymentDate: maturityDate,
+          dividendPerShare: premiumPerShare,
+          quantity: data.quantity,
+          grossAmount: premiumGross,
+          taxAmount: premiumTax,
+          netAmount: premiumGross - premiumTax,
+          currency: data.currency,
+          dividendType: 'finalPremium',
+          isAutoGenerated: true,
+          notes: `Premio finale a scadenza — ${bondDetails.finalPremiumRate}%`,
+        },
+      }),
+    });
+  }
+}
+
 // Zod validation schema for asset form
 // Note: .or(z.nan()) allows undefined values for optional numeric fields
 const assetSchema = z.object({
@@ -541,13 +769,11 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
   const onSubmit = async (data: AssetFormValues) => {
     if (!user) return;
 
-    // Validate that sub-category is provided if enabled for the asset class
     if (isSubCategoryEnabled() && !data.subCategory) {
       toast.error('La sottocategoria è obbligatoria per questa classe di asset');
       return;
     }
 
-    // Validate composition if enabled
     if (isComposite && !validateComposition()) {
       return;
     }
@@ -555,157 +781,41 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
     try {
       setFetchingPrice(true);
 
-      // Step 1: Determine current price using resolution strategy
-      let currentPrice = 1; // Default for cash and fixed-price assets
-      let fetchedCurrentPriceEur: number | undefined; // EUR-converted price for non-EUR assets
-
-      // Determine bond type once — used in both Path 1 (manual) and Path 2 (auto-fetch)
-      // to apply the % of par → EUR conversion consistently.
+      // Bonds with ISIN use Borsa Italiana pricing (% of par convention).
+      // This flag drives both price resolution and form data assembly.
       const isBondWithIsin =
         data.type === 'bond' &&
         data.assetClass === 'bonds' &&
-        data.isin &&
-        data.isin.trim().length > 0;
+        !!(data.isin?.trim());
 
-      // Path 1: Check if manual price is provided (highest priority)
+      // Step 1: Resolve current price using priority chain:
+      //   Path 1 — manual entry (highest priority)
+      //   Path 2 — fetch from Borsa Italiana / Yahoo Finance
+      //   Path 3 — default 1 (cash, real estate, private equity)
+      let currentPrice = 1;
+      let fetchedCurrentPriceEur: number | undefined;
+
       if (data.manualPrice && !isNaN(data.manualPrice) && data.manualPrice > 0) {
-        currentPrice = data.manualPrice;
-        // Bond prices are quoted as % of par (e.g. 104.2 = 104.2%), same convention
-        // as Borsa Italiana auto-fetch. Mirror the Path 2 conversion so manual entry
-        // is consistent: rawPercent × (nominalValue / 100) = EUR per unit.
-        if (isBondWithIsin && data.bondNominalValue && !isNaN(data.bondNominalValue) && data.bondNominalValue > 1) {
-          currentPrice = data.manualPrice * (data.bondNominalValue / 100);
-        }
+        currentPrice = resolveBondPrice(data.manualPrice, data.bondNominalValue, isBondWithIsin);
         toast.success(`Prezzo manuale impostato: ${currentPrice.toFixed(2)} ${data.currency}`);
-      }
-      // Path 2: Check if we need to fetch price from market data sources
-      // Bonds with ISIN: Borsa Italiana
-      // Other assets (stocks, ETFs, crypto, commodities): Yahoo Finance
-      else if (shouldUpdatePrice(data.type, data.subCategory)) {
-        try {
-          // isBondWithIsin already computed above
-
-          let response;
-          let source = 'Yahoo Finance';
-
-          if (isBondWithIsin) {
-            // Use Borsa Italiana scraper for bonds with ISIN
-            response = await fetch(
-              `/api/prices/bond-quote?isin=${encodeURIComponent(data.isin!.trim())}`
-            );
-            source = 'Borsa Italiana';
-          } else {
-            // Use Yahoo Finance for other assets
-            response = await fetch(
-              `/api/prices/quote?ticker=${encodeURIComponent(data.ticker)}`
-            );
-          }
-
-          const quote = await response.json();
-
-          if (quote.price && quote.price > 0) {
-            currentPrice = quote.price;
-            // Bonds from Borsa Italiana are quoted as % of par (e.g. 104.2 = 104.2%).
-            // Convert to actual EUR per unit: price% × (nominalValue / 100)
-            // This mirrors the same conversion in priceUpdater.ts.
-            if (isBondWithIsin && data.bondNominalValue && !isNaN(data.bondNominalValue) && data.bondNominalValue > 1) {
-              currentPrice = currentPrice * (data.bondNominalValue / 100);
-            }
-
-            // The /api/prices/quote route already normalizes GBp → GBP and provides
-            // currentPriceEur via server-side Frankfurter conversion. Use both directly.
-            if (quote.currency && quote.currency.trim() !== '') {
-              data.currency = quote.currency;
-            }
-            if (quote.currentPriceEur && quote.currentPriceEur > 0) {
-              fetchedCurrentPriceEur = quote.currentPriceEur;
-            }
-
-            toast.success(
-              `Prezzo recuperato da ${source}: ${currentPrice.toFixed(2)} ${quote.currency}`
-            );
-          } else {
-            toast.error(
-              `Impossibile recuperare il prezzo ${isBondWithIsin ? `per ISIN ${data.isin}` : `per ${data.ticker}`}. Puoi inserire manualmente il prezzo nel campo apposito.`
-            );
-            // Set price to 0 as indicator that manual update is needed
-            // This allows saving the asset while flagging price as missing
-            currentPrice = 0;
-          }
-        } catch (error) {
-          console.error('Error fetching quote:', error);
-          toast.error(
-            `Errore nel recupero del prezzo. Puoi inserire manualmente il prezzo nel campo apposito.`
-          );
-          currentPrice = 0;
-        }
-      }
-      // Path 3: Use default price of 1 for assets that don't need market prices
-      // (cash, real estate, private equity)
-
-      // Build optional bond details object (only when toggle is on and required fields filled)
-      let bondDetailsValue: BondDetails | undefined;
-      if (
-        showBondDetails &&
-        data.bondCouponRate && !isNaN(data.bondCouponRate) &&
-        data.bondCouponFrequency &&
-        data.bondIssueDate &&
-        data.bondMaturityDate
-      ) {
-        bondDetailsValue = {
-          couponRate: data.bondCouponRate,
-          couponFrequency: data.bondCouponFrequency,
-          issueDate: new Date(data.bondIssueDate),
-          maturityDate: new Date(data.bondMaturityDate),
-          // Include nominalValue only if provided (avoids undefined in Firestore nested object)
-          ...(data.bondNominalValue && !isNaN(data.bondNominalValue) ? { nominalValue: data.bondNominalValue } : {}),
-          // Include step-up schedule only if active and non-empty
-          ...(showStepUp && data.bondCouponRateSchedule && data.bondCouponRateSchedule.length > 0
-            ? { couponRateSchedule: data.bondCouponRateSchedule as CouponRateTier[] }
-            : {}),
-          // Include final premium only if provided
-          ...(data.bondFinalPremiumRate && !isNaN(data.bondFinalPremiumRate)
-            ? { finalPremiumRate: data.bondFinalPremiumRate }
-            : {}),
-        };
+      } else if (shouldUpdatePrice(data.type, data.subCategory)) {
+        const fetched = await fetchMarketPrice(data.ticker, data.isin, data.bondNominalValue, isBondWithIsin);
+        currentPrice = fetched.price;
+        if (fetched.currency) data.currency = fetched.currency;
+        fetchedCurrentPriceEur = fetched.priceEur;
       }
 
+      // Step 2: Assemble bond details and full form payload
+      const bondDetailsValue = buildBondDetailsFromForm(data, showBondDetails, showStepUp);
       const formData: AssetFormData = {
-        ticker: data.ticker,
-        name: data.name,
-        isin: data.isin && data.isin.trim() !== '' ? data.isin.trim().toUpperCase() : undefined,
-        type: data.type,
-        assetClass: data.assetClass,
-        subCategory: data.subCategory || undefined,
-        currency: data.currency,
-        quantity: data.quantity,
-        // averageCost uses the same Borsa Italiana convention as currentPrice: the user
-        // enters the BI price (per 100€ of nominal), so we apply the same % → EUR
-        // conversion. Example: user enters 100 (= bought at par on BI) with nominalValue=1000
-        // → stored as 1000€. User enters 95 → stored as 950€.
-        averageCost: data.averageCost && !isNaN(data.averageCost) && data.averageCost > 0
-          ? (isBondWithIsin && data.bondNominalValue && !isNaN(data.bondNominalValue) && data.bondNominalValue > 1
-              ? data.averageCost * (data.bondNominalValue / 100)
-              : data.averageCost)
-          : undefined,
-        taxRate: data.taxRate && !isNaN(data.taxRate) && data.taxRate >= 0 ? data.taxRate : undefined,
-        totalExpenseRatio: data.totalExpenseRatio && !isNaN(data.totalExpenseRatio) && data.totalExpenseRatio >= 0 ? data.totalExpenseRatio : undefined,
-        stampDutyExempt: data.stampDutyExempt || false,
-        includeInHistoryTables: data.includeInHistoryTables || false,
-        currentPrice,
-        currentPriceEur: fetchedCurrentPriceEur,
-        isLiquid: data.isLiquid,
-        autoUpdatePrice: data.autoUpdatePrice,
-        composition: isComposite && composition.length > 0 ? composition : undefined,
-        outstandingDebt: data.outstandingDebt && !isNaN(data.outstandingDebt) && data.outstandingDebt > 0 ? data.outstandingDebt : undefined,
-        isPrimaryResidence: data.isPrimaryResidence || false,
+        ...buildAssetFormDataFromValues(data, currentPrice, fetchedCurrentPriceEur, isComposite, composition, isBondWithIsin),
         bondDetails: bondDetailsValue,
       };
 
+      // Step 3: Persist asset
       let savedAssetId: string;
-
       if (asset) {
-        // When editing, keep the existing price if we're not fetching a new one
+        // Keep existing price for assets that do not participate in market pricing
         if (!shouldUpdatePrice(data.type, data.subCategory)) {
           formData.currentPrice = asset.currentPrice;
         }
@@ -717,88 +827,12 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         toast.success('Asset creato con successo');
       }
 
-      // Generate next coupon dividend if bond details are configured
+      // Step 4: Schedule coupon dividends for bonds with configured coupon details
       if (bondDetailsValue) {
         try {
-          const issueDate = bondDetailsValue.issueDate as Date;
-          const maturityDate = bondDetailsValue.maturityDate as Date;
-          const nominalValue = bondDetailsValue.nominalValue ?? 1;
-          // Use asset tax rate if set (e.g. 12.5% for BTPs), otherwise default 26%
-          const taxRate = data.taxRate && !isNaN(data.taxRate) && data.taxRate > 0 ? data.taxRate : 26;
-
-          const nextDate = getNextCouponDate(issueDate, bondDetailsValue.couponFrequency, maturityDate);
-
-          if (nextDate) {
-            // For step-up bonds: pick the rate applicable to the payment date
-            const effectiveRate = getApplicableCouponRate(
-              nextDate,
-              issueDate,
-              bondDetailsValue.couponRate,
-              bondDetailsValue.couponRateSchedule
-            );
-            const perShare = calculateCouponPerShare(effectiveRate, nominalValue, bondDetailsValue.couponFrequency);
-            const gross = perShare * data.quantity;
-            const tax = gross * (taxRate / 100);
-
-            const couponResponse = await authenticatedFetch('/api/dividends', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                userId: user.uid,
-                dividendData: {
-                  assetId: savedAssetId,
-                  exDate: nextDate,
-                  paymentDate: nextDate,
-                  dividendPerShare: perShare,
-                  quantity: data.quantity,
-                  grossAmount: gross,
-                  taxAmount: tax,
-                  netAmount: gross - tax,
-                  currency: data.currency,
-                  dividendType: 'coupon',
-                  isAutoGenerated: true,
-                  notes: `Cedola ${data.bondCouponFrequency} — tasso annuo ${effectiveRate}%`,
-                },
-              }),
-            });
-
-            if (couponResponse.ok) {
-              const formattedDate = nextDate.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
-              toast.success(`Prossima cedola programmata: ${formattedDate}`);
-            }
-          }
-
-          // Generate final premium dividend if configured and maturity is in the future.
-          // Cleanup of existing finalPremium entries happens server-side in POST /api/dividends.
-          if (bondDetailsValue.finalPremiumRate && maturityDate > new Date()) {
-            const premiumPerShare = (bondDetailsValue.finalPremiumRate / 100) * nominalValue;
-            const premiumGross = premiumPerShare * data.quantity;
-            const premiumTax = premiumGross * (taxRate / 100);
-
-            await authenticatedFetch('/api/dividends', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                userId: user.uid,
-                dividendData: {
-                  assetId: savedAssetId,
-                  exDate: maturityDate,
-                  paymentDate: maturityDate,
-                  dividendPerShare: premiumPerShare,
-                  quantity: data.quantity,
-                  grossAmount: premiumGross,
-                  taxAmount: premiumTax,
-                  netAmount: premiumGross - premiumTax,
-                  currency: data.currency,
-                  dividendType: 'finalPremium',
-                  isAutoGenerated: true,
-                  notes: `Premio finale a scadenza — ${bondDetailsValue.finalPremiumRate}%`,
-                },
-              }),
-            });
-          }
+          await scheduleCouponDividends(bondDetailsValue, data, savedAssetId, user.uid);
         } catch (couponError) {
-          // Non-critical: asset was saved successfully, coupon generation failed
+          // Non-critical: asset was saved; coupon generation failed
           console.error('Error generating coupon dividend:', couponError);
           toast.error('Asset salvato, ma errore nella generazione della cedola automatica');
         }

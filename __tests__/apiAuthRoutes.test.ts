@@ -20,6 +20,9 @@ const {
   getSettingsMock,
   getCategoryByIdMock,
   assetsWhereGetMock,
+  monthlySnapshotsGetMock,
+  expensesGetMock,
+  assetAllocationTargetsDocGetMock,
   snapshotDocGetMock,
   snapshotDocSetMock,
   overviewSummaryDocGetMock,
@@ -35,6 +38,9 @@ const {
   getSettingsMock: vi.fn(),
   getCategoryByIdMock: vi.fn(),
   assetsWhereGetMock: vi.fn(),
+  monthlySnapshotsGetMock: vi.fn(),
+  expensesGetMock: vi.fn(),
+  assetAllocationTargetsDocGetMock: vi.fn(),
   snapshotDocGetMock: vi.fn(),
   snapshotDocSetMock: vi.fn(),
   overviewSummaryDocGetMock: vi.fn(),
@@ -47,19 +53,45 @@ vi.mock('@/lib/firebase/admin', () => ({
   },
   adminDb: {
     collection: vi.fn((name: string) => {
-      if (name === 'assets') {
-        return {
-          where: vi.fn(() => ({
-            get: assetsWhereGetMock,
-          })),
+      const createQueryChain = (finalGetMock: ReturnType<typeof vi.fn>) => {
+        const chain = {
+          where: vi.fn(() => chain),
+          orderBy: vi.fn(() => chain),
+          get: finalGetMock,
         };
+
+        return chain;
+      };
+
+      if (name === 'assets') {
+        return createQueryChain(assetsWhereGetMock);
       }
 
       if (name === 'monthly-snapshots') {
         return {
+          where: vi.fn(() => {
+            const chain = {
+              orderBy: vi.fn(() => chain),
+              get: monthlySnapshotsGetMock,
+            };
+
+            return chain;
+          }),
           doc: vi.fn(() => ({
             get: snapshotDocGetMock,
             set: snapshotDocSetMock,
+          })),
+        };
+      }
+
+      if (name === 'expenses') {
+        return createQueryChain(expensesGetMock);
+      }
+
+      if (name === 'assetAllocationTargets') {
+        return {
+          doc: vi.fn(() => ({
+            get: assetAllocationTargetsDocGetMock,
           })),
         };
       }
@@ -194,6 +226,15 @@ describe('Private API route auth', () => {
     snapshotDocSetMock.mockResolvedValue(undefined);
     overviewSummaryDocGetMock.mockResolvedValue({ exists: false });
     overviewSummaryDocSetMock.mockResolvedValue(undefined);
+    monthlySnapshotsGetMock.mockResolvedValue({
+      docs: [],
+    });
+    expensesGetMock.mockResolvedValue({
+      docs: [],
+    });
+    assetAllocationTargetsDocGetMock.mockResolvedValue({
+      exists: false,
+    });
   });
 
   it('returns 401 for private dividends route without Authorization header', async () => {
@@ -291,8 +332,8 @@ describe('Private API route auth', () => {
             currentMonthSnapshotExists: false,
           },
         },
-        updatedAt: new Date('2026-04-06T10:00:00.000Z'),
-        computedAt: new Date('2026-04-06T10:00:00.000Z'),
+        updatedAt: new Date(),
+        computedAt: new Date(),
         sourceVersion: 1,
         invalidatedAt: null,
       }),

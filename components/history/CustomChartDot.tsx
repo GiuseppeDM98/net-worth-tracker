@@ -105,17 +105,7 @@ export function CustomChartDot({ cx, cy, payload, isMobile = false }: CustomChar
             />
           </g>
         </>
-      ) : (
-        // Standard blue dot for snapshots without notes
-        <circle
-          cx={cx}
-          cy={cy}
-          r={baseRadius}
-          fill="#3B82F6"
-          stroke="#fff"
-          strokeWidth={strokeWidth}
-        />
-      )}
+      ) : null}
     </g>
   );
 }

@@ -23,6 +23,10 @@ import { getSettings } from './assetAllocationService';
 
 const PERFORMANCE_CACHE_COLLECTION = 'performance-cache';
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 /**
  * Format month and year to MM/YY format (e.g., "04/25")
  * @param year - Full year (e.g., 2025)
@@ -1501,8 +1505,13 @@ async function readPerformanceCache(userId: string): Promise<PerformanceCacheDoc
     const snap = await getDoc(doc(db, PERFORMANCE_CACHE_COLLECTION, userId));
     if (!snap.exists()) return null;
     return snap.data() as PerformanceCacheDocument;
-  } catch {
+  } catch (error) {
     // Cache read failure is non-fatal — fall through to full computation
+    console.warn('Failed to read performance cache, falling back to live computation', {
+      userId,
+      operation: 'readPerformanceCache',
+      error: getErrorMessage(error),
+    });
     return null;
   }
 }
@@ -1516,8 +1525,15 @@ async function writePerformanceCache(userId: string, cacheKey: string, data: Per
       data: serializePerformanceData(data),
     };
     await setDoc(doc(db, PERFORMANCE_CACHE_COLLECTION, userId), document);
-  } catch {
+  } catch (error) {
     // Cache write failure is non-fatal — page still works with freshly computed data
+    console.warn('Failed to write performance cache, keeping live result only', {
+      userId,
+      operation: 'writePerformanceCache',
+      cacheKey,
+      snapshotCount: data.snapshotCount,
+      error: getErrorMessage(error),
+    });
   }
 }
 
