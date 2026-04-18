@@ -337,6 +337,13 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 ### Mobile Header Trash Icon Pattern
 - In a card header that has a title/subtitle block on the left and a destructive icon button on the right, always use `flex items-start justify-between` (not `flex-col` + `sm:flex-row`). `flex-col` puts the trash button on its own row on mobile, wasting vertical space and breaking visual grouping. The subtitle text stays under the title in the left block; the button stays top-right in all viewports.
 
+### Server-Side Layer Separation (`lib/server/`)
+- `lib/server/` hosts server-only modules that sit between API routes and services: use cases, processors, and Admin SDK repositories
+- `lib/server/assetAdminRepository.ts` — canonical Admin SDK asset fetch (`getUserAssetsAdmin`). Import from here in all API routes that need server-side asset access; do not re-declare the function inline
+- `lib/server/dividendUseCase.ts` — dividend creation orchestration (`createDividendWithOptionalExpense`). Contains coupon cleanup, costPerShare enrichment, and conditional expense creation. Route retains only auth, validation, asset fetch, and ownership check
+- `lib/server/dividendProcessor.ts` — 3 cron phases (`runDividendScraping`, `runExpenseCreation`, `runNextCouponScheduling`) with explicit typed result interfaces. Cron route delegates to these; do not add phase logic back into the route handler
+- Pattern rule: API route = auth → validate → fetch → ownership check → delegate to use case/processor → return response. No Firestore queries, business logic, or multi-step orchestration in the handler body itself
+
 ### Pure Functions and Testability
 - If a utility function calls `new Date()` internally to get "now", it is impure and cannot be tested for time-sensitive branches without fake timers. Pass `now: Date` as an explicit parameter. The call site passes `new Date()` — the function stays pure and test code can inject any date. Applied to `buildPensionDraftIssues(drafts, currentAge, retirementAge, now)`.
 
@@ -371,6 +378,7 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - For Performance page UX/motion changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/performanceService.test.ts` before manual validation
 - For History page UX/motion changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/chartService.test.ts` before manual validation
 - For Assistant AI foundation changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/assistantRoutes.test.ts __tests__/assistantWebSearchPolicy.test.ts __tests__/assistantMonthContextService.test.ts` before manual validation
+- For dividend route / cron handler changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/dividendUseCase.test.ts __tests__/dividendProcessor.test.ts` before manual validation
 
 ### Test Patterns
 - Use local `new Date(year, monthIndex, day)` in tests, not ISO strings
@@ -448,6 +456,12 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - On mobile, CPU budget is ~3–5x tighter. Multiple concurrent tasks at mount (re-renders, Recharts SVG, Framer Motion stagger, rAF loops) can exceed the 16ms/frame budget and cause visible animation jank
 - When a page uses `useCountUp` for mount-time KPI animations, avoid simultaneously rendering heavy components (Recharts charts, large lists) that aren't immediately visible
 - Pattern: start collapsible/below-fold Recharts components as collapsed on mobile, let users expand — use `isMobile` from `useMediaQuery` in the `useState` initializer for the expanded state
+
+### JSON Date Deserialization in API Route Bodies
+- `Date` fields in `request.json()` bodies arrive as ISO strings (`"2024-04-10T..."`), not `Date` objects
+- Comparing a string to a `Date` with `<=` / `>=` always returns `false` in JavaScript — the string coerces to `NaN` via `Number()`
+- **Always wrap**: `const paymentDate = new Date(dividendData.paymentDate)` before any date comparison in a route or use case that receives data from the client
+- Applied in `lib/server/dividendUseCase.ts` — the bug caused automatic expense creation to silently never trigger for past dividends
 
 ### createExpense Field Enumeration Trap
 - `createExpense` in `expenseService.ts` explicitly enumerates every field in `removeUndefinedFields({...})` before `addDoc`. `updateExpense` spreads `...updates`, so new fields work automatically there.

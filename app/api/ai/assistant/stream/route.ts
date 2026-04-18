@@ -36,6 +36,7 @@ import {
   evaluateStructuredGoal,
   parseStructuredGoalFromText,
 } from '@/lib/server/assistant/goalEvaluation';
+import { adminDb } from '@/lib/firebase/admin';
 
 /**
  * Extracts memory candidates from a completed exchange and persists new items.
@@ -126,6 +127,18 @@ async function extractAndSaveMemory(
   }
 }
 
+/**
+ * Fetch the year from which cashflow history tracking starts for a user.
+ * Defaults to 5 years ago when not configured.
+ */
+async function fetchHistoryStartYear(userId: string): Promise<number> {
+  const settingsSnap = await adminDb
+    .collection('assetAllocationTargets')
+    .doc(userId)
+    .get();
+  return settingsSnap.data()?.cashflowHistoryStartYear ?? new Date().getFullYear() - 5;
+}
+
 function encodeAssistantEvent(event: AssistantStreamEvent): Uint8Array {
   return new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`);
 }
@@ -178,13 +191,6 @@ export async function POST(request: NextRequest) {
     // For structured analysis modes the server always rebuilds from Firestore —
     // client-supplied numbers are never trusted; only the period selector is used.
     // For chat mode, chatContext determines which builder to use (or none).
-    const getHistoryStartYear = async () => {
-      const settingsSnap = await (await import('@/lib/firebase/admin')).adminDb
-        .collection('assetAllocationTargets')
-        .doc(body.userId)
-        .get();
-      return settingsSnap.data()?.cashflowHistoryStartYear ?? new Date().getFullYear() - 5;
-    };
 
     const includeDummy = preferences.includeDummySnapshots ?? false;
 
@@ -194,7 +200,7 @@ export async function POST(request: NextRequest) {
     } else if (body.mode === 'ytd_analysis') {
       contextBundle = await buildAssistantYtdContext(body.userId, includeDummy);
     } else if (body.mode === 'history_analysis') {
-      contextBundle = await buildAssistantHistoryContext(body.userId, await getHistoryStartYear(), includeDummy);
+      contextBundle = await buildAssistantHistoryContext(body.userId, await fetchHistoryStartYear(body.userId), includeDummy);
     } else if (body.mode === 'chat') {
       // Chat mode: build context only when chatContext is set and not 'none'
       if (body.chatContext === 'year' && body.year) {
@@ -202,7 +208,7 @@ export async function POST(request: NextRequest) {
       } else if (body.chatContext === 'ytd') {
         contextBundle = await buildAssistantYtdContext(body.userId, includeDummy);
       } else if (body.chatContext === 'history') {
-        contextBundle = await buildAssistantHistoryContext(body.userId, await getHistoryStartYear(), includeDummy);
+        contextBundle = await buildAssistantHistoryContext(body.userId, await fetchHistoryStartYear(body.userId), includeDummy);
       } else if (body.chatContext === 'month' && body.month) {
         contextBundle = await buildAssistantMonthContext(body.userId, body.month, includeDummy);
       } else if (!body.chatContext && body.month) {

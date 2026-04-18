@@ -1,37 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAllDividends } from '@/lib/services/dividendService';
 import { calculateYocMetrics } from '@/lib/services/performanceService';
-import { adminDb } from '@/lib/firebase/admin';
-import { Asset } from '@/types/assets';
+import { getUserAssetsAdmin } from '@/lib/server/assetAdminRepository';
 import {
   assertSameUser,
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
 
-/**
- * Fetch all assets for a user using Firebase Admin SDK (server-side only)
- * This is needed because assetService.ts uses client SDK which doesn't work in API routes
- */
-async function getUserAssetsAdmin(userId: string): Promise<Asset[]> {
-  try {
-    const querySnapshot = await adminDb
-      .collection('assets')
-      .where('userId', '==', userId)
-      .get();
-
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      lastPriceUpdate: doc.data().lastPriceUpdate?.toDate() || new Date(),
-      createdAt: doc.data().createdAt?.toDate() || new Date(),
-      updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-    })) as Asset[];
-  } catch (error) {
-    console.error('[getUserAssetsAdmin] Error fetching assets:', error);
-    throw new Error('Failed to fetch assets');
-  }
-}
 
 /**
  * GET /api/performance/yoc

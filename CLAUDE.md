@@ -5,9 +5,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-18, session fix-chart-line-style): **Evoluzione Patrimonio Netto line style**. `CustomChartDot` else branch changed from blue circle to `null` — line renders clean/continuous without per-point markers. Amber note-indicators are preserved for snapshots with notes. `activeDot={{ r: 6 }}` kept for hover UX. File: `components/history/CustomChartDot.tsx`.
-- Previous (2026-04-17, session c-refactoring-funzioni): **SRP refactoring of large functions**. `AssetDialog.tsx` `onSubmit` (274 → 55 lines) split into 5 file-scope helpers: `resolveBondPrice`, `fetchMarketPrice`, `buildBondDetailsFromForm`, `buildAssetFormDataFromValues`, `scheduleCouponDividends`. `analyze-performance/route.ts` POST extracted into `callAnthropicForPerformanceAnalysis` + `buildPerformanceSseStream`. `snapshot/route.ts` inline transforms extracted into `buildAllocationPercentages` + `buildByAssetBreakdown`. Added `__tests__/assetDialogHelpers.test.ts` (18 tests) and `__tests__/snapshotHelpers.test.ts` (9 tests) as characterization anchors.
-- Previous (2026-04-17, session b-error-handling): **Error-handling alignment for Cashflow, Budget, assets, performance cache, and overview invalidation**. Silent catches removed, non-fatal fallbacks explicit and logged, service-level rethrows carry more context.
+- Latest implementation (2026-04-18, session d-separazione-layer): **Layer separation across API routes and cron handler**. New server modules: `lib/server/assetAdminRepository.ts` (shared Admin SDK asset fetch), `lib/server/dividendUseCase.ts` (dividend creation orchestration), `lib/server/dividendProcessor.ts` (3 cron phases as typed functions). Cron handler: 340 → 80 lines. `POST /api/dividends`: 130 → 50 lines. Also fixed pre-existing bug: `paymentDate` from JSON body was a string, `string <= Date` always returned `false`, blocking automatic expense creation for past dividends. Fix: `new Date(dividendData.paymentDate)`. Added `__tests__/dividendUseCase.test.ts` (7 tests) and `__tests__/dividendProcessor.test.ts` (8 tests).
+- Previous (2026-04-18, session fix-chart-line-style): **Evoluzione Patrimonio Netto line style**. `CustomChartDot` else branch changed from blue circle to `null` — line renders clean/continuous without per-point markers. Amber note-indicators preserved. File: `components/history/CustomChartDot.tsx`.
+- Previous (2026-04-17, session c-refactoring-funzioni): **SRP refactoring of large functions**. `AssetDialog.tsx` `onSubmit` (274 → 55 lines) split into 5 file-scope helpers. `analyze-performance/route.ts` and `snapshot/route.ts` similarly extracted. Added `__tests__/assetDialogHelpers.test.ts` (18 tests) and `__tests__/snapshotHelpers.test.ts` (9 tests).
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -59,7 +59,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
   - `npm test -- <file>`
   - `npx vitest run <file>`
   - `npx tsc --noEmit`
-- Current repo includes targeted tests for pure utilities/services plus private API auth regression coverage in `__tests__/apiAuthRoutes.test.ts`, overview/materialized-summary coverage in `__tests__/dashboardOverviewService.test.ts`, performance utilities in `__tests__/performanceService.test.ts`, assistant auth / policy coverage in `__tests__/assistantRoutes.test.ts`, `__tests__/assistantWebSearchPolicy.test.ts`, `__tests__/assistantPromptRouting.test.ts`, `__tests__/assistantMonthContextService.test.ts`, `__tests__/assistantThreadRoutes.test.ts`, `__tests__/assistantMemoryExtraction.test.ts`, and SRP characterization tests in `__tests__/assetDialogHelpers.test.ts` and `__tests__/snapshotHelpers.test.ts`
+- Current repo includes targeted tests for pure utilities/services plus private API auth regression coverage in `__tests__/apiAuthRoutes.test.ts`, overview/materialized-summary coverage in `__tests__/dashboardOverviewService.test.ts`, performance utilities in `__tests__/performanceService.test.ts`, assistant auth / policy coverage in `__tests__/assistantRoutes.test.ts`, `__tests__/assistantWebSearchPolicy.test.ts`, `__tests__/assistantPromptRouting.test.ts`, `__tests__/assistantMonthContextService.test.ts`, `__tests__/assistantThreadRoutes.test.ts`, `__tests__/assistantMemoryExtraction.test.ts`, SRP characterization tests in `__tests__/assetDialogHelpers.test.ts` and `__tests__/snapshotHelpers.test.ts`, and layer-separation tests in `__tests__/dividendUseCase.test.ts` and `__tests__/dividendProcessor.test.ts`
 
 ## Data & Integrations
 - Firestore client + admin
@@ -89,8 +89,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Assets: `app/dashboard/assets/page.tsx`, `components/assets/AssetPriceHistoryTable.tsx`, `components/assets/AssetClassHistoryTable.tsx`
 - Mobile navigation: `components/layout/BottomNavigation.tsx`, `components/layout/SecondaryMenuDrawer.tsx`
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
+- Server-side use cases / processors: `lib/server/assetAdminRepository.ts`, `lib/server/dividendUseCase.ts`, `lib/server/dividendProcessor.ts`
 
-**Last updated**: 2026-04-17 (session c-refactoring-funzioni — SRP function refactoring across AssetDialog, snapshot, and analyze-performance routes)
+**Last updated**: 2026-04-18 (session d-separazione-layer — layer separation, new lib/server modules, dividend expense bug fix)
 
 ## Design Context
 
