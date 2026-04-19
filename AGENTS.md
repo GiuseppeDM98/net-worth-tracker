@@ -341,6 +341,14 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - Use a **static import** (`import { Resend } from 'resend'`) not a dynamic one (`await import('resend')`). `vi.mock` only intercepts static imports — dynamic imports bypass the mock and cause `TypeError: X is not a constructor` in tests.
 - `onboarding@resend.dev` (Resend shared domain) delivers only to the Resend account owner's email. To send to arbitrary recipients a verified custom domain is required. `*.vercel.app` subdomains cannot be verified as sending domains — Vercel controls that DNS zone.
 
+### Periodic Email Service (`lib/server/monthlyEmailService.ts`)
+- **Firestore query depth**: each query uses max 3 `.where()` calls (`userId + year + month`, or `userId + date range`). A 4th condition (e.g. `isDummy !== true`) breaks the test chain mock — filter in code post-fetch instead.
+- **Expense field name**: notes on expense documents are stored as `notes` (not `note` or `description`). Using the wrong field silently falls back to the category name, making all expense descriptions look like "Casa / Casa".
+- **`buildPeriodEmailData` as the single builder**: all three period types (monthly/quarterly/yearly) flow through one function that adjusts the Firestore date window and the previous-period snapshot coordinates. Do not add a separate builder per type — keep them unified.
+- **Settings 3-place rule applies here too**: any new email toggle (`quarterlyEmailEnabled`, `yearlyEmailEnabled`, …) must be added to `types/assets.ts`, `getSettings()`, AND both branches of `setSettings()` in `assetAllocationService.ts`. Missing any one causes the toggle to silently not persist.
+- **Dec 31 fires all three phases**: monthly, Q4 quarterly, and yearly email phases all run on Dec 31 if their respective toggles are enabled. This is intentional — the phases are independent.
+- **Test file field name**: `notes` (not `note`) must be used in test fixture `data()` objects for expense mocks, or the `description` fallback masks the bug.
+
 ### Firestore Query Chain Depth in Tests
 - Keep Admin SDK query chains to **3 `.where()` calls max** when the function will be unit-tested. A 4th `.where()` (e.g. `isDummy != true`) causes `TypeError: .where(...).where(...).where(...).where is not a function` in tests because the mock chain only goes 3 levels deep.
 - Workaround: apply the 4th condition as a post-fetch code filter (`docs.filter(d => !d.data().isDummy)`) — one extra doc fetched at most (with `.limit(1)` the cost is negligible).

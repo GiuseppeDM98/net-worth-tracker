@@ -3,6 +3,12 @@
 - Added monthly email summary: on the last day of each month, a portfolio recap email is automatically sent to configured recipients — includes net worth change vs previous month, asset class breakdown, total income/expenses, net savings, top 3 expense categories, and dividends received
 - Added manual send button in Settings → Report Email Mensili to preview the current month's summary email at any time without waiting for the end of the month
 - Added email recipient management in Settings: enable/disable the feature with a toggle, add or remove any number of recipient addresses
+- Added quarterly email summary: optional automatic email sent on the last day of each quarter (March 31, June 30, September 30, December 31) covering the full quarter's net worth change, cashflow, and dividends
+- Added yearly email summary: optional automatic email sent on December 31 covering the full year's performance
+- Added "Performance Asset Class" section to all summary emails, showing best and worst performing asset classes both by percentage change and by absolute euro change vs the previous period
+- Added allocation percentage column to the asset class table in summary emails
+- Added "Top 5 Expenses" section to all summary emails listing the 5 largest individual transactions of the period, with category and note visible
+- Added savings rate percentage to the cashflow summary section of all emails
 
 ## 🐛 Bug Fixes
 

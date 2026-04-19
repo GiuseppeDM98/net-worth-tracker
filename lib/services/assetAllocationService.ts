@@ -79,6 +79,8 @@ export async function getSettings(
       assistantMemoryEnabled: data.assistantMemoryEnabled,
       costCentersEnabled: data.costCentersEnabled,
       monthlyEmailEnabled: data.monthlyEmailEnabled,
+      quarterlyEmailEnabled: data.quarterlyEmailEnabled,
+      yearlyEmailEnabled: data.yearlyEmailEnabled,
       monthlyEmailRecipients: data.monthlyEmailRecipients,
       targets: data.targets as AssetAllocationTarget,
     };
@@ -215,6 +217,12 @@ export async function setSettings(
       if (settings.monthlyEmailEnabled !== undefined) {
         docData.monthlyEmailEnabled = settings.monthlyEmailEnabled;
       }
+      if (settings.quarterlyEmailEnabled !== undefined) {
+        docData.quarterlyEmailEnabled = settings.quarterlyEmailEnabled;
+      }
+      if (settings.yearlyEmailEnabled !== undefined) {
+        docData.yearlyEmailEnabled = settings.yearlyEmailEnabled;
+      }
       if (settings.monthlyEmailRecipients !== undefined) {
         docData.monthlyEmailRecipients = settings.monthlyEmailRecipients;
       }
@@ -314,6 +322,12 @@ export async function setSettings(
       }
       if (settings.monthlyEmailEnabled !== undefined) {
         docData.monthlyEmailEnabled = settings.monthlyEmailEnabled;
+      }
+      if (settings.quarterlyEmailEnabled !== undefined) {
+        docData.quarterlyEmailEnabled = settings.quarterlyEmailEnabled;
+      }
+      if (settings.yearlyEmailEnabled !== undefined) {
+        docData.yearlyEmailEnabled = settings.yearlyEmailEnabled;
       }
       if (settings.monthlyEmailRecipients !== undefined) {
         docData.monthlyEmailRecipients = settings.monthlyEmailRecipients;

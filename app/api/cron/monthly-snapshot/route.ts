@@ -3,8 +3,13 @@ import { adminDb } from '@/lib/firebase/admin';
 import { updateHallOfFame } from '@/lib/services/hallOfFameService.server';
 import {
   isLastDayOfMonthItaly,
+  isLastDayOfQuarterItaly,
+  isLastDayOfYearItaly,
+  monthToQuarter,
   getSettingsAdmin,
   buildMonthlyEmailData,
+  buildAndSendQuarterly,
+  buildAndSendYearly,
   sendMonthlyEmail,
 } from '@/lib/server/monthlyEmailService';
 import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
@@ -118,9 +123,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Phase 2: Send monthly summary emails (only on the last day of the month)
+    const now = new Date();
     const emailResults = { sent: 0, skipped: 0, errors: 0 };
-    if (isLastDayOfMonthItaly(new Date())) {
-      const { year, month } = getItalyMonthYear(new Date());
+    if (isLastDayOfMonthItaly(now)) {
+      const { year, month } = getItalyMonthYear(now);
       console.log(`Last day of month detected — sending summary emails for ${month}/${year}`);
 
       for (const userDoc of usersSnapshot.docs) {
@@ -156,6 +162,79 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Phase 3: Send quarterly summary emails (only on the last day of a quarter)
+    const quarterlyEmailResults = { sent: 0, skipped: 0, errors: 0 };
+    if (isLastDayOfQuarterItaly(now)) {
+      const { year, month } = getItalyMonthYear(now);
+      const quarter = monthToQuarter(month);
+      console.log(`Last day of Q${quarter} detected — sending quarterly emails for Q${quarter}/${year}`);
+
+      for (const userDoc of usersSnapshot.docs) {
+        const userId = userDoc.id;
+
+        if (userId === process.env.NEXT_PUBLIC_DEMO_USER_ID) {
+          quarterlyEmailResults.skipped++;
+          continue;
+        }
+
+        try {
+          const settings = await getSettingsAdmin(userId);
+          if (!settings?.quarterlyEmailEnabled || !settings.monthlyEmailRecipients?.length) {
+            quarterlyEmailResults.skipped++;
+            continue;
+          }
+
+          const sent = await buildAndSendQuarterly(userId, settings.monthlyEmailRecipients, year, quarter);
+          if (!sent) {
+            console.warn(`No Q${quarter} snapshot found for user ${userId} — skipping quarterly email`);
+            quarterlyEmailResults.skipped++;
+          } else {
+            quarterlyEmailResults.sent++;
+            console.log(`Quarterly email sent for user ${userId}`);
+          }
+        } catch (emailError) {
+          console.error(`Quarterly email failed for user ${userId}:`, emailError);
+          quarterlyEmailResults.errors++;
+        }
+      }
+    }
+
+    // Phase 4: Send yearly summary emails (only on December 31)
+    const yearlyEmailResults = { sent: 0, skipped: 0, errors: 0 };
+    if (isLastDayOfYearItaly(now)) {
+      const { year } = getItalyMonthYear(now);
+      console.log(`December 31 detected — sending yearly emails for ${year}`);
+
+      for (const userDoc of usersSnapshot.docs) {
+        const userId = userDoc.id;
+
+        if (userId === process.env.NEXT_PUBLIC_DEMO_USER_ID) {
+          yearlyEmailResults.skipped++;
+          continue;
+        }
+
+        try {
+          const settings = await getSettingsAdmin(userId);
+          if (!settings?.yearlyEmailEnabled || !settings.monthlyEmailRecipients?.length) {
+            yearlyEmailResults.skipped++;
+            continue;
+          }
+
+          const sent = await buildAndSendYearly(userId, settings.monthlyEmailRecipients, year);
+          if (!sent) {
+            console.warn(`No December snapshot found for user ${userId} — skipping yearly email`);
+            yearlyEmailResults.skipped++;
+          } else {
+            yearlyEmailResults.sent++;
+            console.log(`Yearly email sent for user ${userId}`);
+          }
+        } catch (emailError) {
+          console.error(`Yearly email failed for user ${userId}:`, emailError);
+          yearlyEmailResults.errors++;
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: `Monthly snapshots job completed`,
@@ -165,6 +244,8 @@ export async function GET(request: NextRequest) {
       results,
       errorDetails: errors,
       emailSummary: emailResults,
+      quarterlyEmailSummary: quarterlyEmailResults,
+      yearlyEmailSummary: yearlyEmailResults,
     });
   } catch (error) {
     console.error('Error in monthly snapshot cron job:', error);

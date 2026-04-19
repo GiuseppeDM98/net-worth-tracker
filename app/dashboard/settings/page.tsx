@@ -136,9 +136,11 @@ export default function SettingsPage() {
   const [laborIncomeCategoryIds, setLaborIncomeCategoryIds] = useState<string[]>([]);
   const [costCentersEnabled, setCostCentersEnabled] = useState<boolean>(false);
   const [monthlyEmailEnabled, setMonthlyEmailEnabled] = useState<boolean>(false);
+  const [quarterlyEmailEnabled, setQuarterlyEmailEnabled] = useState<boolean>(false);
+  const [yearlyEmailEnabled, setYearlyEmailEnabled] = useState<boolean>(false);
   const [monthlyEmailRecipients, setMonthlyEmailRecipients] = useState<string[]>([]);
   const [newEmailInput, setNewEmailInput] = useState<string>('');
-  const [sendingTestEmail, setSendingTestEmail] = useState<boolean>(false);
+  const [sendingTestEmailType, setSendingTestEmailType] = useState<'monthly' | 'quarterly' | 'yearly' | null>(null);
   const [assetClassStates, setAssetClassStates] = useState<
     Record<AssetClass, AssetClassState>
   >({} as Record<AssetClass, AssetClassState>);
@@ -347,6 +349,8 @@ export default function SettingsPage() {
         setLaborIncomeCategoryIds(settingsData.laborIncomeCategoryIds ?? []);
         setCostCentersEnabled(settingsData.costCentersEnabled ?? false);
         setMonthlyEmailEnabled(settingsData.monthlyEmailEnabled ?? false);
+        setQuarterlyEmailEnabled(settingsData.quarterlyEmailEnabled ?? false);
+        setYearlyEmailEnabled(settingsData.yearlyEmailEnabled ?? false);
         setMonthlyEmailRecipients(settingsData.monthlyEmailRecipients ?? []);
         // Load dividend settings
         setDividendIncomeCategoryId(settingsData.dividendIncomeCategoryId || '');
@@ -464,6 +468,8 @@ export default function SettingsPage() {
           laborIncomeCategoryIds: [...(settingsData?.laborIncomeCategoryIds ?? [])].sort(),
           costCentersEnabled: settingsData?.costCentersEnabled ?? false,
           monthlyEmailEnabled: settingsData?.monthlyEmailEnabled ?? false,
+          quarterlyEmailEnabled: settingsData?.quarterlyEmailEnabled ?? false,
+          yearlyEmailEnabled: settingsData?.yearlyEmailEnabled ?? false,
           monthlyEmailRecipients: [...(settingsData?.monthlyEmailRecipients ?? [])].sort(),
         })
       );
@@ -996,6 +1002,8 @@ export default function SettingsPage() {
         laborIncomeCategoryIds,
         costCentersEnabled,
         monthlyEmailEnabled,
+        quarterlyEmailEnabled,
+        yearlyEmailEnabled,
         monthlyEmailRecipients,
       });
       toast.success('Impostazioni salvate con successo');
@@ -1310,6 +1318,8 @@ export default function SettingsPage() {
         laborIncomeCategoryIds: [...laborIncomeCategoryIds].sort(),
         costCentersEnabled,
         monthlyEmailEnabled,
+        quarterlyEmailEnabled,
+        yearlyEmailEnabled,
         monthlyEmailRecipients: [...monthlyEmailRecipients].sort(),
       }),
     [
@@ -1325,6 +1335,8 @@ export default function SettingsPage() {
       laborIncomeCategoryIds,
       costCentersEnabled,
       monthlyEmailEnabled,
+      quarterlyEmailEnabled,
+      yearlyEmailEnabled,
       monthlyEmailRecipients,
     ]
   );
@@ -1778,7 +1790,45 @@ export default function SettingsPage() {
             />
           </div>
 
-          {monthlyEmailEnabled && (
+          {/* Quarterly email toggle */}
+          <div className="flex items-center justify-between border-t pt-4">
+            <div>
+              <Label htmlFor="quarterlyEmailEnabled" className="text-sm font-medium">
+                Attiva report trimestrale
+              </Label>
+              <p className="text-sm text-muted-foreground mt-1">
+                Inviato automaticamente l&apos;ultimo giorno di marzo, giugno, settembre e dicembre
+              </p>
+            </div>
+            <Switch
+              id="quarterlyEmailEnabled"
+              checked={quarterlyEmailEnabled}
+              onCheckedChange={setQuarterlyEmailEnabled}
+              disabled={isDemo}
+              className={interactiveControlClass}
+            />
+          </div>
+
+          {/* Yearly email toggle */}
+          <div className="flex items-center justify-between border-t pt-4">
+            <div>
+              <Label htmlFor="yearlyEmailEnabled" className="text-sm font-medium">
+                Attiva report annuale
+              </Label>
+              <p className="text-sm text-muted-foreground mt-1">
+                Inviato automaticamente il 31 dicembre
+              </p>
+            </div>
+            <Switch
+              id="yearlyEmailEnabled"
+              checked={yearlyEmailEnabled}
+              onCheckedChange={setYearlyEmailEnabled}
+              disabled={isDemo}
+              className={interactiveControlClass}
+            />
+          </div>
+
+          {(monthlyEmailEnabled || quarterlyEmailEnabled || yearlyEmailEnabled) && (
             <div className="space-y-3 border-t pt-4">
               <Label className="text-sm font-medium">Destinatari</Label>
 
@@ -1852,54 +1902,61 @@ export default function SettingsPage() {
               )}
 
               {/* Manual send button */}
-              <div className="pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={
-                    isDemo ||
-                    monthlyEmailRecipients.length === 0 ||
-                    sendingTestEmail
-                  }
-                  title="Invia subito il riepilogo del mese corrente agli indirizzi configurati"
-                  onClick={async () => {
-                    setSendingTestEmail(true);
-                    try {
-                      const res = await authenticatedFetch(
-                        '/api/user/monthly-email/send',
-                        { method: 'POST' }
-                      );
-                      if (res.ok) {
-                        toast.success('Email inviata con successo!');
-                      } else {
-                        const body = await res.json().catch(() => ({}));
-                        toast.error(body.error ?? "Errore durante l'invio");
+              {/* Manual send buttons — one per enabled period type */}
+              <div className="pt-2 flex flex-wrap gap-2">
+                {([
+                  { type: 'monthly' as const, label: 'Invia mensile ora', enabled: monthlyEmailEnabled },
+                  { type: 'quarterly' as const, label: 'Invia trimestrale ora', enabled: quarterlyEmailEnabled },
+                  { type: 'yearly' as const, label: 'Invia annuale ora', enabled: yearlyEmailEnabled },
+                ] as const).filter(({ enabled }) => enabled).map(({ type, label }) => (
+                  <Button
+                    key={type}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isDemo || monthlyEmailRecipients.length === 0 || sendingTestEmailType !== null}
+                    onClick={async () => {
+                      setSendingTestEmailType(type);
+                      try {
+                        const res = await authenticatedFetch(
+                          '/api/user/monthly-email/send',
+                          {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ periodType: type }),
+                          }
+                        );
+                        if (res.ok) {
+                          toast.success('Email inviata con successo!');
+                        } else {
+                          const resBody = await res.json().catch(() => ({}));
+                          toast.error(resBody.error ?? "Errore durante l'invio");
+                        }
+                      } catch {
+                        toast.error("Errore durante l'invio dell'email");
+                      } finally {
+                        setSendingTestEmailType(null);
                       }
-                    } catch {
-                      toast.error("Errore durante l'invio dell'email");
-                    } finally {
-                      setSendingTestEmail(false);
-                    }
-                  }}
-                >
-                  {sendingTestEmail ? (
-                    <span className="flex items-center gap-2">
-                      <span className="h-3 w-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
-                      Invio in corso...
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      <Send className="h-4 w-4" />
-                      Invia riepilogo ora
-                    </span>
-                  )}
-                </Button>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Invia il riepilogo del mese corrente per verificare il formato dell&apos;email.
-                  Ricorda di salvare prima le impostazioni.
-                </p>
+                    }}
+                  >
+                    {sendingTestEmailType === type ? (
+                      <span className="flex items-center gap-2">
+                        <span className="h-3 w-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                        Invio in corso...
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <Send className="h-4 w-4" />
+                        {label}
+                      </span>
+                    )}
+                  </Button>
+                ))}
               </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Invia il riepilogo del periodo corrente per verificare il formato.
+                Ricorda di salvare prima le impostazioni.
+              </p>
             </div>
           )}
         </CardContent>

@@ -1,11 +1,11 @@
 /**
- * Monthly email summary service
+ * Periodic email summary service (monthly, quarterly, yearly)
  *
  * Responsibilities:
- *   - Determine whether today is the last calendar day of the month in Italy timezone
- *   - Query Admin SDK for snapshot, expense, and dividend data for a given user/month
- *   - Build a self-contained HTML email summarizing the month
- *   - Send the email via Resend
+ *   - Detect end-of-period dates in Italy timezone
+ *   - Query Admin SDK for snapshot, expense, and dividend data
+ *   - Build self-contained HTML emails summarizing the period
+ *   - Send emails via Resend
  *
  * This module is server-only: it imports firebase-admin and the Resend SDK.
  * Never import it from client components.
@@ -20,31 +20,50 @@ import { AssetAllocationSettings } from '@/types/assets';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export type EmailPeriodType = 'monthly' | 'quarterly' | 'yearly';
+
+export interface AssetClassEntry {
+  name: string;
+  deltaPct: number;
+  deltaAbs: number;
+}
+
+export interface AssetClassPerformers {
+  bestPct: AssetClassEntry | null;
+  worstPct: AssetClassEntry | null;
+  bestAbs: AssetClassEntry | null;
+  worstAbs: AssetClassEntry | null;
+}
+
 export interface MonthlyEmailData {
+  periodType: EmailPeriodType;
   year: number;
-  month: number;
+  month: number;   // for monthly: 1-12; for quarterly: last month of quarter; for yearly: 12
+  quarter?: number; // 1-4, only set for quarterly
   currentNetWorth: number;
   previousNetWorth: number;
   netWorthDelta: number;
   netWorthDeltaPct: number;
   liquidNetWorth: number;
   byAssetClass: Record<string, number>;
+  previousByAssetClass: Record<string, number>;
+  assetClassPerformers: AssetClassPerformers;
   totalIncome: number;
-  totalExpenses: number; // always positive in this struct (raw amounts are negative)
-  topExpenseCategories: Array<{ name: string; amount: number }>;
+  totalExpenses: number; // always positive (raw amounts are negative)
+  topExpenseCategories: Array<{ name: string; amount: number }>; // top 3 categories
+  topIndividualExpenses: Array<{ description: string; categoryName: string; amount: number }>; // top 5 transactions
   dividendTotal: number; // gross EUR
   dividendCount: number;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Date helpers ─────────────────────────────────────────────────────────────
 
 /**
- * Returns true only when the Italy-local date of `now` is the last day of its month.
+ * Returns true when the Italy-local date of `now` is the last calendar day of its month.
  * Exported for testing.
  */
 export function isLastDayOfMonthItaly(now: Date): boolean {
   const italyDate = getItalyDate(now);
-  // Day 0 of the next month = last day of the current month
   const lastDay = new Date(
     italyDate.getFullYear(),
     italyDate.getMonth() + 1,
@@ -52,6 +71,95 @@ export function isLastDayOfMonthItaly(now: Date): boolean {
   ).getDate();
   return italyDate.getDate() === lastDay;
 }
+
+/**
+ * Returns true when the Italy-local date of `now` is the last day of a calendar quarter.
+ * Quarter-end months: March (3), June (6), September (9), December (12).
+ * Exported for testing.
+ */
+export function isLastDayOfQuarterItaly(now: Date): boolean {
+  const italyDate = getItalyDate(now);
+  const month = italyDate.getMonth() + 1;
+  if (![3, 6, 9, 12].includes(month)) return false;
+  const lastDay = new Date(italyDate.getFullYear(), italyDate.getMonth() + 1, 0).getDate();
+  return italyDate.getDate() === lastDay;
+}
+
+/**
+ * Returns true when the Italy-local date of `now` is December 31.
+ * Exported for testing.
+ */
+export function isLastDayOfYearItaly(now: Date): boolean {
+  const italyDate = getItalyDate(now);
+  return italyDate.getMonth() === 11 && italyDate.getDate() === 31;
+}
+
+/**
+ * Returns the quarter number (1-4) for a given month (1-12).
+ * Exported for testing.
+ */
+export function monthToQuarter(month: number): number {
+  return Math.ceil(month / 3);
+}
+
+/**
+ * Returns the first month of the quarter that ends at `endMonth`.
+ * e.g. 3→1, 6→4, 9→7, 12→10.
+ * Exported for testing.
+ */
+export function getQuarterStartMonth(endMonth: number): number {
+  return endMonth - 2;
+}
+
+/**
+ * Returns the end-of-quarter {year, month} for the quarter immediately preceding
+ * the given quarter-end month. Handles year wrap: Q1 → Q4 of the previous year.
+ * Exported for testing.
+ */
+export function getPreviousQuarterEnd(
+  year: number,
+  month: number
+): { year: number; month: number } {
+  // month is always a quarter-end month (3, 6, 9, 12)
+  if (month === 3) return { year: year - 1, month: 12 };
+  return { year, month: month - 3 };
+}
+
+/**
+ * Returns {year, month} of the most recently completed quarter end strictly before `now`.
+ * e.g. April 19 2026 → { year: 2026, month: 3 }
+ *      January 5 2026 → { year: 2025, month: 12 }
+ * Exported for testing.
+ */
+export function getMostRecentCompletedQuarterEnd(now: Date): { year: number; month: number } {
+  const italyDate = getItalyDate(now);
+  const year = italyDate.getFullYear();
+  const currentMonth = italyDate.getMonth() + 1;
+  // Quarter-end months in reverse order
+  const quarterEndMonths = [12, 9, 6, 3];
+  for (const qMonth of quarterEndMonths) {
+    const lastDayOfQ = new Date(year, qMonth, 0).getDate();
+    const qEnd = new Date(year, qMonth - 1, lastDayOfQ);
+    if (italyDate > qEnd) {
+      return { year, month: qMonth };
+    }
+  }
+  // Before March 31 of the current year → Q4 of the previous year
+  return { year: year - 1, month: 12 };
+}
+
+/**
+ * Returns {year, month: 12} of the most recently completed year (Dec 31 must be in the past).
+ * e.g. April 19 2026 → { year: 2025, month: 12 }
+ * Exported for testing.
+ */
+export function getMostRecentCompletedYearEnd(now: Date): { year: number; month: number } {
+  const italyDate = getItalyDate(now);
+  // Dec 31 of the current year is still "this year", so always use year - 1
+  return { year: italyDate.getFullYear() - 1, month: 12 };
+}
+
+// ─── Formatting helpers ───────────────────────────────────────────────────────
 
 function formatEur(amount: number): string {
   return new Intl.NumberFormat('it-IT', {
@@ -76,11 +184,46 @@ const ASSET_CLASS_LABELS: Record<string, string> = {
   commodity: 'Materie prime',
 };
 
+// ─── Period label helpers (pure) ──────────────────────────────────────────────
+
+function periodTitle(data: MonthlyEmailData): string {
+  if (data.periodType === 'quarterly') return `Q${data.quarter} ${data.year}`;
+  if (data.periodType === 'yearly') return `Anno ${data.year}`;
+  return `${MONTH_NAMES[data.month - 1]} ${data.year}`;
+}
+
+function comparisonLabel(data: MonthlyEmailData): string {
+  if (data.periodType === 'quarterly') {
+    const prev = getPreviousQuarterEnd(data.year, data.month);
+    return `Q${monthToQuarter(prev.month)} ${prev.year}`;
+  }
+  if (data.periodType === 'yearly') return `${data.year - 1}`;
+  return 'mese precedente';
+}
+
+function cashflowSectionLabel(data: MonthlyEmailData): string {
+  if (data.periodType === 'quarterly') return 'Cashflow del Trimestre';
+  if (data.periodType === 'yearly') return "Cashflow dell'Anno";
+  return 'Cashflow del Mese';
+}
+
+function expenseCategoryLabel(data: MonthlyEmailData): string {
+  if (data.periodType === 'quarterly') return 'Top Categorie di Spesa (Trimestre)';
+  if (data.periodType === 'yearly') return "Top Categorie di Spesa (Anno)";
+  return 'Top Categorie di Spesa';
+}
+
+function topExpenseTransactionLabel(data: MonthlyEmailData): string {
+  if (data.periodType === 'quarterly') return 'Top 5 Spese del Trimestre';
+  if (data.periodType === 'yearly') return "Top 5 Spese dell'Anno";
+  return 'Top 5 Spese del Mese';
+}
+
 // ─── Admin settings reader ────────────────────────────────────────────────────
 
 /**
- * Read raw settings from Firestore Admin SDK — used inside the cron handler
- * where we cannot use the client SDK.
+ * Read raw settings from Firestore Admin SDK.
+ * Used inside cron handlers where the client SDK is unavailable.
  */
 export async function getSettingsAdmin(
   userId: string
@@ -90,66 +233,207 @@ export async function getSettingsAdmin(
   const data = doc.data()!;
   return {
     monthlyEmailEnabled: data.monthlyEmailEnabled,
+    quarterlyEmailEnabled: data.quarterlyEmailEnabled,
+    yearlyEmailEnabled: data.yearlyEmailEnabled,
     monthlyEmailRecipients: data.monthlyEmailRecipients,
     targets: data.targets,
   } as AssetAllocationSettings;
 }
 
-// ─── Data builder ─────────────────────────────────────────────────────────────
+// ─── Asset class performer computation ───────────────────────────────────────
 
 /**
- * Aggregate all data required for the monthly summary email.
- * Returns null if no snapshot is found for the requested period.
+ * Computes the best and worst performing asset classes by Δ% relative to the previous period.
+ * Classes with zero or missing previous value are excluded (no meaningful % base).
+ * Returns { best: null, worst: null } when there is insufficient data.
+ * Exported for testing.
  */
-export async function buildMonthlyEmailData(
+export function computeAssetClassPerformers(
+  current: Record<string, number>,
+  previous: Record<string, number>
+): AssetClassPerformers {
+  const entries: AssetClassEntry[] = [];
+
+  for (const [cls, value] of Object.entries(current)) {
+    const prev = previous[cls];
+    if (!prev || prev <= 0) continue; // can't compute % without a positive base
+    const deltaAbs = value - prev;
+    const deltaPct = (deltaAbs / prev) * 100;
+    entries.push({ name: ASSET_CLASS_LABELS[cls] ?? cls, deltaPct, deltaAbs });
+  }
+
+  if (entries.length === 0) return { bestPct: null, worstPct: null, bestAbs: null, worstAbs: null };
+
+  const byPct = [...entries].sort((a, b) => b.deltaPct - a.deltaPct);
+  const byAbs = [...entries].sort((a, b) => b.deltaAbs - a.deltaAbs);
+
+  return {
+    bestPct: byPct[0],
+    worstPct: byPct.length > 1 ? byPct[byPct.length - 1] : null,
+    bestAbs: byAbs[0],
+    worstAbs: byAbs.length > 1 ? byAbs[byAbs.length - 1] : null,
+  };
+}
+
+// ─── Expense / dividend aggregation (pure helpers) ───────────────────────────
+
+interface CashflowAggregation {
+  totalIncome: number;
+  totalExpenses: number;
+  topExpenseCategories: Array<{ name: string; amount: number }>;
+  topIndividualExpenses: Array<{ description: string; categoryName: string; amount: number }>;
+}
+
+function aggregateExpenses(
+  docs: FirebaseFirestore.QueryDocumentSnapshot[]
+): CashflowAggregation {
+  let totalIncome = 0;
+  let totalExpenses = 0;
+  const categoryTotals: Record<string, { name: string; amount: number }> = {};
+  const individualExpenses: Array<{ description: string; categoryName: string; amount: number }> =
+    [];
+
+  for (const doc of docs) {
+    const data = doc.data() as {
+      amount: number;
+      categoryName?: string;
+      categoryId?: string;
+      notes?: string;
+    };
+    const { amount } = data;
+
+    if (amount > 0) {
+      totalIncome += amount;
+    } else {
+      const absAmount = Math.abs(amount);
+      totalExpenses += absAmount;
+
+      // Category aggregation
+      const key = data.categoryId ?? data.categoryName ?? 'Altro';
+      if (!categoryTotals[key]) {
+        categoryTotals[key] = { name: data.categoryName ?? 'Altro', amount: 0 };
+      }
+      categoryTotals[key].amount += absAmount;
+
+      // Individual transaction — use notes when available, fall back to category name
+      const description = data.notes?.trim() || data.categoryName || 'Spesa';
+      individualExpenses.push({
+        description,
+        categoryName: data.categoryName ?? 'Altro',
+        amount: absAmount,
+      });
+    }
+  }
+
+  const topExpenseCategories = Object.values(categoryTotals)
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 3);
+
+  const topIndividualExpenses = individualExpenses
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 5);
+
+  return { totalIncome, totalExpenses, topExpenseCategories, topIndividualExpenses };
+}
+
+interface DividendAggregation {
+  dividendTotal: number;
+  dividendCount: number;
+}
+
+function aggregateDividends(
+  docs: FirebaseFirestore.QueryDocumentSnapshot[]
+): DividendAggregation {
+  let dividendTotal = 0;
+  let dividendCount = 0;
+  for (const doc of docs) {
+    const data = doc.data();
+    // Prefer EUR-converted gross amount when available
+    const amount = (data.grossAmountEur ?? data.grossAmount ?? 0) as number;
+    dividendTotal += amount;
+    dividendCount++;
+  }
+  return { dividendTotal, dividendCount };
+}
+
+// ─── Core data builder ────────────────────────────────────────────────────────
+
+/**
+ * Fetches all data required for an email summary covering the given {year, month} period.
+ *
+ * - Monthly: compares against the previous month; expense window = that month.
+ * - Quarterly: compares against the previous quarter end; expense window = full quarter.
+ * - Yearly: compares against the previous December; expense window = full year.
+ *
+ * Returns null when no snapshot exists for the current period end.
+ */
+export async function buildPeriodEmailData(
   userId: string,
   year: number,
-  month: number
+  month: number,
+  periodType: EmailPeriodType = 'monthly'
 ): Promise<MonthlyEmailData | null> {
-  // Derive previous month boundaries (handles January → December)
-  const prevMonth = month === 1 ? 12 : month - 1;
-  const prevYear = month === 1 ? year - 1 : year;
+  // Determine previous-period snapshot coordinates
+  let prevYear: number;
+  let prevMonth: number;
+  // Determine expense window start month
+  let windowStartMonth: number;
 
-  // Parallel fetch: current snapshot, previous snapshot, expenses, dividends
-  const [currentSnapshotSnap, prevSnapshotSnap, expensesSnap, dividendsSnap] =
-    await Promise.all([
-      // isDummy filter omitted from query to keep the chain to 3 conditions
-      // (Firestore inequality filters can't be combined with other inequality fields without a composite index).
-      // We filter isDummy in code after fetch — a single snapshot per user/month makes this safe.
-      adminDb
-        .collection('monthly-snapshots')
-        .where('userId', '==', userId)
-        .where('year', '==', year)
-        .where('month', '==', month)
-        .limit(1)
-        .get(),
+  if (periodType === 'quarterly') {
+    const prev = getPreviousQuarterEnd(year, month);
+    prevYear = prev.year;
+    prevMonth = prev.month;
+    windowStartMonth = getQuarterStartMonth(month);
+  } else if (periodType === 'yearly') {
+    prevYear = year - 1;
+    prevMonth = 12;
+    windowStartMonth = 1;
+  } else {
+    // monthly
+    prevMonth = month === 1 ? 12 : month - 1;
+    prevYear = month === 1 ? year - 1 : year;
+    windowStartMonth = month;
+  }
 
-      adminDb
-        .collection('monthly-snapshots')
-        .where('userId', '==', userId)
-        .where('year', '==', prevYear)
-        .where('month', '==', prevMonth)
-        .limit(1)
-        .get(),
+  const windowStart = new Date(year, windowStartMonth - 1, 1);
+  // Last day of the period end month
+  const windowEnd = new Date(year, month, 0, 23, 59, 59);
 
-      adminDb
-        .collection('expenses')
-        .where('userId', '==', userId)
-        .where('date', '>=', Timestamp.fromDate(new Date(year, month - 1, 1)))
-        .where('date', '<=', Timestamp.fromDate(new Date(year, month, 0, 23, 59, 59)))
-        .get(),
+  const [currentSnap, prevSnap, expensesSnap, dividendsSnap] = await Promise.all([
+    // isDummy filter omitted from query — handled in code to stay within 3 Firestore conditions
+    adminDb
+      .collection('monthly-snapshots')
+      .where('userId', '==', userId)
+      .where('year', '==', year)
+      .where('month', '==', month)
+      .limit(1)
+      .get(),
 
-      adminDb
-        .collection('dividends')
-        .where('userId', '==', userId)
-        .where('paymentDate', '>=', Timestamp.fromDate(new Date(year, month - 1, 1)))
-        .where('paymentDate', '<=', Timestamp.fromDate(new Date(year, month, 0, 23, 59, 59)))
-        .get(),
-    ]);
+    adminDb
+      .collection('monthly-snapshots')
+      .where('userId', '==', userId)
+      .where('year', '==', prevYear)
+      .where('month', '==', prevMonth)
+      .limit(1)
+      .get(),
 
-  // Filter out dummy snapshots in code (avoids a 4-condition Firestore query)
-  const realCurrentDocs = currentSnapshotSnap.docs.filter((d) => !d.data().isDummy);
-  const realPrevDocs = prevSnapshotSnap.docs.filter((d) => !d.data().isDummy);
+    adminDb
+      .collection('expenses')
+      .where('userId', '==', userId)
+      .where('date', '>=', Timestamp.fromDate(windowStart))
+      .where('date', '<=', Timestamp.fromDate(windowEnd))
+      .get(),
+
+    adminDb
+      .collection('dividends')
+      .where('userId', '==', userId)
+      .where('paymentDate', '>=', Timestamp.fromDate(windowStart))
+      .where('paymentDate', '<=', Timestamp.fromDate(windowEnd))
+      .get(),
+  ]);
+
+  const realCurrentDocs = currentSnap.docs.filter((d) => !d.data().isDummy);
+  const realPrevDocs = prevSnap.docs.filter((d) => !d.data().isDummy);
 
   if (realCurrentDocs.length === 0) return null;
 
@@ -162,85 +446,116 @@ export async function buildMonthlyEmailData(
   const netWorthDeltaPct =
     previousNetWorth !== 0 ? (netWorthDelta / Math.abs(previousNetWorth)) * 100 : 0;
 
-  // Aggregate income and expenses
-  let totalIncome = 0;
-  let totalExpenses = 0;
-  const categoryTotals: Record<string, { name: string; amount: number }> = {};
+  const byAssetClass: Record<string, number> = current.byAssetClass ?? {};
+  const previousByAssetClass: Record<string, number> = previous?.byAssetClass ?? {};
 
-  for (const doc of expensesSnap.docs) {
-    const { amount, categoryName, categoryId } = doc.data() as {
-      amount: number;
-      categoryName: string;
-      categoryId: string;
-    };
-
-    if (amount > 0) {
-      totalIncome += amount;
-    } else {
-      totalExpenses += Math.abs(amount);
-      const key = categoryId ?? categoryName ?? 'Altro';
-      if (!categoryTotals[key]) {
-        categoryTotals[key] = { name: categoryName ?? 'Altro', amount: 0 };
-      }
-      categoryTotals[key].amount += Math.abs(amount);
-    }
-  }
-
-  // Top 3 expense categories by amount
-  const topExpenseCategories = Object.values(categoryTotals)
-    .sort((a, b) => b.amount - a.amount)
-    .slice(0, 3);
-
-  // Aggregate dividends
-  let dividendTotal = 0;
-  let dividendCount = 0;
-  for (const doc of dividendsSnap.docs) {
-    const data = doc.data();
-    // Prefer EUR-converted gross amount when available
-    const amount = (data.grossAmountEur ?? data.grossAmount ?? 0) as number;
-    dividendTotal += amount;
-    dividendCount++;
-  }
+  const { totalIncome, totalExpenses, topExpenseCategories, topIndividualExpenses } =
+    aggregateExpenses(expensesSnap.docs);
+  const { dividendTotal, dividendCount } = aggregateDividends(dividendsSnap.docs);
 
   return {
+    periodType,
     year,
     month,
+    quarter: periodType === 'quarterly' ? monthToQuarter(month) : undefined,
     currentNetWorth,
     previousNetWorth,
     netWorthDelta,
     netWorthDeltaPct,
     liquidNetWorth: current.liquidNetWorth ?? 0,
-    byAssetClass: current.byAssetClass ?? {},
+    byAssetClass,
+    previousByAssetClass,
+    assetClassPerformers: computeAssetClassPerformers(byAssetClass, previousByAssetClass),
     totalIncome,
     totalExpenses,
     topExpenseCategories,
+    topIndividualExpenses,
     dividendTotal,
     dividendCount,
   };
+}
+
+/** Backward-compatible wrapper — builds monthly email data. */
+export async function buildMonthlyEmailData(
+  userId: string,
+  year: number,
+  month: number
+): Promise<MonthlyEmailData | null> {
+  return buildPeriodEmailData(userId, year, month, 'monthly');
 }
 
 // ─── Email HTML generator ─────────────────────────────────────────────────────
 
 /** Exported for unit testing only — callers should use sendMonthlyEmail. */
 export function generateEmailHtml(data: MonthlyEmailData): string {
-  const monthLabel = MONTH_NAMES[data.month - 1];
+  const title = periodTitle(data);
+  const comparison = comparisonLabel(data);
+
   const deltaPositive = data.netWorthDelta >= 0;
   const deltaColor = deltaPositive ? '#16a34a' : '#dc2626';
   const deltaArrow = deltaPositive ? '▲' : '▼';
 
+  // Asset class table — with % column and Δ% delta
+  const totalValue = Object.values(data.byAssetClass).reduce(
+    (s, v) => s + (v > 0 ? v : 0),
+    0
+  );
   const assetRows = Object.entries(data.byAssetClass)
     .filter(([, v]) => v > 0)
     .sort(([, a], [, b]) => b - a)
-    .map(
-      ([cls, value]) =>
-        `<tr>
-          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;">${ASSET_CLASS_LABELS[cls] ?? cls}</td>
+    .map(([cls, value]) => {
+      const pct = totalValue > 0 ? ((value / totalValue) * 100).toFixed(1) : '0.0';
+      const label = ASSET_CLASS_LABELS[cls] ?? cls;
+      return `<tr>
+          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;">${label}</td>
           <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;text-align:right;">${formatEur(value)}</td>
-        </tr>`
-    )
+          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;text-align:right;color:#64748b;font-size:12px;">${pct}%</td>
+        </tr>`;
+    })
     .join('');
 
-  const expenseRows = data.topExpenseCategories
+  // Performance spotlight (best/worst Δ%)
+  const { bestPct, worstPct, bestAbs, worstAbs } = data.assetClassPerformers;
+  const hasPctRows = bestPct && worstPct && bestPct.name !== worstPct.name;
+  const hasAbsRows = bestAbs && worstAbs && bestAbs.name !== worstAbs.name;
+
+  const perfRow = (
+    arrow: string,
+    label: string,
+    entry: AssetClassEntry,
+    color: string
+  ) =>
+    `<tr>
+      <td style="padding:5px 0;"><span style="color:${color};font-weight:600;">${arrow} ${label}:</span> ${entry.name}</td>
+      <td style="padding:5px 0;text-align:right;color:${color};font-weight:600;">
+        ${signedPct(entry.deltaPct)}
+        <span style="font-weight:400;color:#64748b;margin-left:6px;">(${entry.deltaAbs >= 0 ? '+' : ''}${formatEur(entry.deltaAbs)})</span>
+      </td>
+    </tr>`;
+
+  const performanceSection =
+    hasPctRows || hasAbsRows
+      ? `<tr>
+          <td style="padding:20px 32px;border-bottom:1px solid #f1f5f9;">
+            <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#0f172a;">Performance Asset Class</p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;color:#374151;">
+              ${hasPctRows ? `
+              <tr><td colspan="2" style="padding:4px 0 2px;font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">Variazione %</td></tr>
+              ${perfRow('▲', 'Migliore', bestPct!, '#16a34a')}
+              ${perfRow('▼', 'Peggiore', worstPct!, '#dc2626')}
+              ` : ''}
+              ${hasAbsRows ? `
+              <tr><td colspan="2" style="padding:${hasPctRows ? '12px' : '4px'} 0 2px;font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">Variazione assoluta</td></tr>
+              ${perfRow('▲', 'Migliore', bestAbs!, '#16a34a')}
+              ${perfRow('▼', 'Peggiore', worstAbs!, '#dc2626')}
+              ` : ''}
+            </table>
+          </td>
+        </tr>`
+      : '';
+
+  // Top 3 expense categories
+  const categoryRows = data.topExpenseCategories
     .map(
       (cat) =>
         `<tr>
@@ -250,15 +565,47 @@ export function generateEmailHtml(data: MonthlyEmailData): string {
     )
     .join('');
 
+  // Top 5 individual expense transactions
+  const individualExpenseRows = data.topIndividualExpenses
+    .map((exp) => {
+      // Show category prominently; note below in muted text only when it differs from category
+      const hasNote = exp.description && exp.description !== exp.categoryName;
+      return `<tr>
+          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;">
+            <span style="display:block;">${exp.categoryName}</span>
+            ${hasNote ? `<span style="display:block;font-size:11px;color:#94a3b8;margin-top:2px;">${exp.description}</span>` : ''}
+          </td>
+          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;text-align:right;vertical-align:top;">${formatEur(exp.amount)}</td>
+        </tr>`;
+    })
+    .join('');
+
   const savedAmount = data.totalIncome - data.totalExpenses;
   const savingsColor = savedAmount >= 0 ? '#16a34a' : '#dc2626';
+  const savingsRate =
+    data.totalIncome > 0 ? ((savedAmount / data.totalIncome) * 100).toFixed(1) : null;
+
+  // "rispetto al mese precedente" vs "rispetto al Q4 2025" vs "rispetto al 2025"
+  const comparisonPhrase =
+    data.periodType === 'monthly'
+      ? `rispetto al ${comparison}`
+      : data.periodType === 'quarterly'
+      ? `rispetto al ${comparison}`
+      : `rispetto al ${comparison}`;
+
+  const comparisonPrevLabel =
+    data.periodType === 'monthly'
+      ? 'Mese precedente'
+      : data.periodType === 'quarterly'
+      ? `Trimestre precedente (${comparison})`
+      : `Anno precedente (${comparison})`;
 
   return `<!DOCTYPE html>
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Riepilogo ${monthLabel} ${data.year}</title>
+  <title>Riepilogo ${title}</title>
 </head>
 <body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:32px 16px;">
@@ -269,7 +616,7 @@ export function generateEmailHtml(data: MonthlyEmailData): string {
         <tr>
           <td style="background:#0f172a;padding:28px 32px;">
             <p style="margin:0;color:#94a3b8;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;">Net Worth Tracker</p>
-            <h1 style="margin:8px 0 0;color:#f8fafc;font-size:22px;font-weight:700;">Riepilogo ${monthLabel} ${data.year}</h1>
+            <h1 style="margin:8px 0 0;color:#f8fafc;font-size:22px;font-weight:700;">Riepilogo ${title}</h1>
           </td>
         </tr>
 
@@ -280,11 +627,11 @@ export function generateEmailHtml(data: MonthlyEmailData): string {
             <p style="margin:0;font-size:32px;font-weight:700;color:#0f172a;">${formatEur(data.currentNetWorth)}</p>
             <p style="margin:8px 0 0;font-size:14px;color:${deltaColor};font-weight:600;">
               ${deltaArrow} ${formatEur(Math.abs(data.netWorthDelta))} (${signedPct(data.netWorthDeltaPct)})
-              <span style="color:#94a3b8;font-weight:400;"> rispetto al mese precedente</span>
+              <span style="color:#94a3b8;font-weight:400;"> ${comparisonPhrase}</span>
             </p>
             ${
               data.previousNetWorth > 0
-                ? `<p style="margin:4px 0 0;font-size:12px;color:#94a3b8;">Mese precedente: ${formatEur(data.previousNetWorth)} &nbsp;·&nbsp; Liquido: ${formatEur(data.liquidNetWorth)}</p>`
+                ? `<p style="margin:4px 0 0;font-size:12px;color:#94a3b8;">${comparisonPrevLabel}: ${formatEur(data.previousNetWorth)} &nbsp;·&nbsp; Liquido: ${formatEur(data.liquidNetWorth)}</p>`
                 : ''
             }
           </td>
@@ -301,6 +648,7 @@ export function generateEmailHtml(data: MonthlyEmailData): string {
                 <tr style="background:#f8fafc;">
                   <th style="padding:6px 12px;text-align:left;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Classe</th>
                   <th style="padding:6px 12px;text-align:right;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Valore</th>
+                  <th style="padding:6px 12px;text-align:right;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">%</th>
                 </tr>
               </thead>
               <tbody>${assetRows}</tbody>
@@ -310,10 +658,13 @@ export function generateEmailHtml(data: MonthlyEmailData): string {
             : ''
         }
 
+        <!-- Performance spotlight -->
+        ${performanceSection}
+
         <!-- Cashflow summary -->
         <tr>
           <td style="padding:20px 32px;border-bottom:1px solid #f1f5f9;">
-            <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#0f172a;">Cashflow del Mese</p>
+            <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#0f172a;">${cashflowSectionLabel(data)}</p>
             <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;color:#374151;">
               <tr>
                 <td style="padding:6px 0;">Entrate totali</td>
@@ -325,18 +676,18 @@ export function generateEmailHtml(data: MonthlyEmailData): string {
               </tr>
               <tr style="border-top:1px solid #e2e8f0;">
                 <td style="padding:8px 0 0;font-weight:600;">Risparmio netto</td>
-                <td style="padding:8px 0 0;text-align:right;color:${savingsColor};font-weight:700;">${formatEur(savedAmount)}</td>
+                <td style="padding:8px 0 0;text-align:right;color:${savingsColor};font-weight:700;">${formatEur(savedAmount)}${savingsRate !== null ? `<span style="font-size:11px;color:#64748b;font-weight:400;margin-left:4px;">(${savingsRate}%)</span>` : ''}</td>
               </tr>
             </table>
           </td>
         </tr>
 
-        <!-- Top expense categories -->
+        <!-- Top 3 expense categories -->
         ${
-          expenseRows
+          categoryRows
             ? `<tr>
           <td style="padding:20px 32px;border-bottom:1px solid #f1f5f9;">
-            <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#0f172a;">Top Categorie di Spesa</p>
+            <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#0f172a;">${expenseCategoryLabel(data)}</p>
             <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;color:#374151;">
               <thead>
                 <tr style="background:#f8fafc;">
@@ -344,7 +695,27 @@ export function generateEmailHtml(data: MonthlyEmailData): string {
                   <th style="padding:6px 12px;text-align:right;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Totale</th>
                 </tr>
               </thead>
-              <tbody>${expenseRows}</tbody>
+              <tbody>${categoryRows}</tbody>
+            </table>
+          </td>
+        </tr>`
+            : ''
+        }
+
+        <!-- Top 5 individual expense transactions -->
+        ${
+          individualExpenseRows
+            ? `<tr>
+          <td style="padding:20px 32px;border-bottom:1px solid #f1f5f9;">
+            <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#0f172a;">${topExpenseTransactionLabel(data)}</p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;color:#374151;">
+              <thead>
+                <tr style="background:#f8fafc;">
+                  <th style="padding:6px 12px;text-align:left;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Spesa</th>
+                  <th style="padding:6px 12px;text-align:right;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Importo</th>
+                </tr>
+              </thead>
+              <tbody>${individualExpenseRows}</tbody>
             </table>
           </td>
         </tr>`
@@ -368,7 +739,7 @@ export function generateEmailHtml(data: MonthlyEmailData): string {
         <tr>
           <td style="padding:20px 32px;background:#f8fafc;">
             <p style="margin:0;font-size:12px;color:#94a3b8;text-align:center;">
-              Generato automaticamente da Net Worth Tracker &nbsp;·&nbsp; ${monthLabel} ${data.year}
+              Generato automaticamente da Net Worth Tracker &nbsp;·&nbsp; ${title}
             </p>
           </td>
         </tr>
@@ -383,7 +754,7 @@ export function generateEmailHtml(data: MonthlyEmailData): string {
 // ─── Sender ───────────────────────────────────────────────────────────────────
 
 /**
- * Send the monthly summary email to all configured recipients.
+ * Send a periodic summary email to all configured recipients.
  * Throws if RESEND_API_KEY is not set or if Resend returns an error.
  */
 export async function sendMonthlyEmail(
@@ -392,8 +763,15 @@ export async function sendMonthlyEmail(
 ): Promise<void> {
   const resend = new Resend(process.env.RESEND_API_KEY);
 
-  const monthLabel = MONTH_NAMES[data.month - 1];
-  const subject = `Riepilogo ${monthLabel} ${data.year} — Net Worth Tracker`;
+  const title = periodTitle(data);
+  const subjectPrefix =
+    data.periodType === 'quarterly'
+      ? 'Riepilogo Trimestrale'
+      : data.periodType === 'yearly'
+      ? 'Riepilogo Annuale'
+      : 'Riepilogo';
+
+  const subject = `${subjectPrefix} ${title} — Net Worth Tracker`;
 
   const { error } = await resend.emails.send({
     from: process.env.RESEND_FROM_EMAIL ?? 'noreply@example.com',
@@ -407,19 +785,49 @@ export async function sendMonthlyEmail(
   }
 }
 
-// ─── Convenience: build + send for a given Italy month ───────────────────────
+// ─── Convenience builders ─────────────────────────────────────────────────────
 
 /**
- * Build email data for the current Italy month and send it.
+ * Build and send for any period type.
  * Returns false when no snapshot exists for the period (email skipped).
  */
+export async function buildAndSendForPeriod(
+  userId: string,
+  recipients: string[],
+  periodType: EmailPeriodType,
+  year: number,
+  month: number
+): Promise<boolean> {
+  const emailData = await buildPeriodEmailData(userId, year, month, periodType);
+  if (!emailData) return false;
+  await sendMonthlyEmail(recipients, emailData);
+  return true;
+}
+
+/** Build and send the monthly email for the current Italy month. */
 export async function buildAndSendForCurrentMonth(
   userId: string,
   recipients: string[]
 ): Promise<boolean> {
   const { year, month } = getItalyMonthYear(new Date());
-  const emailData = await buildMonthlyEmailData(userId, year, month);
-  if (!emailData) return false;
-  await sendMonthlyEmail(recipients, emailData);
-  return true;
+  return buildAndSendForPeriod(userId, recipients, 'monthly', year, month);
+}
+
+/** Build and send quarterly/yearly convenience aliases used by the cron handler. */
+export async function buildAndSendQuarterly(
+  userId: string,
+  recipients: string[],
+  year: number,
+  quarter: number
+): Promise<boolean> {
+  const lastMonth = quarter * 3;
+  return buildAndSendForPeriod(userId, recipients, 'quarterly', year, lastMonth);
+}
+
+export async function buildAndSendYearly(
+  userId: string,
+  recipients: string[],
+  year: number
+): Promise<boolean> {
+  return buildAndSendForPeriod(userId, recipients, 'yearly', year, 12);
 }

@@ -27,7 +27,6 @@ function buildQueryMock(name: string) {
       Promise.resolve(collectionMocks[name] ?? { empty: true, docs: [] })
     ),
   });
-  // A node in the chain returns itself for further .where() calls plus limit/get
   function chainNode(): any {
     return {
       where: () => chainNode(),
@@ -59,17 +58,53 @@ vi.mock('@/lib/utils/dateHelpers', async () => {
 
 import {
   isLastDayOfMonthItaly,
+  isLastDayOfQuarterItaly,
+  isLastDayOfYearItaly,
+  monthToQuarter,
+  getQuarterStartMonth,
+  getPreviousQuarterEnd,
+  getMostRecentCompletedQuarterEnd,
+  getMostRecentCompletedYearEnd,
+  computeAssetClassPerformers,
   buildMonthlyEmailData,
+  buildPeriodEmailData,
   generateEmailHtml,
   sendMonthlyEmail,
   type MonthlyEmailData,
 } from '@/lib/server/monthlyEmailService';
 
+// ─── Shared fixtures ──────────────────────────────────────────────────────────
+
+function makeMonthlyData(overrides: Partial<MonthlyEmailData> = {}): MonthlyEmailData {
+  return {
+    periodType: 'monthly',
+    year: 2025,
+    month: 3,
+    currentNetWorth: 150000,
+    previousNetWorth: 145000,
+    netWorthDelta: 5000,
+    netWorthDeltaPct: 3.45,
+    liquidNetWorth: 30000,
+    byAssetClass: { equity: 90000, bonds: 40000, cash: 20000 },
+    previousByAssetClass: { equity: 85000, bonds: 42000, cash: 18000 },
+    assetClassPerformers: { bestPct: null, worstPct: null, bestAbs: null, worstAbs: null },
+    totalIncome: 3500,
+    totalExpenses: 2000,
+    topExpenseCategories: [
+      { name: 'Alimentari', amount: 800 },
+      { name: 'Trasporti', amount: 600 },
+    ],
+    topIndividualExpenses: [],
+    dividendTotal: 450,
+    dividendCount: 3,
+    ...overrides,
+  };
+}
+
 // ─── isLastDayOfMonthItaly ────────────────────────────────────────────────────
 
 describe('isLastDayOfMonthItaly', () => {
   it('returns true on January 31', () => {
-    // UTC midnight Jan 31 — still Jan 31 in Italy (UTC+1)
     expect(isLastDayOfMonthItaly(new Date('2025-01-31T10:00:00Z'))).toBe(true);
   });
 
@@ -106,70 +141,282 @@ describe('isLastDayOfMonthItaly', () => {
   });
 });
 
+// ─── isLastDayOfQuarterItaly ──────────────────────────────────────────────────
+
+describe('isLastDayOfQuarterItaly', () => {
+  it('returns true on March 31 (end of Q1)', () => {
+    expect(isLastDayOfQuarterItaly(new Date('2026-03-31T10:00:00Z'))).toBe(true);
+  });
+
+  it('returns false on March 30', () => {
+    expect(isLastDayOfQuarterItaly(new Date('2026-03-30T10:00:00Z'))).toBe(false);
+  });
+
+  it('returns true on June 30 (end of Q2)', () => {
+    expect(isLastDayOfQuarterItaly(new Date('2026-06-30T10:00:00Z'))).toBe(true);
+  });
+
+  it('returns true on September 30 (end of Q3)', () => {
+    expect(isLastDayOfQuarterItaly(new Date('2026-09-30T10:00:00Z'))).toBe(true);
+  });
+
+  it('returns true on December 31 (end of Q4)', () => {
+    expect(isLastDayOfQuarterItaly(new Date('2026-12-31T10:00:00Z'))).toBe(true);
+  });
+
+  it('returns false on January 31 (last day of month but not quarter)', () => {
+    expect(isLastDayOfQuarterItaly(new Date('2026-01-31T10:00:00Z'))).toBe(false);
+  });
+
+  it('returns false on February 28', () => {
+    expect(isLastDayOfQuarterItaly(new Date('2026-02-28T10:00:00Z'))).toBe(false);
+  });
+});
+
+// ─── isLastDayOfYearItaly ─────────────────────────────────────────────────────
+
+describe('isLastDayOfYearItaly', () => {
+  it('returns true on December 31', () => {
+    expect(isLastDayOfYearItaly(new Date('2025-12-31T10:00:00Z'))).toBe(true);
+  });
+
+  it('returns false on December 30', () => {
+    expect(isLastDayOfYearItaly(new Date('2025-12-30T10:00:00Z'))).toBe(false);
+  });
+
+  it('returns false on November 30', () => {
+    expect(isLastDayOfYearItaly(new Date('2025-11-30T10:00:00Z'))).toBe(false);
+  });
+
+  it('returns false on January 1', () => {
+    expect(isLastDayOfYearItaly(new Date('2025-01-01T10:00:00Z'))).toBe(false);
+  });
+});
+
+// ─── monthToQuarter ───────────────────────────────────────────────────────────
+
+describe('monthToQuarter', () => {
+  it.each([
+    [1, 1], [2, 1], [3, 1],
+    [4, 2], [5, 2], [6, 2],
+    [7, 3], [8, 3], [9, 3],
+    [10, 4], [11, 4], [12, 4],
+  ])('month %i → Q%i', (month, expectedQuarter) => {
+    expect(monthToQuarter(month)).toBe(expectedQuarter);
+  });
+});
+
+// ─── getQuarterStartMonth ─────────────────────────────────────────────────────
+
+describe('getQuarterStartMonth', () => {
+  it.each([
+    [3, 1], [6, 4], [9, 7], [12, 10],
+  ])('end month %i → start month %i', (end, start) => {
+    expect(getQuarterStartMonth(end)).toBe(start);
+  });
+});
+
+// ─── getPreviousQuarterEnd ────────────────────────────────────────────────────
+
+describe('getPreviousQuarterEnd', () => {
+  it('Q2 (month 6) → Q1 same year (month 3)', () => {
+    expect(getPreviousQuarterEnd(2026, 6)).toEqual({ year: 2026, month: 3 });
+  });
+
+  it('Q1 (month 3) → Q4 previous year (month 12)', () => {
+    expect(getPreviousQuarterEnd(2026, 3)).toEqual({ year: 2025, month: 12 });
+  });
+
+  it('Q4 (month 12) → Q3 same year (month 9)', () => {
+    expect(getPreviousQuarterEnd(2026, 12)).toEqual({ year: 2026, month: 9 });
+  });
+});
+
+// ─── getMostRecentCompletedQuarterEnd ─────────────────────────────────────────
+
+describe('getMostRecentCompletedQuarterEnd', () => {
+  it('April 19 2026 → March 2026 (Q1 completed)', () => {
+    const result = getMostRecentCompletedQuarterEnd(new Date('2026-04-19T10:00:00Z'));
+    expect(result).toEqual({ year: 2026, month: 3 });
+  });
+
+  it('January 5 2026 → December 2025 (Q4 previous year)', () => {
+    const result = getMostRecentCompletedQuarterEnd(new Date('2026-01-05T10:00:00Z'));
+    expect(result).toEqual({ year: 2025, month: 12 });
+  });
+
+  it('July 1 2026 → June 2026 (Q2 completed)', () => {
+    const result = getMostRecentCompletedQuarterEnd(new Date('2026-07-01T10:00:00Z'));
+    expect(result).toEqual({ year: 2026, month: 6 });
+  });
+
+  it('October 15 2026 → September 2026 (Q3 completed)', () => {
+    const result = getMostRecentCompletedQuarterEnd(new Date('2026-10-15T10:00:00Z'));
+    expect(result).toEqual({ year: 2026, month: 9 });
+  });
+});
+
+// ─── getMostRecentCompletedYearEnd ───────────────────────────────────────────
+
+describe('getMostRecentCompletedYearEnd', () => {
+  it('April 19 2026 → December 2025', () => {
+    const result = getMostRecentCompletedYearEnd(new Date('2026-04-19T10:00:00Z'));
+    expect(result).toEqual({ year: 2025, month: 12 });
+  });
+
+  it('January 1 2026 → December 2025', () => {
+    const result = getMostRecentCompletedYearEnd(new Date('2026-01-01T10:00:00Z'));
+    expect(result).toEqual({ year: 2025, month: 12 });
+  });
+});
+
+// ─── computeAssetClassPerformers ──────────────────────────────────────────────
+
+describe('computeAssetClassPerformers', () => {
+  it('identifies best and worst by Δ% and absolute', () => {
+    const current = { equity: 110000, bonds: 38000, cash: 20000 };
+    const previous = { equity: 100000, bonds: 40000, cash: 20000 };
+    // equity: +10% (+€10000), bonds: -5% (-€2000), cash: 0%
+    const result = computeAssetClassPerformers(current, previous);
+    expect(result.bestPct?.name).toBe('Azioni');
+    expect(result.bestPct?.deltaPct).toBeCloseTo(10);
+    expect(result.bestPct?.deltaAbs).toBe(10000);
+    expect(result.worstPct?.name).toBe('Obbligazioni');
+    expect(result.worstPct?.deltaPct).toBeCloseTo(-5);
+    expect(result.worstPct?.deltaAbs).toBe(-2000);
+    // absolute: equity gained most (+10000), bonds lost most (-2000)
+    expect(result.bestAbs?.name).toBe('Azioni');
+    expect(result.worstAbs?.name).toBe('Obbligazioni');
+  });
+
+  it('returns nulls when previous is empty', () => {
+    const result = computeAssetClassPerformers({ equity: 100 }, {});
+    expect(result.bestPct).toBeNull();
+    expect(result.worstPct).toBeNull();
+    expect(result.bestAbs).toBeNull();
+    expect(result.worstAbs).toBeNull();
+  });
+
+  it('returns only best (no worst) when a single class has a previous value', () => {
+    const result = computeAssetClassPerformers({ equity: 110 }, { equity: 100 });
+    expect(result.bestPct?.deltaPct).toBeCloseTo(10);
+    expect(result.worstPct).toBeNull();
+    expect(result.bestAbs?.deltaAbs).toBe(10);
+    expect(result.worstAbs).toBeNull();
+  });
+
+  it('excludes classes with zero previous value', () => {
+    const current = { equity: 110, bonds: 50 };
+    const previous = { equity: 100, bonds: 0 }; // bonds has no base
+    const result = computeAssetClassPerformers(current, previous);
+    expect(result.bestPct?.name).toBe('Azioni');
+    expect(result.worstPct).toBeNull();
+  });
+});
+
 // ─── generateEmailHtml ────────────────────────────────────────────────────────
 
 describe('generateEmailHtml', () => {
-  const sampleData: MonthlyEmailData = {
-    year: 2025,
-    month: 3,
-    currentNetWorth: 150000,
-    previousNetWorth: 145000,
-    netWorthDelta: 5000,
-    netWorthDeltaPct: 3.45,
-    liquidNetWorth: 30000,
-    byAssetClass: { equity: 90000, bonds: 40000, cash: 20000 },
-    totalIncome: 3500,
-    totalExpenses: 2000,
-    topExpenseCategories: [
-      { name: 'Alimentari', amount: 800 },
-      { name: 'Trasporti', amount: 600 },
-    ],
-    dividendTotal: 450,
-    dividendCount: 3,
-  };
-
-  it('contains Italian month name', () => {
-    const html = generateEmailHtml(sampleData);
+  it('contains Italian month name for monthly', () => {
+    const html = generateEmailHtml(makeMonthlyData());
     expect(html).toContain('Marzo 2025');
   });
 
   it('contains positive delta arrow ▲', () => {
-    const html = generateEmailHtml(sampleData);
-    expect(html).toContain('▲');
+    expect(generateEmailHtml(makeMonthlyData())).toContain('▲');
   });
 
   it('contains negative delta arrow ▼ for loss', () => {
-    const lossData: MonthlyEmailData = { ...sampleData, netWorthDelta: -3000, netWorthDeltaPct: -2 };
-    const html = generateEmailHtml(lossData);
+    const html = generateEmailHtml(makeMonthlyData({ netWorthDelta: -3000, netWorthDeltaPct: -2 }));
     expect(html).toContain('▼');
   });
 
   it('shows top expense categories', () => {
-    const html = generateEmailHtml(sampleData);
+    const html = generateEmailHtml(makeMonthlyData());
     expect(html).toContain('Alimentari');
     expect(html).toContain('Trasporti');
   });
 
   it('shows dividend section when dividendCount > 0', () => {
-    const html = generateEmailHtml(sampleData);
-    expect(html).toContain('Dividendi');
+    expect(generateEmailHtml(makeMonthlyData())).toContain('Dividendi');
   });
 
   it('omits dividend section when dividendCount === 0', () => {
-    const noDivData: MonthlyEmailData = { ...sampleData, dividendCount: 0, dividendTotal: 0 };
-    const html = generateEmailHtml(noDivData);
+    const html = generateEmailHtml(makeMonthlyData({ dividendCount: 0, dividendTotal: 0 }));
     expect(html).not.toContain('Dividendi');
   });
 
   it('handles zero expenses (no top categories section)', () => {
-    const noExpData: MonthlyEmailData = {
-      ...sampleData,
-      totalExpenses: 0,
-      topExpenseCategories: [],
-    };
-    const html = generateEmailHtml(noExpData);
-    // top categories table should not appear when list is empty
+    const html = generateEmailHtml(
+      makeMonthlyData({ totalExpenses: 0, topExpenseCategories: [] })
+    );
     expect(html).not.toContain('Top Categorie di Spesa');
+  });
+
+  it('shows % allocation column', () => {
+    // equity = 90000 / 150000 * 100 = 60%
+    const html = generateEmailHtml(makeMonthlyData());
+    expect(html).toContain('60.0%');
+  });
+
+  it('shows performers section when best and worst differ', () => {
+    const entry = { name: 'Azioni', deltaPct: 10, deltaAbs: 10000 };
+    const entryWorst = { name: 'Obbligazioni', deltaPct: -5, deltaAbs: -2000 };
+    const html = generateEmailHtml(
+      makeMonthlyData({
+        assetClassPerformers: {
+          bestPct: entry,
+          worstPct: entryWorst,
+          bestAbs: entry,
+          worstAbs: entryWorst,
+        },
+      })
+    );
+    expect(html).toContain('Migliore');
+    expect(html).toContain('Peggiore');
+    expect(html).toContain('Azioni');
+    expect(html).toContain('Obbligazioni');
+  });
+
+  it('omits performers section when both are null', () => {
+    const html = generateEmailHtml(makeMonthlyData());
+    expect(html).not.toContain('Performance Asset Class');
+  });
+
+  it('shows savings rate in cashflow', () => {
+    // saved = 3500 - 2000 = 1500; rate = 1500/3500 * 100 ≈ 42.9%
+    const html = generateEmailHtml(makeMonthlyData());
+    expect(html).toContain('42.9%');
+  });
+
+  it('shows top 5 individual expenses when present', () => {
+    const html = generateEmailHtml(
+      makeMonthlyData({
+        topIndividualExpenses: [
+          { description: 'Affitto', categoryName: 'Casa', amount: 1200 },
+          { description: 'Spesa settimanale', categoryName: 'Alimentari', amount: 250 },
+        ],
+      })
+    );
+    expect(html).toContain('Top 5 Spese del Mese');
+    expect(html).toContain('Affitto');
+    expect(html).toContain('Spesa settimanale');
+  });
+
+  it('uses quarterly label for quarterly period type', () => {
+    const html = generateEmailHtml(
+      makeMonthlyData({ periodType: 'quarterly', quarter: 1, month: 3, year: 2026 })
+    );
+    expect(html).toContain('Q1 2026');
+    expect(html).toContain('Cashflow del Trimestre');
+  });
+
+  it('uses yearly label for yearly period type', () => {
+    const html = generateEmailHtml(
+      makeMonthlyData({ periodType: 'yearly', month: 12, year: 2025 })
+    );
+    expect(html).toContain('Anno 2025');
+    expect(html).toContain("Cashflow dell'Anno");
   });
 });
 
@@ -177,7 +424,6 @@ describe('generateEmailHtml', () => {
 
 describe('buildMonthlyEmailData', () => {
   beforeEach(() => {
-    // Reset all collection mocks
     Object.keys(collectionMocks).forEach((k) => delete collectionMocks[k]);
   });
 
@@ -207,6 +453,7 @@ describe('buildMonthlyEmailData', () => {
     expect(result).not.toBeNull();
     expect(result!.currentNetWorth).toBe(150000);
     expect(result!.liquidNetWorth).toBe(30000);
+    expect(result!.periodType).toBe('monthly');
   });
 
   it('sums income and expense amounts correctly', async () => {
@@ -228,6 +475,27 @@ describe('buildMonthlyEmailData', () => {
     expect(result!.totalExpenses).toBe(800);
     expect(result!.topExpenseCategories).toHaveLength(2);
     expect(result!.topExpenseCategories[0].name).toBe('Alimentari');
+  });
+
+  it('collects top individual expense transactions', async () => {
+    collectionMocks['monthly-snapshots'] = {
+      empty: false,
+      docs: [{ data: () => ({ totalNetWorth: 100, liquidNetWorth: 50, byAssetClass: {} }) }],
+    };
+    collectionMocks['expenses'] = {
+      docs: [
+        { data: () => ({ amount: -1200, categoryName: 'Casa', notes: 'Affitto' }) },
+        { data: () => ({ amount: -250, categoryName: 'Alimentari', notes: '' }) },
+        { data: () => ({ amount: -80, categoryName: 'Trasporti', notes: 'Benzina' }) },
+      ],
+    };
+    collectionMocks['dividends'] = { docs: [] };
+
+    const result = await buildMonthlyEmailData('user-1', 2025, 3);
+    expect(result!.topIndividualExpenses).toHaveLength(3);
+    // Sorted by amount descending
+    expect(result!.topIndividualExpenses[0].amount).toBe(1200);
+    expect(result!.topIndividualExpenses[0].description).toBe('Affitto');
   });
 
   it('sums dividend grossAmountEur', async () => {
@@ -263,6 +531,97 @@ describe('buildMonthlyEmailData', () => {
   });
 });
 
+// ─── buildPeriodEmailData — quarterly ────────────────────────────────────────
+
+describe('buildPeriodEmailData (quarterly)', () => {
+  beforeEach(() => {
+    Object.keys(collectionMocks).forEach((k) => delete collectionMocks[k]);
+  });
+
+  it('returns null when no end-of-quarter snapshot exists', async () => {
+    collectionMocks['monthly-snapshots'] = { empty: true, docs: [] };
+    const result = await buildPeriodEmailData('user-1', 2026, 3, 'quarterly');
+    expect(result).toBeNull();
+  });
+
+  it('returns quarterly data with correct periodType and quarter', async () => {
+    collectionMocks['monthly-snapshots'] = {
+      empty: false,
+      docs: [
+        {
+          data: () => ({
+            totalNetWorth: 200000,
+            liquidNetWorth: 50000,
+            byAssetClass: { equity: 150000, cash: 50000 },
+          }),
+        },
+      ],
+    };
+    collectionMocks['expenses'] = { docs: [] };
+    collectionMocks['dividends'] = { docs: [] };
+
+    const result = await buildPeriodEmailData('user-1', 2026, 3, 'quarterly');
+    expect(result).not.toBeNull();
+    expect(result!.periodType).toBe('quarterly');
+    expect(result!.quarter).toBe(1);
+  });
+
+  it('aggregates dividends across the full quarter', async () => {
+    collectionMocks['monthly-snapshots'] = {
+      empty: false,
+      docs: [{ data: () => ({ totalNetWorth: 100, liquidNetWorth: 50, byAssetClass: {} }) }],
+    };
+    collectionMocks['expenses'] = { docs: [] };
+    collectionMocks['dividends'] = {
+      docs: [
+        { data: () => ({ grossAmountEur: 300 }) },
+        { data: () => ({ grossAmountEur: 200 }) },
+      ],
+    };
+
+    const result = await buildPeriodEmailData('user-1', 2026, 3, 'quarterly');
+    expect(result!.dividendTotal).toBe(500);
+    expect(result!.dividendCount).toBe(2);
+  });
+});
+
+// ─── buildPeriodEmailData — yearly ───────────────────────────────────────────
+
+describe('buildPeriodEmailData (yearly)', () => {
+  beforeEach(() => {
+    Object.keys(collectionMocks).forEach((k) => delete collectionMocks[k]);
+  });
+
+  it('returns null when no December snapshot exists', async () => {
+    collectionMocks['monthly-snapshots'] = { empty: true, docs: [] };
+    const result = await buildPeriodEmailData('user-1', 2025, 12, 'yearly');
+    expect(result).toBeNull();
+  });
+
+  it('returns yearly data with correct periodType', async () => {
+    collectionMocks['monthly-snapshots'] = {
+      empty: false,
+      docs: [
+        {
+          data: () => ({
+            totalNetWorth: 300000,
+            liquidNetWorth: 80000,
+            byAssetClass: { equity: 220000, cash: 80000 },
+          }),
+        },
+      ],
+    };
+    collectionMocks['expenses'] = { docs: [] };
+    collectionMocks['dividends'] = { docs: [] };
+
+    const result = await buildPeriodEmailData('user-1', 2025, 12, 'yearly');
+    expect(result).not.toBeNull();
+    expect(result!.periodType).toBe('yearly');
+    expect(result!.month).toBe(12);
+    expect(result!.quarter).toBeUndefined();
+  });
+});
+
 // ─── sendMonthlyEmail ─────────────────────────────────────────────────────────
 
 describe('sendMonthlyEmail', () => {
@@ -270,24 +629,8 @@ describe('sendMonthlyEmail', () => {
     resendSendMock.mockResolvedValue({ data: {}, error: null });
   });
 
-  const sampleData: MonthlyEmailData = {
-    year: 2025,
-    month: 4,
-    currentNetWorth: 100000,
-    previousNetWorth: 95000,
-    netWorthDelta: 5000,
-    netWorthDeltaPct: 5.26,
-    liquidNetWorth: 20000,
-    byAssetClass: {},
-    totalIncome: 0,
-    totalExpenses: 0,
-    topExpenseCategories: [],
-    dividendTotal: 0,
-    dividendCount: 0,
-  };
-
-  it('calls Resend with correct subject and recipients', async () => {
-    await sendMonthlyEmail(['a@b.com', 'c@d.com'], sampleData);
+  it('calls Resend with correct subject and recipients (monthly)', async () => {
+    await sendMonthlyEmail(['a@b.com', 'c@d.com'], makeMonthlyData({ year: 2025, month: 4 }));
     expect(resendSendMock).toHaveBeenCalledWith(
       expect.objectContaining({
         to: ['a@b.com', 'c@d.com'],
@@ -296,8 +639,32 @@ describe('sendMonthlyEmail', () => {
     );
   });
 
+  it('uses "Riepilogo Trimestrale" subject for quarterly', async () => {
+    await sendMonthlyEmail(
+      ['a@b.com'],
+      makeMonthlyData({ periodType: 'quarterly', quarter: 1, month: 3, year: 2026 })
+    );
+    expect(resendSendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subject: expect.stringContaining('Riepilogo Trimestrale'),
+      })
+    );
+  });
+
+  it('uses "Riepilogo Annuale" subject for yearly', async () => {
+    await sendMonthlyEmail(
+      ['a@b.com'],
+      makeMonthlyData({ periodType: 'yearly', month: 12, year: 2025 })
+    );
+    expect(resendSendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subject: expect.stringContaining('Riepilogo Annuale'),
+      })
+    );
+  });
+
   it('throws when Resend returns an error', async () => {
     resendSendMock.mockResolvedValue({ data: null, error: { message: 'rate limited' } });
-    await expect(sendMonthlyEmail(['a@b.com'], sampleData)).rejects.toThrow('Resend error');
+    await expect(sendMonthlyEmail(['a@b.com'], makeMonthlyData())).rejects.toThrow('Resend error');
   });
 });

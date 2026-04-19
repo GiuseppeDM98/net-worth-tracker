@@ -51,22 +51,21 @@ describe('getGreeting', () => {
   });
 
   describe('notte (22–4)', () => {
-    it('restituisce Buonanotte alle 22 (boundary di inizio)', () => {
+    it('restituisce Buonasera alle 22', () => {
       const r = getGreeting(22);
-      expect(r.greeting).toBe('Buonanotte');
-      expect(r.subtitle).toBe('Sei sveglio tardi — ecco il tuo portafoglio');
+      expect(r.greeting).toBe('Buonasera');
     });
 
-    it('restituisce Buonanotte a mezzanotte (0)', () => {
-      expect(getGreeting(0).greeting).toBe('Buonanotte');
+    it('restituisce Buonasera a mezzanotte (0)', () => {
+      expect(getGreeting(0).greeting).toBe('Buonasera');
     });
 
-    it('restituisce Buonanotte alle 4 (boundary di fine)', () => {
-      expect(getGreeting(4).greeting).toBe('Buonanotte');
+    it('restituisce Buonasera alle 4 (boundary di fine)', () => {
+      expect(getGreeting(4).greeting).toBe('Buonasera');
     });
 
-    it('restituisce Buonanotte alle 3', () => {
-      expect(getGreeting(3).greeting).toBe('Buonanotte');
+    it('restituisce Buonasera alle 3', () => {
+      expect(getGreeting(3).greeting).toBe('Buonasera');
     });
   });
 
@@ -79,12 +78,12 @@ describe('getGreeting', () => {
       expect(getGreeting(18).greeting).not.toBe('Buon pomeriggio');
     });
 
-    it('22 è notte, non sera', () => {
-      expect(getGreeting(22).greeting).not.toBe('Buonasera');
+    it('22 è sera (Buonasera anche di notte)', () => {
+      expect(getGreeting(22).greeting).toBe('Buonasera');
     });
 
-    it('5 è mattina, non notte', () => {
-      expect(getGreeting(5).greeting).not.toBe('Buonanotte');
+    it('5 è mattina, non sera', () => {
+      expect(getGreeting(5).greeting).not.toBe('Buonasera');
     });
   });
 });
