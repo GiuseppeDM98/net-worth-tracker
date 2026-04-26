@@ -4,6 +4,7 @@ import {
   buildChatPrompt,
   buildHistoryAnalysisPrompt,
   buildMonthAnalysisPrompt,
+  buildQuarterAnalysisPrompt,
   buildYearAnalysisPrompt,
   buildYtdAnalysisPrompt,
 } from './prompts';
@@ -73,6 +74,10 @@ function buildPrompt(
     return buildHistoryAnalysisPrompt(contextBundle, prompt, preferences, memoryItems);
   }
 
+  if (mode === 'quarter_analysis' && contextBundle) {
+    return buildQuarterAnalysisPrompt(contextBundle, prompt, preferences, memoryItems);
+  }
+
   // Chat mode: pass the bundle when available so Claude has real numbers.
   // The prompt builder uses it without forcing a fixed response structure.
   return buildChatPrompt(prompt, preferences, monthLabel, memoryItems, contextBundle, enableWebSearch);
@@ -94,7 +99,7 @@ function buildMessagesArray(
   currentUserContent: string,
   history: AssistantMessage[]
 ): Array<{ role: 'user' | 'assistant'; content: string }> {
-  const isStructured = ['month_analysis', 'year_analysis', 'ytd_analysis', 'history_analysis'].includes(mode);
+  const isStructured = ['month_analysis', 'year_analysis', 'ytd_analysis', 'history_analysis', 'quarter_analysis'].includes(mode);
   // Structured modes cap at 3 pairs (6 msgs); chat allows 10 pairs (20 msgs).
   const maxMessages = isStructured ? 6 : 20;
 
@@ -128,7 +133,7 @@ export async function streamAssistantResponse({
     // and more tokens for the structured breakdown. Chat without web search is light (1500).
     // When chat triggers web search (macro/geopolitical question) the response
     // is naturally longer — raise the cap to avoid mid-sentence truncation.
-    const isStructuredAnalysis = ['month_analysis', 'year_analysis', 'ytd_analysis', 'history_analysis'].includes(mode);
+    const isStructuredAnalysis = ['month_analysis', 'year_analysis', 'ytd_analysis', 'history_analysis', 'quarter_analysis'].includes(mode);
     const chatMaxTokens = enableWebSearch ? 2500 : 1500;
     const stream = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',

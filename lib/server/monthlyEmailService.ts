@@ -17,6 +17,15 @@ import { Resend } from 'resend';
 import { getItalyDate, getItalyMonthYear } from '@/lib/utils/dateHelpers';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import { AssetAllocationSettings } from '@/types/assets';
+import { streamAssistantResponse } from '@/lib/server/assistant/anthropicStream';
+import { getDefaultAssistantPreferences } from '@/lib/server/assistant/webSearchPolicy';
+import { getAssistantMemoryDocument } from '@/lib/server/assistant/store';
+import {
+  buildAssistantMonthContext,
+  buildAssistantQuarterContext,
+  buildAssistantYearContext,
+} from '@/lib/services/assistantMonthContextService';
+import type { AssistantMemoryItem, AssistantMode, AssistantMonthContextBundle } from '@/types/assistant';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -54,6 +63,8 @@ export interface MonthlyEmailData {
   topIndividualExpenses: Array<{ description: string; categoryName: string; amount: number }>; // top 5 transactions
   dividendTotal: number; // gross EUR
   dividendCount: number;
+  // AI-generated markdown comment; undefined when generation failed or AI key is absent
+  aiComment?: string;
 }
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -217,6 +228,126 @@ function topExpenseTransactionLabel(data: MonthlyEmailData): string {
   if (data.periodType === 'quarterly') return 'Top 5 Spese del Trimestre';
   if (data.periodType === 'yearly') return "Top 5 Spese dell'Anno";
   return 'Top 5 Spese del Mese';
+}
+
+// ─── AI comment generation ────────────────────────────────────────────────────
+
+/**
+ * Converts Claude's markdown output to email-safe HTML.
+ *
+ * Handles the subset Claude produces in structured analysis responses:
+ * bold, any-level headings, bullet lists, horizontal rules, and paragraph breaks.
+ * --- separators are removed (section headings already provide visual separation).
+ * Avoids adding a `marked` dependency — the output format is predictable and narrow.
+ */
+function simpleMarkdownToHtml(text: string): string {
+  return (
+    text
+      // Remove horizontal rules (--- or ***) — headings already separate sections
+      .replace(/^[-*]{3,}\s*$/gm, '')
+      // Bold
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      // Any-level headings (# ## ###) → compact bold paragraph
+      .replace(
+        /^#{1,3}\s+(.+)$/gm,
+        '<p style="margin:8px 0 2px;font-size:13px;font-weight:600;color:#0f172a;">$1</p>'
+      )
+      // Bullet list items
+      .replace(
+        /^- (.+)$/gm,
+        '<li style="margin:2px 0;padding-left:0;">$1</li>'
+      )
+      // Wrap consecutive <li> runs in a <ul>
+      .replace(
+        /(<li[^>]*>[\s\S]*?<\/li>\n?)+/g,
+        '<ul style="margin:4px 0 4px 16px;padding:0;list-style:disc;">$&</ul>'
+      )
+      // Collapse 3+ newlines to 2 (avoid giant gaps left by removed ---)
+      .replace(/\n{3,}/g, '\n\n')
+      // Double newline → tight paragraph break
+      .replace(/\n\n/g, '</p><p style="margin:4px 0;">')
+      // Single remaining newlines → line break
+      .replace(/\n/g, '<br/>')
+  );
+}
+
+/**
+ * Generates an AI comment for the period by calling the same analysis pipeline
+ * used by the interactive assistant (month_analysis, quarter_analysis, or year_analysis).
+ *
+ * The comment is injected into the email HTML when available. Any failure
+ * (Anthropic API error, missing key, context build error) is caught and logged;
+ * the email is always sent regardless of whether the comment was generated.
+ *
+ * @returns The AI-generated markdown text, or null on failure.
+ */
+async function generateEmailAiComment(
+  userId: string,
+  emailData: MonthlyEmailData
+): Promise<string | null> {
+  try {
+    // Load user's assistant preferences and active memory items for personalisation.
+    // Falls back to defaults + empty memory on any Firestore failure.
+    let preferences = getDefaultAssistantPreferences();
+    // Web search always enabled for email AI comments so the analysis can connect
+    // portfolio performance to global macro events (rates, geopolitics, markets).
+    preferences = { ...preferences, includeMacroContext: true };
+    let memoryItems: AssistantMemoryItem[] = [];
+
+    try {
+      const memoryDoc = await getAssistantMemoryDocument(userId);
+      // Use user's actual preferences (e.g. responseStyle) but force macro context on
+      preferences = { ...memoryDoc.preferences, includeMacroContext: true };
+      memoryItems = memoryDoc.items.filter((i) => i.status === 'active');
+    } catch {
+      // Memory load is non-critical — proceed with defaults
+    }
+
+    // Map email periodType → AI mode + context builder
+    let mode: AssistantMode;
+    let contextBundle: AssistantMonthContextBundle;
+
+    if (emailData.periodType === 'monthly') {
+      mode = 'month_analysis';
+      contextBundle = await buildAssistantMonthContext(
+        userId,
+        { year: emailData.year, month: emailData.month },
+        false
+      );
+    } else if (emailData.periodType === 'quarterly') {
+      mode = 'quarter_analysis';
+      // quarter is always set for quarterly emails
+      contextBundle = await buildAssistantQuarterContext(userId, emailData.year, emailData.quarter!, false);
+    } else {
+      mode = 'year_analysis';
+      contextBundle = await buildAssistantYearContext(userId, emailData.year, false);
+    }
+
+    const systemPrompt =
+      emailData.periodType === 'monthly'
+        ? 'Analizza il mese e fornisci le tue osservazioni principali.'
+        : emailData.periodType === 'quarterly'
+        ? 'Analizza il trimestre e fornisci le tue osservazioni principali.'
+        : "Analizza l'anno e fornisci le tue osservazioni principali.";
+
+    const { text } = await streamAssistantResponse({
+      mode,
+      prompt: systemPrompt,
+      contextBundle,
+      preferences,
+      memoryItems,
+      enableWebSearch: true,  // always on — connects portfolio performance to global macro events
+      conversationHistory: [],
+      onStatus: () => {},     // no-op: email generation is non-interactive
+      onText: () => {},       // no-op: we use the returned aggregated text
+    });
+
+    return text || null;
+  } catch (error) {
+    // AI failure must never block email sending
+    console.error(`[emailAiComment] Generation failed for user ${userId}:`, error);
+    return null;
+  }
 }
 
 // ─── Admin settings reader ────────────────────────────────────────────────────
@@ -735,6 +866,19 @@ export function generateEmailHtml(data: MonthlyEmailData): string {
             : ''
         }
 
+        <!-- AI Comment -->
+        ${
+          data.aiComment
+            ? `<tr>
+          <td style="padding:20px 32px;border-bottom:1px solid #f1f5f9;background:#f8fafc;">
+            <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#0f172a;">Commento AI</p>
+            <div style="font-size:13px;color:#374151;line-height:1.7;">${simpleMarkdownToHtml(data.aiComment)}</div>
+            <p style="margin:12px 0 0;font-size:11px;color:#94a3b8;">Generato da Assistente AI — verifica sempre le informazioni prima di agire.</p>
+          </td>
+        </tr>`
+            : ''
+        }
+
         <!-- Footer -->
         <tr>
           <td style="padding:20px 32px;background:#f8fafc;">
@@ -790,6 +934,8 @@ export async function sendMonthlyEmail(
 /**
  * Build and send for any period type.
  * Returns false when no snapshot exists for the period (email skipped).
+ * Generates an AI comment and injects it into the email when possible;
+ * AI failure is non-blocking — the email is sent without the comment.
  */
 export async function buildAndSendForPeriod(
   userId: string,
@@ -800,6 +946,13 @@ export async function buildAndSendForPeriod(
 ): Promise<boolean> {
   const emailData = await buildPeriodEmailData(userId, year, month, periodType);
   if (!emailData) return false;
+
+  // Attempt to generate the AI comment — failure is silently swallowed inside generateEmailAiComment
+  const aiComment = await generateEmailAiComment(userId, emailData);
+  if (aiComment) {
+    emailData.aiComment = aiComment;
+  }
+
   await sendMonthlyEmail(recipients, emailData);
   return true;
 }

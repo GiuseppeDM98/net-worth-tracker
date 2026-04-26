@@ -58,6 +58,7 @@ const STRUCTURED_ANALYSIS_MODES: AssistantMode[] = [
   'year_analysis',
   'ytd_analysis',
   'history_analysis',
+  'quarter_analysis',
 ];
 
 export function resolveAssistantWebSearchPolicy(

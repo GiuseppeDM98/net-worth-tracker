@@ -39,6 +39,7 @@ function getDefaultThreadTitle(mode: AssistantMode): string {
   if (mode === 'year_analysis') return 'Nuova analisi annuale';
   if (mode === 'ytd_analysis') return 'Nuova analisi YTD';
   if (mode === 'history_analysis') return 'Nuova analisi storico';
+  if (mode === 'quarter_analysis') return 'Nuova analisi trimestrale';
   return 'Nuova conversazione';
 }
 

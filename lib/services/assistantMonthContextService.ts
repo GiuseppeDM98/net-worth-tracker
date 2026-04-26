@@ -559,6 +559,112 @@ export async function buildAssistantYearContext(
   };
 }
 
+// ─── Quarter builder ─────────────────────────────────────────────────────────
+
+/**
+ * Builds the context bundle for a completed-quarter analysis.
+ *
+ * Baseline: end-of-previous-quarter snapshot (Q1 → Dec prev year; Q2/Q3/Q4 → prev quarter-end)
+ * End: end-of-quarter snapshot (e.g. March for Q1, June for Q2)
+ * Cashflow: all transactions from quarter start month to quarter end month
+ *
+ * selector.month is set to the last month of the quarter (3, 6, 9, or 12) and
+ * selector.quarter is set to 1-4 so getPeriodLabel can render "Q1 2026" instead of "Marzo 2026".
+ *
+ * @param userId - Firebase UID of the authenticated user
+ * @param year - The year of the quarter
+ * @param quarter - 1-4 identifying the calendar quarter
+ * @param includeDummySnapshots - Include test fixture snapshots (test accounts only)
+ */
+export async function buildAssistantQuarterContext(
+  userId: string,
+  year: number,
+  quarter: number,
+  includeDummySnapshots = false
+): Promise<AssistantMonthContextBundle> {
+  const lastMonthOfQuarter = quarter * 3;    // 3, 6, 9, 12
+  const quarterStartMonth = lastMonthOfQuarter - 2; // 1, 4, 7, 10
+
+  // Previous quarter-end: Q1 → Dec of previous year; Q2/Q3/Q4 → 3 months earlier
+  const prevQuarterYear = quarter === 1 ? year - 1 : year;
+  const prevQuarterMonth = quarter === 1 ? 12 : lastMonthOfQuarter - 3;
+
+  const startDate = new Date(year, quarterStartMonth - 1, 1, 0, 0, 0);
+  // Day 0 of next month = last day of quarter-end month
+  const endDate = new Date(year, lastMonthOfQuarter, 0, 23, 59, 59);
+
+  const [allSnapshots, quarterExpenses, settings, assets] = await Promise.all([
+    fetchSnapshots(userId),
+    fetchExpenses(userId, startDate, endDate),
+    fetchSettings(userId),
+    fetchAssets(userId),
+  ]);
+
+  // End snapshot = last day of quarter-end month
+  const currentSnapshot = findSnapshot(allSnapshots, year, lastMonthOfQuarter, includeDummySnapshots);
+  // Baseline snapshot = last day of previous quarter
+  const previousSnapshot = findSnapshot(allSnapshots, prevQuarterYear, prevQuarterMonth, includeDummySnapshots);
+
+  const hasSnapshot = currentSnapshot !== null;
+  const hasPreviousBaseline = previousSnapshot !== null;
+  const hasCashflowData = quarterExpenses.length > 0;
+
+  const notes: string[] = [];
+  if (!hasSnapshot && hasCashflowData) {
+    notes.push('Snapshot patrimoniale di fine trimestre non presente: patrimonio finale non consolidato.');
+  }
+  if (!hasSnapshot && !hasCashflowData) {
+    notes.push('Nessun dato disponibile per questo trimestre.');
+  }
+  if (hasSnapshot && !hasPreviousBaseline) {
+    notes.push('Nessun trimestre precedente disponibile: variazione trimestrale non calcolabile.');
+  }
+
+  const nwStart = previousSnapshot?.totalNetWorth ?? null;
+  const nwEnd = currentSnapshot?.totalNetWorth ?? null;
+  const nwDelta = nwStart !== null && nwEnd !== null ? nwEnd - nwStart : null;
+  const nwDeltaPct =
+    nwDelta !== null && nwStart !== null && nwStart !== 0
+      ? (nwDelta / nwStart) * 100
+      : null;
+
+  const dividendCategoryId = settings?.dividendIncomeCategoryId;
+  const { totalIncome, totalExpenses, totalDividends, netCashFlow } = aggregateCashflow(
+    quarterExpenses,
+    dividendCategoryId
+  );
+
+  const { topExpensesByCategory, topIndividualExpenses } = buildExpenseBreakdown(quarterExpenses);
+  const allocationChanges = buildAllocationChanges(currentSnapshot, previousSnapshot);
+  const bySubCategoryAllocation = buildSubCategoryAllocation(currentSnapshot, assets);
+
+  // selector.quarter disambiguates from a monthly period with the same end-month value
+  return {
+    selector: { year, month: lastMonthOfQuarter, quarter },
+    currentSnapshot,
+    previousSnapshot,
+    cashflow: {
+      totalIncome,
+      totalExpenses,
+      totalDividends,
+      netCashFlow,
+      transactionCount: quarterExpenses.length,
+    },
+    netWorth: { start: nwStart, end: nwEnd, delta: nwDelta, deltaPct: nwDeltaPct },
+    allocationChanges,
+    topExpensesByCategory,
+    topIndividualExpenses,
+    bySubCategoryAllocation,
+    dataQuality: {
+      hasSnapshot,
+      hasPreviousBaseline,
+      hasCashflowData,
+      isPartialMonth: false, // quarterly emails only fire on completed quarters
+      notes,
+    },
+  };
+}
+
 // ─── YTD builder ──────────────────────────────────────────────────────────────
 
 /**

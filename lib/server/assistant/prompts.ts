@@ -34,12 +34,17 @@ const MEMORY_CATEGORY_LABELS: Record<AssistantMemoryItem['category'], string> = 
 
 /**
  * Returns a human-readable label for the period encoded in selector.
- *   month > 0  → "Marzo 2025"
- *   month === 0 → "Anno 2025"
- *   month === -1 → "YTD 2025"
- *   month === -2 → "Storico da 2020"
+ *   selector.quarter set    → "Q1 2025" (check before month > 0 — quarter end-month is positive)
+ *   month > 0               → "Marzo 2025"
+ *   month === 0             → "Anno 2025"
+ *   month === -1            → "YTD 2025"
+ *   month === -2            → "Storico da 2020"
  */
-export function getPeriodLabel(selector: { year: number; month: number }): string {
+export function getPeriodLabel(selector: { year: number; month: number; quarter?: number }): string {
+  // Must check quarter before month > 0: quarterly end-months (3,6,9,12) are positive
+  if (selector.quarter !== undefined) {
+    return `Q${selector.quarter} ${selector.year}`;
+  }
   if (selector.month > 0) {
     return `${MONTH_NAMES[selector.month - 1]} ${selector.year}`;
   }
@@ -419,6 +424,61 @@ export function buildHistoryAnalysisPrompt(
     '- Usa markdown semplice',
     '- Non inventare numeri non presenti nel blocco dati',
     '- Privilegia la visione di lungo periodo, non i dettagli mensili',
+    '',
+    `Domanda dell'utente: ${userPrompt.trim()}`,
+  ];
+
+  return sections.join('\n');
+}
+
+/**
+ * Builds the prompt for a quarterly analysis.
+ *
+ * Covers a full calendar quarter (3 months). Baseline is the previous quarter-end
+ * snapshot; end is the current quarter-end snapshot.
+ * Same 3-section structure as monthly, with quarterly framing.
+ *
+ * Used by the email service to generate the AI comment in quarterly emails.
+ * Not exposed in the interactive UI (quarter_analysis is email-only).
+ */
+export function buildQuarterAnalysisPrompt(
+  bundle: AssistantMonthContextBundle,
+  userPrompt: string,
+  preferences: AssistantPreferences,
+  memoryItems: AssistantMemoryItem[] = []
+): string {
+  const quarterLabel = getPeriodLabel(bundle.selector); // e.g. "Q1 2026"
+  const numericBlock = formatBundleForPrompt(bundle);
+
+  const macroInstruction = preferences.includeMacroContext
+    ? `Puoi integrare contesto macro trimestrale (mercati, tassi, geopolitica) rilevante per il ${quarterLabel}. Usa al massimo 2 ricerche web.`
+    : 'Non cercare informazioni macro esterne. Concentrati esclusivamente sui dati del portafoglio forniti.';
+
+  const memoryBlock = preferences.memoryEnabled
+    ? formatMemoryForPrompt(memoryItems)
+    : 'Non fare affidamento su memoria persistente. Usa solo il contesto esplicito di questa sessione.';
+
+  const sections = [
+    "Sei l'Assistente AI di Net Worth Tracker per un investitore italiano self-directed.",
+    'Rispondi sempre in italiano.',
+    buildResponseStyleInstruction(preferences.responseStyle),
+    macroInstruction,
+    memoryBlock,
+    '',
+    `Stai analizzando ${quarterLabel}.`,
+    'Di seguito trovi i dati finanziari del trimestre, estratti in modo affidabile dal sistema:',
+    '',
+    numericBlock,
+    'Struttura la risposta in tre sezioni markdown:',
+    '1. **In sintesi** — 2-3 frasi sul risultato complessivo del trimestre',
+    '2. **Cosa ha mosso il patrimonio nel trimestre** — i principali driver (mercato, cashflow, allocazione)',
+    "3. **1-2 azioni o attenzioni** — osservazioni pratiche per l'investitore",
+    '',
+    'Rispetta questi vincoli:',
+    '- Massimo 450 parole',
+    '- Usa markdown semplice (grassetto, elenchi puntati, niente tabelle complesse)',
+    '- Non inventare numeri non presenti nel blocco dati',
+    '- Se un dato è N/D, non speculare sul suo valore',
     '',
     `Domanda dell'utente: ${userPrompt.trim()}`,
   ];

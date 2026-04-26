@@ -7,10 +7,9 @@ import {
   isLastDayOfYearItaly,
   monthToQuarter,
   getSettingsAdmin,
-  buildMonthlyEmailData,
+  buildAndSendForPeriod,
   buildAndSendQuarterly,
   buildAndSendYearly,
-  sendMonthlyEmail,
 } from '@/lib/server/monthlyEmailService';
 import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
 
@@ -145,16 +144,14 @@ export async function GET(request: NextRequest) {
             continue;
           }
 
-          const emailData = await buildMonthlyEmailData(userId, year, month);
-          if (!emailData) {
-            console.warn(`No snapshot found for user ${userId} — skipping email`);
+          const sent = await buildAndSendForPeriod(userId, settings.monthlyEmailRecipients, 'monthly', year, month);
+          if (!sent) {
+            console.warn(`No snapshot found for user ${userId} — skipping monthly email`);
             emailResults.skipped++;
-            continue;
+          } else {
+            emailResults.sent++;
+            console.log(`Monthly email sent for user ${userId}`);
           }
-
-          await sendMonthlyEmail(settings.monthlyEmailRecipients, emailData);
-          emailResults.sent++;
-          console.log(`Monthly email sent for user ${userId}`);
         } catch (emailError) {
           console.error(`Monthly email failed for user ${userId}:`, emailError);
           emailResults.errors++;
