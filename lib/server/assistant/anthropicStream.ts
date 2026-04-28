@@ -129,17 +129,17 @@ export async function streamAssistantResponse({
   try {
     onStatus(enableWebSearch ? 'searching' : 'writing');
 
-    // Structured analysis modes (month/year/ytd/history) use extended thinking (budget 2000)
-    // and more tokens for the structured breakdown. Chat without web search is light (1500).
+    // Structured analysis modes (month/year/ytd/history) use extended thinking (budget 4000)
+    // and more tokens for the structured breakdown. Chat without web search is light (3000).
     // When chat triggers web search (macro/geopolitical question) the response
     // is naturally longer — raise the cap to avoid mid-sentence truncation.
     const isStructuredAnalysis = ['month_analysis', 'year_analysis', 'ytd_analysis', 'history_analysis', 'quarter_analysis'].includes(mode);
-    const chatMaxTokens = enableWebSearch ? 2500 : 1500;
+    const chatMaxTokens = enableWebSearch ? 5000 : 3000;
     const stream = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: isStructuredAnalysis ? 3500 : chatMaxTokens,
+      max_tokens: isStructuredAnalysis ? 7000 : chatMaxTokens,
       ...(isStructuredAnalysis
-        ? { thinking: { type: 'enabled', budget_tokens: 2000 } }
+        ? { thinking: { type: 'enabled', budget_tokens: 4000 } }
         : {}),
       ...(enableWebSearch
         ? {

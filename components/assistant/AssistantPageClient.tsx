@@ -967,7 +967,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                         <div>
                           <p className="text-sm font-medium text-foreground">Contesto macro</p>
                           <p className="text-xs text-muted-foreground">
-                            Abilita ricerca web nelle analisi.
+                            Abilita ricerca web nelle analisi e in chat.
                           </p>
                         </div>
                         <Switch
@@ -1043,10 +1043,11 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                           Ricerca web (contesto macro)
                         </p>
                         <p className="text-muted-foreground">
-                          Nelle analisi strutturate (Mese, Anno, YTD, Storico) basta il toggle{' '}
-                          <span className="font-medium text-foreground">Contesto macro</span> nelle preferenze.
-                          In Chat libera si attiva solo se la domanda contiene keyword macro — inflazione, tassi,
-                          dazi, BCE, recessione — o frasi come{' '}
+                          Nelle analisi strutturate (Mese, Anno, YTD, Storico) il toggle{' '}
+                          <span className="font-medium text-foreground">Contesto macro</span> abilita sempre la
+                          ricerca web. In Chat libera: se il toggle è attivo, la ricerca web è sempre abilitata;
+                          se è disattivo si attiva solo su keyword macro — inflazione, tassi, dazi, BCE,
+                          recessione — o frasi come{' '}
                           <span className="font-medium text-foreground">&ldquo;cerca sul web&rdquo;</span>.
                         </p>
                       </div>

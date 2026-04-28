@@ -150,7 +150,8 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 ### Assistant Chat Mode Unification
 - Chat mode can receive numeric context from any period builder. The `chatContext` field in the stream request (`'none' | 'month' | 'year' | 'ytd' | 'history'`) selects the builder; `'none'` skips all context and sends Claude no portfolio data.
 - `enableWebSearch` must be passed from `streamAssistantResponse` through `buildPrompt` → `buildChatPrompt` — without it, the chat prompt has no instruction to use web results for specific recent events even when the tool is active.
-- Chat max_tokens is 1500 normally, 2500 when web search is enabled — macro/geopolitical responses with web search are structurally longer and truncate at 1500.
+- **Web search policy for chat** (`webSearchPolicy.ts`): `return preferences.includeMacroContext || shouldUseWebSearch(prompt)`. Toggle ON → always enable in chat. Toggle OFF → keyword detection only (inflazione, tassi, BCE…). Structured analysis modes use only the toggle, not keyword detection.
+- Chat max_tokens is 3000 normally, 5000 when web search is enabled — macro/geopolitical responses with web search are structurally longer and need headroom. Structured analysis max_tokens is 7000 (thinking budget 4000).
 - The SSE `context` event (numeric panel) is sent for all analysis modes and for chat when a context bundle was built. Chat mode with `chatContext: 'none'` produces no panel.
 
 ### Assistant Context Panel Persistence

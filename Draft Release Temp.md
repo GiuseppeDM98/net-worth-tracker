@@ -18,6 +18,8 @@
 
 ## 🔧 Improvements
 
+- Improved AI Assistant: the "Macro context" toggle in preferences now also enables web search in free chat mode — previously the toggle only applied to structured analyses (monthly, annual, YTD, history). With the toggle on, every chat message benefits from real-time web search for macro and geopolitical context; with it off, web search still activates automatically on keyword-based prompts (inflation, rates, ECB, etc.)
+- Improved AI Assistant response length limits: doubled the maximum response length for all modes — structured analyses now have substantially more room for detailed breakdowns, and chat responses no longer cut off mid-sentence during long explanations
 - Improved the Net Worth Evolution chart in History: the line now renders clean and continuous without dots on every data point, matching the visual style of the area charts below it; note indicators (amber markers) are still shown on snapshots with attached notes
 - Improved error handling in Cashflow and Budget so temporary loading or save issues surface clearer feedback while keeping the page usable
 - Improved resilience when refreshing dashboard overview data after account changes, with safer fallback handling for non-critical failures

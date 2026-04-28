@@ -36,18 +36,29 @@ describe('Assistant web search policy', () => {
     ).toBe(false);
   });
 
-  it('keeps chat web search local to the prompt intent', () => {
+  it('chat: keyword triggers web search even with toggle off', () => {
     expect(
       resolveAssistantWebSearchPolicy('chat', 'Cerca online le ultime notizie macro', {
         ...getDefaultAssistantPreferences(),
         includeMacroContext: false,
       })
     ).toBe(true);
+  });
 
+  it('chat: toggle on enables web search regardless of prompt keywords', () => {
     expect(
       resolveAssistantWebSearchPolicy('chat', 'Riorganizza le mie domande sul portafoglio', {
         ...getDefaultAssistantPreferences(),
         includeMacroContext: true,
+      })
+    ).toBe(true);
+  });
+
+  it('chat: toggle off and no keywords keeps web search disabled', () => {
+    expect(
+      resolveAssistantWebSearchPolicy('chat', 'Riorganizza le mie domande sul portafoglio', {
+        ...getDefaultAssistantPreferences(),
+        includeMacroContext: false,
       })
     ).toBe(false);
   });
