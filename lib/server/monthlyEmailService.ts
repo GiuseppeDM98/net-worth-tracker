@@ -59,7 +59,8 @@ export interface MonthlyEmailData {
   assetClassPerformers: AssetClassPerformers;
   totalIncome: number;
   totalExpenses: number; // always positive (raw amounts are negative)
-  topExpenseCategories: Array<{ name: string; amount: number }>; // top 3 categories
+  topExpenseCategories: Array<{ name: string; amount: number }>; // all expense categories sorted desc
+  allIncomeCategories: Array<{ name: string; amount: number }>; // all income categories sorted desc
   topIndividualExpenses: Array<{ description: string; categoryName: string; amount: number }>; // top 5 transactions
   dividendTotal: number; // gross EUR
   dividendCount: number;
@@ -219,9 +220,15 @@ function cashflowSectionLabel(data: MonthlyEmailData): string {
 }
 
 function expenseCategoryLabel(data: MonthlyEmailData): string {
-  if (data.periodType === 'quarterly') return 'Top Categorie di Spesa (Trimestre)';
-  if (data.periodType === 'yearly') return "Top Categorie di Spesa (Anno)";
-  return 'Top Categorie di Spesa';
+  if (data.periodType === 'quarterly') return 'Spese per Categoria (Trimestre)';
+  if (data.periodType === 'yearly') return 'Spese per Categoria (Anno)';
+  return 'Spese per Categoria';
+}
+
+function incomeCategoryLabel(data: MonthlyEmailData): string {
+  if (data.periodType === 'quarterly') return 'Entrate per Categoria (Trimestre)';
+  if (data.periodType === 'yearly') return 'Entrate per Categoria (Anno)';
+  return 'Entrate per Categoria';
 }
 
 function topExpenseTransactionLabel(data: MonthlyEmailData): string {
@@ -241,22 +248,45 @@ function topExpenseTransactionLabel(data: MonthlyEmailData): string {
  * Avoids adding a `marked` dependency — the output format is predictable and narrow.
  */
 function simpleMarkdownToHtml(text: string): string {
+  // Ordered list items use a placeholder so they can be collapsed and wrapped independently
+  // from unordered items before the final <br/> conversion runs.
+  const OLI_OPEN = '§OLI§';
+  const OLI_CLOSE = '§/OLI§';
+
   return (
     text
+      // Strip <details>/<summary> blocks — AI occasionally wraps content in collapsible HTML
+      // which email clients render as interactive elements, breaking the static email layout
+      .replace(/<summary[^>]*>[\s\S]*?<\/summary>/gi, '')
+      .replace(/<\/?details[^>]*>/gi, '')
       // Remove horizontal rules (--- or ***) — headings already separate sections
       .replace(/^[-*]{3,}\s*$/gm, '')
-      // Bold
+      // Bold (must run before single-asterisk italic to avoid conflict)
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      // Italic — single asterisk emphasis (e.g. *Limite del dato*)
+      .replace(/\*([^*\n]+)\*/g, '<em>$1</em>')
       // Any-level headings (# ## ###) → compact bold paragraph
       .replace(
         /^#{1,3}\s+(.+)$/gm,
-        '<p style="margin:8px 0 2px;font-size:13px;font-weight:600;color:#0f172a;">$1</p>'
+        '<p style="margin:16px 0 2px;font-size:13px;font-weight:600;color:#0f172a;">$1</p>'
       )
-      // Bullet list items
+      // Ordered list items (1. 2. 3.) — must run before bullet items to avoid conflicts
+      .replace(/^\d+\. (.+)$/gm, `${OLI_OPEN}$1${OLI_CLOSE}`)
+      // Collapse blank lines between consecutive ordered items so they group into one <ol>
+      .replace(new RegExp(`(${OLI_CLOSE})\\n\\n(${OLI_OPEN})`, 'g'), `$1\n$2`)
+      // Wrap consecutive ordered item runs in <ol>, expand placeholders into <li>
       .replace(
-        /^- (.+)$/gm,
-        '<li style="margin:2px 0;padding-left:0;">$1</li>'
+        new RegExp(`(${OLI_OPEN}[\\s\\S]*?${OLI_CLOSE}\\n?)+`, 'g'),
+        (match) =>
+          `<ol style="margin:4px 0 4px 16px;padding:0;list-style:decimal;">${match
+            .replace(new RegExp(OLI_OPEN, 'g'), '<li style="margin:5px 0;padding-left:0;">')
+            .replace(new RegExp(OLI_CLOSE, 'g'), '</li>')}</ol>`
       )
+      // Unordered bullet items
+      .replace(/^- (.+)$/gm, '<li style="margin:1px 0;padding-left:0;">$1</li>')
+      // Collapse blank lines between consecutive unordered items so they merge into one <ul>
+      // (AI often emits blank lines between bullets, which would otherwise create separate <ul>s)
+      .replace(/(<\/li>)\n\n(<li)/g, '$1\n$2')
       // Wrap consecutive <li> runs in a <ul>
       .replace(
         /(<li[^>]*>[\s\S]*?<\/li>\n?)+/g,
@@ -264,10 +294,18 @@ function simpleMarkdownToHtml(text: string): string {
       )
       // Collapse 3+ newlines to 2 (avoid giant gaps left by removed ---)
       .replace(/\n{3,}/g, '\n\n')
-      // Double newline → tight paragraph break
-      .replace(/\n\n/g, '</p><p style="margin:4px 0;">')
+      // Double newline → two line breaks (paragraph-like spacing without block-level margins)
+      .replace(/\n\n/g, '<br/><br/>')
       // Single remaining newlines → line break
       .replace(/\n/g, '<br/>')
+      // Tighten spacing around headings: heading <p> tags already carry their own margin,
+      // so extra <br/> before/after them would double up the visual gap
+      .replace(/(<br\/>)+(<p style="margin:\d+px)/g, '$2')
+      .replace(/<\/p>(<br\/>)+/g, '</p>')
+      // Reduce double <br/> around list blocks to single — lists already have their own margin,
+      // so 2 × line-height gap is excessive before/after list groups
+      .replace(/<\/(ul|ol)>(<br\/>){2}/g, '</$1><br/>')
+      .replace(/(<br\/>){2}(<(ul|ol))/g, '<br/>$2')
   );
 }
 
@@ -412,6 +450,7 @@ interface CashflowAggregation {
   totalIncome: number;
   totalExpenses: number;
   topExpenseCategories: Array<{ name: string; amount: number }>;
+  allIncomeCategories: Array<{ name: string; amount: number }>;
   topIndividualExpenses: Array<{ description: string; categoryName: string; amount: number }>;
 }
 
@@ -420,7 +459,8 @@ function aggregateExpenses(
 ): CashflowAggregation {
   let totalIncome = 0;
   let totalExpenses = 0;
-  const categoryTotals: Record<string, { name: string; amount: number }> = {};
+  const expenseCategoryTotals: Record<string, { name: string; amount: number }> = {};
+  const incomeCategoryTotals: Record<string, { name: string; amount: number }> = {};
   const individualExpenses: Array<{ description: string; categoryName: string; amount: number }> =
     [];
 
@@ -433,38 +473,42 @@ function aggregateExpenses(
     };
     const { amount } = data;
 
+    const key = data.categoryId ?? data.categoryName ?? 'Altro';
+    const categoryName = data.categoryName ?? 'Altro';
+
     if (amount > 0) {
       totalIncome += amount;
+      if (!incomeCategoryTotals[key]) {
+        incomeCategoryTotals[key] = { name: categoryName, amount: 0 };
+      }
+      incomeCategoryTotals[key].amount += amount;
     } else {
       const absAmount = Math.abs(amount);
       totalExpenses += absAmount;
 
-      // Category aggregation
-      const key = data.categoryId ?? data.categoryName ?? 'Altro';
-      if (!categoryTotals[key]) {
-        categoryTotals[key] = { name: data.categoryName ?? 'Altro', amount: 0 };
+      if (!expenseCategoryTotals[key]) {
+        expenseCategoryTotals[key] = { name: categoryName, amount: 0 };
       }
-      categoryTotals[key].amount += absAmount;
+      expenseCategoryTotals[key].amount += absAmount;
 
       // Individual transaction — use notes when available, fall back to category name
-      const description = data.notes?.trim() || data.categoryName || 'Spesa';
-      individualExpenses.push({
-        description,
-        categoryName: data.categoryName ?? 'Altro',
-        amount: absAmount,
-      });
+      const description = data.notes?.trim() || categoryName;
+      individualExpenses.push({ description, categoryName, amount: absAmount });
     }
   }
 
-  const topExpenseCategories = Object.values(categoryTotals)
-    .sort((a, b) => b.amount - a.amount)
-    .slice(0, 3);
+  // All categories sorted desc — no cap; callers display the full list
+  const topExpenseCategories = Object.values(expenseCategoryTotals)
+    .sort((a, b) => b.amount - a.amount);
+
+  const allIncomeCategories = Object.values(incomeCategoryTotals)
+    .sort((a, b) => b.amount - a.amount);
 
   const topIndividualExpenses = individualExpenses
     .sort((a, b) => b.amount - a.amount)
     .slice(0, 5);
 
-  return { totalIncome, totalExpenses, topExpenseCategories, topIndividualExpenses };
+  return { totalIncome, totalExpenses, topExpenseCategories, allIncomeCategories, topIndividualExpenses };
 }
 
 interface DividendAggregation {
@@ -580,7 +624,7 @@ export async function buildPeriodEmailData(
   const byAssetClass: Record<string, number> = current.byAssetClass ?? {};
   const previousByAssetClass: Record<string, number> = previous?.byAssetClass ?? {};
 
-  const { totalIncome, totalExpenses, topExpenseCategories, topIndividualExpenses } =
+  const { totalIncome, totalExpenses, topExpenseCategories, allIncomeCategories, topIndividualExpenses } =
     aggregateExpenses(expensesSnap.docs);
   const { dividendTotal, dividendCount } = aggregateDividends(dividendsSnap.docs);
 
@@ -600,6 +644,7 @@ export async function buildPeriodEmailData(
     totalIncome,
     totalExpenses,
     topExpenseCategories,
+    allIncomeCategories,
     topIndividualExpenses,
     dividendTotal,
     dividendCount,
@@ -685,15 +730,28 @@ export function generateEmailHtml(data: MonthlyEmailData): string {
         </tr>`
       : '';
 
-  // Top 3 expense categories
+  // All expense categories with % of total
   const categoryRows = data.topExpenseCategories
-    .map(
-      (cat) =>
-        `<tr>
+    .map((cat) => {
+      const pct = data.totalExpenses > 0 ? ((cat.amount / data.totalExpenses) * 100).toFixed(1) : '0.0';
+      return `<tr>
           <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;">${cat.name}</td>
           <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;text-align:right;">${formatEur(cat.amount)}</td>
-        </tr>`
-    )
+          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;text-align:right;color:#64748b;font-size:12px;">${pct}%</td>
+        </tr>`;
+    })
+    .join('');
+
+  // All income categories with % of total
+  const incomeCategoryRows = data.allIncomeCategories
+    .map((cat) => {
+      const pct = data.totalIncome > 0 ? ((cat.amount / data.totalIncome) * 100).toFixed(1) : '0.0';
+      return `<tr>
+          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;">${cat.name}</td>
+          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;text-align:right;">${formatEur(cat.amount)}</td>
+          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;text-align:right;color:#64748b;font-size:12px;">${pct}%</td>
+        </tr>`;
+    })
     .join('');
 
   // Top 5 individual expense transactions
@@ -813,7 +871,28 @@ export function generateEmailHtml(data: MonthlyEmailData): string {
           </td>
         </tr>
 
-        <!-- Top 3 expense categories -->
+        <!-- Income by category -->
+        ${
+          incomeCategoryRows
+            ? `<tr>
+          <td style="padding:20px 32px;border-bottom:1px solid #f1f5f9;">
+            <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#0f172a;">${incomeCategoryLabel(data)}</p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;color:#374151;">
+              <thead>
+                <tr style="background:#f8fafc;">
+                  <th style="padding:6px 12px;text-align:left;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Categoria</th>
+                  <th style="padding:6px 12px;text-align:right;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Totale</th>
+                  <th style="padding:6px 12px;text-align:right;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">%</th>
+                </tr>
+              </thead>
+              <tbody>${incomeCategoryRows}</tbody>
+            </table>
+          </td>
+        </tr>`
+            : ''
+        }
+
+        <!-- Expense categories -->
         ${
           categoryRows
             ? `<tr>
@@ -824,6 +903,7 @@ export function generateEmailHtml(data: MonthlyEmailData): string {
                 <tr style="background:#f8fafc;">
                   <th style="padding:6px 12px;text-align:left;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Categoria</th>
                   <th style="padding:6px 12px;text-align:right;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Totale</th>
+                  <th style="padding:6px 12px;text-align:right;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">%</th>
                 </tr>
               </thead>
               <tbody>${categoryRows}</tbody>

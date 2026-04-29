@@ -94,6 +94,7 @@ function makeMonthlyData(overrides: Partial<MonthlyEmailData> = {}): MonthlyEmai
       { name: 'Alimentari', amount: 800 },
       { name: 'Trasporti', amount: 600 },
     ],
+    allIncomeCategories: [],
     topIndividualExpenses: [],
     dividendTotal: 450,
     dividendCount: 3,
@@ -346,11 +347,39 @@ describe('generateEmailHtml', () => {
     expect(html).not.toContain('Dividendi');
   });
 
-  it('handles zero expenses (no top categories section)', () => {
+  it('handles zero expenses (no expense categories section)', () => {
     const html = generateEmailHtml(
       makeMonthlyData({ totalExpenses: 0, topExpenseCategories: [] })
     );
-    expect(html).not.toContain('Top Categorie di Spesa');
+    expect(html).not.toContain('Spese per Categoria');
+  });
+
+  it('shows expense category % of total', () => {
+    // Alimentari 800/2000 = 40%, Trasporti 600/2000 = 30%
+    const html = generateEmailHtml(makeMonthlyData());
+    expect(html).toContain('40.0%');
+    expect(html).toContain('30.0%');
+  });
+
+  it('shows income categories section when allIncomeCategories is populated', () => {
+    const html = generateEmailHtml(
+      makeMonthlyData({
+        allIncomeCategories: [
+          { name: 'Stipendio', amount: 3000 },
+          { name: 'Freelance', amount: 500 },
+        ],
+      })
+    );
+    expect(html).toContain('Entrate per Categoria');
+    expect(html).toContain('Stipendio');
+    expect(html).toContain('Freelance');
+    // 3000/3500 ≈ 85.7%
+    expect(html).toContain('85.7%');
+  });
+
+  it('omits income categories section when allIncomeCategories is empty', () => {
+    const html = generateEmailHtml(makeMonthlyData({ allIncomeCategories: [] }));
+    expect(html).not.toContain('Entrate per Categoria');
   });
 
   it('shows % allocation column', () => {
@@ -475,6 +504,8 @@ describe('buildMonthlyEmailData', () => {
     expect(result!.totalExpenses).toBe(800);
     expect(result!.topExpenseCategories).toHaveLength(2);
     expect(result!.topExpenseCategories[0].name).toBe('Alimentari');
+    expect(result!.allIncomeCategories).toHaveLength(1);
+    expect(result!.allIncomeCategories[0].name).toBe('Stipendio');
   });
 
   it('collects top individual expense transactions', async () => {
