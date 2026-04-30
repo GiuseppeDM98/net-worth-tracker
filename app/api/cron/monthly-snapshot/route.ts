@@ -16,8 +16,14 @@ import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
 /**
  * GET /api/cron/monthly-snapshot
  *
- * Monthly automated snapshot creation cron job
- * Scheduled execution: 1st of each month at 00:00 UTC via Vercel Cron
+ * Daily automated snapshot creation cron job
+ * Scheduled execution: every day at 18:00 UTC (19:00/20:00 CET) via Vercel Cron
+ *
+ * Runs daily — snapshot ID is {userId}-{year}-{month}, so each run overwrites
+ * the same document throughout the month (upsert via .set()). The last run of
+ * the month becomes the permanent historical record.
+ * Emails are guarded by isLastDayOfMonthItaly / isLastDayOfQuarterItaly /
+ * isLastDayOfYearItaly and are only sent once on the appropriate day.
  *
  * Orchestration Pattern:
  *   - Fetches all users from database
