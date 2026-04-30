@@ -20,10 +20,15 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed the YOC (Yield on Cost) metric appearing in the Dividends page when no dividends have been received yet — the card now only shows when at least one dividend payment has actually landed in the last 12 months
 - Fixed AI narrative in emails occasionally showing a collapsible `···` element at the top — Claude sometimes emits HTML `<details>` blocks that email clients render as interactive widgets; these are now stripped before sending
 - Fixed italic text (`*text*`) in AI email narratives appearing with raw asterisks instead of being formatted
 - Fixed the "Asset Distribution" pie chart on mobile being clipped when a portfolio has many assets — the legend now shows a maximum of 5 items (filtering entries below 7% first), preventing the chart from being cut off in portrait mode
 - Fixed dividend income entries not being automatically created in Cashflow when manually adding a dividend with a past payment date — the expense now appears immediately after saving, without waiting for the nightly sync
+
+## 🔒 Security
+
+- Updated dependencies to resolve a critical arbitrary code execution vulnerability in protobufjs and a high-severity denial of service vulnerability in Next.js server components; Next.js updated to 16.2.4
 
 ## 📚 Documentation
 

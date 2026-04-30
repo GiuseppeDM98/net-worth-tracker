@@ -480,6 +480,12 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - When a page uses `useCountUp` for mount-time KPI animations, avoid simultaneously rendering heavy components (Recharts charts, large lists) that aren't immediately visible
 - Pattern: start collapsible/below-fold Recharts components as collapsed on mobile, let users expand — use `isMobile` from `useMediaQuery` in the `useState` initializer for the expanded state
 
+### Dividend TTM Filter: paymentDate not exDate
+- Symptom: YOC (Yield on Cost) and `averageYield` appear even when no dividends have been received yet
+- Cause: `getAllDividends` returns ALL dividends including upcoming ones. Filtering by `exDate >= twelveMonthsAgo` passes dividends with a past ex-date but future paymentDate — meaning cash has not arrived yet
+- Fix: filter TTM dividends by `paymentDate >= twelveMonthsAgo && paymentDate <= today`. The `today` variable is already defined for the `paidDividends` chart filter in the same route — reuse it. Applied in `app/api/dividends/stats/route.ts`
+- Rule: use `exDate` only for "announced future" dividend data (upcoming dividends card). Use `paymentDate` capped at `today` for any "received" metric (YOC, averageYield, charts)
+
 ### JSON Date Deserialization in API Route Bodies
 - `Date` fields in `request.json()` bodies arrive as ISO strings (`"2024-04-10T..."`), not `Date` objects
 - Comparing a string to a `Date` with `<=` / `>=` always returns `false` in JavaScript — the string coerces to `NaN` via `Number()`

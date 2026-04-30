@@ -325,10 +325,10 @@ export async function GET(request: NextRequest) {
     const twelveMonthsAgo = new Date();
     twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1);
 
-    // 2. Filter dividends from last 12 months
+    // 2. Filter dividends actually received in last 12 months (paymentDate, capped at today)
     const ttmDividends = allDividends.filter(div => {
-      const exDate = toDate(div.exDate);
-      return exDate >= twelveMonthsAgo;
+      const paymentDate = toDate(div.paymentDate);
+      return paymentDate >= twelveMonthsAgo && paymentDate <= today;
     });
 
     // 3. Calculate total gross dividends TTM
