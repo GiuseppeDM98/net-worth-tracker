@@ -153,9 +153,9 @@ export async function searchTicker(
  * @returns True if asset supports price updates, false otherwise
  */
 export function shouldUpdatePrice(assetType: string, subCategory?: string): boolean {
-  // Real estate and private equity have fixed/manual valuations (not market-traded)
+  // Real estate, pension funds and private equity have fixed/manual valuations (not market-traded)
   // These assets require manual price updates based on appraisals, not market quotes
-  if (assetType === 'realestate' || subCategory === 'Private Equity') {
+  if (assetType === 'realestate' || assetType === 'pensionfund' || subCategory === 'Private Equity') {
     return false;
   }
 

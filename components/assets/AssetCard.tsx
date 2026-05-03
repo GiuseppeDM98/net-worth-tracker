@@ -60,6 +60,7 @@ const formatAssetName = (name: string): string => {
     crypto: 'Crypto',
     cash: 'Cash',
     commodity: 'Commodity',
+    pensionfund: 'Fondo pensione',
   };
   return nameMap[name.toLowerCase()] || name.charAt(0).toUpperCase() + name.slice(1);
 };
@@ -248,6 +249,18 @@ export function AssetCard({
               <div className="col-span-2">
                 <span className="text-gray-500 dark:text-gray-400">Sottocategoria:</span>{' '}
                 <span className="font-medium">{asset.subCategory}</span>
+              </div>
+            )}
+            {asset.pensionFundDetails?.provider && (
+              <div className="col-span-2">
+                <span className="text-gray-500 dark:text-gray-400">Gestore:</span>{' '}
+                <span className="font-medium">{asset.pensionFundDetails.provider}</span>
+              </div>
+            )}
+            {asset.pensionFundDetails?.fundLine && (
+              <div className="col-span-2">
+                <span className="text-gray-500 dark:text-gray-400">Comparto:</span>{' '}
+                <span className="font-medium">{asset.pensionFundDetails.fundLine}</span>
               </div>
             )}
             <div className="col-span-2">

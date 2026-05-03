@@ -1,6 +1,6 @@
 import { Timestamp } from 'firebase/firestore';
 
-// AssetType: Granular classification used in UI (stock, ETF, bond, crypto, etc.)
+// AssetType: Granular classification used in UI (stock, ETF, bond, pension fund, etc.)
 // AssetClass: Broad financial categories for allocation analysis (equity, bonds, etc.)
 //
 // Mapping examples:
@@ -9,8 +9,9 @@ import { Timestamp } from 'firebase/firestore';
 // - bond -> bonds
 // - crypto -> crypto
 // - cash -> cash
+// - pensionfund -> equity/bonds/other classes via composition
 // - realestate -> realestate
-export type AssetType = 'stock' | 'etf' | 'bond' | 'crypto' | 'commodity' | 'cash' | 'realestate';
+export type AssetType = 'stock' | 'etf' | 'bond' | 'crypto' | 'commodity' | 'cash' | 'realestate' | 'pensionfund';
 export type AssetClass = 'equity' | 'bonds' | 'crypto' | 'realestate' | 'cash' | 'commodity';
 
 // Coupon payment frequency for bonds.
@@ -46,6 +47,16 @@ export interface BondDetails {
   finalPremiumRate?: number;   // Bonus % of nominalValue paid at maturity (e.g. 0.8 for BTP Valore 0.8%)
 }
 
+// Pension-fund-specific metadata.
+// The asset value itself remains quantity * currentPrice so snapshots, allocation,
+// FIRE and performance services can keep using the common asset pipeline.
+export interface PensionFundDetails {
+  provider?: string; // Fund provider or pension platform
+  fundLine?: string; // Investment line/compartment (e.g., Growth, Balanced, Guaranteed)
+  membershipDate?: string; // Enrollment date in YYYY-MM-DD format
+  expectedRetirementDate?: string; // Expected pension access date in YYYY-MM-DD format
+}
+
 export interface AssetComposition {
   assetClass: AssetClass;
   percentage: number;
@@ -79,6 +90,7 @@ export interface Asset {
   isPrimaryResidence?: boolean; // Indicates if this real estate is the primary residence (excluded from FIRE calculations based on user setting)
   isin?: string; // ISIN code for dividend scraping (optional)
   bondDetails?: BondDetails; // Optional bond-specific details for coupon scheduling
+  pensionFundDetails?: PensionFundDetails; // Optional pension-fund-specific metadata
   lastPriceUpdate: Date | Timestamp;
   createdAt: Date | Timestamp;
   updatedAt: Date | Timestamp;
@@ -106,6 +118,7 @@ export interface AssetFormData {
   isPrimaryResidence?: boolean;
   isin?: string; // ISIN code for dividend scraping (optional)
   bondDetails?: BondDetails; // Optional bond-specific details for coupon scheduling
+  pensionFundDetails?: PensionFundDetails; // Optional pension-fund-specific metadata
 }
 
 export interface SubCategoryConfig {

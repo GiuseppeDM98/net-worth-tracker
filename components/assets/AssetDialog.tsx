@@ -39,7 +39,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
-import { Asset, AssetFormData, AssetType, AssetClass, AssetAllocationTarget, AssetComposition, CouponFrequency, BondDetails, CouponRateTier } from '@/types/assets';
+import { Asset, AssetFormData, AssetType, AssetClass, AssetAllocationTarget, AssetComposition, CouponFrequency, BondDetails, CouponRateTier, PensionFundDetails } from '@/types/assets';
 import { createAsset, updateAsset } from '@/lib/services/assetService';
 import { getNextCouponDate, calculateCouponPerShare, getApplicableCouponRate } from '@/lib/utils/couponUtils';
 import { getTargets, addSubCategory } from '@/lib/services/assetAllocationService';
@@ -70,6 +70,7 @@ import { Switch } from '@/components/ui/switch';
  *
  * Asset types with fixed or manual valuations should not auto-update:
  * - Real estate: Uses property appraisals, not market prices
+ * - Pension funds: Valuations come from the pension platform, not market quotes
  * - Private equity: Valuations done periodically by fund managers
  * - Cash: Always has price = 1 (no market fluctuation)
  *
@@ -82,7 +83,7 @@ import { Switch } from '@/components/ui/switch';
  */
 function shouldUpdatePrice(assetType: string, subCategory?: string): boolean {
   // Real estate and private equity have fixed valuations (no market price)
-  if (assetType === 'realestate' || subCategory === 'Private Equity') {
+  if (assetType === 'realestate' || assetType === 'pensionfund' || subCategory === 'Private Equity') {
     return false;
   }
 
@@ -188,6 +189,21 @@ function buildBondDetailsFromForm(
       ? { finalPremiumRate: data.bondFinalPremiumRate }
       : {}),
   };
+}
+
+function buildPensionFundDetailsFromForm(data: AssetFormValues): PensionFundDetails | undefined {
+  if (data.type !== 'pensionfund') {
+    return undefined;
+  }
+
+  const details: PensionFundDetails = {
+    ...(data.pensionProvider?.trim() ? { provider: data.pensionProvider.trim() } : {}),
+    ...(data.pensionFundLine?.trim() ? { fundLine: data.pensionFundLine.trim() } : {}),
+    ...(data.pensionMembershipDate ? { membershipDate: data.pensionMembershipDate } : {}),
+    ...(data.pensionExpectedRetirementDate ? { expectedRetirementDate: data.pensionExpectedRetirementDate } : {}),
+  };
+
+  return Object.keys(details).length > 0 ? details : undefined;
 }
 
 /**
@@ -328,7 +344,7 @@ const assetSchema = z.object({
   ticker: z.string().min(1, 'Ticker is required'),
   name: z.string().min(1, 'Name is required'),
   isin: z.string().regex(/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/, 'Invalid ISIN format (example: IT0003128367)').optional().or(z.literal('')),
-  type: z.enum(['stock', 'etf', 'bond', 'crypto', 'commodity', 'cash', 'realestate']),
+  type: z.enum(['stock', 'etf', 'bond', 'crypto', 'commodity', 'cash', 'realestate', 'pensionfund']),
   assetClass: z.enum(['equity', 'bonds', 'crypto', 'realestate', 'cash', 'commodity']),
   subCategory: z.string().optional(),
   currency: z.string().min(1, 'Currency is required'),
@@ -358,6 +374,11 @@ const assetSchema = z.object({
   })).optional(),
   // Final premium at maturity (optional, e.g. BTP Valore 0.8%)
   bondFinalPremiumRate: z.number().min(0).max(100).optional().or(z.nan()),
+  // Pension fund metadata (optional, only persisted for type=pensionfund)
+  pensionProvider: z.string().optional(),
+  pensionFundLine: z.string().optional(),
+  pensionMembershipDate: z.string().optional(),
+  pensionExpectedRetirementDate: z.string().optional(),
 });
 
 type AssetFormValues = z.infer<typeof assetSchema>;
@@ -371,6 +392,7 @@ interface AssetDialogProps {
 const assetTypes: { value: AssetType; label: string }[] = [
   { value: 'stock', label: 'Azione' },
   { value: 'etf', label: 'ETF' },
+  { value: 'pensionfund', label: 'Fondo pensione' },
   { value: 'bond', label: 'Obbligazione' },
   { value: 'crypto', label: 'Criptovaluta' },
   { value: 'commodity', label: 'Materia Prima' },
@@ -460,6 +482,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
       // Default for isLiquid: most assets are liquid except real estate and private equity
       const defaultIsLiquid =
         selectedAssetClass !== 'realestate' &&
+        selectedType !== 'pensionfund' &&
         selectedSubCategory !== 'Private Equity';
 
       // Default for autoUpdatePrice: use shouldUpdatePrice logic
@@ -565,6 +588,10 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         outstandingDebt: asset.outstandingDebt || undefined,
         isPrimaryResidence: asset.isPrimaryResidence || false,
         isin: asset.isin || undefined,
+        pensionProvider: asset.pensionFundDetails?.provider || '',
+        pensionFundLine: asset.pensionFundDetails?.fundLine || '',
+        pensionMembershipDate: asset.pensionFundDetails?.membershipDate || '',
+        pensionExpectedRetirementDate: asset.pensionFundDetails?.expectedRetirementDate || '',
       });
 
       if (asset.composition && asset.composition.length > 0) {
@@ -631,6 +658,10 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         isComposite: false,
         outstandingDebt: undefined,
         isPrimaryResidence: false,
+        pensionProvider: '',
+        pensionFundLine: '',
+        pensionMembershipDate: '',
+        pensionExpectedRetirementDate: '',
       });
       setComposition([]);
       setIsComposite(false);
@@ -757,6 +788,41 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
     return totalQty > 0 ? totalCost / totalQty : null;
   };
 
+  const applyTypeDefaults = (type: AssetType) => {
+    setValue('type', type);
+
+    if (type === 'pensionfund') {
+      setValue('assetClass', 'equity');
+      setValue('subCategory', 'Pension');
+      setValue('currency', 'EUR');
+      setValue('isLiquid', false);
+      setValue('autoUpdatePrice', false);
+      setValue('stampDutyExempt', true);
+      setValue('includeInHistoryTables', true);
+      setValue('isComposite', true);
+      setIsComposite(true);
+      if (composition.length === 0) {
+        setComposition([
+          { assetClass: 'equity', subCategory: 'Pension', percentage: 60 },
+          { assetClass: 'bonds', percentage: 40 },
+        ]);
+      }
+      return;
+    }
+
+    if (type === 'cash') {
+      setValue('assetClass', 'cash');
+      setValue('isLiquid', true);
+      setValue('autoUpdatePrice', false);
+    }
+
+    if (type === 'realestate') {
+      setValue('assetClass', 'realestate');
+      setValue('isLiquid', false);
+      setValue('autoUpdatePrice', false);
+    }
+  };
+
   /**
    * Handle form submission - create or update asset
    *
@@ -807,16 +873,18 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
 
       // Step 2: Assemble bond details and full form payload
       const bondDetailsValue = buildBondDetailsFromForm(data, showBondDetails, showStepUp);
+      const pensionFundDetailsValue = buildPensionFundDetailsFromForm(data);
       const formData: AssetFormData = {
         ...buildAssetFormDataFromValues(data, currentPrice, fetchedCurrentPriceEur, isComposite, composition, isBondWithIsin),
         bondDetails: bondDetailsValue,
+        pensionFundDetails: pensionFundDetailsValue,
       };
 
       // Step 3: Persist asset
       let savedAssetId: string;
       if (asset) {
         // Keep existing price for assets that do not participate in market pricing
-        if (!shouldUpdatePrice(data.type, data.subCategory)) {
+        if (!shouldUpdatePrice(data.type, data.subCategory) && !(data.manualPrice && !isNaN(data.manualPrice) && data.manualPrice > 0)) {
           formData.currentPrice = asset.currentPrice;
         }
         await updateAsset(asset.id, formData);
@@ -917,7 +985,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
               <Label htmlFor="type">Tipo *</Label>
               <Select
                 value={selectedType}
-                onValueChange={(value) => setValue('type', value as AssetType)}
+                onValueChange={(value) => applyTypeDefaults(value as AssetType)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleziona tipo" />
@@ -1058,6 +1126,11 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
               />
               {errors.quantity && (
                 <p className="text-sm text-red-500">{errors.quantity.message}</p>
+              )}
+              {selectedType === 'pensionfund' && (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Se hai solo il controvalore totale, usa quantità 1 e aggiorna il prezzo manualmente con il valore del fondo. Se hai quote e valore quota, usa i dati del prospetto.
+                </p>
               )}
               {/* Show hint when changing quantity in edit mode for non-cash assets.
                   Quantity changes represent capital flowing in/out of the portfolio.
@@ -1229,6 +1302,55 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
               </div>
             )}
           </div>
+
+          {selectedType === 'pensionfund' && (
+            <div className="space-y-4 rounded-lg border p-4">
+              <div className="space-y-0.5">
+                <Label>Dettagli Fondo Pensione</Label>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Dati utili per identificare il fondo e distinguere la disponibilità futura dal patrimonio liquido.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="pensionProvider">Gestore</Label>
+                  <Input
+                    id="pensionProvider"
+                    {...register('pensionProvider')}
+                    placeholder="es. Cometa, Allianz, Amundi"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pensionFundLine">Comparto</Label>
+                  <Input
+                    id="pensionFundLine"
+                    {...register('pensionFundLine')}
+                    placeholder="es. Crescita, Bilanciato, Garantito"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="pensionMembershipDate">Data adesione</Label>
+                  <Input
+                    id="pensionMembershipDate"
+                    type="date"
+                    {...register('pensionMembershipDate')}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pensionExpectedRetirementDate">Decorrenza stimata</Label>
+                  <Input
+                    id="pensionExpectedRetirementDate"
+                    type="date"
+                    {...register('pensionExpectedRetirementDate')}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Debito Residuo - solo per immobili */}
           {selectedType === 'realestate' && selectedAssetClass === 'realestate' && (
@@ -1823,7 +1945,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
             />
           </div>
 
-          {shouldUpdatePrice(selectedType, selectedSubCategory) && (
+          {(shouldUpdatePrice(selectedType, selectedSubCategory) || selectedType === 'pensionfund') && (
             <div className="space-y-2">
               <Label htmlFor="manualPrice">Prezzo Manuale (opzionale)</Label>
               <Input
@@ -1832,9 +1954,11 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                 step="0.0001"
                 {...register('manualPrice', { valueAsNumber: true })}
                 placeholder={
-                  isBondPctMode
-                    ? 'es. 104.20 (% del nominale, lascia vuoto per auto-recupero)'
-                    : `Lascia vuoto per recupero automatico da ${priceSource}`
+                  selectedType === 'pensionfund'
+                    ? 'es. valore quota o controvalore totale'
+                    : isBondPctMode
+                      ? 'es. 104.20 (% del nominale, lascia vuoto per auto-recupero)'
+                      : `Lascia vuoto per recupero automatico da ${priceSource}`
                 }
               />
               {errors.manualPrice && (
@@ -1843,7 +1967,9 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 {isBondPctMode
                   ? `Inserire come % del nominale (es. 104.20 per un BTP quotato a 104.20% di 1000€ → prezzo salvato come 1042€/unità). Lascia vuoto per recupero automatico da ${priceSource}.`
-                  : `Se inserisci un prezzo manuale, questo verrà utilizzato al posto del recupero automatico da ${priceSource}.`}
+                  : selectedType === 'pensionfund'
+                    ? 'Usa il valore quota se tracci le quote; altrimenti usa quantità 1 e inserisci qui il controvalore totale.'
+                    : `Se inserisci un prezzo manuale, questo verrà utilizzato al posto del recupero automatico da ${priceSource}.`}
               </p>
             </div>
           )}
@@ -1853,6 +1979,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
               <strong>Nota:</strong>
               {selectedType === 'cash' && ' Per asset di tipo liquidità, il prezzo sarà impostato a 1.'}
               {selectedType === 'realestate' && ' Per immobili, il prezzo deve essere aggiornato manualmente.'}
+              {selectedType === 'pensionfund' && ' Per fondi pensione, il prezzo deve essere aggiornato manualmente dal valore comunicato dal gestore.'}
               {selectedSubCategory === 'Private Equity' && ' Per Private Equity, il prezzo deve essere aggiornato manualmente.'}
               {shouldUpdatePrice(selectedType, selectedSubCategory) && ` Puoi inserire un prezzo manuale nel campo apposito, oppure il prezzo verrà recuperato automaticamente da ${priceSource}. In caso di errore nel recupero automatico, potrai sempre impostare il prezzo manualmente.`}
             </p>

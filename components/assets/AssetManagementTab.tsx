@@ -73,6 +73,7 @@ const formatAssetName = (name: string): string => {
     crypto: 'Crypto',
     cash: 'Cash',
     commodity: 'Commodity',
+    pensionfund: 'Fondo pensione',
   };
 
   return nameMap[name.toLowerCase()] || name.charAt(0).toUpperCase() + name.slice(1);
@@ -222,7 +223,7 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
       return true;
     }
     // Types that don't support automatic updates (no market price available)
-    const manualTypes = ['realestate', 'cash'];
+    const manualTypes = ['realestate', 'cash', 'pensionfund'];
     if (manualTypes.includes(asset.type)) {
       return true;
     }

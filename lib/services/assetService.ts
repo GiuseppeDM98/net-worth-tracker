@@ -274,7 +274,6 @@ export async function updateAsset(
 
     if (updates.averageCost === undefined) cleanedUpdates.averageCost = deleteField();
     if (updates.taxRate === undefined) cleanedUpdates.taxRate = deleteField();
-
     await updateDoc(assetRef, cleanedUpdates);
 
     const userId = existingAsset.data()?.userId;
@@ -509,6 +508,7 @@ export function calculateLiquidNetWorth(assets: Asset[]): number {
       // (assets created before isLiquid field was added)
       return (
         asset.assetClass !== 'realestate' &&
+        asset.type !== 'pensionfund' &&
         asset.subCategory !== 'Private Equity'
       );
     })
@@ -533,6 +533,7 @@ export function calculateIlliquidNetWorth(assets: Asset[]): number {
       // Otherwise use legacy logic for backwards compatibility
       return (
         asset.assetClass === 'realestate' ||
+        asset.type === 'pensionfund' ||
         asset.subCategory === 'Private Equity'
       );
     })
@@ -587,7 +588,7 @@ export function calculateLiquidFIRENetWorth(assets: Asset[], includePrimaryResid
         return false;
       }
       if (asset.isLiquid !== undefined) return asset.isLiquid === true;
-      return asset.assetClass !== 'realestate' && asset.subCategory !== 'Private Equity';
+      return asset.assetClass !== 'realestate' && asset.type !== 'pensionfund' && asset.subCategory !== 'Private Equity';
     })
     .reduce((total, asset) => total + calculateAssetValue(asset), 0);
 }
@@ -608,7 +609,7 @@ export function calculateIlliquidFIRENetWorth(assets: Asset[], includePrimaryRes
         return false;
       }
       if (asset.isLiquid !== undefined) return asset.isLiquid === false;
-      return asset.assetClass === 'realestate' || asset.subCategory === 'Private Equity';
+      return asset.assetClass === 'realestate' || asset.type === 'pensionfund' || asset.subCategory === 'Private Equity';
     })
     .reduce((total, asset) => total + calculateAssetValue(asset), 0);
 }
