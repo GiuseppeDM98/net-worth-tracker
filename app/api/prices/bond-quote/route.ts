@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBondPriceByIsin } from '@/lib/services/borsaItalianaBondScraperService';
+import { getApiAuthErrorResponse, requireFirebaseAuth } from '@/lib/server/apiAuth';
 
 /**
  * GET /api/prices/bond-quote?isin=IT0005672024
@@ -22,6 +23,8 @@ import { getBondPriceByIsin } from '@/lib/services/borsaItalianaBondScraperServi
  */
 export async function GET(request: NextRequest) {
   try {
+    await requireFirebaseAuth(request);
+
     const searchParams = request.nextUrl.searchParams;
     const isin = searchParams.get('isin')?.trim().toUpperCase();
 
@@ -44,6 +47,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
+    const authErrorResponse = getApiAuthErrorResponse(error);
+    if (authErrorResponse) {
+      return authErrorResponse;
+    }
+
     console.error('Error in bond-quote API:', error);
     return NextResponse.json(
       {

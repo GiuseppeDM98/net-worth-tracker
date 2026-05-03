@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getQuote } from '@/lib/services/yahooFinanceService';
 import { convertToEur } from '@/lib/services/currencyConversionService';
+import { getApiAuthErrorResponse, requireFirebaseAuth } from '@/lib/server/apiAuth';
 
 /**
  * GET /api/prices/quote
@@ -26,6 +27,8 @@ import { convertToEur } from '@/lib/services/currencyConversionService';
  */
 export async function GET(request: NextRequest) {
   try {
+    await requireFirebaseAuth(request);
+
     const searchParams = request.nextUrl.searchParams;
     const ticker = searchParams.get('ticker');
 
@@ -64,6 +67,11 @@ export async function GET(request: NextRequest) {
       ...(currentPriceEur !== undefined ? { currentPriceEur } : {}),
     });
   } catch (error) {
+    const authErrorResponse = getApiAuthErrorResponse(error);
+    if (authErrorResponse) {
+      return authErrorResponse;
+    }
+
     console.error('Error fetching quote:', error);
     return NextResponse.json(
       { error: 'Failed to fetch quote' },
