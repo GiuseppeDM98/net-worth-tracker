@@ -39,7 +39,7 @@ const FEATURES = [
   {
     icon: BarChart3,
     title: 'Portfolio Tracking',
-    description: 'Tieni traccia di azioni, ETF, obbligazioni, crypto, immobili e liquidità in un unico posto.',
+    description: 'Tieni traccia di azioni, ETF, obbligazioni, fondi pensione, crypto, immobili e liquidità in un unico posto.',
   },
   {
     icon: TrendingUp,

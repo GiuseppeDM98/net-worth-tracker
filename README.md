@@ -17,9 +17,10 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 ## Key Features
 
 ### Portfolio Management
-- Multi-asset tracking across stocks, ETFs, bonds, crypto, real estate, commodities, and cash
+- Multi-asset tracking across stocks, ETFs, bonds, pension funds, crypto, real estate, commodities, and cash
 - Multi-currency support: assets priced in USD, GBP, CHF, etc. are automatically converted to EUR for all portfolio calculations using live Frankfurter exchange rates; LSE pence (GBp) normalized to GBP automatically
 - Automatic price updates via Yahoo Finance (all assets) and Borsa Italiana (Italian bonds with ISIN)
+- Dedicated pension fund asset type with manual valuation, default illiquid treatment, stamp-duty exemption, historical table inclusion, and composite allocation support
 - Bond coupon scheduling: automatic coupon generation with step-up rate tiers and final premium (Premio Finale) support — full BTP Valore compatible
 - Average cost tracking with 4-decimal precision, including a built-in multi-broker PMC calculator for positions spread across multiple brokers
 - Current vs target asset allocation visualization
