@@ -31,6 +31,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Yield on Cost (YOC) and Current Yield calculations
 - Monthly returns heatmap and underwater drawdown chart
 - Rolling performance charts
+- **Benchmark comparison**: compare your portfolio's time-weighted return against four model portfolios (60/40, All Weather, Buffett 90/10, Golden Butterfly) with an indexed growth-of-100 chart and TWR summary table; optional USD→EUR conversion via Frankfurter API
 - Progressive disclosure: methodology section collapsed by default; one-time guide strip for new users; "Avanzato" badge on technical metrics (TWR, IRR, Sharpe, YOC); each chart has an inline 2-line reading hint
 - Animated metric cards: values count up on load and settle more naturally during period changes; staggered entrance cascade per section
 - Dashboard KPI cards (Total Portfolio, Liquid, Net Worth, Unrealized Gains, Taxes, Asset Count) animate their values on page load — numbers count up from zero once on mount; each card animates independently so the rest of the page stays stable during the animation

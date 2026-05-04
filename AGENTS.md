@@ -265,6 +265,21 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 
 **Cache key design rule:** include every input that changes the computed output. A key based only on `{count}-{year}-{month}` misses snapshot *value* updates (same month, different net worth). Including `Math.round(totalNetWorth)` catches those. Sub-cent rounding is intentional — avoid floating-point instability in the key string.
 
+### Global Shared Firestore Cache (Non-User Data)
+- For data shared across all users (e.g. benchmark ETF returns, FX rates), use a dedicated collection with a natural key as the doc ID — no `userId` field. Rule: `allow read: if isAuthenticated(); allow write: if false` (Admin SDK writes only)
+- Encode TTL as `cachedAt: Timestamp` in the doc; compare `Date.now() - cachedAt.toMillis()` server-side before returning cached vs recomputing
+- Fire-and-forget writes: wrap in `.catch((err: unknown) => console.error(...))` — cache failure must never break the API response
+- React Query client-side: `staleTime` = server TTL minus headroom (e.g. 6h client for 7d server). Applied: `benchmark-cache/{benchmarkId}`, `fx-rate-cache/usd-eur`
+
+### Fixed Hooks for Variable-Length Data Sources
+- When a component needs data from a variable number of sources (e.g. user toggles which of N benchmarks to show), declare N fixed hook instances (`b0`–`b3`) at component level with `enabled: false` for inactive ones — never loop over hooks. React enforces stable hook call counts and throws at runtime otherwise
+- Applied in `BenchmarkComparisonSection`: 4 fixed `useBenchmarkReturns` hooks, one per benchmark constant
+
+### Cross-Component Metric Consistency
+- When a derived value shown in a chart or table must match a KPI card exactly, pass the pre-computed figure as a prop from the page — do not recompute from chart data. The most common drift source is annualization denominator: chart return-point count = n−1, `metrics.numberOfMonths` = n. A 1-month difference produces ~0.4pp divergence at 14% TWR
+- De-annualize for "total growth": `(1 + TWR/100)^(months/12) − 1`. Compute in the page, pass as `portfolioTotalGrowth`
+- Applied in `BenchmarkComparisonChart` / `BenchmarkComparisonSection`
+
 ### Dashboard Data Isolation
 - Do not add `useAllExpenses` or other full-history queries to Overview/Dashboard
 - Full-history expense analysis belongs in History or Cashflow
@@ -502,10 +517,6 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - Fix: use `boolean | null` as the initial state (`null` = not yet loaded). While `null`, render an `animate-pulse` placeholder div with the same height as the TabsList (`h-10`). Mount the real TabsList only after the settings are known, so the correct column count is set in one paint.
 - Pattern: `const [featureEnabled, setFeatureEnabled] = useState<boolean | null>(null)` → `{featureEnabled === null ? <div className="hidden desktop:block h-10 animate-pulse rounded-md bg-muted" /> : <TabsList ...>}`
 
-### Docker — NEXT_PUBLIC_* Must Be Build Args
-- `NEXT_PUBLIC_*` variables are inlined into the JS bundle by Next.js at compile time. In Docker, they must be passed as `--build-arg` to `docker build` (declared as `ARG`/`ENV` in the builder stage) — setting them only as runtime `-e` or `env_file` values has no effect; the client bundle already has empty strings baked in.
-- Docker Compose reads `.env` by default for variable substitution in the YAML (`${VAR}`). It does NOT read `.env.local`. Always run with `--env-file .env.local`: `docker compose --env-file .env.local up -d --build`.
-- Firebase Authorized Domains must include any custom self-hosted domain. `*.vercel.app` is pre-authorized by Firebase; all other domains (including Docker/VPS deployments) must be added manually in Firebase Console → Authentication → Settings → Authorized domains.
 
 
 

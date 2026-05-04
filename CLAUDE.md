@@ -5,10 +5,10 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest implementation (2026-04-30, session drifting-sutherland): **YOC TTM filter fix + dependency security updates**. `app/api/dividends/stats/route.ts`: TTM dividend filter changed from `exDate >= twelveMonthsAgo` to `paymentDate >= twelveMonthsAgo && paymentDate <= today` — YOC card now correctly hidden when no dividends have been received, since `allDividends` includes future entries and `exDate` does not cap at today. `npm audit fix` + `next@16.2.4`: resolved `protobufjs` critical (arbitrary code execution) and `next` high (DoS via server components). 14 remaining vulnerabilities are untreatable without breaking changes (all in `firebase-admin` transitive chain: `@tootallnate/once`, `uuid`, `google-gax`; and `postcss` inside next's bundle — reported fix is `next@9.3.3`, a false positive). Tests: 483 pass, 1 pre-existing fail in `assistantPromptRouting`.
-- Previous (2026-04-29, session unified-whale): **Email category breakdown + AI comment rendering fixes**. `monthlyEmailService.ts`: `aggregateExpenses()` now tracks income categories (`allIncomeCategories`) and returns all expense categories without cap. `MonthlyEmailData` gains `allIncomeCategories`. Email HTML: new "Entrate per Categoria" table (all income categories, EUR + %) after cashflow summary; "Spese per Categoria" (renamed from "Top Categorie di Spesa") shows all categories with % column. `simpleMarkdownToHtml()` rewrite: collapsed `</li>\n\n<li>` before `<ul>` wrapping; `\n\n` → `<br/><br/>` with post-processing to strip `<br/>` around heading `<p>` and reduce to single `<br/>` around `<ul>/<ol>`; added `<ol>` support via placeholder pattern; added `*italic*` → `<em>`; strip `<details>/<summary>`; increased heading `margin-top` from `8px` to `16px`. Tests: 81 pass.
-- Previous (2026-04-28, session jazzy-fountain): **Contesto macro in chat libera**. `resolveAssistantWebSearchPolicy` in `webSearchPolicy.ts`: in chat mode, `return preferences.includeMacroContext || shouldUseWebSearch(prompt)` — toggle ON = web search sempre attivo, toggle OFF = fallback a keyword detection. Tests: 93 pass.
-- Previous (2026-04-26, session ai-email-comment): **AI comment in periodic emails**. All three email types (monthly/quarterly/yearly) now include a "Commento AI" section. New `quarter_analysis` mode added to `AssistantMode`. `generateEmailAiComment()` wraps everything in try/catch — AI failure never blocks email. `selector.quarter` field so quarterly renders "Q1 2026" not "Marzo 2026". Tests: 93 pass.
+- Latest implementation (2026-05-04, session portfolio-comparison-benchmarks): **Benchmark comparison in Rendimenti**. New "Confronto con Portafogli Modello" section below Evoluzione Patrimonio: indexed growth-of-100 chart and TWR table comparing user portfolio against 4 model portfolios (60/40, All Weather, Buffett 90/10, Golden Butterfly). ETF proxy returns fetched from Yahoo Finance server-side, cached in global `benchmark-cache/{benchmarkId}` (7d TTL, Admin SDK write only). Optional "Converti benchmark in EUR" toggle fetches monthly EUR/USD rates from Frankfurter API, cached in `fx-rate-cache/usd-eur`. 4 fixed hooks for stable React hook call count. `portfolioTWR`/`numberOfMonths` passed as props from `metrics.*` to avoid denominator drift vs the KPI card.
+- Previous (2026-04-30, session drifting-sutherland): **YOC TTM filter fix + dependency security updates**. `app/api/dividends/stats/route.ts`: TTM filter changed from `exDate >= twelveMonthsAgo` to `paymentDate >= twelveMonthsAgo && paymentDate <= today`. `npm audit fix` + `next@16.2.4`: resolved `protobufjs` critical and `next` high vulnerabilities. 14 remaining vulnerabilities untreatable without breaking changes (firebase-admin transitive chain). Tests: 483 pass.
+- Previous (2026-04-29, session unified-whale): **Email category breakdown + AI comment rendering fixes**. `monthlyEmailService.ts`: all income/expense categories now included without cap. `simpleMarkdownToHtml()` rewrite: `<ol>` support, `*italic*` → `<em>`, `<details>/<summary>` stripped, `<br/>` spacing around headings/lists corrected. Tests: 81 pass.
+- Previous (2026-04-28, session jazzy-fountain): **Contesto macro in chat libera**. `resolveAssistantWebSearchPolicy`: toggle ON = web search sempre attivo in chat, toggle OFF = keyword detection fallback.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
@@ -32,14 +32,13 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Dividendi & Cedole now keeps calendar day focus, active date filtering, table/detail context, and summary cards more tightly in sync, with a read-only contextual detail step before edit mode
 - Storico "Evoluzione Patrimonio Netto" line chart now renders as a clean continuous line — per-point dots removed; amber note-indicator markers are preserved for snapshots with notes (`CustomChartDot`, `activeDot` hover still active)
 - Storico now reads more like a guided analysis surface: main sections enter as chapters, dense blocks are separated more clearly, chart mode switches feel local instead of page-wide, and doubling milestones build progressively
+- **Benchmark comparison in Rendimenti (2026-05-04)**: "Confronto con Portafogli Modello" card with indexed growth-of-100 chart and TWR table for 60/40, All Weather, Buffett 90/10, Golden Butterfly. Toggle pills select active benchmarks; ⓘ button shows ETF composition. "Converti benchmark in EUR" switch applies monthly Frankfurter FX rates. Key files: `types/benchmarks.ts`, `lib/constants/benchmarks.ts`, `app/api/benchmarks/returns/route.ts`, `app/api/benchmarks/fx-rates/route.ts`, `lib/hooks/useBenchmarkReturns.ts`, `lib/hooks/useFxRates.ts`, `components/performance/BenchmarkComparisonChart.tsx`, `components/performance/BenchmarkComparisonSection.tsx`
 - Rendimenti now presents smoother period switching, KPI settling from prior values, staged monthly heatmap reveal, a more legible underwater drawdown surface, and contextual custom-range / AI dialogs
 - Allocazione now presents a more readable drill-down path on desktop and a steadier mobile sheet experience, with each drill-down level reopening from the top and progress bars using centered target markers
 - Patrimonio now preserves visited macro-tab and sub-tab state across `Gestione Asset`, `Anno Corrente`, and `Storico`, with calmer transitions for dense historical tables, scoped refresh feedback on the active view, and a hidden previous-month baseline for `Anno Corrente` so first-month comparisons and summary percentages remain accurate without adding an extra visible column
 - Patrimonio Anno Corrente and Storico tables show only assets with `includeInHistoryTables: true` (toggle in AssetDialog). Anno Corrente: `quantity > 0` only. Storico: includes `quantity === 0` for sold-asset history with "Venduto" badge. `restrictToPassedAssets={true}` on both tables. Disabling cost basis in AssetDialog correctly deletes `averageCost`/`taxRate` from Firestore via `deleteField()`
 - Overview/Panoramica now loads KPI, variations, expense summary, charts, and rendering flags from one authenticated overview query, improving warm loads and keeping related data in sync after asset, cashflow, snapshot, and stamp-duty-setting changes
 - Overview/Dashboard KPI cards all animate on mount via `OverviewAnimatedCurrency` leaf nodes (count-up isolated per card, not page-level). Charts mount after hero settles via `requestIdleCallback`. Formatter cache in `lib/utils/formatters.ts` avoids `Intl.NumberFormat` allocation on every render.
-- Overview/Panoramica greeting is now consistent with the shared header format, showing the first name without a comma
-- Private API actions now require verified Firebase auth server-side, while scheduled maintenance flows continue to authenticate with `CRON_SECRET`
 - **Cost Centers (2026-04-14)**: optional 6th tab in Cashflow (`costCentersEnabled` toggle in Settings → Preferenze). Group expenses by object/project (e.g. "Automobile Dacia"). Per-center KPI cards, monthly spend chart, linked transaction table. Assignment via `ExpenseDialog` selector. Delete/rename cascade to linked expenses via `writeBatch`. Firestore collection: `costCenters`. New composite indexes: `costCenters/{userId+createdAt}`, `expenses/{userId+costCenterId+date}`.
 - Cashflow tracking with categories, filters, Sankey drill-down, budget management, and linked cash-account updates
 - History page with net worth evolution, asset class breakdown, liquidity, YoY variation, savings vs investment growth, `Lavoro & Investimenti`, doubling analysis, and allocation comparison
@@ -64,9 +63,9 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Data & Integrations
 - Firestore client + admin
-- Yahoo Finance for prices
+- Yahoo Finance for prices and benchmark ETF history
 - Borsa Italiana scraping for Italian bonds and dividend data
-- Frankfurter API for FX conversion
+- Frankfurter API for FX conversion (asset prices) and historical monthly EUR/USD rates (benchmark EUR conversion)
 - Anthropic for AI analysis
 
 ## Known Issues (Active)
@@ -82,6 +81,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - History components: `components/dashboard/LaborMetricsChart.tsx`, `components/history/*`
 - Chart service: `lib/services/chartService.ts`
 - Performance: `app/dashboard/performance/page.tsx`, `lib/services/performanceService.ts`, `performance-cache/{userId}` (Firestore cache collection)
+- Benchmark comparison: `types/benchmarks.ts`, `lib/constants/benchmarks.ts`, `app/api/benchmarks/returns/route.ts`, `app/api/benchmarks/fx-rates/route.ts`, `lib/hooks/useBenchmarkReturns.ts`, `lib/hooks/useFxRates.ts`, `components/performance/BenchmarkComparison{Chart,Section}.tsx`, `benchmark-cache/{benchmarkId}`, `fx-rate-cache/usd-eur` (Firestore global cache)
 - Cashflow, budget, cost centers: `components/cashflow/*`, `lib/utils/budgetUtils.ts`, `types/budget.ts`, `types/costCenters.ts`, `lib/services/costCenterService.ts`
 - FIRE: `components/fire-simulations/*`, `lib/services/fireService.ts`
 - Dividends: `components/dividends/*`
@@ -92,7 +92,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 - Server-side use cases / processors: `lib/server/assetAdminRepository.ts`, `lib/server/dividendUseCase.ts`, `lib/server/dividendProcessor.ts`, `lib/server/monthlyEmailService.ts`
 
-**Last updated**: 2026-04-30 (session drifting-sutherland — YOC TTM filter fix, npm security updates)
+**Last updated**: 2026-05-04 (session portfolio-comparison-benchmarks — benchmark comparison + EUR conversion in Rendimenti)
 
 ## Design Context
 
