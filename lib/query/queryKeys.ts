@@ -45,4 +45,8 @@ export const queryKeys = {
     contextHistory: (userId: string, startYear: number) =>
       ['assistant', 'context', userId, startYear, -2] as const,
   },
+  // Benchmarks
+  benchmarks: {
+    returns: (benchmarkId: string) => ['benchmarks', 'returns', benchmarkId] as const,
+  },
 } as const;

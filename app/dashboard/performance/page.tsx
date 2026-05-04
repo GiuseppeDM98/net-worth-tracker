@@ -53,6 +53,7 @@ import { PerformanceTooltip } from '@/components/performance/PerformanceTooltip'
 import { MonthlyReturnsHeatmap } from '@/components/performance/MonthlyReturnsHeatmap';
 import { UnderwaterDrawdownChart } from '@/components/performance/UnderwaterDrawdownChart';
 import { PerformancePageSkeleton } from '@/components/performance/PerformancePageSkeleton';
+import { BenchmarkComparisonSection } from '@/components/performance/BenchmarkComparisonSection';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 
 /**
@@ -979,6 +980,16 @@ export default function PerformancePage() {
               </ResponsiveContainer>
             </CardContent>
           </Card>
+        </motion.div>
+
+        {/* Benchmark Comparison Section */}
+        <motion.div variants={cardItem}>
+          <BenchmarkComparisonSection
+            portfolioHeatmapData={heatmapData}
+            startDate={metrics.startDate}
+            endDate={metrics.endDate}
+            selectedPeriod={selectedPeriod}
+          />
         </motion.div>
 
         {/* Rolling CAGR Chart */}
