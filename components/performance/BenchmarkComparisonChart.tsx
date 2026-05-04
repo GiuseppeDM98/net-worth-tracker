@@ -29,6 +29,8 @@ interface BenchmarkComparisonChartProps {
   portfolioTWR: number | null;
   // Period duration in months used for annualizing benchmark TWR consistently
   numberOfMonths: number;
+  // Pre-computed cumulative TWR (de-annualized) from the performance page — consistent with KPI
+  portfolioTotalGrowth: number | null;
 }
 
 interface IndexedPoint {
@@ -115,6 +117,7 @@ export function BenchmarkComparisonChart({
   height,
   portfolioTWR,
   numberOfMonths,
+  portfolioTotalGrowth,
 }: BenchmarkComparisonChartProps) {
   const chartData = useMemo<IndexedPoint[]>(() => {
     const portfolioFlat = flattenHeatmap(portfolioHeatmapData);
@@ -272,7 +275,9 @@ export function BenchmarkComparisonChart({
                   </span>
                 </td>
                 <td className="text-right py-2 pl-3 tabular-nums text-muted-foreground">
-                  {formatGrowth(twrSummary.portfolioFinalIndexed)}
+                  {portfolioTotalGrowth != null
+                    ? `${portfolioTotalGrowth >= 0 ? '+' : ''}${portfolioTotalGrowth.toFixed(2)}%`
+                    : formatGrowth(twrSummary.portfolioFinalIndexed)}
                 </td>
               </tr>
               {/* Benchmark rows */}

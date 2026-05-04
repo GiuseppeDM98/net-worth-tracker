@@ -22,6 +22,8 @@ interface BenchmarkComparisonSectionProps {
   portfolioTWR: number | null;
   // Same denominator used by the main metric for annualization (months in period).
   numberOfMonths: number;
+  // Cumulative TWR (de-annualized from portfolioTWR) — consistent with KPI card.
+  portfolioTotalGrowth: number | null;
 }
 
 /**
@@ -40,6 +42,7 @@ export function BenchmarkComparisonSection({
   selectedPeriod,
   portfolioTWR,
   numberOfMonths,
+  portfolioTotalGrowth,
 }: BenchmarkComparisonSectionProps) {
   const isMobile = useMediaQuery('(max-width: 767px)');
   const [isOpen, setIsOpen] = useState(!isMobile);
@@ -211,6 +214,7 @@ export function BenchmarkComparisonSection({
                 height={getChartHeight()}
                 portfolioTWR={portfolioTWR}
                 numberOfMonths={numberOfMonths}
+                portfolioTotalGrowth={portfolioTotalGrowth}
               />
             ) : !hasPortfolioData ? (
               <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">

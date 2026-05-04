@@ -991,6 +991,11 @@ export default function PerformancePage() {
             selectedPeriod={selectedPeriod}
             portfolioTWR={metrics.timeWeightedReturn}
             numberOfMonths={metrics.numberOfMonths}
+            portfolioTotalGrowth={
+              metrics.timeWeightedReturn != null && metrics.numberOfMonths > 0
+                ? (Math.pow(1 + metrics.timeWeightedReturn / 100, metrics.numberOfMonths / 12) - 1) * 100
+                : null
+            }
           />
         </motion.div>
 
