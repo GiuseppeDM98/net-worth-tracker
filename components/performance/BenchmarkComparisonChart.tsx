@@ -256,7 +256,12 @@ export function BenchmarkComparisonChart({
                   </span>
                 </td>
                 <td className="text-right py-2 pl-3 tabular-nums text-muted-foreground">
-                  {chartData.length > 0 ? `${(chartData[chartData.length - 1].portfolio - 100).toFixed(2)}%` : '–'}
+                  {chartData.length > 0
+                    ? (() => {
+                        const g = chartData[chartData.length - 1].portfolio - 100;
+                        return `${g >= 0 ? '+' : ''}${g.toFixed(2)}%`;
+                      })()
+                    : '–'}
                 </td>
               </tr>
               {/* Benchmark rows */}
