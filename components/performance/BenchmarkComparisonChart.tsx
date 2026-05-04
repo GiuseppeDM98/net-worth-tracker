@@ -25,6 +25,10 @@ interface BenchmarkComparisonChartProps {
   startDate: Date;
   endDate: Date;
   height: number;
+  // Pre-computed TWR from the performance page (matches the KPI card exactly)
+  portfolioTWR: number | null;
+  // Period duration in months used for annualizing benchmark TWR consistently
+  numberOfMonths: number;
 }
 
 interface IndexedPoint {
@@ -35,7 +39,6 @@ interface IndexedPoint {
 
 /**
  * Flatten heatmap data (grouped by year) into a sorted [{year, month, return}] array.
- * Returns null entries for months with no data.
  */
 function flattenHeatmap(heatmapData: MonthlyReturnHeatmapData[]): Array<{ year: number; month: number; return: number }> {
   const flat: Array<{ year: number; month: number; return: number }> = [];
@@ -52,9 +55,6 @@ function flattenHeatmap(heatmapData: MonthlyReturnHeatmapData[]): Array<{ year: 
 /**
  * Filter a monthly return series to the [startDate, endDate] window and
  * re-index it to 100 at the first included month.
- *
- * Returns an array of { year, month, indexed } where indexed starts at 100
- * and grows/shrinks with each monthly return.
  */
 function buildIndexedSeries(
   returns: Array<{ year: number; month: number; return: number }>,
@@ -83,12 +83,27 @@ function buildIndexedSeries(
 }
 
 /**
+ * Annualize a cumulative return over a known number of months.
+ * Uses the same numberOfMonths denominator as the main performance page so that
+ * benchmark TWR values are comparable on an equal-period basis.
+ */
+function annualizeTWR(cumulativeIndexed: number, numberOfMonths: number): number | null {
+  if (numberOfMonths <= 0) return null;
+  const cumulativeReturn = cumulativeIndexed / 100; // e.g. 1.5891 for +58.91%
+  const years = numberOfMonths / 12;
+  if (years === 0) return (cumulativeReturn - 1) * 100;
+  const annualized = (Math.pow(cumulativeReturn, 1 / years) - 1) * 100;
+  return isFinite(annualized) ? annualized : null;
+}
+
+/**
  * Indexed growth-of-100 line chart comparing the user's portfolio against
  * selected model benchmarks over the same time period.
  *
  * Both portfolio and benchmarks are normalized to 100 at the first month of
- * the selected period so that relative performance is immediately visible
- * regardless of absolute portfolio sizes.
+ * the selected period. The TWR in the summary table uses portfolioTWR from the
+ * main performance page (exact match with the KPI card) and annualizes benchmarks
+ * with the same numberOfMonths denominator for a fair comparison.
  */
 export function BenchmarkComparisonChart({
   portfolioHeatmapData,
@@ -98,6 +113,8 @@ export function BenchmarkComparisonChart({
   startDate,
   endDate,
   height,
+  portfolioTWR,
+  numberOfMonths,
 }: BenchmarkComparisonChartProps) {
   const chartData = useMemo<IndexedPoint[]>(() => {
     const portfolioFlat = flattenHeatmap(portfolioHeatmapData);
@@ -105,12 +122,10 @@ export function BenchmarkComparisonChart({
 
     if (portfolioIndexed.length === 0) return [];
 
-    // Build a lookup keyed by "YYYY-MM" for the portfolio
     const portfolioMap = new Map<string, number>(
       portfolioIndexed.map(p => [`${p.year}-${String(p.month).padStart(2, '0')}`, p.indexed])
     );
 
-    // Build indexed series for each selected benchmark
     const benchmarkMaps: Record<string, Map<string, number>> = {};
     for (const id of selectedBenchmarkIds) {
       const raw = benchmarkReturns[id];
@@ -121,7 +136,6 @@ export function BenchmarkComparisonChart({
       );
     }
 
-    // Merge all series on the portfolio's date axis (portfolio is the reference)
     return portfolioIndexed.map(p => {
       const key = `${p.year}-${String(p.month).padStart(2, '0')}`;
       const point: IndexedPoint = {
@@ -135,19 +149,12 @@ export function BenchmarkComparisonChart({
     });
   }, [portfolioHeatmapData, benchmarkReturns, selectedBenchmarkIds, startDate, endDate]);
 
-  // Annualized TWR for the chart period, computed from the indexed series endpoint.
-  // annualizedTWR = (finalIndex / 100)^(12 / n_months) - 1
   const twrSummary = useMemo(() => {
     if (chartData.length === 0) return null;
 
-    const nMonths = chartData.length;
-    const years = nMonths / 12;
+    const portfolioFinalIndexed = chartData[chartData.length - 1].portfolio;
 
-    const portfolioFinal = chartData[chartData.length - 1].portfolio;
-    const portfolioTWR = years > 0
-      ? (Math.pow(portfolioFinal / 100, 1 / years) - 1) * 100
-      : (portfolioFinal / 100 - 1) * 100;
-
+    // Benchmark TWR: annualize using the same numberOfMonths as the main metric
     const benchmarkTWRs: Record<string, number | null> = {};
     for (const id of selectedBenchmarkIds) {
       const finalValue = chartData[chartData.length - 1][id];
@@ -155,13 +162,11 @@ export function BenchmarkComparisonChart({
         benchmarkTWRs[id] = null;
         continue;
       }
-      benchmarkTWRs[id] = years > 0
-        ? (Math.pow(finalValue / 100, 1 / years) - 1) * 100
-        : (finalValue / 100 - 1) * 100;
+      benchmarkTWRs[id] = annualizeTWR(finalValue, numberOfMonths);
     }
 
-    return { portfolioTWR, benchmarkTWRs, nMonths };
-  }, [chartData, selectedBenchmarkIds]);
+    return { portfolioFinalIndexed, benchmarkTWRs };
+  }, [chartData, selectedBenchmarkIds, numberOfMonths]);
 
   if (chartData.length === 0) {
     return (
@@ -172,6 +177,16 @@ export function BenchmarkComparisonChart({
   }
 
   const activeBenchmarks = benchmarkDefinitions.filter(b => selectedBenchmarkIds.includes(b.id));
+
+  const formatTWR = (value: number | null) => {
+    if (value == null) return '–';
+    return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
+  };
+
+  const formatGrowth = (indexed: number) => {
+    const g = indexed - 100;
+    return `${g >= 0 ? '+' : ''}${g.toFixed(2)}%`;
+  };
 
   return (
     <div className="space-y-4">
@@ -193,7 +208,9 @@ export function BenchmarkComparisonChart({
             contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--card-foreground)' }}
             labelStyle={{ fontWeight: 600, color: '#111827' }}
             formatter={(value: number, name: string) => {
-              const label = name === 'portfolio' ? 'Il Tuo Portafoglio' : (activeBenchmarks.find(b => b.id === name)?.name ?? name);
+              const label = name === 'portfolio'
+                ? 'Il Tuo Portafoglio'
+                : (activeBenchmarks.find(b => b.id === name)?.name ?? name);
               return [`${value.toFixed(2)}`, label];
             }}
           />
@@ -202,7 +219,6 @@ export function BenchmarkComparisonChart({
               value === 'portfolio' ? 'Il Tuo Portafoglio' : (activeBenchmarks.find(b => b.id === value)?.name ?? value)
             }
           />
-          {/* Portfolio line — uses the primary chart color token */}
           <Line
             type="monotone"
             dataKey="portfolio"
@@ -242,7 +258,7 @@ export function BenchmarkComparisonChart({
               </tr>
             </thead>
             <tbody>
-              {/* User portfolio row */}
+              {/* User portfolio row — uses pre-computed TWR from main metric for consistency */}
               <tr className="border-b border-border/50">
                 <td className="py-2 pr-4">
                   <div className="flex items-center gap-2">
@@ -251,24 +267,18 @@ export function BenchmarkComparisonChart({
                   </div>
                 </td>
                 <td className="text-right py-2 px-3 font-medium tabular-nums">
-                  <span className={twrSummary.portfolioTWR >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
-                    {twrSummary.portfolioTWR >= 0 ? '+' : ''}{twrSummary.portfolioTWR.toFixed(2)}%
+                  <span className={portfolioTWR != null && portfolioTWR >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                    {formatTWR(portfolioTWR)}
                   </span>
                 </td>
                 <td className="text-right py-2 pl-3 tabular-nums text-muted-foreground">
-                  {chartData.length > 0
-                    ? (() => {
-                        const g = chartData[chartData.length - 1].portfolio - 100;
-                        return `${g >= 0 ? '+' : ''}${g.toFixed(2)}%`;
-                      })()
-                    : '–'}
+                  {formatGrowth(twrSummary.portfolioFinalIndexed)}
                 </td>
               </tr>
               {/* Benchmark rows */}
               {activeBenchmarks.map(b => {
                 const twr = twrSummary.benchmarkTWRs[b.id];
                 const finalIndexed = chartData[chartData.length - 1][b.id];
-                const totalGrowth = typeof finalIndexed === 'number' ? finalIndexed - 100 : null;
                 return (
                   <tr key={b.id} className="border-b border-border/50 last:border-0">
                     <td className="py-2 pr-4">
@@ -278,16 +288,12 @@ export function BenchmarkComparisonChart({
                       </div>
                     </td>
                     <td className="text-right py-2 px-3 font-medium tabular-nums">
-                      {twr == null ? (
-                        <span className="text-muted-foreground">–</span>
-                      ) : (
-                        <span className={twr >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
-                          {twr >= 0 ? '+' : ''}{twr.toFixed(2)}%
-                        </span>
-                      )}
+                      <span className={twr != null && twr >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                        {formatTWR(twr)}
+                      </span>
                     </td>
                     <td className="text-right py-2 pl-3 tabular-nums text-muted-foreground">
-                      {totalGrowth == null ? '–' : `${totalGrowth >= 0 ? '+' : ''}${totalGrowth.toFixed(2)}%`}
+                      {typeof finalIndexed === 'number' ? formatGrowth(finalIndexed) : '–'}
                     </td>
                   </tr>
                 );
@@ -295,7 +301,7 @@ export function BenchmarkComparisonChart({
             </tbody>
           </table>
           <p className="text-xs text-muted-foreground mt-2">
-            TWR annualizzato calcolato sul periodo {twrSummary.nMonths < 12 ? 'parziale' : `di ${twrSummary.nMonths} mesi`}.
+            TWR annualizzato calcolato sul periodo di {numberOfMonths} mesi.
             Rendimenti benchmark in USD (ETF quotati sul mercato americano).
           </p>
         </div>

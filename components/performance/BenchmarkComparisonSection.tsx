@@ -13,11 +13,15 @@ import { MonthlyReturnHeatmapData, TimePeriod } from '@/types/performance';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 
 interface BenchmarkComparisonSectionProps {
-  // From prepareMonthlyReturnsHeatmap — cash-flow adjusted monthly returns
   portfolioHeatmapData: MonthlyReturnHeatmapData[];
   startDate: Date;
   endDate: Date;
   selectedPeriod: TimePeriod;
+  // Pre-computed from the main performance page — used directly in the table so the
+  // TWR shown here matches the KPI card exactly (avoids rounding drift from heatmap).
+  portfolioTWR: number | null;
+  // Same denominator used by the main metric for annualization (months in period).
+  numberOfMonths: number;
 }
 
 /**
@@ -34,13 +38,16 @@ export function BenchmarkComparisonSection({
   startDate,
   endDate,
   selectedPeriod,
+  portfolioTWR,
+  numberOfMonths,
 }: BenchmarkComparisonSectionProps) {
   const isMobile = useMediaQuery('(max-width: 767px)');
   const [isOpen, setIsOpen] = useState(!isMobile);
   const [activeBenchmarkIds, setActiveBenchmarkIds] = useState<string[]>([BENCHMARKS[0].id]);
+  // Which benchmark pill is showing its composition tooltip
+  const [expandedInfo, setExpandedInfo] = useState<string | null>(null);
 
   // Fixed hooks — one per benchmark definition (4 total, stable call count).
-  // enabled: false when the benchmark is not toggled on, so no fetch occurs.
   const b0 = useBenchmarkReturns(BENCHMARKS[0].id, activeBenchmarkIds.includes(BENCHMARKS[0].id));
   const b1 = useBenchmarkReturns(BENCHMARKS[1].id, activeBenchmarkIds.includes(BENCHMARKS[1].id));
   const b2 = useBenchmarkReturns(BENCHMARKS[2].id, activeBenchmarkIds.includes(BENCHMARKS[2].id));
@@ -48,14 +55,12 @@ export function BenchmarkComparisonSection({
 
   const hookResults = [b0, b1, b2, b3];
 
-  // Build lookup maps: benchmarkId → data / loading / error
   const benchmarkData = useMemo(() => {
     const map: Record<string, ReturnType<typeof useBenchmarkReturns>['data']> = {};
     BENCHMARKS.forEach((b, i) => {
       if (hookResults[i].data) map[b.id] = hookResults[i].data;
     });
     return map;
-  // hookResults is a new array every render, but its contents stabilise once loaded
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [b0.data, b1.data, b2.data, b3.data]);
 
@@ -77,13 +82,13 @@ export function BenchmarkComparisonSection({
     setActiveBenchmarkIds(prev =>
       prev.includes(id) ? prev.filter(b => b !== id) : [...prev, id]
     );
+    // Close the composition panel when toggling off
+    setExpandedInfo(prev => prev === id ? null : prev);
   };
 
   const getChartHeight = () => (isMobile ? 260 : 380);
 
   const hasPortfolioData = portfolioHeatmapData.some(y => y.months.some(m => m.return !== null));
-
-  // Only pass data for benchmarks that are both active AND loaded
   const readyBenchmarkIds = activeBenchmarkIds.filter(id => benchmarkData[id]);
 
   return (
@@ -110,38 +115,83 @@ export function BenchmarkComparisonSection({
 
         <CollapsibleContent>
           <CardContent className="pt-0 space-y-4">
-            {/* Benchmark toggle pills */}
-            <div className="flex flex-wrap gap-2">
-              {BENCHMARKS.map(benchmark => {
-                const isActive = activeBenchmarkIds.includes(benchmark.id);
-                const hasError = benchmarkErrors[benchmark.id];
+            {/* Benchmark toggle pills + composition info */}
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-2">
+                {BENCHMARKS.map(benchmark => {
+                  const isActive = activeBenchmarkIds.includes(benchmark.id);
+                  const hasError = benchmarkErrors[benchmark.id];
+                  const isInfoOpen = expandedInfo === benchmark.id;
+                  return (
+                    <div key={benchmark.id} className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={isActive ? 'default' : 'outline'}
+                        onClick={() => toggleBenchmark(benchmark.id)}
+                        className={cn(
+                          'transition-all duration-150',
+                          isActive && 'ring-2 ring-offset-1',
+                          hasError && 'opacity-50'
+                        )}
+                        style={
+                          isActive
+                            ? { backgroundColor: benchmark.color, borderColor: benchmark.color }
+                            : { borderColor: benchmark.color, color: benchmark.color }
+                        }
+                      >
+                        {benchmark.name}
+                        {hasError && ' ⚠'}
+                      </Button>
+                      {/* Info toggle button showing/hiding composition */}
+                      <button
+                        type="button"
+                        aria-label={`Mostra composizione ${benchmark.name}`}
+                        onClick={() => setExpandedInfo(prev => prev === benchmark.id ? null : benchmark.id)}
+                        className={cn(
+                          'rounded-full p-1 transition-colors',
+                          isInfoOpen
+                            ? 'text-foreground'
+                            : 'text-muted-foreground hover:text-foreground'
+                        )}
+                      >
+                        <Info className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Composition panel — shown when a benchmark's info button is clicked */}
+              {expandedInfo && (() => {
+                const b = BENCHMARKS.find(x => x.id === expandedInfo);
+                if (!b) return null;
                 return (
-                  <Button
-                    key={benchmark.id}
-                    type="button"
-                    size="sm"
-                    variant={isActive ? 'default' : 'outline'}
-                    onClick={() => toggleBenchmark(benchmark.id)}
-                    className={cn(
-                      'transition-all duration-150',
-                      isActive && 'ring-2 ring-offset-1',
-                      hasError && 'opacity-50'
-                    )}
-                    style={
-                      isActive
-                        ? { backgroundColor: benchmark.color, borderColor: benchmark.color }
-                        : { borderColor: benchmark.color, color: benchmark.color }
-                    }
-                    title={benchmark.description}
-                  >
-                    {benchmark.name}
-                    {hasError && ' ⚠'}
-                  </Button>
+                  <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm space-y-2 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-top-1 duration-150">
+                    <p className="font-medium">{b.name}</p>
+                    <p className="text-muted-foreground text-xs">{b.description}</p>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1">
+                      {b.components.map(c => (
+                        <span key={c.ticker} className="text-xs tabular-nums">
+                          <span className="font-medium font-mono">{c.ticker}</span>
+                          {' '}
+                          <span className="text-muted-foreground">{c.name}</span>
+                          {' '}
+                          <span className="font-medium" style={{ color: b.color }}>
+                            {Math.round(c.weight * 100)}%
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Fonte: prezzi storici mensili (adjusted close) via Yahoo Finance. Ribilanciamento annuale assunto.
+                    </p>
+                  </div>
                 );
-              })}
+              })()}
             </div>
 
-            {/* Loading indicator while any active benchmark is still fetching */}
+            {/* Loading indicator */}
             {anyLoading && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
@@ -149,7 +199,7 @@ export function BenchmarkComparisonSection({
               </div>
             )}
 
-            {/* Chart — rendered once at least one benchmark has loaded */}
+            {/* Chart */}
             {hasPortfolioData && readyBenchmarkIds.length > 0 ? (
               <BenchmarkComparisonChart
                 portfolioHeatmapData={portfolioHeatmapData}
@@ -159,6 +209,8 @@ export function BenchmarkComparisonSection({
                 startDate={startDate}
                 endDate={endDate}
                 height={getChartHeight()}
+                portfolioTWR={portfolioTWR}
+                numberOfMonths={numberOfMonths}
               />
             ) : !hasPortfolioData ? (
               <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">

@@ -989,6 +989,8 @@ export default function PerformancePage() {
             startDate={metrics.startDate}
             endDate={metrics.endDate}
             selectedPeriod={selectedPeriod}
+            portfolioTWR={metrics.timeWeightedReturn}
+            numberOfMonths={metrics.numberOfMonths}
           />
         </motion.div>
 
