@@ -199,6 +199,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Collezione fx-rate-cache - tassi di cambio mensili USD/EUR (dato globale)
+    // Document ID == "usd-eur"; nessun campo userId.
+    // Leggibile da qualsiasi utente autenticato; scrivibile solo via Admin SDK (write: false).
+    match /fx-rate-cache/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
     // Collezione costCenters - centri di costo per raggruppare spese per oggetto/progetto
     match /costCenters/{costCenterId} {
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;

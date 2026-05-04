@@ -11,8 +11,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { BenchmarkMonthlyReturn } from '@/types/benchmarks';
-import { BenchmarkDefinition } from '@/types/benchmarks';
+import { BenchmarkMonthlyReturn, BenchmarkDefinition, FxMonthlyRate } from '@/types/benchmarks';
 import { MonthlyReturnHeatmapData } from '@/types/performance';
 
 interface BenchmarkComparisonChartProps {
@@ -31,6 +30,9 @@ interface BenchmarkComparisonChartProps {
   numberOfMonths: number;
   // Pre-computed cumulative TWR (de-annualized) from the performance page — consistent with KPI
   portfolioTotalGrowth: number | null;
+  // When true, benchmark USD returns are converted to EUR using monthly FX rates
+  convertToEur: boolean;
+  fxRates: FxMonthlyRate[];
 }
 
 interface IndexedPoint {
@@ -85,6 +87,38 @@ function buildIndexedSeries(
 }
 
 /**
+ * Convert a USD monthly return series to EUR using end-of-month FX rates.
+ *
+ * Formula: R_EUR[t] = (1 + R_USD[t]) * (eurPerUsd[t] / eurPerUsd[t-1]) - 1
+ *
+ * Months where the FX rate is unavailable are passed through unchanged (USD return).
+ */
+function applyFxConversion(
+  returns: Array<{ year: number; month: number; return: number }>,
+  fxRates: FxMonthlyRate[]
+): Array<{ year: number; month: number; return: number }> {
+  const fxMap = new Map<string, number>(
+    fxRates.map(r => [`${r.year}-${String(r.month).padStart(2, '0')}`, r.eurPerUsd])
+  );
+
+  return returns.map(r => {
+    const currKey = `${r.year}-${String(r.month).padStart(2, '0')}`;
+    const prevDate = new Date(r.year, r.month - 2, 1); // month - 2 because Date month is 0-indexed
+    const prevKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+
+    const currRate = fxMap.get(currKey);
+    const prevRate = fxMap.get(prevKey);
+
+    if (currRate == null || prevRate == null || prevRate === 0) {
+      return r; // FX data unavailable for this month — pass through unchanged
+    }
+
+    const returnEur = (1 + r.return) * (currRate / prevRate) - 1;
+    return { ...r, return: returnEur };
+  });
+}
+
+/**
  * Annualize a cumulative return over a known number of months.
  * Uses the same numberOfMonths denominator as the main performance page so that
  * benchmark TWR values are comparable on an equal-period basis.
@@ -118,6 +152,8 @@ export function BenchmarkComparisonChart({
   portfolioTWR,
   numberOfMonths,
   portfolioTotalGrowth,
+  convertToEur,
+  fxRates,
 }: BenchmarkComparisonChartProps) {
   const chartData = useMemo<IndexedPoint[]>(() => {
     const portfolioFlat = flattenHeatmap(portfolioHeatmapData);
@@ -133,7 +169,8 @@ export function BenchmarkComparisonChart({
     for (const id of selectedBenchmarkIds) {
       const raw = benchmarkReturns[id];
       if (!raw) continue;
-      const indexed = buildIndexedSeries(raw, startDate, endDate);
+      const converted = convertToEur && fxRates.length > 0 ? applyFxConversion(raw, fxRates) : raw;
+      const indexed = buildIndexedSeries(converted, startDate, endDate);
       benchmarkMaps[id] = new Map(
         indexed.map(p => [`${p.year}-${String(p.month).padStart(2, '0')}`, p.indexed])
       );
@@ -150,7 +187,7 @@ export function BenchmarkComparisonChart({
       }
       return point;
     });
-  }, [portfolioHeatmapData, benchmarkReturns, selectedBenchmarkIds, startDate, endDate]);
+  }, [portfolioHeatmapData, benchmarkReturns, selectedBenchmarkIds, startDate, endDate, convertToEur, fxRates]);
 
   const twrSummary = useMemo(() => {
     if (chartData.length === 0) return null;
@@ -307,7 +344,9 @@ export function BenchmarkComparisonChart({
           </table>
           <p className="text-xs text-muted-foreground mt-2">
             TWR annualizzato calcolato sul periodo di {numberOfMonths} mesi.
-            Rendimenti benchmark in USD (ETF quotati sul mercato americano).
+            {convertToEur
+              ? 'Rendimenti benchmark convertiti in EUR (tasso di cambio mensile USD/EUR, fonte: Frankfurter API).'
+              : 'Rendimenti benchmark in USD (ETF quotati sul mercato americano).'}
           </p>
         </div>
       )}

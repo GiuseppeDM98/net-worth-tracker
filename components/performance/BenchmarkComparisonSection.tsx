@@ -7,10 +7,13 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ChevronDown, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useBenchmarkReturns } from '@/lib/hooks/useBenchmarkReturns';
+import { useFxRates } from '@/lib/hooks/useFxRates';
 import { BenchmarkComparisonChart } from './BenchmarkComparisonChart';
 import { BENCHMARKS } from '@/lib/constants/benchmarks';
 import { MonthlyReturnHeatmapData, TimePeriod } from '@/types/performance';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 interface BenchmarkComparisonSectionProps {
   portfolioHeatmapData: MonthlyReturnHeatmapData[];
@@ -49,6 +52,7 @@ export function BenchmarkComparisonSection({
   const [activeBenchmarkIds, setActiveBenchmarkIds] = useState<string[]>([BENCHMARKS[0].id]);
   // Which benchmark pill is showing its composition tooltip
   const [expandedInfo, setExpandedInfo] = useState<string | null>(null);
+  const [convertToEur, setConvertToEur] = useState(false);
 
   // Fixed hooks — one per benchmark definition (4 total, stable call count).
   const b0 = useBenchmarkReturns(BENCHMARKS[0].id, activeBenchmarkIds.includes(BENCHMARKS[0].id));
@@ -57,6 +61,8 @@ export function BenchmarkComparisonSection({
   const b3 = useBenchmarkReturns(BENCHMARKS[3].id, activeBenchmarkIds.includes(BENCHMARKS[3].id));
 
   const hookResults = [b0, b1, b2, b3];
+
+  const { data: fxRates = [], isLoading: fxLoading, isError: fxError } = useFxRates(convertToEur);
 
   const benchmarkData = useMemo(() => {
     const map: Record<string, ReturnType<typeof useBenchmarkReturns>['data']> = {};
@@ -76,10 +82,12 @@ export function BenchmarkComparisonSection({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [b0.isError, b1.isError, b2.isError, b3.isError]);
 
-  const anyLoading = activeBenchmarkIds.some((id) => {
-    const idx = BENCHMARKS.findIndex(b => b.id === id);
-    return idx >= 0 && hookResults[idx].isLoading;
-  });
+  const anyLoading =
+    (convertToEur && fxLoading) ||
+    activeBenchmarkIds.some((id) => {
+      const idx = BENCHMARKS.findIndex(b => b.id === id);
+      return idx >= 0 && hookResults[idx].isLoading;
+    });
 
   const toggleBenchmark = (id: string) => {
     setActiveBenchmarkIds(prev =>
@@ -103,7 +111,8 @@ export function BenchmarkComparisonSection({
               <div>
                 <CardTitle>Confronto con Portafogli Modello</CardTitle>
                 <CardDescription className="mt-1">
-                  Crescita di 100 indicizzata al primo mese del periodo. Rendimenti benchmark in USD.
+                  Crescita di 100 indicizzata al primo mese del periodo.{' '}
+                  {convertToEur ? 'Benchmark convertiti in EUR.' : 'Rendimenti benchmark in USD.'}
                 </CardDescription>
               </div>
               <ChevronDown
@@ -194,6 +203,23 @@ export function BenchmarkComparisonSection({
               })()}
             </div>
 
+            {/* EUR conversion toggle */}
+            <div className="flex items-center gap-3 pt-1">
+              <Switch
+                id="convert-to-eur"
+                checked={convertToEur}
+                onCheckedChange={setConvertToEur}
+              />
+              <Label htmlFor="convert-to-eur" className="text-sm cursor-pointer select-none">
+                Converti benchmark in EUR
+              </Label>
+              {convertToEur && fxError && (
+                <span className="text-xs text-red-500 dark:text-red-400">
+                  ⚠ Tassi di cambio non disponibili
+                </span>
+              )}
+            </div>
+
             {/* Loading indicator */}
             {anyLoading && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -215,6 +241,8 @@ export function BenchmarkComparisonSection({
                 portfolioTWR={portfolioTWR}
                 numberOfMonths={numberOfMonths}
                 portfolioTotalGrowth={portfolioTotalGrowth}
+                convertToEur={convertToEur}
+                fxRates={fxRates}
               />
             ) : !hasPortfolioData ? (
               <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
