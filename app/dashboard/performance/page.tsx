@@ -996,6 +996,10 @@ export default function PerformancePage() {
                 ? (Math.pow(1 + metrics.timeWeightedReturn / 100, metrics.numberOfMonths / 12) - 1) * 100
                 : null
             }
+            portfolioVolatility={metrics.volatility}
+            portfolioSharpe={metrics.sharpeRatio}
+            portfolioMaxDrawdown={metrics.maxDrawdown}
+            riskFreeRate={metrics.riskFreeRate}
           />
         </motion.div>
 

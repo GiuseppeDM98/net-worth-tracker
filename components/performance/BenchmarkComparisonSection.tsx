@@ -27,16 +27,24 @@ interface BenchmarkComparisonSectionProps {
   numberOfMonths: number;
   // Cumulative TWR (de-annualized from portfolioTWR) — consistent with KPI card.
   portfolioTotalGrowth: number | null;
+  // Pre-computed risk metrics (cashflow-adjusted) passed through for KPI consistency.
+  portfolioVolatility: number | null;
+  portfolioSharpe: number | null;
+  portfolioMaxDrawdown: number | null;
+  // Risk-free rate from user settings for Sharpe/Sortino calculation.
+  riskFreeRate: number;
 }
 
 /**
  * "Confronto con Portafogli Modello" section in the Rendimenti page.
  *
- * Each of the 4 benchmark hooks is always declared (React rules require stable hook
+ * Each of the 6 benchmark hooks is always declared (React rules require stable hook
  * call counts), but `enabled` is false for inactive benchmarks so no fetches happen.
  * Data from enabled hooks is merged into the chart.
  *
  * Collapsed by default on mobile (dense page), open on desktop.
+ *
+ * Update checklist when adding a benchmark: see lib/constants/benchmarks.ts header.
  */
 export function BenchmarkComparisonSection({
   portfolioHeatmapData,
@@ -46,6 +54,10 @@ export function BenchmarkComparisonSection({
   portfolioTWR,
   numberOfMonths,
   portfolioTotalGrowth,
+  portfolioVolatility,
+  portfolioSharpe,
+  portfolioMaxDrawdown,
+  riskFreeRate,
 }: BenchmarkComparisonSectionProps) {
   const isMobile = useMediaQuery('(max-width: 767px)');
   const [isOpen, setIsOpen] = useState(!isMobile);
@@ -54,13 +66,15 @@ export function BenchmarkComparisonSection({
   const [expandedInfo, setExpandedInfo] = useState<string | null>(null);
   const [convertToEur, setConvertToEur] = useState(false);
 
-  // Fixed hooks — one per benchmark definition (4 total, stable call count).
+  // Fixed hooks — one per benchmark definition (6 total, stable call count).
   const b0 = useBenchmarkReturns(BENCHMARKS[0].id, activeBenchmarkIds.includes(BENCHMARKS[0].id));
   const b1 = useBenchmarkReturns(BENCHMARKS[1].id, activeBenchmarkIds.includes(BENCHMARKS[1].id));
   const b2 = useBenchmarkReturns(BENCHMARKS[2].id, activeBenchmarkIds.includes(BENCHMARKS[2].id));
   const b3 = useBenchmarkReturns(BENCHMARKS[3].id, activeBenchmarkIds.includes(BENCHMARKS[3].id));
+  const b4 = useBenchmarkReturns(BENCHMARKS[4].id, activeBenchmarkIds.includes(BENCHMARKS[4].id));
+  const b5 = useBenchmarkReturns(BENCHMARKS[5].id, activeBenchmarkIds.includes(BENCHMARKS[5].id));
 
-  const hookResults = [b0, b1, b2, b3];
+  const hookResults = [b0, b1, b2, b3, b4, b5];
 
   const { data: fxRates = [], isLoading: fxLoading, isError: fxError } = useFxRates(convertToEur);
 
@@ -71,7 +85,7 @@ export function BenchmarkComparisonSection({
     });
     return map;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [b0.data, b1.data, b2.data, b3.data]);
+  }, [b0.data, b1.data, b2.data, b3.data, b4.data, b5.data]);
 
   const benchmarkErrors = useMemo(() => {
     const map: Record<string, boolean> = {};
@@ -80,7 +94,7 @@ export function BenchmarkComparisonSection({
     });
     return map;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [b0.isError, b1.isError, b2.isError, b3.isError]);
+  }, [b0.isError, b1.isError, b2.isError, b3.isError, b4.isError, b5.isError]);
 
   const anyLoading =
     (convertToEur && fxLoading) ||
@@ -241,6 +255,10 @@ export function BenchmarkComparisonSection({
                 portfolioTWR={portfolioTWR}
                 numberOfMonths={numberOfMonths}
                 portfolioTotalGrowth={portfolioTotalGrowth}
+                portfolioVolatility={portfolioVolatility}
+                portfolioSharpe={portfolioSharpe}
+                portfolioMaxDrawdown={portfolioMaxDrawdown}
+                riskFreeRate={riskFreeRate}
                 convertToEur={convertToEur}
                 fxRates={fxRates}
               />

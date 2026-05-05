@@ -20,6 +20,11 @@ import { BenchmarkDefinition } from '@/types/benchmarks';
  *  - VBR: Vanguard Small-Cap Value (US small-cap value, from 2004)
  *
  * All benchmarks assume annual rebalancing back to target weights.
+ *
+ * Update checklist when adding a benchmark:
+ *  1. Add entry to BENCHMARKS[] below
+ *  2. Add fixed hook declaration in BenchmarkComparisonSection.tsx (stable hook count)
+ *  3. Update hookResults array in BenchmarkComparisonSection.tsx
  */
 export const BENCHMARKS: BenchmarkDefinition[] = [
   {
@@ -66,6 +71,27 @@ export const BENCHMARKS: BenchmarkDefinition[] = [
       { ticker: 'GLD', weight: 0.20, name: 'Oro' },
       { ticker: 'TLT', weight: 0.20, name: 'Treasury 20+ anni' },
       { ticker: 'SHY', weight: 0.20, name: 'Treasury 1-3 anni' },
+    ],
+  },
+  {
+    id: 'permanent-portfolio',
+    name: 'Portafoglio Permanente',
+    description: 'Strategia di Harry Browne: 25% in ciascuna delle quattro stagioni economiche — crescita (azioni), recessione (obbligazioni a lungo), inflazione (oro) e deflazione (liquidità a breve). Precursore del Golden Butterfly.',
+    color: '#ec4899', // pink-500
+    components: [
+      { ticker: 'VTI', weight: 0.25, name: 'US Total Market' },
+      { ticker: 'TLT', weight: 0.25, name: 'Treasury 20+ anni' },
+      { ticker: 'GLD', weight: 0.25, name: 'Oro' },
+      { ticker: 'SHY', weight: 0.25, name: 'Treasury 1-3 anni' },
+    ],
+  },
+  {
+    id: 'acwi-100',
+    name: '100% ACWI',
+    description: '100% azioni globali (MSCI All Country World). Benchmark azionario puro — utile come riferimento di mercato per valutare se un portafoglio diversificato sovraperforma o sottoperforma il mercato azionario mondiale.',
+    color: '#06b6d4', // cyan-500
+    components: [
+      { ticker: 'ACWI', weight: 1.0, name: 'MSCI All Country World' },
     ],
   },
 ];
