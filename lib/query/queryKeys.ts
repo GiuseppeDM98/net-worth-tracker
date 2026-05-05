@@ -48,4 +48,9 @@ export const queryKeys = {
     contextHistory: (userId: string, startYear: number) =>
       ['assistant', 'context', userId, startYear, -2] as const,
   },
+  // Benchmarks
+  benchmarks: {
+    returns: (benchmarkId: string) => ['benchmarks', 'returns', benchmarkId] as const,
+    fxRates: () => ['benchmarks', 'fx-rates'] as const,
+  },
 } as const;
