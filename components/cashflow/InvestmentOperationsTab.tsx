@@ -12,7 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/contexts/AuthContext';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useInvestmentOperations } from '@/lib/hooks/useInvestmentOperations';
-import { createInvestmentOperation, deleteInvestmentOperation } from '@/lib/services/investmentOperationService';
+import {
+  createInvestmentOperation,
+  deleteInvestmentOperation,
+  updateInvestmentOperation,
+} from '@/lib/services/investmentOperationService';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import { toDate } from '@/lib/utils/dateHelpers';
@@ -55,6 +59,7 @@ export function InvestmentOperationsTab() {
   const [notes, setNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | undefined>();
+  const [editingId, setEditingId] = useState<string | undefined>();
 
   const selectedAsset = investmentAssets.find(asset => asset.id === assetId);
   const grossAmount = Number(quantity) * Number(pricePerUnit);
@@ -70,6 +75,10 @@ export function InvestmentOperationsTab() {
   };
 
   const resetForm = () => {
+    setEditingId(undefined);
+    setAssetId('__none__');
+    setType('buy');
+    setCashAssetId('__none__');
     setQuantity('');
     setPricePerUnit('');
     setFees('');
@@ -77,7 +86,7 @@ export function InvestmentOperationsTab() {
     setNotes('');
   };
 
-  const handleCreate = async () => {
+  const handleSubmit = async () => {
     if (!user) return;
 
     const parsedQuantity = Number(quantity);
@@ -104,7 +113,7 @@ export function InvestmentOperationsTab() {
 
     try {
       setIsSaving(true);
-      await createInvestmentOperation(user.uid, {
+      const payload = {
         assetId,
         type,
         date: new Date(`${date}T00:00:00`),
@@ -115,16 +124,37 @@ export function InvestmentOperationsTab() {
         currency: selectedAsset?.currency || 'EUR',
         cashAssetId: cashAssetId !== '__none__' ? cashAssetId : undefined,
         notes: notes.trim() || undefined,
-      });
+      };
+      if (editingId) {
+        await updateInvestmentOperation(editingId, payload);
+      } else {
+        await createInvestmentOperation(user.uid, payload);
+      }
       await invalidate();
       resetForm();
-      toast.success('Operazione investimento registrata');
+      toast.success(editingId ? 'Operazione investimento aggiornata' : 'Operazione investimento registrata');
     } catch (error) {
       console.error('Error creating investment operation:', error);
       toast.error(error instanceof Error ? error.message : 'Errore nel salvataggio dell operazione');
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleEdit = (operationId: string) => {
+    const operation = operations.find(item => item.id === operationId);
+    if (!operation) return;
+
+    setEditingId(operation.id);
+    setAssetId(operation.assetId);
+    setType(operation.type);
+    setCashAssetId(operation.cashAssetId || '__none__');
+    setQuantity(String(operation.quantity));
+    setPricePerUnit(String(operation.pricePerUnit));
+    setFees(operation.fees ? String(operation.fees) : '');
+    setTaxes(operation.taxes ? String(operation.taxes) : '');
+    setDate(toDate(operation.date).toISOString().slice(0, 10));
+    setNotes(operation.notes || '');
   };
 
   const handleDelete = async (operationId: string) => {
@@ -154,13 +184,13 @@ export function InvestmentOperationsTab() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             {type === 'sell' ? <BanknoteArrowUp className="h-5 w-5" /> : <BanknoteArrowDown className="h-5 w-5" />}
-            Nuova operazione
+            {editingId ? 'Modifica operazione' : 'Nuova operazione'}
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 desktop:grid-cols-6 desktop:items-end">
           <div className="space-y-2 desktop:col-span-2">
             <Label>Asset</Label>
-            <Select value={assetId} onValueChange={setAssetId}>
+            <Select value={assetId} onValueChange={setAssetId} disabled={!!editingId}>
               <SelectTrigger>
                 <SelectValue placeholder="Seleziona asset" />
               </SelectTrigger>
@@ -225,10 +255,15 @@ export function InvestmentOperationsTab() {
             <Label>Note</Label>
             <Input value={notes} onChange={(event) => setNotes(event.target.value)} />
           </div>
-          <Button onClick={handleCreate} disabled={isSaving || investmentAssets.length === 0} className="desktop:col-span-1">
+          <Button onClick={handleSubmit} disabled={isSaving || investmentAssets.length === 0} className="desktop:col-span-1">
             <Plus className="mr-2 h-4 w-4" />
-            Registra
+            {editingId ? 'Aggiorna' : 'Registra'}
           </Button>
+          {editingId && (
+            <Button type="button" variant="outline" onClick={resetForm} className="desktop:col-span-1">
+              Annulla
+            </Button>
+          )}
           {Number.isFinite(grossAmount) && grossAmount > 0 && (
             <p className="text-sm text-muted-foreground desktop:col-span-5">
               Controvalore lordo: {formatCurrency(grossAmount)}
@@ -257,6 +292,16 @@ export function InvestmentOperationsTab() {
                     <p className="text-xs text-muted-foreground">
                       {formatDate(toDate(operation.date))} · {operation.quantity} quote · {formatCurrency(operation.pricePerUnit)}
                     </p>
+                    {operation.cashAssetId && (
+                      <p className="text-xs text-muted-foreground">
+                        Conto cash: {operation.cashAssetName || cashAssets.find(asset => asset.id === operation.cashAssetId)?.name || operation.cashAssetId}
+                      </p>
+                    )}
+                    {(operation.fees > 0 || operation.taxes > 0) && (
+                      <p className="text-xs text-muted-foreground">
+                        Commissioni {formatCurrency(operation.fees)} · Tasse {formatCurrency(operation.taxes)}
+                      </p>
+                    )}
                     {operation.notes && (
                       <p className="mt-1 text-xs text-muted-foreground">{operation.notes}</p>
                     )}
@@ -270,6 +315,15 @@ export function InvestmentOperationsTab() {
                         PMC risultante {operation.resultingAverageCost ? formatCurrency(operation.resultingAverageCost) : '-'}
                       </p>
                     </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEdit(operation.id)}
+                      disabled={deletingId === operation.id}
+                    >
+                      Modifica
+                    </Button>
                     <Button
                       type="button"
                       variant="ghost"

@@ -170,6 +170,7 @@ export async function createInvestmentOperation(
       taxes,
       currency: input.currency || asset.currency || 'EUR',
       cashAssetId: input.cashAssetId,
+      cashAssetName: cashAsset?.name,
       linkedExpenseId: input.linkedExpenseId,
       notes: input.notes,
       previousQuantity,
@@ -289,6 +290,118 @@ export async function deleteInvestmentOperation(operationId: string): Promise<vo
   }
 }
 
+export async function updateInvestmentOperation(
+  operationId: string,
+  input: InvestmentOperationFormData
+): Promise<void> {
+  const operationRef = doc(db, INVESTMENT_OPERATIONS_COLLECTION, operationId);
+  let userId: string | undefined;
+
+  await runTransaction(db, async transaction => {
+    const operationSnap = await transaction.get(operationRef);
+    if (!operationSnap.exists()) {
+      throw new Error('Operation not found');
+    }
+
+    const operation = normalizeOperation(operationSnap.id, operationSnap.data());
+    userId = operation.userId;
+    if (operation.assetId !== input.assetId) {
+      throw new Error('Changing the linked asset is not supported. Delete and recreate the operation.');
+    }
+
+    const assetRef = doc(db, ASSETS_COLLECTION, operation.assetId);
+    const assetSnap = await transaction.get(assetRef);
+    if (!assetSnap.exists()) {
+      throw new Error('Asset not found');
+    }
+
+    const asset = { id: assetSnap.id, ...assetSnap.data() } as Asset;
+    if (asset.userId !== operation.userId || asset.assetClass === 'cash') {
+      throw new Error('Asset does not belong to the operation owner');
+    }
+    if (Math.abs((asset.quantity || 0) - operation.resultingQuantity) > 0.000001) {
+      throw new Error('Cannot update operation because the asset changed after it was recorded');
+    }
+
+    const fees = input.fees ?? 0;
+    const taxes = input.taxes ?? 0;
+    const {
+      grossAmount,
+      resultingQuantity,
+      resultingAverageCost,
+      realizedGain,
+      realizedGainTax,
+      netCashEffect,
+    } = calculateInvestmentOperationEffect({
+      type: input.type,
+      previousQuantity: operation.previousQuantity,
+      previousAverageCost: operation.previousAverageCost,
+      quantity: input.quantity,
+      pricePerUnit: input.pricePerUnit,
+      fees,
+      taxes,
+    });
+
+    const cashRefs = new Map<string, { ref: ReturnType<typeof doc>; asset: Asset }>();
+    const cashIds = Array.from(new Set([operation.cashAssetId, input.cashAssetId].filter(Boolean))) as string[];
+    for (const cashId of cashIds) {
+      const cashRef = doc(db, ASSETS_COLLECTION, cashId);
+      const cashSnap = await transaction.get(cashRef);
+      if (!cashSnap.exists()) {
+        throw new Error('Cash asset not found');
+      }
+      const cashAsset = cashSnap.data() as Asset;
+      if (cashAsset.userId !== operation.userId || cashAsset.assetClass !== 'cash') {
+        throw new Error('Cash asset does not belong to the operation owner');
+      }
+      cashRefs.set(cashId, { ref: cashRef, asset: cashAsset });
+    }
+
+    const now = Timestamp.now();
+    transaction.update(assetRef, {
+      quantity: resultingQuantity,
+      averageCost: resultingAverageCost === undefined ? deleteField() : resultingAverageCost,
+      updatedAt: now,
+    });
+
+    for (const cashId of cashIds) {
+      const cashEntry = cashRefs.get(cashId);
+      if (!cashEntry) continue;
+      const oldDelta = operation.cashAssetId === cashId ? -operation.netCashEffect : 0;
+      const newDelta = input.cashAssetId === cashId ? netCashEffect : 0;
+      transaction.update(cashEntry.ref, {
+        quantity: (cashEntry.asset.quantity || 0) + oldDelta + newDelta,
+        updatedAt: now,
+      });
+    }
+
+    const newCashAsset = input.cashAssetId ? cashRefs.get(input.cashAssetId)?.asset : undefined;
+    transaction.update(operationRef, removeUndefinedFields({
+      type: input.type,
+      date: Timestamp.fromDate(input.date),
+      quantity: input.quantity,
+      pricePerUnit: input.pricePerUnit,
+      grossAmount,
+      fees,
+      taxes,
+      currency: input.currency || asset.currency || 'EUR',
+      cashAssetId: input.cashAssetId || deleteField(),
+      cashAssetName: newCashAsset?.name || deleteField(),
+      notes: input.notes || deleteField(),
+      resultingQuantity,
+      resultingAverageCost: resultingAverageCost === undefined ? deleteField() : resultingAverageCost,
+      realizedGain: realizedGain === undefined ? deleteField() : realizedGain,
+      realizedGainTax: realizedGainTax === undefined ? deleteField() : realizedGainTax,
+      netCashEffect,
+      updatedAt: now,
+    }));
+  });
+
+  if (userId) {
+    await invalidateDashboardOverviewSummary(userId, 'investment_operation_updated');
+  }
+}
+
 export async function createInternalTransfer(
   userId: string,
   input: InternalTransferFormData
@@ -359,6 +472,89 @@ export async function createInternalTransfer(
   return transferId;
 }
 
+export async function updateInternalTransfer(
+  transferId: string,
+  input: InternalTransferFormData
+): Promise<void> {
+  calculateInternalTransferEffect(input.amount, input.fees ?? 0);
+  if (input.fromCashAssetId === input.toCashAssetId) {
+    throw new Error('Source and destination cash assets must be different');
+  }
+
+  const transferRef = doc(db, INTERNAL_TRANSFERS_COLLECTION, transferId);
+  let userId: string | undefined;
+
+  await runTransaction(db, async transaction => {
+    const transferSnap = await transaction.get(transferRef);
+    if (!transferSnap.exists()) {
+      throw new Error('Transfer not found');
+    }
+
+    const transfer = normalizeTransfer(transferSnap.id, transferSnap.data());
+    userId = transfer.userId;
+    const fees = input.fees ?? 0;
+    const oldFees = transfer.fees ?? 0;
+    const cashIds = Array.from(new Set([
+      transfer.fromCashAssetId,
+      transfer.toCashAssetId,
+      input.fromCashAssetId,
+      input.toCashAssetId,
+    ]));
+    const cashRefs = new Map<string, { ref: ReturnType<typeof doc>; asset: Asset }>();
+
+    for (const cashId of cashIds) {
+      const cashRef = doc(db, ASSETS_COLLECTION, cashId);
+      const cashSnap = await transaction.get(cashRef);
+      if (!cashSnap.exists()) {
+        throw new Error('Cash asset not found');
+      }
+      const cashAsset = cashSnap.data() as Asset;
+      if (cashAsset.userId !== transfer.userId || cashAsset.assetClass !== 'cash') {
+        throw new Error('Transfer assets must be cash assets owned by the transfer owner');
+      }
+      cashRefs.set(cashId, { ref: cashRef, asset: cashAsset });
+    }
+
+    const deltas = new Map<string, number>();
+    const addDelta = (cashId: string, delta: number) => {
+      deltas.set(cashId, (deltas.get(cashId) ?? 0) + delta);
+    };
+    addDelta(transfer.fromCashAssetId, transfer.amount + oldFees);
+    addDelta(transfer.toCashAssetId, -transfer.amount);
+    addDelta(input.fromCashAssetId, -(input.amount + fees));
+    addDelta(input.toCashAssetId, input.amount);
+
+    const now = Timestamp.now();
+    for (const [cashId, delta] of deltas) {
+      const cashEntry = cashRefs.get(cashId);
+      if (!cashEntry || Math.abs(delta) < 0.000001) continue;
+      transaction.update(cashEntry.ref, {
+        quantity: (cashEntry.asset.quantity || 0) + delta,
+        updatedAt: now,
+      });
+    }
+
+    const fromAsset = cashRefs.get(input.fromCashAssetId)?.asset;
+    const toAsset = cashRefs.get(input.toCashAssetId)?.asset;
+    transaction.update(transferRef, removeUndefinedFields({
+      fromCashAssetId: input.fromCashAssetId,
+      fromCashAssetName: fromAsset?.name,
+      toCashAssetId: input.toCashAssetId,
+      toCashAssetName: toAsset?.name,
+      amount: input.amount,
+      currency: input.currency || fromAsset?.currency || 'EUR',
+      date: Timestamp.fromDate(input.date),
+      fees,
+      notes: input.notes || deleteField(),
+      updatedAt: now,
+    }));
+  });
+
+  if (userId) {
+    await invalidateDashboardOverviewSummary(userId, 'internal_transfer_updated');
+  }
+}
+
 export async function getInternalTransfers(userId: string): Promise<InternalTransfer[]> {
   const transfersRef = collection(db, INTERNAL_TRANSFERS_COLLECTION);
   const q = query(transfersRef, where('userId', '==', userId));
@@ -367,6 +563,61 @@ export async function getInternalTransfers(userId: string): Promise<InternalTran
   return snapshot.docs
     .map(transferDoc => normalizeTransfer(transferDoc.id, transferDoc.data()))
     .sort((a, b) => toDateValue(b.date).getTime() - toDateValue(a.date).getTime());
+}
+
+export async function deleteInternalTransfer(transferId: string): Promise<void> {
+  const transferRef = doc(db, INTERNAL_TRANSFERS_COLLECTION, transferId);
+  let userId: string | undefined;
+
+  await runTransaction(db, async transaction => {
+    const transferSnap = await transaction.get(transferRef);
+    if (!transferSnap.exists()) {
+      return;
+    }
+
+    const transfer = normalizeTransfer(transferSnap.id, transferSnap.data());
+    userId = transfer.userId;
+
+    const fromRef = doc(db, ASSETS_COLLECTION, transfer.fromCashAssetId);
+    const toRef = doc(db, ASSETS_COLLECTION, transfer.toCashAssetId);
+    const [fromSnap, toSnap] = await Promise.all([
+      transaction.get(fromRef),
+      transaction.get(toRef),
+    ]);
+
+    if (!fromSnap.exists() || !toSnap.exists()) {
+      throw new Error('Cash asset not found');
+    }
+
+    const fromAsset = fromSnap.data() as Asset;
+    const toAsset = toSnap.data() as Asset;
+    if (
+      fromAsset.userId !== transfer.userId ||
+      toAsset.userId !== transfer.userId ||
+      fromAsset.assetClass !== 'cash' ||
+      toAsset.assetClass !== 'cash'
+    ) {
+      throw new Error('Transfer assets are no longer valid cash assets');
+    }
+
+    const fees = transfer.fees ?? 0;
+    const now = Timestamp.now();
+    transaction.update(fromRef, {
+      quantity: (fromAsset.quantity || 0) + transfer.amount + fees,
+      updatedAt: now,
+    });
+    transaction.update(toRef, {
+      quantity: (toAsset.quantity || 0) - transfer.amount,
+      updatedAt: now,
+    });
+    transaction.delete(transferRef);
+  });
+
+  if (userId) {
+    await invalidateDashboardOverviewSummary(userId, 'internal_transfer_deleted');
+  } else {
+    await deleteDoc(transferRef).catch(() => undefined);
+  }
 }
 
 export async function markInvestmentOperationExpenseLink(

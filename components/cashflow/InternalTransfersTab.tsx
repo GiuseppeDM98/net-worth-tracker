@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowRightLeft, Plus } from 'lucide-react';
+import { ArrowRightLeft, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,9 +12,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/contexts/AuthContext';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useInternalTransfers } from '@/lib/hooks/useInvestmentOperations';
-import { createInternalTransfer } from '@/lib/services/investmentOperationService';
+import {
+  createInternalTransfer,
+  deleteInternalTransfer,
+  updateInternalTransfer,
+} from '@/lib/services/investmentOperationService';
 import { queryKeys } from '@/lib/query/queryKeys';
-import { formatCurrency } from '@/lib/utils/formatters';
+import { formatCurrency, formatDate } from '@/lib/utils/formatters';
+import { toDate } from '@/lib/utils/dateHelpers';
 
 export function InternalTransfersTab() {
   const { user } = useAuth();
@@ -30,8 +35,28 @@ export function InternalTransfersTab() {
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | undefined>();
+  const [deletingId, setDeletingId] = useState<string | undefined>();
 
-  const handleCreate = async () => {
+  const invalidate = async () => {
+    if (!user) return;
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.assets.transfers(user.uid) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(user.uid) }),
+    ]);
+  };
+
+  const resetForm = () => {
+    setEditingId(undefined);
+    setFromCashAssetId('__none__');
+    setToCashAssetId('__none__');
+    setAmount('');
+    setFees('');
+    setNotes('');
+  };
+
+  const handleSubmit = async () => {
     if (!user) return;
     const parsedAmount = Number(amount);
     const parsedFees = fees ? Number(fees) : 0;
@@ -55,28 +80,54 @@ export function InternalTransfersTab() {
 
     try {
       setIsSaving(true);
-      await createInternalTransfer(user.uid, {
+      const payload = {
         fromCashAssetId,
         toCashAssetId,
         amount: parsedAmount,
         fees: parsedFees,
         date: new Date(`${date}T00:00:00`),
         notes: notes.trim() || undefined,
-      });
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.assets.transfers(user.uid) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(user.uid) }),
-      ]);
-      setAmount('');
-      setFees('');
-      setNotes('');
-      toast.success('Trasferimento registrato');
+      };
+      if (editingId) {
+        await updateInternalTransfer(editingId, payload);
+      } else {
+        await createInternalTransfer(user.uid, payload);
+      }
+      await invalidate();
+      resetForm();
+      toast.success(editingId ? 'Trasferimento aggiornato' : 'Trasferimento registrato');
     } catch (error) {
       console.error('Error creating internal transfer:', error);
       toast.error('Errore nel salvataggio del trasferimento');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleEdit = (transferId: string) => {
+    const transfer = transfers.find(item => item.id === transferId);
+    if (!transfer) return;
+
+    setEditingId(transfer.id);
+    setFromCashAssetId(transfer.fromCashAssetId);
+    setToCashAssetId(transfer.toCashAssetId);
+    setAmount(String(transfer.amount));
+    setFees(transfer.fees ? String(transfer.fees) : '');
+    setDate(toDate(transfer.date).toISOString().slice(0, 10));
+    setNotes(transfer.notes || '');
+  };
+
+  const handleDelete = async (transferId: string) => {
+    try {
+      setDeletingId(transferId);
+      await deleteInternalTransfer(transferId);
+      await invalidate();
+      toast.success('Trasferimento eliminato');
+    } catch (error) {
+      console.error('Error deleting internal transfer:', error);
+      toast.error(error instanceof Error ? error.message : 'Errore nell eliminazione del trasferimento');
+    } finally {
+      setDeletingId(undefined);
     }
   };
 
@@ -93,7 +144,7 @@ export function InternalTransfersTab() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ArrowRightLeft className="h-5 w-5" />
-            Nuovo trasferimento
+            {editingId ? 'Modifica trasferimento' : 'Nuovo trasferimento'}
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 desktop:grid-cols-6 desktop:items-end">
@@ -141,10 +192,15 @@ export function InternalTransfersTab() {
             <Label>Note</Label>
             <Input value={notes} onChange={(event) => setNotes(event.target.value)} />
           </div>
-          <Button onClick={handleCreate} disabled={isSaving || cashAssets.length < 2} className="desktop:col-span-1">
+          <Button onClick={handleSubmit} disabled={isSaving || cashAssets.length < 2} className="desktop:col-span-1">
             <Plus className="mr-2 h-4 w-4" />
-            Registra
+            {editingId ? 'Aggiorna' : 'Registra'}
           </Button>
+          {editingId && (
+            <Button type="button" variant="outline" onClick={resetForm} className="desktop:col-span-1">
+              Annulla
+            </Button>
+          )}
         </CardContent>
       </Card>
 
@@ -165,16 +221,37 @@ export function InternalTransfersTab() {
                     <p className="font-medium">
                       {transfer.fromCashAssetName} → {transfer.toCashAssetName}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(transfer.date as Date).toLocaleDateString('it-IT')}
-                      {transfer.notes ? ` · ${transfer.notes}` : ''}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold">{formatCurrency(transfer.amount)}</p>
-                    {!!transfer.fees && transfer.fees > 0 && (
-                      <p className="text-xs text-red-600">Commissioni {formatCurrency(transfer.fees)}</p>
+                    <p className="text-xs text-muted-foreground">{formatDate(toDate(transfer.date))}</p>
+                    {transfer.notes && (
+                      <p className="text-xs text-muted-foreground">{transfer.notes}</p>
                     )}
+                  </div>
+                  <div className="flex items-center justify-between gap-3 desktop:justify-end">
+                    <div className="text-right">
+                      <p className="font-semibold">{formatCurrency(transfer.amount)}</p>
+                      {!!transfer.fees && transfer.fees > 0 && (
+                        <p className="text-xs text-red-600">Commissioni {formatCurrency(transfer.fees)}</p>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEdit(transfer.id)}
+                      disabled={deletingId === transfer.id}
+                    >
+                      Modifica
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDelete(transfer.id)}
+                      disabled={deletingId === transfer.id}
+                      title="Elimina trasferimento"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               ))}

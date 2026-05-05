@@ -17,6 +17,7 @@ export interface InvestmentOperation {
   taxes: number;
   currency: string;
   cashAssetId?: string;
+  cashAssetName?: string;
   linkedExpenseId?: string;
   notes?: string;
   previousQuantity: number;
@@ -40,6 +41,7 @@ export interface InvestmentOperationFormData {
   taxes?: number;
   currency?: string;
   cashAssetId?: string;
+  cashAssetName?: string;
   linkedExpenseId?: string;
   notes?: string;
 }

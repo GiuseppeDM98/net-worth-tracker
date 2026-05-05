@@ -21,7 +21,9 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
+import { useInternalTransfers, useInvestmentOperations } from '@/lib/hooks/useInvestmentOperations';
 import { Expense, ExpenseCategory, EXPENSE_TYPE_LABELS } from '@/types/expenses';
+import { InternalTransfer, InvestmentOperation } from '@/types/investments';
 import {
   calculateTotalIncome,
   calculateTotalExpenses,
@@ -39,12 +41,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Plus, TrendingUp, TrendingDown, Wallet, RefreshCw, Filter, ChevronDown, Scale, Check, X } from 'lucide-react';
+import { Plus, TrendingUp, TrendingDown, Wallet, RefreshCw, Filter, ChevronDown, Scale, Check, X, ArrowRightLeft, ChartCandlestick } from 'lucide-react';
 import { ExpenseDialog } from '@/components/expenses/ExpenseDialog';
 import { ExpenseTable } from '@/components/expenses/ExpenseTable';
 import { ExpenseCard } from '@/components/expenses/ExpenseCard';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { toDate } from '@/lib/utils/dateHelpers';
 
 const MONTHS = [
   { value: '1', label: 'Gennaio' },
@@ -61,12 +64,24 @@ const MONTHS = [
   { value: '12', label: 'Dicembre' },
 ];
 
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('it-IT', {
+    style: 'currency',
+    currency: 'EUR',
+  }).format(amount);
+};
+
 interface ExpenseTrackingTabProps {
   allExpenses: Expense[];
   categories: ExpenseCategory[];
   loading: boolean;
   onRefresh: () => Promise<void>;
 }
+
+type UnifiedMovement =
+  | { id: string; kind: 'expense'; date: Date; title: string; subtitle: string; amount: number; source: Expense }
+  | { id: string; kind: 'investment'; date: Date; title: string; subtitle: string; amount: number; source: InvestmentOperation }
+  | { id: string; kind: 'transfer'; date: Date; title: string; subtitle: string; amount: number; source: InternalTransfer };
 
 /**
  * CHECKLIST: When adding new ExpenseType values:
@@ -79,6 +94,8 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   const { user } = useAuth();
   const isDemo = useDemoMode();
   const queryClient = useQueryClient();
+  const { data: investmentOperations = [] } = useInvestmentOperations(user?.uid);
+  const { data: internalTransfers = [] } = useInternalTransfers(user?.uid);
   const currentYear = new Date().getFullYear();
   const currentMonth = String(new Date().getMonth() + 1); // 1-based month (1-12)
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -425,13 +442,6 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
     }
   };
 
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('it-IT', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(amount);
-  };
-
   // Filter options for Type
   const typeOptions = useMemo(() => {
     const types = [
@@ -528,6 +538,64 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
 
     return filtered;
   }, [expenses, selectedType, selectedCategoryId, selectedSubCategoryId]);
+
+  const unifiedMovements = useMemo<UnifiedMovement[]>(() => {
+    const matchesPeriod = (dateLike: Parameters<typeof toDate>[0]) => {
+      const date = toDate(dateLike);
+      if (date.getFullYear() !== selectedYear) return false;
+      return selectedMonth === 'all' || date.getMonth() + 1 === parseInt(selectedMonth);
+    };
+
+    const expenseMovements: UnifiedMovement[] = filteredExpenses.map(expense => ({
+      id: `expense-${expense.id}`,
+      kind: 'expense',
+      date: toDate(expense.date),
+      title: expense.categoryName,
+      subtitle: [
+        EXPENSE_TYPE_LABELS[expense.type],
+        expense.subCategoryName,
+        expense.linkedCashAssetId ? 'conto cash collegato' : undefined,
+      ].filter(Boolean).join(' · '),
+      amount: expense.amount,
+      source: expense,
+    }));
+
+    const operationMovements: UnifiedMovement[] = investmentOperations
+      .filter(operation => matchesPeriod(operation.date))
+      .map(operation => ({
+        id: `investment-${operation.id}`,
+        kind: 'investment',
+        date: toDate(operation.date),
+        title: `${operation.type === 'sell' ? 'Vendita' : 'Acquisto'} ${operation.assetName}`,
+        subtitle: [
+          `${operation.quantity} quote a ${formatCurrency(operation.pricePerUnit)}`,
+          operation.cashAssetName ? `conto ${operation.cashAssetName}` : operation.cashAssetId ? 'conto cash collegato' : 'senza conto cash',
+          operation.fees > 0 ? `commissioni ${formatCurrency(operation.fees)}` : undefined,
+          operation.taxes > 0 ? `tasse ${formatCurrency(operation.taxes)}` : undefined,
+        ].filter(Boolean).join(' · '),
+        amount: operation.netCashEffect,
+        source: operation,
+      }));
+
+    const transferMovements: UnifiedMovement[] = internalTransfers
+      .filter(transfer => matchesPeriod(transfer.date))
+      .map(transfer => ({
+        id: `transfer-${transfer.id}`,
+        kind: 'transfer',
+        date: toDate(transfer.date),
+        title: `${transfer.fromCashAssetName} -> ${transfer.toCashAssetName}`,
+        subtitle: [
+          'Trasferimento interno',
+          transfer.fees && transfer.fees > 0 ? `commissioni ${formatCurrency(transfer.fees)}` : undefined,
+          transfer.notes,
+        ].filter(Boolean).join(' · '),
+        amount: 0,
+        source: transfer,
+      }));
+
+    return [...expenseMovements, ...operationMovements, ...transferMovements]
+      .sort((a, b) => b.date.getTime() - a.date.getTime());
+  }, [filteredExpenses, internalTransfers, investmentOperations, selectedMonth, selectedYear]);
 
   // Calculate totals from filtered expenses
   const totalIncome = calculateTotalIncome(filteredExpenses);
@@ -960,6 +1028,67 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
           </CollapsibleContent>
         </Card>
       </Collapsible>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            {selectedMonth !== 'all'
+              ? `Tutti i movimenti di ${MONTHS.find(m => m.value === selectedMonth)?.label} ${selectedYear}`
+              : `Tutti i movimenti del ${selectedYear}`}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {unifiedMovements.length === 0 ? (
+            <div className="rounded-md border border-dashed p-8 text-center">
+              <p className="text-muted-foreground">Nessun movimento trovato</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {unifiedMovements.slice(0, 50).map(movement => (
+                <div key={movement.id} className="flex flex-col gap-3 rounded-md border p-3 desktop:flex-row desktop:items-center desktop:justify-between">
+                  <div className="flex min-w-0 gap-3">
+                    <div className="mt-0.5 shrink-0">
+                      {movement.kind === 'investment' ? (
+                        <ChartCandlestick className="h-4 w-4 text-blue-600" />
+                      ) : movement.kind === 'transfer' ? (
+                        <ArrowRightLeft className="h-4 w-4 text-purple-600" />
+                      ) : movement.amount >= 0 ? (
+                        <TrendingUp className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <TrendingDown className="h-4 w-4 text-red-600" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-medium">{movement.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {toDate(movement.date).toLocaleDateString('it-IT')}
+                        {movement.subtitle ? ` · ${movement.subtitle}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    {movement.kind === 'transfer' ? (
+                      <p className="font-semibold text-muted-foreground">Neutro</p>
+                    ) : (
+                      <p className={movement.amount >= 0 ? 'font-semibold text-green-600' : 'font-semibold text-red-600'}>
+                        {formatCurrency(movement.amount)}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      {movement.kind === 'investment' ? 'Investimento' : movement.kind === 'transfer' ? 'Trasferimento' : 'Cashflow'}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              {unifiedMovements.length > 50 && (
+                <p className="text-sm text-muted-foreground text-center pt-2">
+                  Visualizzati 50 di {unifiedMovements.length} movimenti. Usa i filtri temporali per ridurre i risultati.
+                </p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Expenses - Desktop Table / Mobile Cards */}
       <Card>

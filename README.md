@@ -23,8 +23,9 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Dedicated pension fund asset type with manual valuation, default illiquid treatment, stamp-duty exemption, historical table inclusion, and composite allocation support
 - Bond coupon scheduling: automatic coupon generation with step-up rate tiers and final premium (Premio Finale) support — full BTP Valore compatible
 - Average cost tracking with 4-decimal precision, including a built-in multi-broker PMC calculator for positions spread across multiple brokers
-- Dedicated investment operations tab for buys/sells, with quantity updates, weighted-average-cost recalculation, optional cash-account impact, fees/taxes, and realized gain tracking without classifying trades as expenses or income
-- Internal cash transfers between cash assets, excluded from income/expense savings metrics
+- Dedicated investment operations tab for buys/sells, with quantity updates, weighted-average-cost recalculation, optional cash-account impact, fees/taxes, edit/delete actions, and realized gain tracking without classifying trades as expenses or income
+- Internal cash transfers between cash assets with edit/delete actions, excluded from income/expense savings metrics
+- Unified cashflow tracking view showing ordinary cashflow entries, investment operations, and internal transfers in one chronological movement list
 - Current vs target asset allocation visualization
 - Hierarchical asset allocation analysis with desktop drill-down and mobile bottom-sheet navigation
 - Current-year historical tables use a hidden previous-month baseline so January can show growth vs the previous December without rendering an extra visible column
