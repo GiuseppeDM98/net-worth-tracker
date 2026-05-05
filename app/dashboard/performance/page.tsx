@@ -53,6 +53,7 @@ import { PerformanceTooltip } from '@/components/performance/PerformanceTooltip'
 import { MonthlyReturnsHeatmap } from '@/components/performance/MonthlyReturnsHeatmap';
 import { UnderwaterDrawdownChart } from '@/components/performance/UnderwaterDrawdownChart';
 import { PerformancePageSkeleton } from '@/components/performance/PerformancePageSkeleton';
+import { BenchmarkComparisonSection } from '@/components/performance/BenchmarkComparisonSection';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 
 /**
@@ -979,6 +980,27 @@ export default function PerformancePage() {
               </ResponsiveContainer>
             </CardContent>
           </Card>
+        </motion.div>
+
+        {/* Benchmark Comparison Section */}
+        <motion.div variants={cardItem}>
+          <BenchmarkComparisonSection
+            portfolioHeatmapData={heatmapData}
+            startDate={metrics.startDate}
+            endDate={metrics.endDate}
+            selectedPeriod={selectedPeriod}
+            portfolioTWR={metrics.timeWeightedReturn}
+            numberOfMonths={metrics.numberOfMonths}
+            portfolioTotalGrowth={
+              metrics.timeWeightedReturn != null && metrics.numberOfMonths > 0
+                ? (Math.pow(1 + metrics.timeWeightedReturn / 100, metrics.numberOfMonths / 12) - 1) * 100
+                : null
+            }
+            portfolioVolatility={metrics.volatility}
+            portfolioSharpe={metrics.sharpeRatio}
+            portfolioMaxDrawdown={metrics.maxDrawdown}
+            riskFreeRate={metrics.riskFreeRate}
+          />
         </motion.div>
 
         {/* Rolling CAGR Chart */}
