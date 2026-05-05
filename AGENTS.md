@@ -272,8 +272,9 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - React Query client-side: `staleTime` = server TTL minus headroom (e.g. 6h client for 7d server). Applied: `benchmark-cache/{benchmarkId}`, `fx-rate-cache/usd-eur`
 
 ### Fixed Hooks for Variable-Length Data Sources
-- When a component needs data from a variable number of sources (e.g. user toggles which of N benchmarks to show), declare N fixed hook instances (`b0`–`b3`) at component level with `enabled: false` for inactive ones — never loop over hooks. React enforces stable hook call counts and throws at runtime otherwise
-- Applied in `BenchmarkComparisonSection`: 4 fixed `useBenchmarkReturns` hooks, one per benchmark constant
+- When a component needs data from a variable number of sources (e.g. user toggles which of N benchmarks to show), declare N fixed hook instances (`b0`–`bN`) at component level with `enabled: false` for inactive ones — never loop over hooks. React enforces stable hook call counts and throws at runtime otherwise
+- Applied in `BenchmarkComparisonSection`: 6 fixed `useBenchmarkReturns` hooks, one per benchmark constant
+- **Adding a new benchmark**: (1) add entry to `BENCHMARKS[]` in `lib/constants/benchmarks.ts`, (2) add `const bN = useBenchmarkReturns(BENCHMARKS[N].id, ...)` in `BenchmarkComparisonSection.tsx`, (3) add `bN` to `hookResults` array and update `b*.data`/`b*.isError` dependency arrays in `benchmarkData`/`benchmarkErrors` memos
 
 ### Cross-Component Metric Consistency
 - When a derived value shown in a chart or table must match a KPI card exactly, pass the pre-computed figure as a prop from the page — do not recompute from chart data. The most common drift source is annualization denominator: chart return-point count = n−1, `metrics.numberOfMonths` = n. A 1-month difference produces ~0.4pp divergence at 14% TWR
