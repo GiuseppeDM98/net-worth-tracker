@@ -202,38 +202,38 @@ export default function CashflowPage() {
           <div className="hidden desktop:block h-10 w-full max-w-5xl rounded-md bg-muted animate-pulse" />
         ) : (
           <TabsList className={`hidden desktop:grid w-full max-w-6xl ${costCentersEnabled ? 'grid-cols-8' : 'grid-cols-7'}`}>
-            <TabsTrigger value="tracking" className="flex items-center gap-2">
+            <TabsTrigger value="tracking" className="flex min-w-0 items-center gap-1.5 px-2">
               <Receipt className="h-4 w-4" />
-              Tracciamento
+              <span className="min-w-0 truncate">Tracciamento</span>
             </TabsTrigger>
-            <TabsTrigger value="dividends" className="flex items-center gap-2">
+            <TabsTrigger value="dividends" className="flex min-w-0 items-center gap-1.5 px-2">
               <Coins className="h-4 w-4" />
-              Dividendi &amp; Cedole
+              <span className="min-w-0 truncate">Dividendi &amp; Cedole</span>
             </TabsTrigger>
-            <TabsTrigger value="investments" className="flex items-center gap-2">
+            <TabsTrigger value="investments" className="flex min-w-0 items-center gap-1.5 px-2">
               <ChartCandlestick className="h-4 w-4" />
-              Investimenti
+              <span className="min-w-0 truncate">Investimenti</span>
             </TabsTrigger>
-            <TabsTrigger value="current-year" className="flex items-center gap-2">
+            <TabsTrigger value="current-year" className="flex min-w-0 items-center gap-1.5 px-2">
               <TrendingUp className="h-4 w-4" />
-              Anno Corrente
+              <span className="min-w-0 truncate">Anno Corrente</span>
             </TabsTrigger>
-            <TabsTrigger value="total-history" className="flex items-center gap-2">
+            <TabsTrigger value="total-history" className="flex min-w-0 items-center gap-1.5 px-2">
               <BarChart3 className="h-4 w-4" />
-              Storico Totale
+              <span className="min-w-0 truncate">Storico Totale</span>
             </TabsTrigger>
-            <TabsTrigger value="budget" className="flex items-center gap-2">
+            <TabsTrigger value="budget" className="flex min-w-0 items-center gap-1.5 px-2">
               <Target className="h-4 w-4" />
-              Budget
+              <span className="min-w-0 truncate">Budget</span>
             </TabsTrigger>
-            <TabsTrigger value="transfers" className="flex items-center gap-2">
+            <TabsTrigger value="transfers" className="flex min-w-0 items-center gap-1.5 px-2">
               <ArrowRightLeft className="h-4 w-4" />
-              Trasferimenti
+              <span className="min-w-0 truncate">Trasferimenti</span>
             </TabsTrigger>
             {costCentersEnabled && (
-              <TabsTrigger value="cost-centers" className="flex items-center gap-2">
+              <TabsTrigger value="cost-centers" className="flex min-w-0 items-center gap-1.5 px-2">
                 <Layers className="h-4 w-4" />
-                Centri di Costo
+                <span className="min-w-0 truncate">Centri di Costo</span>
               </TabsTrigger>
             )}
           </TabsList>
