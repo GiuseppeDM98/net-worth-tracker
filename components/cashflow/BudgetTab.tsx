@@ -74,6 +74,7 @@ import {
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
+import { createId } from '@/lib/utils/idHelpers';
 
 // ==================== Constants ====================
 
@@ -472,7 +473,7 @@ export function BudgetTab({
     );
 
     const newItem: BudgetItem = {
-      id: crypto.randomUUID(),
+      id: createId('budget'),
       scope: 'subcategory',
       categoryId: subForm.categoryId,
       categoryName: cat?.name,

@@ -22,6 +22,7 @@ import { getUserSnapshots } from './snapshotService';
 import { getAllExpenses, calculateTotalIncome, calculateTotalExpenses } from './expenseService';
 import { Expense } from '@/types/expenses';
 import { getItalyMonthYear, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
+import { createId } from '@/lib/utils/idHelpers';
 
 const COLLECTION_NAME = 'hall-of-fame';
 const MAX_MONTHLY_RECORDS = 20;
@@ -349,7 +350,7 @@ export async function addHallOfFameNote(
 
     // Generate new note with UUID and timestamps
     const newNote: HallOfFameNote = {
-      id: crypto.randomUUID(), // Built-in browser API, RFC 4122 compliant
+      id: createId('hall-of-fame-note'),
       text: trimmedText,
       sections: noteData.sections,
       year: noteData.year,

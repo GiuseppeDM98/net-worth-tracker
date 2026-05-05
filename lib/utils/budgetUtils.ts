@@ -11,6 +11,7 @@ import { Expense, ExpenseCategory } from '@/types/expenses';
 import { BudgetComparison, BudgetItem } from '@/types/budget';
 import { getItalyMonth, getItalyMonthYear, getItalyYear } from './dateHelpers';
 import { toDate } from './dateHelpers';
+import { createId } from './idHelpers';
 
 // Section display order: fixed → variable → debt → income
 const SECTION_ORDER: Record<string, number> = { fixed: 0, variable: 1, debt: 2, income: 3 };
@@ -267,7 +268,7 @@ export function autoInitBudgetItems(
       );
 
     return {
-      id: existing?.id ?? crypto.randomUUID(),
+      id: existing?.id ?? createId('budget'),
       scope: 'category',
       categoryId: cat.id,
       categoryName: cat.name,

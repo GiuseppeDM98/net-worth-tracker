@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Check } from 'lucide-react';
+import { createId } from '@/lib/utils/idHelpers';
 
 interface GoalFormDialogProps {
   open: boolean;
@@ -145,7 +146,7 @@ export function GoalFormDialog({
       const now = Timestamp.now();
       const parsedTarget = targetAmount ? parseFloat(targetAmount) : undefined;
       const goalData: InvestmentGoal = {
-        id: goal?.id || crypto.randomUUID(),
+        id: goal?.id || createId('goal'),
         name: name.trim(),
         targetAmount: parsedTarget && parsedTarget > 0 ? parsedTarget : undefined,
         targetDate: targetDate || undefined,

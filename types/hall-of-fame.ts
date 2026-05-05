@@ -33,7 +33,7 @@ export type HallOfFameSectionKey =
  * - Max ~100-200 notes expected per user (no pagination needed)
  */
 export interface HallOfFameNote {
-  id: string; // UUID generated with crypto.randomUUID() (RFC 4122)
+  id: string; // Generated client-side with createId()
   text: string; // Note text (max 500 characters)
   sections: HallOfFameSectionKey[]; // Ranking sections where this note should appear
   year: number; // Year in Italy timezone (via getItalyYear)

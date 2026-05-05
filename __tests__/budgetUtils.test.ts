@@ -16,6 +16,7 @@ import {
   getDefaultMonthlyAmount,
   buildBudgetComparison,
 } from '@/lib/utils/budgetUtils';
+import { createId } from '@/lib/utils/idHelpers';
 import type { Expense } from '@/types/expenses';
 import type { BudgetItem } from '@/types/budget';
 
@@ -25,7 +26,7 @@ import type { BudgetItem } from '@/types/budget';
 
 function makeExpense(overrides: Partial<Expense> & { amount: number; date: Date }): Expense {
   return {
-    id: crypto.randomUUID(),
+    id: createId('expense'),
     userId: 'u1',
     type: 'fixed',
     categoryId: 'cat1',
