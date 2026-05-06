@@ -69,6 +69,8 @@ export async function POST(request: NextRequest) {
       illiquidNetWorth,
       byAssetClass,
       byAsset,
+      byOwnershipProfile,
+      byParticipant,
       assetAllocation,
     } = body;
 
@@ -171,6 +173,8 @@ export async function POST(request: NextRequest) {
       illiquidNetWorth,
       byAssetClass,
       byAsset: byAsset || [],
+      byOwnershipProfile: byOwnershipProfile || {},
+      byParticipant: byParticipant || {},
       assetAllocation,
       createdAt: Timestamp.now(),
     };

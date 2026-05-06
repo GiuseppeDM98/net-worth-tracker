@@ -11,12 +11,14 @@ import {
 } from '@/lib/services/assetService';
 import { calculateCurrentAllocation } from '@/lib/services/assetAllocationService';
 import { updateUserAssetPrices } from '@/lib/helpers/priceUpdater';
+import { buildOwnershipSnapshotBreakdown, getDefaultHouseholdConfig } from '@/lib/utils/householdUtils';
 import {
   assertSameUser,
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
 import { invalidateDashboardOverviewSummaryServer } from '@/lib/services/dashboardOverviewInvalidation.server';
+import type { HouseholdConfig } from '@/types/household';
 
 const SNAPSHOTS_COLLECTION = 'monthly-snapshots';
 
@@ -31,15 +33,27 @@ function buildAllocationPercentages(
   return result;
 }
 
-function buildByAssetBreakdown(assets: Asset[]) {
-  return assets.map((asset) => ({
-    assetId: asset.id,
-    ticker: asset.ticker,
-    name: asset.name,
-    quantity: asset.quantity,
-    price: asset.currentPrice,
-    totalValue: calculateAssetValue(asset),
-  }));
+async function getHouseholdConfigForSnapshot(userId: string): Promise<HouseholdConfig> {
+  const fallback = getDefaultHouseholdConfig(userId);
+
+  try {
+    const snapshot = await adminDb.collection('householdConfigs').doc(userId).get();
+    if (!snapshot.exists) {
+      return fallback;
+    }
+
+    const data = snapshot.data() as Partial<HouseholdConfig>;
+    return {
+      ...fallback,
+      ...data,
+      userId,
+      participants: data.participants?.length ? data.participants : fallback.participants,
+      profiles: data.profiles?.length ? data.profiles : fallback.profiles,
+      attributionRules: data.attributionRules ?? [],
+    };
+  } catch {
+    return fallback;
+  }
 }
 
 /**
@@ -178,7 +192,12 @@ export async function POST(request: NextRequest) {
     //   - assetAllocation: percentages for allocation drift charts over time
     // Kept percentages for backward compatibility (early versions stored only percentages).
     const assetAllocation = buildAllocationPercentages(allocation.byAssetClass, totalNetWorth);
-    const byAsset = buildByAssetBreakdown(assets);
+    const householdConfig = await getHouseholdConfigForSnapshot(userId);
+    const ownershipBreakdown = buildOwnershipSnapshotBreakdown(
+      assets,
+      calculateAssetValue,
+      householdConfig
+    );
 
     const snapshotId = `${userId}-${snapshotYear}-${snapshotMonth}`;
 
@@ -199,7 +218,9 @@ export async function POST(request: NextRequest) {
       illiquidNetWorth,
       fireNetWorth,
       byAssetClass: allocation.byAssetClass,
-      byAsset,
+      byAsset: ownershipBreakdown.byAsset,
+      byOwnershipProfile: ownershipBreakdown.byOwnershipProfile,
+      byParticipant: ownershipBreakdown.byParticipant,
       assetAllocation,
       createdAt: Timestamp.now(),
     };

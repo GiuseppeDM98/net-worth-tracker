@@ -1,4 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
+import type { InternalTransferPurpose } from './household';
 
 export type InvestmentOperationType = 'buy' | 'sell' | 'contribution' | 'withdrawal' | 'fee' | 'tax';
 
@@ -73,6 +74,7 @@ export interface InternalTransfer {
   currency: string;
   date: Date | Timestamp;
   fees?: number;
+  purpose?: InternalTransferPurpose;
   notes?: string;
   linkedExpenseId?: string;
   createdAt: Date | Timestamp;
@@ -86,6 +88,7 @@ export interface InternalTransferFormData {
   currency?: string;
   date: Date;
   fees?: number;
+  purpose?: InternalTransferPurpose;
   notes?: string;
   linkedExpenseId?: string;
 }

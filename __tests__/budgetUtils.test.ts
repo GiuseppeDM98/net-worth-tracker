@@ -120,6 +120,35 @@ describe('getActualForItem — category scope', () => {
     const otherCat: BudgetItem = { id: 'x', scope: 'category', categoryId: 'cat2', monthlyAmount: 0, order: 0 };
     expect(getActualForItem(otherCat, EXPENSES, 2025)).toBeCloseTo(200);
   });
+
+  it('filters actuals by attribution profile when the budget item is scoped to a profile', () => {
+    const attributedExpenses: Expense[] = [
+      makeExpense({
+        type: 'variable',
+        categoryId: 'cat2',
+        amount: -120,
+        date: new Date(2025, 0, 10),
+        attributionProfileId: 'comune-50-50',
+      }),
+      makeExpense({
+        type: 'variable',
+        categoryId: 'cat2',
+        amount: -80,
+        date: new Date(2025, 0, 12),
+        attributionProfileId: 'self-100',
+      }),
+    ];
+    const item: BudgetItem = {
+      id: 'attr-budget',
+      scope: 'category',
+      categoryId: 'cat2',
+      monthlyAmount: 100,
+      attributionProfileId: 'comune-50-50',
+      order: 0,
+    };
+
+    expect(getActualForItem(item, attributedExpenses, 2025)).toBeCloseTo(120);
+  });
 });
 
 describe('getActualForItem — subcategory scope', () => {

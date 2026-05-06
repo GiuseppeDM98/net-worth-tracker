@@ -22,14 +22,15 @@ const SECTION_ORDER: Record<string, number> = { fixed: 0, variable: 1, debt: 2, 
  * Stable composite key for a budget item used for deduplication and lookups.
  * Exported so both the component and autoInit can use the same key logic.
  */
-export function budgetItemKey(item: Pick<BudgetItem, 'scope' | 'expenseType' | 'categoryId' | 'subCategoryId'>): string {
+export function budgetItemKey(item: Pick<BudgetItem, 'scope' | 'expenseType' | 'categoryId' | 'subCategoryId' | 'attributionProfileId'>): string {
+  const attributionSuffix = item.attributionProfileId ? `-attr-${item.attributionProfileId}` : '';
   switch (item.scope) {
     case 'type':
-      return `type-${item.expenseType}`;
+      return `type-${item.expenseType}${attributionSuffix}`;
     case 'category':
-      return `cat-${item.categoryId}`;
+      return `cat-${item.categoryId}${attributionSuffix}`;
     case 'subcategory':
-      return `sub-${item.categoryId}-${item.subCategoryId}`;
+      return `sub-${item.categoryId}-${item.subCategoryId}${attributionSuffix}`;
   }
 }
 
@@ -43,6 +44,10 @@ export function budgetItemKey(item: Pick<BudgetItem, 'scope' | 'expenseType' | '
  * so income categories are tracked correctly alongside spending categories.
  */
 function expenseMatchesItem(expense: Expense, item: BudgetItem): boolean {
+  if (item.attributionProfileId && expense.attributionProfileId !== item.attributionProfileId) {
+    return false;
+  }
+
   switch (item.scope) {
     case 'type':
       // Type-scope budgets are spending-only: skip income and positive amounts
@@ -255,7 +260,7 @@ export function autoInitBudgetItems(
   const orderCounter: Record<string, number> = {};
 
   const categoryItems: BudgetItem[] = spendingCategories.map((cat) => {
-    const key = `cat-${cat.id}`;
+    const key = budgetItemKey({ scope: 'category', categoryId: cat.id });
     const existing = existingByKey.get(key);
     const sectionOrder = (orderCounter[cat.type] ?? 0);
     orderCounter[cat.type] = sectionOrder + 1;

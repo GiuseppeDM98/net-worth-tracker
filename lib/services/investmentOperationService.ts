@@ -12,7 +12,9 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
+import { appendHouseholdAuditEntrySafe } from '@/lib/services/householdService';
 import { Asset } from '@/types/assets';
+import { INTERNAL_TRANSFER_PURPOSE_LABELS } from '@/types/household';
 import {
   InternalTransfer,
   InternalTransferFormData,
@@ -459,6 +461,7 @@ export async function createInternalTransfer(
       currency: input.currency || fromAsset.currency || 'EUR',
       date: Timestamp.fromDate(input.date),
       fees,
+      purpose: input.purpose ?? 'neutral_transfer',
       notes: input.notes,
       linkedExpenseId: input.linkedExpenseId,
       createdAt: now,
@@ -469,6 +472,18 @@ export async function createInternalTransfer(
   });
 
   await invalidateDashboardOverviewSummary(userId, 'internal_transfer_created');
+  appendHouseholdAuditEntrySafe(userId, {
+    entityType: 'internalTransfer',
+    entityId: transferId,
+    action: 'create',
+    summary: `Trasferimento creato: ${INTERNAL_TRANSFER_PURPOSE_LABELS[input.purpose ?? 'neutral_transfer']}`,
+    after: {
+      fromCashAssetId: input.fromCashAssetId,
+      toCashAssetId: input.toCashAssetId,
+      amount: input.amount,
+      purpose: input.purpose ?? 'neutral_transfer',
+    },
+  });
   return transferId;
 }
 
@@ -545,6 +560,7 @@ export async function updateInternalTransfer(
       currency: input.currency || fromAsset?.currency || 'EUR',
       date: Timestamp.fromDate(input.date),
       fees,
+      purpose: input.purpose ?? 'neutral_transfer',
       notes: input.notes || deleteField(),
       updatedAt: now,
     }));
@@ -552,6 +568,18 @@ export async function updateInternalTransfer(
 
   if (userId) {
     await invalidateDashboardOverviewSummary(userId, 'internal_transfer_updated');
+    appendHouseholdAuditEntrySafe(userId, {
+      entityType: 'internalTransfer',
+      entityId: transferId,
+      action: 'update',
+      summary: `Trasferimento aggiornato: ${INTERNAL_TRANSFER_PURPOSE_LABELS[input.purpose ?? 'neutral_transfer']}`,
+      after: {
+        fromCashAssetId: input.fromCashAssetId,
+        toCashAssetId: input.toCashAssetId,
+        amount: input.amount,
+        purpose: input.purpose ?? 'neutral_transfer',
+      },
+    });
   }
 }
 
@@ -615,6 +643,12 @@ export async function deleteInternalTransfer(transferId: string): Promise<void> 
 
   if (userId) {
     await invalidateDashboardOverviewSummary(userId, 'internal_transfer_deleted');
+    appendHouseholdAuditEntrySafe(userId, {
+      entityType: 'internalTransfer',
+      entityId: transferId,
+      action: 'delete',
+      summary: `Trasferimento eliminato: ${transferId}`,
+    });
   } else {
     await deleteDoc(transferRef).catch(() => undefined);
   }

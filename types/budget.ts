@@ -1,5 +1,6 @@
 import { Timestamp } from 'firebase/firestore';
 import { ExpenseType } from './expenses';
+import type { OwnershipSplit } from './household';
 
 // Budget feature types
 //
@@ -25,6 +26,9 @@ export interface BudgetItem {
   subCategoryId?: string;
   subCategoryName?: string; // denormalized fallback
   monthlyAmount: number; // positive EUR amount set by user
+  attributionProfileId?: string;
+  attributionProfileName?: string;
+  attributionSplits?: OwnershipSplit[];
   // Sort order within the item's section (expense type group)
   order: number;
 }

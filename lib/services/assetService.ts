@@ -17,6 +17,7 @@ import {
 import { db } from '@/lib/firebase/config';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
+import { appendHouseholdAuditEntrySafe } from '@/lib/services/householdService';
 import { Asset, AssetFormData } from '@/types/assets';
 
 const ASSETS_COLLECTION = 'assets';
@@ -222,6 +223,17 @@ export async function createAsset(
       const assetRef = doc(db, ASSETS_COLLECTION, assetId);
       await setDoc(assetRef, cleanedData);
       await invalidateDashboardOverviewSummary(userId, 'asset_created');
+      appendHouseholdAuditEntrySafe(userId, {
+        entityType: 'asset',
+        entityId: assetId,
+        action: 'create',
+        summary: `Asset creato: ${assetData.name}`,
+        after: {
+          name: assetData.name,
+          ownershipProfileId: assetData.ownershipProfileId,
+          ownershipProfileName: assetData.ownershipProfileName,
+        },
+      });
       console.log('Asset created with existing ID', {
         userId,
         assetId,
@@ -231,6 +243,17 @@ export async function createAsset(
       // Generate new ID
       const docRef = await addDoc(assetsRef, cleanedData);
       await invalidateDashboardOverviewSummary(userId, 'asset_created');
+      appendHouseholdAuditEntrySafe(userId, {
+        entityType: 'asset',
+        entityId: docRef.id,
+        action: 'create',
+        summary: `Asset creato: ${assetData.name}`,
+        after: {
+          name: assetData.name,
+          ownershipProfileId: assetData.ownershipProfileId,
+          ownershipProfileName: assetData.ownershipProfileName,
+        },
+      });
       console.log('Asset created with new ID', {
         userId,
         assetId: docRef.id,
@@ -283,6 +306,20 @@ export async function updateAsset(
     const userId = existingAsset.data()?.userId;
     if (userId) {
       await invalidateDashboardOverviewSummary(userId, 'asset_updated');
+      appendHouseholdAuditEntrySafe(userId, {
+        entityType: 'asset',
+        entityId: assetId,
+        action: 'update',
+        summary: `Asset aggiornato: ${updates.name ?? existingAsset.data()?.name ?? assetId}`,
+        before: {
+          ownershipProfileId: existingAsset.data()?.ownershipProfileId,
+          ownershipProfileName: existingAsset.data()?.ownershipProfileName,
+        },
+        after: {
+          ownershipProfileId: updates.ownershipProfileId,
+          ownershipProfileName: updates.ownershipProfileName,
+        },
+      });
     }
   } catch (error) {
     console.error('Failed to update asset', {

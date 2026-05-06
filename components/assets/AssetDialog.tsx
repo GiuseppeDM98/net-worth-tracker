@@ -33,7 +33,7 @@
  */
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -41,6 +41,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { Asset, AssetFormData, AssetType, AssetClass, AssetAllocationTarget, AssetComposition, CouponFrequency, BondDetails, CouponRateTier, PensionFundDetails } from '@/types/assets';
 import { createAsset, updateAsset } from '@/lib/services/assetService';
+import { useHouseholdConfig } from '@/lib/hooks/useHousehold';
+import { getDefaultProfile, getEffectiveOwnershipProfiles, isHouseholdEnabled, profileToAssignment } from '@/lib/utils/householdUtils';
+import { DEFAULT_PROFILE_SELF_ID } from '@/types/household';
 import { getNextCouponDate, calculateCouponPerShare, getApplicableCouponRate } from '@/lib/utils/couponUtils';
 import { getTargets, addSubCategory } from '@/lib/services/assetAllocationService';
 import {
@@ -379,6 +382,7 @@ const assetSchema = z.object({
   pensionFundLine: z.string().optional(),
   pensionMembershipDate: z.string().optional(),
   pensionExpectedRetirementDate: z.string().optional(),
+  ownershipProfileId: z.string().optional(),
 });
 
 type AssetFormValues = z.infer<typeof assetSchema>;
@@ -411,6 +415,7 @@ const assetClasses: { value: AssetClass; label: string }[] = [
 
 export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
   const { user } = useAuth();
+  const { data: householdConfig } = useHouseholdConfig(user?.uid);
   const [fetchingPrice, setFetchingPrice] = useState(false);
   const [allocationTargets, setAllocationTargets] = useState<AssetAllocationTarget | null>(null);
   const [loadingTargets, setLoadingTargets] = useState(false);
@@ -444,6 +449,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
       isComposite: false,
       outstandingDebt: undefined,
       isPrimaryResidence: false,
+      ownershipProfileId: DEFAULT_PROFILE_SELF_ID,
     },
   });
 
@@ -471,6 +477,14 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
     ? 'Borsa Italiana'
     : 'Yahoo Finance';
   const watchIsComposite = watch('isComposite');
+  const householdEnabled = isHouseholdEnabled(householdConfig);
+  const defaultOwnershipProfileId = householdEnabled
+    ? householdConfig?.defaultAssetProfileId || DEFAULT_PROFILE_SELF_ID
+    : DEFAULT_PROFILE_SELF_ID;
+  const ownershipProfiles = useMemo(
+    () => (householdEnabled ? getEffectiveOwnershipProfiles(householdConfig) : []),
+    [householdConfig, householdEnabled]
+  );
 
   // Set intelligent defaults for isLiquid and autoUpdatePrice based on asset class
   // Why intelligent defaults? Reduces user errors and form friction.
@@ -592,6 +606,9 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         pensionFundLine: asset.pensionFundDetails?.fundLine || '',
         pensionMembershipDate: asset.pensionFundDetails?.membershipDate || '',
         pensionExpectedRetirementDate: asset.pensionFundDetails?.expectedRetirementDate || '',
+        ownershipProfileId: householdEnabled
+          ? asset.ownershipProfileId || defaultOwnershipProfileId
+          : DEFAULT_PROFILE_SELF_ID,
       });
 
       if (asset.composition && asset.composition.length > 0) {
@@ -662,6 +679,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         pensionFundLine: '',
         pensionMembershipDate: '',
         pensionExpectedRetirementDate: '',
+        ownershipProfileId: defaultOwnershipProfileId,
       });
       setComposition([]);
       setIsComposite(false);
@@ -673,7 +691,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
       setShowCostCalculator(false);
       setBrokerEntries([{ qty: '', price: '' }]);
     }
-  }, [asset, reset]);
+  }, [asset, defaultOwnershipProfileId, householdEnabled, householdConfig, reset]);
 
   // Get available sub-categories for the selected asset class
   const availableSubCategories = (): string[] => {
@@ -874,10 +892,16 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
       // Step 2: Assemble bond details and full form payload
       const bondDetailsValue = buildBondDetailsFromForm(data, showBondDetails, showStepUp);
       const pensionFundDetailsValue = buildPensionFundDetailsFromForm(data);
+      const ownershipAssignment = profileToAssignment(
+        getDefaultProfile(householdConfig, data.ownershipProfileId || defaultOwnershipProfileId)
+      );
       const formData: AssetFormData = {
         ...buildAssetFormDataFromValues(data, currentPrice, fetchedCurrentPriceEur, isComposite, composition, isBondWithIsin),
         bondDetails: bondDetailsValue,
         pensionFundDetails: pensionFundDetailsValue,
+        ownershipProfileId: ownershipAssignment.profileId,
+        ownershipProfileName: ownershipAssignment.profileName,
+        ownershipSplits: ownershipAssignment.splits,
       };
 
       // Step 3: Persist asset
@@ -1100,6 +1124,30 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                   </SelectContent>
                 </Select>
               )}
+            </div>
+          )}
+
+          {householdEnabled && ownershipProfiles.length > 1 && (
+            <div className="space-y-2">
+              <Label htmlFor="ownershipProfileId">Proprietà</Label>
+              <Select
+                value={watch('ownershipProfileId') || defaultOwnershipProfileId}
+                onValueChange={(value) => setValue('ownershipProfileId', value)}
+              >
+                <SelectTrigger id="ownershipProfileId">
+                  <SelectValue placeholder="Seleziona proprietà" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ownershipProfiles.map((profile) => (
+                    <SelectItem key={profile.id} value={profile.id}>
+                      {profile.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Usata per dividere patrimonio, conti di pagamento e snapshot tra i partecipanti.
+              </p>
             </div>
           )}
 

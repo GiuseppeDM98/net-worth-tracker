@@ -24,7 +24,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
-import { Wallet, Receipt, TrendingUp, BarChart3, Coins, Target, Layers, ArrowRightLeft, ChartCandlestick } from 'lucide-react';
+import { Wallet, Receipt, TrendingUp, BarChart3, Coins, Target, Layers, ArrowRightLeft, ChartCandlestick, Scale } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ExpenseTrackingTab } from '@/components/cashflow/ExpenseTrackingTab';
@@ -35,10 +35,12 @@ import { BudgetTab } from '@/components/cashflow/BudgetTab';
 import { CostCentersTab } from '@/components/cashflow/CostCentersTab';
 import { InternalTransfersTab } from '@/components/cashflow/InternalTransfersTab';
 import { InvestmentOperationsTab } from '@/components/cashflow/InvestmentOperationsTab';
+import { CompensationsTab } from '@/components/cashflow/CompensationsTab';
 import { useAuth } from '@/contexts/AuthContext';
 import { Dividend } from '@/types/dividend';
 import { Asset } from '@/types/assets';
 import { useExpenses, useExpenseCategories } from '@/lib/hooks/useExpenses';
+import { useHouseholdConfig } from '@/lib/hooks/useHousehold';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { getAllAssets } from '@/lib/services/assetService';
 import { getSettings } from '@/lib/services/assetAllocationService';
@@ -62,6 +64,8 @@ export default function CashflowPage() {
   // React Query hooks for expenses and categories
   const { data: allExpenses = [], isLoading: expensesLoading } = useExpenses(user?.uid);
   const { data: categories = [], isLoading: categoriesLoading } = useExpenseCategories(user?.uid);
+  const { data: householdConfig, isLoading: householdLoading } = useHouseholdConfig(user?.uid);
+  const householdEnabled = householdConfig?.enabled === true;
 
   const [cashflowHistoryStartYear, setCashflowHistoryStartYear] = useState<number>(2025);
 
@@ -111,6 +115,12 @@ export default function CashflowPage() {
     }
   }, [user, mountedTabs, otherDataLoaded]);
 
+  useEffect(() => {
+    if (!householdLoading && !householdEnabled && activeTab === 'compensations') {
+      setActiveTab('tracking');
+    }
+  }, [activeTab, householdEnabled, householdLoading]);
+
   // Load cashflow history start year from user settings (one-time read per session)
   useEffect(() => {
     if (!user) return;
@@ -153,9 +163,14 @@ export default function CashflowPage() {
   };
 
   const handleTabChange = (value: string) => {
+    if (value === 'compensations' && !householdEnabled) return;
     setActiveTab(value);
     setMountedTabs(prev => new Set(prev).add(value));
   };
+
+  const desktopTabCount = 7 + (householdEnabled ? 1 : 0) + (costCentersEnabled ? 1 : 0);
+  const desktopTabGridClass =
+    desktopTabCount === 9 ? 'grid-cols-9' : desktopTabCount === 8 ? 'grid-cols-8' : 'grid-cols-7';
 
   return (
     <div className="space-y-6 p-4 desktop:p-8 max-desktop:portrait:pb-20">
@@ -187,6 +202,9 @@ export default function CashflowPage() {
               <SelectItem value="total-history">Storico Totale</SelectItem>
               <SelectItem value="budget">Budget</SelectItem>
               <SelectItem value="transfers">Trasferimenti</SelectItem>
+              {householdEnabled && (
+                <SelectItem value="compensations">Compensazioni</SelectItem>
+              )}
               {costCentersEnabled && (
                 <SelectItem value="cost-centers">Centri di Costo</SelectItem>
               )}
@@ -201,7 +219,7 @@ export default function CashflowPage() {
           // Placeholder that matches the TabsList height while settings load
           <div className="hidden desktop:block h-10 w-full max-w-5xl rounded-md bg-muted animate-pulse" />
         ) : (
-          <TabsList className={`hidden desktop:grid w-full max-w-6xl ${costCentersEnabled ? 'grid-cols-8' : 'grid-cols-7'}`}>
+          <TabsList className={`hidden desktop:grid w-full max-w-6xl ${desktopTabGridClass}`}>
             <TabsTrigger value="tracking" className="flex min-w-0 items-center gap-1.5 px-2">
               <Receipt className="h-4 w-4" />
               <span className="min-w-0 truncate">Tracciamento</span>
@@ -230,6 +248,12 @@ export default function CashflowPage() {
               <ArrowRightLeft className="h-4 w-4" />
               <span className="min-w-0 truncate">Trasferimenti</span>
             </TabsTrigger>
+            {householdEnabled && (
+              <TabsTrigger value="compensations" className="flex min-w-0 items-center gap-1.5 px-2">
+                <Scale className="h-4 w-4" />
+                <span className="min-w-0 truncate">Compensazioni</span>
+              </TabsTrigger>
+            )}
             {costCentersEnabled && (
               <TabsTrigger value="cost-centers" className="flex min-w-0 items-center gap-1.5 px-2">
                 <Layers className="h-4 w-4" />
@@ -341,6 +365,21 @@ export default function CashflowPage() {
               variants={tabPanelSwitch}
             >
               <InternalTransfersTab />
+            </motion.div>
+          </TabsContent>
+        )}
+        {householdEnabled && mountedTabs.has('compensations') && (
+          <TabsContent value="compensations" className="mt-6" forceMount>
+            <motion.div
+              initial={false}
+              animate={activeTab === 'compensations' ? 'visible' : 'hidden'}
+              variants={tabPanelSwitch}
+            >
+              <CompensationsTab
+                allExpenses={allExpenses}
+                loading={loading}
+                historyStartYear={cashflowHistoryStartYear}
+              />
             </motion.div>
           </TabsContent>
         )}

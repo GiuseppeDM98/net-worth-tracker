@@ -32,6 +32,9 @@ import { chartShellSettle, fadeVariants, slideDown } from '@/lib/utils/motionVar
 import { Expense, ExpenseCategory, ExpenseType } from '@/types/expenses';
 import { BudgetItem } from '@/types/budget';
 import { getBudgetConfig, saveBudgetConfig } from '@/lib/services/budgetService';
+import { appendHouseholdAuditEntrySafe } from '@/lib/services/householdService';
+import { useHouseholdConfig } from '@/lib/hooks/useHousehold';
+import { getEffectiveOwnershipProfiles, isHouseholdEnabled, profileToAssignment } from '@/lib/utils/householdUtils';
 import {
   buildBudgetComparison,
   getDefaultMonthlyAmount,
@@ -211,6 +214,13 @@ export function BudgetTab({
   const controlClassName = 'transition-colors duration-200 border-border/70 hover:border-primary/40 focus-visible:ring-primary/30 data-[placeholder]:text-muted-foreground';
   const currentYear = getItalyYear();
   const currentMonth = getItalyMonth();
+  const { data: householdConfig } = useHouseholdConfig(userId);
+  const householdEnabled = isHouseholdEnabled(householdConfig);
+  const householdProfiles = useMemo(
+    () => (householdEnabled ? getEffectiveOwnershipProfiles(householdConfig) : []),
+    [householdConfig, householdEnabled]
+  );
+  const [selectedAttributionProfileId, setSelectedAttributionProfileId] = useState('__all__');
 
   // Raw saved items from Firestore (may be empty on first load)
   const [savedItems, setSavedItems] = useState<BudgetItem[]>([]);
@@ -279,6 +289,17 @@ export function BudgetTab({
     return () => clearTimeout(timeout);
   }, [selectedItemKey]);
 
+  useEffect(() => {
+    setSelectedItemKey(null);
+    setMobileDetailItemId(null);
+  }, [selectedAttributionProfileId]);
+
+  useEffect(() => {
+    if (!householdEnabled && selectedAttributionProfileId !== '__all__') {
+      setSelectedAttributionProfileId('__all__');
+    }
+  }, [householdEnabled, selectedAttributionProfileId]);
+
   // Derive display items: auto-init merges saved amounts with live categories.
   // Runs on every render so new categories appear without an explicit save.
   const displayItems = useMemo(
@@ -286,10 +307,23 @@ export function BudgetTab({
     [categories, allExpenses, historyStartYear, savedItems]
   );
 
+  const budgetViewItems = useMemo(() => {
+    if (selectedAttributionProfileId === '__all__') return displayItems;
+    const profile = householdProfiles.find((item) => item.id === selectedAttributionProfileId);
+    if (!profile) return displayItems;
+    const assignment = profileToAssignment(profile);
+    return displayItems.map((item) => ({
+      ...item,
+      attributionProfileId: assignment.profileId,
+      attributionProfileName: assignment.profileName,
+      attributionSplits: assignment.splits,
+    }));
+  }, [displayItems, householdProfiles, selectedAttributionProfileId]);
+
   // Build comparisons for all display items
   const comparisons = useMemo(
-    () => displayItems.map((item) => buildBudgetComparison(item, allExpenses, currentYear, historyStartYear)),
-    [displayItems, allExpenses, currentYear, historyStartYear]
+    () => budgetViewItems.map((item) => buildBudgetComparison(item, allExpenses, currentYear, historyStartYear)),
+    [budgetViewItems, allExpenses, currentYear, historyStartYear]
   );
 
   // Year-by-year breakdown for the selected item (or aggregate key).
@@ -311,17 +345,17 @@ export function BudgetTab({
       let isIncome: boolean;
 
       if (selectedItemKey === TOTAL_EXPENSES_KEY) {
-        aggItems = displayItems.filter(i => (getItemSectionType(i, categories) as string) !== 'income');
+        aggItems = budgetViewItems.filter(i => (getItemSectionType(i, categories) as string) !== 'income');
         label = 'Totale Spese';
         isIncome = false;
       } else if (selectedItemKey === TOTAL_INCOME_KEY) {
-        aggItems = displayItems.filter(i => (getItemSectionType(i, categories) as string) === 'income');
+        aggItems = budgetViewItems.filter(i => (getItemSectionType(i, categories) as string) === 'income');
         label = 'Totale Entrate';
         isIncome = true;
       } else {
         // Strip __subtotal_ prefix (11 chars) and __ suffix (2 chars)
         const sectionType = selectedItemKey.slice(11, -2);
-        aggItems = displayItems.filter(i => getItemSectionType(i, categories) === sectionType);
+        aggItems = budgetViewItems.filter(i => getItemSectionType(i, categories) === sectionType);
         const section = SECTIONS.find(s => s.type === sectionType);
         label = `Subtotale ${section?.label ?? sectionType}`;
         isIncome = section?.isIncome ?? false;
@@ -349,7 +383,7 @@ export function BudgetTab({
       };
     }
 
-    const item = displayItems.find((i) => budgetItemKey(i) === selectedItemKey);
+    const item = budgetViewItems.find((i) => budgetItemKey(i) === selectedItemKey);
     if (!item) return null;
     const isIncome = (getItemSectionType(item, categories) as string) === 'income';
     const years: number[] = [];
@@ -366,7 +400,7 @@ export function BudgetTab({
         budgetAnnual: item.monthlyAmount * 12,
       })),
     };
-  }, [selectedItemKey, displayItems, allExpenses, historyStartYear, currentYear, categories]);
+  }, [selectedItemKey, budgetViewItems, allExpenses, historyStartYear, currentYear, categories]);
 
   // ==================== Grouping helpers ====================
 
@@ -498,6 +532,13 @@ export function BudgetTab({
     setSaving(true);
     try {
       await saveBudgetConfig(userId, draftItems);
+      appendHouseholdAuditEntrySafe(userId, {
+        entityType: 'budget',
+        entityId: userId,
+        action: 'update',
+        summary: 'Budget aggiornato',
+        after: { itemCount: draftItems.length },
+      });
       setSavedItems(draftItems);
       setIsEditing(false);
       setDraftItems([]);
@@ -544,8 +585,8 @@ export function BudgetTab({
     // Separate totals for expenses vs income.
     // getItemSectionType return type excludes 'income' but at runtime income categories return 'income' — cast to string for comparison.
     const isIncomeItem = (item: BudgetItem) => (getItemSectionType(item, categories) as string) === 'income';
-    const expenseItems = displayItems.filter(i => !isIncomeItem(i));
-    const incomeItems = displayItems.filter(i => isIncomeItem(i));
+    const expenseItems = budgetViewItems.filter(i => !isIncomeItem(i));
+    const incomeItems = budgetViewItems.filter(i => isIncomeItem(i));
     const expenseComparisons = comparisons.filter(c => !isIncomeItem(c.item));
     const incomeComparisons = comparisons.filter(c => isIncomeItem(c.item));
 
@@ -610,7 +651,7 @@ export function BudgetTab({
           </TableHeader>
           <TableBody>
             {SECTIONS.map(({ type: sectionType, label: sectionLabel, isIncome }) => {
-              const items = sectionItems(displayItems, sectionType);
+              const items = sectionItems(budgetViewItems, sectionType);
               if (items.length === 0) return null;
 
               const isCollapsed = collapsedSections.has(sectionType);
@@ -1009,7 +1050,7 @@ export function BudgetTab({
             the same Anno × Gen…Dic structure as the aggregate table above, so the
             user can spot high-spend months per category at a glance. */}
         {selectedItemKey === TOTAL_EXPENSES_KEY && SECTIONS.filter(s => !s.isIncome).map(section => {
-          const secItems = sectionItems(displayItems, section.type);
+          const secItems = sectionItems(budgetViewItems, section.type);
           if (secItems.length === 0) return null;
 
           const secBudgetAnnual = secItems.reduce((s, i) => s + i.monthlyAmount * 12, 0);
@@ -1362,8 +1403,8 @@ export function BudgetTab({
     const compMap = new Map(comparisons.map((c) => [c.item.id, c]));
 
     const isIncomeItem = (item: BudgetItem) => (getItemSectionType(item, categories) as string) === 'income';
-    const expenseItems = displayItems.filter(i => !isIncomeItem(i));
-    const incomeItems = displayItems.filter(i => isIncomeItem(i));
+    const expenseItems = budgetViewItems.filter(i => !isIncomeItem(i));
+    const incomeItems = budgetViewItems.filter(i => isIncomeItem(i));
     const expenseComparisons = comparisons.filter(c => !isIncomeItem(c.item));
     const incomeComparisons = comparisons.filter(c => isIncomeItem(c.item));
 
@@ -1378,7 +1419,7 @@ export function BudgetTab({
     const totalIncBudgetMonthly = incomeItems.reduce((s, i) => s + i.monthlyAmount, 0);
 
     // Detail dialog data
-    const detailItem = mobileDetailItemId ? displayItems.find(i => i.id === mobileDetailItemId) : null;
+    const detailItem = mobileDetailItemId ? budgetViewItems.find(i => i.id === mobileDetailItemId) : null;
     const detailComp = mobileDetailItemId ? comparisons.find(c => c.item.id === mobileDetailItemId) : null;
     const detailIsIncome = detailItem ? (getItemSectionType(detailItem, categories) as string) === 'income' : false;
 
@@ -1386,7 +1427,7 @@ export function BudgetTab({
       <>
         <div className="space-y-4">
           {SECTIONS.map(({ type: sectionType, label: sectionLabel, isIncome }) => {
-            const items = sectionItems(displayItems, sectionType);
+            const items = sectionItems(budgetViewItems, sectionType);
             if (items.length === 0) return null;
 
             const isCollapsed = collapsedSections.has(sectionType);
@@ -1612,7 +1653,22 @@ export function BudgetTab({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {!isEditing && householdEnabled && householdProfiles.length > 1 && (
+            <Select value={selectedAttributionProfileId} onValueChange={setSelectedAttributionProfileId}>
+              <SelectTrigger className={cn('h-9 w-[190px] text-sm', controlClassName)}>
+                <SelectValue placeholder="Attribuzione" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Tutte le attribuzioni</SelectItem>
+                {householdProfiles.map((profile) => (
+                  <SelectItem key={profile.id} value={profile.id}>
+                    {profile.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           {!isEditing && (
             <Button variant="outline" size="sm" onClick={handleStartEditing} className="flex items-center gap-1.5 dark:border-gray-600 dark:text-gray-200">
               <Pencil className="h-3.5 w-3.5" />

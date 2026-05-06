@@ -34,7 +34,9 @@ import {
   calculateFIRENetWorth,
 } from './assetService';
 import { calculateCurrentAllocation } from './assetAllocationService';
+import { getHouseholdConfig } from './householdService';
 import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
+import { buildOwnershipSnapshotBreakdown, getDefaultHouseholdConfig } from '@/lib/utils/householdUtils';
 
 const SNAPSHOTS_COLLECTION = 'monthly-snapshots';
 
@@ -80,19 +82,18 @@ export async function createSnapshot(
           : 0;
     });
 
-    const byAsset = assets
-      // Skip assets with no quantity — they would store totalValue: 0 with a valid price,
-      // which corrupts the value history display (snapshots are immutable). Sold assets
-      // (quantity=0) already appear in past snapshots taken while they were held.
-      .filter((asset) => asset.quantity > 0)
-      .map((asset) => ({
-        assetId: asset.id,
-        ticker: asset.ticker,
-        name: asset.name,
-        quantity: asset.quantity,
-        price: asset.currentPrice,
-        totalValue: calculateAssetValue(asset),
-      }));
+    const householdConfig = await getHouseholdConfig(userId).catch((error) => {
+      console.warn('Unable to load household config for snapshot, using personal mode', {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return getDefaultHouseholdConfig(userId);
+    });
+    const ownershipBreakdown = buildOwnershipSnapshotBreakdown(
+      assets,
+      calculateAssetValue,
+      householdConfig
+    );
 
     const snapshotId = `${userId}-${snapshotYear}-${snapshotMonth}`;
 
@@ -107,7 +108,9 @@ export async function createSnapshot(
       illiquidNetWorth,
       fireNetWorth,
       byAssetClass: allocation.byAssetClass,
-      byAsset,
+      byAsset: ownershipBreakdown.byAsset,
+      byOwnershipProfile: ownershipBreakdown.byOwnershipProfile,
+      byParticipant: ownershipBreakdown.byParticipant,
       assetAllocation,
       createdAt: Timestamp.now(),
     };

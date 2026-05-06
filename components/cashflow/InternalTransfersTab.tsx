@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/contexts/AuthContext';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useInternalTransfers } from '@/lib/hooks/useInvestmentOperations';
+import { useHouseholdConfig } from '@/lib/hooks/useHousehold';
 import {
   createInternalTransfer,
   deleteInternalTransfer,
@@ -20,18 +21,26 @@ import {
 import { queryKeys } from '@/lib/query/queryKeys';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import { toDate } from '@/lib/utils/dateHelpers';
+import { isHouseholdEnabled } from '@/lib/utils/householdUtils';
+import {
+  INTERNAL_TRANSFER_PURPOSE_LABELS,
+  type InternalTransferPurpose,
+} from '@/types/household';
 
 export function InternalTransfersTab() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { data: assets = [] } = useAssets(user?.uid);
   const { data: transfers = [], isLoading } = useInternalTransfers(user?.uid);
+  const { data: householdConfig } = useHouseholdConfig(user?.uid);
+  const householdEnabled = isHouseholdEnabled(householdConfig);
   const cashAssets = useMemo(() => assets.filter(asset => asset.assetClass === 'cash'), [assets]);
 
   const [fromCashAssetId, setFromCashAssetId] = useState('__none__');
   const [toCashAssetId, setToCashAssetId] = useState('__none__');
   const [amount, setAmount] = useState('');
   const [fees, setFees] = useState('');
+  const [purpose, setPurpose] = useState<InternalTransferPurpose>('neutral_transfer');
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -53,6 +62,7 @@ export function InternalTransfersTab() {
     setToCashAssetId('__none__');
     setAmount('');
     setFees('');
+    setPurpose('neutral_transfer');
     setNotes('');
   };
 
@@ -85,6 +95,7 @@ export function InternalTransfersTab() {
         toCashAssetId,
         amount: parsedAmount,
         fees: parsedFees,
+        purpose: householdEnabled ? purpose : 'neutral_transfer',
         date: new Date(`${date}T00:00:00`),
         notes: notes.trim() || undefined,
       };
@@ -113,6 +124,7 @@ export function InternalTransfersTab() {
     setToCashAssetId(transfer.toCashAssetId);
     setAmount(String(transfer.amount));
     setFees(transfer.fees ? String(transfer.fees) : '');
+    setPurpose(transfer.purpose ?? 'neutral_transfer');
     setDate(toDate(transfer.date).toISOString().slice(0, 10));
     setNotes(transfer.notes || '');
   };
@@ -188,6 +200,21 @@ export function InternalTransfersTab() {
             <Label>Commissioni</Label>
             <Input type="number" min="0" step="0.01" value={fees} onChange={(event) => setFees(event.target.value)} />
           </div>
+          {householdEnabled && (
+            <div className="space-y-2 desktop:col-span-2">
+              <Label>Tipo</Label>
+              <Select value={purpose} onValueChange={(value) => setPurpose(value as InternalTransferPurpose)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Tipo trasferimento" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(INTERNAL_TRANSFER_PURPOSE_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="space-y-2 desktop:col-span-4">
             <Label>Note</Label>
             <Input value={notes} onChange={(event) => setNotes(event.target.value)} />
@@ -222,6 +249,11 @@ export function InternalTransfersTab() {
                       {transfer.fromCashAssetName} → {transfer.toCashAssetName}
                     </p>
                     <p className="text-xs text-muted-foreground">{formatDate(toDate(transfer.date))}</p>
+                    {householdEnabled && (
+                      <p className="text-xs text-muted-foreground">
+                        {INTERNAL_TRANSFER_PURPOSE_LABELS[transfer.purpose ?? 'neutral_transfer']}
+                      </p>
+                    )}
                     {transfer.notes && (
                       <p className="text-xs text-muted-foreground">{transfer.notes}</p>
                     )}

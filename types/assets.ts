@@ -1,4 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
+import type { OwnershipSplit } from './household';
 
 // AssetType: Granular classification used in UI (stock, ETF, bond, pension fund, etc.)
 // AssetClass: Broad financial categories for allocation analysis (equity, bonds, etc.)
@@ -91,6 +92,9 @@ export interface Asset {
   isin?: string; // ISIN code for dividend scraping (optional)
   bondDetails?: BondDetails; // Optional bond-specific details for coupon scheduling
   pensionFundDetails?: PensionFundDetails; // Optional pension-fund-specific metadata
+  ownershipProfileId?: string;
+  ownershipProfileName?: string;
+  ownershipSplits?: OwnershipSplit[];
   lastPriceUpdate: Date | Timestamp;
   createdAt: Date | Timestamp;
   updatedAt: Date | Timestamp;
@@ -119,6 +123,9 @@ export interface AssetFormData {
   isin?: string; // ISIN code for dividend scraping (optional)
   bondDetails?: BondDetails; // Optional bond-specific details for coupon scheduling
   pensionFundDetails?: PensionFundDetails; // Optional pension-fund-specific metadata
+  ownershipProfileId?: string;
+  ownershipProfileName?: string;
+  ownershipSplits?: OwnershipSplit[];
 }
 
 export interface SubCategoryConfig {
@@ -273,7 +280,22 @@ export interface MonthlySnapshot {
     quantity: number;
     price: number;
     totalValue: number;
+    ownershipProfileId?: string;
+    ownershipProfileName?: string;
+    ownershipSplits?: OwnershipSplit[];
   }>;
+  byOwnershipProfile?: {
+    [profileId: string]: {
+      profileName: string;
+      totalValue: number;
+    };
+  };
+  byParticipant?: {
+    [participantId: string]: {
+      participantName: string;
+      totalValue: number;
+    };
+  };
   assetAllocation: {
     [assetClass: string]: number;
   };

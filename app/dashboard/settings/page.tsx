@@ -53,7 +53,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Save, RotateCcw, Plus, Trash2, ChevronDown, ChevronUp, Edit, Receipt, FlaskConical, Coins, ArrowRightLeft, Settings, PieChart, Palette, Mail, X, Send } from 'lucide-react';
+import { Save, RotateCcw, Plus, Trash2, ChevronDown, ChevronUp, Edit, Receipt, FlaskConical, Coins, ArrowRightLeft, Settings, PieChart, Palette, Mail, X, Send, Users } from 'lucide-react';
 import { useColorTheme, ColorTheme } from '@/contexts/ColorThemeContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -70,6 +70,17 @@ import { CategoryDeleteConfirmDialog } from '@/components/expenses/CategoryDelet
 import { CategoryMoveDialog } from '@/components/expenses/CategoryMoveDialog';
 import { CreateDummySnapshotModal } from '@/components/CreateDummySnapshotModal';
 import { DeleteDummyDataDialog } from '@/components/DeleteDummyDataDialog';
+import { getHouseholdConfig, saveHouseholdConfig } from '@/lib/services/householdService';
+import { getEffectiveOwnershipProfiles, isHouseholdEnabled, profileToAssignment, validateOwnershipSplits } from '@/lib/utils/householdUtils';
+import { createId } from '@/lib/utils/idHelpers';
+import {
+  DEFAULT_PARTICIPANT_SELF_ID,
+  DEFAULT_PROFILE_SELF_ID,
+  type AttributionRule,
+  type HouseholdConfig,
+  type HouseholdParticipant,
+  type OwnershipProfile,
+} from '@/types/household';
 
 interface SubTarget {
   name: string;
@@ -141,6 +152,15 @@ export default function SettingsPage() {
   const [monthlyEmailRecipients, setMonthlyEmailRecipients] = useState<string[]>([]);
   const [newEmailInput, setNewEmailInput] = useState<string>('');
   const [sendingTestEmailType, setSendingTestEmailType] = useState<'monthly' | 'quarterly' | 'yearly' | null>(null);
+  const [householdConfig, setHouseholdConfig] = useState<HouseholdConfig | null>(null);
+  const [householdBaselineKey, setHouseholdBaselineKey] = useState('');
+  const [newRuleName, setNewRuleName] = useState('');
+  const [newRuleExpenseType, setNewRuleExpenseType] = useState<ExpenseType | '__any__'>('__any__');
+  const [newRuleCategoryId, setNewRuleCategoryId] = useState('__any__');
+  const [newRuleSubCategoryId, setNewRuleSubCategoryId] = useState('__any__');
+  const [newRuleCashAssetId, setNewRuleCashAssetId] = useState('__any__');
+  const [newRuleProfileId, setNewRuleProfileId] = useState(DEFAULT_PROFILE_SELF_ID);
+  const [newParticipantName, setNewParticipantName] = useState('');
   const [assetClassStates, setAssetClassStates] = useState<
     Record<AssetClass, AssetClassState>
   >({} as Record<AssetClass, AssetClassState>);
@@ -185,7 +205,7 @@ export default function SettingsPage() {
   const enableTestSnapshots = process.env.NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS === 'true';
 
   // Tab navigation — lazy-loading pattern (same as Assets/Cashflow pages)
-  type SettingsTabId = 'generale' | 'allocazione' | 'spese' | 'dividendi' | 'aspetto';
+  type SettingsTabId = 'generale' | 'allocazione' | 'spese' | 'household' | 'dividendi' | 'aspetto';
   const [mountedTabs, setMountedTabs] = useState<Set<SettingsTabId>>(new Set(['allocazione']));
   const [activeTab, setActiveTab] = useState<SettingsTabId>('allocazione');
   const { colorTheme, setColorTheme } = useColorTheme();
@@ -218,11 +238,26 @@ export default function SettingsPage() {
     if (user) {
       loadTargets();
       loadExpenseCategories();
+      loadHouseholdConfig();
       getAllAssets(user.uid).then((assets) =>
         setCashAssets(assets.filter((a) => a.assetClass === 'cash'))
       );
     }
   }, [user]);
+
+  const loadHouseholdConfig = async () => {
+    if (!user) return;
+    try {
+      const config = await getHouseholdConfig(user.uid);
+      const snapshot = JSON.stringify(config);
+      setHouseholdConfig(config);
+      setHouseholdBaselineKey(snapshot);
+      setNewRuleProfileId(config.defaultExpenseProfileId || DEFAULT_PROFILE_SELF_ID);
+    } catch (error) {
+      console.error('Error loading household config:', error);
+      toast.error('Errore nel caricamento delle attribuzioni');
+    }
+  };
 
   // Auto-calculate equity and bonds percentages when age or risk-free rate changes
   useEffect(() => {
@@ -850,8 +885,321 @@ export default function SettingsPage() {
     );
   };
 
+  const syncRulesWithProfiles = (
+    rules: AttributionRule[],
+    profiles: OwnershipProfile[]
+  ): AttributionRule[] => {
+    const profilesById = new Map(profiles.map((profile) => [profile.id, profile]));
+    return rules
+      .filter((rule) => profilesById.has(rule.ownershipProfileId))
+      .map((rule) => {
+        const profile = profilesById.get(rule.ownershipProfileId)!;
+        const assignment = profileToAssignment(profile);
+        return {
+          ...rule,
+          ownershipProfileName: assignment.profileName,
+          ownershipSplits: assignment.splits,
+        };
+      });
+  };
+
+  const ensureSelfDefaults = (config: HouseholdConfig): HouseholdConfig => {
+    const hasSelfParticipant = config.participants.some((participant) => participant.id === DEFAULT_PARTICIPANT_SELF_ID);
+    const selfParticipant: HouseholdParticipant = {
+      id: DEFAULT_PARTICIPANT_SELF_ID,
+      name: 'Io',
+      role: 'self',
+      sortOrder: 0,
+      active: true,
+      isDefault: true,
+    };
+    const selfProfile: OwnershipProfile = {
+      id: DEFAULT_PROFILE_SELF_ID,
+      name: `${hasSelfParticipant
+        ? config.participants.find((participant) => participant.id === DEFAULT_PARTICIPANT_SELF_ID)?.name || 'Io'
+        : 'Io'} 100%`,
+      type: 'personal',
+      splits: [{
+        participantId: DEFAULT_PARTICIPANT_SELF_ID,
+        participantName: hasSelfParticipant
+          ? config.participants.find((participant) => participant.id === DEFAULT_PARTICIPANT_SELF_ID)?.name || 'Io'
+          : 'Io',
+        percentage: 100,
+      }],
+      sortOrder: 0,
+      active: true,
+      isDefault: true,
+    };
+
+    const participants = hasSelfParticipant
+      ? config.participants
+      : [selfParticipant, ...config.participants];
+    const profiles = config.profiles.some((profile) => profile.id === DEFAULT_PROFILE_SELF_ID)
+      ? config.profiles
+      : [selfProfile, ...config.profiles];
+
+    return {
+      ...config,
+      participants,
+      profiles,
+      defaultAssetProfileId: config.defaultAssetProfileId || DEFAULT_PROFILE_SELF_ID,
+      defaultExpenseProfileId: config.defaultExpenseProfileId || DEFAULT_PROFILE_SELF_ID,
+      defaultIncomeProfileId: config.defaultIncomeProfileId || DEFAULT_PROFILE_SELF_ID,
+    };
+  };
+
+  const handleHouseholdEnabledChange = (enabled: boolean) => {
+    if (!householdConfig) return;
+    const nextConfig = ensureSelfDefaults({
+      ...householdConfig,
+      enabled,
+      defaultAssetProfileId: enabled ? householdConfig.defaultAssetProfileId || DEFAULT_PROFILE_SELF_ID : DEFAULT_PROFILE_SELF_ID,
+      defaultExpenseProfileId: enabled ? householdConfig.defaultExpenseProfileId || DEFAULT_PROFILE_SELF_ID : DEFAULT_PROFILE_SELF_ID,
+      defaultIncomeProfileId: DEFAULT_PROFILE_SELF_ID,
+    });
+    setHouseholdConfig(nextConfig);
+    setNewRuleProfileId(nextConfig.defaultExpenseProfileId || DEFAULT_PROFILE_SELF_ID);
+  };
+
+  const handleAddHouseholdParticipant = () => {
+    if (!householdConfig) return;
+    const name = newParticipantName.trim();
+    if (!name) {
+      toast.error('Inserisci il nome della persona');
+      return;
+    }
+
+    const normalizedName = name.toLocaleLowerCase('it');
+    const duplicate = householdConfig.participants.some(
+      (participant) => participant.active !== false && participant.name.trim().toLocaleLowerCase('it') === normalizedName
+    );
+    if (duplicate) {
+      toast.error('Esiste già una persona con questo nome');
+      return;
+    }
+
+    const selfParticipant = householdConfig.participants.find((participant) => participant.id === DEFAULT_PARTICIPANT_SELF_ID);
+    const selfName = selfParticipant?.name || 'Io';
+    const participantId = createId('person');
+    const maxParticipantOrder = Math.max(0, ...householdConfig.participants.map((participant) => participant.sortOrder ?? 0));
+    const maxProfileOrder = Math.max(0, ...householdConfig.profiles.map((profile) => profile.sortOrder ?? 0));
+    const isFirstAdditionalParticipant = householdConfig.participants
+      .filter((participant) => participant.active !== false && participant.id !== DEFAULT_PARTICIPANT_SELF_ID)
+      .length === 0;
+
+    const participant: HouseholdParticipant = {
+      id: participantId,
+      name,
+      role: 'other',
+      sortOrder: maxParticipantOrder + 1,
+      active: true,
+    };
+    const personalProfile: OwnershipProfile = {
+      id: createId('profile'),
+      name: `${name} 100%`,
+      type: 'personal',
+      splits: [{ participantId, participantName: name, percentage: 100 }],
+      sortOrder: maxProfileOrder + 1,
+      active: true,
+    };
+    const sharedProfile: OwnershipProfile = {
+      id: createId('profile'),
+      name: `Comune con ${name} 50/50`,
+      type: 'shared',
+      splits: [
+        { participantId: DEFAULT_PARTICIPANT_SELF_ID, participantName: selfName, percentage: 50 },
+        { participantId, participantName: name, percentage: 50 },
+      ],
+      sortOrder: maxProfileOrder + 2,
+      active: true,
+    };
+
+    setHouseholdConfig({
+      ...householdConfig,
+      enabled: true,
+      participants: [...householdConfig.participants, participant],
+      profiles: [...householdConfig.profiles, personalProfile, sharedProfile],
+      defaultExpenseProfileId: isFirstAdditionalParticipant
+        ? sharedProfile.id
+        : householdConfig.defaultExpenseProfileId || DEFAULT_PROFILE_SELF_ID,
+    });
+    if (isFirstAdditionalParticipant) {
+      setNewRuleProfileId(sharedProfile.id);
+    }
+    setNewParticipantName('');
+  };
+
+  const handleRenameHouseholdParticipant = (participantId: string, name: string) => {
+    if (!householdConfig) return;
+    const participantName = name;
+    const participants = householdConfig.participants.map((participant) =>
+      participant.id === participantId ? { ...participant, name: participantName } : participant
+    );
+    const profiles = householdConfig.profiles.map((profile) => {
+      const splits = profile.splits.map((split) =>
+        split.participantId === participantId ? { ...split, participantName } : split
+      );
+      const isPersonalProfile =
+        profile.type === 'personal' &&
+        profile.splits.length === 1 &&
+        profile.splits[0].participantId === participantId;
+      return {
+        ...profile,
+        name: isPersonalProfile ? `${participantName || 'Persona'} 100%` : profile.name,
+        splits,
+      };
+    });
+
+    setHouseholdConfig({
+      ...householdConfig,
+      participants,
+      profiles,
+      attributionRules: syncRulesWithProfiles(householdConfig.attributionRules, profiles),
+    });
+  };
+
+  const handleRemoveHouseholdParticipant = (participantId: string) => {
+    if (!householdConfig || participantId === DEFAULT_PARTICIPANT_SELF_ID) return;
+    const removedProfileIds = new Set(
+      householdConfig.profiles
+        .filter((profile) => profile.splits.some((split) => split.participantId === participantId))
+        .map((profile) => profile.id)
+    );
+    const participants = householdConfig.participants.filter((participant) => participant.id !== participantId);
+    const profiles = householdConfig.profiles.filter((profile) => !removedProfileIds.has(profile.id));
+    const defaultAssetProfileId = removedProfileIds.has(householdConfig.defaultAssetProfileId)
+      ? DEFAULT_PROFILE_SELF_ID
+      : householdConfig.defaultAssetProfileId;
+    const defaultExpenseProfileId = removedProfileIds.has(householdConfig.defaultExpenseProfileId)
+      ? DEFAULT_PROFILE_SELF_ID
+      : householdConfig.defaultExpenseProfileId;
+
+    setHouseholdConfig({
+      ...householdConfig,
+      participants,
+      profiles,
+      defaultAssetProfileId,
+      defaultExpenseProfileId,
+      defaultIncomeProfileId: DEFAULT_PROFILE_SELF_ID,
+      attributionRules: syncRulesWithProfiles(
+        householdConfig.attributionRules.filter((rule) => !removedProfileIds.has(rule.ownershipProfileId)),
+        profiles
+      ),
+    });
+    setNewRuleProfileId(defaultExpenseProfileId || DEFAULT_PROFILE_SELF_ID);
+  };
+
+  const handleDefaultHouseholdProfileChange = (
+    field: 'defaultAssetProfileId' | 'defaultExpenseProfileId' | 'defaultIncomeProfileId',
+    profileId: string
+  ) => {
+    if (!householdConfig) return;
+    setHouseholdConfig({
+      ...householdConfig,
+      [field]: profileId,
+    });
+  };
+
+  const handleAddAttributionRule = () => {
+    if (!householdConfig) return;
+    if (!householdConfig.enabled) {
+      toast.error('Attiva la gestione multi-persona prima di creare regole');
+      return;
+    }
+
+    const profile = getEffectiveOwnershipProfiles(householdConfig).find((item) => item.id === newRuleProfileId);
+    if (!profile) {
+      toast.error('Seleziona un profilo valido');
+      return;
+    }
+
+    const category = expenseCategories.find((item) => item.id === newRuleCategoryId);
+    const subCategory = category?.subCategories.find((item) => item.id === newRuleSubCategoryId);
+    const assignment = profileToAssignment(profile);
+    const rule: AttributionRule = {
+      id: createId('household-rule'),
+      name: newRuleName.trim() || `Regola ${assignment.profileName}`,
+      active: true,
+      sortOrder: householdConfig.attributionRules.length,
+      expenseType: newRuleExpenseType !== '__any__' ? newRuleExpenseType : undefined,
+      categoryId: newRuleCategoryId !== '__any__' ? newRuleCategoryId : undefined,
+      categoryName: category?.name,
+      subCategoryId: newRuleSubCategoryId !== '__any__' ? newRuleSubCategoryId : undefined,
+      subCategoryName: subCategory?.name,
+      linkedCashAssetId: newRuleCashAssetId !== '__any__' ? newRuleCashAssetId : undefined,
+      ownershipProfileId: assignment.profileId,
+      ownershipProfileName: assignment.profileName,
+      ownershipSplits: assignment.splits,
+    };
+
+    setHouseholdConfig({
+      ...householdConfig,
+      attributionRules: [...householdConfig.attributionRules, rule],
+    });
+    setNewRuleName('');
+    setNewRuleExpenseType('__any__');
+    setNewRuleCategoryId('__any__');
+    setNewRuleSubCategoryId('__any__');
+    setNewRuleCashAssetId('__any__');
+  };
+
+  const handleRemoveAttributionRule = (ruleId: string) => {
+    if (!householdConfig) return;
+    setHouseholdConfig({
+      ...householdConfig,
+      attributionRules: householdConfig.attributionRules
+        .filter((rule) => rule.id !== ruleId)
+        .map((rule, index) => ({ ...rule, sortOrder: index })),
+    });
+  };
+
+  const handleToggleAttributionRule = (ruleId: string, active: boolean) => {
+    if (!householdConfig) return;
+    setHouseholdConfig({
+      ...householdConfig,
+      attributionRules: householdConfig.attributionRules.map((rule) =>
+        rule.id === ruleId ? { ...rule, active } : rule
+      ),
+    });
+  };
+
+  const handleSaveHousehold = async () => {
+    if (!user || !householdConfig) return;
+    const activeParticipants = householdConfig.participants.filter((participant) => participant.active !== false);
+    if (householdConfig.enabled) {
+      if (activeParticipants.some((participant) => !participant.name.trim())) {
+        toast.error('Ogni persona deve avere un nome');
+        return;
+      }
+      const invalidProfile = getEffectiveOwnershipProfiles(householdConfig).find(
+        (profile) => !validateOwnershipSplits(profile.splits).isValid
+      );
+      if (invalidProfile) {
+        toast.error(`Il profilo ${invalidProfile.name} ha percentuali non valide`);
+        return;
+      }
+    }
+
+    try {
+      setSaving(true);
+      await saveHouseholdConfig(user.uid, householdConfig);
+      setHouseholdBaselineKey(JSON.stringify(householdConfig));
+      toast.success('Attribuzioni salvate');
+    } catch (error) {
+      console.error('Error saving household config:', error);
+      toast.error('Errore nel salvataggio delle attribuzioni');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!user) return;
+
+    if (activeTab === 'household') {
+      await handleSaveHousehold();
+      return;
+    }
 
     // Auto-cleanup empty subcategory rows before validation (Bug #8 fix)
     assetClasses.forEach(assetClass => {
@@ -1350,22 +1698,42 @@ export default function SettingsPage() {
     [dividendIncomeCategoryId, dividendIncomeSubCategoryId]
   );
 
+  const householdSnapshotKey = useMemo(
+    () => JSON.stringify(householdConfig),
+    [householdConfig]
+  );
+  const householdEnabled = isHouseholdEnabled(householdConfig);
+  const householdProfiles = useMemo(
+    () => getEffectiveOwnershipProfiles(householdConfig),
+    [householdConfig]
+  );
+  const householdParticipants = useMemo(
+    () => (householdConfig?.participants ?? [])
+      .filter((participant) => participant.active !== false)
+      .sort((a, b) => a.sortOrder - b.sortOrder),
+    [householdConfig]
+  );
+
   const hasUnsavedAllocationChanges =
     allocationBaselineKey.length > 0 && allocationSnapshotKey !== allocationBaselineKey;
   const hasUnsavedGeneralChanges =
     generalBaselineKey.length > 0 && generalSnapshotKey !== generalBaselineKey;
   const hasUnsavedDividendChanges =
     dividendBaselineKey.length > 0 && dividendSnapshotKey !== dividendBaselineKey;
+  const hasUnsavedHouseholdChanges =
+    householdBaselineKey.length > 0 && householdSnapshotKey !== householdBaselineKey;
 
   const hasUnsavedChanges =
     hasUnsavedAllocationChanges ||
     hasUnsavedGeneralChanges ||
-    hasUnsavedDividendChanges;
+    hasUnsavedDividendChanges ||
+    hasUnsavedHouseholdChanges;
 
   const activeTabHasUnsavedChanges =
     (activeTab === 'allocazione' && hasUnsavedAllocationChanges) ||
     (activeTab === 'generale' && hasUnsavedGeneralChanges) ||
-    (activeTab === 'dividendi' && hasUnsavedDividendChanges);
+    (activeTab === 'dividendi' && hasUnsavedDividendChanges) ||
+    (activeTab === 'household' && hasUnsavedHouseholdChanges);
 
   if (loading) return null;
 
@@ -1424,12 +1792,13 @@ export default function SettingsPage() {
               <SelectItem value="allocazione">Allocazione</SelectItem>
               <SelectItem value="generale">Preferenze</SelectItem>
               <SelectItem value="spese">Spese</SelectItem>
+              <SelectItem value="household">Attribuzioni</SelectItem>
               <SelectItem value="dividendi">Dividendi</SelectItem>
               <SelectItem value="aspetto">Aspetto</SelectItem>
             </SelectContent>
           </Select>
         </div>
-        <TabsList className="hidden desktop:grid desktop:grid-cols-5 w-full">
+        <TabsList className="hidden desktop:grid desktop:grid-cols-6 w-full">
           <TabsTrigger value="allocazione" className="flex items-center gap-2">
             <PieChart className="h-4 w-4" />
             Allocazione
@@ -1441,6 +1810,10 @@ export default function SettingsPage() {
           <TabsTrigger value="spese" className="flex items-center gap-2">
             <Receipt className="h-4 w-4" />
             Spese
+          </TabsTrigger>
+          <TabsTrigger value="household" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Attribuzioni
           </TabsTrigger>
           <TabsTrigger value="dividendi" className="flex items-center gap-2">
             <Coins className="h-4 w-4" />
@@ -2622,6 +2995,355 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+          </TabsContent>
+        )}
+
+        {/* Tab: Attribuzioni household (lazy) */}
+        {mountedTabs.has('household') && (
+          <TabsContent value="household" className="mt-6 space-y-4 sm:space-y-6">
+            {hasUnsavedHouseholdChanges && (
+              <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-foreground">
+                Anteprima attiva: profili e regole di attribuzione non sono ancora salvati.
+              </div>
+            )}
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" />
+                  <CardTitle>Gestione multi-persona</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-5 p-4 sm:p-6">
+                {!householdConfig ? (
+                  <p className="text-sm text-muted-foreground">Caricamento attribuzioni...</p>
+                ) : (
+                  <>
+                    <div className="flex flex-col gap-3 rounded-md border p-4 desktop:flex-row desktop:items-center desktop:justify-between">
+                      <div>
+                        <p className="font-medium">Abilita gestione per più persone</p>
+                        <p className="text-sm text-muted-foreground">
+                          Quando è disattivata tutto viene attribuito a {householdProfiles[0]?.name ?? 'Io 100%'}.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={householdConfig.enabled}
+                        onCheckedChange={handleHouseholdEnabledChange}
+                        disabled={isDemo}
+                        title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+                      />
+                    </div>
+
+                    {!householdEnabled && (
+                      <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                        Modalità personale attiva: asset, spese, entrate, budget e snapshot usano un solo proprietario.
+                      </div>
+                    )}
+
+                    {householdEnabled && (
+                      <>
+                        <div className="grid gap-3 desktop:grid-cols-[1fr_auto] desktop:items-end">
+                          <div className="space-y-2">
+                            <Label>Nuova persona</Label>
+                            <Input
+                              value={newParticipantName}
+                              onChange={(event) => setNewParticipantName(event.target.value)}
+                              placeholder="es. Moglie"
+                              className={interactiveControlClass}
+                              disabled={isDemo}
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            onClick={handleAddHouseholdParticipant}
+                            disabled={isDemo}
+                            title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Aggiungi persona
+                          </Button>
+                        </div>
+
+                        <div className="grid gap-4 desktop:grid-cols-3">
+                          <div className="space-y-2">
+                            <Label>Asset predefiniti</Label>
+                            <Select
+                              value={householdConfig.defaultAssetProfileId || DEFAULT_PROFILE_SELF_ID}
+                              onValueChange={(value) => handleDefaultHouseholdProfileChange('defaultAssetProfileId', value)}
+                              disabled={isDemo}
+                            >
+                              <SelectTrigger className={interactiveControlClass}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {householdProfiles.map((profile) => (
+                                  <SelectItem key={profile.id} value={profile.id}>{profile.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Spese predefinite</Label>
+                            <Select
+                              value={householdConfig.defaultExpenseProfileId || DEFAULT_PROFILE_SELF_ID}
+                              onValueChange={(value) => {
+                                handleDefaultHouseholdProfileChange('defaultExpenseProfileId', value);
+                                setNewRuleProfileId(value);
+                              }}
+                              disabled={isDemo}
+                            >
+                              <SelectTrigger className={interactiveControlClass}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {householdProfiles.map((profile) => (
+                                  <SelectItem key={profile.id} value={profile.id}>{profile.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Entrate predefinite</Label>
+                            <Select
+                              value={householdConfig.defaultIncomeProfileId || DEFAULT_PROFILE_SELF_ID}
+                              onValueChange={(value) => handleDefaultHouseholdProfileChange('defaultIncomeProfileId', value)}
+                              disabled={isDemo}
+                            >
+                              <SelectTrigger className={interactiveControlClass}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {householdProfiles.map((profile) => (
+                                  <SelectItem key={profile.id} value={profile.id}>{profile.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <div className="grid gap-3 desktop:grid-cols-2">
+                      {householdParticipants.map((participant) => (
+                        <div key={participant.id} className="rounded-md border p-3">
+                          <div className="flex items-start gap-2">
+                            <div className="min-w-0 flex-1 space-y-2">
+                              <Label className="text-xs">
+                                {participant.id === DEFAULT_PARTICIPANT_SELF_ID ? 'Persona principale' : 'Persona'}
+                              </Label>
+                              <Input
+                                value={participant.name}
+                                onChange={(event) => handleRenameHouseholdParticipant(participant.id, event.target.value)}
+                                className={interactiveControlClass}
+                                disabled={isDemo}
+                              />
+                            </div>
+                            {participant.id !== DEFAULT_PARTICIPANT_SELF_ID && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRemoveHouseholdParticipant(participant.id)}
+                                disabled={isDemo}
+                                title={isDemo ? 'Non disponibile in modalità demo' : 'Rimuovi persona'}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="grid gap-3 desktop:grid-cols-3">
+                      {householdProfiles.map((profile) => (
+                        <div key={profile.id} className="rounded-md border p-3">
+                          <p className="font-medium">{profile.name}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {profile.splits.map((split) => `${split.participantName} ${split.percentage}%`).join(' · ')}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                      </>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Receipt className="h-5 w-5 text-primary" />
+                  <CardTitle>Regole automatiche di attribuzione</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-5 p-4 sm:p-6">
+                {!householdConfig ? (
+                  <p className="text-sm text-muted-foreground">Caricamento regole...</p>
+                ) : !householdEnabled ? (
+                  <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                    Le regole automatiche si attivano solo in modalità multi-persona.
+                  </p>
+                ) : (
+                  <>
+                    <div className="grid gap-4 desktop:grid-cols-6 desktop:items-end">
+                      <div className="space-y-2 desktop:col-span-2">
+                        <Label>Nome regola</Label>
+                        <Input
+                          value={newRuleName}
+                          onChange={(event) => setNewRuleName(event.target.value)}
+                          placeholder="es. Pranzi personali"
+                          className={interactiveControlClass}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Tipo</Label>
+                        <Select
+                          value={newRuleExpenseType}
+                          onValueChange={(value) => {
+                            setNewRuleExpenseType(value as ExpenseType | '__any__');
+                            setNewRuleCategoryId('__any__');
+                            setNewRuleSubCategoryId('__any__');
+                          }}
+                        >
+                          <SelectTrigger className={interactiveControlClass}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__any__">Qualsiasi</SelectItem>
+                            {(['income', 'fixed', 'variable', 'debt'] as ExpenseType[]).map((type) => (
+                              <SelectItem key={type} value={type}>{EXPENSE_TYPE_LABELS[type]}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Categoria</Label>
+                        <Select
+                          value={newRuleCategoryId}
+                          onValueChange={(value) => {
+                            setNewRuleCategoryId(value);
+                            setNewRuleSubCategoryId('__any__');
+                          }}
+                        >
+                          <SelectTrigger className={interactiveControlClass}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__any__">Qualsiasi</SelectItem>
+                            {expenseCategories
+                              .filter((category) => newRuleExpenseType === '__any__' || category.type === newRuleExpenseType)
+                              .map((category) => (
+                                <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Sottocategoria</Label>
+                        <Select
+                          value={newRuleSubCategoryId}
+                          onValueChange={setNewRuleSubCategoryId}
+                          disabled={newRuleCategoryId === '__any__'}
+                        >
+                          <SelectTrigger className={interactiveControlClass}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__any__">Qualsiasi</SelectItem>
+                            {expenseCategories
+                              .find((category) => category.id === newRuleCategoryId)
+                              ?.subCategories.map((subCategory) => (
+                                <SelectItem key={subCategory.id} value={subCategory.id}>{subCategory.name}</SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Profilo</Label>
+                        <Select value={newRuleProfileId} onValueChange={setNewRuleProfileId}>
+                          <SelectTrigger className={interactiveControlClass}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {householdProfiles.map((profile) => (
+                              <SelectItem key={profile.id} value={profile.id}>{profile.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2 desktop:col-span-2">
+                        <Label>Conto pagatore</Label>
+                        <Select value={newRuleCashAssetId} onValueChange={setNewRuleCashAssetId}>
+                          <SelectTrigger className={interactiveControlClass}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__any__">Qualsiasi</SelectItem>
+                            {cashAssets.map((asset) => (
+                              <SelectItem key={asset.id} value={asset.id}>{asset.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <Button
+                        type="button"
+                        onClick={handleAddAttributionRule}
+                        disabled={!householdConfig || isDemo}
+                        title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+                        className="desktop:col-span-1"
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Aggiungi
+                      </Button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {householdConfig.attributionRules.length === 0 ? (
+                        <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                          Nessuna regola configurata. Senza regole viene usato il profilo predefinito impostato sopra.
+                        </p>
+                      ) : (
+                        householdConfig.attributionRules.map((rule) => (
+                          <div key={rule.id} className="flex flex-col gap-3 rounded-md border p-3 desktop:flex-row desktop:items-center desktop:justify-between">
+                            <div className="min-w-0">
+                              <p className="font-medium">{rule.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {[rule.expenseType ? EXPENSE_TYPE_LABELS[rule.expenseType] : 'Qualsiasi tipo', rule.categoryName, rule.subCategoryName, rule.linkedCashAssetId ? 'Conto specifico' : null]
+                                  .filter(Boolean)
+                                  .join(' · ')}
+                              </p>
+                              <p className="text-xs text-muted-foreground">Attribuisce a {rule.ownershipProfileName}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={rule.active}
+                                onCheckedChange={(checked) => handleToggleAttributionRule(rule.id, checked)}
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRemoveAttributionRule(rule.id)}
+                                title="Elimina regola"
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
         )}
 

@@ -50,6 +50,9 @@ export async function saveBudgetConfig(userId: string, items: BudgetItem[]): Pro
       if (item.categoryName != null) clean.categoryName = item.categoryName;
       if (item.subCategoryId != null) clean.subCategoryId = item.subCategoryId;
       if (item.subCategoryName != null) clean.subCategoryName = item.subCategoryName;
+      if (item.attributionProfileId != null) clean.attributionProfileId = item.attributionProfileId;
+      if (item.attributionProfileName != null) clean.attributionProfileName = item.attributionProfileName;
+      if (item.attributionSplits != null) clean.attributionSplits = item.attributionSplits;
       return clean;
     });
 

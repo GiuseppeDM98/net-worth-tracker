@@ -30,6 +30,12 @@ export const queryKeys = {
     categories: (userId: string) => ['expense-categories', userId] as const,
   },
 
+  // Household ownership and attribution
+  household: {
+    config: (userId: string) => ['household', 'config', userId] as const,
+    audit: (userId: string) => ['household', 'audit', userId] as const,
+  },
+
   // Assistant
   assistant: {
     threads: (userId: string) => ['assistant', 'threads', userId] as const,

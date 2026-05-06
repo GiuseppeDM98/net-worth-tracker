@@ -1,4 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
+import type { OwnershipSplit } from './household';
 
 // Expense categories for cashflow tracking.
 // These are mutually exclusive and determine UI filtering/display logic.
@@ -92,6 +93,9 @@ export interface Expense {
   // WARNING: If a cost center is renamed, bulk-update all linked expenses via costCenterService.renameCostCenter.
   costCenterId?: string;
   costCenterName?: string;
+  attributionProfileId?: string;
+  attributionProfileName?: string;
+  attributionSplits?: OwnershipSplit[];
   createdAt: Date | Timestamp;
   updatedAt: Date | Timestamp;
 }
@@ -125,6 +129,9 @@ export interface ExpenseFormData {
   investmentOperationTaxes?: number;
   costCenterId?: string;    // Optional cost center assignment
   costCenterName?: string;  // Denormalized name, must be kept in sync via costCenterService
+  attributionProfileId?: string;
+  attributionProfileName?: string;
+  attributionSplits?: OwnershipSplit[];
 }
 
 export interface MonthlyExpenseSummary {

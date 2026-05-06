@@ -32,6 +32,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
+import { appendHouseholdAuditEntrySafe } from '@/lib/services/householdService';
 import {
   Expense,
   ExpenseFormData,
@@ -260,12 +261,27 @@ export async function createExpense(
       investmentOperationTaxes: expenseData.investmentOperationTaxes,
       costCenterId: expenseData.costCenterId,
       costCenterName: expenseData.costCenterName,
+      attributionProfileId: expenseData.attributionProfileId,
+      attributionProfileName: expenseData.attributionProfileName,
+      attributionSplits: expenseData.attributionSplits,
       createdAt: now,
       updatedAt: now,
     });
 
     const docRef = await addDoc(expensesRef, cleanedData);
     await invalidateDashboardOverviewSummary(userId, 'expense_created');
+    appendHouseholdAuditEntrySafe(userId, {
+      entityType: 'expense',
+      entityId: docRef.id,
+      action: 'create',
+      summary: `Cashflow creato: ${categoryName}`,
+      after: {
+        categoryName,
+        amount,
+        attributionProfileId: expenseData.attributionProfileId,
+        attributionProfileName: expenseData.attributionProfileName,
+      },
+    });
 
     return docRef.id;
   } catch (error) {
@@ -341,6 +357,9 @@ async function createRecurringExpenses(
         investmentOperationTaxes: i === 0 ? expenseData.investmentOperationTaxes : undefined,
         costCenterId: expenseData.costCenterId,
         costCenterName: expenseData.costCenterName,
+        attributionProfileId: expenseData.attributionProfileId,
+        attributionProfileName: expenseData.attributionProfileName,
+        attributionSplits: expenseData.attributionSplits,
         createdAt: now,
         updatedAt: now,
       });
@@ -351,6 +370,18 @@ async function createRecurringExpenses(
 
     await batch.commit();
     await invalidateDashboardOverviewSummary(userId, 'expense_created');
+    appendHouseholdAuditEntrySafe(userId, {
+      entityType: 'expense',
+      entityId: parentId,
+      action: 'create',
+      summary: `Cashflow ricorrente creato: ${categoryName}`,
+      after: {
+        categoryName,
+        count: createdIds.length,
+        attributionProfileId: expenseData.attributionProfileId,
+        attributionProfileName: expenseData.attributionProfileName,
+      },
+    });
 
     return createdIds;
   } catch (error) {
@@ -465,6 +496,9 @@ async function createInstallmentExpenses(
         investmentOperationTaxes: i === 0 ? expenseData.investmentOperationTaxes : undefined,
         costCenterId: expenseData.costCenterId,
         costCenterName: expenseData.costCenterName,
+        attributionProfileId: expenseData.attributionProfileId,
+        attributionProfileName: expenseData.attributionProfileName,
+        attributionSplits: expenseData.attributionSplits,
 
         createdAt: now,
         updatedAt: now,
@@ -476,6 +510,18 @@ async function createInstallmentExpenses(
 
     await batch.commit();
     await invalidateDashboardOverviewSummary(userId, 'expense_created');
+    appendHouseholdAuditEntrySafe(userId, {
+      entityType: 'expense',
+      entityId: parentId,
+      action: 'create',
+      summary: `Rate cashflow create: ${categoryName}`,
+      after: {
+        categoryName,
+        count: createdIds.length,
+        attributionProfileId: expenseData.attributionProfileId,
+        attributionProfileName: expenseData.attributionProfileName,
+      },
+    });
 
     console.log(`Created ${installmentCount} installment expenses with parent ID: ${parentId}`);
     return createdIds;
@@ -553,6 +599,11 @@ export async function updateExpense(
       investmentOperationPricePerUnit: updates.investmentOperationPricePerUnit,
       investmentOperationFees: updates.investmentOperationFees,
       investmentOperationTaxes: updates.investmentOperationTaxes,
+      costCenterId: updates.costCenterId,
+      costCenterName: updates.costCenterName,
+      attributionProfileId: updates.attributionProfileId,
+      attributionProfileName: updates.attributionProfileName,
+      attributionSplits: updates.attributionSplits,
       updatedAt: Timestamp.now(),
     });
 
@@ -560,6 +611,20 @@ export async function updateExpense(
     const userId = existingExpense.data()?.userId as string | undefined;
     if (userId) {
       await invalidateDashboardOverviewSummary(userId, 'expense_updated');
+      appendHouseholdAuditEntrySafe(userId, {
+        entityType: 'expense',
+        entityId: expenseId,
+        action: 'update',
+        summary: `Cashflow aggiornato: ${categoryName ?? existingExpense.data()?.categoryName ?? expenseId}`,
+        before: {
+          attributionProfileId: existingExpense.data()?.attributionProfileId,
+          attributionProfileName: existingExpense.data()?.attributionProfileName,
+        },
+        after: {
+          attributionProfileId: updates.attributionProfileId,
+          attributionProfileName: updates.attributionProfileName,
+        },
+      });
     }
   } catch (error) {
     console.error('Error updating expense:', error);
@@ -578,6 +643,18 @@ export async function deleteExpense(expenseId: string): Promise<void> {
     const userId = existingExpense.data()?.userId as string | undefined;
     if (userId) {
       await invalidateDashboardOverviewSummary(userId, 'expense_deleted');
+      appendHouseholdAuditEntrySafe(userId, {
+        entityType: 'expense',
+        entityId: expenseId,
+        action: 'delete',
+        summary: `Cashflow eliminato: ${existingExpense.data()?.categoryName ?? expenseId}`,
+        before: {
+          categoryName: existingExpense.data()?.categoryName,
+          amount: existingExpense.data()?.amount,
+          attributionProfileId: existingExpense.data()?.attributionProfileId,
+          attributionProfileName: existingExpense.data()?.attributionProfileName,
+        },
+      });
     }
   } catch (error) {
     console.error('Error deleting expense:', error);

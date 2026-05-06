@@ -53,6 +53,9 @@ import {
   deleteInvestmentOperation,
 } from '@/lib/services/investmentOperationService';
 import { getSettings } from '@/lib/services/assetAllocationService';
+import { useHouseholdConfig } from '@/lib/hooks/useHousehold';
+import { getDefaultProfile, getEffectiveOwnershipProfiles, isHouseholdEnabled, profileToAssignment, resolveExpenseAttribution } from '@/lib/utils/householdUtils';
+import { DEFAULT_PROFILE_SELF_ID } from '@/types/household';
 import { getAllCategories, addSubCategory } from '@/lib/services/expenseCategoryService';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { Timestamp } from 'firebase/firestore';
@@ -125,6 +128,7 @@ const expenseSchema = z.object({
   investmentOperationFees: z.number().min(0).optional().or(z.nan()),
   investmentOperationTaxes: z.number().min(0).optional().or(z.nan()),
   linkedInvestmentQuantityDelta: z.number().positive('La quantità deve essere positiva').optional().or(z.nan()),
+  attributionProfileId: z.string().optional(),
 }).refine((data) => {
   // Custom validation: when isInstallment is true, validate mode-specific required fields
   if (data.isInstallment) {
@@ -165,6 +169,7 @@ const expenseTypes: { value: ExpenseType; label: string }[] = [
 
 export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDialogProps) {
   const { user } = useAuth();
+  const { data: householdConfig } = useHouseholdConfig(user?.uid);
   const queryClient = useQueryClient();
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
@@ -179,6 +184,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
   const [newSubCategoryName, setNewSubCategoryName] = useState('');
   const [addingSubCategory, setAddingSubCategory] = useState(false);
   const [showSubCategoryInput, setShowSubCategoryInput] = useState(false);
+  const [hasManualAttribution, setHasManualAttribution] = useState(false);
 
   const {
     register,
@@ -207,13 +213,24 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
       investmentOperationFees: undefined,
       investmentOperationTaxes: undefined,
       linkedInvestmentQuantityDelta: undefined,
+      attributionProfileId: DEFAULT_PROFILE_SELF_ID,
     },
   });
 
   const selectedType = watch('type');
   const selectedCategoryId = watch('categoryId');
+  const selectedSubCategoryId = watch('subCategoryId');
   const selectedIsRecurring = watch('isRecurring');
   const selectedDate = watch('date');
+  const selectedLinkedCashAssetId = watch('linkedCashAssetId');
+  const householdEnabled = isHouseholdEnabled(householdConfig);
+  const householdProfiles = householdEnabled ? getEffectiveOwnershipProfiles(householdConfig) : [];
+  const defaultExpenseAttributionProfileId = householdEnabled
+    ? householdConfig?.defaultExpenseProfileId || DEFAULT_PROFILE_SELF_ID
+    : DEFAULT_PROFILE_SELF_ID;
+  const defaultIncomeAttributionProfileId = householdEnabled
+    ? householdConfig?.defaultIncomeProfileId || DEFAULT_PROFILE_SELF_ID
+    : DEFAULT_PROFILE_SELF_ID;
 
   // Load categories and cash assets when dialog opens
   useEffect(() => {
@@ -308,9 +325,13 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
         linkedInvestmentQuantityDelta: expense.linkedInvestmentQuantityDelta
           ? Math.abs(expense.linkedInvestmentQuantityDelta)
           : undefined,
+        attributionProfileId: householdEnabled
+          ? expense.attributionProfileId || defaultExpenseAttributionProfileId
+          : DEFAULT_PROFILE_SELF_ID,
       });
       // Pre-select the cost center if the expense already has one
       setSelectedCostCenterId(expense.costCenterId || '__none__');
+      setHasManualAttribution(false);
     } else {
       reset({
         type: 'variable',
@@ -330,10 +351,12 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
         investmentOperationFees: undefined,
         investmentOperationTaxes: undefined,
         linkedInvestmentQuantityDelta: undefined,
+        attributionProfileId: defaultExpenseAttributionProfileId,
       });
       setSelectedCostCenterId('__none__');
+      setHasManualAttribution(false);
     }
-  }, [expense, reset, open]);
+  }, [expense, defaultExpenseAttributionProfileId, householdEnabled, householdConfig, reset, open]);
 
   // Apply default cash account for new expenses once settings are loaded.
   // Runs when defaults change (i.e., after loadCashAssets resolves) and when type changes.
@@ -346,6 +369,35 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
       }
     }
   }, [defaultDebitCashAssetId, defaultCreditCashAssetId, selectedType, expense, open, setValue]);
+
+  useEffect(() => {
+    if (!open || expense || hasManualAttribution || !householdConfig || !householdEnabled) return;
+
+    const assignment = resolveExpenseAttribution(
+      {
+        type: selectedType,
+        categoryId: selectedCategoryId || '',
+        subCategoryId: selectedSubCategoryId || undefined,
+        linkedCashAssetId: selectedLinkedCashAssetId !== '__none__' ? selectedLinkedCashAssetId : undefined,
+        attributionProfileId: undefined,
+        attributionProfileName: undefined,
+        attributionSplits: undefined,
+      },
+      householdConfig
+    );
+    setValue('attributionProfileId', assignment.profileId);
+  }, [
+    open,
+    expense,
+    hasManualAttribution,
+    householdConfig,
+    householdEnabled,
+    selectedType,
+    selectedCategoryId,
+    selectedSubCategoryId,
+    selectedLinkedCashAssetId,
+    setValue,
+  ]);
 
   // Auto-set recurring day when date changes
   // Why: When user enables recurring expenses and selects a date, we automatically
@@ -466,6 +518,12 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
     const resolvedCostCenterName = resolvedCostCenterId
       ? costCenters.find(c => c.id === resolvedCostCenterId)?.name
       : undefined;
+    const fallbackAttributionProfileId = data.type === 'income'
+      ? defaultIncomeAttributionProfileId
+      : defaultExpenseAttributionProfileId;
+    const attributionAssignment = profileToAssignment(
+      getDefaultProfile(householdConfig, data.attributionProfileId || fallbackAttributionProfileId)
+    );
 
     try {
       const expenseData: ExpenseFormData = {
@@ -506,6 +564,11 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
         // Optional cost center assignment (undefined clears the field on update)
         costCenterId: resolvedCostCenterId,
         costCenterName: resolvedCostCenterName,
+
+        // Household attribution assignment
+        attributionProfileId: attributionAssignment.profileId,
+        attributionProfileName: attributionAssignment.profileName,
+        attributionSplits: attributionAssignment.splits,
       };
 
       if (expense) {
@@ -526,6 +589,9 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
           | 'investmentOperationTaxes'
           | 'costCenterId'
           | 'costCenterName'
+          | 'attributionProfileId'
+          | 'attributionProfileName'
+          | 'attributionSplits'
         > & {
           linkedCashAssetId: string | null;
           linkedInvestmentAssetId: string | null;
@@ -538,6 +604,9 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
           investmentOperationTaxes: number | null;
           costCenterId: string | null;
           costCenterName: string | null;
+          attributionProfileId: string;
+          attributionProfileName: string;
+          attributionSplits: typeof attributionAssignment.splits;
         } = {
           ...expenseData,
           linkedCashAssetId: linkedCashAssetId ?? null,
@@ -551,6 +620,9 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
           investmentOperationTaxes: investmentOperationTaxes ?? null,
           costCenterId: resolvedCostCenterId ?? null,
           costCenterName: resolvedCostCenterName ?? null,
+          attributionProfileId: attributionAssignment.profileId,
+          attributionProfileName: attributionAssignment.profileName,
+          attributionSplits: attributionAssignment.splits,
         };
 
         let newInvestmentOperationId: string | undefined;
@@ -1218,7 +1290,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
           {cashAssets.length > 0 && (
             <div className="w-full space-y-2">
               <Label htmlFor="linkedCashAssetId">
-                {selectedType === 'income' ? 'Conto di Accredito' : 'Conto di Prelievo'}
+                {selectedType === 'income' ? 'Accreditato su' : 'Pagato da'}
                 <span className="text-muted-foreground font-normal ml-1">(opzionale)</span>
               </Label>
               <Select
@@ -1239,6 +1311,33 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
               </Select>
               <p className="text-xs text-muted-foreground">
                 Il saldo del conto selezionato viene aggiornato automaticamente al salvataggio.
+              </p>
+            </div>
+          )}
+
+          {householdEnabled && householdProfiles.length > 1 && (
+            <div className="w-full space-y-2">
+              <Label htmlFor="attributionProfileId">Attribuito a</Label>
+              <Select
+                value={watch('attributionProfileId') || defaultExpenseAttributionProfileId}
+                onValueChange={(value) => {
+                  setHasManualAttribution(true);
+                  setValue('attributionProfileId', value);
+                }}
+              >
+                <SelectTrigger id="attributionProfileId">
+                  <SelectValue placeholder="Seleziona attribuzione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {householdProfiles.map((profile) => (
+                    <SelectItem key={profile.id} value={profile.id}>
+                      {profile.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Determina chi sostiene economicamente la voce. Il conto sopra indica invece chi ha pagato materialmente.
               </p>
             </div>
           )}
