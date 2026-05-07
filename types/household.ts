@@ -13,6 +13,7 @@ export interface HouseholdParticipant {
   sortOrder: number;
   active: boolean;
   isDefault?: boolean;
+  archivedAt?: Date | Timestamp;
 }
 
 export interface OwnershipSplit {
@@ -23,15 +24,26 @@ export interface OwnershipSplit {
 
 export type OwnershipProfileType = 'personal' | 'shared' | 'custom';
 
+export interface OwnershipProfileVersion {
+  id: string;
+  validFrom: string;
+  validTo?: string;
+  splits: OwnershipSplit[];
+  createdAt?: Date | Timestamp;
+}
+
 export interface OwnershipProfile {
   id: string;
   userId?: string;
   name: string;
   type: OwnershipProfileType;
   splits: OwnershipSplit[];
+  versions?: OwnershipProfileVersion[];
   sortOrder: number;
   active: boolean;
   isDefault?: boolean;
+  archived?: boolean;
+  archivedAt?: Date | Timestamp;
 }
 
 export interface AttributionRule {

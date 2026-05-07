@@ -54,7 +54,7 @@ import {
 } from '@/lib/services/investmentOperationService';
 import { getSettings } from '@/lib/services/assetAllocationService';
 import { useHouseholdConfig } from '@/lib/hooks/useHousehold';
-import { getDefaultProfile, getEffectiveOwnershipProfiles, isHouseholdEnabled, profileToAssignment, resolveExpenseAttribution } from '@/lib/utils/householdUtils';
+import { getAssignableOwnershipProfiles, getDefaultProfile, isHouseholdEnabled, profileToAssignment, resolveExpenseAttribution } from '@/lib/utils/householdUtils';
 import { DEFAULT_PROFILE_SELF_ID } from '@/types/household';
 import { getAllCategories, addSubCategory } from '@/lib/services/expenseCategoryService';
 import { queryKeys } from '@/lib/query/queryKeys';
@@ -224,7 +224,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
   const selectedDate = watch('date');
   const selectedLinkedCashAssetId = watch('linkedCashAssetId');
   const householdEnabled = isHouseholdEnabled(householdConfig);
-  const householdProfiles = householdEnabled ? getEffectiveOwnershipProfiles(householdConfig) : [];
+  const householdProfiles = householdEnabled ? getAssignableOwnershipProfiles(householdConfig) : [];
   const defaultExpenseAttributionProfileId = householdEnabled
     ? householdConfig?.defaultExpenseProfileId || DEFAULT_PROFILE_SELF_ID
     : DEFAULT_PROFILE_SELF_ID;
@@ -522,7 +522,8 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
       ? defaultIncomeAttributionProfileId
       : defaultExpenseAttributionProfileId;
     const attributionAssignment = profileToAssignment(
-      getDefaultProfile(householdConfig, data.attributionProfileId || fallbackAttributionProfileId)
+      getDefaultProfile(householdConfig, data.attributionProfileId || fallbackAttributionProfileId),
+      data.date
     );
 
     try {

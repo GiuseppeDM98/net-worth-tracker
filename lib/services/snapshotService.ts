@@ -92,7 +92,8 @@ export async function createSnapshot(
     const ownershipBreakdown = buildOwnershipSnapshotBreakdown(
       assets,
       calculateAssetValue,
-      householdConfig
+      householdConfig,
+      new Date(snapshotYear, snapshotMonth - 1, 1)
     );
 
     const snapshotId = `${userId}-${snapshotYear}-${snapshotMonth}`;

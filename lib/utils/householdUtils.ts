@@ -8,9 +8,10 @@ import {
   type HouseholdConfig,
   type HouseholdParticipant,
   type OwnershipProfile,
+  type OwnershipProfileType,
   type OwnershipSplit,
 } from '@/types/household';
-import { getItalyMonthYear, toDate } from '@/lib/utils/dateHelpers';
+import { getItalyDate, getItalyMonthYear, toDate } from '@/lib/utils/dateHelpers';
 
 const EPSILON = 0.01;
 
@@ -142,6 +143,59 @@ export function getEffectiveOwnershipProfiles(
   return [self, ...profiles].sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
+function getDateKey(date: Date | string | undefined | null = new Date()): string {
+  const italyDate = getItalyDate(date ?? new Date());
+  const year = italyDate.getFullYear();
+  const month = String(italyDate.getMonth() + 1).padStart(2, '0');
+  const day = String(italyDate.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function inferOwnershipProfileType(splits: OwnershipSplit[]): OwnershipProfileType {
+  const normalized = normalizeOwnershipSplits(splits);
+  if (normalized.length === 1 && Math.abs(normalized[0].percentage - 100) <= EPSILON) {
+    return 'personal';
+  }
+  if (normalized.length === 2 && normalized.every((item) => Math.abs(item.percentage - 50) <= EPSILON)) {
+    return 'shared';
+  }
+  return 'custom';
+}
+
+export function getProfileSplitsForDate(
+  profile: OwnershipProfile,
+  date: Date | string | undefined | null = new Date()
+): OwnershipSplit[] {
+  const dateKey = getDateKey(date);
+  const matchingVersion = [...(profile.versions ?? [])]
+    .filter((version) => {
+      const validTo = version.validTo || '9999-12-31';
+      return version.validFrom <= dateKey && validTo >= dateKey && validateOwnershipSplits(version.splits).isValid;
+    })
+    .sort((a, b) => b.validFrom.localeCompare(a.validFrom))[0];
+
+  return normalizeOwnershipSplits(matchingVersion?.splits ?? profile.splits);
+}
+
+export function isOwnershipProfileAssignable(
+  profile: OwnershipProfile,
+  config: HouseholdConfig | null | undefined
+): boolean {
+  if (!isHouseholdEnabled(config)) {
+    return profile.id === DEFAULT_PROFILE_SELF_ID;
+  }
+  if (profile.active === false || profile.archived === true) return false;
+
+  const activeParticipantIds = new Set(getEffectiveHouseholdParticipants(config).map((participant) => participant.id));
+  return getProfileSplitsForDate(profile).every((split) => activeParticipantIds.has(split.participantId));
+}
+
+export function getAssignableOwnershipProfiles(
+  config: HouseholdConfig | null | undefined
+): OwnershipProfile[] {
+  return getEffectiveOwnershipProfiles(config).filter((profile) => isOwnershipProfileAssignable(profile, config));
+}
+
 export function validateOwnershipSplits(splits: OwnershipSplit[]): { isValid: boolean; message?: string } {
   if (!splits.length) {
     return { isValid: false, message: 'Serve almeno un partecipante.' };
@@ -191,11 +245,14 @@ export function getDefaultProfile(config: HouseholdConfig | null | undefined, pr
   );
 }
 
-export function profileToAssignment(profile: OwnershipProfile): OwnershipAssignment {
+export function profileToAssignment(
+  profile: OwnershipProfile,
+  date: Date | string | undefined | null = new Date()
+): OwnershipAssignment {
   return {
     profileId: profile.id,
     profileName: profile.name,
-    splits: normalizeOwnershipSplits(profile.splits),
+    splits: getProfileSplitsForDate(profile, date),
   };
 }
 
@@ -205,14 +262,24 @@ function hasValidSplits(splits: OwnershipSplit[] | undefined): splits is Ownersh
 
 export function resolveAssetOwnership(
   asset: Pick<Asset, 'ownershipProfileId' | 'ownershipProfileName' | 'ownershipSplits'>,
-  config?: HouseholdConfig | null
+  config?: HouseholdConfig | null,
+  date?: Date | string | null
 ): OwnershipAssignment {
   const resolvedConfig = config ?? getDefaultHouseholdConfig();
+  const storedProfile = getOwnershipProfile(resolvedConfig, asset.ownershipProfileId);
 
   if (
     isHouseholdEnabled(resolvedConfig) &&
     asset.ownershipProfileId &&
-    getOwnershipProfile(resolvedConfig, asset.ownershipProfileId) &&
+    storedProfile?.versions?.length
+  ) {
+    return profileToAssignment(storedProfile, date);
+  }
+
+  if (
+    isHouseholdEnabled(resolvedConfig) &&
+    asset.ownershipProfileId &&
+    storedProfile &&
     hasValidSplits(asset.ownershipSplits)
   ) {
     return {
@@ -223,7 +290,7 @@ export function resolveAssetOwnership(
   }
 
   const profile = getDefaultProfile(resolvedConfig, asset.ownershipProfileId ?? resolvedConfig.defaultAssetProfileId);
-  return profileToAssignment(profile);
+  return profileToAssignment(profile, date);
 }
 
 function ruleMatchesExpense(rule: AttributionRule, expense: Expense): boolean {
@@ -257,15 +324,25 @@ export function findAttributionRule(expense: Expense, config: HouseholdConfig): 
 }
 
 export function resolveExpenseAttribution(
-  expense: Pick<Expense, 'type' | 'categoryId' | 'subCategoryId' | 'linkedCashAssetId' | 'attributionProfileId' | 'attributionProfileName' | 'attributionSplits'>,
+  expense: Pick<Expense, 'type' | 'categoryId' | 'subCategoryId' | 'linkedCashAssetId' | 'attributionProfileId' | 'attributionProfileName' | 'attributionSplits'> & Partial<Pick<Expense, 'date'>>,
   config?: HouseholdConfig | null
 ): OwnershipAssignment {
   const resolvedConfig = config ?? getDefaultHouseholdConfig();
+  const effectiveDate = toDate((expense as Expense).date);
+  const attributionProfile = getOwnershipProfile(resolvedConfig, expense.attributionProfileId);
 
   if (
     isHouseholdEnabled(resolvedConfig) &&
     expense.attributionProfileId &&
-    getOwnershipProfile(resolvedConfig, expense.attributionProfileId) &&
+    attributionProfile?.versions?.length
+  ) {
+    return profileToAssignment(attributionProfile, effectiveDate);
+  }
+
+  if (
+    isHouseholdEnabled(resolvedConfig) &&
+    expense.attributionProfileId &&
+    attributionProfile &&
     hasValidSplits(expense.attributionSplits)
   ) {
     return {
@@ -278,6 +355,11 @@ export function resolveExpenseAttribution(
   const fullExpense = expense as Expense;
   const rule = findAttributionRule(fullExpense, resolvedConfig);
   if (rule && hasValidSplits(rule.ownershipSplits)) {
+    const ruleProfile = getOwnershipProfile(resolvedConfig, rule.ownershipProfileId);
+    if (ruleProfile?.versions?.length) {
+      return profileToAssignment(ruleProfile, effectiveDate);
+    }
+
     return {
       profileId: rule.ownershipProfileId,
       profileName: rule.ownershipProfileName,
@@ -288,7 +370,7 @@ export function resolveExpenseAttribution(
   const fallbackId = expense.type === 'income'
     ? resolvedConfig.defaultIncomeProfileId
     : resolvedConfig.defaultExpenseProfileId;
-  return profileToAssignment(getDefaultProfile(resolvedConfig, fallbackId));
+  return profileToAssignment(getDefaultProfile(resolvedConfig, fallbackId), effectiveDate);
 }
 
 export function allocateAmountBySplits(amount: number, splits: OwnershipSplit[]): ParticipantAllocation[] {
@@ -371,7 +453,7 @@ export function calculateMonthlyCompensations(
 
     const paymentAsset = expense.linkedCashAssetId ? assetsById.get(expense.linkedCashAssetId) : undefined;
     const payerAssignment = paymentAsset
-      ? resolveAssetOwnership(paymentAsset, config)
+      ? resolveAssetOwnership(paymentAsset, config, toDate(expense.date))
       : resolveExpenseAttribution(expense, config);
     const attributionAssignment = resolveExpenseAttribution(expense, config);
 
@@ -393,8 +475,8 @@ export function calculateMonthlyCompensations(
     if (!fromAsset || !toAsset) continue;
 
     const amount = Math.abs(transfer.amount);
-    const fromAssignment = resolveAssetOwnership(fromAsset, config);
-    const toAssignment = resolveAssetOwnership(toAsset, config);
+    const fromAssignment = resolveAssetOwnership(fromAsset, config, toDate(transfer.date));
+    const toAssignment = resolveAssetOwnership(toAsset, config, toDate(transfer.date));
 
     for (const allocation of allocateAmountBySplits(amount, fromAssignment.splits)) {
       addAmount(rows, effectiveParticipants, allocation, 'settlementPaid');
@@ -441,7 +523,8 @@ export function calculateMonthlyCompensations(
 export function buildOwnershipSnapshotBreakdown(
   assets: Asset[],
   calculateValue: (asset: Asset) => number,
-  config: HouseholdConfig = getDefaultHouseholdConfig()
+  config: HouseholdConfig = getDefaultHouseholdConfig(),
+  date: Date | string | null = new Date()
 ) {
   const byOwnershipProfile: NonNullable<MonthlySnapshot['byOwnershipProfile']> = {};
   const byParticipant: NonNullable<MonthlySnapshot['byParticipant']> = {};
@@ -449,7 +532,7 @@ export function buildOwnershipSnapshotBreakdown(
   const byAsset = assets
     .filter((asset) => asset.quantity > 0)
     .map((asset) => {
-      const ownership = resolveAssetOwnership(asset, config);
+      const ownership = resolveAssetOwnership(asset, config, date);
       const totalValue = calculateValue(asset);
 
       byOwnershipProfile[ownership.profileId] = byOwnershipProfile[ownership.profileId] ?? {

@@ -42,7 +42,7 @@ import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { Asset, AssetFormData, AssetType, AssetClass, AssetAllocationTarget, AssetComposition, CouponFrequency, BondDetails, CouponRateTier, PensionFundDetails } from '@/types/assets';
 import { createAsset, updateAsset } from '@/lib/services/assetService';
 import { useHouseholdConfig } from '@/lib/hooks/useHousehold';
-import { getDefaultProfile, getEffectiveOwnershipProfiles, isHouseholdEnabled, profileToAssignment } from '@/lib/utils/householdUtils';
+import { getAssignableOwnershipProfiles, getDefaultProfile, isHouseholdEnabled, profileToAssignment } from '@/lib/utils/householdUtils';
 import { DEFAULT_PROFILE_SELF_ID } from '@/types/household';
 import { getNextCouponDate, calculateCouponPerShare, getApplicableCouponRate } from '@/lib/utils/couponUtils';
 import { getTargets, addSubCategory } from '@/lib/services/assetAllocationService';
@@ -482,7 +482,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
     ? householdConfig?.defaultAssetProfileId || DEFAULT_PROFILE_SELF_ID
     : DEFAULT_PROFILE_SELF_ID;
   const ownershipProfiles = useMemo(
-    () => (householdEnabled ? getEffectiveOwnershipProfiles(householdConfig) : []),
+    () => (householdEnabled ? getAssignableOwnershipProfiles(householdConfig) : []),
     [householdConfig, householdEnabled]
   );
 

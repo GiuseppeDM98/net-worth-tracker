@@ -34,7 +34,7 @@ import { BudgetItem } from '@/types/budget';
 import { getBudgetConfig, saveBudgetConfig } from '@/lib/services/budgetService';
 import { appendHouseholdAuditEntrySafe } from '@/lib/services/householdService';
 import { useHouseholdConfig } from '@/lib/hooks/useHousehold';
-import { getEffectiveOwnershipProfiles, isHouseholdEnabled, profileToAssignment } from '@/lib/utils/householdUtils';
+import { getAssignableOwnershipProfiles, isHouseholdEnabled, profileToAssignment } from '@/lib/utils/householdUtils';
 import {
   buildBudgetComparison,
   getDefaultMonthlyAmount,
@@ -217,7 +217,7 @@ export function BudgetTab({
   const { data: householdConfig } = useHouseholdConfig(userId);
   const householdEnabled = isHouseholdEnabled(householdConfig);
   const householdProfiles = useMemo(
-    () => (householdEnabled ? getEffectiveOwnershipProfiles(householdConfig) : []),
+    () => (householdEnabled ? getAssignableOwnershipProfiles(householdConfig) : []),
     [householdConfig, householdEnabled]
   );
   const [selectedAttributionProfileId, setSelectedAttributionProfileId] = useState('__all__');

@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   buildOwnershipSnapshotBreakdown,
   calculateMonthlyCompensations,
+  getAssignableOwnershipProfiles,
   getDefaultHouseholdConfig,
+  getProfileSplitsForDate,
+  inferOwnershipProfileType,
   resolveExpenseAttribution,
   validateOwnershipSplits,
 } from '@/lib/utils/householdUtils';
@@ -199,6 +202,136 @@ describe('resolveExpenseAttribution', () => {
 
     expect(attribution.profileId).toBe(DEFAULT_PROFILE_SELF_ID);
   });
+
+  it('uses the profile version valid on the expense date', () => {
+    const config = makeEnabledConfig();
+    config.profiles = config.profiles.map((profile) =>
+      profile.id === SHARED_PROFILE_ID
+        ? {
+            ...profile,
+            versions: [
+              {
+                id: 'v-jan',
+                validFrom: '2026-01-01',
+                splits: [
+                  { participantId: 'self', participantName: 'Io', percentage: 50 },
+                  { participantId: PARTNER_ID, participantName: 'Moglie', percentage: 50 },
+                ],
+              },
+              {
+                id: 'v-jul',
+                validFrom: '2026-07-01',
+                splits: [
+                  { participantId: 'self', participantName: 'Io', percentage: 70 },
+                  { participantId: PARTNER_ID, participantName: 'Moglie', percentage: 30 },
+                ],
+              },
+            ],
+          }
+        : profile
+    );
+
+    const juneAttribution = resolveExpenseAttribution(
+      makeExpense({
+        date: new Date(2026, 5, 30),
+        attributionProfileId: SHARED_PROFILE_ID,
+        attributionSplits: [{ participantId: 'self', participantName: 'Io', percentage: 100 }],
+      }),
+      config
+    );
+    const julyAttribution = resolveExpenseAttribution(
+      makeExpense({
+        date: new Date(2026, 6, 1),
+        attributionProfileId: SHARED_PROFILE_ID,
+        attributionSplits: [{ participantId: 'self', participantName: 'Io', percentage: 100 }],
+      }),
+      config
+    );
+
+    expect(juneAttribution.splits).toEqual([
+      { participantId: 'self', participantName: 'Io', percentage: 50 },
+      { participantId: PARTNER_ID, participantName: 'Moglie', percentage: 50 },
+    ]);
+    expect(julyAttribution.splits).toEqual([
+      { participantId: 'self', participantName: 'Io', percentage: 70 },
+      { participantId: PARTNER_ID, participantName: 'Moglie', percentage: 30 },
+    ]);
+  });
+});
+
+describe('ownership profile management helpers', () => {
+  it('infers custom profiles for uneven or multi-person splits', () => {
+    expect(inferOwnershipProfileType([
+      { participantId: 'self', participantName: 'Io', percentage: 70 },
+      { participantId: PARTNER_ID, participantName: 'Moglie', percentage: 30 },
+    ])).toBe('custom');
+    expect(inferOwnershipProfileType([
+      { participantId: 'self', participantName: 'Io', percentage: 33.33 },
+      { participantId: PARTNER_ID, participantName: 'Moglie', percentage: 33.33 },
+      { participantId: 'child', participantName: 'Figlio', percentage: 33.34 },
+    ])).toBe('custom');
+  });
+
+  it('keeps archived profiles resolvable but excludes them from new assignments', () => {
+    const config = makeEnabledConfig();
+    config.participants = config.participants.map((participant) =>
+      participant.id === PARTNER_ID ? { ...participant, active: false } : participant
+    );
+    config.profiles = config.profiles.map((profile) =>
+      profile.id === SHARED_PROFILE_ID ? { ...profile, archived: true } : profile
+    );
+
+    expect(getAssignableOwnershipProfiles(config).map((profile) => profile.id)).toEqual([DEFAULT_PROFILE_SELF_ID]);
+
+    const attribution = resolveExpenseAttribution(
+      makeExpense({
+        attributionProfileId: SHARED_PROFILE_ID,
+        attributionProfileName: 'Comune 50/50',
+        attributionSplits: config.profiles.find((profile) => profile.id === SHARED_PROFILE_ID)!.splits,
+      }),
+      config
+    );
+
+    expect(attribution.profileId).toBe(SHARED_PROFILE_ID);
+    expect(attribution.splits).toEqual([
+      { participantId: 'self', participantName: 'Io', percentage: 50 },
+      { participantId: PARTNER_ID, participantName: 'Moglie', percentage: 50 },
+    ]);
+  });
+
+  it('returns the latest profile version valid for a date', () => {
+    const config = makeEnabledConfig();
+    const profile = {
+      ...config.profiles.find((item) => item.id === SHARED_PROFILE_ID)!,
+      versions: [
+        {
+          id: 'v-1',
+          validFrom: '2026-01-01',
+          splits: [
+            { participantId: 'self', participantName: 'Io', percentage: 60 },
+            { participantId: PARTNER_ID, participantName: 'Moglie', percentage: 40 },
+          ],
+        },
+        {
+          id: 'v-2',
+          validFrom: '2026-09-01',
+          splits: [
+            { participantId: 'self', participantName: 'Io', percentage: 80 },
+            { participantId: PARTNER_ID, participantName: 'Moglie', percentage: 20 },
+          ],
+        },
+      ],
+    };
+
+    expect(getProfileSplitsForDate(profile, new Date(2026, 7, 1))).toEqual([
+      { participantId: 'self', participantName: 'Io', percentage: 60 },
+      { participantId: PARTNER_ID, participantName: 'Moglie', percentage: 40 },
+    ]);
+    expect(getProfileSplitsForDate(profile, new Date(2026, 8, 1))).toEqual([
+      { participantId: 'self', participantName: 'Io', percentage: 80 },
+      { participantId: PARTNER_ID, participantName: 'Moglie', percentage: 20 },
+    ]);
+  });
 });
 
 describe('calculateMonthlyCompensations', () => {
@@ -290,5 +423,47 @@ describe('buildOwnershipSnapshotBreakdown', () => {
     expect(breakdown.byAsset[0].ownershipProfileId).toBe(DEFAULT_PROFILE_SELF_ID);
     expect(breakdown.byParticipant.self.totalValue).toBe(200);
     expect(breakdown.byParticipant[PARTNER_ID]).toBeUndefined();
+  });
+
+  it('uses profile versions for dated snapshot ownership', () => {
+    const config = makeEnabledConfig();
+    config.profiles = config.profiles.map((profile) =>
+      profile.id === SHARED_PROFILE_ID
+        ? {
+            ...profile,
+            versions: [
+              {
+                id: 'v-jan',
+                validFrom: '2026-01-01',
+                splits: [
+                  { participantId: 'self', participantName: 'Io', percentage: 50 },
+                  { participantId: PARTNER_ID, participantName: 'Moglie', percentage: 50 },
+                ],
+              },
+              {
+                id: 'v-jul',
+                validFrom: '2026-07-01',
+                splits: [
+                  { participantId: 'self', participantName: 'Io', percentage: 70 },
+                  { participantId: PARTNER_ID, participantName: 'Moglie', percentage: 30 },
+                ],
+              },
+            ],
+          }
+        : profile
+    );
+    const assets = [
+      makeAsset({ id: 'cash-comune', quantity: 100, ...assignment(config, SHARED_PROFILE_ID) }),
+    ];
+
+    const breakdown = buildOwnershipSnapshotBreakdown(
+      assets,
+      (asset) => asset.quantity,
+      config,
+      new Date(2026, 6, 1)
+    );
+
+    expect(breakdown.byParticipant.self.totalValue).toBe(70);
+    expect(breakdown.byParticipant[PARTNER_ID].totalValue).toBe(30);
   });
 });

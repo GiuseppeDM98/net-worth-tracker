@@ -71,7 +71,15 @@ import { CategoryMoveDialog } from '@/components/expenses/CategoryMoveDialog';
 import { CreateDummySnapshotModal } from '@/components/CreateDummySnapshotModal';
 import { DeleteDummyDataDialog } from '@/components/DeleteDummyDataDialog';
 import { getHouseholdConfig, saveHouseholdConfig } from '@/lib/services/householdService';
-import { getEffectiveOwnershipProfiles, isHouseholdEnabled, profileToAssignment, validateOwnershipSplits } from '@/lib/utils/householdUtils';
+import {
+  getAssignableOwnershipProfiles,
+  getEffectiveOwnershipProfiles,
+  getProfileSplitsForDate,
+  inferOwnershipProfileType,
+  isHouseholdEnabled,
+  profileToAssignment,
+  validateOwnershipSplits,
+} from '@/lib/utils/householdUtils';
 import { createId } from '@/lib/utils/idHelpers';
 import {
   DEFAULT_PARTICIPANT_SELF_ID,
@@ -161,6 +169,10 @@ export default function SettingsPage() {
   const [newRuleCashAssetId, setNewRuleCashAssetId] = useState('__any__');
   const [newRuleProfileId, setNewRuleProfileId] = useState(DEFAULT_PROFILE_SELF_ID);
   const [newParticipantName, setNewParticipantName] = useState('');
+  const [profileEditorId, setProfileEditorId] = useState('__new__');
+  const [profileDraftName, setProfileDraftName] = useState('');
+  const [profileDraftValidFrom, setProfileDraftValidFrom] = useState(() => new Date().toISOString().slice(0, 10));
+  const [profileDraftPercentages, setProfileDraftPercentages] = useState<Record<string, string>>({});
   const [assetClassStates, setAssetClassStates] = useState<
     Record<AssetClass, AssetClassState>
   >({} as Record<AssetClass, AssetClassState>);
@@ -961,6 +973,148 @@ export default function SettingsPage() {
     setNewRuleProfileId(nextConfig.defaultExpenseProfileId || DEFAULT_PROFILE_SELF_ID);
   };
 
+  const buildProfileDraftSplits = () =>
+    profileEditorParticipants
+      .map((participant) => ({
+        participantId: participant.id,
+        participantName: participant.name,
+        percentage: Number(profileDraftPercentages[participant.id] || 0),
+      }))
+      .filter((split) => split.percentage > 0);
+
+  const setProfileDraftFromProfile = (profileId: string) => {
+    setProfileEditorId(profileId);
+    setProfileDraftValidFrom(new Date().toISOString().slice(0, 10));
+
+    if (profileId === '__new__' || !householdConfig) {
+      setProfileDraftName('');
+      setProfileDraftPercentages(
+        Object.fromEntries(householdParticipants.map((participant) => [participant.id, '0']))
+      );
+      return;
+    }
+
+    const profile = householdConfig.profiles.find((item) => item.id === profileId);
+    if (!profile) return;
+
+    const splits = getProfileSplitsForDate(profile);
+    const participantIds = new Set(householdParticipants.map((participant) => participant.id));
+    const participantsForDraft = [
+      ...householdParticipants,
+      ...splits
+        .filter((split) => !participantIds.has(split.participantId))
+        .map((split) => householdConfig.participants.find((participant) => participant.id === split.participantId))
+        .filter((participant): participant is HouseholdParticipant => !!participant),
+    ];
+
+    setProfileDraftName(profile.name);
+    setProfileDraftPercentages(
+      Object.fromEntries(
+        participantsForDraft.map((participant) => {
+          const split = splits.find((item) => item.participantId === participant.id);
+          return [participant.id, split ? String(split.percentage) : '0'];
+        })
+      )
+    );
+  };
+
+  const handleEqualizeProfileDraftSplits = () => {
+    if (profileEditorParticipants.length === 0) return;
+    const base = Number((100 / profileEditorParticipants.length).toFixed(2));
+    const values: Record<string, string> = {};
+    let assigned = 0;
+    profileEditorParticipants.forEach((participant, index) => {
+      const value = index === profileEditorParticipants.length - 1
+        ? Number((100 - assigned).toFixed(2))
+        : base;
+      assigned += value;
+      values[participant.id] = String(value);
+    });
+    setProfileDraftPercentages(values);
+  };
+
+  const handleSaveOwnershipProfileDraft = () => {
+    if (!householdConfig) return;
+    const name = profileDraftName.trim();
+    if (!name) {
+      toast.error('Inserisci il nome del profilo');
+      return;
+    }
+    if (!profileDraftValidFrom) {
+      toast.error('Seleziona la data di validità');
+      return;
+    }
+
+    const splits = buildProfileDraftSplits();
+    const validation = validateOwnershipSplits(splits);
+    if (!validation.isValid) {
+      toast.error(validation.message || 'Split non valido');
+      return;
+    }
+
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const shouldUpdateCurrentSplits = profileDraftValidFrom <= todayKey;
+
+    if (profileEditorId === '__new__') {
+      const maxProfileOrder = Math.max(0, ...householdConfig.profiles.map((profile) => profile.sortOrder ?? 0));
+      const profile: OwnershipProfile = {
+        id: createId('profile'),
+        name,
+        type: inferOwnershipProfileType(splits),
+        splits,
+        versions: [{
+          id: createId('profile-version'),
+          validFrom: profileDraftValidFrom,
+          splits,
+          createdAt: new Date(),
+        }],
+        sortOrder: maxProfileOrder + 1,
+        active: true,
+      };
+
+      setHouseholdConfig({
+        ...householdConfig,
+        profiles: [...householdConfig.profiles, profile],
+      });
+      setProfileEditorId(profile.id);
+      toast.success('Profilo creato');
+      return;
+    }
+
+    if (profileEditorId === DEFAULT_PROFILE_SELF_ID) {
+      toast.error('Il profilo personale principale non può essere modificato dagli split');
+      return;
+    }
+
+    const profiles = householdConfig.profiles.map((profile) => {
+      if (profile.id !== profileEditorId) return profile;
+      const versions = [
+        ...(profile.versions ?? []).filter((version) => version.validFrom !== profileDraftValidFrom),
+        {
+          id: createId('profile-version'),
+          validFrom: profileDraftValidFrom,
+          splits,
+          createdAt: new Date(),
+        },
+      ].sort((a, b) => a.validFrom.localeCompare(b.validFrom));
+
+      return {
+        ...profile,
+        name,
+        type: inferOwnershipProfileType(splits),
+        splits: shouldUpdateCurrentSplits ? splits : profile.splits,
+        versions,
+      };
+    });
+
+    setHouseholdConfig({
+      ...householdConfig,
+      profiles,
+      attributionRules: syncRulesWithProfiles(householdConfig.attributionRules, profiles),
+    });
+    toast.success('Profilo aggiornato');
+  };
+
   const handleAddHouseholdParticipant = () => {
     if (!householdConfig) return;
     const name = newParticipantName.trim();
@@ -999,17 +1153,30 @@ export default function SettingsPage() {
       name: `${name} 100%`,
       type: 'personal',
       splits: [{ participantId, participantName: name, percentage: 100 }],
+      versions: [{
+        id: createId('profile-version'),
+        validFrom: new Date().toISOString().slice(0, 10),
+        splits: [{ participantId, participantName: name, percentage: 100 }],
+        createdAt: new Date(),
+      }],
       sortOrder: maxProfileOrder + 1,
       active: true,
     };
+    const sharedSplits = [
+      { participantId: DEFAULT_PARTICIPANT_SELF_ID, participantName: selfName, percentage: 50 },
+      { participantId, participantName: name, percentage: 50 },
+    ];
     const sharedProfile: OwnershipProfile = {
       id: createId('profile'),
       name: `Comune con ${name} 50/50`,
       type: 'shared',
-      splits: [
-        { participantId: DEFAULT_PARTICIPANT_SELF_ID, participantName: selfName, percentage: 50 },
-        { participantId, participantName: name, percentage: 50 },
-      ],
+      splits: sharedSplits,
+      versions: [{
+        id: createId('profile-version'),
+        validFrom: new Date().toISOString().slice(0, 10),
+        splits: sharedSplits,
+        createdAt: new Date(),
+      }],
       sortOrder: maxProfileOrder + 2,
       active: true,
     };
@@ -1039,6 +1206,12 @@ export default function SettingsPage() {
       const splits = profile.splits.map((split) =>
         split.participantId === participantId ? { ...split, participantName } : split
       );
+      const versions = profile.versions?.map((version) => ({
+        ...version,
+        splits: version.splits.map((split) =>
+          split.participantId === participantId ? { ...split, participantName } : split
+        ),
+      }));
       const isPersonalProfile =
         profile.type === 'personal' &&
         profile.splits.length === 1 &&
@@ -1047,6 +1220,7 @@ export default function SettingsPage() {
         ...profile,
         name: isPersonalProfile ? `${participantName || 'Persona'} 100%` : profile.name,
         splits,
+        ...(versions ? { versions } : {}),
       };
     });
 
@@ -1060,17 +1234,22 @@ export default function SettingsPage() {
 
   const handleRemoveHouseholdParticipant = (participantId: string) => {
     if (!householdConfig || participantId === DEFAULT_PARTICIPANT_SELF_ID) return;
-    const removedProfileIds = new Set(
+    const archivedAt = new Date();
+    const archivedProfileIds = new Set(
       householdConfig.profiles
         .filter((profile) => profile.splits.some((split) => split.participantId === participantId))
         .map((profile) => profile.id)
     );
-    const participants = householdConfig.participants.filter((participant) => participant.id !== participantId);
-    const profiles = householdConfig.profiles.filter((profile) => !removedProfileIds.has(profile.id));
-    const defaultAssetProfileId = removedProfileIds.has(householdConfig.defaultAssetProfileId)
+    const participants = householdConfig.participants.map((participant) =>
+      participant.id === participantId ? { ...participant, active: false, archivedAt } : participant
+    );
+    const profiles = householdConfig.profiles.map((profile) =>
+      archivedProfileIds.has(profile.id) ? { ...profile, archived: true, archivedAt } : profile
+    );
+    const defaultAssetProfileId = archivedProfileIds.has(householdConfig.defaultAssetProfileId)
       ? DEFAULT_PROFILE_SELF_ID
       : householdConfig.defaultAssetProfileId;
-    const defaultExpenseProfileId = removedProfileIds.has(householdConfig.defaultExpenseProfileId)
+    const defaultExpenseProfileId = archivedProfileIds.has(householdConfig.defaultExpenseProfileId)
       ? DEFAULT_PROFILE_SELF_ID
       : householdConfig.defaultExpenseProfileId;
 
@@ -1081,12 +1260,81 @@ export default function SettingsPage() {
       defaultAssetProfileId,
       defaultExpenseProfileId,
       defaultIncomeProfileId: DEFAULT_PROFILE_SELF_ID,
-      attributionRules: syncRulesWithProfiles(
-        householdConfig.attributionRules.filter((rule) => !removedProfileIds.has(rule.ownershipProfileId)),
-        profiles
+      attributionRules: householdConfig.attributionRules.map((rule) =>
+        archivedProfileIds.has(rule.ownershipProfileId) ? { ...rule, active: false } : rule
       ),
     });
     setNewRuleProfileId(defaultExpenseProfileId || DEFAULT_PROFILE_SELF_ID);
+  };
+
+  const handleRestoreHouseholdParticipant = (participantId: string) => {
+    if (!householdConfig) return;
+    const participants = householdConfig.participants.map((participant) => {
+      if (participant.id !== participantId) return participant;
+      const { archivedAt, ...rest } = participant;
+      return { ...rest, active: true };
+    });
+    const activeParticipantIds = new Set(
+      participants
+        .filter((participant) => participant.active !== false)
+        .map((participant) => participant.id)
+    );
+    const profiles = householdConfig.profiles.map((profile) => {
+      const canRestoreProfile = profile.splits.every((split) => activeParticipantIds.has(split.participantId));
+      if (!canRestoreProfile) return profile;
+      const { archivedAt, ...rest } = profile;
+      return { ...rest, archived: false };
+    });
+
+    setHouseholdConfig({
+      ...householdConfig,
+      participants,
+      profiles,
+    });
+  };
+
+  const handleArchiveOwnershipProfile = (profileId: string) => {
+    if (!householdConfig || profileId === DEFAULT_PROFILE_SELF_ID) return;
+    const archivedAt = new Date();
+    const profiles = householdConfig.profiles.map((profile) =>
+      profile.id === profileId ? { ...profile, archived: true, archivedAt } : profile
+    );
+    const defaultAssetProfileId = householdConfig.defaultAssetProfileId === profileId
+      ? DEFAULT_PROFILE_SELF_ID
+      : householdConfig.defaultAssetProfileId;
+    const defaultExpenseProfileId = householdConfig.defaultExpenseProfileId === profileId
+      ? DEFAULT_PROFILE_SELF_ID
+      : householdConfig.defaultExpenseProfileId;
+
+    setHouseholdConfig({
+      ...householdConfig,
+      profiles,
+      defaultAssetProfileId,
+      defaultExpenseProfileId,
+      attributionRules: householdConfig.attributionRules.map((rule) =>
+        rule.ownershipProfileId === profileId ? { ...rule, active: false } : rule
+      ),
+    });
+    if (profileEditorId === profileId) {
+      setProfileDraftFromProfile('__new__');
+    }
+  };
+
+  const handleRestoreOwnershipProfile = (profileId: string) => {
+    if (!householdConfig) return;
+    const activeParticipantIds = new Set(householdParticipants.map((participant) => participant.id));
+    const profile = householdConfig.profiles.find((item) => item.id === profileId);
+    if (!profile || !profile.splits.every((split) => activeParticipantIds.has(split.participantId))) {
+      toast.error('Ripristina prima tutte le persone usate da questo profilo');
+      return;
+    }
+
+    const profiles = householdConfig.profiles.map((item) => {
+      if (item.id !== profileId) return item;
+      const { archivedAt, ...rest } = item;
+      return { ...rest, archived: false };
+    });
+    setHouseholdConfig({ ...householdConfig, profiles });
   };
 
   const handleDefaultHouseholdProfileChange = (
@@ -1107,7 +1355,7 @@ export default function SettingsPage() {
       return;
     }
 
-    const profile = getEffectiveOwnershipProfiles(householdConfig).find((item) => item.id === newRuleProfileId);
+    const profile = getAssignableOwnershipProfiles(householdConfig).find((item) => item.id === newRuleProfileId);
     if (!profile) {
       toast.error('Seleziona un profilo valido');
       return;
@@ -1172,7 +1420,7 @@ export default function SettingsPage() {
         return;
       }
       const invalidProfile = getEffectiveOwnershipProfiles(householdConfig).find(
-        (profile) => !validateOwnershipSplits(profile.splits).isValid
+        (profile) => profile.active !== false && !validateOwnershipSplits(profile.splits).isValid
       );
       if (invalidProfile) {
         toast.error(`Il profilo ${invalidProfile.name} ha percentuali non valide`);
@@ -1707,12 +1955,34 @@ export default function SettingsPage() {
     () => getEffectiveOwnershipProfiles(householdConfig),
     [householdConfig]
   );
+  const assignableHouseholdProfiles = useMemo(
+    () => getAssignableOwnershipProfiles(householdConfig),
+    [householdConfig]
+  );
   const householdParticipants = useMemo(
     () => (householdConfig?.participants ?? [])
       .filter((participant) => participant.active !== false)
       .sort((a, b) => a.sortOrder - b.sortOrder),
     [householdConfig]
   );
+  const archivedHouseholdParticipants = useMemo(
+    () => (householdConfig?.participants ?? [])
+      .filter((participant) => participant.active === false)
+      .sort((a, b) => a.sortOrder - b.sortOrder),
+    [householdConfig]
+  );
+  const profileEditorParticipants = useMemo(() => {
+    const activeParticipants = [...householdParticipants];
+    const selectedProfile = householdConfig?.profiles.find((profile) => profile.id === profileEditorId);
+    if (!selectedProfile) return activeParticipants;
+
+    const existingIds = new Set(activeParticipants.map((participant) => participant.id));
+    const archivedParticipantsInProfile = selectedProfile.splits
+      .map((split) => householdConfig?.participants.find((participant) => participant.id === split.participantId))
+      .filter((participant): participant is HouseholdParticipant => !!participant && !existingIds.has(participant.id));
+
+    return [...activeParticipants, ...archivedParticipantsInProfile].sort((a, b) => a.sortOrder - b.sortOrder);
+  }, [householdConfig, householdParticipants, profileEditorId]);
 
   const hasUnsavedAllocationChanges =
     allocationBaselineKey.length > 0 && allocationSnapshotKey !== allocationBaselineKey;
@@ -3076,7 +3346,7 @@ export default function SettingsPage() {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {householdProfiles.map((profile) => (
+                                {assignableHouseholdProfiles.map((profile) => (
                                   <SelectItem key={profile.id} value={profile.id}>{profile.name}</SelectItem>
                                 ))}
                               </SelectContent>
@@ -3096,7 +3366,7 @@ export default function SettingsPage() {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {householdProfiles.map((profile) => (
+                                {assignableHouseholdProfiles.map((profile) => (
                                   <SelectItem key={profile.id} value={profile.id}>{profile.name}</SelectItem>
                                 ))}
                               </SelectContent>
@@ -3113,11 +3383,98 @@ export default function SettingsPage() {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {householdProfiles.map((profile) => (
+                                {assignableHouseholdProfiles.map((profile) => (
                                   <SelectItem key={profile.id} value={profile.id}>{profile.name}</SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
+                          </div>
+                        </div>
+
+                        <div className="rounded-md border p-4 space-y-4">
+                          <div className="grid gap-4 desktop:grid-cols-3 desktop:items-end">
+                            <div className="space-y-2">
+                              <Label>Profilo</Label>
+                              <Select value={profileEditorId} onValueChange={setProfileDraftFromProfile}>
+                                <SelectTrigger className={interactiveControlClass}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="__new__">Nuovo profilo custom</SelectItem>
+                                  {householdProfiles
+                                    .filter((profile) => profile.id !== DEFAULT_PROFILE_SELF_ID)
+                                    .map((profile) => (
+                                      <SelectItem key={profile.id} value={profile.id}>{profile.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Nome profilo</Label>
+                              <Input
+                                value={profileDraftName}
+                                onChange={(event) => setProfileDraftName(event.target.value)}
+                                placeholder="es. Comune casa 70/30"
+                                className={interactiveControlClass}
+                                disabled={isDemo}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Valido dal</Label>
+                              <Input
+                                type="date"
+                                value={profileDraftValidFrom}
+                                onChange={(event) => setProfileDraftValidFrom(event.target.value)}
+                                className={interactiveControlClass}
+                                disabled={isDemo}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid gap-3 desktop:grid-cols-3">
+                            {profileEditorParticipants.map((participant) => (
+                              <div key={participant.id} className="space-y-2">
+                                <Label className="text-xs">
+                                  {participant.name}
+                                  {participant.active === false && (
+                                    <span className="ml-1 text-muted-foreground">(archiviata)</span>
+                                  )}
+                                </Label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  step="0.01"
+                                  value={profileDraftPercentages[participant.id] ?? '0'}
+                                  onChange={(event) =>
+                                    setProfileDraftPercentages((prev) => ({
+                                      ...prev,
+                                      [participant.id]: event.target.value,
+                                    }))
+                                  }
+                                  className={interactiveControlClass}
+                                  disabled={isDemo || participant.active === false}
+                                />
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={handleEqualizeProfileDraftSplits}
+                              disabled={isDemo || profileEditorParticipants.length === 0}
+                            >
+                              Dividi equamente
+                            </Button>
+                            <Button
+                              type="button"
+                              onClick={handleSaveOwnershipProfileDraft}
+                              disabled={isDemo || profileEditorId === DEFAULT_PROFILE_SELF_ID}
+                            >
+                              {profileEditorId === '__new__' ? 'Crea profilo' : 'Salva versione'}
+                            </Button>
                           </div>
                         </div>
 
@@ -3153,13 +3510,43 @@ export default function SettingsPage() {
                       ))}
                     </div>
 
+                    {archivedHouseholdParticipants.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Persone archiviate</p>
+                        <div className="grid gap-2 desktop:grid-cols-2">
+                          {archivedHouseholdParticipants.map((participant) => (
+                            <div key={participant.id} className="flex items-center justify-between rounded-md border border-dashed p-3">
+                              <span className="text-sm text-muted-foreground">{participant.name}</span>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleRestoreHouseholdParticipant(participant.id)}
+                                disabled={isDemo}
+                              >
+                                Ripristina
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="grid gap-3 desktop:grid-cols-3">
                       {householdProfiles.map((profile) => (
-                        <div key={profile.id} className="rounded-md border p-3">
+                        <div key={profile.id} className={`rounded-md border p-3 ${profile.archived ? 'border-dashed opacity-70' : ''}`}>
                           <p className="font-medium">{profile.name}</p>
                           <p className="mt-1 text-xs text-muted-foreground">
-                            {profile.splits.map((split) => `${split.participantName} ${split.percentage}%`).join(' · ')}
+                            {getProfileSplitsForDate(profile).map((split) => `${split.participantName} ${split.percentage}%`).join(' · ')}
                           </p>
+                          {!!profile.versions?.length && (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {profile.versions.length} {profile.versions.length === 1 ? 'versione' : 'versioni'}
+                            </p>
+                          )}
+                          {profile.archived && (
+                            <p className="mt-1 text-xs text-muted-foreground">Profilo archiviato</p>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -3270,7 +3657,7 @@ export default function SettingsPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {householdProfiles.map((profile) => (
+                            {assignableHouseholdProfiles.map((profile) => (
                               <SelectItem key={profile.id} value={profile.id}>{profile.name}</SelectItem>
                             ))}
                           </SelectContent>
