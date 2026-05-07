@@ -12,6 +12,7 @@ interface CoverSectionProps {
   timeFilter?: TimeFilter;
   selectedYear?: number;
   selectedMonth?: number;
+  householdScopeLabel?: string;
 }
 
 /**
@@ -69,7 +70,7 @@ function getReportTypeLabel(
  * @param userName - User's display name
  * @param timeFilter - Report period (total/yearly/monthly)
  */
-export function CoverSection({ generatedAt, userName, timeFilter, selectedYear, selectedMonth }: CoverSectionProps) {
+export function CoverSection({ generatedAt, userName, timeFilter, selectedYear, selectedMonth, householdScopeLabel }: CoverSectionProps) {
   const formattedDate = format(generatedAt, 'dd/MM/yyyy', { locale: it });
 
   return (
@@ -89,7 +90,13 @@ export function CoverSection({ generatedAt, userName, timeFilter, selectedYear, 
         <Text style={styles.subtitle}>{userName}</Text>
 
         {/* Date */}
-        <Text style={styles.date}>Generato il {formattedDate}</Text>
+        <Text style={householdScopeLabel && householdScopeLabel !== 'Tutto' ? styles.date : styles.dateWithoutScope}>
+          Generato il {formattedDate}
+        </Text>
+
+        {householdScopeLabel && householdScopeLabel !== 'Tutto' && (
+          <Text style={styles.scope}>Vista: {householdScopeLabel}</Text>
+        )}
 
         {/* Divider */}
         <View style={styles.divider} />
@@ -152,6 +159,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Helvetica',
     color: '#6B7280',
+    marginBottom: 12,
+  },
+  dateWithoutScope: {
+    fontSize: 14,
+    fontFamily: 'Helvetica',
+    color: '#6B7280',
+    marginBottom: 40,
+  },
+  scope: {
+    fontSize: 12,
+    fontFamily: 'Helvetica-Bold',
+    color: '#374151',
     marginBottom: 40,
   },
   divider: {

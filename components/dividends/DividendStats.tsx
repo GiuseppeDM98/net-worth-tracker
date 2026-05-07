@@ -42,6 +42,8 @@ import { toast } from 'sonner';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { chartShellSettle } from '@/lib/utils/motionVariants';
 import { useCountUp } from '@/lib/utils/useCountUp';
+import { toDate } from '@/lib/utils/dateHelpers';
+import type { Dividend } from '@/types/dividend';
 
 // Custom tooltip that uses Tailwind dark-mode tokens for background/border,
 // while preserving per-series colors via entry.color.
@@ -78,6 +80,7 @@ interface DividendStatsProps {
   endDate?: Date;
   // When set, stats are filtered to a single asset (affects charts + metric cards)
   assetId?: string;
+  overrideDividends?: Dividend[];
 }
 
 interface DividendStatsData {
@@ -173,6 +176,89 @@ interface DividendStatsData {
 
 // COLORS is resolved inside DividendStats via useChartColors() — see below
 
+function summarizeDividends(dividends: Dividend[]) {
+  return dividends.reduce(
+    (total, dividend) => ({
+      totalGross: total.totalGross + (dividend.grossAmountEur ?? dividend.grossAmount),
+      totalTax: total.totalTax + (dividend.taxAmountEur ?? dividend.taxAmount),
+      totalNet: total.totalNet + (dividend.netAmountEur ?? dividend.netAmount),
+      count: total.count + 1,
+    }),
+    { totalGross: 0, totalTax: 0, totalNet: 0, count: 0 }
+  );
+}
+
+function buildClientDividendStats(
+  dividends: Dividend[],
+  startDate?: Date,
+  endDate?: Date,
+  assetId?: string
+): DividendStatsData {
+  const assetScopedDividends = assetId
+    ? dividends.filter((dividend) => dividend.assetId === assetId)
+    : dividends;
+  const periodDividends = assetScopedDividends.filter((dividend) => {
+    const paymentDate = toDate(dividend.paymentDate);
+    if (startDate && paymentDate < startDate) return false;
+    if (endDate && paymentDate > endDate) return false;
+    return true;
+  });
+  const now = new Date();
+
+  const byAsset = Array.from(
+    periodDividends.reduce((map, dividend) => {
+      const current = map.get(dividend.assetId) ?? {
+        assetTicker: dividend.assetTicker,
+        assetName: dividend.assetName,
+        totalNet: 0,
+        count: 0,
+      };
+      current.totalNet += dividend.netAmountEur ?? dividend.netAmount;
+      current.count += 1;
+      map.set(dividend.assetId, current);
+      return map;
+    }, new Map<string, DividendStatsData['byAsset'][number]>()).values()
+  ).sort((a, b) => b.totalNet - a.totalNet);
+
+  const byYear = Array.from(
+    periodDividends.reduce((map, dividend) => {
+      const year = toDate(dividend.paymentDate).getFullYear();
+      const current = map.get(year) ?? { year, totalGross: 0, totalTax: 0, totalNet: 0 };
+      current.totalGross += dividend.grossAmountEur ?? dividend.grossAmount;
+      current.totalTax += dividend.taxAmountEur ?? dividend.taxAmount;
+      current.totalNet += dividend.netAmountEur ?? dividend.netAmount;
+      map.set(year, current);
+      return map;
+    }, new Map<number, DividendStatsData['byYear'][number]>()).values()
+  ).sort((a, b) => a.year - b.year);
+
+  const byMonth = Array.from(
+    periodDividends.reduce((map, dividend) => {
+      const paymentDate = toDate(dividend.paymentDate);
+      const key = `${paymentDate.getFullYear()}-${String(paymentDate.getMonth() + 1).padStart(2, '0')}`;
+      const current = map.get(key) ?? {
+        month: paymentDate.toLocaleDateString('it-IT', { month: 'short', year: '2-digit' }),
+        totalNet: 0,
+      };
+      current.totalNet += dividend.netAmountEur ?? dividend.netAmount;
+      map.set(key, current);
+      return map;
+    }, new Map<string, DividendStatsData['byMonth'][number]>()).values()
+  );
+
+  return {
+    period: summarizeDividends(periodDividends),
+    allTime: summarizeDividends(assetScopedDividends),
+    averageYield: 0,
+    upcomingTotal: assetScopedDividends
+      .filter((dividend) => toDate(dividend.paymentDate) > now)
+      .reduce((sum, dividend) => sum + (dividend.netAmountEur ?? dividend.netAmount), 0),
+    byAsset,
+    byYear,
+    byMonth,
+  };
+}
+
 function SettledPercentValue({
   value,
   className,
@@ -235,7 +321,7 @@ function MetricInfoTooltip({ content }: { content: string }) {
   );
 }
 
-export function DividendStats({ startDate, endDate, assetId }: DividendStatsProps) {
+export function DividendStats({ startDate, endDate, assetId, overrideDividends }: DividendStatsProps) {
   const COLORS = useChartColors();
   const { user } = useAuth();
   const [stats, setStats] = useState<DividendStatsData | null>(null);
@@ -284,10 +370,16 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
   }, [stats]);
 
   useEffect(() => {
+    if (overrideDividends) {
+      setStats(buildClientDividendStats(overrideDividends, startDate, endDate, assetId));
+      setLoading(false);
+      return;
+    }
+
     if (user) {
       loadStats();
     }
-  }, [user, startDate, endDate, assetId]);
+  }, [user, startDate, endDate, assetId, overrideDividends]);
 
   const loadStats = async () => {
     if (!user) return;

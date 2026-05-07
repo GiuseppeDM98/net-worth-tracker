@@ -388,6 +388,21 @@ describe('generateEmailHtml', () => {
     expect(html).toContain('60.0%');
   });
 
+  it('shows household participant breakdown when available', () => {
+    const html = generateEmailHtml(
+      makeMonthlyData({
+        byParticipant: [
+          { name: 'Giuseppe', amount: 90000, percent: 60 },
+          { name: 'Moglie', amount: 60000, percent: 40 },
+        ],
+      })
+    );
+
+    expect(html).toContain('Patrimonio per Persona');
+    expect(html).toContain('Giuseppe');
+    expect(html).toContain('Moglie');
+  });
+
   it('shows performers section when best and worst differ', () => {
     const entry = { name: 'Azioni', deltaPct: 10, deltaAbs: 10000 };
     const entryWorst = { name: 'Obbligazioni', deltaPct: -5, deltaAbs: -2000 };

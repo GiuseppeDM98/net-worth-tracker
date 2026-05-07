@@ -27,21 +27,32 @@ import { useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
+import { useHouseholdScopeFilter } from '@/lib/hooks/useHouseholdScopeFilter';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Wallet, CalendarClock, History, Monitor } from 'lucide-react';
 import { AssetManagementTab } from '@/components/assets/AssetManagementTab';
 import { AssetPriceHistoryTable } from '@/components/assets/AssetPriceHistoryTable';
 import { AssetClassHistoryTable } from '@/components/assets/AssetClassHistoryTable';
+import { HouseholdScopeSelect } from '@/components/household/HouseholdScopeSelect';
 import { getCurrentYear } from '@/lib/utils/assetPriceHistoryUtils';
 import { cn } from '@/lib/utils';
 import { tabPanelSwitch } from '@/lib/utils/motionVariants';
+import { filterAssetsByOwnershipScope, filterSnapshotsByOwnershipScope } from '@/lib/utils/householdUtils';
 
 type MacroTabId = 'management' | 'anno-corrente' | 'storico';
 type HistoricalSubTabId = 'prezzi' | 'valori' | 'asset-class';
 
 export default function AssetsPage() {
   const { user } = useAuth();
+  const {
+    householdConfig,
+    householdEnabled,
+    options: householdScopeOptions,
+    selectedScopeKey,
+    setSelectedScopeKey,
+    scope,
+  } = useHouseholdScopeFilter(user?.uid);
 
   // React Query hooks - automatic caching and invalidation
   const { data: assets = [], isLoading: loading, refetch: refetchAssets } = useAssets(user?.uid);
@@ -127,21 +138,31 @@ export default function AssetsPage() {
     isRefreshing && 'border-primary/30 bg-primary/5 text-foreground'
   );
 
+  const scopedAssets = useMemo(
+    () => filterAssetsByOwnershipScope(assets, householdConfig, scope),
+    [assets, householdConfig, scope]
+  );
+
+  const scopedSnapshots = useMemo(
+    () => filterSnapshotsByOwnershipScope(snapshots, assets, householdConfig, scope),
+    [assets, householdConfig, scope, snapshots]
+  );
+
   // Anno Corrente: only active (quantity > 0) assets with the flag enabled.
   // Sold assets are excluded here — they can't have meaningful current-year data
   // if sold before this year, and if sold during the year they'd appear via snapshots
   // anyway (but we keep this strict for simplicity).
   const historyTableAssets = useMemo(
-    () => assets.filter((a) => a.quantity > 0 && a.includeInHistoryTables === true),
-    [assets]
+    () => scopedAssets.filter((a) => a.quantity > 0 && a.includeInHistoryTables === true),
+    [scopedAssets]
   );
 
   // Storico: includes sold assets (quantity === 0) with the flag enabled so their
   // historical months still show with a "Venduto" badge. Assets completely removed
   // from Firestore can't be recovered (flag lost), so only qty=0 ones are preserved.
   const historyTableAssetsAll = useMemo(
-    () => assets.filter((a) => a.includeInHistoryTables === true),
-    [assets]
+    () => scopedAssets.filter((a) => a.includeInHistoryTables === true),
+    [scopedAssets]
   );
 
   if (loading) {
@@ -154,10 +175,21 @@ export default function AssetsPage() {
 
   return (
     <div className="space-y-6 max-desktop:portrait:pb-20">
-      <div>
-        <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Patrimonio</p>
-        <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Patrimonio</h1>
-        <p className="mt-2 text-muted-foreground">Gestisci e monitora il tuo patrimonio</p>
+      <div className="flex flex-col gap-4 desktop:flex-row desktop:items-end desktop:justify-between">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Patrimonio</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Patrimonio</h1>
+          <p className="mt-2 text-muted-foreground">Gestisci e monitora il tuo patrimonio</p>
+        </div>
+        {householdEnabled && (
+          <HouseholdScopeSelect
+            value={selectedScopeKey}
+            onValueChange={setSelectedScopeKey}
+            options={householdScopeOptions}
+            label="Vista patrimonio"
+            className="desktop:w-[260px]"
+          />
+        )}
       </div>
 
       {/* Outer tabs: 3 macro-tabs */}
@@ -245,7 +277,7 @@ export default function AssetsPage() {
                   >
                     <AssetPriceHistoryTable
                       assets={historyTableAssets}
-                      snapshots={snapshots}
+                      snapshots={scopedSnapshots}
                       filterYear={getCurrentYear()}
                       displayMode="price"
                       includePreviousMonthBaseline={true}
@@ -272,7 +304,7 @@ export default function AssetsPage() {
                   >
                     <AssetPriceHistoryTable
                       assets={historyTableAssets}
-                      snapshots={snapshots}
+                      snapshots={scopedSnapshots}
                       filterYear={getCurrentYear()}
                       displayMode="totalValue"
                       includePreviousMonthBaseline={true}
@@ -298,7 +330,7 @@ export default function AssetsPage() {
                     variants={tabPanelSwitch}
                   >
                     <AssetClassHistoryTable
-                      snapshots={snapshots}
+                      snapshots={scopedSnapshots}
                       filterYear={getCurrentYear()}
                       includePreviousMonthBaseline={true}
                       loading={snapshotsLoading}
@@ -356,7 +388,7 @@ export default function AssetsPage() {
                   >
                     <AssetPriceHistoryTable
                       assets={historyTableAssetsAll}
-                      snapshots={snapshots}
+                      snapshots={scopedSnapshots}
                       filterStartDate={{ year: 2025, month: 11 }}
                       displayMode="price"
                       restrictToPassedAssets={true}
@@ -382,7 +414,7 @@ export default function AssetsPage() {
                   >
                     <AssetPriceHistoryTable
                       assets={historyTableAssetsAll}
-                      snapshots={snapshots}
+                      snapshots={scopedSnapshots}
                       filterStartDate={{ year: 2025, month: 11 }}
                       displayMode="totalValue"
                       restrictToPassedAssets={true}
@@ -407,7 +439,7 @@ export default function AssetsPage() {
                     variants={tabPanelSwitch}
                   >
                     <AssetClassHistoryTable
-                      snapshots={snapshots}
+                      snapshots={scopedSnapshots}
                       filterStartDate={{ year: 2025, month: 11 }}
                       loading={snapshotsLoading}
                       onRefresh={handleRefresh}

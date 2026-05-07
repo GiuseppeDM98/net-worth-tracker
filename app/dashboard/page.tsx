@@ -25,17 +25,94 @@ import {
 import { Wallet, TrendingUp, PieChart, DollarSign, Camera, TrendingDown, Receipt, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCreateSnapshot } from '@/lib/hooks/useSnapshots';
+import { useAssets } from '@/lib/hooks/useAssets';
+import { useExpenses } from '@/lib/hooks/useExpenses';
+import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { useDashboardOverview } from '@/lib/hooks/useDashboardOverview';
+import { useHouseholdScopeFilter } from '@/lib/hooks/useHouseholdScopeFilter';
 import { SavingsRateBadge } from '@/components/ui/SavingsRateBadge';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
-import { getItalyDate, getItalyMonthYear } from '@/lib/utils/dateHelpers';
+import { getItalyDate, getItalyMonthYear, toDate } from '@/lib/utils/dateHelpers';
 import { getGreeting } from '@/lib/utils/getGreeting';
 import { OverviewAnimatedCurrency } from '@/components/dashboard/OverviewAnimatedCurrency';
 import { OverviewChartsSection } from '@/components/dashboard/OverviewChartsSection';
+import { HouseholdScopeSelect } from '@/components/household/HouseholdScopeSelect';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
+import {
+  calculateLiquidEstimatedTaxes,
+  calculateLiquidNetWorth,
+  calculateNetTotal,
+  calculateTotalEstimatedTaxes,
+  calculateTotalUnrealizedGains,
+  calculateTotalValue,
+  calculateAnnualPortfolioCost,
+  calculateIlliquidNetWorth,
+  calculatePortfolioWeightedTER,
+} from '@/lib/services/assetService';
+import { calculateNetBalance, calculateTotalExpenses, calculateTotalIncome } from '@/lib/services/expenseService';
+import { prepareAssetClassDistributionData, prepareAssetDistributionData } from '@/lib/services/chartService';
+import {
+  filterAssetsByOwnershipScope,
+  filterExpensesByAttributionScope,
+  filterSnapshotsByOwnershipScope,
+} from '@/lib/utils/householdUtils';
+import type { DashboardOverviewExpenseStats, DashboardOverviewPayload } from '@/types/dashboardOverview';
+import type { Expense } from '@/types/expenses';
+import type { MonthlySnapshot } from '@/types/assets';
 
 const MotionButtonShell = motion.div;
+
+function summarizeScopedExpenses(expenses: Expense[]) {
+  return {
+    income: calculateTotalIncome(expenses),
+    expenses: calculateTotalExpenses(expenses),
+    net: calculateNetBalance(expenses),
+  };
+}
+
+function buildScopedExpenseStats(
+  expenses: Expense[],
+  currentMonthReference: { year: number; month: number }
+): DashboardOverviewExpenseStats {
+  const previousMonthReference = currentMonthReference.month === 1
+    ? { year: currentMonthReference.year - 1, month: 12 }
+    : { year: currentMonthReference.year, month: currentMonthReference.month - 1 };
+
+  const expensesForPeriod = (period: { year: number; month: number }) =>
+    expenses.filter((expense) => {
+      const expenseDate = toDate(expense.date);
+      const expensePeriod = getItalyMonthYear(expenseDate);
+      return expensePeriod.year === period.year && expensePeriod.month === period.month;
+    });
+
+  const currentMonth = summarizeScopedExpenses(expensesForPeriod(currentMonthReference));
+  const previousMonth = summarizeScopedExpenses(expensesForPeriod(previousMonthReference));
+
+  return {
+    currentMonth,
+    previousMonth,
+    delta: {
+      income: previousMonth.income > 0
+        ? ((currentMonth.income - previousMonth.income) / previousMonth.income) * 100
+        : 0,
+      expenses: previousMonth.expenses > 0
+        ? ((currentMonth.expenses - previousMonth.expenses) / previousMonth.expenses) * 100
+        : 0,
+      net: previousMonth.net !== 0
+        ? ((currentMonth.net - previousMonth.net) / Math.abs(previousMonth.net)) * 100
+        : 0,
+    },
+  };
+}
+
+function calculateSnapshotChange(currentValue: number, previousSnapshot: MonthlySnapshot) {
+  const value = currentValue - previousSnapshot.totalNetWorth;
+  return {
+    value,
+    percentage: previousSnapshot.totalNetWorth > 0 ? (value / previousSnapshot.totalNetWorth) * 100 : 0,
+  };
+}
 
 /**
  * MAIN DASHBOARD PAGE
@@ -52,6 +129,15 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const isDemo = useDemoMode();
   const prefersReducedMotion = useReducedMotion();
+  const {
+    householdConfig,
+    householdEnabled,
+    options: householdScopeOptions,
+    selectedScopeKey,
+    setSelectedScopeKey,
+    scope,
+    isScoped,
+  } = useHouseholdScopeFilter(user?.uid);
 
   // Calculated once at mount — no need to re-evaluate on every render.
   // Hour extracted in Europe/Rome timezone so the greeting is always contextually correct.
@@ -65,7 +151,10 @@ export default function DashboardPage() {
     return { label, subtitle: result.subtitle };
   }, [user?.displayName]);
 
-  const { data: overview, isLoading: loadingOverview } = useDashboardOverview(user?.uid);
+  const { data: rawOverview, isLoading: loadingOverview } = useDashboardOverview(user?.uid);
+  const { data: assets = [] } = useAssets(user?.uid);
+  const { data: expenses = [] } = useExpenses(user?.uid);
+  const { data: snapshots = [] } = useSnapshots(user?.uid);
   const createSnapshotMutation = useCreateSnapshot(user?.uid || '');
 
   const loading = loadingOverview;
@@ -118,6 +207,96 @@ export default function DashboardPage() {
 
   const currentMonthReference = useMemo(() => getItalyMonthYear(), []);
 
+  const scopedAssets = useMemo(
+    () => filterAssetsByOwnershipScope(assets, householdConfig, scope),
+    [assets, householdConfig, scope]
+  );
+
+  const scopedExpenses = useMemo(
+    () => filterExpensesByAttributionScope(expenses, householdConfig, scope),
+    [expenses, householdConfig, scope]
+  );
+
+  const scopedSnapshots = useMemo(
+    () => filterSnapshotsByOwnershipScope(snapshots, assets, householdConfig, scope),
+    [assets, householdConfig, scope, snapshots]
+  );
+
+  const scopedOverview = useMemo<DashboardOverviewPayload | null>(() => {
+    if (!rawOverview || !isScoped) return null;
+
+    const totalValue = calculateTotalValue(scopedAssets);
+    const liquidNetWorth = calculateLiquidNetWorth(scopedAssets);
+    const illiquidNetWorth = calculateIlliquidNetWorth(scopedAssets);
+    const liquidEstimatedTaxes = calculateLiquidEstimatedTaxes(scopedAssets);
+    const currentSnapshot = scopedSnapshots.find(
+      (snapshot) => snapshot.year === currentMonthReference.year && snapshot.month === currentMonthReference.month
+    ) ?? null;
+    const sortedSnapshots = [...scopedSnapshots].sort(
+      (a, b) => (a.year - b.year) || (a.month - b.month)
+    );
+    const previousSnapshot = currentSnapshot
+      ? sortedSnapshots.filter(
+          (snapshot) =>
+            snapshot.year < currentMonthReference.year ||
+            (snapshot.year === currentMonthReference.year && snapshot.month < currentMonthReference.month)
+        ).at(-1) ?? null
+      : sortedSnapshots.at(-1) ?? null;
+    const previousYearBaseline = sortedSnapshots
+      .filter((snapshot) => snapshot.year < currentMonthReference.year)
+      .at(-1) ?? null;
+
+    return {
+      ...rawOverview,
+      metrics: {
+        totalValue,
+        liquidNetWorth,
+        illiquidNetWorth,
+        netTotal: calculateNetTotal(scopedAssets),
+        liquidNetTotal: liquidNetWorth - liquidEstimatedTaxes,
+        unrealizedGains: calculateTotalUnrealizedGains(scopedAssets),
+        estimatedTaxes: calculateTotalEstimatedTaxes(scopedAssets),
+        portfolioTER: calculatePortfolioWeightedTER(scopedAssets),
+        annualPortfolioCost: calculateAnnualPortfolioCost(scopedAssets),
+        annualStampDuty: rawOverview.metrics.annualStampDuty,
+      },
+      variations: {
+        monthly: previousSnapshot ? calculateSnapshotChange(currentSnapshot?.totalNetWorth ?? totalValue, previousSnapshot) : null,
+        yearly: previousYearBaseline ? calculateSnapshotChange(currentSnapshot?.totalNetWorth ?? totalValue, previousYearBaseline) : null,
+      },
+      expenseStats: buildScopedExpenseStats(scopedExpenses, currentMonthReference),
+      charts: {
+        assetClassData: prepareAssetClassDistributionData(scopedAssets),
+        assetData: prepareAssetDistributionData(scopedAssets, chartColors),
+        liquidityData: [
+          {
+            name: 'Liquido',
+            value: liquidNetWorth,
+            percentage: totalValue > 0 ? (liquidNetWorth / totalValue) * 100 : 0,
+            color: '#10b981',
+          },
+          {
+            name: 'Illiquido',
+            value: illiquidNetWorth,
+            percentage: totalValue > 0 ? (illiquidNetWorth / totalValue) * 100 : 0,
+            color: '#f59e0b',
+          },
+        ],
+      },
+      flags: {
+        ...rawOverview.flags,
+        assetCount: scopedAssets.filter((asset) => asset.quantity > 0).length,
+        hasCostBasisTracking: scopedAssets.some(
+          (asset) => (asset.averageCost && asset.averageCost > 0) || (asset.taxRate && asset.taxRate > 0)
+        ),
+        hasTERTracking: scopedAssets.some((asset) => !!(asset.totalExpenseRatio && asset.totalExpenseRatio > 0)),
+        hasStampDuty: rawOverview.flags.hasStampDuty && rawOverview.metrics.annualStampDuty > 0,
+      },
+    };
+  }, [chartColors, currentMonthReference, isScoped, rawOverview, scopedAssets, scopedExpenses, scopedSnapshots]);
+
+  const overview = scopedOverview ?? rawOverview;
+
   /**
    * Create monthly snapshot of current portfolio state.
    *
@@ -141,7 +320,7 @@ export default function DashboardPage() {
 
     // Check if snapshot for current month already exists (prevent accidental duplicates)
     try {
-      if (overview?.flags.currentMonthSnapshotExists) {
+      if (rawOverview?.flags.currentMonthSnapshotExists) {
         setShowConfirmDialog(true);
       } else {
         await createSnapshot();
@@ -260,6 +439,15 @@ export default function DashboardPage() {
               {greeting.subtitle}
             </p>
           </div>
+          {householdEnabled && (
+            <HouseholdScopeSelect
+              value={selectedScopeKey}
+              onValueChange={setSelectedScopeKey}
+              options={householdScopeOptions}
+              label="Vista panoramica"
+              className="w-full sm:w-[240px]"
+            />
+          )}
           <MotionButtonShell
             whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
             transition={springLayoutTransition}
@@ -267,7 +455,7 @@ export default function DashboardPage() {
             <Button
               ref={snapshotButtonRef}
               onClick={handleCreateSnapshot}
-              disabled={isDemo || creatingSnapshot || (overview?.flags.assetCount ?? 0) === 0}
+              disabled={isDemo || creatingSnapshot || (rawOverview?.flags.assetCount ?? 0) === 0}
               title={isDemo ? 'Non disponibile in modalità demo' : undefined}
               variant="default"
               className="w-full sm:w-auto"

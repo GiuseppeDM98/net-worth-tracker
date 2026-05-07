@@ -121,6 +121,11 @@ export function AssetCard({
                 Azzerato
               </Badge>
             )}
+            {asset.ownershipProfileName && (
+              <Badge variant="outline" className="mt-1 text-xs">
+                Proprietà: {asset.ownershipProfileName}
+              </Badge>
+            )}
           </div>
           <Badge
             className="ml-2"

@@ -138,6 +138,13 @@ export function ExpenseCard({ expense, onEdit, onDelete, isDemo = false }: Expen
             </span>
           </div>
         </div>
+        {expense.attributionProfileName && (
+          <div className="mb-3">
+            <Badge variant="outline" className="text-xs">
+              Attribuzione: {expense.attributionProfileName}
+            </Badge>
+          </div>
+        )}
 
         {/* Dettagli collassabili */}
         {showDetails && (

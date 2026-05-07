@@ -169,6 +169,7 @@ export async function POST(request: NextRequest) {
     const preferences = {
       ...getDefaultAssistantPreferences(),
       ...body.preferences,
+      householdScopeLabel: body.householdScopeLabel ?? body.preferences?.householdScopeLabel,
     };
     const enableWebSearch = resolveAssistantWebSearchPolicy(
       body.mode,

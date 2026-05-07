@@ -14,6 +14,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useChartColors } from '@/lib/hooks/useChartColors';
+import { useAuth } from '@/contexts/AuthContext';
+import { useHouseholdScopeFilter } from '@/lib/hooks/useHouseholdScopeFilter';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { calculateIncomeExpenseRatio, calculateTotalExpenses, calculateTotalIncome } from '@/lib/services/expenseService';
@@ -46,6 +48,8 @@ import { getItalyMonth, getItalyMonthYear, getItalyYear, toDate } from '@/lib/ut
 import { CashflowSankeyChart } from '@/components/cashflow/CashflowSankeyChart';
 import { chartShellSettle, fadeVariants } from '@/lib/utils/motionVariants';
 import { cn } from '@/lib/utils';
+import { HouseholdScopeSelect } from '@/components/household/HouseholdScopeSelect';
+import { filterExpensesByAttributionScope } from '@/lib/utils/householdUtils';
 
 interface ChartData {
   name: string;
@@ -111,6 +115,15 @@ interface TotalHistoryTabProps {
 }
 
 export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 }: TotalHistoryTabProps) {
+  const { user } = useAuth();
+  const {
+    householdConfig,
+    householdEnabled,
+    options: householdScopeOptions,
+    selectedScopeKey,
+    setSelectedScopeKey,
+    scope,
+  } = useHouseholdScopeFilter(user?.uid);
   const COLORS = useChartColors();
   const controlClassName = 'transition-colors duration-200 border-border/70 hover:border-primary/40 focus-visible:ring-primary/30 data-[placeholder]:text-muted-foreground';
 
@@ -145,6 +158,11 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
     return () => media.removeEventListener('change', handleChange);
   }, []);
 
+  const scopedExpenses = useMemo(
+    () => filterExpensesByAttributionScope(allExpenses, householdConfig, scope),
+    [allExpenses, householdConfig, scope]
+  );
+
   // Auto-scroll to the appropriate chart when drill-down changes
   useEffect(() => {
     if (drillDown.level !== 'category' && drillDown.chartType) {
@@ -159,8 +177,8 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
 
   // Excludes data before historyStartYear (user-configurable in Settings) — same filter used by trend charts
   const expensesFrom2025ForAnalysis = useMemo(() => {
-    return allExpenses.filter(expense => getItalyYear(toDate(expense.date)) >= historyStartYear);
-  }, [allExpenses, historyStartYear]);
+    return scopedExpenses.filter(expense => getItalyYear(toDate(expense.date)) >= historyStartYear);
+  }, [historyStartYear, scopedExpenses]);
 
   // Extract available years from filtered expenses, sorted newest first
   const availableYears = useMemo(() => {
@@ -236,7 +254,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
   const getMonthlyTrend = () => {
     const monthlyMap = new Map<string, { income: number; expenses: number; sortKey: string }>();
 
-    allExpenses.forEach((expense: Expense) => {
+    scopedExpenses.forEach((expense: Expense) => {
       const date = toDate(expense.date);
       const { month, year } = getItalyMonthYear(date);
       const monthKey = `${String(month).padStart(2, '0')}/${String(year).slice(-2)}`;
@@ -280,7 +298,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
   const getYearlyTrend = () => {
     const yearlyMap = new Map<number, { income: number; expenses: number }>();
 
-    allExpenses.forEach((expense: Expense) => {
+    scopedExpenses.forEach((expense: Expense) => {
       const date = toDate(expense.date);
       const year = getItalyYear(date);
 
@@ -834,7 +852,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
     const yearlyMap = new Map<number, Expense[]>();
 
     // Group expenses by year
-    allExpenses.forEach((expense: Expense) => {
+    scopedExpenses.forEach((expense: Expense) => {
       const date = toDate(expense.date);
       const year = getItalyYear(date);
 
@@ -861,7 +879,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
   };
 
   // Filter expenses from historyStartYear onwards for trend charts (excludes bulk-imported older data)
-  const expensesFrom2025 = allExpenses.filter((expense: Expense) => {
+  const expensesFrom2025 = scopedExpenses.filter((expense: Expense) => {
     const date = toDate(expense.date);
     return getItalyYear(date) >= historyStartYear;
   });
@@ -941,7 +959,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
     );
   }
 
-  if (allExpenses.length === 0) {
+  if (scopedExpenses.length === 0) {
     return (
       <div className="p-8">
         <div className="text-center">
@@ -983,7 +1001,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
         {/* Filter Controls */}
         <div className="flex flex-col gap-4 mb-6">
           {/* Year + Month filter dropdowns */}
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <Label className="text-sm font-semibold text-blue-900 dark:text-blue-100">
                 Analisi Periodo
@@ -992,7 +1010,7 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                 I filtri aggiornano la lettura storica in-place, con feedback locale sul pannello attivo.
               </p>
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="grid gap-2 sm:grid-cols-3">
               {/* Year dropdown */}
               <Select
                 value={selectedYear?.toString() || '__all_years__'}
@@ -1027,6 +1045,16 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
                   ))}
                 </SelectContent>
               </Select>
+
+              {householdEnabled && (
+                <HouseholdScopeSelect
+                  value={selectedScopeKey}
+                  onValueChange={setSelectedScopeKey}
+                  options={householdScopeOptions}
+                  label="Attribuzione"
+                  triggerClassName={cn('w-full sm:w-[220px]', controlClassName)}
+                />
+              )}
             </div>
           </div>
 

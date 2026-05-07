@@ -12,6 +12,9 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
+import { useAssets } from '@/lib/hooks/useAssets';
+import { useExpenses } from '@/lib/hooks/useExpenses';
+import { useHouseholdScopeFilter } from '@/lib/hooks/useHouseholdScopeFilter';
 import { getAllPerformanceData, calculatePerformanceForPeriod, preparePerformanceChartData, getSnapshotsForPeriod, prepareMonthlyReturnsHeatmap, prepareUnderwaterDrawdownData } from '@/lib/services/performanceService';
 import { getUserSnapshots } from '@/lib/services/snapshotService';
 import { PerformanceData, PerformanceMetrics, TimePeriod } from '@/types/performance';
@@ -54,7 +57,9 @@ import { MonthlyReturnsHeatmap } from '@/components/performance/MonthlyReturnsHe
 import { UnderwaterDrawdownChart } from '@/components/performance/UnderwaterDrawdownChart';
 import { PerformancePageSkeleton } from '@/components/performance/PerformancePageSkeleton';
 import { BenchmarkComparisonSection } from '@/components/performance/BenchmarkComparisonSection';
+import { HouseholdScopeSelect } from '@/components/household/HouseholdScopeSelect';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
+import { filterExpensesByAttributionScope, filterSnapshotsByOwnershipScope } from '@/lib/utils/householdUtils';
 
 /**
  * PERFORMANCE PAGE ARCHITECTURE
@@ -90,6 +95,17 @@ import { authenticatedFetch } from '@/lib/utils/authFetch';
 export default function PerformancePage() {
   const { user } = useAuth();
   const isDemo = useDemoMode();
+  const {
+    householdConfig,
+    householdEnabled,
+    options: householdScopeOptions,
+    selectedScopeKey,
+    setSelectedScopeKey,
+    scope,
+    isScoped,
+  } = useHouseholdScopeFilter(user?.uid);
+  const { data: assets = [] } = useAssets(user?.uid);
+  const { data: expenses = [] } = useExpenses(user?.uid);
   const [isPendingPeriodChange, startPeriodTransition] = useTransition();
   const [performanceData, setPerformanceData] = useState<PerformanceData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -97,6 +113,7 @@ export default function PerformancePage() {
   const [showCustomDateDialog, setShowCustomDateDialog] = useState(false);
   const [showAIAnalysisDialog, setShowAIAnalysisDialog] = useState(false);
   const [cachedSnapshots, setCachedSnapshots] = useState<MonthlySnapshot[]>([]);
+  const [scopedMetrics, setScopedMetrics] = useState<PerformanceMetrics | null>(null);
   const [isMethodologyOpen, setIsMethodologyOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshAnimationTick, setRefreshAnimationTick] = useState(0);
@@ -366,7 +383,7 @@ export default function PerformancePage() {
    * Note: Custom period only exists after user creates it via date picker dialog.
    * All other periods (YTD, 1Y, 3Y, 5Y, ALL) pre-calculated on page load.
    */
-  const metrics = useMemo<PerformanceMetrics | null>(() => {
+  const baseMetrics = useMemo<PerformanceMetrics | null>(() => {
     if (!performanceData) return null;
 
     switch (selectedPeriod) {
@@ -380,16 +397,59 @@ export default function PerformancePage() {
     }
   }, [performanceData, selectedPeriod]);
 
+  const scopedSnapshots = useMemo(
+    () => filterSnapshotsByOwnershipScope(cachedSnapshots, assets, householdConfig, scope),
+    [assets, cachedSnapshots, householdConfig, scope]
+  );
+
+  const scopedExpenses = useMemo(
+    () => filterExpensesByAttributionScope(expenses, householdConfig, scope),
+    [expenses, householdConfig, scope]
+  );
+
+  useEffect(() => {
+    if (!user || !performanceData || !baseMetrics || !isScoped || scopedSnapshots.length === 0) {
+      setScopedMetrics(null);
+      return;
+    }
+
+    let cancelled = false;
+    calculatePerformanceForPeriod(
+      user.uid,
+      scopedSnapshots,
+      baseMetrics.timePeriod,
+      performanceData.ytd.riskFreeRate,
+      baseMetrics.timePeriod === 'CUSTOM' ? baseMetrics.startDate : undefined,
+      baseMetrics.timePeriod === 'CUSTOM' ? baseMetrics.endDate : undefined,
+      scopedExpenses,
+      performanceData.ytd.dividendCategoryId
+    )
+      .then((nextMetrics) => {
+        if (!cancelled) setScopedMetrics(nextMetrics);
+      })
+      .catch((error) => {
+        console.error('Error calculating scoped performance metrics:', error);
+        if (!cancelled) setScopedMetrics(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [baseMetrics, isScoped, performanceData, scopedExpenses, scopedSnapshots, user]);
+
+  const metrics = scopedMetrics ?? baseMetrics;
+
   const periodSnapshots = useMemo(() => {
-    if (!metrics || cachedSnapshots.length === 0) return [];
+    const sourceSnapshots = isScoped ? scopedSnapshots : cachedSnapshots;
+    if (!metrics || sourceSnapshots.length === 0) return [];
 
     return getSnapshotsForPeriod(
-      cachedSnapshots,
+      sourceSnapshots,
       metrics.timePeriod,
       metrics.startDate,
       metrics.endDate
     );
-  }, [cachedSnapshots, metrics]);
+  }, [cachedSnapshots, isScoped, metrics, scopedSnapshots]);
 
   const chartData = useMemo(() => {
     if (!metrics || periodSnapshots.length === 0) return [];
@@ -552,6 +612,15 @@ export default function PerformancePage() {
               Analisi dei rendimenti e metriche di rischio-rendimento
             </p>
           </div>
+          {householdEnabled && (
+            <HouseholdScopeSelect
+              value={selectedScopeKey}
+              onValueChange={setSelectedScopeKey}
+              options={householdScopeOptions}
+              label="Vista rendimenti"
+              className="w-full sm:w-[240px]"
+            />
+          )}
         </div>
 
         <Tabs value={selectedPeriod} onValueChange={(value) => handlePeriodChange(value as TimePeriod)}>
@@ -620,6 +689,15 @@ export default function PerformancePage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2 sm:justify-end">
+            {householdEnabled && (
+              <HouseholdScopeSelect
+                value={selectedScopeKey}
+                onValueChange={setSelectedScopeKey}
+                options={householdScopeOptions}
+                label="Vista rendimenti"
+                className="w-full sm:w-[240px]"
+              />
+            )}
             <Button
               variant="outline"
               size="sm"

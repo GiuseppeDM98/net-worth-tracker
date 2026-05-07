@@ -17,6 +17,7 @@ import { motion } from 'framer-motion';
 import { cardItem, pageVariants, tableShellSettle } from '@/lib/utils/motionVariants';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
+import { useHouseholdScopeFilter } from '@/lib/hooks/useHouseholdScopeFilter';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { Dividend, DividendType } from '@/types/dividend';
 import { Asset } from '@/types/assets';
@@ -36,12 +37,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { HouseholdScopeSelect } from '@/components/household/HouseholdScopeSelect';
 import { CalendarDays, Download, Filter, ListFilter, Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { toDate } from '@/lib/utils/dateHelpers';
 import { cn } from '@/lib/utils';
+import { filterDividendsByOwnershipScope } from '@/lib/utils/householdUtils';
 
 const dividendTypeLabels: Record<DividendType, string> = {
   ordinary: 'Ordinario',
@@ -62,6 +65,14 @@ interface DividendTrackingTabProps {
 export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: DividendTrackingTabProps) {
   const { user } = useAuth();
   const isDemo = useDemoMode();
+  const {
+    householdConfig,
+    householdEnabled,
+    options: householdScopeOptions,
+    selectedScopeKey,
+    setSelectedScopeKey,
+    scope,
+  } = useHouseholdScopeFilter(user?.uid);
   const [scraping, setScraping] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedDividend, setSelectedDividend] = useState<Dividend | null>(null);
@@ -79,11 +90,16 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
 
   // View mode (table or calendar)
   const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table');
-  const hasActiveFilters = assetFilter !== '__all__' || typeFilter !== '__all__' || startDate !== undefined || endDate !== undefined;
+  const hasActiveFilters = assetFilter !== '__all__' || typeFilter !== '__all__' || startDate !== undefined || endDate !== undefined || selectedScopeKey !== '__all__';
+
+  const ownershipScopedDividends = useMemo(
+    () => filterDividendsByOwnershipScope(dividends, assets, householdConfig, scope),
+    [assets, dividends, householdConfig, scope]
+  );
 
   // Derive filtered list synchronously — no extra render on filter change.
   const filteredDividends = useMemo(() => {
-    let filtered = [...dividends];
+    let filtered = [...ownershipScopedDividends];
 
     // Filter by asset
     if (assetFilter && assetFilter !== '__all__') {
@@ -105,7 +121,7 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
     }
 
     return filtered;
-  }, [dividends, assetFilter, typeFilter, startDate, endDate]);
+  }, [ownershipScopedDividends, assetFilter, typeFilter, startDate, endDate]);
 
   const focusedDate = useMemo(() => {
     if (!startDate || !endDate) return null;
@@ -335,6 +351,7 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
     setTypeFilter('__all__');
     setStartDate(undefined);
     setEndDate(undefined);
+    setSelectedScopeKey('__all__');
   };
 
   /**
@@ -417,7 +434,16 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
             </div>
           )}
         </div>
-        <div className="grid gap-4 desktop:grid-cols-4">
+        <div className="grid gap-4 desktop:grid-cols-5">
+          {householdEnabled && (
+            <HouseholdScopeSelect
+              value={selectedScopeKey}
+              onValueChange={setSelectedScopeKey}
+              options={householdScopeOptions}
+              label="Vista dividendi"
+            />
+          )}
+
           {/* Asset Filter */}
           <div className="space-y-2">
             <Label htmlFor="assetFilter">Asset</Label>
@@ -518,6 +544,7 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
         startDate={startDate}
         endDate={endDate}
         assetId={assetFilter !== '__all__' ? assetFilter : undefined}
+        overrideDividends={ownershipScopedDividends}
       />
       </motion.div>
 

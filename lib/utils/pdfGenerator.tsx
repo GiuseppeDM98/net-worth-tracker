@@ -66,6 +66,9 @@ export async function generatePDF(options: PDFGenerateOptions): Promise<void> {
       timeFilter: options.timeFilter,
       selectedYear: options.selectedYear,
       selectedMonth: options.selectedMonth,
+      householdConfig: options.householdConfig,
+      householdScope: options.householdScope,
+      householdScopeLabel: options.householdScopeLabel,
     };
 
     // Step 3: Fetch and prepare section data

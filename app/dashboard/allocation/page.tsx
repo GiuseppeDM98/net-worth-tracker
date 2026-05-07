@@ -35,6 +35,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useHouseholdScopeFilter } from '@/lib/hooks/useHouseholdScopeFilter';
 import Link from 'next/link';
 import { getAllAssets, ASSET_CLASS_ORDER } from '@/lib/services/assetService';
 import {
@@ -61,9 +62,11 @@ import { toast } from 'sonner';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { AllocationCard } from '@/components/allocation/AllocationCard';
 import { AllocationSheet } from '@/components/allocation/AllocationSheet';
+import { HouseholdScopeSelect } from '@/components/household/HouseholdScopeSelect';
 import { AnimatePresence, motion } from 'framer-motion';
 import { drillDownShell } from '@/lib/utils/motionVariants';
 import { cn } from '@/lib/utils';
+import { filterAssetsByOwnershipScope } from '@/lib/utils/householdUtils';
 
 type DrillDownLevel = 'assetClass' | 'subCategory' | 'specificAsset';
 
@@ -87,6 +90,14 @@ interface TriggerOrigin {
 
 export default function AllocationPage() {
   const { user } = useAuth();
+  const {
+    householdConfig,
+    householdEnabled,
+    options: householdScopeOptions,
+    selectedScopeKey,
+    setSelectedScopeKey,
+    scope,
+  } = useHouseholdScopeFilter(user?.uid);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [targets, setTargets] = useState<AssetAllocationTarget | null>(null);
   const [allocation, setAllocation] = useState<AllocationResult | null>(null);
@@ -136,6 +147,16 @@ export default function AllocationPage() {
       loadData();
     }
   }, [user]);
+
+  const scopedAssets = useMemo(
+    () => filterAssetsByOwnershipScope(assets, householdConfig, scope),
+    [assets, householdConfig, scope]
+  );
+
+  useEffect(() => {
+    if (!targets) return;
+    setAllocation(compareAllocations(scopedAssets, targets));
+  }, [scopedAssets, targets]);
 
   const loadData = async () => {
     if (!user) return;
@@ -668,14 +689,25 @@ export default function AllocationPage() {
               Confronta l'allocazione corrente con i tuoi obiettivi
             </p>
           </div>
-          {!usingGoalTargets && (
-            <Link href="/dashboard/settings" className="w-full shrink-0 sm:w-auto">
-              <Button variant="outline" size="sm" className="w-full sm:w-auto">
-                <Settings className="mr-2 h-4 w-4" />
-                Modifica Target
-              </Button>
-            </Link>
-          )}
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-end">
+            {householdEnabled && (
+              <HouseholdScopeSelect
+                value={selectedScopeKey}
+                onValueChange={setSelectedScopeKey}
+                options={householdScopeOptions}
+                label="Vista allocazione"
+                className="sm:w-[240px]"
+              />
+            )}
+            {!usingGoalTargets && (
+              <Link href="/dashboard/settings" className="w-full shrink-0 sm:w-auto">
+                <Button variant="outline" size="sm" className="w-full sm:w-auto">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Modifica Target
+                </Button>
+              </Link>
+            )}
+          </div>
         </div>
       </div>
 

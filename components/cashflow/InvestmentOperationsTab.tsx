@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAssets } from '@/lib/hooks/useAssets';
+import { useHouseholdScopeFilter } from '@/lib/hooks/useHouseholdScopeFilter';
 import { useInvestmentOperations } from '@/lib/hooks/useInvestmentOperations';
 import {
   createInvestmentOperation,
@@ -20,6 +21,8 @@ import {
 import { queryKeys } from '@/lib/query/queryKeys';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import { toDate } from '@/lib/utils/dateHelpers';
+import { HouseholdScopeSelect } from '@/components/household/HouseholdScopeSelect';
+import { filterInvestmentOperationsByOwnershipScope } from '@/lib/utils/householdUtils';
 import { InvestmentOperationType } from '@/types/investments';
 
 const OPERATION_LABELS: Record<InvestmentOperationType, string> = {
@@ -36,6 +39,14 @@ const FORM_OPERATION_TYPES: InvestmentOperationType[] = ['buy', 'sell'];
 export function InvestmentOperationsTab() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const {
+    householdConfig,
+    householdEnabled,
+    options: householdScopeOptions,
+    selectedScopeKey,
+    setSelectedScopeKey,
+    scope,
+  } = useHouseholdScopeFilter(user?.uid);
   const { data: assets = [] } = useAssets(user?.uid);
   const { data: operations = [], isLoading } = useInvestmentOperations(user?.uid);
 
@@ -63,6 +74,10 @@ export function InvestmentOperationsTab() {
 
   const selectedAsset = investmentAssets.find(asset => asset.id === assetId);
   const grossAmount = Number(quantity) * Number(pricePerUnit);
+  const filteredOperations = useMemo(
+    () => filterInvestmentOperationsByOwnershipScope(operations, assets, householdConfig, scope),
+    [assets, householdConfig, operations, scope]
+  );
 
   const invalidate = async () => {
     if (!user) return;
@@ -173,11 +188,22 @@ export function InvestmentOperationsTab() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">Operazioni Investimento</h2>
-        <p className="text-muted-foreground mt-1">
-          Registra acquisti e vendite senza classificarli come entrate, spese o debiti
-        </p>
+      <div className="flex flex-col gap-3 desktop:flex-row desktop:items-end desktop:justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">Operazioni Investimento</h2>
+          <p className="text-muted-foreground mt-1">
+            Registra acquisti e vendite senza classificarli come entrate, spese o debiti
+          </p>
+        </div>
+        {householdEnabled && (
+          <HouseholdScopeSelect
+            value={selectedScopeKey}
+            onValueChange={setSelectedScopeKey}
+            options={householdScopeOptions}
+            label="Vista operazioni"
+            className="desktop:w-[260px]"
+          />
+        )}
       </div>
 
       <Card>
@@ -279,11 +305,11 @@ export function InvestmentOperationsTab() {
         <CardContent>
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Caricamento operazioni...</p>
-          ) : operations.length === 0 ? (
+          ) : filteredOperations.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nessuna operazione investimento registrata.</p>
           ) : (
             <div className="space-y-3">
-              {operations.map(operation => (
+              {filteredOperations.map(operation => (
                 <div key={operation.id} className="flex flex-col gap-3 rounded-md border p-3 desktop:flex-row desktop:items-center desktop:justify-between">
                   <div className="min-w-0">
                     <p className="font-medium">

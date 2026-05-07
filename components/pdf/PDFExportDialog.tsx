@@ -30,6 +30,8 @@ import {
 import { Loader2 } from 'lucide-react';
 import { generatePDF, validatePDFOptions } from '@/lib/utils/pdfGenerator';
 import { useAuth } from '@/contexts/AuthContext';
+import { useHouseholdScopeFilter } from '@/lib/hooks/useHouseholdScopeFilter';
+import { HouseholdScopeSelect } from '@/components/household/HouseholdScopeSelect';
 import { toast } from 'sonner';
 import type { SectionSelection, TimeFilter } from '@/types/pdf';
 import type { MonthlySnapshot, Asset, AssetAllocationTarget } from '@/types/assets';
@@ -41,6 +43,7 @@ import {
   getTimeFilterTooltip,
   getTimeFilterLabel,
 } from '@/lib/utils/pdfTimeFilters';
+import { filterAssetsByOwnershipScope, filterSnapshotsByOwnershipScope } from '@/lib/utils/householdUtils';
 
 export interface PDFExportDialogProps {
   open: boolean;
@@ -92,9 +95,26 @@ export function PDFExportDialog({
   allocationTargets,
 }: PDFExportDialogProps) {
   const { user } = useAuth();
+  const {
+    householdConfig,
+    householdEnabled,
+    options: householdScopeOptions,
+    selectedScopeKey,
+    setSelectedScopeKey,
+    scope,
+    scopeLabel,
+  } = useHouseholdScopeFilter(user?.uid);
+  const scopedAssets = useMemo(
+    () => filterAssetsByOwnershipScope(assets, householdConfig, scope),
+    [assets, householdConfig, scope]
+  );
+  const scopedSnapshots = useMemo(
+    () => filterSnapshotsByOwnershipScope(snapshots, assets, householdConfig, scope),
+    [assets, householdConfig, scope, snapshots]
+  );
   const [loading, setLoading] = useState(false);
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('total');
-  const [validation, setValidation] = useState(validateTimeFilterData(snapshots));
+  const [validation, setValidation] = useState(validateTimeFilterData(scopedSnapshots));
   const [selectedYear, setSelectedYear] = useState(validation.currentYear);
   const [selectedMonth, setSelectedMonth] = useState(validation.currentMonth);
   // All sections default to selected (true)
@@ -110,16 +130,16 @@ export function PDFExportDialog({
 
   // Derive available years and months from snapshot data
   const availableYears = useMemo(() => {
-    const years = new Set(snapshots.map(s => s.year));
+    const years = new Set(scopedSnapshots.map(s => s.year));
     return Array.from(years).sort((a, b) => b - a);
-  }, [snapshots]);
+  }, [scopedSnapshots]);
 
   const availableMonthsForYear = useMemo(() => {
     const months = new Set(
-      snapshots.filter(s => s.year === selectedYear).map(s => s.month)
+      scopedSnapshots.filter(s => s.year === selectedYear).map(s => s.month)
     );
     return Array.from(months).sort((a, b) => a - b);
-  }, [snapshots, selectedYear]);
+  }, [scopedSnapshots, selectedYear]);
 
   // Whether the selected period is in the past (no current asset-level data available)
   const isPastPeriod = useMemo(() => {
@@ -150,8 +170,8 @@ export function PDFExportDialog({
 
   // Revalidate time filter availability when snapshot data changes
   useEffect(() => {
-    setValidation(validateTimeFilterData(snapshots));
-  }, [snapshots]);
+    setValidation(validateTimeFilterData(scopedSnapshots));
+  }, [scopedSnapshots]);
 
   // Auto-adjust sections when year selection changes within yearly mode
   useEffect(() => {
@@ -192,7 +212,7 @@ export function PDFExportDialog({
     if (availableYears.length > 0) {
       newYear = availableYears[0];
       setSelectedYear(newYear);
-      const monthsForLatestYear = snapshots
+      const monthsForLatestYear = scopedSnapshots
         .filter(s => s.year === newYear)
         .map(s => s.month);
       if (monthsForLatestYear.length > 0) {
@@ -250,7 +270,7 @@ export function PDFExportDialog({
 
       // Filter snapshots to selected time period with user-chosen year/month
       const filteredSnapshots = filterSnapshotsByTime(
-        snapshots,
+        scopedSnapshots,
         timeFilter,
         timeFilter !== 'total' ? selectedYear : undefined,
         timeFilter === 'monthly' ? selectedMonth : undefined
@@ -271,11 +291,14 @@ export function PDFExportDialog({
         userName: user.displayName || 'Utente',
         sections,
         snapshots: filteredSnapshots,
-        assets,
+        assets: scopedAssets,
         allocationTargets,
         timeFilter,
         selectedYear: timeFilter !== 'total' ? selectedYear : undefined,
         selectedMonth: timeFilter === 'monthly' ? selectedMonth : undefined,
+        householdConfig,
+        householdScope: scope,
+        householdScopeLabel: scopeLabel,
       };
 
       // Validate options structure
@@ -432,7 +455,7 @@ export function PDFExportDialog({
                             const newYear = parseInt(v);
                             setSelectedYear(newYear);
                             // Reset month if not available in new year
-                            const monthsForNewYear = snapshots
+                            const monthsForNewYear = scopedSnapshots
                               .filter(s => s.year === newYear)
                               .map(s => s.month);
                             if (!monthsForNewYear.includes(selectedMonth)) {
@@ -458,6 +481,17 @@ export function PDFExportDialog({
               </RadioGroup>
             </TooltipProvider>
           </div>
+
+          {householdEnabled && (
+            <div className="space-y-2 pb-4 border-b">
+              <HouseholdScopeSelect
+                value={selectedScopeKey}
+                onValueChange={setSelectedScopeKey}
+                options={householdScopeOptions}
+                label="Vista report"
+              />
+            </div>
+          )}
 
           {/* Section checkboxes */}
           <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">

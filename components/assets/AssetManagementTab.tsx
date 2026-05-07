@@ -24,9 +24,10 @@
  */
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
+import { useHouseholdScopeFilter } from '@/lib/hooks/useHouseholdScopeFilter';
 import { Asset } from '@/types/assets';
 import {
   calculateAssetValue,
@@ -61,6 +62,8 @@ import { toast } from 'sonner';
 import { AssetDialog } from '@/components/assets/AssetDialog';
 import { AssetCard } from '@/components/assets/AssetCard';
 import { TaxCalculatorModal } from '@/components/assets/TaxCalculatorModal';
+import { HouseholdScopeSelect } from '@/components/household/HouseholdScopeSelect';
+import { filterAssetsByOwnershipScope } from '@/lib/utils/householdUtils';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 
@@ -89,6 +92,14 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
   const { user } = useAuth();
   const isDemo = useDemoMode();
   const queryClient = useQueryClient();
+  const {
+    householdConfig,
+    householdEnabled,
+    options: householdScopeOptions,
+    selectedScopeKey,
+    setSelectedScopeKey,
+    scope,
+  } = useHouseholdScopeFilter(user?.uid);
 
   const deleteAssetMutation = useDeleteAsset(user?.uid || '');
 
@@ -97,6 +108,11 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [taxCalculatorOpen, setTaxCalculatorOpen] = useState(false);
   const [calculatingAsset, setCalculatingAsset] = useState<Asset | null>(null);
+
+  const filteredAssets = useMemo(
+    () => filterAssetsByOwnershipScope(assets, householdConfig, scope),
+    [assets, householdConfig, scope]
+  );
 
   /**
    * Batch update prices for all assets via server-side Yahoo Finance API
@@ -198,7 +214,7 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
     return !!(asset.averageCost && asset.averageCost > 0 && asset.taxRate && asset.taxRate >= 0);
   };
 
-  const totalValue = calculateTotalValue(assets);
+  const totalValue = calculateTotalValue(filteredAssets);
 
   /**
    * Determine if asset requires manual price updates
@@ -279,7 +295,7 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
               <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{formatCurrency(totalValue)}</p>
             </div>
             {(() => {
-              const assetsWithCostBasis = assets.filter((a) => a.averageCost);
+              const assetsWithCostBasis = filteredAssets.filter((a) => a.averageCost);
               if (assetsWithCostBasis.length === 0) return null;
 
               const totalGainLoss = assetsWithCostBasis.reduce(
@@ -320,17 +336,38 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
         </CardContent>
       </Card>
 
+      {householdEnabled && (
+        <Card>
+          <CardContent className="grid gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_minmax(220px,320px)] sm:items-end">
+            <div>
+              <p className="text-sm font-medium text-foreground">Filtro proprietà</p>
+              <p className="text-xs text-muted-foreground">
+                Per persona i valori condivisi vengono riproporzionati secondo lo split del profilo.
+              </p>
+            </div>
+            <HouseholdScopeSelect
+              value={selectedScopeKey}
+              onValueChange={setSelectedScopeKey}
+              options={householdScopeOptions}
+              label="Vista patrimonio"
+            />
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardContent>
-          {assets.length === 0 ? (
+          {filteredAssets.length === 0 ? (
             <div className="flex h-64 items-center justify-center text-gray-500 dark:text-gray-400">
-              Nessun asset presente. Clicca su &quot;Aggiungi Asset&quot; per iniziare.
+              {assets.length === 0
+                ? 'Nessun asset presente. Clicca su "Aggiungi Asset" per iniziare.'
+                : 'Nessun asset corrisponde al filtro proprietà selezionato.'}
             </div>
           ) : (
             <>
               {/* Mobile/Tablet Card Layout (< 1440px) */}
               <div className="desktop:hidden grid grid-cols-1 gap-4 landscape:grid-cols-2 pt-4">
-                {assets.map((asset) => (
+                {filteredAssets.map((asset) => (
                   <AssetCard
                     key={asset.id}
                     asset={asset}
@@ -352,6 +389,7 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
                       <TableHead>Nome</TableHead>
                       <TableHead>Ticker</TableHead>
                       <TableHead>Classe</TableHead>
+                      <TableHead>Proprietà</TableHead>
                       <TableHead className="text-right">Quantità</TableHead>
                       <TableHead className="text-right">Prezzo</TableHead>
                       <TableHead className="text-right">PMC</TableHead>
@@ -364,7 +402,7 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {assets.map((asset) => {
+                    {filteredAssets.map((asset) => {
                       const value = calculateAssetValue(asset);
                       const lastUpdate =
                         asset.lastPriceUpdate instanceof Date ? asset.lastPriceUpdate : new Date();
@@ -402,6 +440,15 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
                             >
                               {formatAssetName(asset.assetClass)}
                             </span>
+                          </TableCell>
+                          <TableCell>
+                            {asset.ownershipProfileName ? (
+                              <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+                                {asset.ownershipProfileName}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-right">{formatNumber(asset.quantity, 2)}</TableCell>
                           <TableCell className="text-right">{formatCurrency(asset.currentPrice, asset.currency, 4)}</TableCell>
@@ -516,7 +563,7 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
                   </TableBody>
                   <TableFooter>
                     <TableRow>
-                      <TableCell colSpan={7} className="text-right font-semibold">
+                      <TableCell colSpan={8} className="text-right font-semibold">
                         Totale:
                       </TableCell>
                       <TableCell className="text-right font-semibold">{formatCurrency(totalValue)}</TableCell>
@@ -524,7 +571,7 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
                       <TableCell className="text-right font-semibold">
                         {(() => {
                           // Calculate total gain/loss
-                          const assetsWithCostBasis = assets.filter((a) => a.averageCost);
+                          const assetsWithCostBasis = filteredAssets.filter((a) => a.averageCost);
                           const totalGainLoss = assetsWithCostBasis.reduce(
                             (sum, asset) => sum + calculateUnrealizedGains(asset),
                             0

@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/contexts/AuthContext';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useInternalTransfers } from '@/lib/hooks/useInvestmentOperations';
-import { useHouseholdConfig } from '@/lib/hooks/useHousehold';
+import { useHouseholdScopeFilter } from '@/lib/hooks/useHouseholdScopeFilter';
 import {
   createInternalTransfer,
   deleteInternalTransfer,
@@ -21,7 +21,8 @@ import {
 import { queryKeys } from '@/lib/query/queryKeys';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import { toDate } from '@/lib/utils/dateHelpers';
-import { isHouseholdEnabled } from '@/lib/utils/householdUtils';
+import { HouseholdScopeSelect } from '@/components/household/HouseholdScopeSelect';
+import { filterInternalTransfersByOwnershipScope } from '@/lib/utils/householdUtils';
 import {
   INTERNAL_TRANSFER_PURPOSE_LABELS,
   type InternalTransferPurpose,
@@ -32,9 +33,19 @@ export function InternalTransfersTab() {
   const queryClient = useQueryClient();
   const { data: assets = [] } = useAssets(user?.uid);
   const { data: transfers = [], isLoading } = useInternalTransfers(user?.uid);
-  const { data: householdConfig } = useHouseholdConfig(user?.uid);
-  const householdEnabled = isHouseholdEnabled(householdConfig);
+  const {
+    householdConfig,
+    householdEnabled,
+    options: householdScopeOptions,
+    selectedScopeKey,
+    setSelectedScopeKey,
+    scope,
+  } = useHouseholdScopeFilter(user?.uid);
   const cashAssets = useMemo(() => assets.filter(asset => asset.assetClass === 'cash'), [assets]);
+  const filteredTransfers = useMemo(
+    () => filterInternalTransfersByOwnershipScope(transfers, assets, householdConfig, scope),
+    [assets, householdConfig, scope, transfers]
+  );
 
   const [fromCashAssetId, setFromCashAssetId] = useState('__none__');
   const [toCashAssetId, setToCashAssetId] = useState('__none__');
@@ -152,6 +163,16 @@ export function InternalTransfersTab() {
         </p>
       </div>
 
+      {householdEnabled && (
+        <HouseholdScopeSelect
+          value={selectedScopeKey}
+          onValueChange={setSelectedScopeKey}
+          options={householdScopeOptions}
+          label="Vista trasferimenti"
+          className="desktop:w-[260px]"
+        />
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -238,11 +259,11 @@ export function InternalTransfersTab() {
         <CardContent>
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Caricamento trasferimenti...</p>
-          ) : transfers.length === 0 ? (
+          ) : filteredTransfers.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nessun trasferimento interno registrato.</p>
           ) : (
             <div className="space-y-3">
-              {transfers.map(transfer => (
+              {filteredTransfers.map(transfer => (
                 <div key={transfer.id} className="flex flex-col gap-2 rounded-md border p-3 desktop:flex-row desktop:items-center desktop:justify-between">
                   <div>
                     <p className="font-medium">

@@ -3,6 +3,8 @@
 
 import type { Asset, MonthlySnapshot, AssetAllocationTarget } from '@/types/assets';
 import type { PerformanceMetrics } from '@/types/performance';
+import type { HouseholdConfig } from '@/types/household';
+import type { HouseholdFilterScope } from '@/lib/utils/householdUtils';
 
 // ============================================
 // Core PDF Data Types
@@ -18,6 +20,9 @@ export interface PDFDataContext {
   timeFilter?: TimeFilter;
   selectedYear?: number;
   selectedMonth?: number;
+  householdConfig?: HouseholdConfig | null;
+  householdScope?: HouseholdFilterScope;
+  householdScopeLabel?: string;
 }
 
 export interface SectionSelection {
@@ -264,6 +269,9 @@ export interface PDFGenerateOptions {
   timeFilter?: TimeFilter;     // Optional: default 'total'
   selectedYear?: number;
   selectedMonth?: number;
+  householdConfig?: HouseholdConfig | null;
+  householdScope?: HouseholdFilterScope;
+  householdScopeLabel?: string;
 }
 
 export interface PDFGenerationResult {

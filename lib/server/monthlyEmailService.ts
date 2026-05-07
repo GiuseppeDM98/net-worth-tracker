@@ -56,6 +56,7 @@ export interface MonthlyEmailData {
   liquidNetWorth: number;
   byAssetClass: Record<string, number>;
   previousByAssetClass: Record<string, number>;
+  byParticipant?: Array<{ name: string; amount: number; percent: number }>;
   assetClassPerformers: AssetClassPerformers;
   totalIncome: number;
   totalExpenses: number; // always positive (raw amounts are negative)
@@ -623,6 +624,16 @@ export async function buildPeriodEmailData(
 
   const byAssetClass: Record<string, number> = current.byAssetClass ?? {};
   const previousByAssetClass: Record<string, number> = previous?.byAssetClass ?? {};
+  const byParticipant = Object.values(
+    (current.byParticipant ?? {}) as Record<string, { participantName: string; totalValue: number }>
+  )
+    .filter((entry) => entry.totalValue > 0)
+    .sort((a, b) => b.totalValue - a.totalValue)
+    .map((entry) => ({
+      name: entry.participantName,
+      amount: entry.totalValue,
+      percent: currentNetWorth > 0 ? (entry.totalValue / currentNetWorth) * 100 : 0,
+    }));
 
   const { totalIncome, totalExpenses, topExpenseCategories, allIncomeCategories, topIndividualExpenses } =
     aggregateExpenses(expensesSnap.docs);
@@ -640,6 +651,7 @@ export async function buildPeriodEmailData(
     liquidNetWorth: current.liquidNetWorth ?? 0,
     byAssetClass,
     previousByAssetClass,
+    byParticipant,
     assetClassPerformers: computeAssetClassPerformers(byAssetClass, previousByAssetClass),
     totalIncome,
     totalExpenses,
@@ -688,6 +700,14 @@ export function generateEmailHtml(data: MonthlyEmailData): string {
           <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;text-align:right;color:#64748b;font-size:12px;">${pct}%</td>
         </tr>`;
     })
+    .join('');
+
+  const participantRows = (data.byParticipant ?? [])
+    .map((participant) => `<tr>
+          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;">${participant.name}</td>
+          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;text-align:right;">${formatEur(participant.amount)}</td>
+          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;text-align:right;color:#64748b;font-size:12px;">${participant.percent.toFixed(1)}%</td>
+        </tr>`)
     .join('');
 
   // Performance spotlight (best/worst Δ%)
@@ -849,6 +869,26 @@ export function generateEmailHtml(data: MonthlyEmailData): string {
 
         <!-- Performance spotlight -->
         ${performanceSection}
+
+        ${
+          participantRows
+            ? `<tr>
+          <td style="padding:20px 32px;border-bottom:1px solid #f1f5f9;">
+            <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#0f172a;">Patrimonio per Persona</p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;color:#374151;">
+              <thead>
+                <tr style="background:#f8fafc;">
+                  <th style="padding:6px 12px;text-align:left;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Persona</th>
+                  <th style="padding:6px 12px;text-align:right;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Valore</th>
+                  <th style="padding:6px 12px;text-align:right;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">%</th>
+                </tr>
+              </thead>
+              <tbody>${participantRows}</tbody>
+            </table>
+          </td>
+        </tr>`
+            : ''
+        }
 
         <!-- Cashflow summary -->
         <tr>

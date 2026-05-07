@@ -30,6 +30,7 @@ export interface AssistantPreferences {
   // When enabled, dummy (test fixture) snapshots are included in context bundles.
   // Off by default — intended for test accounts only.
   includeDummySnapshots: boolean;
+  householdScopeLabel?: string;
 }
 
 export interface AssistantMonthContext {
@@ -249,6 +250,7 @@ export interface AssistantStreamRequest {
   // Used only in chat mode to specify the context period type
   chatContext?: AssistantChatContextType;
   preferences?: AssistantPreferences;
+  householdScopeLabel?: string;
 }
 
 export type AssistantStreamEvent =

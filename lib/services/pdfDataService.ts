@@ -56,6 +56,7 @@ import { getAllExpenses } from './expenseService';
 import { getAnnualExpenses, getAnnualIncome, calculateFIREMetrics } from './fireService';
 import { formatCurrency, formatPercentage } from './chartService';
 import { filterExpensesByTime } from '@/lib/utils/pdfTimeFilters';
+import { filterExpensesByAttributionScope } from '@/lib/utils/householdUtils';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { calculatePerformanceForPeriod } from './performanceService';
 
@@ -105,11 +106,19 @@ export async function fetchPDFData(
       }
     }
 
+    const scopedExpenses = cachedExpenses
+      ? filterExpensesByAttributionScope(
+          cachedExpenses,
+          context.householdConfig,
+          context.householdScope ?? { kind: 'all' }
+        )
+      : null;
+
     if (sections.cashflow) {
       // Filter expenses for cashflow section based on timeFilter and user-selected period
       const filteredExpenses = timeFilter
-        ? filterExpensesByTime(cachedExpenses!, timeFilter, selectedYear, selectedMonth)
-        : cachedExpenses!;
+        ? filterExpensesByTime(scopedExpenses!, timeFilter, selectedYear, selectedMonth)
+        : scopedExpenses!;
       data.cashflow = prepareCashflowData(filteredExpenses);
     }
 
@@ -119,7 +128,7 @@ export async function fetchPDFData(
       const settings = await getSettings(userId);
       const includePrimaryResidence = settings?.includePrimaryResidenceInFIRE ?? false;
       const fireNetWorth = calculateFIRENetWorth(context.assets, includePrimaryResidence);
-      data.fire = await prepareFireData(userId, cachedExpenses!, fireNetWorth);
+      data.fire = await prepareFireData(userId, scopedExpenses!, fireNetWorth);
     }
 
     // Performance: calculate metrics for selected time period (yearly = YTD, total = ALL)
@@ -128,7 +137,7 @@ export async function fetchPDFData(
         userId,
         context.snapshots,
         timeFilter,
-        cachedExpenses ?? undefined,
+        scopedExpenses ?? undefined,
         selectedYear
       ) ?? undefined;
     }

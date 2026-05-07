@@ -21,6 +21,8 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
+import { useAssets } from '@/lib/hooks/useAssets';
+import { useHouseholdScopeFilter } from '@/lib/hooks/useHouseholdScopeFilter';
 import { useInternalTransfers, useInvestmentOperations } from '@/lib/hooks/useInvestmentOperations';
 import { Expense, ExpenseCategory, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { InternalTransfer, InvestmentOperation } from '@/types/investments';
@@ -45,6 +47,12 @@ import { Plus, TrendingUp, TrendingDown, Wallet, RefreshCw, Filter, ChevronDown,
 import { ExpenseDialog } from '@/components/expenses/ExpenseDialog';
 import { ExpenseTable } from '@/components/expenses/ExpenseTable';
 import { ExpenseCard } from '@/components/expenses/ExpenseCard';
+import { HouseholdScopeSelect } from '@/components/household/HouseholdScopeSelect';
+import {
+  filterExpensesByAttributionScope,
+  filterInternalTransfersByOwnershipScope,
+  filterInvestmentOperationsByOwnershipScope,
+} from '@/lib/utils/householdUtils';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { toDate } from '@/lib/utils/dateHelpers';
@@ -94,8 +102,17 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   const { user } = useAuth();
   const isDemo = useDemoMode();
   const queryClient = useQueryClient();
+  const { data: assets = [] } = useAssets(user?.uid);
   const { data: investmentOperations = [] } = useInvestmentOperations(user?.uid);
   const { data: internalTransfers = [] } = useInternalTransfers(user?.uid);
+  const {
+    householdConfig,
+    householdEnabled,
+    options: householdScopeOptions,
+    selectedScopeKey,
+    setSelectedScopeKey,
+    scope,
+  } = useHouseholdScopeFilter(user?.uid);
   const currentYear = new Date().getFullYear();
   const currentMonth = String(new Date().getMonth() + 1); // 1-based month (1-12)
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -131,18 +148,33 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
   const subCategoryDropdownRef = useRef<HTMLDivElement>(null);
 
+  const attributionScopedExpenses = useMemo(
+    () => filterExpensesByAttributionScope(allExpenses, householdConfig, scope),
+    [allExpenses, householdConfig, scope]
+  );
+
+  const scopedInvestmentOperations = useMemo(
+    () => filterInvestmentOperationsByOwnershipScope(investmentOperations, assets, householdConfig, scope),
+    [assets, householdConfig, investmentOperations, scope]
+  );
+
+  const scopedInternalTransfers = useMemo(
+    () => filterInternalTransfersByOwnershipScope(internalTransfers, assets, householdConfig, scope),
+    [assets, householdConfig, internalTransfers, scope]
+  );
+
   // Generate available years from ALL expenses (not filtered)
   const availableYears = useMemo(() => {
-    if (allExpenses.length === 0) return [];
+    if (attributionScopedExpenses.length === 0) return [];
 
-    const years = allExpenses.map(expense => {
+    const years = attributionScopedExpenses.map(expense => {
       const date = expense.date instanceof Date ? expense.date : expense.date.toDate();
       return date.getFullYear();
     });
 
     const uniqueYears = Array.from(new Set(years)).sort((a, b) => b - a);
     return uniqueYears;
-  }, [allExpenses]);
+  }, [attributionScopedExpenses]);
 
   const handleYearChange = (year: number) => {
     setSelectedYear(year);
@@ -199,6 +231,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
     setSearchQueryType('');
     setSearchQueryCategory('');
     setSearchQuerySubCategory('');
+    setSelectedScopeKey('__all__');
   };
 
   // Clearing Type also clears dependent filters AND their search queries.
@@ -226,11 +259,16 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   };
 
   // Check if any filter is active
-  const hasActiveFilters = selectedMonth !== 'all' || selectedType !== 'all' || selectedCategoryId !== 'all' || selectedSubCategoryId !== 'all';
+  const hasActiveFilters =
+    selectedMonth !== 'all' ||
+    selectedType !== 'all' ||
+    selectedCategoryId !== 'all' ||
+    selectedSubCategoryId !== 'all' ||
+    selectedScopeKey !== '__all__';
 
   // Derive year+month slice from allExpenses synchronously — no extra render on filter change.
   const expenses = useMemo(() => {
-    return allExpenses.filter(expense => {
+    return attributionScopedExpenses.filter(expense => {
       const date = expense.date instanceof Date ? expense.date : expense.date.toDate();
       const expenseYear = date.getFullYear();
       const expenseMonth = date.getMonth() + 1; // 1-based
@@ -240,7 +278,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
 
       return true;
     });
-  }, [allExpenses, selectedYear, selectedMonth]);
+  }, [attributionScopedExpenses, selectedYear, selectedMonth]);
 
   /**
    * Click-outside handler for custom dropdowns
@@ -560,7 +598,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
       source: expense,
     }));
 
-    const operationMovements: UnifiedMovement[] = investmentOperations
+    const operationMovements: UnifiedMovement[] = scopedInvestmentOperations
       .filter(operation => matchesPeriod(operation.date))
       .map(operation => ({
         id: `investment-${operation.id}`,
@@ -577,7 +615,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
         source: operation,
       }));
 
-    const transferMovements: UnifiedMovement[] = internalTransfers
+    const transferMovements: UnifiedMovement[] = scopedInternalTransfers
       .filter(transfer => matchesPeriod(transfer.date))
       .map(transfer => ({
         id: `transfer-${transfer.id}`,
@@ -595,7 +633,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
 
     return [...expenseMovements, ...operationMovements, ...transferMovements]
       .sort((a, b) => b.date.getTime() - a.date.getTime());
-  }, [filteredExpenses, internalTransfers, investmentOperations, selectedMonth, selectedYear]);
+  }, [filteredExpenses, scopedInternalTransfers, scopedInvestmentOperations, selectedMonth, selectedYear]);
 
   // Calculate totals from filtered expenses
   const totalIncome = calculateTotalIncome(filteredExpenses);
@@ -1010,6 +1048,16 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                     </div>
                   )}
                 </div>
+
+                {householdEnabled && (
+                  <HouseholdScopeSelect
+                    value={selectedScopeKey}
+                    onValueChange={setSelectedScopeKey}
+                    options={householdScopeOptions}
+                    label="Attribuzione"
+                    className="desktop:min-w-[220px]"
+                  />
+                )}
 
                 {/* Reset Filters Button */}
                 {hasActiveFilters && (

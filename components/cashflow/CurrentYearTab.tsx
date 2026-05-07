@@ -17,6 +17,8 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useChartColors } from '@/lib/hooks/useChartColors';
+import { useAuth } from '@/contexts/AuthContext';
+import { useHouseholdScopeFilter } from '@/lib/hooks/useHouseholdScopeFilter';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { calculateTotalIncome, calculateTotalExpenses } from '@/lib/services/expenseService';
@@ -49,6 +51,8 @@ import { getItalyMonth, getItalyMonthYear, getItalyYear, toDate } from '@/lib/ut
 import { CashflowSankeyChart } from '@/components/cashflow/CashflowSankeyChart';
 import { chartShellSettle, fadeVariants } from '@/lib/utils/motionVariants';
 import { cn } from '@/lib/utils';
+import { HouseholdScopeSelect } from '@/components/household/HouseholdScopeSelect';
+import { filterExpensesByAttributionScope } from '@/lib/utils/householdUtils';
 
 interface ChartData {
   name: string;
@@ -114,6 +118,15 @@ interface CurrentYearTabProps {
 }
 
 export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
+  const { user } = useAuth();
+  const {
+    householdConfig,
+    householdEnabled,
+    options: householdScopeOptions,
+    selectedScopeKey,
+    setSelectedScopeKey,
+    scope,
+  } = useHouseholdScopeFilter(user?.uid);
   const COLORS = useChartColors();
   const controlClassName = 'transition-colors duration-200 border-border/70 hover:border-primary/40 focus-visible:ring-primary/30 data-[placeholder]:text-muted-foreground';
 
@@ -144,6 +157,11 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
 
   // Get current year
   const currentYear = getItalyYear();
+
+  const scopedExpenses = useMemo(
+    () => filterExpensesByAttributionScope(allExpenses, householdConfig, scope),
+    [allExpenses, householdConfig, scope]
+  );
 
   // Load alert dismissal state from localStorage
   useEffect(() => {
@@ -179,8 +197,8 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
 
   // Filter expenses for current year only using useMemo
   const currentYearExpenses = useMemo(() => {
-    return allExpenses.filter(expense => getItalyYear(toDate(expense.date)) === currentYear);
-  }, [allExpenses, currentYear]);
+    return scopedExpenses.filter(expense => getItalyYear(toDate(expense.date)) === currentYear);
+  }, [currentYear, scopedExpenses]);
 
   // Filter expenses for Sankey chart based on selected month
   // Uses timezone-aware helpers to ensure consistent filtering (server UTC vs client CET)
@@ -795,7 +813,7 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
           {/* Filter Controls */}
           <div className="flex flex-col gap-4 mb-6">
             {/* Month filter dropdown */}
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <Label htmlFor="monthFilter" className="text-sm font-semibold text-blue-900 dark:text-blue-100">
                   Vista Mensile
@@ -804,22 +822,38 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                   Il cambio filtro aggiorna Sankey e grafici in continuità, senza resettare il contesto.
                 </p>
               </div>
-              <Select
-                value={selectedMonth?.toString() || '__all__'}
-                onValueChange={(value) => setSelectedMonth(value === '__all__' ? null : parseInt(value))}
-              >
-                <SelectTrigger id="monthFilter" className={cn('w-full sm:w-[220px]', controlClassName)}>
-                  <SelectValue placeholder="Tutto l'anno" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">Tutto l&apos;anno</SelectItem>
-                  {ITALIAN_MONTHS.map((month, index) => (
-                    <SelectItem key={index + 1} value={(index + 1).toString()}>
-                      {month}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="grid w-full gap-3 sm:w-auto sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="monthFilter">Mese</Label>
+                  <Select
+                    value={selectedMonth?.toString() || '__all__'}
+                    onValueChange={(value) => setSelectedMonth(value === '__all__' ? null : parseInt(value))}
+                  >
+                    <SelectTrigger id="monthFilter" className={cn('w-full sm:w-[220px]', controlClassName)}>
+                      <SelectValue placeholder="Tutto l'anno" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">Tutto l&apos;anno</SelectItem>
+                      {ITALIAN_MONTHS.map((month, index) => (
+                        <SelectItem key={index + 1} value={(index + 1).toString()}>
+                          {month}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {householdEnabled && (
+                  <div className="space-y-2">
+                    <HouseholdScopeSelect
+                      value={selectedScopeKey}
+                      onValueChange={setSelectedScopeKey}
+                      options={householdScopeOptions}
+                      label="Attribuzione"
+                      triggerClassName={cn('w-full sm:w-[240px]', controlClassName)}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Active filter indicator */}

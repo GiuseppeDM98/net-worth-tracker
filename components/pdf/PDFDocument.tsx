@@ -76,6 +76,7 @@ export function PDFDocument({
         timeFilter={context.timeFilter}
         selectedYear={context.selectedYear}
         selectedMonth={context.selectedMonth}
+        householdScopeLabel={context.householdScopeLabel}
       />
 
       {/* Portfolio section - Asset details with pagination (25 assets per page) */}

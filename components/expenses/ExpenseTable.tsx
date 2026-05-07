@@ -390,6 +390,7 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false }: Ex
             <TableRow>
               <TableHead className="w-[100px]">Data</TableHead>
               <TableHead className="w-[120px]">Tipo</TableHead>
+              <TableHead>Attribuzione</TableHead>
               <TableHead>Categoria</TableHead>
               <TableHead>Sottocategoria</TableHead>
               <TableHead className="text-right w-[120px]">
@@ -429,6 +430,15 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false }: Ex
                 >
                   {getTypeLabel(expense.type)}
                 </span>
+              </TableCell>
+              <TableCell>
+                {expense.attributionProfileName ? (
+                  <Badge variant="outline" className="text-xs">
+                    {expense.attributionProfileName}
+                  </Badge>
+                ) : (
+                  <span className="text-sm text-muted-foreground">-</span>
+                )}
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">

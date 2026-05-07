@@ -32,6 +32,7 @@ import { AssistantContextCard, AssistantContextPill } from '@/components/assista
 import { AssistantMemoryPanel } from '@/components/assistant/AssistantMemoryPanel';
 import { AssistantPromptChips } from '@/components/assistant/AssistantPromptChips';
 import { AssistantStreamingResponse } from '@/components/assistant/AssistantStreamingResponse';
+import { HouseholdScopeSelect } from '@/components/household/HouseholdScopeSelect';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -46,6 +47,7 @@ import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { useAssistantMemory, useUpdateAssistantMemory } from '@/lib/hooks/useAssistantMemory';
 import { useAssistantPeriodContext } from '@/lib/hooks/useAssistantMonthContext';
 import { useAssistantThread, useAssistantThreads, useDeleteAssistantThread } from '@/lib/hooks/useAssistantThreads';
+import { useHouseholdScopeFilter } from '@/lib/hooks/useHouseholdScopeFilter';
 import { assistantPromptChips } from '@/lib/constants/assistantPrompts';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
@@ -349,6 +351,13 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isDemo = useDemoMode();
+  const {
+    householdEnabled,
+    options: householdScopeOptions,
+    selectedScopeKey,
+    setSelectedScopeKey,
+    scopeLabel,
+  } = useHouseholdScopeFilter(user?.uid);
   const prefersReducedMotion = useReducedMotion();
   const conversationEndRef = useRef<HTMLDivElement>(null);
   // Stores the last successfully submitted prompt so retry can re-send it
@@ -645,6 +654,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
             ...(chatContextType === 'year' ? { year: selectedYear } : {}),
           } : {}),
           preferences: memory?.preferences,
+          householdScopeLabel: scopeLabel,
         }),
       });
 
@@ -960,6 +970,17 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {householdEnabled && (
+                      <div className="mb-3 space-y-1.5">
+                        <HouseholdScopeSelect
+                          value={selectedScopeKey}
+                          onValueChange={setSelectedScopeKey}
+                          options={householdScopeOptions}
+                          label="Vista dati"
+                        />
+                      </div>
+                    )}
 
                     {/* Toggle switches */}
                     <div className="space-y-2">

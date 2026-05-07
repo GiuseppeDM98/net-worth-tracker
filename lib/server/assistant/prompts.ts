@@ -209,6 +209,13 @@ function buildResponseStyleInstruction(style: AssistantPreferences['responseStyl
 
 // ─── Prompt builders ──────────────────────────────────────────────────────────
 
+function buildHouseholdScopeInstruction(preferences: AssistantPreferences): string {
+  if (!preferences.householdScopeLabel || preferences.householdScopeLabel === 'Tutto') {
+    return '';
+  }
+  return `Vista household attiva: ${preferences.householdScopeLabel}. Interpreta i dati e la risposta dentro questo perimetro; se i numeri aggregati non sono filtrati lato server, segnala esplicitamente il limite invece di presentarli come esclusivi della vista.`;
+}
+
 /**
  * Builds the full system + user content sent to Claude for a month analysis.
  *
@@ -246,6 +253,7 @@ export function buildMonthAnalysisPrompt(
     'Sei l\'Assistente AI di Net Worth Tracker per un investitore italiano self-directed.',
     'Rispondi sempre in italiano.',
     buildResponseStyleInstruction(preferences.responseStyle),
+    buildHouseholdScopeInstruction(preferences),
     macroInstruction,
     memoryBlock,
     '',
@@ -303,6 +311,7 @@ export function buildYearAnalysisPrompt(
     'Sei l\'Assistente AI di Net Worth Tracker per un investitore italiano self-directed.',
     'Rispondi sempre in italiano.',
     buildResponseStyleInstruction(preferences.responseStyle),
+    buildHouseholdScopeInstruction(preferences),
     macroInstruction,
     memoryBlock,
     '',
@@ -355,6 +364,7 @@ export function buildYtdAnalysisPrompt(
     'Sei l\'Assistente AI di Net Worth Tracker per un investitore italiano self-directed.',
     'Rispondi sempre in italiano.',
     buildResponseStyleInstruction(preferences.responseStyle),
+    buildHouseholdScopeInstruction(preferences),
     macroInstruction,
     memoryBlock,
     '',
@@ -407,6 +417,7 @@ export function buildHistoryAnalysisPrompt(
     'Sei l\'Assistente AI di Net Worth Tracker per un investitore italiano self-directed.',
     'Rispondi sempre in italiano.',
     buildResponseStyleInstruction(preferences.responseStyle),
+    buildHouseholdScopeInstruction(preferences),
     macroInstruction,
     memoryBlock,
     '',
@@ -462,6 +473,7 @@ export function buildQuarterAnalysisPrompt(
     "Sei l'Assistente AI di Net Worth Tracker per un investitore italiano self-directed.",
     'Rispondi sempre in italiano.',
     buildResponseStyleInstruction(preferences.responseStyle),
+    buildHouseholdScopeInstruction(preferences),
     macroInstruction,
     memoryBlock,
     '',
@@ -521,6 +533,7 @@ export function buildChatPrompt(
     'Sei l\'Assistente AI di Net Worth Tracker per un investitore italiano.',
     'Rispondi sempre in italiano.',
     buildResponseStyleInstruction(preferences.responseStyle),
+    buildHouseholdScopeInstruction(preferences),
     'Stai rispondendo a una conversazione generale sul portafoglio dell\'utente.',
     ...(webSearchInstruction ? [webSearchInstruction] : []),
     memoryBlock,
