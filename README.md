@@ -26,6 +26,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Dedicated investment operations tab for buys/sells, with quantity updates, weighted-average-cost recalculation, optional cash-account impact, fees/taxes, edit/delete actions, and realized gain tracking without classifying trades as expenses or income
 - Internal cash transfers between cash assets with edit/delete actions, excluded from income/expense savings metrics
 - Unified cashflow tracking view showing ordinary cashflow entries, investment operations, and internal transfers in one chronological movement list
+- Optional household ownership mode: manage multiple people and shared ownership profiles, assign assets/cashflow/transfers by owner or attribution profile, and filter Panoramica, Patrimonio, Allocazione, Rendimenti, Cashflow, Dividendi, Storico, PDF export, emails, and AI context by "Tutto", profile, or participant
 - Current vs target asset allocation visualization
 - Hierarchical asset allocation analysis with desktop drill-down and mobile bottom-sheet navigation
 - Current-year historical tables use a hidden previous-month baseline so January can show growth vs the previous December without rendering an extra visible column
@@ -199,7 +200,7 @@ See [`.env.local.example`](.env.local.example) for detailed comments on each var
 | Forms | react-hook-form, zod | Form handling and validation |
 | Dates | date-fns, date-fns-tz | Timezone-aware date operations |
 | Scraping | cheerio | Borsa Italiana dividend and bond price data |
-| Testing | Vitest | Unit testing (218 tests) |
+| Testing | Vitest | Unit testing (511 tests) |
 
 ## Development
 
