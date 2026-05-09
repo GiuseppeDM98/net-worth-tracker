@@ -1,7 +1,8 @@
 # AI Agent Guidelines - Net Worth Tracker (Lean)
 
 Project-specific conventions and recurring pitfalls for Net Worth Tracker.
-For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
+This is the shared operational contract for Codex and Claude Code. For architecture
+and current product status, see [CLAUDE.md](CLAUDE.md).
 
 ---
 
