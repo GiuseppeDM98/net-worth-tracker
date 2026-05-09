@@ -21,25 +21,17 @@ export function PieChart({
   const isMobile = useMediaQuery('(max-width: 768px)');
   const prefersReducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
   const [isAnimationActive, setIsAnimationActive] = useState(animateOnMount);
-
-  if (!data || data.length === 0) {
-    return (
-      <div className="flex h-64 items-center justify-center text-muted-foreground">
-        Nessun dato disponibile. Aggiungi assets per visualizzare il grafico.
-      </div>
-    );
-  }
-
-  // Ensure data is sorted by value descending for legend order
-  const sortedData = [...data].sort((a, b) => b.value - a.value);
+  const hasData = !!data && data.length > 0;
 
   useEffect(() => {
+    if (!hasData) return;
     onFirstRender?.();
     // We only need to mark the chart as seen once for the parent page.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [hasData]);
 
   useEffect(() => {
+    if (!hasData) return;
     if (prefersReducedMotion || !animateOnMount) {
       setIsAnimationActive(false);
       return;
@@ -51,7 +43,18 @@ export function PieChart({
     });
 
     return () => cancelAnimationFrame(frameId);
-  }, [animateOnMount, prefersReducedMotion]);
+  }, [animateOnMount, hasData, prefersReducedMotion]);
+
+  if (!hasData) {
+    return (
+      <div className="flex h-64 items-center justify-center text-muted-foreground">
+        Nessun dato disponibile. Aggiungi assets per visualizzare il grafico.
+      </div>
+    );
+  }
+
+  // Ensure data is sorted by value descending for legend order
+  const sortedData = [...data].sort((a, b) => b.value - a.value);
 
   // Responsive configuration
   const chartConfig = {

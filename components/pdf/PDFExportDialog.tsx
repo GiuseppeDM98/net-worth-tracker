@@ -112,11 +112,11 @@ export function PDFExportDialog({
     () => filterSnapshotsByOwnershipScope(snapshots, assets, householdConfig, scope),
     [assets, householdConfig, scope, snapshots]
   );
+  const validation = useMemo(() => validateTimeFilterData(scopedSnapshots), [scopedSnapshots]);
   const [loading, setLoading] = useState(false);
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('total');
-  const [validation, setValidation] = useState(validateTimeFilterData(scopedSnapshots));
-  const [selectedYear, setSelectedYear] = useState(validation.currentYear);
-  const [selectedMonth, setSelectedMonth] = useState(validation.currentMonth);
+  const [selectedYear, setSelectedYear] = useState(() => validation.currentYear);
+  const [selectedMonth, setSelectedMonth] = useState(() => validation.currentMonth);
   // All sections default to selected (true)
   const [sections, setSections] = useState<SectionSelection>({
     portfolio: true,
@@ -168,10 +168,18 @@ export function PDFExportDialog({
     return disabled;
   }, [timeFilter, isPastPeriod]);
 
-  // Revalidate time filter availability when snapshot data changes
+  // Keep period selectors valid when the household scope changes the available snapshots.
   useEffect(() => {
-    setValidation(validateTimeFilterData(scopedSnapshots));
-  }, [scopedSnapshots]);
+    if (availableYears.length > 0 && !availableYears.includes(selectedYear)) {
+      setSelectedYear(availableYears[0]);
+    }
+  }, [availableYears, selectedYear]);
+
+  useEffect(() => {
+    if (availableMonthsForYear.length > 0 && !availableMonthsForYear.includes(selectedMonth)) {
+      setSelectedMonth(Math.max(...availableMonthsForYear));
+    }
+  }, [availableMonthsForYear, selectedMonth]);
 
   // Auto-adjust sections when year selection changes within yearly mode
   useEffect(() => {

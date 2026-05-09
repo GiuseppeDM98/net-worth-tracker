@@ -88,8 +88,12 @@ export function useHouseholdScopeFilter(userId: string | undefined) {
     }
   }, []);
 
-  const selectedOption = options.find((option) => option.value === selectedScopeKey) ?? options[0];
-  const scope = scopeKeyToFilterScope(selectedScopeKey);
+  const selectedOption = useMemo(
+    () => options.find((option) => option.value === selectedScopeKey) ?? options[0],
+    [options, selectedScopeKey]
+  );
+  const scope = useMemo(() => scopeKeyToFilterScope(selectedScopeKey), [selectedScopeKey]);
+  const isScoped = scope.kind !== 'all';
 
   return {
     householdConfig,
@@ -100,6 +104,6 @@ export function useHouseholdScopeFilter(userId: string | undefined) {
     selectedOption,
     scope,
     scopeLabel: selectedOption?.label ?? 'Tutto',
-    isScoped: scope.kind !== 'all',
+    isScoped,
   };
 }

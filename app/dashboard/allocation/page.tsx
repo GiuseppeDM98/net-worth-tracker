@@ -100,7 +100,6 @@ export default function AllocationPage() {
   } = useHouseholdScopeFilter(user?.uid);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [targets, setTargets] = useState<AssetAllocationTarget | null>(null);
-  const [allocation, setAllocation] = useState<AllocationResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [usingGoalTargets, setUsingGoalTargets] = useState(false);
 
@@ -153,10 +152,10 @@ export default function AllocationPage() {
     [assets, householdConfig, scope]
   );
 
-  useEffect(() => {
-    if (!targets) return;
-    setAllocation(compareAllocations(scopedAssets, targets));
-  }, [scopedAssets, targets]);
+  const allocation = useMemo(
+    () => targets ? compareAllocations(scopedAssets, targets) : null,
+    [scopedAssets, targets]
+  );
 
   const loadData = async () => {
     if (!user) return;
@@ -199,9 +198,6 @@ export default function AllocationPage() {
 
       setTargets(effectiveTargets);
       setUsingGoalTargets(fromGoals);
-
-      const allocationResult = compareAllocations(assetsData, effectiveTargets);
-      setAllocation(allocationResult);
     } catch (error) {
       console.error('Error loading allocation data:', error);
       toast.error('Errore nel caricamento dei dati');
