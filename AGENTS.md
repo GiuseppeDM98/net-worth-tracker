@@ -3,98 +3,133 @@
 This is the shared entrypoint for Codex, Claude Code, and Caliber-generated
 agent context. Keep this file concise. Durable project knowledge lives in:
 
-- [docs/agent-memory.md](docs/agent-memory.md): detailed operational rules,
-  recurring pitfalls, UI conventions, assistant patterns, and test notes.
-- [docs/project-status.md](docs/project-status.md): architecture snapshot,
-  feature status, integrations, and known issues.
-- [.claude/rules](.claude/rules): Claude Code rule files that should mirror the
-  same high-level contract used by Codex.
+- [docs/agent-memory.md](docs/agent-memory.md)
+- [docs/project-status.md](docs/project-status.md)
+- [.claude/rules](.claude/rules)
+- [SETUP.md](SETUP.md)
 
-When adding new long-lived guidance, update the docs above first, then keep only
-the short, high-signal summary here.
+When a change affects durable guidance, update the docs above first, then keep
+`AGENTS.md` as the short summary.
 
 ## Source Of Truth
 
-Claude Code and Codex must follow the same project rules.
-
-- Treat `AGENTS.md` as the short shared operational entrypoint for
-  implementation work, tests, localization, git hygiene, and recurring pitfalls.
-- Treat `CLAUDE.md` as Claude Code's short project entrypoint.
-- Read `docs/agent-memory.md` for the full durable operational memory.
-- Read `docs/project-status.md` for detailed architecture and current-product
-  status.
-- When a change alters project conventions, update `docs/agent-memory.md`
-  first, then keep `AGENTS.md` as a concise summary.
-- When a change alters current architecture or active features, update
-  `docs/project-status.md` first, then keep `CLAUDE.md` as a concise summary.
+- Treat `AGENTS.md` as the shared operational entrypoint for implementation,
+  tests, localization, git hygiene, and recurring pitfalls.
+- Treat `CLAUDE.md` as Claude Code's project entrypoint.
+- Read `docs/agent-memory.md` for durable operational memory.
+- Read `docs/project-status.md` for architecture and current feature status.
 - If files conflict, prefer `AGENTS.md` / `docs/agent-memory.md` for how to
   work and `CLAUDE.md` / `docs/project-status.md` for what currently exists.
 
 ## Non-Negotiables
 
-- User-facing text is Italian. Code comments are English only.
+- User-facing text is Italian; code comments are English only.
 - Use `desktop:` for the 1440px Tailwind breakpoint; do not introduce `lg:`.
-- Use `formatCurrency()`, `formatDate()`, and Italy timezone helpers from
-  `dateHelpers.ts`. Do not group domain data with raw `Date.getMonth()` or
-  `Date.getFullYear()`.
-- Keep settings fields synchronized across type definition, `getSettings()`,
-  and `setSettings()`. Feature toggles live in `AssetAllocationSettings`.
-- Prefer `useMemo` for derived React data. Avoid `useEffect + setState` for
-  computed collections.
-- Do not revert user changes or unrelated dirty files. Work only on the files
-  needed for the current request.
-- Private App Router API routes using Firebase Admin must authenticate
-  server-side and bind operations to the verified Firebase UID.
+- Use `formatCurrency()`, `formatDate()`, and `dateHelpers.ts` helpers.
+- Keep settings fields synchronized across types, getters, and setters.
+- Prefer `useMemo` for derived collections; avoid `useEffect + setState`.
+- Private `app/api/*` routes must verify Firebase UID server-side.
+- Cron routes must validate `Authorization: Bearer ${process.env.CRON_SECRET}`.
+- Do not revert unrelated user changes or touch `Draft Release Temp.md` / `Temp.md`.
 
-## Household Scope Contract
+## Core Areas
 
-Household ownership mode is optional. When disabled, behavior must stay
-single-user by default. When enabled, views can be scoped by all data, ownership
-profile, or participant.
+- App Router: `app/page.tsx`, `app/layout.tsx`, `app/dashboard/*`
+- APIs: `app/api/*`, especially `app/api/ai/assistant/*`, `app/api/dividends/*`, `app/api/portfolio/snapshot/*`
+- Services: `lib/services/*`, `lib/server/*`, `lib/helpers/priceUpdater.ts`
+- Types: `types/*`
+- Tests: `__tests__/*.test.ts` with `vitest.config.ts`
 
-Important implementation rules:
+## Workflow Skills
 
-- `useHouseholdScopeFilter()` returns a scope object that must stay
-  referentially stable for the selected key.
-- Do not inline fresh `{ kind, id }` scope objects into dependency arrays.
-- Components fed by scoped collections must call hooks before empty-data
-  returns; scoped profiles can legitimately produce zero rows.
-- Snapshot/report/PDF/export logic must preserve saved split metadata instead
-  of recalculating historical ownership from today's profile shape.
+Codex does not automatically load repo-local skills. Treat `.agents/skills/*`
+as workflow playbooks: when a task matches one of these areas, read the matching
+`SKILL.md` before changing code. `.claude/skills/*` mirrors the same workflows
+for Claude Code.
 
-## UI And Copy
+- API auth / private routes: `.agents/skills/api-auth-routes/SKILL.md`
+- Vitest route tests: `.agents/skills/vitest-route-testing/SKILL.md`
+- Dividends, coupons, snapshots, and snapshot routes:
+  `.agents/skills/dividend-and-snapshot-workflows/SKILL.md`
+- Assistant SSE streaming, thread state, memory, and prompt context:
+  `.agents/skills/assistant-streaming/SKILL.md`
+- Caliber setup or missing Caliber binary:
+  `.agents/skills/setup-caliber/SKILL.md`
+- Searching available workflow guidance:
+  `.agents/skills/find-skills/SKILL.md`
 
-- Navigation taxonomy: `Panoramica`, `Patrimonio`, `Allocazione`,
-  `Rendimenti`, `Storico`, `Impostazioni`.
-- Keep `Hall of Fame`, `FIRE e Simulazioni`, `Cashflow`, and `Assistente AI`
-  as established labels.
-- Use `Sottocategoria`, not `Sotto-categoria`.
-- In JSX with inline tags, preserve spaces explicitly:
-  `testo {' '}<strong>valore</strong>{' '} testo`.
-- In `.tsx` Italian strings, avoid typographic apostrophes that can trigger
-  `TS1127`; prefer ASCII apostrophes or double-quoted strings.
+Do not duplicate skill content into `AGENTS.md`; keep this file as a short index
+and update the skill file itself when the detailed workflow changes. Keep the
+`.agents/skills` and `.claude/skills` copies aligned.
 
-## Verification
+## Commands
 
-Use the narrowest relevant test first, then broaden based on blast radius.
-
-```powershell
-npm.cmd test -- --run __tests__/householdUtils.test.ts
+```bash
+npm.cmd test -- --run __tests__/assistantRoutes.test.ts
+npm.cmd test -- --run __tests__/apiAuthRoutes.test.ts
 npm.cmd test
+```
+
+```bash
 npx tsc --noEmit
 npm.cmd run build
 ```
 
-For docs-only changes, at minimum run `git diff --check`.
+```bash
+git diff --check
+npm.cmd run lint
+```
 
-## Caliber Policy
+## Verification
 
-Caliber may shorten `AGENTS.md` and `CLAUDE.md`. That is acceptable only because
-the detailed content is stored in `docs/agent-memory.md` and
-`docs/project-status.md`.
+- Start with the narrowest `__tests__/*` file related to the change.
+- Broaden to `npm.cmd test`, then `npx tsc --noEmit`, then `npm.cmd run build`.
+- For docs-only edits, `git diff --check` is the minimum useful check.
+- `npm.cmd run lint` may still report historical repo issues.
 
-Do not delete durable guidance from the docs during a Caliber refresh. If
-Caliber proposes a shorter entrypoint, preserve links back to the detailed docs.
+<!-- caliber:managed:pre-commit -->
+## Before Committing
 
-`caliber refresh` can send repository context to an external model. Run it only
-with explicit user approval and review the resulting diff before committing.
+**IMPORTANT:** Before every git commit, you MUST ensure Caliber syncs agent configs with the latest code changes.
+
+First, check if the pre-commit hook is already installed:
+```bash
+grep -q "caliber" .git/hooks/pre-commit 2>/dev/null && echo "hook-active" || echo "no-hook"
+```
+
+- If **hook-active**: the hook handles sync automatically — just commit normally. Tell the user: "Caliber will sync your agent configs automatically via the pre-commit hook."
+- If **no-hook**: run Caliber manually before committing:
+  1. Tell the user: "Caliber: Syncing agent configs with your latest changes..."
+  2. Run: `caliber refresh && git add CLAUDE.md .claude/ .cursor/ .cursorrules .github/copilot-instructions.md .github/instructions/ AGENTS.md CALIBER_LEARNINGS.md .agents/ .opencode/ 2>/dev/null`
+  3. After it completes, briefly tell the user what Caliber updated. Then proceed with the commit.
+
+**Valid `caliber refresh` options:** `--quiet` (suppress output) and `--dry-run` (preview without writing). Do not pass any other flags — options like `--auto-approve`, `--debug`, or `--force` do not exist and will cause errors.
+
+**`caliber config`** takes no flags — it runs an interactive provider setup. Do not pass `--provider`, `--api-key`, or `--endpoint`.
+
+If `caliber` is not found, read `.agents/skills/setup-caliber/SKILL.md` and follow its instructions to install Caliber.
+<!-- /caliber:managed:pre-commit -->
+
+<!-- caliber:managed:learnings -->
+## Session Learnings
+
+Read `CALIBER_LEARNINGS.md` for patterns and anti-patterns learned from previous sessions.
+These are auto-extracted from real tool usage — treat them as project-specific rules.
+<!-- /caliber:managed:learnings -->
+
+<!-- caliber:managed:model-config -->
+## Model Configuration
+
+Recommended default: `claude-sonnet-4-6` with high effort (stronger reasoning; higher cost and latency than smaller models).
+Smaller/faster models trade quality for speed and cost — pick what fits the task.
+Pin your choice (`/model` in Claude Code, or `CALIBER_MODEL` when using Caliber with an API provider) so upstream default changes do not silently change behavior.
+
+<!-- /caliber:managed:model-config -->
+
+<!-- caliber:managed:sync -->
+## Context Sync
+
+This project uses [Caliber](https://github.com/caliber-ai-org/ai-setup) to keep AI agent configs in sync across Claude Code, Cursor, Copilot, and Codex.
+Configs update automatically before each commit via `caliber refresh`.
+If the pre-commit hook is not set up, read `.agents/skills/setup-caliber/SKILL.md` and follow the setup instructions.
+<!-- /caliber:managed:sync -->
