@@ -1,4 +1,4 @@
-﻿---
+---
 name: skill-check
 description: "Validate Claude Code skills against the agentskills specification. Catches structural, semantic, and naming issues before users do."
 category: development

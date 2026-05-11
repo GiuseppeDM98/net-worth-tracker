@@ -1,4 +1,4 @@
-﻿---
+---
 name: recharts
 description: Build composable, responsive React charts with Recharts library. Use when creating data visualizations including line charts, area charts, bar charts, pie charts, scatter plots, and composed charts. Handles chart customization, responsive sizing, tooltips, legends, axes configuration, performance optimization, and accessibility.
 ---

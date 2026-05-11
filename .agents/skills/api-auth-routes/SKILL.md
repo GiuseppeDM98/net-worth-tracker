@@ -1,4 +1,4 @@
-﻿---
+---
 name: api-auth-routes
 description: Creates or edits authenticated `app/api/*` routes with Firebase UID checks, `assertSameUser()`, `assertResourceOwner()`, and `getApiAuthErrorResponse()`. Use when user says 'secure this route', 'add private API', or 'Firebase auth for API'. Do NOT use for public endpoints or UI-only work.
 ---
@@ -7,7 +7,7 @@ description: Creates or edits authenticated `app/api/*` routes with Firebase UID
 ## Critical
 
 1. Private `app/api/*` routes must verify the Firebase UID server-side before any resource access or mutation.
-2. Use the projectâ€™s auth helpers exactly as existing routes do:
+2. Use the project’s auth helpers exactly as existing routes do:
    - `getApiAuthErrorResponse()` for auth failures
    - `assertSameUser()` when the request user must match a target UID
    - `assertResourceOwner()` when the request user must own the resource being accessed
@@ -45,15 +45,15 @@ description: Creates or edits authenticated `app/api/*` routes with Firebase UID
    - In the route file, use `getApiAuthErrorResponse()` for unauthorized/forbidden responses exactly as existing routes do.
    - Do not invent new auth JSON shapes, status codes, or error messages unless the current route family already uses them.
    - Keep the response consistent for all auth failure branches.
-   - **This step uses the output from Step 4. Verify** auth failures match the projectâ€™s existing response shape before proceeding to the next step.
+   - **This step uses the output from Step 4. Verify** auth failures match the project’s existing response shape before proceeding to the next step.
 
-6. **Preserve the routeâ€™s existing data flow and service boundaries.**
+6. **Preserve the route’s existing data flow and service boundaries.**
    - Keep business logic in `lib/server/*` or `lib/services/*` when the codebase already does so.
    - Use route handlers only for request parsing, auth checks, and response formatting.
    - If the route calls a server use case, reuse the same input/output types from `types/*` and the same imports already present in the feature area.
    - **This step uses the output from Step 5. Verify** the route still matches the existing separation of concerns before proceeding to validation.
 
-7. **Validate with the projectâ€™s standard checks.**
+7. **Validate with the project’s standard checks.**
    - Run the relevant targeted test when available, for example:
      - `npm.cmd test -- --run __tests__/assistantRoutes.test.ts`
      - `npm.cmd test -- --run __tests__/householdUtils.test.ts`
@@ -63,7 +63,7 @@ description: Creates or edits authenticated `app/api/*` routes with Firebase UID
 
 ## Examples
 
-**User says:** â€œSecure this private API route.â€
+**User says:** “Secure this private API route.”
 
 **Actions taken:**
 1. Open the existing file under `app/api/<feature>/route.ts`.
@@ -73,7 +73,7 @@ description: Creates or edits authenticated `app/api/*` routes with Firebase UID
 5. Return failures with `getApiAuthErrorResponse()`.
 6. Run the relevant Vitest file and `npx tsc --noEmit`.
 
-**Result:** The route behaves like the rest of the authenticated API layer: server-side Firebase auth is enforced, unauthorized access is blocked early, and responses match the projectâ€™s existing auth error shape.
+**Result:** The route behaves like the rest of the authenticated API layer: server-side Firebase auth is enforced, unauthorized access is blocked early, and responses match the project’s existing auth error shape.
 
 ## Common Issues
 

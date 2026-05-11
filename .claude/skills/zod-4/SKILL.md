@@ -1,4 +1,4 @@
-﻿---
+---
 name: zod-4
 description: >
   Zod 4 schema validation patterns.

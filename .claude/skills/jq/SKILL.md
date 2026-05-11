@@ -1,4 +1,4 @@
-﻿---
+---
 name: jq
 description: "Expert jq usage for JSON querying, filtering, transformation, and pipeline integration. Practical patterns for real shell workflows."
 category: development
