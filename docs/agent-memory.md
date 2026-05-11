@@ -58,6 +58,7 @@ architecture and current product status, see
 - For state-preserving tab UIs, keep per-scope active tab state explicitly (e.g. separate sub-tab state for `Anno Corrente` and `Storico`) instead of sharing one global sub-tab value
 - Use `useMemo` for derived state; do not use `useEffect + setState` for computed values
 - **Household scope filter contract**: `useHouseholdScopeFilter()` returns a `scope` object that is intentionally memoized by `selectedScopeKey`. Do not inline fresh `{ kind, id }` scope objects into dependency arrays for scoped assets/expenses/snapshots; this can create maximum-update-depth loops in pages that derive downstream data.
+- **Household-scoped data loading**: keep unscoped pages on their server-aggregated or lightweight query path. Do not fetch full assets/expenses/snapshots just in case household scoping might be used. Gate the heavy client collections behind `householdEnabled && isScoped` and keep the fast `rawOverview` path for `Tutto` / disabled household mode. On Panoramica this avoids reintroducing the slowdown fixed by `perf: reduce initial dashboard load`.
 - **Scoped empty-data hook order**: components fed by household-scoped collections must call hooks before empty-data returns. A profile/participant can legitimately produce zero assets or chart rows; returning before later hooks causes React error #300 when switching from populated data to empty data.
 - When a private API returns date-like values for React Query consumers, normalize them at the hook boundary with `toDate()` instead of scattering conversions inside page components
 - **Naming-only cleanup rule**: for sessions scoped to naming/readability, prefer local semantic renames (`payload` → domain-specific response name, `body` → `requestBody`, `stream` → typed stream role) and avoid cross-file renames or structural extractions unless the runtime contract is already unclear
@@ -66,6 +67,7 @@ architecture and current product status, see
 - `next/dynamic` with named exports must unwrap via `.then(m => ({ default: m.Named }))`
 - Use `ssr: false` for client-only dialogs and panels
 - Pass the props type parameter to preserve type safety
+- Heavy route-local surfaces must be loaded with `next/dynamic`: Cashflow tab panels are render-lazy and bundle-lazy; PDF export (`@react-pdf/renderer`, `html2canvas`) stays behind the export button; React Query Devtools is development-only. Do not statically import these back into route entry files.
 
 ### Expense Sign Convention
 - Income is stored positive
