@@ -1,30 +1,11 @@
-/**
- * DASHBOARD LAYOUT
- *
- * Provides consistent structure for all dashboard pages.
- *
- * STRUCTURE:
- * - Sidebar: Navigation menu
- * - Header: Top bar with user info
- * - Main content area: Child pages render here
- * - Bottom Navigation: Mobile-only (portrait mode)
- *
- * RESPONSIVE BEHAVIOR:
- * - Desktop (≥1024px): Sidebar always visible, no bottom nav
- * - Mobile Portrait: Sidebar hidden, bottom nav visible
- * - Mobile Landscape: Hamburger menu to open sidebar
- */
-
 'use client';
 
-import { useState } from 'react';
 import { MotionConfig } from 'framer-motion';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
-import { Sidebar } from '@/components/layout/Sidebar';
-import { Header } from '@/components/layout/Header';
+import { AppSidebar } from '@/components/layout/Sidebar';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
-import { Menu, X, FlaskConical } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
+import { FlaskConical } from 'lucide-react';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 
 export default function DashboardLayout({
@@ -32,61 +13,42 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const isDemo = useDemoMode();
 
   return (
-    // MotionConfig propagates to the entire dashboard tree — all Framer Motion
-    // animations respect prefers-reduced-motion without per-component guards.
     <MotionConfig reducedMotion="user">
-    <ProtectedRoute>
-      <div className="flex h-screen overflow-hidden">
-        {/* Mobile sidebar backdrop */}
-        {sidebarOpen && (
-          <div
-            className="fixed inset-0 z-40 bg-black/50 desktop:hidden"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
+      <ProtectedRoute>
+        <SidebarProvider className="h-screen overflow-hidden">
+          <AppSidebar />
 
-        {/* Sidebar */}
-        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-        {/* Main content */}
-        <div className="flex flex-1 flex-col overflow-hidden">
-          {/* Mobile hamburger menu - solo landscape */}
-          <div className="flex items-center gap-4 bg-background px-4 py-3 desktop:hidden max-desktop:portrait:hidden max-desktop:landscape:flex border-b">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2"
-            >
-              {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </Button>
-            <h1 className="text-lg font-semibold">Portfolio Tracker</h1>
-          </div>
-
-          {/* Demo banner — shown only for the shared demo account */}
-          {isDemo && (
-            <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800/60 px-4 py-2 text-xs text-amber-800 dark:text-amber-300">
-              <FlaskConical className="h-3.5 w-3.5 shrink-0" />
-              <span className="font-medium">Modalità Demo</span>
-              <span className="text-amber-700 dark:text-amber-400 hidden sm:inline">— sola lettura, i dati non possono essere modificati</span>
+          <SidebarInset className="overflow-hidden">
+            {/* Hamburger bar — landscape mobile only.
+                SidebarTrigger toggles the shadcn sidebar Sheet on screens < 1440px. */}
+            <div className="flex shrink-0 items-center gap-2 border-b bg-background px-4 py-2.5 desktop:hidden max-desktop:portrait:hidden max-desktop:landscape:flex">
+              <SidebarTrigger />
+              <span className="text-base font-semibold">Portfolio Tracker</span>
             </div>
-          )}
-          <Header />
-          {/* Page transition is handled by template.tsx which re-mounts on every
-              navigation — see app/dashboard/template.tsx for the rationale */}
-          <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-950 p-4 md:p-6 desktop:pb-6 max-desktop:portrait:pb-20 max-desktop:landscape:pb-6">
-            {children}
-          </main>
-        </div>
-      </div>
 
-      {/* Bottom Navigation - Solo mobile portrait */}
-      <BottomNavigation />
-    </ProtectedRoute>
+            {isDemo && (
+              <div className="flex shrink-0 items-center gap-1.5 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300">
+                <FlaskConical className="h-3.5 w-3.5 shrink-0" />
+                <span className="font-medium">Modalità Demo</span>
+                <span className="hidden text-amber-700 dark:text-amber-400 sm:inline">
+                  — sola lettura, i dati non possono essere modificati
+                </span>
+              </div>
+            )}
+
+            {/* Page transitions handled by template.tsx which re-mounts on every navigation */}
+            <main className="flex-1 overflow-y-auto bg-gray-50 p-4 dark:bg-gray-950 md:p-6 desktop:pb-6 max-desktop:portrait:[padding-bottom:calc(env(safe-area-inset-bottom,0px)+88px)] max-desktop:landscape:pb-6">
+              {children}
+            </main>
+          </SidebarInset>
+        </SidebarProvider>
+
+        {/* Bottom Navigation — mobile portrait only */}
+        <BottomNavigation />
+      </ProtectedRoute>
     </MotionConfig>
   );
 }

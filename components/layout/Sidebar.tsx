@@ -1,154 +1,288 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  useSidebar,
+} from '@/components/ui/sidebar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { AssistenteBanner } from '@/components/layout/AssistenteBanner';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
   Wallet,
   PieChart,
   History,
-  Settings,
   Receipt,
-  BarChart3,
   Flame,
   Trophy,
-  Dices,
   TrendingUp,
-  Bot,
+  Settings,
+  LogOut,
+  MoreVertical,
+  Sun,
+  Moon,
+  Monitor,
 } from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { toast } from 'sonner';
 
-interface SidebarProps {
-  isOpen?: boolean;
-  onClose?: () => void;
-}
+// Primary routes — appear unlabeled at the top of the sidebar and as the 3 main
+// tabs in BottomNavigation. If you change these, update BottomNavigation.tsx too.
+const primaryNav = [
+  { name: 'Panoramica', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Patrimonio', href: '/dashboard/assets', icon: Wallet },
+  { name: 'Cashflow', href: '/dashboard/cashflow', icon: Receipt },
+];
 
-/**
- * Main navigation sidebar for the dashboard.
- *
- * Responsive behavior (progressive enhancement approach):
- * - Desktop (≥1440px): Always visible, fixed width 256px (w-64), positioned relative
- * - Mobile landscape (<1440px + landscape): Slide-in overlay (fixed, z-50) controlled by isOpen prop
- * - Mobile portrait (<1440px + portrait): Hidden (uses BottomNavigation instead)
- *
- * Navigation architecture:
- * - 9 total routes in this sidebar
- * - 6 of these also appear in SecondaryMenuDrawer (Allocation, Performance, History, Hall of Fame, FIRE, Settings)
- * - 3 are unique to Sidebar: Overview, Assets, Cashflow
- * - Mobile portrait gets 3 primary routes in BottomNavigation + 6 secondary in drawer
- *
- * Custom Tailwind breakpoints:
- * - `desktop:` = @media (min-width: 1440px)
- * - `max-desktop:` = @media (max-width: 1439px)
- * - `landscape:` and `portrait:` = orientation modifiers
- *
- * @param isOpen - Controls sidebar visibility on mobile landscape (ignored on desktop)
- * @param onClose - Callback to close sidebar, called after navigation on mobile
- */
-export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
+// Analysis routes — also in SecondaryMenuDrawer under "Analisi".
+const analysisNav = [
+  { name: 'Allocazione', href: '/dashboard/allocation', icon: PieChart },
+  { name: 'Rendimenti', href: '/dashboard/performance', icon: TrendingUp },
+  { name: 'Storico', href: '/dashboard/history', icon: History },
+  { name: 'Hall of Fame', href: '/dashboard/hall-of-fame', icon: Trophy },
+];
+
+// Planning routes — also in SecondaryMenuDrawer under "Pianificazione".
+const planningNav = [
+  { name: 'FIRE e Simulazioni', href: '/dashboard/fire-simulations', icon: Flame },
+];
+
+function NavItems({ items }: { items: typeof primaryNav }) {
   const pathname = usePathname();
+  const { isMobile, setOpenMobile } = useSidebar();
 
-  // WARNING: If you add/remove navigation items here, also update:
-  // - SecondaryMenuDrawer.tsx (7 secondary items: Allocazione, Rendimenti, Storico, Assistente AI, Hall of Fame, FIRE, Impostazioni)
-  // - BottomNavigation.tsx (3 primary items: Panoramica, Patrimonio, Cashflow)
-  // Total navigation: 10 routes (this sidebar contains all 10)
-  const navigation = [
-    { name: 'Panoramica', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Patrimonio', href: '/dashboard/assets', icon: Wallet },
-    { name: 'Allocazione', href: '/dashboard/allocation', icon: PieChart },
-    { name: 'Rendimenti', href: '/dashboard/performance', icon: TrendingUp },
-    { name: 'Storico', href: '/dashboard/history', icon: History },
-    // Assistente AI is conditionally included based on the feature flag.
-    // The flag defaults to enabled when the variable is absent.
-    ...(process.env.NEXT_PUBLIC_ASSISTANT_AI_ENABLED !== 'false'
-      ? [{ name: 'Assistente AI', href: '/dashboard/assistant', icon: Bot }]
-      : []),
-    // Hall of Fame: kept in English as an intentional premium brand choice
-    { name: 'Hall of Fame', href: '/dashboard/hall-of-fame', icon: Trophy },
-    // FIRE: acronym (Financial Independence, Retire Early) — intentional hybrid
-    { name: 'FIRE e Simulazioni', href: '/dashboard/fire-simulations', icon: Flame },
-    // Cashflow: established financial term used as-is in Italian finance
-    { name: 'Cashflow', href: '/dashboard/cashflow', icon: Receipt },
-    { name: 'Impostazioni', href: '/dashboard/settings', icon: Settings },
-  ];
-
-  /**
-   * Auto-closes sidebar on mobile landscape after navigation.
-   *
-   * Why 1440px threshold?
-   * Matches the Tailwind `desktop:` breakpoint defined in tailwind.config.ts.
-   * On smaller screens, close the overlay sidebar after navigation to free up
-   * screen space and show the selected page content.
-   *
-   * Desktop view keeps sidebar open for persistent navigation.
-   */
-  const handleLinkClick = () => {
-    if (onClose && window.innerWidth < 1440) {
-      onClose();
-    }
+  const handleClick = () => {
+    if (isMobile) setOpenMobile(false);
   };
 
   return (
-    <div
-      className={cn(
-        'flex h-full w-64 flex-col bg-sidebar text-sidebar-foreground transition-transform duration-300 ease-in-out',
-        // Desktop (≥desktop): sempre relativo, sempre visibile
-        'desktop:relative desktop:translate-x-0',
-        // Mobile landscape SOLO (< desktop + landscape): fixed, slide in/out
-        'max-desktop:landscape:fixed max-desktop:landscape:inset-y-0 max-desktop:landscape:left-0 max-desktop:landscape:z-50',
-        // Mobile portrait SOLO (< desktop + portrait): nascosta
-        'max-desktop:portrait:hidden',
-        // Show/hide su mobile landscape
-        isOpen ? 'translate-x-0' : 'max-desktop:landscape:-translate-x-full'
-      )}
-    >
-      {/* Desktop header (hidden on mobile since we show it in the hamburger menu bar) */}
-      <div className="hidden desktop:flex h-16 items-center px-6">
-        <h1 className="text-xl font-bold">Portfolio Tracker</h1>
-      </div>
-
-      {/* Mobile header */}
-      <div className="flex desktop:hidden h-16 items-center px-6 border-b border-sidebar-border">
-        <h1 className="text-xl font-bold">Portfolio Tracker</h1>
-      </div>
-
-      <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
-        {navigation.map((item) => {
-          // Overview (/dashboard) must use exact match only — startsWith would
-          // match every sub-route (/dashboard/assets, /dashboard/history, etc.)
-          const isActive = item.href === '/dashboard'
+    <SidebarMenu>
+      {items.map((item) => {
+        const isActive =
+          item.href === '/dashboard'
             ? pathname === item.href
             : pathname === item.href || pathname.startsWith(item.href + '/');
-          return (
-            // Each link is relative-positioned so the absolute pill sits behind content.
-            <Link
-              key={item.name}
-              href={item.href}
-              onClick={handleLinkClick}
-              className={cn(
-                'relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                isActive
-                  ? 'text-sidebar-accent-foreground'
-                  : 'text-sidebar-foreground/70 hover:text-sidebar-foreground'
-              )}
+        return (
+          <SidebarMenuItem key={item.name}>
+            {isActive && (
+              <motion.div
+                layoutId="sidebar-active-pill"
+                className="absolute inset-0 rounded-md bg-sidebar-accent"
+                transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+              />
+            )}
+            <SidebarMenuButton
+              asChild
+              isActive={isActive}
+              tooltip={item.name}
+              className="relative z-10 data-[active=true]:bg-transparent"
             >
-              {/* Animated pill slides between active nav items via shared layoutId.
-                  Spring physics (stiff + low damping) gives a snappy native feel
-                  without overshoot. */}
-              {isActive && (
-                <motion.div
-                  layoutId="sidebar-active-pill"
-                  className="absolute inset-0 rounded-lg bg-sidebar-accent"
-                  transition={{ type: 'spring', stiffness: 400, damping: 35 }}
-                />
-              )}
-              <item.icon className="relative z-10 h-5 w-5" />
-              <span className="relative z-10">{item.name}</span>
-            </Link>
-          );
-        })}
-      </nav>
-    </div>
+              <Link href={item.href} onClick={handleClick}>
+                <item.icon />
+                <span>{item.name}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        );
+      })}
+    </SidebarMenu>
+  );
+}
+
+export function AppSidebar() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { user, signOut } = useAuth();
+  const { isMobile, setOpenMobile } = useSidebar();
+  const { theme, setTheme } = useTheme();
+  const [confirmLogout, setConfirmLogout] = useState(false);
+
+  const closeMobile = () => {
+    if (isMobile) setOpenMobile(false);
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast.success('Logout effettuato con successo');
+      router.push('/login');
+    } catch {
+      toast.error('Errore durante il logout');
+    }
+  };
+
+  const displayName = user?.displayName?.split(' ')[0] || user?.email?.split('@')[0] || '';
+  const initials = user?.displayName
+    ? user.displayName.split(' ').slice(0, 2).map((n: string) => n[0]).join('').toUpperCase()
+    : (user?.email?.[0].toUpperCase() ?? '?');
+
+  return (
+    <>
+    <Sidebar collapsible="offcanvas">
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" asChild>
+              <Link href="/dashboard" onClick={closeMobile}>
+                <div className="flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground text-xs font-bold">
+                  NW
+                </div>
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-semibold">Portfolio Tracker</span>
+                </div>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+
+      <SidebarContent>
+        {/* Primary routes — no label, acts as visual anchor */}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <NavItems items={primaryNav} />
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Analysis routes */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Analisi</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <NavItems items={analysisNav} />
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Planning routes */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Pianificazione</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <NavItems items={planningNav} />
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+      </SidebarContent>
+
+      <SidebarFooter>
+        {process.env.NEXT_PUBLIC_ASSISTANT_AI_ENABLED !== 'false' && (
+          <AssistenteBanner onClick={closeMobile} />
+        )}
+        <SidebarMenu className={process.env.NEXT_PUBLIC_ASSISTANT_AI_ENABLED !== 'false' ? 'mt-[22px]' : undefined}>
+          <SidebarMenuItem>
+            <div className="flex w-full items-center gap-2 overflow-hidden rounded-md px-2 py-1.5">
+              <Avatar className="size-8 shrink-0 rounded-lg">
+                <AvatarFallback className="rounded-lg bg-primary text-primary-foreground text-xs font-semibold">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="grid flex-1 overflow-hidden text-left text-sm leading-tight">
+                <span className="truncate font-medium text-sidebar-foreground">{displayName}</span>
+                <span className="truncate text-xs text-muted-foreground">{user?.email}</span>
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="ml-auto flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground">
+                    <MoreVertical className="size-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="top" align="end" className="w-52">
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem asChild>
+                      <Link href="/dashboard/settings" onClick={closeMobile}>
+                        <Settings className="size-4" />
+                        Impostazioni
+                      </Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">
+                    Preferenze
+                  </DropdownMenuLabel>
+                  {/* Theme selector — plain div so clicking buttons doesn't close the menu */}
+                  <div className="flex items-center justify-between px-2 py-1.5">
+                    <span className="text-sm">Tema</span>
+                    <div className="flex items-center gap-0.5 rounded-md border bg-muted/50 p-0.5">
+                      {([
+                        { value: 'system', icon: Monitor, label: 'Sistema' },
+                        { value: 'light',  icon: Sun,     label: 'Chiaro'  },
+                        { value: 'dark',   icon: Moon,    label: 'Scuro'   },
+                      ] as const).map(({ value, icon: Icon, label }) => (
+                        <button
+                          key={value}
+                          onClick={() => setTheme(value)}
+                          title={label}
+                          className={cn(
+                            'flex size-6 items-center justify-center rounded transition-colors',
+                            theme === value
+                              ? 'bg-background text-foreground shadow-sm'
+                              : 'text-muted-foreground hover:text-foreground'
+                          )}
+                        >
+                          <Icon className="size-3.5" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => setConfirmLogout(true)}>
+                    <LogOut className="size-4" />
+                    Esci
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+    </Sidebar>
+
+    <AlertDialog open={confirmLogout} onOpenChange={setConfirmLogout}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Esci dall&apos;account?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Verrai disconnesso da questo dispositivo.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Annulla</AlertDialogCancel>
+          <AlertDialogAction onClick={handleSignOut}>Esci</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
