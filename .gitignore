@@ -44,3 +44,4 @@ firebase-admin-key.json
 next-env.d.ts
 
 # Draft\ Release\ Temp.md
+.firebaserc
