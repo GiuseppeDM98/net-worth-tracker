@@ -3,6 +3,7 @@
 
 import type { MonthlySnapshot } from '@/types/assets';
 import type { SectionSelection, TimeFilter, TimeFilterValidation } from '@/types/pdf';
+import { getItalyMonth, getItalyMonthYear, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
 
 /**
  * Filter snapshots by time filter.
@@ -27,8 +28,8 @@ export function filterSnapshotsByTime(
   }
 
   const now = new Date();
-  const targetYear = year ?? now.getFullYear();
-  const targetMonth = month ?? (now.getMonth() + 1);
+  const targetYear = year ?? getItalyYear(now);
+  const targetMonth = month ?? getItalyMonth(now);
 
   if (timeFilter === 'yearly') {
     return snapshots.filter(s => s.year === targetYear);
@@ -66,17 +67,11 @@ export function filterExpensesByTime(
   }
 
   const now = new Date();
-  const targetYear = year ?? now.getFullYear();
-  const targetMonth = month ?? (now.getMonth() + 1);
+  const targetYear = year ?? getItalyYear(now);
+  const targetMonth = month ?? getItalyMonth(now);
 
   return expenses.filter(expense => {
-    // Handle both Date and Firestore Timestamp
-    const date = expense.date instanceof Date
-      ? expense.date
-      : expense.date.toDate();
-
-    const expenseYear = date.getFullYear();
-    const expenseMonth = date.getMonth() + 1;
+    const { year: expenseYear, month: expenseMonth } = getItalyMonthYear(toDate(expense.date));
 
     if (timeFilter === 'yearly') {
       return expenseYear === targetYear;
@@ -103,8 +98,8 @@ export function validateTimeFilterData(
   snapshots: MonthlySnapshot[]
 ): TimeFilterValidation {
   const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
+  const currentYear = getItalyYear(now);
+  const currentMonth = getItalyMonth(now);
 
   // Check if any year has enough data for yearly export (>=2 snapshots)
   const snapshotsByYear = new Map<number, number>();

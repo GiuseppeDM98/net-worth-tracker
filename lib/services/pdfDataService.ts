@@ -57,6 +57,7 @@ import { getAnnualExpenses, getAnnualIncome, calculateFIREMetrics } from './fire
 import { formatCurrency, formatPercentage } from './chartService';
 import { filterExpensesByTime } from '@/lib/utils/pdfTimeFilters';
 import { filterExpensesByAttributionScope } from '@/lib/utils/householdUtils';
+import { getItalyMonthYear, toDate } from '@/lib/utils/dateHelpers';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { calculatePerformanceForPeriod } from './performanceService';
 
@@ -426,8 +427,8 @@ export function prepareCashflowData(expenses: any[]): CashflowData {
     const amount = Math.abs(expense.amount);
 
     // Track unique months
-    const date = expense.date instanceof Date ? expense.date : expense.date.toDate();
-    const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
+    const { year, month } = getItalyMonthYear(toDate(expense.date));
+    const monthKey = `${year}-${month}`;
     monthsSet.add(monthKey);
 
     if (expense.type === 'income') {

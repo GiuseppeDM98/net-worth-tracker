@@ -111,8 +111,8 @@ export default function CashflowPage() {
   const loading = expensesLoading || categoriesLoading || otherDataLoading;
 
   // Load dividends and assets only when their tabs are mounted
-  const loadOtherData = async () => {
-    if (!user || otherDataLoaded) return;
+  const loadOtherData = async (force = false) => {
+    if (!user || (!force && otherDataLoaded)) return;
 
     try {
       setOtherDataLoading(true);
@@ -192,7 +192,7 @@ export default function CashflowPage() {
 
     // Force re-fetch of other data (dividends, assets)
     setOtherDataLoaded(false);
-    await loadOtherData();
+    await loadOtherData(true);
   };
 
   const handleTabChange = (value: string) => {
