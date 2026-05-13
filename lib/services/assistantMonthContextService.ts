@@ -34,8 +34,21 @@ import { getItalyMonthYear, toDate } from '@/lib/utils/dateHelpers';
 import { AssistantMonthContextBundle, AssistantMonthSelectorValue } from '@/types/assistant';
 import { Asset, AssetAllocationSettings, MonthlySnapshot } from '@/types/assets';
 import { Expense } from '@/types/expenses';
+import type { HouseholdConfig } from '@/types/household';
+import {
+  filterAssetsByOwnershipScope,
+  filterExpensesByAttributionScope,
+  filterSnapshotsByOwnershipScope,
+  getDefaultHouseholdConfig,
+  isHouseholdEnabled,
+  type HouseholdFilterScope,
+} from '@/lib/utils/householdUtils';
 
 const MAX_ALLOCATION_CHANGES = 5;
+
+interface AssistantContextBuildOptions {
+  householdScope?: HouseholdFilterScope;
+}
 
 /**
  * Returns the first and last moment of the given year/month as Date objects.
@@ -183,6 +196,54 @@ async function fetchAssets(userId: string): Promise<Asset[]> {
     const data = doc.data();
     return { id: doc.id, ...data } as Asset;
   });
+}
+
+async function fetchHouseholdConfig(userId: string): Promise<HouseholdConfig> {
+  const fallback = getDefaultHouseholdConfig(userId);
+  try {
+    const doc = await adminDb.collection('householdConfigs').doc(userId).get();
+    if (!doc.exists) return fallback;
+
+    const data = doc.data() as Partial<HouseholdConfig> | undefined;
+    return {
+      ...fallback,
+      ...data,
+      userId,
+      participants: data?.participants ?? fallback.participants,
+      profiles: data?.profiles ?? fallback.profiles,
+      attributionRules: data?.attributionRules ?? fallback.attributionRules,
+    };
+  } catch (error) {
+    console.warn('Unable to load household config for assistant context, using personal mode', {
+      userId,
+      error,
+    });
+    return fallback;
+  }
+}
+
+async function applyHouseholdScope(
+  userId: string,
+  snapshots: MonthlySnapshot[],
+  expenses: Expense[],
+  assets: Asset[],
+  options?: AssistantContextBuildOptions
+): Promise<{ snapshots: MonthlySnapshot[]; expenses: Expense[]; assets: Asset[] }> {
+  const scope = options?.householdScope;
+  if (!scope || scope.kind === 'all') {
+    return { snapshots, expenses, assets };
+  }
+
+  const householdConfig = await fetchHouseholdConfig(userId);
+  if (!isHouseholdEnabled(householdConfig)) {
+    return { snapshots, expenses, assets };
+  }
+
+  return {
+    snapshots: filterSnapshotsByOwnershipScope(snapshots, assets, householdConfig, scope),
+    expenses: filterExpensesByAttributionScope(expenses, householdConfig, scope),
+    assets: filterAssetsByOwnershipScope(assets, householdConfig, scope),
+  };
 }
 
 // ─── Shared helpers ──────────────────────────────────────────────────────────
@@ -360,7 +421,8 @@ function buildAllocationChanges(
 export async function buildAssistantMonthContext(
   userId: string,
   selector: AssistantMonthSelectorValue,
-  includeDummySnapshots = false
+  includeDummySnapshots = false,
+  options?: AssistantContextBuildOptions
 ): Promise<AssistantMonthContextBundle> {
   const { year, month } = selector;
   const { startDate, endDate } = getMonthDateRange(year, month);
@@ -373,9 +435,14 @@ export async function buildAssistantMonthContext(
     fetchSettings(userId),
     fetchAssets(userId),
   ]);
+  const {
+    snapshots: scopedSnapshots,
+    expenses: scopedExpenses,
+    assets: scopedAssets,
+  } = await applyHouseholdScope(userId, allSnapshots, monthExpenses, assets, options);
 
-  const currentSnapshot = findSnapshot(allSnapshots, year, month, includeDummySnapshots);
-  const previousSnapshot = findSnapshot(allSnapshots, prevYear, prevMonth, includeDummySnapshots);
+  const currentSnapshot = findSnapshot(scopedSnapshots, year, month, includeDummySnapshots);
+  const previousSnapshot = findSnapshot(scopedSnapshots, prevYear, prevMonth, includeDummySnapshots);
 
   // Derive data quality flags before building any numbers
   const now = new Date();
@@ -384,7 +451,7 @@ export async function buildAssistantMonthContext(
 
   const hasSnapshot = currentSnapshot !== null;
   const hasPreviousBaseline = previousSnapshot !== null;
-  const hasCashflowData = monthExpenses.length > 0;
+  const hasCashflowData = scopedExpenses.length > 0;
   // A month is partial when it's the current calendar month and no snapshot exists yet
   const isPartialMonth = isCurrentMonth && !hasSnapshot;
 
@@ -415,13 +482,13 @@ export async function buildAssistantMonthContext(
   // --- Cashflow breakdown ---
   const dividendCategoryId = settings?.dividendIncomeCategoryId;
   const { totalIncome, totalExpenses, totalDividends, netCashFlow } = aggregateCashflow(
-    monthExpenses,
+    scopedExpenses,
     dividendCategoryId
   );
 
-  const { topExpensesByCategory, topIndividualExpenses } = buildExpenseBreakdown(monthExpenses);
+  const { topExpensesByCategory, topIndividualExpenses } = buildExpenseBreakdown(scopedExpenses);
   const allocationChanges = buildAllocationChanges(currentSnapshot, previousSnapshot);
-  const bySubCategoryAllocation = buildSubCategoryAllocation(currentSnapshot, assets);
+  const bySubCategoryAllocation = buildSubCategoryAllocation(currentSnapshot, scopedAssets);
 
   return {
     selector,
@@ -432,7 +499,7 @@ export async function buildAssistantMonthContext(
       totalExpenses,
       totalDividends,
       netCashFlow,
-      transactionCount: monthExpenses.length,
+      transactionCount: scopedExpenses.length,
     },
     netWorth: {
       start: nwStart,
@@ -471,7 +538,8 @@ export async function buildAssistantMonthContext(
 export async function buildAssistantYearContext(
   userId: string,
   year: number,
-  includeDummySnapshots = false
+  includeDummySnapshots = false,
+  options?: AssistantContextBuildOptions
 ): Promise<AssistantMonthContextBundle> {
   const now = new Date();
   const { year: italyCurrentYear } = getItalyMonthYear(now);
@@ -487,15 +555,20 @@ export async function buildAssistantYearContext(
     fetchSettings(userId),
     fetchAssets(userId),
   ]);
+  const {
+    snapshots: scopedSnapshots,
+    expenses: scopedExpenses,
+    assets: scopedAssets,
+  } = await applyHouseholdScope(userId, allSnapshots, yearExpenses, assets, options);
 
   // Baseline = December of previous year
-  const previousSnapshot = findSnapshot(allSnapshots, year - 1, 12, includeDummySnapshots);
+  const previousSnapshot = findSnapshot(scopedSnapshots, year - 1, 12, includeDummySnapshots);
   // End = latest snapshot within target year
-  const currentSnapshot = findLatestSnapshotInYear(allSnapshots, year, includeDummySnapshots);
+  const currentSnapshot = findLatestSnapshotInYear(scopedSnapshots, year, includeDummySnapshots);
 
   const hasSnapshot = currentSnapshot !== null;
   const hasPreviousBaseline = previousSnapshot !== null;
-  const hasCashflowData = yearExpenses.length > 0;
+  const hasCashflowData = scopedExpenses.length > 0;
 
   const notes: string[] = [];
   if (!hasSnapshot && hasCashflowData) {
@@ -524,13 +597,13 @@ export async function buildAssistantYearContext(
 
   const dividendCategoryId = settings?.dividendIncomeCategoryId;
   const { totalIncome, totalExpenses, totalDividends, netCashFlow } = aggregateCashflow(
-    yearExpenses,
+    scopedExpenses,
     dividendCategoryId
   );
 
-  const { topExpensesByCategory, topIndividualExpenses } = buildExpenseBreakdown(yearExpenses);
+  const { topExpensesByCategory, topIndividualExpenses } = buildExpenseBreakdown(scopedExpenses);
   const allocationChanges = buildAllocationChanges(currentSnapshot, previousSnapshot);
-  const bySubCategoryAllocation = buildSubCategoryAllocation(currentSnapshot, assets);
+  const bySubCategoryAllocation = buildSubCategoryAllocation(currentSnapshot, scopedAssets);
 
   // selector.month = 0 signals "year-level" period to prompt builders and the context card
   return {
@@ -542,7 +615,7 @@ export async function buildAssistantYearContext(
       totalExpenses,
       totalDividends,
       netCashFlow,
-      transactionCount: yearExpenses.length,
+      transactionCount: scopedExpenses.length,
     },
     netWorth: { start: nwStart, end: nwEnd, delta: nwDelta, deltaPct: nwDeltaPct },
     allocationChanges,
@@ -679,7 +752,8 @@ export async function buildAssistantQuarterContext(
  */
 export async function buildAssistantYtdContext(
   userId: string,
-  includeDummySnapshots = false
+  includeDummySnapshots = false,
+  options?: AssistantContextBuildOptions
 ): Promise<AssistantMonthContextBundle> {
   const now = new Date();
   const { year: currentYear, month: currentMonth } = getItalyMonthYear(now);
@@ -694,15 +768,20 @@ export async function buildAssistantYtdContext(
     fetchSettings(userId),
     fetchAssets(userId),
   ]);
+  const {
+    snapshots: scopedSnapshots,
+    expenses: scopedExpenses,
+    assets: scopedAssets,
+  } = await applyHouseholdScope(userId, allSnapshots, ytdExpenses, assets, options);
 
   // Baseline = December of previous year (same as year builder)
-  const previousSnapshot = findSnapshot(allSnapshots, currentYear - 1, 12, includeDummySnapshots);
+  const previousSnapshot = findSnapshot(scopedSnapshots, currentYear - 1, 12, includeDummySnapshots);
   // End = latest snapshot of current year found so far
-  const currentSnapshot = findLatestSnapshotInYear(allSnapshots, currentYear, includeDummySnapshots);
+  const currentSnapshot = findLatestSnapshotInYear(scopedSnapshots, currentYear, includeDummySnapshots);
 
   const hasSnapshot = currentSnapshot !== null;
   const hasPreviousBaseline = previousSnapshot !== null;
-  const hasCashflowData = ytdExpenses.length > 0;
+  const hasCashflowData = scopedExpenses.length > 0;
 
   const notes: string[] = [
     'Analisi YTD (da inizio anno a oggi): anno in corso, dati parziali.',
@@ -724,13 +803,13 @@ export async function buildAssistantYtdContext(
 
   const dividendCategoryId = settings?.dividendIncomeCategoryId;
   const { totalIncome, totalExpenses, totalDividends, netCashFlow } = aggregateCashflow(
-    ytdExpenses,
+    scopedExpenses,
     dividendCategoryId
   );
 
-  const { topExpensesByCategory, topIndividualExpenses } = buildExpenseBreakdown(ytdExpenses);
+  const { topExpensesByCategory, topIndividualExpenses } = buildExpenseBreakdown(scopedExpenses);
   const allocationChanges = buildAllocationChanges(currentSnapshot, previousSnapshot);
-  const bySubCategoryAllocation = buildSubCategoryAllocation(currentSnapshot, assets);
+  const bySubCategoryAllocation = buildSubCategoryAllocation(currentSnapshot, scopedAssets);
 
   // selector.month = -1 signals "YTD" period
   return {
@@ -742,7 +821,7 @@ export async function buildAssistantYtdContext(
       totalExpenses,
       totalDividends,
       netCashFlow,
-      transactionCount: ytdExpenses.length,
+      transactionCount: scopedExpenses.length,
     },
     netWorth: { start: nwStart, end: nwEnd, delta: nwDelta, deltaPct: nwDeltaPct },
     allocationChanges,
@@ -777,7 +856,8 @@ export async function buildAssistantYtdContext(
 export async function buildAssistantHistoryContext(
   userId: string,
   startYear: number,
-  includeDummySnapshots = false
+  includeDummySnapshots = false,
+  options?: AssistantContextBuildOptions
 ): Promise<AssistantMonthContextBundle> {
   const now = new Date();
   const { year: currentYear, month: currentMonth } = getItalyMonthYear(now);
@@ -791,20 +871,25 @@ export async function buildAssistantHistoryContext(
     fetchSettings(userId),
     fetchAssets(userId),
   ]);
+  const {
+    snapshots: scopedSnapshots,
+    expenses: scopedExpenses,
+    assets: scopedAssets,
+  } = await applyHouseholdScope(userId, allSnapshots, historyExpenses, assets, options);
 
   // Filter to snapshots within the history window
-  const windowSnapshots = allSnapshots.filter(
+  const windowSnapshots = scopedSnapshots.filter(
     (s) => s.year >= startYear && (!s.isDummy || includeDummySnapshots)
   );
 
   // Baseline = first snapshot in or after startYear
   const previousSnapshot = windowSnapshots.length > 0 ? windowSnapshots[0] : null;
   // End = latest snapshot overall
-  const currentSnapshot = findLatestSnapshotAtOrBeforeYear(allSnapshots, currentYear, includeDummySnapshots);
+  const currentSnapshot = findLatestSnapshotAtOrBeforeYear(scopedSnapshots, currentYear, includeDummySnapshots);
 
   const hasSnapshot = currentSnapshot !== null;
   const hasPreviousBaseline = previousSnapshot !== null;
-  const hasCashflowData = historyExpenses.length > 0;
+  const hasCashflowData = scopedExpenses.length > 0;
 
   const yearsSpan = currentYear - startYear + 1;
   const notes: string[] = [
@@ -824,13 +909,13 @@ export async function buildAssistantHistoryContext(
 
   const dividendCategoryId = settings?.dividendIncomeCategoryId;
   const { totalIncome, totalExpenses, totalDividends, netCashFlow } = aggregateCashflow(
-    historyExpenses,
+    scopedExpenses,
     dividendCategoryId
   );
 
-  const { topExpensesByCategory, topIndividualExpenses } = buildExpenseBreakdown(historyExpenses);
+  const { topExpensesByCategory, topIndividualExpenses } = buildExpenseBreakdown(scopedExpenses);
   const allocationChanges = buildAllocationChanges(currentSnapshot, previousSnapshot);
-  const bySubCategoryAllocation = buildSubCategoryAllocation(currentSnapshot, assets);
+  const bySubCategoryAllocation = buildSubCategoryAllocation(currentSnapshot, scopedAssets);
 
   // selector.month = -2 signals "total history" period
   return {
@@ -842,7 +927,7 @@ export async function buildAssistantHistoryContext(
       totalExpenses,
       totalDividends,
       netCashFlow,
-      transactionCount: historyExpenses.length,
+      transactionCount: scopedExpenses.length,
     },
     netWorth: { start: nwStart, end: nwEnd, delta: nwDelta, deltaPct: nwDeltaPct },
     allocationChanges,

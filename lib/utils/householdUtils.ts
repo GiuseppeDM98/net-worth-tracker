@@ -450,8 +450,12 @@ function getSplitRatioForScope(splits: OwnershipSplit[], scope: HouseholdFilterS
   return (splits.find((split) => split.participantId === scope.id)?.percentage ?? 0) / 100;
 }
 
-function getAssetClass(assetId: string, assetsById: Map<string, Asset>): string | undefined {
-  return assetsById.get(assetId)?.assetClass;
+function getSnapshotAssetClass(
+  snapshotAsset: MonthlySnapshot['byAsset'][number],
+  assetsById: Map<string, Asset>
+): string | undefined {
+  return assetsById.get(snapshotAsset.assetId)?.assetClass
+    ?? (snapshotAsset as typeof snapshotAsset & { assetClass?: string }).assetClass;
 }
 
 function recalculateAssetAllocation(byAssetClass: Record<string, number>, totalNetWorth: number): Record<string, number> {
@@ -475,7 +479,7 @@ export function filterSnapshotsByOwnershipScope(
 
   return snapshots.map((snapshot) => {
     const byAsset = snapshot.byAsset.flatMap((snapshotAsset) => {
-      const assetClass = getAssetClass(snapshotAsset.assetId, assetsById);
+      const assetClass = getSnapshotAssetClass(snapshotAsset, assetsById);
       const storedProfile = getOwnershipProfile(config, snapshotAsset.ownershipProfileId);
       const assignment = storedProfile
         ? profileToAssignment(storedProfile, new Date(snapshot.year, snapshot.month - 1, 1))
@@ -511,7 +515,11 @@ export function filterSnapshotsByOwnershipScope(
       byAssetClass[assetClass] = (byAssetClass[assetClass] ?? 0) + snapshotAsset.totalValue;
     }
 
-    const cleanByAsset = byAsset.map(({ _assetClass, ...snapshotAsset }) => snapshotAsset);
+    const cleanByAsset = byAsset.map((snapshotAsset) => {
+      const cleanSnapshotAsset = { ...snapshotAsset };
+      delete (cleanSnapshotAsset as typeof cleanSnapshotAsset & { _assetClass?: string })._assetClass;
+      return cleanSnapshotAsset;
+    });
     const totalNetWorth = cleanByAsset.reduce((sum, snapshotAsset) => sum + snapshotAsset.totalValue, 0);
     const liquidNetWorth = byAssetClass.cash ?? 0;
     const illiquidNetWorth = Math.max(0, totalNetWorth - liquidNetWorth);
@@ -523,9 +531,9 @@ export function filterSnapshotsByOwnershipScope(
       illiquidNetWorth,
       fireNetWorth: snapshot.fireNetWorth !== undefined ? totalNetWorth : snapshot.fireNetWorth,
       byAsset: cleanByAsset,
-      byAssetClass: Object.keys(byAssetClass).length > 0 ? byAssetClass : snapshot.byAssetClass,
+      byAssetClass,
       assetAllocation: recalculateAssetAllocation(
-        Object.keys(byAssetClass).length > 0 ? byAssetClass : snapshot.byAssetClass,
+        byAssetClass,
         totalNetWorth
       ),
     };

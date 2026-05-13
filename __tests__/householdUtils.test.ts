@@ -524,6 +524,36 @@ describe('ownership profile management helpers', () => {
     ]);
   });
 
+  it('recomputes historical snapshot asset classes from stored snapshot asset metadata when live assets are missing', () => {
+    const config = makeEnabledConfig();
+    const snapshots = [
+      makeSnapshot({
+        totalNetWorth: 1000,
+        liquidNetWorth: 0,
+        illiquidNetWorth: 1000,
+        byAssetClass: { equity: 1000 },
+        byAsset: [
+          {
+            assetId: 'sold-etf',
+            ticker: 'ETF',
+            name: 'ETF venduto',
+            quantity: 10,
+            price: 100,
+            totalValue: 1000,
+            assetClass: 'equity',
+            ...assignment(config, SHARED_PROFILE_ID),
+          } as MonthlySnapshot['byAsset'][number] & { assetClass: string },
+        ],
+      }),
+    ];
+
+    const selfSnapshots = filterSnapshotsByOwnershipScope(snapshots, [], config, { kind: 'participant', id: 'self' });
+
+    expect(selfSnapshots[0].totalNetWorth).toBe(500);
+    expect(selfSnapshots[0].byAssetClass).toEqual({ equity: 500 });
+    expect(selfSnapshots[0].assetAllocation).toEqual({ equity: 100 });
+  });
+
   it('filters dividends by underlying asset ownership', () => {
     const config = makeEnabledConfig();
     const assets = [

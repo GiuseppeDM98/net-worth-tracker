@@ -58,6 +58,13 @@ import { CreateManualSnapshotModal } from '@/components/CreateManualSnapshotModa
 import { SnapshotSearchDialog } from '@/components/history/SnapshotSearchDialog';
 import { CustomChartDot } from '@/components/history/CustomChartDot';
 import { ExportPDFButton } from '@/components/dashboard/ExportPDFButton';
+import { HouseholdScopeSelect } from '@/components/household/HouseholdScopeSelect';
+import { useHouseholdScopeFilter } from '@/lib/hooks/useHouseholdScopeFilter';
+import {
+  filterAssetsByOwnershipScope,
+  filterExpensesByAttributionScope,
+  filterSnapshotsByOwnershipScope,
+} from '@/lib/utils/householdUtils';
 import {
   LineChart,
   Line,
@@ -148,6 +155,14 @@ export default function HistoryPage() {
   const [savingsSelectedYear, setSavingsSelectedYear] = useState<number | 'all'>('all');
   const [visibleChapters, setVisibleChapters] = useState<HistoryChapterId[]>([]);
   const prefersReducedMotion = useReducedMotion();
+  const {
+    householdConfig,
+    householdEnabled,
+    options: householdScopeOptions,
+    selectedScopeKey,
+    setSelectedScopeKey,
+    scope,
+  } = useHouseholdScopeFilter(user?.uid);
 
   // Responsive breakpoints
   const isMobile = useMediaQuery('(max-width: 767px)');
@@ -244,14 +259,14 @@ export default function HistoryPage() {
    * Downloads file directly to browser's default download location.
    */
   const handleExportCSV = () => {
-    if (snapshots.length === 0) {
+    if (displaySnapshots.length === 0) {
       toast.error('Nessun dato da esportare');
       return;
     }
 
     // Create CSV content
     const headers = ['Data', 'Patrimonio Totale', 'Patrimonio Liquido', 'Patrimonio Illiquido'];
-    const rows = snapshots.map((snapshot) => [
+    const rows = displaySnapshots.map((snapshot) => [
       `${String(snapshot.month).padStart(2, '0')}/${snapshot.year}`,
       snapshot.totalNetWorth,
       snapshot.liquidNetWorth,
@@ -304,27 +319,43 @@ export default function HistoryPage() {
     );
   };
 
-  const netWorthHistory = prepareNetWorthHistoryData(snapshots);
-  const assetClassHistory = prepareAssetClassHistoryData(snapshots);
-  const yoyVariationData = prepareYoYVariationData(snapshots);
-  const savingsVsInvestmentData = prepareSavingsVsInvestmentData(snapshots, expenses);
+  const scopedAssets = useMemo(
+    () => filterAssetsByOwnershipScope(assets, householdConfig, scope),
+    [assets, householdConfig, scope]
+  );
+  const scopedExpenses = useMemo(
+    () => filterExpensesByAttributionScope(expenses, householdConfig, scope),
+    [expenses, householdConfig, scope]
+  );
+  const scopedSnapshots = useMemo(
+    () => filterSnapshotsByOwnershipScope(snapshots, assets, householdConfig, scope),
+    [assets, householdConfig, scope, snapshots]
+  );
+  const displayAssets = householdEnabled ? scopedAssets : assets;
+  const displayExpenses = householdEnabled ? scopedExpenses : expenses;
+  const displaySnapshots = householdEnabled ? scopedSnapshots : snapshots;
+
+  const netWorthHistory = prepareNetWorthHistoryData(displaySnapshots);
+  const assetClassHistory = prepareAssetClassHistoryData(displaySnapshots);
+  const yoyVariationData = prepareYoYVariationData(displaySnapshots);
+  const savingsVsInvestmentData = prepareSavingsVsInvestmentData(displaySnapshots, displayExpenses);
   const savingsVsInvestmentDataMonthly = useMemo(
     () =>
       typeof savingsSelectedYear === 'number'
-        ? prepareSavingsVsInvestmentDataMonthly(snapshots, expenses, savingsSelectedYear)
+        ? prepareSavingsVsInvestmentDataMonthly(displaySnapshots, displayExpenses, savingsSelectedYear)
         : [],
-    [snapshots, expenses, savingsSelectedYear]
+    [displaySnapshots, displayExpenses, savingsSelectedYear]
   );
   const savingsVsInvestmentDataAllMonths = useMemo(
-    () => prepareSavingsVsInvestmentDataAllMonths(snapshots, expenses),
-    [snapshots, expenses]
+    () => prepareSavingsVsInvestmentDataAllMonths(displaySnapshots, displayExpenses),
+    [displaySnapshots, displayExpenses]
   );
   // Unique years from snapshots for the year selector, newest first
   const savingsAvailableYears = useMemo(
-    () => [...new Set(snapshots.map((s) => s.year))].sort((a, b) => b - a),
-    [snapshots]
+    () => [...new Set(displaySnapshots.map((s) => s.year))].sort((a, b) => b - a),
+    [displaySnapshots]
   );
-  const doublingTimeSummary = prepareDoublingTimeData(snapshots, doublingMode);
+  const doublingTimeSummary = prepareDoublingTimeData(displaySnapshots, doublingMode);
   const visibleChapterSet = useMemo(() => new Set(visibleChapters), [visibleChapters]);
   const notesCount = useMemo(
     () => netWorthHistory.filter((item) => item.note && item.note.trim() !== '').length,
@@ -348,11 +379,11 @@ export default function HistoryPage() {
   // to derive estimated taxes (avoids a separate Firestore call).
   const laborIncomeMetrics = useMemo(() => {
     const categoryIds = portfolioSettings?.laborIncomeCategoryIds;
-    if (!categoryIds || categoryIds.length === 0 || expenses.length === 0) return null;
+    if (!categoryIds || categoryIds.length === 0 || displayExpenses.length === 0) return null;
 
     const startYear = portfolioSettings?.cashflowHistoryStartYear ?? 2025;
     const categorySet = new Set(categoryIds);
-    const filtered = expenses.filter((e) => getItalyYear(e.date) >= startYear);
+    const filtered = displayExpenses.filter((e) => getItalyYear(e.date) >= startYear);
 
     const totalLaborIncome = filtered
       .filter((e) => e.type === 'income' && categorySet.has(e.categoryId))
@@ -364,14 +395,14 @@ export default function HistoryPage() {
 
     const totalSavedFromWork = totalLaborIncome + totalExpensesSum;
 
-    const relevantSnapshots = snapshots
+    const relevantSnapshots = displaySnapshots
       .filter((s) => s.year >= startYear)
       .sort((a, b) => (a.year !== b.year ? a.year - b.year : a.month - b.month));
 
     let totalInvestmentGrowthGross = 0;
     if (relevantSnapshots.length >= 1) {
       const baselineSnapshot =
-        snapshots.find((s) => s.year === startYear - 1 && s.month === 12) ??
+        displaySnapshots.find((s) => s.year === startYear - 1 && s.month === 12) ??
         relevantSnapshots[0];
       const netWorthDelta =
         relevantSnapshots.at(-1)!.totalNetWorth - baselineSnapshot.totalNetWorth;
@@ -382,19 +413,19 @@ export default function HistoryPage() {
     }
 
     // Use current assets to estimate capital gains taxes (same logic as dashboard)
-    const estimatedTaxes = calculateTotalEstimatedTaxes(assets);
+    const estimatedTaxes = calculateTotalEstimatedTaxes(displayAssets);
     const totalInvestmentGrowthNet = totalInvestmentGrowthGross - estimatedTaxes;
 
     return { totalLaborIncome, totalSavedFromWork, totalExpensesSum, totalInvestmentGrowthGross, totalInvestmentGrowthNet, startYear };
-  }, [expenses, snapshots, portfolioSettings, assets]);
+  }, [displayExpenses, displaySnapshots, portfolioSettings, displayAssets]);
 
   // Monthly labor vs investment breakdown — only when labor categories are configured in Settings
   const laborMetricsChartData = useMemo(() => {
     const categoryIds = portfolioSettings?.laborIncomeCategoryIds;
-    if (!categoryIds || categoryIds.length === 0 || expenses.length === 0) return [];
+    if (!categoryIds || categoryIds.length === 0 || displayExpenses.length === 0) return [];
     const startYear = portfolioSettings?.cashflowHistoryStartYear ?? 2025;
-    return prepareMonthlyLaborMetricsData(snapshots, expenses, categoryIds, startYear);
-  }, [snapshots, expenses, portfolioSettings]);
+    return prepareMonthlyLaborMetricsData(displaySnapshots, displayExpenses, categoryIds, startYear);
+  }, [displaySnapshots, displayExpenses, portfolioSettings]);
 
   const laborMonthCounts = useMemo(() => {
     return laborMetricsChartData.reduce(
@@ -422,7 +453,7 @@ export default function HistoryPage() {
 
   // Prepare current vs target data
   const allocation = compareAllocations(
-    assets,
+    displayAssets,
     targets || getDefaultTargets()
   );
 
@@ -659,17 +690,25 @@ export default function HistoryPage() {
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto sm:items-center">
+            {householdEnabled && (
+              <HouseholdScopeSelect
+                value={selectedScopeKey}
+                onValueChange={setSelectedScopeKey}
+                options={householdScopeOptions}
+                className="w-full sm:w-[240px]"
+              />
+            )}
             {/* PDF export is the primary download action */}
             <ExportPDFButton
-              snapshots={snapshots}
-              assets={assets}
+              snapshots={displaySnapshots}
+              assets={displayAssets}
               allocationTargets={targets || getDefaultTargets()}
             />
             <Button
               variant="outline"
               size="sm"
               onClick={handleExportCSV}
-              disabled={snapshots.length === 0}
+              disabled={displaySnapshots.length === 0}
               className="w-full sm:w-auto"
             >
               <Download className="mr-2 h-4 w-4" />
@@ -2036,7 +2075,7 @@ export default function HistoryPage() {
       </div>
       </motion.section>
 
-      {snapshots.length > 0 && (
+      {displaySnapshots.length > 0 && (
         <motion.section
           variants={chapterReveal}
           initial="hidden"
@@ -2066,7 +2105,7 @@ export default function HistoryPage() {
                 "md:grid-cols-2 desktop:grid-cols-3"
               )}
             >
-              {snapshots.slice(-6).reverse().map((snapshot) => (
+              {displaySnapshots.slice(-6).reverse().map((snapshot) => (
                 <motion.div
                   key={`${snapshot.year}-${snapshot.month}`}
                   variants={cardItem}
@@ -2125,7 +2164,7 @@ export default function HistoryPage() {
       <SnapshotSearchDialog
         open={snapshotSearchDialogOpen}
         onOpenChange={setSnapshotSearchDialogOpen}
-        snapshots={snapshots}
+        snapshots={displaySnapshots}
         onSave={handleSaveNote}
       />
     </div>

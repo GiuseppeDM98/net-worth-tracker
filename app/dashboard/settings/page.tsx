@@ -3536,7 +3536,35 @@ export default function SettingsPage() {
                     <div className="grid gap-3 desktop:grid-cols-3">
                       {householdProfiles.map((profile) => (
                         <div key={profile.id} className={`rounded-md border p-3 ${profile.archived ? 'border-dashed opacity-70' : ''}`}>
-                          <p className="font-medium">{profile.name}</p>
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="font-medium">{profile.name}</p>
+                            {!profile.isDefault && (
+                              profile.archived ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleRestoreOwnershipProfile(profile.id)}
+                                  disabled={isDemo}
+                                  title={isDemo ? 'Non disponibile in modalità demo' : 'Ripristina profilo'}
+                                >
+                                  <RotateCcw className="mr-2 h-4 w-4" />
+                                  Ripristina
+                                </Button>
+                              ) : (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleArchiveOwnershipProfile(profile.id)}
+                                  disabled={isDemo}
+                                  title={isDemo ? 'Non disponibile in modalità demo' : 'Archivia profilo'}
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                              )
+                            )}
+                          </div>
                           <p className="mt-1 text-xs text-muted-foreground">
                             {getProfileSplitsForDate(profile).map((split) => `${split.participantName} ${split.percentage}%`).join(' · ')}
                           </p>
