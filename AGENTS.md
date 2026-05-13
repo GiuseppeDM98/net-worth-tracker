@@ -30,6 +30,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - **Multi-card grid breakpoint decision**: adding `sm:grid-cols-2` to a 3-item row leaves the third card alone on a half-width row at 640px — often worse than a full-width stack. Prefer no `sm:` breakpoint (full-width stack on mobile) → `desktop:grid-cols-3` directly. Reserve `sm:grid-cols-2` for content where 2 columns genuinely helps at 640px (e.g. Bear/Base/Bull scenario cards where any pairing is better than a single tall column).
 - **`items-end` for mixed-height label rows**: only use `items-end` on a form grid when ALL cells have the same structure (label + input, nothing else). `items-end` aligns the bottom edge of the entire cell div — if any cell has hint text below its input, the hint becomes the new "bottom", so cells without hint text float their input down to match the hint height of the taller cell. In that case use `items-start` instead and shorten long labels so they don't cause height divergence. Rule: hint text in any cell → `items-start`; uniform label+input only → `items-end` is safe.
 - **Nested Radix collapsible chevron rotation**: `CollapsibleTrigger asChild` propagates `data-state="open|closed"` to its child element. Add `group` to the child Button, then `group-data-[state=open]:rotate-180 transition-transform duration-200 motion-reduce:transition-none` to the `ChevronDown` inside. No extra React state needed. Works in Tailwind v4.
+- **Chevron rotation for manual `useState` open/close** (no Radix `data-state`): pair the icon with `transition-transform duration-200 motion-reduce:transition-none ${open ? 'rotate-180' : ''}`. Always render the chevron on expandable rows — the click affordance is invisible without it. Applied in `ExposureSection` row drill-downs.
 
 ### Layout Tokens
 - Never hardcode structural layout colors in shell components
@@ -48,7 +49,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - For state-preserving tab UIs, keep per-scope active tab state explicitly (e.g. separate sub-tab state for `Anno Corrente` and `Storico`) instead of sharing one global sub-tab value
 - Use `useMemo` for derived state; do not use `useEffect + setState` for computed values
 - When a private API returns date-like values for React Query consumers, normalize them at the hook boundary with `toDate()` instead of scattering conversions inside page components
-- **Naming-only cleanup rule**: for sessions scoped to naming/readability, prefer local semantic renames (`payload` → domain-specific response name, `body` → `requestBody`, `stream` → typed stream role) and avoid cross-file renames or structural extractions unless the runtime contract is already unclear
+- **Lazy-load gating for heavy panels**: for collapsible sections that hit an expensive endpoint (Yahoo Finance, scraping, etc.), gate the query with `enabled: !!userId && isOpen`. The fetch only fires on first expand; subsequent expands hit the React Query cache. Applied in `usePortfolioExposure` + `ExposureSection`.
 
 ### Dynamic Imports
 - `next/dynamic` with named exports must unwrap via `.then(m => ({ default: m.Named }))`
@@ -264,6 +265,13 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - Fire-and-forget writes: wrap in `.catch((err: unknown) => console.error(...))` — cache failure must never break the API response
 - React Query client-side: `staleTime` = server TTL minus headroom (e.g. 6h client for 7d server). Applied: `benchmark-cache/{benchmarkId}`, `fx-rate-cache/usd-eur`, `ecb-rate-cache/deposit-rate`
 - **Sparse time-series carry-forward**: external series with observations per event date (not per calendar month) must be expanded to a full monthly array before caching. Pattern: keep the last observation per `YYYY-MM` in a `Map`, then iterate from the start month to the current month using `Date.UTC` (not local), emitting the last seen value for months with no observation. Applied in `lib/server/ecbRatesService.ts` (`buildMonthlyRatesFromFred`) for FRED ECBDFR.
+
+### Cache Schema Evolution Without cacheKey Bump
+- When adding a new field to the data shape inside an existing cache document, add it as **optional** in the TypeScript type. Old cached docs lacking the field then degrade gracefully (UI hides the dependent feature when undefined) without forcing a global recompute on deploy.
+- Pair the optional-field migration with an explicit **force-refresh** affordance on the route + hook so users can opt out of the stale-but-valid cache without waiting for the TTL or changing the cacheKey inputs:
+  - Route accepts `?force=true` (`request.nextUrl.searchParams.get('force') === 'true'`) which bypasses the cache READ but still WRITES the recomputed result back — so the next non-forced visit benefits from the fresh cache.
+  - Hook exposes a `refresh()` callback in addition to `refetch`. `refresh()` arms a `useRef<boolean>` consumed and cleared by the next `queryFn` call. Use a ref, not state — flipping state would force an extra render.
+  - Wire UI "Aggiorna" buttons to `refresh()`, never to bare React Query `refetch()`. Bare `refetch` re-hits the endpoint but receives the same cached doc when the cacheKey is unchanged. Applied in `usePortfolioExposure` + `/api/portfolio/exposure?force=true`.
 
 ### Fixed Hooks for Variable-Length Data Sources
 - When a component needs data from a variable number of sources (e.g. user toggles which of N benchmarks to show), declare N fixed hook instances (`b0`–`bN`) at component level with `enabled: false` for inactive ones — never loop over hooks. React enforces stable hook call counts and throws at runtime otherwise
