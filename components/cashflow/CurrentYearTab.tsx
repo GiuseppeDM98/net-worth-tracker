@@ -37,8 +37,6 @@ import {
   ResponsiveContainer,
   Tooltip,
   Legend,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -216,77 +214,6 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
       return expenseMonth === selectedMonth;
     });
   }, [currentYearExpenses, selectedMonth]);
-
-  /**
-   * Aggregate expenses by category name with percentage calculation
-   *
-   * Algorithm:
-   * 1. Filter out income (only expenses)
-   * 2. Create Map<categoryName, amount>
-   * 3. Accumulate amounts by category
-   * 4. Calculate percentages from total
-   * 5. Sort by value descending
-   *
-   * Why Map? O(1) lookups, preserves insertion order for debugging
-   *
-   * @param expenses - Expense array to aggregate (can be filtered by month)
-   */
-  const getExpensesByCategory = (expenses: Expense[]): ChartData[] => {
-    const expenseItems = expenses.filter(e => e.type !== 'income');
-    const total = calculateTotalExpenses(expenses);
-
-    if (total === 0) return [];
-
-    const categoryMap = new Map<string, number>();
-
-    expenseItems.forEach(expense => {
-      const current = categoryMap.get(expense.categoryName) || 0;
-      categoryMap.set(expense.categoryName, current + Math.abs(expense.amount));
-    });
-
-    const data: ChartData[] = [];
-    categoryMap.forEach((value, name) => {
-      data.push({
-        name,
-        value,
-        percentage: (value / total) * 100,
-        color: COLORS[data.length % COLORS.length],
-      });
-    });
-
-    return data.sort((a, b) => b.value - a.value);
-  };
-
-  /**
-   * Aggregate income by category name with percentage calculation
-   *
-   * @param expenses - Expense array to aggregate (can be filtered by month)
-   */
-  const getIncomeByCategory = (expenses: Expense[]): ChartData[] => {
-    const incomeItems = expenses.filter(e => e.type === 'income');
-    const total = calculateTotalIncome(expenses);
-
-    if (total === 0) return [];
-
-    const categoryMap = new Map<string, number>();
-
-    incomeItems.forEach(expense => {
-      const current = categoryMap.get(expense.categoryName) || 0;
-      categoryMap.set(expense.categoryName, current + expense.amount);
-    });
-
-    const data: ChartData[] = [];
-    categoryMap.forEach((value, name) => {
-      data.push({
-        name,
-        value,
-        percentage: (value / total) * 100,
-        color: COLORS[data.length % COLORS.length],
-      });
-    });
-
-    return data.sort((a, b) => b.value - a.value);
-  };
 
   // Expenses-by-type breakdown using filtered data (respects month filter).
   // Separate from getExpensesByType() which always uses the full-year dataset.
@@ -726,6 +653,60 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
   const monthlyExpensesByType = getMonthlyExpensesByType();
   const monthlyExpensesByCategory = getMonthlyExpensesByCategory();
   const monthlyIncomeByCategory = getMonthlyIncomeByCategory();
+  const expensesByCategoryData = useMemo(() => {
+    const expenseItems = monthFilteredExpenses.filter(e => e.type !== 'income');
+    const total = calculateTotalExpenses(monthFilteredExpenses);
+
+    if (total === 0) return [];
+
+    const categoryMap = new Map<string, number>();
+
+    expenseItems.forEach(expense => {
+      const current = categoryMap.get(expense.categoryName) || 0;
+      categoryMap.set(expense.categoryName, current + Math.abs(expense.amount));
+    });
+
+    const data: ChartData[] = [];
+    categoryMap.forEach((value, name) => {
+      data.push({
+        name,
+        value,
+        percentage: (value / total) * 100,
+        color: COLORS[data.length % COLORS.length],
+      });
+    });
+
+    return data.sort((a, b) => b.value - a.value);
+  }, [COLORS, monthFilteredExpenses]);
+  const incomeByCategoryData = useMemo(() => {
+    const incomeItems = monthFilteredExpenses.filter(e => e.type === 'income');
+    const total = calculateTotalIncome(monthFilteredExpenses);
+
+    if (total === 0) return [];
+
+    const categoryMap = new Map<string, number>();
+
+    incomeItems.forEach(expense => {
+      const current = categoryMap.get(expense.categoryName) || 0;
+      categoryMap.set(expense.categoryName, current + expense.amount);
+    });
+
+    const data: ChartData[] = [];
+    categoryMap.forEach((value, name) => {
+      data.push({
+        name,
+        value,
+        percentage: (value / total) * 100,
+        color: COLORS[data.length % COLORS.length],
+      });
+    });
+
+    return data.sort((a, b) => b.value - a.value);
+  }, [COLORS, monthFilteredExpenses]);
+  const expensesByTypeFilteredData = useMemo(
+    () => getExpensesByTypeFiltered(monthFilteredExpenses),
+    [monthFilteredExpenses]
+  );
 
   // Get current drill-down data (uses monthFilteredExpenses to respect month filter)
   const currentSubcategoriesData = drillDown.level === 'subcategory' && drillDown.selectedCategory && drillDown.chartType
@@ -808,8 +789,7 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
           SECTION 1: MONTH-FILTERED CHARTS
           (Sankey + Spese per Categoria + Entrate per Categoria)
           ============================================== */}
-      {currentYearExpenses.length > 0 && (
-        <div className="rounded-lg border-2 border-blue-200 bg-blue-50/50 dark:bg-blue-950/10 dark:border-blue-800 p-4 sm:p-6">
+      <div className="rounded-lg border-2 border-blue-200 bg-blue-50/50 dark:bg-blue-950/10 dark:border-blue-800 p-4 sm:p-6">
           {/* Filter Controls */}
           <div className="flex flex-col gap-4 mb-6">
             {/* Month filter dropdown */}
@@ -893,31 +873,20 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
             className="grid gap-4 sm:gap-6 md:grid-cols-2"
           >
             {/* Empty state: single message for all 3 charts */}
-            {selectedMonth !== null && monthFilteredExpenses.length === 0 && (
+            {monthFilteredExpenses.length === 0 && (
               <Card className="md:col-span-2">
                 <CardContent className="py-12">
                   <p className="text-center text-muted-foreground">
-                    Nessuna transazione trovata per {ITALIAN_MONTHS[selectedMonth - 1]} {currentYear}
+                    {selectedMonth !== null
+                      ? `Nessuna transazione trovata per ${ITALIAN_MONTHS[selectedMonth - 1]} ${currentYear}`
+                      : `Nessuna transazione trovata per il ${currentYear}`}
                   </p>
                 </CardContent>
               </Card>
             )}
 
             {/* Only render charts when filtered data exists */}
-            {monthFilteredExpenses.length > 0 && (() => {
-              // Prepare chart data with filtered expenses using useMemo pattern
-              // This ensures data is computed only when monthFilteredExpenses changes
-              const expensesByCategoryData = useMemo(
-                () => getExpensesByCategory(monthFilteredExpenses),
-                [monthFilteredExpenses]
-              );
-
-              const incomeByCategoryData = useMemo(
-                () => getIncomeByCategory(monthFilteredExpenses),
-                [monthFilteredExpenses]
-              );
-
-              return (
+            {monthFilteredExpenses.length > 0 && (
                 <>
                   {/* CHART 1: Sankey Flow Diagram */}
                   <div className="md:col-span-2">
@@ -1146,9 +1115,7 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                   )}
 
                   {/* CHART 2b: Spese per Tipo - filtered by month */}
-                  {(() => {
-                    const expensesByTypeFilteredData = getExpensesByTypeFiltered(monthFilteredExpenses);
-                    return expensesByTypeFilteredData.length > 0 ? (
+                  {expensesByTypeFilteredData.length > 0 && (
                       <Card className="md:col-span-2">
                         <CardHeader>
                           <CardTitle>
@@ -1192,8 +1159,7 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                           </ResponsiveContainer>
                         </CardContent>
                       </Card>
-                    ) : null;
-                  })()}
+                    )}
 
                   {/* CHART 3: Entrate per Categoria - Interactive Drill-Down */}
                   {(incomeByCategoryData.length > 0 || (drillDown.chartType === 'income' && drillDown.level !== 'category')) && (
@@ -1404,11 +1370,9 @@ export function CurrentYearTab({ allExpenses, loading }: CurrentYearTabProps) {
                     </Card>
                   )}
                 </>
-              );
-            })()}
+            )}
           </motion.div>
         </div>
-      )}
 
       {/* ==============================================
           SECTION 2: OTHER CHARTS (Full Year - No Filter)

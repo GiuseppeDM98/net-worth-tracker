@@ -20,7 +20,7 @@
  *
  * Trade-offs:
  * - Installments and recurring expenses are mutually exclusive to prevent confusion
- * - Expense type cannot be changed after creation to maintain data integrity
+ * - Changing expense type resets category/subcategory to maintain data integrity
  * - Date parsing uses local midnight (T00:00:00) to avoid timezone issues with date-only inputs
  *
  * @param open - Controls dialog visibility
@@ -921,7 +921,6 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
                 setValue('categoryId', ''); // Reset category when type changes
                 setValue('subCategoryId', '');
               }}
-              disabled={!!expense} // Don't allow changing type when editing
             >
               <SelectTrigger id="type">
                 <SelectValue placeholder="Seleziona tipo" />
@@ -936,11 +935,6 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
             </Select>
             {errors.type && (
               <p className="text-sm text-red-500">{errors.type.message}</p>
-            )}
-            {expense && (
-              <p className="text-sm text-muted-foreground">
-                Il tipo di voce non può essere modificato
-              </p>
             )}
           </div>
 
