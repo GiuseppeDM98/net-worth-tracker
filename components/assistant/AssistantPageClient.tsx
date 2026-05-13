@@ -356,6 +356,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     options: householdScopeOptions,
     selectedScopeKey,
     setSelectedScopeKey,
+    scope,
     scopeLabel,
   } = useHouseholdScopeFilter(user?.uid);
   const prefersReducedMotion = useReducedMotion();
@@ -654,6 +655,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
             ...(chatContextType === 'year' ? { year: selectedYear } : {}),
           } : {}),
           preferences: memory?.preferences,
+          householdScope: scope,
           householdScopeLabel: scopeLabel,
         }),
       });

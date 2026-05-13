@@ -1,3 +1,5 @@
+import type { HouseholdFilterScope } from '@/lib/utils/householdUtils';
+
 // WARNING: If you add a mode here, also update:
 // - AssistantComposer.tsx (mode selector options) — skip for email-only modes
 // - anthropicStream.ts (buildPrompt routing, isStructured/isStructuredAnalysis arrays)
@@ -250,6 +252,7 @@ export interface AssistantStreamRequest {
   // Used only in chat mode to specify the context period type
   chatContext?: AssistantChatContextType;
   preferences?: AssistantPreferences;
+  householdScope?: HouseholdFilterScope;
   householdScopeLabel?: string;
 }
 

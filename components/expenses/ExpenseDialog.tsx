@@ -326,7 +326,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
           ? Math.abs(expense.linkedInvestmentQuantityDelta)
           : undefined,
         attributionProfileId: householdEnabled
-          ? expense.attributionProfileId || defaultExpenseAttributionProfileId
+          ? expense.attributionProfileId || (expense.type === 'income' ? defaultIncomeAttributionProfileId : defaultExpenseAttributionProfileId)
           : DEFAULT_PROFILE_SELF_ID,
       });
       // Pre-select the cost center if the expense already has one
@@ -356,7 +356,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
       setSelectedCostCenterId('__none__');
       setHasManualAttribution(false);
     }
-  }, [expense, defaultExpenseAttributionProfileId, householdEnabled, householdConfig, reset, open]);
+  }, [expense, defaultExpenseAttributionProfileId, defaultIncomeAttributionProfileId, householdEnabled, householdConfig, reset, open]);
 
   // Apply default cash account for new expenses once settings are loaded.
   // Runs when defaults change (i.e., after loadCashAssets resolves) and when type changes.

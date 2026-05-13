@@ -52,7 +52,7 @@ import {
   compareAllocations,
   getSettings,
 } from './assetAllocationService';
-import { getAllExpenses } from './expenseService';
+import { calculateTotalExpenses, calculateTotalIncome, getAllExpenses } from './expenseService';
 import { getAnnualExpenses, getAnnualIncome, calculateFIREMetrics } from './fireService';
 import { formatCurrency, formatPercentage } from './chartService';
 import { filterExpensesByTime } from '@/lib/utils/pdfTimeFilters';
@@ -101,7 +101,7 @@ export async function fetchPDFData(
     }
 
     // Cashflow: fetch expenses if not cached, then filter by timeFilter
-    if (sections.cashflow || sections.fire) {
+    if (sections.cashflow || sections.fire || sections.performance) {
       if (!cachedExpenses) {
         cachedExpenses = await getAllExpenses(userId);
       }
@@ -488,8 +488,12 @@ export async function prepareFireData(
   expenses: any[],
   currentNetWorth: number
 ): Promise<FireData> {
-  const annualExpenses = await getAnnualExpenses(userId);
-  const annualIncome = await getAnnualIncome(userId);
+  const annualExpenses = expenses.length > 0
+    ? calculateTotalExpenses(expenses)
+    : await getAnnualExpenses(userId);
+  const annualIncome = expenses.length > 0
+    ? calculateTotalIncome(expenses)
+    : await getAnnualIncome(userId);
 
   // Get user settings for safe withdrawal rate
   const settings = await getSettings(userId);

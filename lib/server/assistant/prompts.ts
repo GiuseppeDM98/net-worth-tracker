@@ -213,7 +213,7 @@ function buildHouseholdScopeInstruction(preferences: AssistantPreferences): stri
   if (!preferences.householdScopeLabel || preferences.householdScopeLabel === 'Tutto') {
     return '';
   }
-  return `Vista household attiva: ${preferences.householdScopeLabel}. Interpreta i dati e la risposta dentro questo perimetro; se i numeri aggregati non sono filtrati lato server, segnala esplicitamente il limite invece di presentarli come esclusivi della vista.`;
+  return `Vista household attiva: ${preferences.householdScopeLabel}. Interpreta i dati numerici e la risposta dentro questo perimetro.`;
 }
 
 /**

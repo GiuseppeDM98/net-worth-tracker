@@ -437,7 +437,7 @@ export default function PerformancePage() {
     };
   }, [baseMetrics, isScoped, performanceData, scopedExpenses, scopedSnapshots, user]);
 
-  const metrics = scopedMetrics ?? baseMetrics;
+  const metrics = isScoped ? scopedMetrics : baseMetrics;
 
   const periodSnapshots = useMemo(() => {
     const sourceSnapshots = isScoped ? scopedSnapshots : cachedSnapshots;
