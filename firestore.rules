@@ -191,6 +191,13 @@ service cloud.firestore {
       allow delete: if isOwner(userId);
     }
 
+    // Collezione exposure-cache - cache esposizione portafoglio per utente (ETF holdings, settori, emittenti)
+    // Document ID == userId; Admin SDK write only (client cannot write directly).
+    match /exposure-cache/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+
     // Collezione benchmark-cache - rendimenti storici dei portafogli modello (dato globale)
     // Document ID == benchmarkId (es. "60-40", "all-weather"); nessun campo userId.
     // Leggibile da qualsiasi utente autenticato; scrivibile solo via Admin SDK (write: false).
