@@ -959,24 +959,6 @@ export function TotalHistoryTab({ allExpenses, loading, historyStartYear = 2025 
     );
   }
 
-  if (scopedExpenses.length === 0) {
-    return (
-      <div className="p-8">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold mb-4">Cashflow Totale</h1>
-          <div className="rounded-md border border-dashed p-8">
-            <p className="text-muted-foreground">
-              Nessun dato disponibile per i grafici
-            </p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Aggiungi alcune spese per visualizzare i grafici
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* Desktop recommendation banner — charts and drill-down are best on larger screens */}
