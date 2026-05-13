@@ -64,6 +64,12 @@ import { AllocationSheet } from '@/components/allocation/AllocationSheet';
 import { AnimatePresence, motion } from 'framer-motion';
 import { drillDownShell } from '@/lib/utils/motionVariants';
 import { cn } from '@/lib/utils';
+import dynamic from 'next/dynamic';
+
+const ExposureSection = dynamic(
+  () => import('@/components/allocation/ExposureSection').then((m) => ({ default: m.ExposureSection })),
+  { ssr: false }
+);
 
 type DrillDownLevel = 'assetClass' | 'subCategory' | 'specificAsset';
 
@@ -940,6 +946,9 @@ export default function AllocationPage() {
         </motion.div>
         </AnimatePresence>
       )}
+
+      {/* Exposure breakdown — lazy loaded, shared between mobile and desktop */}
+      {user && <ExposureSection userId={user.uid} />}
     </div>
   );
 }

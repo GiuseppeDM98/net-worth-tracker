@@ -51,4 +51,9 @@ export const queryKeys = {
     fxRates: () => ['benchmarks', 'fx-rates'] as const,
     ecbRates: () => ['benchmarks', 'ecb-rates'] as const,
   },
+
+  // Portfolio
+  portfolio: {
+    exposure: (userId: string) => ['portfolio', 'exposure', userId] as const,
+  },
 } as const;
