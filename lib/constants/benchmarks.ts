@@ -75,7 +75,7 @@ export const BENCHMARKS: BenchmarkDefinition[] = [
   },
   {
     id: 'permanent-portfolio',
-    name: 'Portafoglio Permanente',
+    name: 'Permanent Portfolio',
     description: 'Strategia di Harry Browne: 25% in ciascuna delle quattro stagioni economiche — crescita (azioni), recessione (obbligazioni a lungo), inflazione (oro) e deflazione (liquidità a breve). Precursore del Golden Butterfly.',
     color: '#ec4899', // pink-500
     components: [
