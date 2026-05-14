@@ -21,7 +21,7 @@ areas live in `app/dashboard/*`, `app/api/*`, `components/*`, `lib/services/*`,
 - `next`, `react`, `typescript`, `tailwindcss`, `postcss`
 - `firebase`, `firebase-admin`, Firestore rules in `firestore.rules`
 - `@tanstack/react-query`, `recharts`, `@nivo/sankey`, `framer-motion`
-- `@anthropic-ai/sdk`, `yahoo-finance2`, `cheerio`, Frankfurter FX API
+- `@anthropic-ai/sdk`, `yahoo-finance2`, `cheerio`, Frankfurter FX API, FRED API
 - `vitest`, `eslint`, `zod`, `react-hook-form`, shadcn/ui in `components/ui/*`
 
 ## Architecture
@@ -69,7 +69,7 @@ npm.cmd run lint
 - Assistant flows: `app/api/ai/assistant/*`, `lib/server/assistant/*`, `components/assistant/*`
 - Snapshot and pricing flows: `app/api/portfolio/snapshot/*`, `app/api/prices/*`, `lib/helpers/priceUpdater.ts`
 - Dividend flows: `app/api/dividends/*`, `lib/server/dividendUseCase.ts`, `lib/server/dividendProcessor.ts`
-- Performance flows: `app/api/performance/*`, `lib/services/performanceService.ts`
+- Performance and benchmark flows: `app/api/performance/*`, `app/api/benchmarks/*`, `lib/services/performanceService.ts`, `lib/server/ecbRatesService.ts`, `lib/hooks/useEcbRates.ts`, `types/benchmarks.ts`
 - PDF export: `components/pdf/*`, `lib/services/pdfDataService.ts`, `lib/utils/pdfGenerator.tsx`
 
 ## Verification Notes

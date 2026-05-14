@@ -48,3 +48,15 @@ export interface FxRatesResponse {
   monthlyRates: FxMonthlyRate[];
   cachedAt: string; // ISO string
 }
+
+// Monthly ECB deposit facility rate (annual %)
+export interface EcbMonthlyRate {
+  year: number;
+  month: number; // 1-12
+  rate: number;  // annual %, e.g. 4.0
+}
+
+export interface EcbRatesResponse {
+  monthlyRates: EcbMonthlyRate[];
+  cachedAt: string; // ISO string
+}

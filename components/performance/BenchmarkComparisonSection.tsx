@@ -8,6 +8,7 @@ import { ChevronDown, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useBenchmarkReturns } from '@/lib/hooks/useBenchmarkReturns';
 import { useFxRates } from '@/lib/hooks/useFxRates';
+import { useEcbRates } from '@/lib/hooks/useEcbRates';
 import { BenchmarkComparisonChart } from './BenchmarkComparisonChart';
 import { BENCHMARKS } from '@/lib/constants/benchmarks';
 import { MonthlyReturnHeatmapData, TimePeriod } from '@/types/performance';
@@ -77,6 +78,7 @@ export function BenchmarkComparisonSection({
   const hookResults = [b0, b1, b2, b3, b4, b5];
 
   const { data: fxRates = [], isLoading: fxLoading, isError: fxError } = useFxRates(convertToEur);
+  const { data: ecbRates = [], isError: ecbError } = useEcbRates(isOpen);
 
   const benchmarkData = useMemo(() => {
     const map: Record<string, ReturnType<typeof useBenchmarkReturns>['data']> = {};
@@ -261,6 +263,8 @@ export function BenchmarkComparisonSection({
                 riskFreeRate={riskFreeRate}
                 convertToEur={convertToEur}
                 fxRates={fxRates}
+                ecbRates={ecbRates}
+                ecbError={ecbError}
               />
             ) : !hasPortfolioData ? (
               <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
