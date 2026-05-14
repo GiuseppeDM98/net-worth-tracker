@@ -58,5 +58,6 @@ export const queryKeys = {
   benchmarks: {
     returns: (benchmarkId: string) => ['benchmarks', 'returns', benchmarkId] as const,
     fxRates: () => ['benchmarks', 'fx-rates'] as const,
+    ecbRates: () => ['benchmarks', 'ecb-rates'] as const,
   },
 } as const;

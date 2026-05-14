@@ -222,6 +222,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Collezione ecb-rate-cache - tassi BCE deposit facility mensili (dato globale)
+    // Document ID == "deposit-rate"; nessun campo userId.
+    // Leggibile da qualsiasi utente autenticato; scrivibile solo via Admin SDK (write: false).
+    match /ecb-rate-cache/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
     // Collezione costCenters - centri di costo per raggruppare spese per oggetto/progetto
     match /costCenters/{costCenterId} {
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;

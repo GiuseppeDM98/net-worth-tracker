@@ -12,6 +12,7 @@ import {
   buildAndSendYearly,
 } from '@/lib/server/monthlyEmailService';
 import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
+import { refreshEcbRatesIfStale } from '@/lib/server/ecbRatesService';
 
 /**
  * GET /api/cron/monthly-snapshot
@@ -125,6 +126,14 @@ export async function GET(request: NextRequest) {
           error: (error as Error).message,
         });
       }
+    }
+
+    // Refresh ECB rate cache if stale — non-blocking so the cron never fails because of this
+    try {
+      await refreshEcbRatesIfStale();
+      console.log('[cron] ECB rate cache refreshed');
+    } catch (ecbError) {
+      console.error('[cron] ECB rate cache refresh failed (non-blocking):', ecbError);
     }
 
     // Phase 2: Send monthly summary emails (only on the last day of the month)

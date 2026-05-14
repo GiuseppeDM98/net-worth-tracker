@@ -142,6 +142,7 @@ Copy `.env.local.example` to `.env.local` and fill in your values:
 | `NEXT_PUBLIC_REGISTRATION_WHITELIST_ENABLED` | No | Enable email whitelist for registration |
 | `NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS` | No | Enable test snapshot generation in Settings |
 | `ANTHROPIC_API_KEY` | No | Enables AI-powered performance analysis |
+| `FRED_API_KEY` | No | Enables period-accurate Sharpe/Sortino in benchmark comparison (ECB deposit facility rate history via FRED); falls back to user-configured rate if absent |
 | `RESEND_API_KEY` | No | Enables automatic monthly portfolio summary emails (via [Resend](https://resend.com)) |
 | `RESEND_FROM_EMAIL` | No | Sender address for monthly emails (e.g. `onboarding@resend.dev` for personal use) |
 | `NEXT_PUBLIC_DEMO_USER_ID` | No | Firebase UID of the shared demo account |
@@ -173,7 +174,7 @@ See [`.env.local.example`](.env.local.example) for detailed comments on each var
 │  Firebase Auth  │  Firestore DB     │
 └─────────────────┴───────────────────┘
          External APIs:
-   Yahoo Finance · Frankfurter · Borsa Italiana · Anthropic
+   Yahoo Finance · Frankfurter · Borsa Italiana · Anthropic · FRED
 ```
 
 **Key design patterns:**
