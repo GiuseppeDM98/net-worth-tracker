@@ -42,6 +42,7 @@
 ## 🔒 Security
 
 - Updated dependencies to resolve a critical arbitrary code execution vulnerability in protobufjs and a high-severity denial of service vulnerability in Next.js server components; Next.js updated to 16.2.4
+- Pinned PostCSS to `^8.5.14` via npm `overrides` to resolve a moderate XSS vulnerability (GHSA-qx2v-qp2m-jg93) in the version bundled by Next.js — deduplicates PostCSS across the whole dependency tree (Next.js, Tailwind, Vite)
 
 ## 📚 Documentation
 
