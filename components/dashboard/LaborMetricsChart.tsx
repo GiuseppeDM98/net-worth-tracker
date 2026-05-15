@@ -14,7 +14,8 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { prepareMonthlyLaborMetricsData, formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
+import { prepareMonthlyLaborMetricsData, formatCurrencyCompact } from '@/lib/services/chartService';
+import { fmtCurrency } from '@/lib/utils/chartUtils';
 import { EmptyState, ChartEmptyIcon } from '@/components/ui/EmptyState';
 
 interface LaborMetricsChartProps {
@@ -47,7 +48,7 @@ export default function LaborMetricsChart({ data, isMobile }: LaborMetricsChartP
           tick={{ fontSize: isMobile ? 10 : 12 }}
         />
         <Tooltip
-          formatter={(value) => formatCurrency(value as number)}
+          formatter={fmtCurrency}
           contentStyle={{
             backgroundColor: 'var(--card)',
             border: '1px solid var(--border)',

@@ -1,20 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { AssistenteBanner } from '@/components/layout/AssistenteBanner';
+import { LogoutDialog } from '@/components/layout/LogoutDialog';
 import {
   PieChart,
   History,
@@ -40,9 +31,11 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { drawerContainer, drawerItem } from '@/lib/utils/motionVariants';
+import { applyThemeWithTransition } from '@/lib/utils/themeTransition';
+import { useLogout } from '@/lib/hooks/useLogout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from 'next-themes';
-import { toast } from 'sonner';
+import { getDisplayInfo } from '@/lib/utils/userDisplayUtils';
 
 // WARNING: If you add/remove navigation items here, also update:
 // - Sidebar.tsx (analysisNav / planningNav arrays)
@@ -69,9 +62,9 @@ interface SecondaryMenuDrawerProps {
 export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const { theme, setTheme } = useTheme();
-  const [confirmLogout, setConfirmLogout] = useState(false);
+  const { confirmLogout, setConfirmLogout, handleSignOut } = useLogout(() => onOpenChange(false));
 
   // Lock body scroll when open
   useEffect(() => {
@@ -95,21 +88,7 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
     onOpenChange(false);
   };
 
-  const displayName = user?.displayName?.split(' ')[0] || user?.email?.split('@')[0] || '';
-  const initials = user?.displayName
-    ? user.displayName.split(' ').slice(0, 2).map((n: string) => n[0]).join('').toUpperCase()
-    : (user?.email?.[0].toUpperCase() ?? '?');
-
-  const handleSignOut = async () => {
-    onOpenChange(false);
-    try {
-      await signOut();
-      toast.success('Logout effettuato con successo');
-      router.push('/login');
-    } catch {
-      toast.error('Errore durante il logout');
-    }
-  };
+  const { displayName, initials } = getDisplayInfo(user);
 
   const navItemCn = (active: boolean) =>
     cn(
@@ -216,7 +195,10 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <button className="ml-auto flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground">
+                      <button
+                        aria-label="Opzioni account"
+                        className="ml-auto flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                      >
                         <MoreVertical className="size-4" />
                       </button>
                     </DropdownMenuTrigger>
@@ -243,7 +225,7 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
                           ] as const).map(({ value, icon: Icon, label }) => (
                             <button
                               key={value}
-                              onClick={() => setTheme(value)}
+                              onClick={(e) => applyThemeWithTransition(value, e, setTheme)}
                               title={label}
                               className={cn(
                                 'flex size-6 items-center justify-center rounded transition-colors',
@@ -271,20 +253,11 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
         )}
       </AnimatePresence>
 
-      <AlertDialog open={confirmLogout} onOpenChange={setConfirmLogout}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Esci dall&apos;account?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Verrai disconnesso da questo dispositivo.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
-            <AlertDialogAction onClick={handleSignOut}>Esci</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <LogoutDialog
+        open={confirmLogout}
+        onOpenChange={setConfirmLogout}
+        onConfirm={handleSignOut}
+      />
     </>
   );
 }

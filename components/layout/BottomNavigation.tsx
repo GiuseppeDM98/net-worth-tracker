@@ -5,7 +5,9 @@ import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Wallet, Receipt, MoreHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { SecondaryMenuDrawer } from './SecondaryMenuDrawer';
+import { isNavItemActive } from '@/lib/utils/navUtils';
 
 // WARNING: If you add/remove navigation items here, also update:
 // - Sidebar.tsx (primaryNav array)
@@ -26,11 +28,9 @@ const secondaryHrefs = [
   '/dashboard/settings',
 ];
 
-// Active tab style: neutral grey pill, works across all 6 themes.
-// Foreground/12 gives a soft grey regardless of accent color.
-const activeClass = 'bg-[var(--sidebar-foreground)]/[0.12] text-sidebar-foreground';
+const activeClass = 'text-sidebar-foreground';
 const inactiveClass =
-  'text-sidebar-foreground/55 hover:bg-[var(--sidebar-foreground)]/[0.07] hover:text-sidebar-foreground';
+  'text-sidebar-foreground/55 hover:text-sidebar-foreground';
 
 export function BottomNavigation() {
   const pathname = usePathname();
@@ -52,18 +52,25 @@ export function BottomNavigation() {
       >
         <div className="flex items-center gap-1 px-2 py-1.5">
           {primaryNavigation.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive = isNavItemActive(item.href, pathname);
             return (
               <Link
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  'flex flex-col items-center justify-center gap-1 rounded-full px-3 py-2 transition-colors',
+                  'relative flex flex-col items-center justify-center gap-1 rounded-full px-3 py-2 transition-colors',
                   isActive ? activeClass : inactiveClass
                 )}
               >
-                <item.icon className="h-5 w-5" />
-                <span className="text-[11px] font-medium leading-none">{item.name}</span>
+                {isActive && (
+                  <motion.div
+                    layoutId="active-pill"
+                    className="absolute inset-0 rounded-full bg-[var(--sidebar-foreground)]/[0.12]"
+                    transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+                  />
+                )}
+                <item.icon className="relative z-10 h-5 w-5" />
+                <span className="relative z-10 text-[11px] font-medium leading-none">{item.name}</span>
               </Link>
             );
           })}
@@ -71,12 +78,19 @@ export function BottomNavigation() {
           <button
             onClick={() => setDrawerOpen(true)}
             className={cn(
-              'flex flex-col items-center justify-center gap-1 rounded-full px-3 py-2 transition-colors',
+              'relative flex flex-col items-center justify-center gap-1 rounded-full px-3 py-2 transition-colors',
               isAltroActive ? activeClass : inactiveClass
             )}
           >
-            <MoreHorizontal className="h-5 w-5" />
-            <span className="text-[11px] font-medium leading-none">Altro</span>
+            {isAltroActive && (
+              <motion.div
+                layoutId="active-pill"
+                className="absolute inset-0 rounded-full bg-[var(--sidebar-foreground)]/[0.12]"
+                transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+              />
+            )}
+            <MoreHorizontal className="relative z-10 h-5 w-5" />
+            <span className="relative z-10 text-[11px] font-medium leading-none">Altro</span>
           </button>
         </div>
       </nav>

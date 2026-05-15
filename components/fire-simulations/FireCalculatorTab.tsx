@@ -58,6 +58,7 @@ import { getItalyYear } from '@/lib/utils/dateHelpers';
 import { getSettings, setSettings, getDefaultTargets } from '@/lib/services/assetAllocationService';
 import { getFIREData, calculatePlannedFIREMetrics, calculateFIREMetrics, prepareRunwaySummaryLabel } from '@/lib/services/fireService';
 import { formatCurrency, formatCurrencyCompact, formatPercentage } from '@/lib/services/chartService';
+import { fmtCurrency } from '@/lib/utils/chartUtils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -959,7 +960,7 @@ export function FireCalculatorTab() {
                   tick={{ fontSize: isMobile ? 10 : 12 }}
                 />
                 <Tooltip
-                  formatter={(value) => formatCurrency(value as number)}
+                  formatter={fmtCurrency}
                   contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', color: 'var(--card-foreground)' }}
                   labelStyle={{ color: 'var(--foreground)' }}
                 />
