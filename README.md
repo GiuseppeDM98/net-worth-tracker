@@ -216,6 +216,7 @@ npm run test:watch # Run tests in watch mode
 - **UI language**: Italian
 - **Code language**: English (comments explain WHY, not WHAT — see [COMMENTS.md](COMMENTS.md))
 - **Responsive breakpoint**: `desktop:` (1440px) instead of Tailwind's default `lg:`
+- **Radix UI imports**: All `components/ui/` primitives import from the `radix-ui` umbrella package with named imports (`{ X as XPrimitive }`) — not from individual `@radix-ui/react-*` packages
 - **Radix Select**: No empty string values — use sentinel values like `__all__`
 - **Settings changes**: Always update type definition + getter + setter together
 
