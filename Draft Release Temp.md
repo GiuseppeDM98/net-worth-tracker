@@ -1,5 +1,6 @@
 ## ✨ New Features
 
+- Redesigned the **Add Expense** dialog with a guided two-step flow: first pick the expense type from a visual card grid (Variable Expense, Fixed Expense, Debt / Installment, Income), then fill in only the fields that matter for that type — no more scrolling past installment or recurring fields for a simple purchase. The expense type picker uses the same design language as the Add Asset dialog: icon cards with a short description, animated step transitions, and a "← Change type" ghost button to go back without losing your context
 - Redesigned the **Add Asset** dialog with a guided two-step flow: first pick the asset type from a visual card grid (Stocks, ETFs, Bonds, Crypto, Cash, Real Estate, Commodities), then fill in only the fields that matter for that type — no more scrolling past irrelevant inputs. Ticker, ISIN, cost basis, TER, coupon details, and debt fields appear only when relevant to the chosen type
 
 - Added **"Esposizione Portfolio"** section to the Allocation page — a collapsible card showing how your portfolio is distributed across the underlying companies, sectors, and ETF providers, aggregated across all your ETFs plus direct stocks. See your true exposure to a single company (e.g. Nvidia) even when it's split across multiple ETFs like SWDA and CHIP
@@ -23,6 +24,7 @@
 
 ## 🔧 Improvements
 
+- Improved the **Edit Expense** form: the expense type is now shown as a read-only badge instead of a disabled dropdown, making it immediately clear that the type is fixed after creation. The form opens directly in the relevant field view without requiring a type selection step
 - Improved the **Edit Asset** form to show only the fields relevant to the asset type being edited — previously all fields were always visible regardless of type, so editing a cash account showed bond coupon fields, TER, and ISIN. The form now matches what you see when adding that asset type
 
 - Improved the positive/negative month counters in the benchmark comparison table: values now display as "X/Y" (e.g. "29/40" or "30/41") showing how many months out of the total observations were positive or negative — makes it immediately clear why the portfolio and benchmark totals can differ (the portfolio uses the first snapshot as a baseline and has one fewer return observation than the benchmark)

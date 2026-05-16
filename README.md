@@ -43,7 +43,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Fully responsive on mobile and tablet: dropdown period selector, stacked header, color-only heatmap view on small screens
 
 ### Cashflow
-- Income and expense tracking with custom categories and subcategories
+- Income and expense tracking with custom categories and subcategories, entered via a guided two-step dialog: pick the expense type first (Variable, Fixed, Debt/Installment, Income), then fill in only the relevant fields for that type
 - **Budget tab**: automatic budget tracking for all expense categories — items auto-generated from your categories with no manual setup; annual view with progress bars comparing current year vs budget, previous year, and historical average; click any row (category, section subtotal, or Total Expenses/Income) to open a historical year×month panel with min/max month highlights; Total Expenses also shows a per-type breakdown (Fixed / Variable / Debt) as separate month-by-month tables; collapsible sections with reordering; fully responsive on mobile with tappable cards and a per-item detail dialog
 - Bulk move transactions between categories/subcategories (cross-type supported)
 - 5-layer Sankey diagram visualization

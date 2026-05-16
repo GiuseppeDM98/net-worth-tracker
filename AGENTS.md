@@ -62,6 +62,8 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - The `else` (new-record) branch of the reset must enumerate **every** field including optional ones (e.g. `isin`, `bondCouponRate`, `bondCouponRateSchedule`, …). Omitting a field silently carries its value across opens; only the edit branch round-trips those fields from Firestore and catches the omission.
 - Call `replaceTiers([])` (or equivalent `useFieldArray` reset) in the same branch — `reset()` does not clear field arrays.
 - **`React.ElementType` for Lucide icons in data arrays**: when storing a Lucide icon component in a typed constant array (e.g. `TYPE_CARDS`), use `React.ElementType` as the field type — NOT `(p: { className?: string }) => JSX.Element` or `React.ReactElement`. Lucide exports `ForwardRefExoticComponent`, which is not assignable to a function-call signature but is assignable to `React.ElementType`. Requires `import React from 'react'`.
+- **`getValues()` vs `watch()` in event handlers**: `watch()` subscribes reactively at render time — inside a `useEffect`, `onChange`, or `onCheckedChange` handler it returns the value captured at last render, not the current live value. Use `getValues('fieldName')` inside event handlers to read the point-in-time value. Only use `watch()` for reactive renders.
+- **Submit button outside `<form>` via `form` attribute**: `<button type="submit" form="my-form-id">` connects a button to a form by ID without nesting. Critical when the form is inside a scrollable div and the footer button is a sibling outside that div — nesting would break the layout. The `<form>` tag just needs `id="my-form-id"`.
 
 ### Expense Sign Convention
 - Income is stored positive
@@ -520,6 +522,11 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - `createExpense` in `expenseService.ts` explicitly enumerates every field in `removeUndefinedFields({...})` before `addDoc`. `updateExpense` spreads `...updates`, so new fields work automatically there.
 - **Symptom**: a new field saved correctly on edit but silently missing on create.
 - **Fix**: whenever you add a field to `ExpenseFormData`, also add it to the `cleanedData` object in ALL three creation paths: single expense, recurring expenses (the batch loop), and installment expenses (the batch loop). Search for `linkedCashAssetId: expenseData.linkedCashAssetId` — all three occurrences need the new field right next to it.
+
+### AnimatePresence Dialog Body Collapse
+- Symptom: dialog opens but body appears completely blank — no form fields, no cards, just empty white space
+- Cause: `absolute inset-0` on a `motion.div` inside `AnimatePresence` requires the parent to have an **explicit pixel height**. Inside a flex dialog driven by content height (`max-h-[90vh] flex flex-col`), a `flex-1` child has no defined pixel height — absolute children collapse to zero.
+- Fix: use `div.flex-1.overflow-y-auto.min-h-0` as the scrollable container (no `relative`), plain padding classes on the `motion.div` children, and move the sticky footer outside `AnimatePresence` as a `shrink-0` sibling. Connect the submit button with `<form id="expense-form">` + `<button type="submit" form="expense-form">` so it doesn't need to be physically inside the `<form>` tag.
 
 ### Async Tab Count: boolean | null Pattern
 - Tab count depends on async settings: init `useState<boolean | null>(null)`. While `null`, render `<div className="hidden desktop:block h-10 animate-pulse rounded-md bg-muted" />` to hold the space. Mount real `TabsList` only after settings arrive — avoids a 5→6 column reflow flash.
