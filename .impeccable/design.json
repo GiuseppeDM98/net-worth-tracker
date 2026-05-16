@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-16T00:00:00.000Z",
+  "title": "Design System: Net Worth Tracker",
+  "extensions": {
+    "colorMeta": {
+      "deep-void":        { "role": "neutral",  "displayName": "Deep Void",        "canonical": "oklch(0.145 0 0)",           "tonalRamp": ["oklch(0.10 0 0)", "oklch(0.145 0 0)", "oklch(0.205 0 0)", "oklch(0.269 0 0)", "oklch(0.38 0 0)", "oklch(0.52 0 0)", "oklch(0.70 0 0)", "oklch(0.92 0 0)"] },
+      "charcoal-surface": { "role": "neutral",  "displayName": "Charcoal Surface", "canonical": "oklch(0.205 0 0)",           "tonalRamp": ["oklch(0.10 0 0)", "oklch(0.145 0 0)", "oklch(0.205 0 0)", "oklch(0.269 0 0)", "oklch(0.38 0 0)", "oklch(0.52 0 0)", "oklch(0.70 0 0)", "oklch(0.92 0 0)"] },
+      "graphite-lift":    { "role": "neutral",  "displayName": "Graphite Lift",    "canonical": "oklch(0.269 0 0)",           "tonalRamp": ["oklch(0.10 0 0)", "oklch(0.145 0 0)", "oklch(0.205 0 0)", "oklch(0.269 0 0)", "oklch(0.38 0 0)", "oklch(0.52 0 0)", "oklch(0.70 0 0)", "oklch(0.92 0 0)"] },
+      "off-blanc":        { "role": "neutral",  "displayName": "Off-Blanc",        "canonical": "oklch(0.985 0 0)",           "tonalRamp": ["oklch(0.10 0 0)", "oklch(0.145 0 0)", "oklch(0.205 0 0)", "oklch(0.269 0 0)", "oklch(0.38 0 0)", "oklch(0.52 0 0)", "oklch(0.70 0 0)", "oklch(0.985 0 0)"] },
+      "mid-ash":          { "role": "neutral",  "displayName": "Mid-Ash",          "canonical": "oklch(0.708 0 0)",           "tonalRamp": ["oklch(0.10 0 0)", "oklch(0.20 0 0)", "oklch(0.30 0 0)", "oklch(0.42 0 0)", "oklch(0.556 0 0)", "oklch(0.65 0 0)", "oklch(0.708 0 0)", "oklch(0.85 0 0)"] },
+      "indigo-signal":    { "role": "primary",  "displayName": "Indigo Signal",    "canonical": "oklch(0.488 0.243 264.376)", "tonalRamp": ["oklch(0.18 0.08 264)", "oklch(0.26 0.13 264)", "oklch(0.35 0.18 264)", "oklch(0.44 0.22 264)", "oklch(0.488 0.243 264)", "oklch(0.58 0.22 264)", "oklch(0.69 0.17 264)", "oklch(0.82 0.10 264)"] },
+      "jade-return":      { "role": "secondary","displayName": "Jade Return",      "canonical": "oklch(0.696 0.17 162.48)",   "tonalRamp": ["oklch(0.18 0.05 162)", "oklch(0.28 0.08 162)", "oklch(0.38 0.11 162)", "oklch(0.49 0.14 162)", "oklch(0.60 0.16 162)", "oklch(0.696 0.17 162)", "oklch(0.79 0.14 162)", "oklch(0.89 0.08 162)"] },
+      "amber-watch":      { "role": "tertiary", "displayName": "Amber Watch",      "canonical": "oklch(0.769 0.188 70.08)",   "tonalRamp": ["oklch(0.20 0.06 70)", "oklch(0.30 0.09 70)", "oklch(0.42 0.13 70)", "oklch(0.54 0.16 70)", "oklch(0.65 0.18 70)", "oklch(0.769 0.188 70)", "oklch(0.86 0.14 70)", "oklch(0.93 0.08 70)"] },
+      "violet-risk":      { "role": "tertiary", "displayName": "Violet Risk",      "canonical": "oklch(0.627 0.265 303.9)",   "tonalRamp": ["oklch(0.18 0.09 304)", "oklch(0.27 0.14 304)", "oklch(0.37 0.19 304)", "oklch(0.49 0.23 304)", "oklch(0.60 0.255 304)", "oklch(0.627 0.265 304)", "oklch(0.73 0.22 304)", "oklch(0.85 0.13 304)"] },
+      "coral-loss":       { "role": "tertiary", "displayName": "Coral Loss",       "canonical": "oklch(0.645 0.246 16.439)",  "tonalRamp": ["oklch(0.18 0.08 16)", "oklch(0.27 0.13 16)", "oklch(0.37 0.18 16)", "oklch(0.49 0.22 16)", "oklch(0.58 0.24 16)", "oklch(0.645 0.246 16)", "oklch(0.74 0.20 16)", "oklch(0.86 0.12 16)"] },
+      "destructive":      { "role": "neutral",  "displayName": "Destructive Flame","canonical": "oklch(0.5771 0.2152 27.325)","tonalRamp": ["oklch(0.18 0.07 27)", "oklch(0.27 0.11 27)", "oklch(0.37 0.16 27)", "oklch(0.47 0.19 27)", "oklch(0.5771 0.2152 27)", "oklch(0.67 0.19 27)", "oklch(0.76 0.15 27)", "oklch(0.87 0.08 27)"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display",  "purpose": "Page heroes, net worth totals. One instance per view maximum." },
+      "headline": { "displayName": "Headline","purpose": "Section headers, dialog titles, authority-demand card titles." },
+      "title":    { "displayName": "Title",   "purpose": "Sub-section headers, table group labels." },
+      "body":     { "displayName": "Body",    "purpose": "Prose, descriptions, notes. Max 65ch line length." },
+      "label":    { "displayName": "Label",   "purpose": "Input labels, tags, stat captions, tab text." },
+      "numeric":  { "displayName": "Numeric", "purpose": "All monetary values, percentages, dates in financial contexts. tnum always on." }
+    },
+    "shadows": [
+      { "name": "whisper", "value": "0 1px 2px rgba(0,0,0,0.05)",                                    "purpose": "Inputs, form fields. Faint inset quality without visual weight." },
+      { "name": "lift",    "value": "0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06)",         "purpose": "Cards, data panels. In-document surfaces that need gentle separation." },
+      { "name": "float",   "value": "0 4px 24px rgba(0,0,0,0.28)",                                   "purpose": "Floating surfaces only: mobile nav pill, dropdown menus, detached modals." }
+    ],
+    "motion": [
+      { "name": "ease-standard",    "value": "cubic-bezier(0.4, 0, 0.2, 1)",       "purpose": "Theme toggle view transition, general state changes. 0.45s." },
+      { "name": "ease-out-quart",   "value": "cubic-bezier(0.25, 1, 0.5, 1)",      "purpose": "Exit transitions, panel reveals. Fast end, slow start." },
+      { "name": "spring-dialog",    "value": "type: spring, stiffness: 300, damping: 30", "purpose": "Dialog and sheet entry/exit via Framer Motion. Physics-native feel." },
+      { "name": "stagger-children", "value": "0.05s delay increment",              "purpose": "List item cascade reveals. 50ms between children, 3-8 item max." }
+    ],
+    "breakpoints": [
+      { "name": "desktop", "value": "1440px", "purpose": "Primary layout switch. iPad Mini landscape (1024px) gets mobile layout by design." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button (Dark)",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary action trigger. Off-Blanc on dark background. Hover dims slightly.",
+      "html": "<button class=\"ds-btn-primary\">Salva modifiche</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 16px; background-color: oklch(0.985 0 0); color: oklch(0.205 0 0); font-family: 'Geist Sans', system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; line-height: 1; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.15s ease, box-shadow 0.15s ease; white-space: nowrap; } .ds-btn-primary:hover { background-color: oklch(0.922 0 0); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px oklch(0.708 0 0 / 50%); } .ds-btn-primary:active { background-color: oklch(0.875 0 0); } .ds-btn-primary:disabled { opacity: 0.5; pointer-events: none; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary action. Transparent with border. Pairs alongside a Primary.",
+      "html": "<button class=\"ds-btn-outline\">Annulla</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 16px; background-color: transparent; color: oklch(0.985 0 0); font-family: 'Geist Sans', system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; line-height: 1; border: 1px solid oklch(1 0 0 / 10%); border-radius: 8px; cursor: pointer; transition: background-color 0.15s ease, border-color 0.15s ease; white-space: nowrap; } .ds-btn-outline:hover { background-color: oklch(0.269 0 0); border-color: oklch(1 0 0 / 20%); } .ds-btn-outline:focus-visible { outline: none; box-shadow: 0 0 0 3px oklch(0.708 0 0 / 50%); } .ds-btn-outline:disabled { opacity: 0.5; pointer-events: none; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Tertiary action. Invisible at rest. Used in dense tables and toolbars.",
+      "html": "<button class=\"ds-btn-ghost\">Modifica</button>",
+      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 12px; background-color: transparent; color: oklch(0.708 0 0); font-family: 'Geist Sans', system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; line-height: 1; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.15s ease, color 0.15s ease; white-space: nowrap; } .ds-btn-ghost:hover { background-color: oklch(0.269 0 0 / 50%); color: oklch(0.985 0 0); } .ds-btn-ghost:focus-visible { outline: none; box-shadow: 0 0 0 3px oklch(0.708 0 0 / 50%); } .ds-btn-ghost:disabled { opacity: 0.5; pointer-events: none; }"
+    },
+    {
+      "name": "Data Card",
+      "kind": "card",
+      "refersTo": "card-default",
+      "description": "Primary content container for KPI groups, charts, and data panels.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-title\">Patrimonio Netto</div><div class=\"ds-card-value\">€ 124.350,00</div><div class=\"ds-card-label\">+2,4% questo mese</div></div>",
+      "css": ".ds-card { background-color: oklch(0.205 0 0); color: oklch(0.985 0 0); border: 1px solid oklch(1 0 0 / 10%); border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06); } .ds-card-title { font-family: 'Geist Sans', system-ui, sans-serif; font-size: 0.75rem; font-weight: 500; color: oklch(0.708 0 0); letter-spacing: 0.01em; text-transform: uppercase; } .ds-card-value { font-family: 'Geist Mono', ui-monospace, monospace; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; font-feature-settings: \"tnum\" 1; } .ds-card-label { font-family: 'Geist Sans', system-ui, sans-serif; font-size: 0.75rem; font-weight: 400; color: oklch(0.708 0 0); }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input-default",
+      "description": "Standard form text field. Transparent at rest, border communicates editability.",
+      "html": "<div class=\"ds-field\"><label class=\"ds-label\" for=\"ds-input-eg\">Importo</label><input class=\"ds-input\" id=\"ds-input-eg\" type=\"text\" placeholder=\"€ 0,00\" /></div>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 6px; } .ds-label { font-family: 'Geist Sans', system-ui, sans-serif; font-size: 0.75rem; font-weight: 500; color: oklch(0.708 0 0); letter-spacing: 0.01em; } .ds-input { height: 36px; width: 100%; padding: 0 12px; background-color: oklch(1 0 0 / 4%); color: oklch(0.985 0 0); font-family: 'Geist Mono', ui-monospace, monospace; font-size: 0.875rem; font-feature-settings: \"tnum\" 1; border: 1px solid oklch(1 0 0 / 10%); border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); outline: none; transition: border-color 0.15s ease, box-shadow 0.15s ease; } .ds-input::placeholder { color: oklch(0.556 0 0); } .ds-input:focus-visible { border-color: oklch(0.708 0 0); box-shadow: 0 0 0 3px oklch(0.708 0 0 / 50%); } .ds-input:disabled { opacity: 0.5; pointer-events: none; cursor: not-allowed; }"
+    },
+    {
+      "name": "Badge",
+      "kind": "chip",
+      "refersTo": "badge-default",
+      "description": "Asset type label, status indicator, filter chip.",
+      "html": "<div style=\"display:flex;gap:8px;align-items:center;\"><span class=\"ds-badge ds-badge--default\">ETF</span><span class=\"ds-badge ds-badge--outline\">Azione</span><span class=\"ds-badge ds-badge--destructive\">Venduto</span></div>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; border-radius: 8px; padding: 2px 10px; font-family: 'Geist Sans', system-ui, sans-serif; font-size: 0.75rem; font-weight: 600; line-height: 1.4; letter-spacing: 0.01em; border: 1px solid transparent; transition: background-color 0.15s ease; } .ds-badge--default { background-color: oklch(0.985 0 0); color: oklch(0.205 0 0); } .ds-badge--outline { background-color: transparent; color: oklch(0.985 0 0); border-color: oklch(1 0 0 / 15%); } .ds-badge--destructive { background-color: oklch(0.5771 0.2152 27.325); color: oklch(0.985 0 0); }"
+    },
+    {
+      "name": "Mobile Nav Pill",
+      "kind": "nav",
+      "description": "Floating bottom navigation. Pill shape, Float shadow, safe-area aware.",
+      "html": "<nav class=\"ds-nav-pill\"><a class=\"ds-nav-item ds-nav-item--active\" href=\"#\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect width=\"7\" height=\"9\" x=\"3\" y=\"3\" rx=\"1\"/><rect width=\"7\" height=\"5\" x=\"14\" y=\"3\" rx=\"1\"/><rect width=\"7\" height=\"9\" x=\"14\" y=\"12\" rx=\"1\"/><rect width=\"7\" height=\"5\" x=\"3\" y=\"16\" rx=\"1\"/></svg><span>Panoramica</span></a><a class=\"ds-nav-item\" href=\"#\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 12V7H5a2 2 0 0 1 0-4h14v4\"/><path d=\"M3 5v14a2 2 0 0 0 2 2h16v-5\"/><path d=\"M18 12a2 2 0 0 0 0 4h4v-4Z\"/></svg><span>Patrimonio</span></a><a class=\"ds-nav-item\" href=\"#\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z\"/><path d=\"M14 8H8\"/><path d=\"M16 12H8\"/><path d=\"M13 16H8\"/></svg><span>Cashflow</span></a></nav>",
+      "css": ".ds-nav-pill { display: inline-flex; align-items: center; gap: 4px; padding: 6px 8px; background-color: oklch(0.205 0 0); border: 1px solid oklch(1 0 0 / 10%); border-radius: 9999px; box-shadow: 0 4px 24px rgba(0,0,0,0.28); } .ds-nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 14px; border-radius: 9999px; color: oklch(0.985 0 0 / 55%); font-family: 'Geist Sans', system-ui, sans-serif; font-size: 0.625rem; font-weight: 500; text-decoration: none; transition: color 0.15s ease, background-color 0.15s ease; } .ds-nav-item:hover { color: oklch(0.985 0 0); } .ds-nav-item--active { color: oklch(0.985 0 0); background-color: oklch(0.269 0 0); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Precision Instrument",
+    "overview": "This system is built for one purpose: total clarity about your financial position. Every element earns its place by communicating a number, a trend, or a relationship. The aesthetic is Linear/Vercel clarity pushed further — not a design exercise, but an instrument. The default palette is achromatic by conviction. Color belongs to the data.\n\nDark mode is the primary experience. An Italian investor reviewing portfolio performance at their desk, evening light off, monitor close, expects precision: sharp contrasts, monospaced figures, no visual noise competing with numbers that represent years of work.\n\nThe five named color themes (Solar Dusk, Elegant Luxury, Midnight Bloom, Cyberpunk, Retro Arcade) are personality layers on top of a structural foundation. The default theme is the instrument in its raw state. The themes are its finishes.",
+    "keyCharacteristics": [
+      "Achromatic structural palette; data colors carry all chromatic meaning in the default theme",
+      "Geist Sans for interface text, Geist Mono for every number that matters",
+      "Radius is tight: 8px (inputs, buttons), 14px (cards)",
+      "Elevation is ambient: surfaces layer through background steps, shadows are atmospheric whispers",
+      "Motion is physics-native: spring dialogs, ease-out-quart state transitions, circle-reveal theme toggle",
+      "Density is intentional — power-user tool; information is not hidden without reason"
+    ],
+    "rules": [
+      { "name": "The Zero-Chroma Rule",   "body": "The default surface palette has no hue. Adding a brand color to buttons, cards, or navigation in the default theme is forbidden. Color is earned by data, not decoration.", "section": "colors" },
+      { "name": "The Data Owns Color Rule","body": "Chart palettes, performance indicators, and the five named themes are the only sanctioned sources of chromatic energy. Interface chrome in the default theme is always achromatic.", "section": "colors" },
+      { "name": "The Mono Mandate",       "body": "Every number in a financial context uses Geist Mono with tnum features. KPI cards, table cells, chart axis labels, percentage badges. No exceptions.", "section": "typography" },
+      { "name": "The Two-Font Rule",      "body": "The system uses exactly two fonts. No display serif, no decorative typeface, no icon font treated as type.", "section": "typography" },
+      { "name": "The Ambient Rule",       "body": "Shadows are atmospheric, not structural. A card's 1px border at 10% opacity does more compositional work than its shadow.", "section": "elevation" },
+      { "name": "The Float Threshold",    "body": "Float shadow (0 4px 24px rgba(0,0,0,0.28)) is reserved for elements that physically exit document flow. Using it on an in-flow card is an error.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use Geist Mono with font-feature-settings: \"tnum\" 1 for every monetary value, percentage, and structured date.",
+      "Do reference --sidebar-primary for active navigation states. In the default theme this is the only sanctioned non-achromatic color in interface chrome.",
+      "Do use the Float shadow exclusively for elements that leave document flow.",
+      "Do respect prefers-reduced-motion. Framer Motion's useReducedMotion() is integrated and must be preserved.",
+      "Do use desktop: (1440px) as the primary responsive breakpoint. Never use lg: for wide-screen layouts.",
+      "Do use oklch() for all custom color definitions. This project is OKLCH-native.",
+      "Do let the five named themes handle personality. Resist adding theme-like color to the default palette.",
+      "Do use the view-transition circle reveal for dark/light toggling."
+    ],
+    "donts": [
+      "Don't add brand color to the default theme's surface chrome. Zero-chroma is the rule.",
+      "Don't model density after a Bloomberg terminal. Dense, yes; illegible or cold, never.",
+      "Don't use consumer fintech color patterns (colorful fills, playful gradients, bright accents everywhere).",
+      "Don't apply Material Design component conventions.",
+      "Don't use gradient text (background-clip: text with a gradient). Use weight or size for emphasis.",
+      "Don't use side-stripe borders (colored border-left > 1px as a card accent).",
+      "Don't use glassmorphism decoratively.",
+      "Don't use proportional figures for financial numbers in tabular contexts.",
+      "Don't apply Float shadow to in-document cards."
+    ]
+  }
+}
