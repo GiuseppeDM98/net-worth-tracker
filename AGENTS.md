@@ -275,6 +275,13 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - React Query client-side: `staleTime` = server TTL minus headroom (e.g. 6h client for 7d server). Applied: `benchmark-cache/{benchmarkId}`, `fx-rate-cache/usd-eur`, `ecb-rate-cache/deposit-rate`
 - **Sparse time-series carry-forward**: external series with observations per event date (not per calendar month) must be expanded to a full monthly array before caching. Pattern: keep the last observation per `YYYY-MM` in a `Map`, then iterate from the start month to the current month using `Date.UTC` (not local), emitting the last seen value for months with no observation. Applied in `lib/server/ecbRatesService.ts` (`buildMonthlyRatesFromFred`) for FRED ECBDFR.
 
+### Yahoo Finance Module Asymmetry: ETF Sectors vs Stock Sectors
+- **ETFs/funds**: use `topHoldings` module → `sectorWeightings` is an array of `Record<string, number>` with snake_case keys (`"technology"`, `"financial_services"`) that match `SECTOR_LABELS` directly
+- **Individual stocks**: use `assetProfile` module → `sector` is a title-case string (`"Technology"`, `"Financial Services"`) — must be translated via a dedicated map (e.g. `YAHOO_ASSET_PROFILE_SECTOR_TO_KEY`) before matching `SECTOR_LABELS`
+- The two modules are mutually exclusive per asset type: `topHoldings` on a stock returns no `sectorWeightings`; `assetProfile` on an ETF returns no `sector`
+- Fetch both batches concurrently: `Promise.all([Promise.allSettled(...etfs), Promise.allSettled(...stocks)])` — independent settle semantics, zero added latency
+- `cacheKey` must encode both ETF and stock tickers; an ETF-only key goes stale when stock composition changes without any ETF change. Applied in `lib/server/portfolioExposureService.ts`
+
 ### Cache Schema Evolution Without cacheKey Bump
 - When adding a new field to the data shape inside an existing cache document, add it as **optional** in the TypeScript type. Old cached docs lacking the field then degrade gracefully (UI hides the dependent feature when undefined) without forcing a global recompute on deploy.
 - Pair the optional-field migration with an explicit **force-refresh** affordance on the route + hook so users can opt out of the stale-but-valid cache without waiting for the TTL or changing the cacheKey inputs:

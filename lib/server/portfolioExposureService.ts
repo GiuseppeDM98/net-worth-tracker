@@ -35,6 +35,22 @@ const SECTOR_LABELS: Record<string, string> = {
   realestate: 'Immobiliare',
 };
 
+// Maps assetProfile.sector strings (title-case, from Yahoo Finance) to our internal keys.
+// topHoldings uses camelCase keys directly; assetProfile uses a different format.
+const YAHOO_ASSET_PROFILE_SECTOR_TO_KEY: Record<string, string> = {
+  'Technology': 'technology',
+  'Healthcare': 'healthcare',
+  'Financial Services': 'financial_services',
+  'Consumer Cyclical': 'consumer_cyclical',
+  'Consumer Defensive': 'consumer_defensive',
+  'Industrials': 'industrials',
+  'Communication Services': 'communication_services',
+  'Energy': 'energy',
+  'Basic Materials': 'basic_materials',
+  'Utilities': 'utilities',
+  'Real Estate': 'realestate',
+};
+
 // Mirror of calculateAssetValue() from assetService.ts for server-side use.
 // assetService.ts imports the client Firebase SDK and cannot be used in API routes.
 function resolveAssetValueEur(asset: Asset): number {
@@ -79,7 +95,7 @@ export async function computePortfolioExposure(
   );
   const analyzedAssets = etfAssets.length + stockAssets.length;
 
-  // --- Fetch Yahoo Finance data for all ETFs in parallel ---
+  // --- Fetch Yahoo Finance data for ETFs and stocks in parallel ---
   type YFResult = {
     asset: Asset;
     topHoldings: {
@@ -89,37 +105,65 @@ export async function computePortfolioExposure(
     fundFamily: string | null;
   };
 
-  const etfFetchResults = await Promise.allSettled(
-    etfAssets.map(async (asset): Promise<YFResult> => {
-      try {
-        const summary = await yahooFinance.quoteSummary(asset.ticker, {
-          modules: ['topHoldings', 'fundProfile'],
-        });
-        const holdings = summary.topHoldings ?? null;
-        const family = (summary.fundProfile as { family?: string | null } | null)?.family ?? null;
-        return {
-          asset,
-          topHoldings: holdings
-            ? {
-                holdings: (holdings.holdings ?? []) as Array<{
-                  symbol: string;
-                  holdingName: string;
-                  holdingPercent: number;
-                }>,
-                sectorWeightings: (holdings.sectorWeightings ?? []) as Array<Record<string, number>>,
-              }
-            : null,
-          fundFamily: family,
-        };
-      } catch {
-        return { asset, topHoldings: null, fundFamily: null };
-      }
-    })
-  );
+  type StockResult = {
+    asset: Asset;
+    // Internal sector key (e.g. "technology"), null when Yahoo has no data for the ticker
+    sectorKey: string | null;
+  };
+
+  const [etfFetchResults, stockFetchResults] = await Promise.all([
+    Promise.allSettled(
+      etfAssets.map(async (asset): Promise<YFResult> => {
+        try {
+          const summary = await yahooFinance.quoteSummary(asset.ticker, {
+            modules: ['topHoldings', 'fundProfile'],
+          });
+          const holdings = summary.topHoldings ?? null;
+          const family = (summary.fundProfile as { family?: string | null } | null)?.family ?? null;
+          return {
+            asset,
+            topHoldings: holdings
+              ? {
+                  holdings: (holdings.holdings ?? []) as Array<{
+                    symbol: string;
+                    holdingName: string;
+                    holdingPercent: number;
+                  }>,
+                  sectorWeightings: (holdings.sectorWeightings ?? []) as Array<Record<string, number>>,
+                }
+              : null,
+            fundFamily: family,
+          };
+        } catch {
+          return { asset, topHoldings: null, fundFamily: null };
+        }
+      })
+    ),
+    // Fetch sector via assetProfile for individual stocks.
+    // topHoldings.sectorWeightings is only available for ETFs/funds, not for equities.
+    Promise.allSettled(
+      stockAssets.map(async (asset): Promise<StockResult> => {
+        try {
+          const summary = await yahooFinance.quoteSummary(asset.ticker, {
+            modules: ['assetProfile'],
+          });
+          const sector = (summary.assetProfile as { sector?: string } | null)?.sector ?? null;
+          const sectorKey = sector ? (YAHOO_ASSET_PROFILE_SECTOR_TO_KEY[sector] ?? null) : null;
+          return { asset, sectorKey };
+        } catch {
+          return { asset, sectorKey: null };
+        }
+      })
+    ),
+  ]);
 
   // Flatten settled results, drop failures
   const etfData: YFResult[] = etfFetchResults
     .filter((r): r is PromiseFulfilledResult<YFResult> => r.status === 'fulfilled')
+    .map((r) => r.value);
+
+  const stockData: StockResult[] = stockFetchResults
+    .filter((r): r is PromiseFulfilledResult<StockResult> => r.status === 'fulfilled')
     .map((r) => r.value);
 
   // --- Aggregate company exposure ---
@@ -223,6 +267,27 @@ export async function computePortfolioExposure(
     }
   }
 
+  // Direct stocks are 100% exposed to their single sector (sectorWeight: 1).
+  // Stocks without a resolvable sector key are silently skipped.
+  for (const { asset, sectorKey } of stockData) {
+    if (!sectorKey) continue;
+    const assetValue = assetValues.get(asset.id) ?? 0;
+    const source = {
+      assetName: asset.name,
+      ticker: asset.ticker,
+      contributionEur: assetValue,
+      sectorWeight: 1,
+      assetValueEur: assetValue,
+    };
+    const existing = sectorMap.get(sectorKey);
+    if (existing) {
+      existing.exposureEur += assetValue;
+      existing.sources.push(source);
+    } else {
+      sectorMap.set(sectorKey, { exposureEur: assetValue, sources: [source] });
+    }
+  }
+
   const sectors: ExposureSector[] = Array.from(sectorMap.entries())
     .map(([key, { exposureEur, sources }]) => ({
       key,
@@ -265,7 +330,7 @@ export async function computePortfolioExposure(
     etfAssets.reduce((s, a) => s + (assetValues.get(a.id) ?? 0), 0) +
     stockAssets.reduce((s, a) => s + (assetValues.get(a.id) ?? 0), 0);
 
-  const cacheKey = `${etfAssets.length}-${etfAssets.map((a) => a.ticker).sort().join(',')}-${Math.round(totalPortfolioValue)}`;
+  const cacheKey = `${etfAssets.length}-${etfAssets.map((a) => a.ticker).sort().join(',')}-${stockAssets.map((a) => a.ticker).sort().join(',')}-${Math.round(totalPortfolioValue)}`;
 
   return {
     topHoldings,

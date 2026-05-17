@@ -41,6 +41,7 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed single stocks not appearing in the Sectors tab of Portfolio Exposure — direct stock positions now contribute to the sector breakdown based on their Yahoo Finance sector classification. Previously, only ETF holdings were aggregated into sectors; individual stocks were silently excluded even though they appeared correctly in the Top Holdings tab
 - Fixed stale data appearing in the Add Asset dialog when opening it a second time immediately after adding an asset — all fields now reset cleanly on every open
 
 - Fixed benchmark comparison table showing different TWR and total growth values than the main KPI cards on the Performance page — values now use the same pre-computed metrics as the header cards
