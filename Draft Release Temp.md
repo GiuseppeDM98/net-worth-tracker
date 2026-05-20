@@ -25,6 +25,9 @@
 ## 🔧 Improvements
 
 - Redesigned the **Overview (Panoramica)** page with a bolder, cleaner layout: the total portfolio value is now displayed in a larger typeface that dominates the screen; monthly and YTD variations are shown as compact inline chips directly below the main number instead of separate cards; income and expenses are combined into a single "Cashflow" card with a two-column layout — reducing visual noise while keeping all the same information
+- Improved the Overview loading experience: the page now shows a structural skeleton that mirrors the real layout (header, hero number, secondary KPI, cashflow card) while data loads, instead of a bare spinner in an empty page
+- Improved the Overview "Cashflow" section empty state: when no expenses have been recorded for the current month, the section now shows a clear message instead of displaying `€0.00`, which was visually indistinguishable from a real zero-spend month
+- Removed the redundant "Number of Assets" card from the Overview secondary KPI row — the asset count was already shown as a caption below the portfolio total; the "Net Liquid Assets" card now takes the full row width for improved readability
 
 - Improved the **Edit Expense** form: the expense type is now shown as a read-only badge instead of a disabled dropdown, making it immediately clear that the type is fixed after creation. The form opens directly in the relevant field view without requiring a type selection step
 - Improved the **Edit Asset** form to show only the fields relevant to the asset type being edited — previously all fields were always visible regardless of type, so editing a cash account showed bond coupon fields, TER, and ISIN. The form now matches what you see when adding that asset type

@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Wallet, TrendingUp, PieChart, DollarSign, Camera, TrendingDown, Receipt, Loader2 } from 'lucide-react';
+import { Wallet, TrendingUp, Camera, TrendingDown, Receipt } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCreateSnapshot } from '@/lib/hooks/useSnapshots';
 import { useDashboardOverview } from '@/lib/hooks/useDashboardOverview';
@@ -235,8 +235,43 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className="space-y-6 max-desktop:portrait:pb-20">
+        {/* Header skeleton */}
+        <div className="pb-4 border-b border-border">
+          <div className="h-3 w-20 bg-muted rounded animate-pulse mb-2" />
+          <div className="h-8 w-56 bg-muted rounded animate-pulse mb-2" />
+          <div className="h-4 w-44 bg-muted rounded animate-pulse" />
+        </div>
+        {/* Hero card skeleton */}
+        <div className="rounded-xl border border-border bg-card px-6 py-6">
+          <div className="h-3 w-40 bg-muted rounded animate-pulse mb-4" />
+          <div className="h-12 w-52 bg-muted rounded animate-pulse mb-4" />
+          <div className="flex gap-2">
+            <div className="h-6 w-36 bg-muted rounded animate-pulse" />
+            <div className="h-6 w-24 bg-muted rounded animate-pulse" />
+          </div>
+        </div>
+        {/* Secondary KPI skeleton */}
+        <div className="rounded-xl border border-border bg-card px-6 py-6">
+          <div className="h-3 w-36 bg-muted rounded animate-pulse mb-3" />
+          <div className="h-8 w-44 bg-muted rounded animate-pulse" />
+        </div>
+        {/* Cashflow skeleton */}
+        <div className="rounded-xl border border-border bg-card px-6 py-6">
+          <div className="h-3 w-40 bg-muted rounded animate-pulse mb-5" />
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <div className="h-3 w-16 bg-muted rounded animate-pulse" />
+              <div className="h-8 w-28 bg-muted rounded animate-pulse" />
+              <div className="h-3 w-24 bg-muted rounded animate-pulse" />
+            </div>
+            <div className="space-y-2">
+              <div className="h-3 w-12 bg-muted rounded animate-pulse" />
+              <div className="h-8 w-28 bg-muted rounded animate-pulse" />
+              <div className="h-3 w-24 bg-muted rounded animate-pulse" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -349,58 +384,31 @@ export default function DashboardPage() {
               </div>
               <p className="text-xs text-muted-foreground mt-2">
                 {(overview?.flags.assetCount ?? 0) === 0
-                  ? 'Aggiungi assets per iniziare'
-                  : `${overview?.flags.assetCount ?? 0} asset${(overview?.flags.assetCount ?? 0) !== 1 ? 's' : ''}`}
+                  ? 'Aggiungi asset per iniziare'
+                  : `${overview?.flags.assetCount ?? 0} asset in portafoglio`}
               </p>
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* Secondary KPI row — 2-col at sm+; these contextualize the hero number */}
-        <motion.div
-          layout="position"
-          transition={springLayoutTransition}
-          className="grid gap-4 sm:grid-cols-2"
-        >
-          <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
-            <Card className="h-full">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Patrimonio Liquido Lordo</CardTitle>
-                <Wallet className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <OverviewAnimatedCurrency
-                  value={overview?.metrics.liquidNetWorth ?? 0}
-                  animateOnMount={true}
-                  startDelay={105}
-                  duration={390}
-                  className="text-2xl font-bold"
-                />
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
-            <Card className="h-full">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Numero Assets</CardTitle>
-                <PieChart className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <OverviewAnimatedCurrency
-                  value={overview?.flags.assetCount ?? 0}
-                  animateOnMount={true}
-                  format="integer"
-                  startDelay={105}
-                  duration={390}
-                  className="text-2xl font-bold"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {(overview?.flags.assetCount ?? 0) === 0 ? 'Nessun asset presente' : 'Asset in portafoglio'}
-                </p>
-              </CardContent>
-            </Card>
-          </motion.div>
+        {/* Secondary KPI — Patrimonio Liquido full-width; asset count is already
+            surfaced as a caption below the hero number, no need for a separate card. */}
+        <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Patrimonio Liquido Lordo</CardTitle>
+              <Wallet className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <OverviewAnimatedCurrency
+                value={overview?.metrics.liquidNetWorth ?? 0}
+                animateOnMount={true}
+                startDelay={105}
+                duration={390}
+                className="text-2xl font-bold"
+              />
+            </CardContent>
+          </Card>
         </motion.div>
 
       </motion.section>
@@ -425,23 +433,22 @@ export default function DashboardPage() {
               variants={staggerContainer}
               initial="hidden"
               animate="visible"
-              className="grid gap-6 md:grid-cols-2"
+              className="grid gap-6 sm:grid-cols-2"
             >
               <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Patrimonio Totale Netto</CardTitle>
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    <Wallet className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    {/* animateOnMount=true — second primary KPI per step-2 spec.
-                        No onSettled here; hero (Lordo) already drives the settled signal. */}
+                    {/* No onSettled here; hero (Lordo) already drives the settled signal. */}
                     <OverviewAnimatedCurrency
                       value={overview.metrics.netTotal}
                       animateOnMount={true}
                       startDelay={125}
                       duration={380}
-                      className="text-2xl font-bold text-blue-600"
+                      className="text-2xl font-bold"
                     />
                     <p className="text-xs text-muted-foreground">
                       Dopo tasse stimate
@@ -462,7 +469,7 @@ export default function DashboardPage() {
                       animateOnMount={true}
                       startDelay={140}
                       duration={380}
-                      className="text-2xl font-bold text-blue-600"
+                      className="text-2xl font-bold"
                     />
                     <p className="text-xs text-muted-foreground">
                       Liquidità dopo tasse stimate
@@ -479,7 +486,7 @@ export default function DashboardPage() {
               variants={staggerContainer}
               initial="hidden"
               animate="visible"
-              className="grid gap-6 md:grid-cols-2"
+              className="grid gap-6 sm:grid-cols-2"
             >
               <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
                 <Card>
@@ -518,7 +525,7 @@ export default function DashboardPage() {
                       animateOnMount={true}
                       startDelay={170}
                       duration={380}
-                      className="text-2xl font-bold text-orange-600"
+                      className="text-2xl font-bold text-amber-600 dark:text-amber-400"
                     />
                     <p className="text-xs text-muted-foreground">
                       Imposte su plusvalenze non realizzate
@@ -586,17 +593,9 @@ export default function DashboardPage() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <p className="text-xs text-muted-foreground mb-2">Entrate</p>
-                  <div className="text-2xl font-bold">€0,00</div>
-                  <p className="text-xs text-muted-foreground mt-0.5">Nessun dato</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground mb-2">Spese</p>
-                  <div className="text-2xl font-bold">€0,00</div>
-                  <p className="text-xs text-muted-foreground mt-0.5">Nessun dato</p>
-                </div>
+              <div className="flex flex-col items-center justify-center py-4 gap-2">
+                <Receipt className="h-7 w-7 text-muted-foreground/40" />
+                <p className="text-sm text-muted-foreground">Nessuna spesa registrata questo mese</p>
               </div>
             )}
           </CardContent>
@@ -614,7 +613,7 @@ export default function DashboardPage() {
           initial="hidden"
           animate="visible"
           exit="exit"
-          className="grid gap-6 md:grid-cols-2"
+          className="grid gap-6 sm:grid-cols-2"
         >
           {overview?.flags.hasTERTracking && (
             <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
@@ -624,7 +623,7 @@ export default function DashboardPage() {
                 <Receipt className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-purple-600">
+                <div className="text-2xl font-bold">
                   {overview.metrics.portfolioTER.toFixed(2)}%
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -639,7 +638,7 @@ export default function DashboardPage() {
             layout="position"
             transition={springLayoutTransition}
             variants={cardItem}
-            className={!overview?.flags.hasTERTracking ? 'md:col-span-2' : ''}
+            className={!overview?.flags.hasTERTracking ? 'sm:col-span-2' : ''}
           >
           <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -647,7 +646,7 @@ export default function DashboardPage() {
               <TrendingDown className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-orange-600">
+              <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
                 {formatCurrency(overview.metrics.annualPortfolioCost + overview.metrics.annualStampDuty)}
               </div>
               {overview.flags.hasTERTracking && overview.flags.hasStampDuty ? (
