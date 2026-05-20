@@ -292,18 +292,20 @@ export default function DashboardPage() {
         className="space-y-4"
       >
 
-        {/* Hero card — full-width, dominant number */}
+        {/* Hero card — full-width, dominant number.
+            No side-stripe border (banned by design system); the card's natural
+            border + shadow provide sufficient separation. Variation chips live
+            inline so the user gets trend context without scrolling past the hero. */}
         <motion.div
           layout="position"
           transition={springLayoutTransition}
           variants={heroMetricSettle}
         >
-          <Card className="border-l-4 border-l-primary">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Patrimonio Totale Lordo</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
+          <Card>
             <CardContent>
+              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-3">
+                Patrimonio Totale Lordo
+              </p>
               {/* animateOnMount=true — hero is the primary KPI, animates once on load.
                   onSettled triggers heroSettled so OverviewChartsSection can schedule
                   chart mount via requestIdleCallback after the animation completes. */}
@@ -311,9 +313,41 @@ export default function DashboardPage() {
                 value={overview?.metrics.totalValue ?? 0}
                 animateOnMount={true}
                 onSettled={handleHeroSettled}
-                className="text-3xl font-bold desktop:text-4xl"
+                className="text-4xl font-bold tracking-tight desktop:text-5xl"
               />
-              <p className="text-xs text-muted-foreground mt-1">
+              {/* Variation chips — monthly and YTD changes inline under the number.
+                  Only rendered when snapshot data is available (at least one prior month). */}
+              <div className="mt-3 flex flex-wrap gap-2">
+                {overview?.variations.monthly && (
+                  <span className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium ${
+                    overview.variations.monthly.value >= 0
+                      ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                      : 'bg-red-500/10 text-red-600 dark:text-red-400'
+                  }`}>
+                    {overview.variations.monthly.value >= 0
+                      ? <TrendingUp className="h-3 w-3" />
+                      : <TrendingDown className="h-3 w-3" />
+                    }
+                    {overview.variations.monthly.value >= 0 ? '+' : ''}{formatCurrency(overview.variations.monthly.value)}{' '}
+                    ({overview.variations.monthly.percentage >= 0 ? '+' : ''}{overview.variations.monthly.percentage.toFixed(2)}%) questo mese
+                  </span>
+                )}
+                {overview?.variations.yearly && (
+                  <span className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium ${
+                    overview.variations.yearly.value >= 0
+                      ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                      : 'bg-red-500/10 text-red-600 dark:text-red-400'
+                  }`}>
+                    {overview.variations.yearly.value >= 0
+                      ? <TrendingUp className="h-3 w-3" />
+                      : <TrendingDown className="h-3 w-3" />
+                    }
+                    {overview.variations.yearly.value >= 0 ? '+' : ''}{formatCurrency(overview.variations.yearly.value)}{' '}
+                    ({overview.variations.yearly.percentage >= 0 ? '+' : ''}{overview.variations.yearly.percentage.toFixed(2)}%) YTD
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
                 {(overview?.flags.assetCount ?? 0) === 0
                   ? 'Aggiungi assets per iniziare'
                   : `${overview?.flags.assetCount ?? 0} asset${(overview?.flags.assetCount ?? 0) !== 1 ? 's' : ''}`}
@@ -497,159 +531,76 @@ export default function DashboardPage() {
         )}
       </AnimatePresence>
 
-      {/* Secondary metrics group — tighter internal spacing (space-y-4) vs the
-          space-y-6 page-level gap groups these three clusters visually together,
-          subordinating them to the hero above and the composition zone below */}
+      {/* Secondary metrics group — cashflow card + optional cost section.
+          Variations moved inline to the hero; this group now handles cashflow
+          context and portfolio cost references. */}
       <motion.div
         layout="position"
         transition={springLayoutTransition}
         className="space-y-4"
       >
 
-      {/* Variazioni Cards */}
+      {/* Cashflow mensile — income and expenses in one card so the user can
+          compare them at a glance without scrolling between two separate cards. */}
       <motion.div
         layout="position"
         transition={springLayoutTransition}
-        variants={staggerContainer}
+        variants={cardItem}
         initial="hidden"
         animate="visible"
-        className="grid gap-6 md:grid-cols-2"
       >
-        <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Variazione Mensile</CardTitle>
-            {overview?.variations.monthly && overview.variations.monthly.value < 0
-              ? <TrendingDown className="h-4 w-4 text-red-500" />
-              : <TrendingUp className="h-4 w-4 text-green-500" />
-            }
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <CardTitle className="text-sm font-medium">Cashflow Questo Mese</CardTitle>
           </CardHeader>
-          <CardContent>
-            {overview?.variations.monthly ? (
-              <>
-                <div className={`text-2xl font-bold ${
-                  overview.variations.monthly.value >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {overview.variations.monthly.value >= 0 ? '+' : ''}{formatCurrency(overview.variations.monthly.value)}
-                </div>
-                <p className={`text-xs ${
-                  overview.variations.monthly.percentage >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {overview.variations.monthly.percentage >= 0 ? '+' : ''}{overview.variations.monthly.percentage.toFixed(2)}%
-                </p>
-              </>
-            ) : (
-              <>
-                <div className="text-2xl font-bold">-</div>
-                <p className="text-xs text-muted-foreground">
-                  Dati non disponibili
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-        </motion.div>
-
-        <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Variazione Annuale (YTD)</CardTitle>
-            {overview?.variations.yearly && overview.variations.yearly.value < 0
-              ? <TrendingDown className="h-4 w-4 text-red-500" />
-              : <TrendingUp className="h-4 w-4 text-green-500" />
-            }
-          </CardHeader>
-          <CardContent>
-            {overview?.variations.yearly ? (
-              <>
-                <div className={`text-2xl font-bold ${
-                  overview.variations.yearly.value >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {overview.variations.yearly.value >= 0 ? '+' : ''}{formatCurrency(overview.variations.yearly.value)}
-                </div>
-                <p className={`text-xs ${
-                  overview.variations.yearly.percentage >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {overview.variations.yearly.percentage >= 0 ? '+' : ''}{overview.variations.yearly.percentage.toFixed(2)}%
-                </p>
-              </>
-            ) : (
-              <>
-                <div className="text-2xl font-bold">-</div>
-                <p className="text-xs text-muted-foreground">
-                  Dati non disponibili
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-        </motion.div>
-      </motion.div>
-
-      {/* Expense Stats Cards */}
-      <motion.div
-        layout="position"
-        transition={springLayoutTransition}
-        variants={staggerContainer}
-        initial="hidden"
-        animate="visible"
-        className="grid gap-6 md:grid-cols-2"
-      >
-        <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Entrate Questo Mese</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             {overview?.expenseStats ? (
-              <>
-                <div className="text-2xl font-bold text-green-600">
-                  {formatCurrency(overview.expenseStats.currentMonth.income)}
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <TrendingUp className="h-3.5 w-3.5 text-green-600" />
+                    <p className="text-xs text-muted-foreground">Entrate</p>
+                  </div>
+                  <div className="text-2xl font-bold text-green-600">
+                    {formatCurrency(overview.expenseStats.currentMonth.income)}
+                  </div>
+                  <p className={`text-xs mt-0.5 ${
+                    overview.expenseStats.delta.income >= 0 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {overview.expenseStats.delta.income >= 0 ? '+' : ''}{overview.expenseStats.delta.income.toFixed(1)}% dal mese scorso
+                  </p>
                 </div>
-                <p className={`text-xs ${
-                  overview.expenseStats.delta.income >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {overview.expenseStats.delta.income >= 0 ? '+' : ''}{overview.expenseStats.delta.income.toFixed(1)}% dal mese scorso
-                </p>
-              </>
+                <div>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <TrendingDown className="h-3.5 w-3.5 text-red-600" />
+                    <p className="text-xs text-muted-foreground">Spese</p>
+                  </div>
+                  <div className="text-2xl font-bold text-red-600">
+                    {formatCurrency(overview.expenseStats.currentMonth.expenses)}
+                  </div>
+                  <p className={`text-xs mt-0.5 ${
+                    overview.expenseStats.delta.expenses >= 0 ? 'text-red-600' : 'text-green-600'
+                  }`}>
+                    {overview.expenseStats.delta.expenses >= 0 ? '+' : ''}{overview.expenseStats.delta.expenses.toFixed(1)}% dal mese scorso
+                  </p>
+                </div>
+              </div>
             ) : (
-              <>
-                <div className="text-2xl font-bold">€0,00</div>
-                <p className="text-xs text-muted-foreground">Nessun dato</p>
-              </>
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Entrate</p>
+                  <div className="text-2xl font-bold">€0,00</div>
+                  <p className="text-xs text-muted-foreground mt-0.5">Nessun dato</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Spese</p>
+                  <div className="text-2xl font-bold">€0,00</div>
+                  <p className="text-xs text-muted-foreground mt-0.5">Nessun dato</p>
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
-        </motion.div>
-
-        <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Spese Questo Mese</CardTitle>
-            <TrendingDown className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            {overview?.expenseStats ? (
-              <>
-                <div className="text-2xl font-bold text-red-600">
-                  {formatCurrency(overview.expenseStats.currentMonth.expenses)}
-                </div>
-                <p className={`text-xs ${
-                  overview.expenseStats.delta.expenses >= 0 ? 'text-red-600' : 'text-green-600'
-                }`}>
-                  {overview.expenseStats.delta.expenses >= 0 ? '+' : ''}{overview.expenseStats.delta.expenses.toFixed(1)}% dal mese scorso
-                </p>
-              </>
-            ) : (
-              <>
-                <div className="text-2xl font-bold">€0,00</div>
-                <p className="text-xs text-muted-foreground">Nessun dato</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-        </motion.div>
       </motion.div>
 
       {/* Cost cards — shown if any asset has TER tracking or stamp duty is enabled */}

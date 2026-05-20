@@ -32,6 +32,10 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - **Nested Radix collapsible chevron rotation**: `CollapsibleTrigger asChild` propagates `data-state="open|closed"` to its child element. Add `group` to the child Button, then `group-data-[state=open]:rotate-180 transition-transform duration-200 motion-reduce:transition-none` to the `ChevronDown` inside. No extra React state needed. Works in Tailwind v4.
 - **Chevron rotation for manual `useState` open/close** (no Radix `data-state`): pair the icon with `transition-transform duration-200 motion-reduce:transition-none ${open ? 'rotate-180' : ''}`. Always render the chevron on expandable rows — the click affordance is invisible without it. Applied in `ExposureSection` row drill-downs.
 
+### shadcn Card Built-in Padding
+- `Card` (new-york) has `py-6` built-in via its own className. When there is no `CardHeader`, `CardContent` is the first child — no manual `pt-6` is needed on `CardContent`. Add it only if you need extra top spacing beyond the Card's own `py-6`.
+- `CardContent` adds `px-6` only (no vertical padding). The vertical rhythm comes entirely from the Card's `py-6` + the `gap-6` between children.
+
 ### Layout Tokens
 - Never hardcode structural layout colors in shell components
 - Use semantic tokens like `bg-background`, `text-foreground`, `border-border`

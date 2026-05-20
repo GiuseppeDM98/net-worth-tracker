@@ -15,6 +15,8 @@ L'app non è uno strumento impersonale: è un cruscotto privato, quasi un diario
 ### Aesthetic Direction
 **Riferimento primario**: Linear / Vercel — tipografia forte, dark mode eccellente, geometria pulita, microinterazioni fluide, nessun decoro superfluo.
 
+**Riferimento secondario**: Trade Republic — gerarchia numerica estrema (il dato primario occupa il massimo spazio fisico), chip di variazione inline sotto il numero principale, layout verticale chiaro dati → contesto, card borderless o con bordo minimo, verde/rosso netti per gain/loss. I due riferimenti sono compatibili: condividono dark mode premium, zero decorazione, tipografia come struttura.
+
 **Visual tone**: Ultra-clean con personalità. Spazio bianco intenzionale. Gerarchia tipografica netta. Dati che respirano. Animazioni che informano, non intrattengo.
 
 **Direzione**: Overdrive — implementazioni tecnicamente ambiziose che fanno alzare il sopracciglio. Fisica spring su dialog, scroll-driven reveals, counter animati, transizioni che sembrano impossibili per una web app.
@@ -27,13 +29,15 @@ L'app non è uno strumento impersonale: è un cruscotto privato, quasi un diario
 
 1. **Dati prima, decorazione mai** — ogni elemento visivo guadagna il suo spazio comunicando un'informazione. Se togliendolo la pagina è più chiara, va tolto.
 
-2. **Movimento con intenzione** — le animazioni rivelano struttura e relazioni, non distrano. Il tempo e la fisica devono sembrare naturali (spring, ease-out-quart). Rispetta sempre `prefers-reduced-motion`.
+2. **Il numero comanda** — il dato primario di ogni schermata occupa il massimo spazio fisico e visivo disponibile. Tutto il resto è contesto di supporto: chip compatti, etichette piccole, metriche secondarie. L'utente deve capire in meno di 2 secondi il numero più importante senza cercare.
 
-3. **La densità è una feature** — questo è un tool per power user. Non semplificare fino a banalizzare. La sfida è rendere la complessità leggibile, non nasconderla.
+3. **Movimento con intenzione** — le animazioni rivelano struttura e relazioni, non distrano. Il tempo e la fisica devono sembrare naturali (spring, ease-out-quart). Rispetta sempre `prefers-reduced-motion`.
 
-4. **Fiducia attraverso la precisione** — i numeri devono sembrare assolutamente corretti: font monospaziato per valori, allineamento decimale, consistenza nei formati. L'utente deve sentire che può fidarsi dei dati.
+4. **La densità è una feature** — questo è un tool per power user. Non semplificare fino a banalizzare. La sfida è rendere la complessità leggibile, non nasconderla.
 
-5. **Personalità nei dettagli** — i momenti di piacere vengono dai dettagli: un counter che si anima, un grafico che si disegna in modo inaspettato, uno stato vuoto che racconta qualcosa. Non chiassosi, ma memorabili.
+5. **Fiducia attraverso la precisione** — i numeri devono sembrare assolutamente corretti: font monospaziato per valori, allineamento decimale, consistenza nei formati. L'utente deve sentire che può fidarsi dei dati.
+
+6. **Personalità nei dettagli** — i momenti di piacere vengono dai dettagli: un counter che si anima, un grafico che si disegna in modo inaspettato, uno stato vuoto che racconta qualcosa. Non chiassosi, ma memorabili.
 
 ---
 

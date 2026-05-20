@@ -183,7 +183,7 @@ Five chart colors cover the semantic range of portfolio data. These are the syst
 
 ### Hierarchy
 
-- **Display** (600 weight, `clamp(1.75rem, 3vw, 2.5rem)`, lh 1.1, ls -0.02em): Page heroes, net worth totals on Overview. Tight tracking at large sizes; tight leading. One instance per view maximum.
+- **Display** (600 weight, `clamp(1.75rem, 3.5vw, 3rem)`, lh 1.1, ls -0.02em): Page heroes, net worth totals on Overview. Tight tracking at large sizes; tight leading. One instance per view maximum. In Tailwind: `text-4xl font-bold tracking-tight desktop:text-5xl`.
 - **Headline** (600 weight, 1.25rem, lh 1.25, ls -0.01em): Section headers, dialog titles, card-level titles where data density demands authority.
 - **Title** (600 weight, 1rem, lh 1.4, ls -0.005em): Sub-section headers, table group labels, the step below Headline.
 - **Body** (400 weight, 0.875rem, lh 1.6): All prose, descriptions, note content. Max line length 65ch.
@@ -264,6 +264,20 @@ Cards organize data panels, KPI groups, and chart containers. Structural, not de
 ### The Net Worth Counter (Signature Component)
 
 The animated currency counter in Overview KPI cards is the system's most distinctive interactive element. Count-up animation is isolated to the leaf `<span>` containing the value, preventing surrounding layout reflow. `Intl.NumberFormat` results are cached via `cachedFormatCurrencyEUR` to prevent allocation on every render frame. Mounting is deferred through `requestIdleCallback`: the hero section settles first, charts mount after. Numbers land — they count from a prior value, never from zero.
+
+### Variation Chips (Canonical Pattern)
+
+Periodic changes (monthly, YTD) are displayed as compact inline chips directly below the hero number — not as separate cards. This keeps the primary number dominant while giving immediate trend context.
+
+**Structure:** `inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium`
+
+**Colors:**
+- Positive: `bg-green-500/10 text-green-600 dark:text-green-400`
+- Negative: `bg-red-500/10 text-red-600 dark:text-red-400`
+
+**Content:** `{icon} {+/-}{formattedValue} ({+/-}{pct}%) {period label}` — e.g. `↗ +€1.240,00 (+2.34%) questo mese`
+
+**Rules:** Only render when snapshot data exists (at least one prior period). Never show a placeholder chip — absence communicates "no prior data" cleanly. Icon is `TrendingUp` or `TrendingDown` at `h-3 w-3`. Multiple chips wrap naturally via `flex-wrap gap-2`.
 
 ## 6. Do's and Don'ts
 
