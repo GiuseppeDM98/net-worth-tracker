@@ -429,7 +429,7 @@ export async function calculateDividendStats(
     // Filter out future dividends - only calculate stats for paid/realized dividends
     // Upcoming dividends are tracked separately and shouldn't inflate statistics
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setHours(23, 59, 59, 999);
     const paidDividends = dividends.filter(div => {
       const paymentDate = div.paymentDate instanceof Date ? div.paymentDate : new Date();
       return paymentDate <= today;

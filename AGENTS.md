@@ -519,6 +519,7 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - Cause: `getAllDividends` returns ALL dividends including upcoming ones. Filtering by `exDate >= twelveMonthsAgo` passes dividends with a past ex-date but future paymentDate — meaning cash has not arrived yet
 - Fix: filter TTM dividends by `paymentDate >= twelveMonthsAgo && paymentDate <= today`. The `today` variable is already defined for the `paidDividends` chart filter in the same route — reuse it. Applied in `app/api/dividends/stats/route.ts`
 - Rule: use `exDate` only for "announced future" dividend data (upcoming dividends card). Use `paymentDate` capped at `today` for any "received" metric (YOC, averageYield, charts)
+- **`today` timezone gotcha**: `today.setHours(0, 0, 0, 0)` produces `2026-05-19T22:00:00Z` on a CEST (UTC+2) server — 2 hours *before* midnight UTC. A dividend stored at `2026-05-20T00:00:00Z` (Firestore midnight UTC) then compares as *future* and vanishes from both "received" and "upcoming" lists. Fix: always use `today.setHours(23, 59, 59, 999)` when constructing the upper bound for `paymentDate <=` comparisons — the resulting UTC timestamp is always *after* midnight UTC of the same local day, regardless of server timezone. Applied in `dividendService.ts`, `app/api/dividends/stats/route.ts`, `lib/server/dividendUseCase.ts`.
 
 ### JSON Date Deserialization in API Route Bodies
 - `Date` fields in `request.json()` bodies arrive as ISO strings (`"2024-04-10T..."`), not `Date` objects

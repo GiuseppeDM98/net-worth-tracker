@@ -26,6 +26,7 @@
 
 - Improved the **Edit Expense** form: the expense type is now shown as a read-only badge instead of a disabled dropdown, making it immediately clear that the type is fixed after creation. The form opens directly in the relevant field view without requiring a type selection step
 - Improved the **Edit Asset** form to show only the fields relevant to the asset type being edited — previously all fields were always visible regardless of type, so editing a cash account showed bond coupon fields, TER, and ISIN. The form now matches what you see when adding that asset type
+- Added gross TTM dividend amount ("Dividendi/Cedole TTM (Lordo)") to the Yield on Cost card in the Dividends & Coupons page — the numerator is now visible alongside the YOC percentage, making it clear which income is being measured
 
 - Improved the positive/negative month counters in the benchmark comparison table: values now display as "X/Y" (e.g. "29/40" or "30/41") showing how many months out of the total observations were positive or negative — makes it immediately clear why the portfolio and benchmark totals can differ (the portfolio uses the first snapshot as a baseline and has one fewer return observation than the benchmark)
 - Improved Sharpe and Sortino ratio accuracy in the benchmark comparison table: ratios now use the arithmetic mean of ECB deposit facility rates over the exact evaluation period instead of the user's configured rate — a 5-year comparison now reflects the actual rate environment (which ranged from -0.50% in 2020 to +4.00% in 2023–2024) rather than applying today's rate retroactively. The dynamic footnote shows which rate was used and for how many months. The Sharpe ratio in the main KPI card is unchanged.
@@ -52,6 +53,7 @@
 - Fixed italic text (`*text*`) in AI email narratives appearing with raw asterisks instead of being formatted
 - Fixed the "Asset Distribution" pie chart on mobile being clipped when a portfolio has many assets — the legend now shows a maximum of 5 items (filtering entries below 7% first), preventing the chart from being cut off in portrait mode
 - Fixed dividend income entries not being automatically created in Cashflow when manually adding a dividend with a past payment date — the expense now appears immediately after saving, without waiting for the nightly sync
+- Fixed dividends paid today not appearing in the Dividends & Coupons page on servers in non-UTC timezones (e.g. CEST/UTC+2) — a midnight-UTC payment timestamp was incorrectly treated as "future", causing today's dividends to vanish from both "received" and "upcoming" lists
 
 ## 🔒 Security
 

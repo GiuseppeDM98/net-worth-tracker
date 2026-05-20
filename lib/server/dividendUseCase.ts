@@ -76,7 +76,7 @@ export async function createDividendWithOptionalExpense(
   // and string <= Date comparisons always return false in JavaScript.
   const paymentDate = new Date(dividendData.paymentDate);
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  today.setHours(23, 59, 59, 999);
 
   let expenseId: string | undefined;
 

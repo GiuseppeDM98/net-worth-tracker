@@ -249,6 +249,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
       coverage: stats.yieldOnCostAssets.length,
       currentYieldPortfolio,
       spread: stats.portfolioYieldOnCost - currentYieldPortfolio,
+      totalTtmDividends,
     };
   }, [stats]);
 
@@ -401,7 +402,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                       <p>{yocSummary.coverage} {yocSummary.coverage === 1 ? 'asset coperto' : 'asset coperti'}</p>
                     </div>
                   </div>
-                  <div className="grid gap-3 border-t border-border/50 pt-4 sm:grid-cols-2">
+                  <div className="grid gap-3 border-t border-border/50 pt-4 grid-cols-1 sm:grid-cols-3">
                     <div>
                       <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
                         Spread vs Rendimento Corrente
@@ -409,7 +410,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                       <SettledPercentValue
                         value={yocSummary.spread}
                         className={`mt-1 text-lg font-semibold tabular-nums ${yocSummary.spread >= 0 ? 'text-emerald-600' : 'text-red-600'}`}
-                    />
+                      />
                     </div>
                     <div>
                       <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
@@ -417,6 +418,14 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                       </p>
                       <p className="mt-1 text-lg font-semibold tabular-nums">
                         {stats.totalCostBasis !== undefined ? formatCurrency(stats.totalCostBasis) : '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                        Dividendi/Cedole TTM (Lordo)
+                      </p>
+                      <p className="mt-1 text-lg font-semibold tabular-nums">
+                        {yocSummary.totalTtmDividends !== undefined ? formatCurrency(yocSummary.totalTtmDividends) : '—'}
                       </p>
                     </div>
                   </div>

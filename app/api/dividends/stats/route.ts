@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
 
     // Filter out future dividends for charts (only show paid dividends)
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setHours(23, 59, 59, 999);
     const paidDividends = allDividends.filter(div => {
       const paymentDate = toDate(div.paymentDate);
       return paymentDate <= today;
