@@ -1,5 +1,11 @@
 import { PieChartData } from '@/types/assets';
 
+export interface DashboardOverviewSparklinePoint {
+  month: number;
+  year: number;
+  totalNetWorth: number;
+}
+
 export interface DashboardOverviewVariation {
   value: number;
   percentage: number;
@@ -60,4 +66,7 @@ export interface DashboardOverviewPayload {
     sourceVersion: number;
     stale: boolean;
   };
+  // Last 3 historical snapshots for the hero sparkline — optional so old cached
+  // docs degrade gracefully (no sparkline shown until next recompute).
+  sparklineData?: DashboardOverviewSparklinePoint[];
 }

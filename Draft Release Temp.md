@@ -24,6 +24,10 @@
 
 ## 🔧 Improvements
 
+- Added a **12-month sparkline** to the Overview hero card — a compact trend line appears below the monthly and YTD variation chips, showing how your net worth has moved over the past year. Start and end values are labelled for immediate context without having to open the History page
+- Added a **permanent savings rate** to the Overview cashflow card — your current month's savings rate (income minus expenses ÷ income) is now always visible below the income and expense figures, color-coded by level: green above 20%, amber between 10–20%, red below 10%
+- The **fiscal detail cards** on the Overview page (Net Total, Net Liquid, Unrealized Gains, Estimated Taxes) are now collapsible under a "Dettaglio Fiscale" header — expanded by default so nothing is hidden, but can be collapsed to reduce visual noise for users who check this section less often
+
 - Redesigned the **Overview (Panoramica)** page with a bolder, cleaner layout: the total portfolio value is now displayed in a larger typeface that dominates the screen; monthly and YTD variations are shown as compact inline chips directly below the main number instead of separate cards; income and expenses are combined into a single "Cashflow" card with a two-column layout — reducing visual noise while keeping all the same information
 - Improved the Overview loading experience: the page now shows a structural skeleton that mirrors the real layout (header, hero number, secondary KPI, cashflow card) while data loads, instead of a bare spinner in an empty page
 - Improved the Overview "Cashflow" section empty state: when no expenses have been recorded for the current month, the section now shows a clear message instead of displaying `€0.00`, which was visually indistinguishable from a real zero-spend month

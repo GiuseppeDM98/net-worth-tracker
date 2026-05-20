@@ -22,7 +22,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Wallet, TrendingUp, Camera, TrendingDown, Receipt } from 'lucide-react';
+import { Wallet, TrendingUp, Camera, TrendingDown, Receipt, ChevronDown } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
 import { useCreateSnapshot } from '@/lib/hooks/useSnapshots';
 import { useDashboardOverview } from '@/lib/hooks/useDashboardOverview';
@@ -32,6 +33,7 @@ import { getItalyDate, getItalyMonthYear } from '@/lib/utils/dateHelpers';
 import { getGreeting } from '@/lib/utils/getGreeting';
 import { OverviewAnimatedCurrency } from '@/components/dashboard/OverviewAnimatedCurrency';
 import { OverviewChartsSection } from '@/components/dashboard/OverviewChartsSection';
+import { NetWorthSparkline } from '@/components/dashboard/NetWorthSparkline';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 
@@ -72,6 +74,8 @@ export default function DashboardPage() {
 
   const [creatingSnapshot, setCreatingSnapshot] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  // Cost basis detail starts open — user can collapse to reduce visual density
+  const [costBasisOpen, setCostBasisOpen] = useState(true);
   const [snapshotDialogStyle, setSnapshotDialogStyle] = useState<CSSProperties | undefined>(undefined);
   const snapshotButtonRef = useRef<HTMLButtonElement | null>(null);
   const snapshotDialogRef = useRef<HTMLDivElement | null>(null);
@@ -382,6 +386,13 @@ export default function DashboardPage() {
                   </span>
                 )}
               </div>
+              {/* Sparkline — 3-month net worth trend for visual context under the chips.
+                  Renders only when at least 2 historical snapshots are available. */}
+              {overview?.sparklineData && overview.sparklineData.length >= 2 && (
+                <div className="mt-3 -mx-1 opacity-70">
+                  <NetWorthSparkline data={overview.sparklineData} />
+                </div>
+              )}
               <p className="text-xs text-muted-foreground mt-2">
                 {(overview?.flags.assetCount ?? 0) === 0
                   ? 'Aggiungi asset per iniziare'
@@ -418,122 +429,136 @@ export default function DashboardPage() {
         {overview?.flags.hasCostBasisTracking && (
           <motion.div
             key="cost-basis-section"
-            layout
+            layout="position"
             transition={springLayoutTransition}
             variants={slideDown}
             initial="hidden"
             animate="visible"
             exit="exit"
-            className="space-y-6"
           >
-            {/* Net Worth Cards */}
-            <motion.div
-              layout="position"
-              transition={springLayoutTransition}
-              variants={staggerContainer}
-              initial="hidden"
-              animate="visible"
-              className="grid gap-6 sm:grid-cols-2"
-            >
-              <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Patrimonio Totale Netto</CardTitle>
-                    <Wallet className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    {/* No onSettled here; hero (Lordo) already drives the settled signal. */}
-                    <OverviewAnimatedCurrency
-                      value={overview.metrics.netTotal}
-                      animateOnMount={true}
-                      startDelay={125}
-                      duration={380}
-                      className="text-2xl font-bold"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Dopo tasse stimate
-                    </p>
-                  </CardContent>
-                </Card>
-              </motion.div>
+            {/* Collapsible header — clicking toggles visibility of the 4 fiscal detail cards.
+                CollapsibleTrigger asChild avoids nested <button> inside the div trigger. */}
+            <Collapsible open={costBasisOpen} onOpenChange={setCostBasisOpen}>
+              <CollapsibleTrigger asChild>
+                <div className="flex items-center justify-between cursor-pointer select-none mb-4 group">
+                  <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Dettaglio Fiscale
+                  </p>
+                  <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none group-data-[state=open]:rotate-180" />
+                </div>
+              </CollapsibleTrigger>
 
-              <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Patrimonio Liquido Netto</CardTitle>
-                    <Wallet className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <OverviewAnimatedCurrency
-                      value={overview.metrics.liquidNetTotal}
-                      animateOnMount={true}
-                      startDelay={140}
-                      duration={380}
-                      className="text-2xl font-bold"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Liquidità dopo tasse stimate
-                    </p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            </motion.div>
+              <CollapsibleContent className="space-y-6">
+                {/* Net Worth Cards */}
+                <motion.div
+                  layout="position"
+                  transition={springLayoutTransition}
+                  variants={staggerContainer}
+                  initial="hidden"
+                  animate="visible"
+                  className="grid gap-6 sm:grid-cols-2"
+                >
+                  <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Patrimonio Totale Netto</CardTitle>
+                        <Wallet className="h-4 w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                        {/* No onSettled here; hero (Lordo) already drives the settled signal. */}
+                        <OverviewAnimatedCurrency
+                          value={overview.metrics.netTotal}
+                          animateOnMount={true}
+                          startDelay={125}
+                          duration={380}
+                          className="text-2xl font-bold"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Dopo tasse stimate
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
 
-            {/* Gains and Taxes Cards */}
-            <motion.div
-              layout="position"
-              transition={springLayoutTransition}
-              variants={staggerContainer}
-              initial="hidden"
-              animate="visible"
-              className="grid gap-6 sm:grid-cols-2"
-            >
-              <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Plusvalenze Non Realizzate</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className={`text-2xl font-bold ${
-                      overview.metrics.unrealizedGains >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {overview.metrics.unrealizedGains >= 0 ? '+' : ''}
-                      <OverviewAnimatedCurrency
-                        value={overview.metrics.unrealizedGains}
-                        animateOnMount={true}
-                        startDelay={155}
-                        duration={380}
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Guadagno/perdita rispetto al costo medio
-                    </p>
-                  </CardContent>
-                </Card>
-              </motion.div>
+                  <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Patrimonio Liquido Netto</CardTitle>
+                        <Wallet className="h-4 w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                        <OverviewAnimatedCurrency
+                          value={overview.metrics.liquidNetTotal}
+                          animateOnMount={true}
+                          startDelay={140}
+                          duration={380}
+                          className="text-2xl font-bold"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Liquidità dopo tasse stimate
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                </motion.div>
 
-              <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Tasse Stimate</CardTitle>
-                    <Receipt className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <OverviewAnimatedCurrency
-                      value={overview.metrics.estimatedTaxes}
-                      animateOnMount={true}
-                      startDelay={170}
-                      duration={380}
-                      className="text-2xl font-bold text-amber-600 dark:text-amber-400"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Imposte su plusvalenze non realizzate
-                    </p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            </motion.div>
+                {/* Gains and Taxes Cards */}
+                <motion.div
+                  layout="position"
+                  transition={springLayoutTransition}
+                  variants={staggerContainer}
+                  initial="hidden"
+                  animate="visible"
+                  className="grid gap-6 sm:grid-cols-2"
+                >
+                  <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Plusvalenze Non Realizzate</CardTitle>
+                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className={`text-2xl font-bold ${
+                          overview.metrics.unrealizedGains >= 0 ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {overview.metrics.unrealizedGains >= 0 ? '+' : ''}
+                          <OverviewAnimatedCurrency
+                            value={overview.metrics.unrealizedGains}
+                            animateOnMount={true}
+                            startDelay={155}
+                            duration={380}
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Guadagno/perdita rispetto al costo medio
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+
+                  <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Tasse Stimate</CardTitle>
+                        <Receipt className="h-4 w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                        <OverviewAnimatedCurrency
+                          value={overview.metrics.estimatedTaxes}
+                          animateOnMount={true}
+                          startDelay={170}
+                          duration={380}
+                          className="text-2xl font-bold text-amber-600 dark:text-amber-400"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Imposte su plusvalenze non realizzate
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                </motion.div>
+              </CollapsibleContent>
+            </Collapsible>
           </motion.div>
         )}
       </AnimatePresence>
@@ -562,36 +587,56 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="pt-0">
             {overview?.expenseStats ? (
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <TrendingUp className="h-3.5 w-3.5 text-green-600" />
-                    <p className="text-xs text-muted-foreground">Entrate</p>
+              <>
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <TrendingUp className="h-3.5 w-3.5 text-green-600" />
+                      <p className="text-xs text-muted-foreground">Entrate</p>
+                    </div>
+                    <div className="text-2xl font-bold text-green-600">
+                      {formatCurrency(overview.expenseStats.currentMonth.income)}
+                    </div>
+                    <p className={`text-xs mt-0.5 ${
+                      overview.expenseStats.delta.income >= 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {overview.expenseStats.delta.income >= 0 ? '+' : ''}{overview.expenseStats.delta.income.toFixed(1)}% dal mese scorso
+                    </p>
                   </div>
-                  <div className="text-2xl font-bold text-green-600">
-                    {formatCurrency(overview.expenseStats.currentMonth.income)}
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <TrendingDown className="h-3.5 w-3.5 text-red-600" />
+                      <p className="text-xs text-muted-foreground">Spese</p>
+                    </div>
+                    <div className="text-2xl font-bold text-red-600">
+                      {formatCurrency(overview.expenseStats.currentMonth.expenses)}
+                    </div>
+                    <p className={`text-xs mt-0.5 ${
+                      overview.expenseStats.delta.expenses >= 0 ? 'text-red-600' : 'text-green-600'
+                    }`}>
+                      {overview.expenseStats.delta.expenses >= 0 ? '+' : ''}{overview.expenseStats.delta.expenses.toFixed(1)}% dal mese scorso
+                    </p>
                   </div>
-                  <p className={`text-xs mt-0.5 ${
-                    overview.expenseStats.delta.income >= 0 ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    {overview.expenseStats.delta.income >= 0 ? '+' : ''}{overview.expenseStats.delta.income.toFixed(1)}% dal mese scorso
-                  </p>
                 </div>
-                <div>
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <TrendingDown className="h-3.5 w-3.5 text-red-600" />
-                    <p className="text-xs text-muted-foreground">Spese</p>
-                  </div>
-                  <div className="text-2xl font-bold text-red-600">
-                    {formatCurrency(overview.expenseStats.currentMonth.expenses)}
-                  </div>
-                  <p className={`text-xs mt-0.5 ${
-                    overview.expenseStats.delta.expenses >= 0 ? 'text-red-600' : 'text-green-600'
-                  }`}>
-                    {overview.expenseStats.delta.expenses >= 0 ? '+' : ''}{overview.expenseStats.delta.expenses.toFixed(1)}% dal mese scorso
-                  </p>
-                </div>
-              </div>
+                {/* Savings rate row — only when income > 0 to avoid division by zero */}
+                {overview.expenseStats.currentMonth.income > 0 && (() => {
+                  const { income, expenses } = overview.expenseStats!.currentMonth;
+                  const rate = ((income - expenses) / income) * 100;
+                  const rateColor = rate >= 20
+                    ? 'text-green-600 dark:text-green-400'
+                    : rate >= 10
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-red-600 dark:text-red-400';
+                  return (
+                    <div className="border-t border-border mt-4 pt-4 flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">Tasso di risparmio</p>
+                      <span className={`text-sm font-semibold ${rateColor}`}>
+                        {rate >= 0 ? '+' : ''}{rate.toFixed(0)}%
+                      </span>
+                    </div>
+                  );
+                })()}
+              </>
             ) : (
               <div className="flex flex-col items-center justify-center py-4 gap-2">
                 <Receipt className="h-7 w-7 text-muted-foreground/40" />

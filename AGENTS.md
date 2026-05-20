@@ -30,6 +30,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - **Multi-card grid breakpoint decision**: adding `sm:grid-cols-2` to a 3-item row leaves the third card alone on a half-width row at 640px — often worse than a full-width stack. Prefer no `sm:` breakpoint (full-width stack on mobile) → `desktop:grid-cols-3` directly. Reserve `sm:grid-cols-2` for content where 2 columns genuinely helps at 640px (e.g. Bear/Base/Bull scenario cards where any pairing is better than a single tall column).
 - **`items-end` for mixed-height label rows**: only use `items-end` on a form grid when ALL cells have the same structure (label + input, nothing else). `items-end` aligns the bottom edge of the entire cell div — if any cell has hint text below its input, the hint becomes the new "bottom", so cells without hint text float their input down to match the hint height of the taller cell. In that case use `items-start` instead and shorten long labels so they don't cause height divergence. Rule: hint text in any cell → `items-start`; uniform label+input only → `items-end` is safe.
 - **Nested Radix collapsible chevron rotation**: `CollapsibleTrigger asChild` propagates `data-state="open|closed"` to its child element. Add `group` to the child Button, then `group-data-[state=open]:rotate-180 transition-transform duration-200 motion-reduce:transition-none` to the `ChevronDown` inside. No extra React state needed. Works in Tailwind v4.
+- **`layout` vs `layout="position"` when a Framer Motion parent wraps a Radix Collapsible**: Using bare `layout` on a `motion.div` that contains `CollapsibleContent` causes visible text stretch when collapsing. When `CollapsibleContent` changes height, Framer Motion intercepts the parent's size change and applies a scale transform to animate it — this scales all children including the trigger text. Fix: use `layout="position"` which only animates X/Y translation, not size changes. Applied in the cost-basis section of `app/dashboard/page.tsx`.
 - **Chevron rotation for manual `useState` open/close** (no Radix `data-state`): pair the icon with `transition-transform duration-200 motion-reduce:transition-none ${open ? 'rotate-180' : ''}`. Always render the chevron on expandable rows — the click affordance is invisible without it. Applied in `ExposureSection` row drill-downs.
 
 ### shadcn Card Built-in Padding
@@ -486,6 +487,11 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 ### Cashflow Null State vs Genuine Zero
 - Symptom: user sees `€0,00` when no expense data has been entered yet; indistinguishable from a month with zero real spend
 - Fix: branch on `expenseStats === null` (data absent) vs `expenseStats` truthy (data present, value may legitimately be zero). For the null case, render an icon + message empty state (e.g. `<Receipt>` + "Nessuna spesa registrata questo mese") instead of a formatted zero. `€0,00` is reserved for confirmed real zero — absence is not zero.
+
+### Recharts Sparkline — flat line when values are large absolute numbers
+- Symptom: a sparkline for net worth (e.g. 260k → 284k, +8% growth) renders as a completely flat horizontal line.
+- Cause: Recharts' default Y-axis domain starts from `0`. Relative to a 0–284k scale, an 8% variation is imperceptible.
+- Fix: add `<YAxis hide domain={['auto', 'auto']} />` — the `hide` prop removes visual rendering while `domain={['auto', 'auto']}` scales the Y range to the data min/max. Applied in `components/dashboard/NetWorthSparkline.tsx`.
 
 ### Recharts ResponsiveContainer -1 Warning
 - Symptom: `The width(-1) and height(-1) of chart should be greater than 0` (fires twice) when a chart appears after an async state change (e.g. after a fetch completes and `loading` flips to `false`).
