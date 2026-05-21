@@ -225,6 +225,13 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - `priceUpdater.ts` always overwrites the asset's `currency` field from `quote.currency` (after GBp normalization) — this self-corrects assets created with the wrong currency in the form.
 - Cron (`monthly-snapshot` → `portfolio/snapshot` → `priceUpdater`) propagates the fix automatically to all users on each snapshot run.
 
+### Asset Sparklines (Mobile)
+- `AssetSparkline` component (`components/assets/AssetSparkline.tsx`) reuses the `NetWorthSparkline` pattern: Recharts `LineChart` + `<YAxis hide domain={['auto','auto']} />` + rAF defer (`requestAnimationFrame` before mount) + `useReducedMotion()`. Height 32px, no start/end labels.
+- **`price` vs `totalValue` for fixed-price assets**: cash, real estate, private equity, and any asset with `autoUpdatePrice=false` have their unit price permanently fixed at €1. A sparkline on `price` would be a flat horizontal line. Use `entry.totalValue` from `MonthlySnapshot.byAsset` for these assets, `entry.price` for all others. Gate: `requiresManualPricing(asset)` in `AssetManagementTab.tsx` already encodes this logic — reuse it.
+- Data field: name it `value` (not `price`) in the interface so the component is agnostic to the underlying source.
+- Data is extracted from snapshots as `useMemo` in `AssetManagementTab`, keyed by `asset.id`, last 12 months, sorted chronologically. Passed as `sparklineData?` prop to `AssetCard`. Guard in `AssetCard`: only render when `sparklineData && sparklineData.length >= 2`.
+- Render inside `<div className="desktop:hidden">` — sparklines are mobile-only; the desktop table already has the price column.
+
 ### Asset and FIRE Rules
 - `quantity = 0` is valid and marks sold assets in history logic
 - Cash asset balance lives in `quantity`, not via price updates

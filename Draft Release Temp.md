@@ -24,6 +24,9 @@
 
 ## 🔧 Improvements
 
+- Added **price trend sparklines** to individual asset cards on mobile — each card now shows a compact 12-month trend chart immediately below the value and gain/loss figures, using the same visual style as the Overview hero sparkline. The chart uses total value (not unit price) for cash accounts and fixed-price assets like private equity, where the unit price is always €1 and quantity carries the signal
+- The **"Totale Patrimonio"** summary card on the asset management page is now centered on mobile, giving the key portfolio metric a cleaner hero-number feel
+
 - Redesigned the **Patrimonio (Asset Management)** page with a cleaner, Trade Republic-inspired layout: portfolio total and individual asset values are now displayed as dominant numbers, with gain/loss shown as a compact colored secondary line below — eliminating the side-by-side layout that caused values to overflow on narrow screens
 - Added **column sorting** to the desktop asset table — click Valore Totale, G/P%, Peso%, Nome, or Classe to sort; click again to reverse direction
 - Added a **compact 3-month summary** for the Current Year and History tabs on mobile: shows the last three available months per asset with color-coded month-over-month changes, replacing the previous "desktop recommended" banner that provided no useful information on mobile

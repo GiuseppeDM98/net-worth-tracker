@@ -24,6 +24,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { AssetSparkline } from '@/components/assets/AssetSparkline';
 
 interface AssetCardProps {
   asset: Asset;
@@ -33,6 +34,7 @@ interface AssetCardProps {
   onCalculateTaxes?: (asset: Asset) => void;
   isManualPrice: boolean;
   isDemo?: boolean;
+  sparklineData?: { value: number }[];
 }
 
 export function AssetCard({
@@ -43,6 +45,7 @@ export function AssetCard({
   onCalculateTaxes,
   isManualPrice,
   isDemo = false,
+  sparklineData,
 }: AssetCardProps) {
   const [showDetails, setShowDetails] = useState(false);
   const [isPendingDelete, setIsPendingDelete] = useState(false);
@@ -177,6 +180,13 @@ export function AssetCard({
             </p>
           )}
         </div>
+
+        {/* Sparkline — mobile only, graceful degradation se dati insufficienti */}
+        {sparklineData && sparklineData.length >= 2 && (
+          <div className="desktop:hidden mt-2 mb-1">
+            <AssetSparkline data={sparklineData} />
+          </div>
+        )}
 
         {/* Peso % separato da border-t */}
         <div className="pt-2 border-t border-border mb-3">

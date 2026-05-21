@@ -215,7 +215,7 @@ export default function AssetsPage() {
             animate={activeTab === 'management' ? 'visible' : 'hidden'}
             variants={tabPanelSwitch}
           >
-            <AssetManagementTab assets={assets} loading={loading} onRefresh={handleRefresh} />
+            <AssetManagementTab assets={assets} loading={loading} onRefresh={handleRefresh} snapshots={snapshots} />
           </motion.div>
         </TabsContent>
 

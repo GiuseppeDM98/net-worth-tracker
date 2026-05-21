@@ -24,7 +24,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
-import { Asset } from '@/types/assets';
+import { Asset, MonthlySnapshot } from '@/types/assets';
 import {
   calculateAssetValue,
   calculateTotalValue,
@@ -68,6 +68,7 @@ interface AssetManagementTabProps {
   assets: Asset[];
   loading: boolean;
   onRefresh: () => Promise<void>;
+  snapshots?: MonthlySnapshot[];
 }
 
 interface SortHeadProps {
@@ -101,7 +102,7 @@ function SortHead({ column, children, className, sortState, onSort }: SortHeadPr
   );
 }
 
-export function AssetManagementTab({ assets, loading, onRefresh }: AssetManagementTabProps) {
+export function AssetManagementTab({ assets, loading, onRefresh, snapshots }: AssetManagementTabProps) {
   const { user } = useAuth();
   const isDemo = useDemoMode();
   const queryClient = useQueryClient();
@@ -277,6 +278,28 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
     ? 'text-red-600'
     : 'text-muted-foreground';
 
+  // Per-asset sparklines from monthly snapshots (mobile only).
+  // Manual-price assets (cash, real estate, private equity, autoUpdatePrice=false) use
+  // totalValue because their unit price is fixed at €1 — the quantity carries the signal.
+  const assetSparklineData = useMemo(() => {
+    if (!snapshots?.length) return {} as Record<string, { value: number }[]>;
+    const sorted = [...snapshots].sort((a, b) =>
+      a.year !== b.year ? a.year - b.year : a.month - b.month
+    );
+    const result: Record<string, { value: number }[]> = {};
+    for (const asset of assets) {
+      const useTotal = requiresManualPricing(asset);
+      const points = sorted
+        .flatMap((snap) => {
+          const entry = snap.byAsset?.find((e) => e.assetId === asset.id);
+          return entry ? [{ value: useTotal ? entry.totalValue : entry.price }] : [];
+        })
+        .slice(-12);
+      if (points.length >= 2) result[asset.id] = points;
+    }
+    return result;
+  }, [assets, snapshots]);
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -344,19 +367,21 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
       {/* Total Summary Card — stacked layout: value dominates, G/P as secondary line */}
       <Card>
         <CardContent className="p-4">
-          <p className="text-xs text-muted-foreground mb-1">Totale Patrimonio</p>
-          <p className="text-3xl font-bold text-foreground font-mono tracking-tight">
-            {formatCurrency(totalValue)}
-          </p>
-          {assetsWithCostBasis.length > 0 && (
-            <p className={`text-sm font-semibold font-mono mt-1.5 ${totalGainColor}`}>
-              {totalIsPositive ? '+' : ''}
-              {formatCurrency(totalGainLoss)}
-              <span className="text-xs ml-1.5 opacity-80">
-                ({totalIsPositive ? '+' : ''}{formatNumber(totalGainPct, 2)}%)
-              </span>
+          <div className="text-center desktop:text-left">
+            <p className="text-xs text-muted-foreground mb-1">Totale Patrimonio</p>
+            <p className="text-3xl font-bold text-foreground font-mono tracking-tight">
+              {formatCurrency(totalValue)}
             </p>
-          )}
+            {assetsWithCostBasis.length > 0 && (
+              <p className={`text-sm font-semibold font-mono mt-1.5 ${totalGainColor}`}>
+                {totalIsPositive ? '+' : ''}
+                {formatCurrency(totalGainLoss)}
+                <span className="text-xs ml-1.5 opacity-80">
+                  ({totalIsPositive ? '+' : ''}{formatNumber(totalGainPct, 2)}%)
+                </span>
+              </p>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -390,6 +415,7 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
                     onCalculateTaxes={hasCostBasisTracking(asset) ? handleCalculateTaxes : undefined}
                     isManualPrice={requiresManualPricing(asset)}
                     isDemo={isDemo}
+                    sparklineData={assetSparklineData[asset.id]}
                   />
                 ))}
               </div>
