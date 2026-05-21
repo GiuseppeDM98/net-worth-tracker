@@ -24,6 +24,14 @@
 
 ## 🔧 Improvements
 
+- Redesigned the **Performance (Rendimenti)** page with a cleaner, Trade Republic-inspired layout: each metric section now has one dominant number at the top (Time-Weighted Return for Returns, Sharpe Ratio for Risk, Net Cash Flow for Context, Net YOC for Dividends) displayed large and bold — replacing the previous grid of 16 equal-weight cards where nothing stood out
+- Performance metric definitions now open as **inline popovers** (tap the ? icon on any metric row) — replaced the previous custom tooltip that could be clipped on mobile
+- Period selector on the **Performance page on mobile** now uses the same segmented pill control as Patrimonio and Cashflow — all five periods (YTD / 1A / 3A / 5A / Stor.) are visible at a glance with a smooth spring animation between them, replacing the previous dropdown
+- Custom date range on the **Performance page** is now shown as a dismissible chip below the period selector ("Periodo: DD/MM – DD/MM ✕") instead of occupying a permanent greyed-out slot in the period bar
+- Chart series colors on the Performance page are now **theme-aware** — they use the active color theme's chart palette instead of hardcoded defaults that clashed with Solar Dusk, Cyberpunk, and other non-default themes
+- Rolling CAGR and Rolling Sharpe charts now **always appear** with an explanatory message when the period has insufficient data — previously the cards silently disappeared, giving no indication of why
+- The **Underwater Drawdown chart** is now significantly more visible in dark color themes — the fill area is deeper and the boundary line is bolder, making drawdown periods easy to identify even in Solar Dusk and Midnight Bloom dark modes
+
 - Merged the "Anno Corrente" and "Storico Totale" tabs in Cashflow into a single **"Analisi"** tab — choose between current year, a specific year (with optional month filter), or full history from a single period selector. A "Ripristina" button appears whenever a non-default period is active, returning to the current year in one tap
 - Cashflow tab navigation on mobile now uses a **smooth sliding pill control** — all tabs are visible at a glance with a spring animation between them, replacing the previous horizontal-scroll tab bar that required swiping to discover hidden tabs
 - Expense deletion in the Cashflow tracking tab now uses **inline two-tap confirmation** — first tap arms the button, second tap executes (auto-disarms after 3 seconds) — replacing the browser's native blocking pop-up dialog

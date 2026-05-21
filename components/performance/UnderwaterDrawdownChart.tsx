@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useMemo } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { UnderwaterDrawdownData } from '@/types/performance';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -34,7 +34,7 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
     <div className="bg-background border border-border rounded-lg shadow-lg p-3">
       <p className="font-semibold mb-2">{label}</p>
       <div className="flex items-center gap-2 text-sm">
-        <div className="w-3 h-3 rounded-full bg-red-500" />
+        <div className="w-3 h-3 rounded-full bg-destructive" />
         <span className="text-muted-foreground">Drawdown:</span>
         <span className="font-medium">{formatPercentage(drawdown)}</span>
       </div>
@@ -78,6 +78,16 @@ export function UnderwaterDrawdownChart({
     }, null)
   ), [data]);
 
+  // Read --destructive once after paint so the color is theme-aware
+  const [destructiveColor, setDestructiveColor] = useState('oklch(0.5771 0.2152 27.325)');
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const c = getComputedStyle(document.documentElement).getPropertyValue('--destructive').trim();
+      if (c) setDestructiveColor(c.startsWith('oklch') ? c : `oklch(${c})`);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
   if (data.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
@@ -108,9 +118,9 @@ export function UnderwaterDrawdownChart({
       <AreaChart data={data}>
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#ef4444" stopOpacity={0.42} />
-            <stop offset="65%" stopColor="#ef4444" stopOpacity={0.18} />
-            <stop offset="100%" stopColor="#ef4444" stopOpacity={0.06} />
+            <stop offset="0%" stopColor={destructiveColor} stopOpacity={0.72} />
+            <stop offset="55%" stopColor={destructiveColor} stopOpacity={0.45} />
+            <stop offset="100%" stopColor={destructiveColor} stopOpacity={0.18} />
           </linearGradient>
         </defs>
         {/* stroke="var(--border)" makes the grid theme-aware without JS theme detection */}
@@ -134,7 +144,8 @@ export function UnderwaterDrawdownChart({
         <Area
           type="monotone"
           dataKey="drawdown"
-          stroke="#EF4444" // red-500
+          stroke={destructiveColor}
+          strokeWidth={2}
           fill={`url(#${gradientId})`}
           name="Drawdown"
           animationBegin={0}

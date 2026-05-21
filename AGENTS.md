@@ -340,6 +340,9 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - Do not wrap shadcn `TableRow` with `motion()`; use `motion.tr`
 - Use `motion.create(Component)` — `motion(Component)` is deprecated in Framer Motion v11+ and logs a warning
 - Page-level Framer Motion quality should be validated in production mode (`npm run build` + `npm run start`) before treating desktop smoothness as a regression; `next dev` can noticeably exaggerate count-up and layout-motion cost
+- **`useChartColors()` is mandatory for all Recharts series**: never hardcode hex values (`#8884d8`, `#82ca9d`, `#ff7300`, etc.) in `stroke`/`fill` props — these are Recharts defaults and clash with non-default themes. Read CSS vars after paint via `useChartColors()` and pass `chartColors[0..4]` as props. This includes AreaChart series, LineChart series, and any decorative fills.
+- **Dark-mode area gradient opacity**: use stop opacities of at least `0.65 / 0.45 / 0.18` (top/mid/bottom) for `<linearGradient>` fills on area charts. The typical `0.4 / 0.2 / 0.05` range makes mid-luminance colors (e.g. `--destructive` in Solar Dusk dark: `oklch(0.57 0.22 ...)`) nearly invisible against a dark background. Also set `strokeWidth={2}` so the boundary line remains legible even when the fill is light. Applied in `UnderwaterDrawdownChart`.
+- **Rolling charts: always render, never conditionally hide**: prefer always rendering a rolling chart card with an inline empty-state message when data is insufficient over `{data.length > 0 && <Card>}`. Silent disappearance violates system status visibility — the user can't tell if the section is loading, broken, or just unavailable for their period length.
 - Recharts defaults:
   - `Bar` / `Pie`: `animationDuration={600}` + `animationEasing="ease-out"`
   - `Line` / `Area`: `animationDuration={800}` + `animationEasing="ease-out"`
@@ -391,6 +394,13 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - **Navigation-focused items** (users click to drill down or navigate) → flat `divide-y divide-border/50` list inside `overflow-hidden rounded-xl border border-border bg-card`. No card boxes per item, no progress bars — the parent supplies the visual structure.
 - **Content-dense items** (users read and compare values without navigating) → card grid (`grid grid-cols-1 sm:grid-cols-2 gap-4`). Each item is self-contained.
 - Applied in Allocazione (`AllocationCard` + page render functions) vs Patrimonio (`AssetCard` card grid). The distinction: allocation items are affordances, asset cards are information blocks.
+
+### Trade Republic Metric Hierarchy
+- **Hero Dominant Value Block**: the primary metric per section renders at `text-4xl font-bold font-mono` with an eyebrow label (`text-xs uppercase tracking-widest text-muted-foreground/70`). Passed as the `hero` prop of `MetricSection`. Applied in `components/performance/HeroMetricBlock.tsx`.
+- **Flat secondary rows**: all other metrics use `flex items-center justify-between px-6 py-3.5` inside a `divide-y divide-border` container — NOT a card-in-card grid. Values at `text-sm font-semibold font-mono`. Applied in `components/performance/MetricCard.tsx`.
+- **`MetricSection` container**: single `<Card className="overflow-hidden">` with the hero block separated from flat rows by `border-b border-border`. No progress bars, no side-stripe accents, no `sm:grid-cols-2`.
+- **CUSTOM period as chip overlay**: never give a "Custom" state a permanent slot in a period selector — it appears visibly disabled/inert until active. Instead render a `rounded-full` chip with the date range below the selector, only when a custom range is active. A `×` button inside resets to the default period.
+- **Period selector without Tabs context**: when a selector must work across multiple return paths (e.g. `hasInsufficientData` + normal), use plain `<button role="tab">` + Framer Motion `layoutId` at module level. shadcn `<Tabs>` requires `<TabsContent>` — using it without children is semantically wrong and creates coupling. Applied as `PerformancePeriodSelector` in `app/dashboard/performance/page.tsx`.
 
 ### Mobile Tab Switcher: Segmented Pill vs Select
 - **Never use `Select` for tab navigation** — `Select` is a form-input pattern (2 taps, hidden options, overlay modal). A segmented pill is a navigation affordance (1 tap, all options visible).

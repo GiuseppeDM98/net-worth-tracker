@@ -29,12 +29,13 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Asset management table supports column sorting (Valore Totale, G/P%, Peso%, Nome, Classe); mobile view shows a compact 3-month summary for historical tabs instead of a "desktop recommended" banner; individual asset cards show a 12-month price sparkline on mobile; the Gestione / Anno Corrente / Storico section switcher on mobile uses a segmented pill control so all three sections are visible at a glance
 
 ### Performance Analytics
-- Comprehensive metrics: ROI, CAGR, TWR, IRR, Sharpe Ratio, Maximum Drawdown
+- Comprehensive metrics across 4 sections (Returns, Risk, Context, Dividends) — each section leads with a dominant hero number (TWR, Sharpe, Net Cash Flow, YOC Net) followed by compact secondary rows; metric definitions accessible via inline popovers
+- Period selector (YTD / 1Y / 3Y / 5Y / All-time) uses a segmented pill control on mobile with spring animation; custom date ranges appear as a dismissible chip, not a permanent tab slot
 - Yield on Cost (YOC) and Current Yield calculations
-- Monthly returns heatmap and underwater drawdown chart
-- Rolling performance charts
+- Monthly returns heatmap and underwater drawdown chart (theme-aware colors, boosted contrast in dark themes)
+- Rolling 12-month CAGR and Sharpe Ratio charts with 3-month moving average; always visible with an informative empty state when data is insufficient
 - **Benchmark comparison**: compare your portfolio against six model portfolios (60/40, All Weather, Buffett 90/10, Golden Butterfly, Permanent Portfolio, 100% ACWI) with an indexed growth-of-100 chart and a comprehensive risk/return table — TWR, Volatility, Sharpe, Sortino, Calmar, Max Drawdown, best/worst month, and positive/negative month counts; optional USD→EUR conversion via Frankfurter API
-- Progressive disclosure: methodology section collapsed by default; one-time guide strip for new users; "Avanzato" badge on technical metrics (TWR, IRR, Sharpe, YOC); each chart has an inline 2-line reading hint
+- Progressive disclosure: methodology section collapsed by default; one-time guide strip for new users; "Avanzato" badge on technical metrics (TWR, IRR, Sharpe, YOC)
 - Animated metric cards: values count up on load and settle more naturally during period changes; staggered entrance cascade per section
 - Dashboard KPI cards (Total Portfolio, Liquid Net Worth, Unrealized Gains, Taxes) animate their values on page load — numbers count up from zero once on mount; each card animates independently so the rest of the page stays stable during the animation
 - All major pages (Dashboard, Hall of Fame, History, Performance, Dividends) animate on load with staggered card entrances and smooth expand/collapse transitions; respects system "Reduce Motion" preference
