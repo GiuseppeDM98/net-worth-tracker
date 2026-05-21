@@ -24,6 +24,11 @@
 
 ## 🔧 Improvements
 
+- Redesigned the **Allocation (Allocazione)** page with a cleaner, Trade Republic-inspired layout: each asset class now shows its current value as a large dominant number, with current %, target %, and the buy/sell delta as a compact secondary line — replacing the previous dense four-section cards (eyebrow label, progress bar, value grid, difference banner) where no single number stood out. On mobile, allocation items are now a flat scrollable list instead of a card grid, making the drill-down navigation clearer. On desktop, the eight-column flat table is now a five-column table where value and percentage are stacked in the same cell, reducing visual noise while keeping all the same information
+- The action signal on each allocation item (COMPRA / VENDI / OK) is now a compact colored chip — no more color-coded progress bars filling the card; the chip communicates the rebalancing action at a glance
+- The Allocation page skeleton (shown while data loads) now accurately mirrors the real page layout — previously it showed a different card structure that caused a visible layout shift when data arrived
+- Portfolio Exposure bars in the Allocation page are now thinner (`h-1.5` track) with more vertical padding between rows, making the section easier to scan
+
 - Added **price trend sparklines** to individual asset cards on mobile — each card now shows a compact 12-month trend chart immediately below the value and gain/loss figures, using the same visual style as the Overview hero sparkline. The chart uses total value (not unit price) for cash accounts and fixed-price assets like private equity, where the unit price is always €1 and quantity carries the signal
 - The **"Totale Patrimonio"** summary card on the asset management page is now centered on mobile, giving the key portfolio metric a cleaner hero-number feel
 

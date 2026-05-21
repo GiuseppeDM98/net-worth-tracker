@@ -39,7 +39,7 @@ function ExposureBar({ pct, className }: { pct: number; className?: string }) {
   const reducedMotion = useReducedMotion();
   const width = Math.min(Math.max(pct * 100, 0), 100);
   return (
-    <div className={`relative h-2 w-full overflow-hidden rounded-full bg-muted/70 ${className ?? ''}`}>
+    <div className={`relative h-1.5 w-full overflow-hidden rounded-full bg-muted/70 ${className ?? ''}`}>
       <motion.div
         className="absolute inset-y-0 left-0 rounded-full bg-primary/70"
         animate={reducedMotion ? undefined : { width: `${width}%` }}
@@ -132,7 +132,7 @@ function ExpandableRow({
   expandable: boolean;
 }) {
   return (
-    <div className="py-2.5">
+    <div className="py-3.5">
       <button
         type="button"
         className="w-full text-left"

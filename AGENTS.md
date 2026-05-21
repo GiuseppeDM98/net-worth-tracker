@@ -387,25 +387,25 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 ### Mobile Layout for Large Monetary Values
 - **Side-by-side `text-2xl`+ values overflow on mobile**: a `flex justify-between` row with two large numbers (e.g. `text-3xl` portfolio total + `text-xl` G/P amount) will overflow on narrow screens — the combined width exceeds the card. Fix: use a stacked vertical layout — primary value at full width, secondary value as a smaller colored line below with the percentage as an inline `<span>`. Pattern: `<p className="text-3xl font-bold font-mono">{primary}</p><p className="text-sm font-semibold font-mono {color}">{secondary} <span className="text-xs opacity-80">({pct}%)</span></p>`. This is impossible to overflow regardless of viewport width and follows Trade Republic hierarchy. Applied in `AssetManagementTab` summary card and `AssetCard` Valore Totale + G/P section.
 
+### Flat List vs Card Grid for Navigation Items
+- **Navigation-focused items** (users click to drill down or navigate) → flat `divide-y divide-border/50` list inside `overflow-hidden rounded-xl border border-border bg-card`. No card boxes per item, no progress bars — the parent supplies the visual structure.
+- **Content-dense items** (users read and compare values without navigating) → card grid (`grid grid-cols-1 sm:grid-cols-2 gap-4`). Each item is self-contained.
+- Applied in Allocazione (`AllocationCard` + page render functions) vs Patrimonio (`AssetCard` card grid). The distinction: allocation items are affordances, asset cards are information blocks.
+
 ### Mobile Header Trash Icon Pattern
 - In a card header that has a title/subtitle block on the left and a destructive icon button on the right, always use `flex items-start justify-between` (not `flex-col` + `sm:flex-row`). `flex-col` puts the trash button on its own row on mobile, wasting vertical space and breaking visual grouping. The subtitle text stays under the title in the left block; the button stays top-right in all viewports.
 
 ### Resend Integration
-- Use a **static import** (`import { Resend } from 'resend'`) not a dynamic one (`await import('resend')`). `vi.mock` only intercepts static imports — dynamic imports bypass the mock and cause `TypeError: X is not a constructor` in tests.
-- `onboarding@resend.dev` (Resend shared domain) delivers only to the Resend account owner's email. To send to arbitrary recipients a verified custom domain is required. `*.vercel.app` subdomains cannot be verified as sending domains — Vercel controls that DNS zone.
+- Use a **static import** (`import { Resend } from 'resend'`) not a dynamic one. `vi.mock` only intercepts static imports.
+- `onboarding@resend.dev` delivers only to the Resend account owner's email. Custom domain required for arbitrary recipients.
 
 ### Periodic Email Service (`lib/server/monthlyEmailService.ts`)
-- **Firestore query depth**: each query uses max 3 `.where()` calls (`userId + year + month`, or `userId + date range`). A 4th condition (e.g. `isDummy !== true`) breaks the test chain mock — filter in code post-fetch instead.
-- **Expense field name**: notes on expense documents are stored as `notes` (not `note` or `description`). Using the wrong field silently falls back to the category name, making all expense descriptions look like "Casa / Casa".
-- **`buildPeriodEmailData` as the single builder**: all three period types (monthly/quarterly/yearly) flow through one function that adjusts the Firestore date window and the previous-period snapshot coordinates. Do not add a separate builder per type — keep them unified.
-- **Settings 3-place rule applies here too**: any new email toggle (`quarterlyEmailEnabled`, `yearlyEmailEnabled`, …) must be added to `types/assets.ts`, `getSettings()`, AND both branches of `setSettings()` in `assetAllocationService.ts`. Missing any one causes the toggle to silently not persist.
-- **Dec 31 fires all three phases**: monthly, Q4 quarterly, and yearly email phases all run on Dec 31 if their respective toggles are enabled. This is intentional — the phases are independent.
-- **Test file field name**: `notes` (not `note`) must be used in test fixture `data()` objects for expense mocks, or the `description` fallback masks the bug.
-- **`selector.quarter` check before `month > 0` in `getPeriodLabel`**: quarter end-months (3, 6, 9, 12) are positive integers, so without the `quarter !== undefined` guard first, Q1 would render as "Marzo 2026" instead of "Q1 2026". Always check `selector.quarter !== undefined` as the first branch.
-- **AI comment failure must never block email**: `generateEmailAiComment` wraps everything in an outer try/catch and returns `null` on any error (Anthropic down, timeout, missing key). The email is sent without the AI section — never let AI failure suppress the financial report.
-- **Web search always active in email AI comments**: `enableWebSearch: true` + `includeMacroContext: true` are hardcoded in `generateEmailAiComment` regardless of user preferences — end-of-period analysis gains much more from macro context (BCE/Fed rates, geopolitical events) than interactive chat sessions where the user can already apply their own context.
-- **`simpleMarkdownToHtml` — ordering and gotchas**: this function is a chain of `.replace()` calls where order is critical. Key rules: (1) strip `<details>/<summary>` first — Claude occasionally emits raw HTML collapsible blocks that email clients render as interactive widgets; (2) process `**bold**` before `*italic*` to avoid consuming the outer asterisks and leaving orphaned ones; (3) collapse blank lines between consecutive `<li>` items (`</li>\n\n<li>` → `</li>\n<li>`) BEFORE the `<ul>` wrap regex, otherwise each bullet becomes its own `<ul>` block; (4) spacing inside lists is CSS `margin` on `<li>`, not `<br/>` — `<br/>` only affects between-block spacing; (5) strip `<br/>` before/after heading `<p>` tags and reduce `<br/><br/>` to `<br/>` before/after `<ul>/<ol>` blocks — the list/heading block margins already provide visual separation and `2 × line-height` compounds badly in email clients. Use `margin:\d+px` (not a hardcoded value) in the heading-strip regex to stay robust to future margin tweaks.
-- **`<ol>` support with placeholder pattern**: ordered list items (`^\d+\. `) use a string placeholder (`§OLI§`/`§/OLI§`) to differentiate them from `<ul>` items during the wrap step. The placeholder is expanded inside a `.replace()` callback that wraps the matched run in `<ol>` and swaps in proper `<li>` tags. This avoids HTML-in-regex fragility and is fully testable.
+- **Firestore query depth**: max 3 `.where()` calls per query — a 4th breaks test chain mocks. Filter post-fetch in code instead.
+- **Expense field name**: `notes` (not `note`). Wrong field silently falls back to category name.
+- **`buildPeriodEmailData`**: single builder for monthly/quarterly/yearly — one function, adjust date window and snapshot coords per type. Do not split into separate builders.
+- **Settings 3-place rule**: email toggles must be added to `types/assets.ts`, `getSettings()`, AND both branches of `setSettings()`.
+- **AI comment failure must never block email**: `generateEmailAiComment` returns `null` on any error — email sends without the AI section.
+- **`simpleMarkdownToHtml` order**: strip `<details>/<summary>` first; process `**bold**` before `*italic*`; collapse blank lines between `<li>` items before `<ul>` wrap regex; use CSS `margin` on `<li>` for spacing, not `<br/>`.
 
 ### Firestore Query Chain Depth in Tests
 - Keep Admin SDK query chains to **3 `.where()` calls max** when the function will be unit-tested. A 4th `.where()` (e.g. `isDummy != true`) causes `TypeError: .where(...).where(...).where(...).where is not a function` in tests because the mock chain only goes 3 levels deep.
@@ -489,6 +489,12 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - Symptom: switching a `TabsContent forceMount` view leaves blank vertical space even though the old panel looks hidden
 - Fix: ensure inactive tab panels are explicitly removed from layout with `data-[state=inactive]:hidden` (see `components/ui/tabs.tsx`)
 
+### Skeleton as Dead Code — Loading State Silent Failure
+- Symptom: a skeleton component file exists and is well-implemented, but the page shows a blank flash (or nothing) during load.
+- Cause: the skeleton was never imported or used in the page. `if (loading) return null` (or no loading guard at all) was left in place — the skeleton was effectively dead code.
+- Fix: always verify the loading branch actively uses `<PageSkeleton />`. After creating or rewriting a skeleton, search for `return null` and `if (loading)` in the page file to confirm the skeleton is wired up. The TypeScript compiler does not catch an unused component.
+- Applied in `app/dashboard/allocation/page.tsx`: `AllocationPageSkeleton` existed for months but was never imported.
+
 ### Recharts Legend and Tooltip Mismatch
 - `Legend` reads `<Bar fill>`, not `<Cell>`
 - Always set `fill` on `<Bar>` even when per-bar colors are overridden by `<Cell>`
@@ -554,11 +560,6 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - Comparing a string to a `Date` with `<=` / `>=` always returns `false` in JavaScript — the string coerces to `NaN` via `Number()`
 - **Always wrap**: `const paymentDate = new Date(dividendData.paymentDate)` before any date comparison in a route or use case that receives data from the client
 - Applied in `lib/server/dividendUseCase.ts` — the bug caused automatic expense creation to silently never trigger for past dividends
-
-### createExpense Field Enumeration Trap
-- `createExpense` in `expenseService.ts` explicitly enumerates every field in `removeUndefinedFields({...})` before `addDoc`. `updateExpense` spreads `...updates`, so new fields work automatically there.
-- **Symptom**: a new field saved correctly on edit but silently missing on create.
-- **Fix**: whenever you add a field to `ExpenseFormData`, also add it to the `cleanedData` object in ALL three creation paths: single expense, recurring expenses (the batch loop), and installment expenses (the batch loop). Search for `linkedCashAssetId: expenseData.linkedCashAssetId` — all three occurrences need the new field right next to it.
 
 ### AnimatePresence Dialog Body Collapse
 - Symptom: dialog opens but body appears completely blank — no form fields, no cards, just empty white space
