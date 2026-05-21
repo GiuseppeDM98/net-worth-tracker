@@ -29,6 +29,8 @@
 - The Allocation page skeleton (shown while data loads) now accurately mirrors the real page layout — previously it showed a different card structure that caused a visible layout shift when data arrived
 - Portfolio Exposure bars in the Allocation page are now thinner (`h-1.5` track) with more vertical padding between rows, making the section easier to scan
 
+- The section switcher on the **Patrimonio** page (Gestione Asset / Anno Corrente / Storico) on mobile now shows all three options at a glance as a segmented pill control — previously a dropdown that required two taps and hid the other sections. Switching sections now takes a single tap, and the active section animates with a smooth slide transition
+
 - Added **price trend sparklines** to individual asset cards on mobile — each card now shows a compact 12-month trend chart immediately below the value and gain/loss figures, using the same visual style as the Overview hero sparkline. The chart uses total value (not unit price) for cash accounts and fixed-price assets like private equity, where the unit price is always €1 and quantity carries the signal
 - The **"Totale Patrimonio"** summary card on the asset management page is now centered on mobile, giving the key portfolio metric a cleaner hero-number feel
 

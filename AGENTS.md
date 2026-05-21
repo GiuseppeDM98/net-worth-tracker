@@ -392,6 +392,13 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - **Content-dense items** (users read and compare values without navigating) → card grid (`grid grid-cols-1 sm:grid-cols-2 gap-4`). Each item is self-contained.
 - Applied in Allocazione (`AllocationCard` + page render functions) vs Patrimonio (`AssetCard` card grid). The distinction: allocation items are affordances, asset cards are information blocks.
 
+### Mobile Tab Switcher: Segmented Pill vs Select
+- **≤3 tabs → segmented pill control**, never a `Select` dropdown. `Select` is a form-input pattern (2 taps, hidden options, overlay); a segmented pill is a navigation affordance (1 tap, all options visible at a glance).
+- **Pattern**: module-level `TABS` constant (stable reference for React Compiler), `role="tablist"` on the container div, `role="tab"` + `aria-selected={activeTab === value}` + `type="button"` on each button. Framer Motion `layoutId` spring pill (stiffness 400, damping 35) behind the active segment. Abbreviated labels (≤8 chars) to survive iPhone SE widths — icon + label always fits at `text-xs` in `flex-1 h-9` segments.
+- **Anti-pattern: floating pill for page-local tabs**. The floating pill (bottom nav style) is reserved for global page navigation. Using it for within-page section switching creates a semantic mismatch — floating signals "always accessible regardless of scroll", which is inappropriate for local tabs. Keep page-local switchers inline and let them scroll away.
+- **4+ tabs**: reconsider the pattern — horizontal scroll tab bar or a Select may be appropriate when 4+ labels can't fit equally. The ≤3 rule is strict.
+- Applied in `app/dashboard/assets/page.tsx` (Gestione / Corrente / Storico).
+
 ### Mobile Header Trash Icon Pattern
 - In a card header that has a title/subtitle block on the left and a destructive icon button on the right, always use `flex items-start justify-between` (not `flex-col` + `sm:flex-row`). `flex-col` puts the trash button on its own row on mobile, wasting vertical space and breaking visual grouping. The subtitle text stays under the title in the left block; the button stays top-right in all viewports.
 

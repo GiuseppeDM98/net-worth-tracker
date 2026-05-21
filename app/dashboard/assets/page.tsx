@@ -27,8 +27,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Wallet, CalendarClock, History, ChevronDown } from 'lucide-react';
 import { AssetManagementTab } from '@/components/assets/AssetManagementTab';
@@ -41,6 +41,13 @@ import type { ComponentProps } from 'react';
 
 type MacroTabId = 'management' | 'anno-corrente' | 'storico';
 type HistoricalSubTabId = 'prezzi' | 'valori' | 'asset-class';
+
+// Abbreviated labels fit any mobile width (≤8 chars + icon per segment).
+const MOBILE_TABS: Array<{ value: MacroTabId; label: string; icon: React.ElementType }> = [
+  { value: 'management', label: 'Gestione', icon: Wallet },
+  { value: 'anno-corrente', label: 'Corrente', icon: CalendarClock },
+  { value: 'storico', label: 'Storico', icon: History },
+];
 
 // Mobile-only wrapper: compact 3-month summary above a collapsible full table.
 // Defined at module level so React sees a stable component reference each render.
@@ -176,18 +183,39 @@ export default function AssetsPage() {
       </div>
 
       <Tabs defaultValue="management" value={activeTab} onValueChange={handleTabChange} className="w-full">
-        {/* Mobile (< 1440px): Radix Select for section switching */}
+        {/* Mobile (<1440px): segmented pill — all 3 tabs visible, single tap */}
         <div className="desktop:hidden mb-4">
-          <Select value={activeTab} onValueChange={handleTabChange}>
-            <SelectTrigger className="w-full h-12 text-base">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="management">Gestione Asset</SelectItem>
-              <SelectItem value="anno-corrente">Anno Corrente</SelectItem>
-              <SelectItem value="storico">Storico</SelectItem>
-            </SelectContent>
-          </Select>
+          <div role="tablist" aria-label="Sezioni patrimonio" className="flex rounded-xl bg-muted p-1 gap-1">
+            {MOBILE_TABS.map(({ value, label, icon: Icon }) => (
+              <button
+                key={value}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === value}
+                onClick={() => handleTabChange(value)}
+                className={cn(
+                  'relative flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg text-xs font-medium',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
+                  activeTab !== value && 'text-muted-foreground hover:text-foreground transition-colors duration-150'
+                )}
+              >
+                {activeTab === value && (
+                  <motion.span
+                    layoutId="assets-mobile-tab"
+                    className="absolute inset-0 rounded-lg bg-background shadow-sm"
+                    transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+                  />
+                )}
+                <span className={cn(
+                  'relative z-10 flex items-center gap-1.5',
+                  activeTab === value ? 'text-foreground' : 'text-muted-foreground'
+                )}>
+                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{label}</span>
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Desktop (1440px+): standard tab list */}
