@@ -185,7 +185,7 @@ function ProgressCell({ ratio, inverted = false }: { ratio: number; inverted?: b
   const pct = Math.round(ratio * 100);
   return (
     <div className="flex items-center gap-2 min-w-[120px]">
-      <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full transition-all ${progressColor(ratio, inverted)}`}
           style={{ width: `${Math.min(100, pct)}%` }}
@@ -577,11 +577,11 @@ export function BudgetTab({
             <TableRow>
               <TableHead>Voce</TableHead>
               <TableHead className="text-right">Budget/anno</TableHead>
-              <TableHead className="text-right text-blue-600 dark:text-blue-400">{currentYear}</TableHead>
+              <TableHead className="text-right text-primary">{currentYear}</TableHead>
               <TableHead className="text-right text-amber-600 dark:text-amber-400">{currentYear - 1}</TableHead>
               <TableHead className="text-right text-xs">vs {currentYear - 1}</TableHead>
               {hasHistory && (
-                <TableHead className="text-right text-purple-600 dark:text-purple-400">Media storica</TableHead>
+                <TableHead className="text-right text-muted-foreground">Media storica</TableHead>
               )}
               {hasHistory && (
                 <TableHead className="text-right text-xs">vs Media</TableHead>
@@ -674,7 +674,7 @@ export function BudgetTab({
                                     key={item.id}
                                     className={`flex items-center border-b border-gray-100 dark:border-gray-800 cursor-pointer transition-colors ${
                                       isSelected
-                                        ? 'bg-blue-50/60 dark:bg-blue-950/20 hover:bg-blue-50/80 dark:hover:bg-blue-950/30'
+                                        ? 'bg-muted/40 hover:bg-muted/60'
                                         : 'hover:bg-muted/40'
                                     }`}
                                     onClick={() =>
@@ -684,7 +684,7 @@ export function BudgetTab({
                                     <div className="flex-1 min-w-0 pl-6 pr-2 py-4 text-sm">
                                       <span className="flex items-center gap-1">
                                         {isSelected
-                                          ? <ChevronDown className="h-3 w-3 text-blue-500 shrink-0" />
+                                          ? <ChevronDown className="h-3 w-3 text-primary shrink-0" />
                                           : <ChevronRight className="h-3 w-3 text-gray-300 dark:text-gray-600 shrink-0" />}
                                         {getItemLabel(item, categories)}
                                       </span>
@@ -721,7 +721,7 @@ export function BudgetTab({
                               <div
                                 className={`flex items-center border-t border-gray-200 dark:border-gray-700 cursor-pointer select-none transition-colors ${
                                   selectedItemKey === SUBTOTAL_KEY(sectionType)
-                                    ? 'bg-blue-50/60 dark:bg-blue-950/20 hover:bg-blue-50/80 dark:hover:bg-blue-950/30'
+                                    ? 'bg-muted/40 hover:bg-muted/60'
                                     : 'bg-gray-50/60 dark:bg-gray-800/30 hover:bg-muted/40'
                                 }`}
                                 onClick={() => setSelectedItemKey(prev => prev === SUBTOTAL_KEY(sectionType) ? null : SUBTOTAL_KEY(sectionType))}
@@ -729,7 +729,7 @@ export function BudgetTab({
                                 <div className="flex-1 min-w-0 pl-6 pr-2 py-4 text-xs font-medium text-gray-500 dark:text-gray-400">
                                   <span className="flex items-center gap-1">
                                     {selectedItemKey === SUBTOTAL_KEY(sectionType)
-                                      ? <ChevronDown className="h-3 w-3 text-blue-500 shrink-0" />
+                                      ? <ChevronDown className="h-3 w-3 text-primary shrink-0" />
                                       : <ChevronRight className="h-3 w-3 text-gray-300 dark:text-gray-600 shrink-0" />}
                                     Subtotale {sectionLabel}
                                   </span>
@@ -779,7 +779,7 @@ export function BudgetTab({
               <TableRow
                 className={`cursor-pointer select-none transition-colors ${
                   selectedItemKey === TOTAL_EXPENSES_KEY
-                    ? 'bg-blue-50/60 dark:bg-blue-950/20 hover:bg-blue-50/80 dark:hover:bg-blue-950/30'
+                    ? 'bg-muted/40 hover:bg-muted/60'
                     : 'hover:bg-muted/40'
                 }`}
                 onClick={() => setSelectedItemKey(prev => prev === TOTAL_EXPENSES_KEY ? null : TOTAL_EXPENSES_KEY)}
@@ -787,7 +787,7 @@ export function BudgetTab({
                 <TableCell className="font-semibold">
                   <span className="flex items-center gap-1">
                     {selectedItemKey === TOTAL_EXPENSES_KEY
-                      ? <ChevronDown className="h-3 w-3 text-blue-500 shrink-0" />
+                      ? <ChevronDown className="h-3 w-3 text-primary shrink-0" />
                       : <ChevronRight className="h-3 w-3 text-gray-300 dark:text-gray-600 shrink-0" />}
                     Totale Spese
                   </span>
@@ -827,7 +827,7 @@ export function BudgetTab({
               <TableRow
                 className={`cursor-pointer select-none transition-colors ${
                   selectedItemKey === TOTAL_INCOME_KEY
-                    ? 'bg-blue-50/60 dark:bg-blue-950/20 hover:bg-blue-50/80 dark:hover:bg-blue-950/30'
+                    ? 'bg-muted/40 hover:bg-muted/60'
                     : 'hover:bg-muted/40'
                 }`}
                 onClick={() => setSelectedItemKey(prev => prev === TOTAL_INCOME_KEY ? null : TOTAL_INCOME_KEY)}
@@ -835,7 +835,7 @@ export function BudgetTab({
                 <TableCell className="font-semibold">
                   <span className="flex items-center gap-1">
                     {selectedItemKey === TOTAL_INCOME_KEY
-                      ? <ChevronDown className="h-3 w-3 text-blue-500 shrink-0" />
+                      ? <ChevronDown className="h-3 w-3 text-primary shrink-0" />
                       : <ChevronRight className="h-3 w-3 text-gray-300 dark:text-gray-600 shrink-0" />}
                     Totale Entrate
                   </span>
@@ -894,17 +894,17 @@ export function BudgetTab({
     return (
       <div
         id="budget-deep-dive"
-        className="rounded-lg border-2 border-blue-200 bg-blue-50/50 dark:bg-blue-950/10 dark:border-blue-800 p-4"
+        className="rounded-lg border bg-muted/30 p-4"
       >
         {/* Header with title and close button */}
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-sm text-blue-800 dark:text-blue-300">
+          <h3 className="font-semibold text-sm text-foreground">
             Analisi Storica: {label}
           </h3>
           <button
             onClick={() => setSelectedItemKey(null)}
             aria-label="Chiudi analisi storica"
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            className="text-muted-foreground hover:text-foreground transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -915,17 +915,17 @@ export function BudgetTab({
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-blue-200 dark:border-blue-800">
-                <th className="text-left pr-2 py-1 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap sticky left-0 z-10 bg-blue-50 dark:bg-blue-950/30">Anno</th>
-                <th className="text-right pr-3 py-1 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap hidden sm:table-cell">Budget</th>
+              <tr className="border-b border-border">
+                <th className="text-left pr-2 py-1 font-medium text-muted-foreground whitespace-nowrap sticky left-0 z-10 bg-muted/50">Anno</th>
+                <th className="text-right pr-3 py-1 font-medium text-muted-foreground whitespace-nowrap hidden sm:table-cell">Budget</th>
                 {MONTH_LABELS.map((m, idx) => (
-                  <th key={m} className="text-right px-0.5 sm:px-1.5 py-1 font-medium text-gray-500 dark:text-gray-500 whitespace-nowrap">
+                  <th key={m} className="text-right px-0.5 sm:px-1.5 py-1 font-medium text-muted-foreground whitespace-nowrap">
                     <span className="hidden sm:inline">{m}</span>
                     <span className="sm:hidden">{MONTH_LETTERS[idx]}</span>
                   </th>
                 ))}
-                <th className="text-right pl-2 sm:pl-3 py-1 font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">Tot.</th>
-                <th className="text-right pl-1 sm:pl-2 py-1 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap hidden sm:table-cell">vs Budget</th>
+                <th className="text-right pl-2 sm:pl-3 py-1 font-semibold text-foreground whitespace-nowrap">Tot.</th>
+                <th className="text-right pl-1 sm:pl-2 py-1 font-medium text-muted-foreground whitespace-nowrap hidden sm:table-cell">vs Budget</th>
               </tr>
             </thead>
             <tbody>
@@ -953,16 +953,16 @@ export function BudgetTab({
                 return (
                   <tr
                     key={year}
-                    className={`border-b border-blue-100 dark:border-blue-900/50 ${
+                    className={`border-b border-border/60 ${
                       isCurrentYear
-                        ? 'bg-blue-100/60 dark:bg-blue-900/30 font-medium'
-                        : 'bg-white dark:bg-blue-950/5 hover:bg-blue-50/30 dark:hover:bg-blue-950/20'
+                        ? 'bg-muted/60 font-medium'
+                        : 'hover:bg-muted/30'
                     }`}
                   >
                     <td className="pr-2 py-1.5 tabular-nums whitespace-nowrap sticky left-0 z-10 bg-inherit">
                       {year}
                       {/* Small marker so the current year stands out in a long list */}
-                      {isCurrentYear && <span className="ml-1 text-blue-500">◂</span>}
+                      {isCurrentYear && <span className="ml-1 text-primary">◂</span>}
                     </td>
                     <td className="pr-3 py-1.5 text-right tabular-nums text-gray-500 dark:text-gray-400 whitespace-nowrap hidden sm:table-cell">
                       {budgetAnnual > 0 ? formatCurrency(budgetAnnual) : '—'}
@@ -1024,22 +1024,22 @@ export function BudgetTab({
           });
 
           return (
-            <div key={section.type} className="mt-4 pt-4 border-t border-blue-200 dark:border-blue-800">
-              <p className="text-xs font-medium text-blue-700 dark:text-blue-400 mb-2">{section.label}</p>
+            <div key={section.type} className="mt-4 pt-4 border-t border-border">
+              <p className="text-xs font-medium text-foreground mb-2">{section.label}</p>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="border-b border-blue-200 dark:border-blue-800">
-                      <th className="text-left pr-2 py-1 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap sticky left-0 z-10 bg-blue-50 dark:bg-blue-950/30">Anno</th>
-                      <th className="text-right pr-3 py-1 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap hidden sm:table-cell">Budget</th>
+                    <tr className="border-b border-border">
+                      <th className="text-left pr-2 py-1 font-medium text-muted-foreground whitespace-nowrap sticky left-0 z-10 bg-muted/50">Anno</th>
+                      <th className="text-right pr-3 py-1 font-medium text-muted-foreground whitespace-nowrap hidden sm:table-cell">Budget</th>
                       {MONTH_LABELS.map((m, idx) => (
-                        <th key={m} className="text-right px-0.5 sm:px-1.5 py-1 font-medium text-gray-500 dark:text-gray-500 whitespace-nowrap">
+                        <th key={m} className="text-right px-0.5 sm:px-1.5 py-1 font-medium text-muted-foreground whitespace-nowrap">
                           <span className="hidden sm:inline">{m}</span>
                           <span className="sm:hidden">{MONTH_LETTERS[idx]}</span>
                         </th>
                       ))}
-                      <th className="text-right pl-2 sm:pl-3 py-1 font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">Tot.</th>
-                      <th className="text-right pl-1 sm:pl-2 py-1 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap hidden sm:table-cell">vs Budget</th>
+                      <th className="text-right pl-2 sm:pl-3 py-1 font-semibold text-foreground whitespace-nowrap">Tot.</th>
+                      <th className="text-right pl-1 sm:pl-2 py-1 font-medium text-muted-foreground whitespace-nowrap hidden sm:table-cell">vs Budget</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1063,14 +1063,14 @@ export function BudgetTab({
                       return (
                         <tr
                           key={year}
-                          className={`border-b border-blue-100 dark:border-blue-900/50 ${
+                          className={`border-b border-border/60 ${
                             isCurrentYear
-                              ? 'bg-blue-100/60 dark:bg-blue-900/30 font-medium'
-                              : 'hover:bg-blue-50/30 dark:hover:bg-blue-950/20'
+                              ? 'bg-muted/60 font-medium'
+                              : 'hover:bg-muted/30'
                           }`}
                         >
                           <td className="pr-2 py-1.5 tabular-nums whitespace-nowrap sticky left-0 z-10 bg-inherit">
-                            {year}{isCurrentYear && <span className="ml-1 text-blue-500">◂</span>}
+                            {year}{isCurrentYear && <span className="ml-1 text-primary">◂</span>}
                           </td>
                           <td className="pr-3 py-1.5 text-right tabular-nums text-gray-500 dark:text-gray-400 whitespace-nowrap hidden sm:table-cell">
                             {secBudgetAnnual > 0 ? formatCurrency(secBudgetAnnual) : '—'}
@@ -1120,7 +1120,7 @@ export function BudgetTab({
   function EditPanel() {
     return (
       <div className="space-y-6">
-        <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
+        <Alert className="border-border bg-muted/40">
           <Info className="h-4 w-4" />
           <AlertDescription className="text-xs">
             Le categorie vengono rilevate automaticamente. Modifica gli importi mensili e aggiungi
@@ -1190,7 +1190,7 @@ export function BudgetTab({
 
                 {/* Subcategory items — amount editable, deletable, reorderable */}
                 {subItems.map((item, idx) => (
-                  <div key={item.id} className="flex items-center gap-2 py-1 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
+                  <div key={item.id} className="flex items-center gap-2 py-1 pl-4 border-t border-border/40">
                     <div className="flex flex-col">
                       <button
                         className="text-gray-400 hover:text-gray-600 disabled:opacity-20"
@@ -1427,7 +1427,7 @@ export function BudgetTab({
                           return (
                             <button
                               key={item.id}
-                              className={`w-full text-left rounded-md border p-3 space-y-2 transition-colors hover:bg-muted/40 active:bg-muted/60 ${item.scope === 'subcategory' ? 'ml-3 border-l-2 border-l-gray-200 dark:border-l-gray-700' : ''}`}
+                              className={`w-full text-left rounded-md border p-3 space-y-2 transition-colors hover:bg-muted/40 active:bg-muted/60 ${item.scope === 'subcategory' ? 'ml-3' : ''}`}
                               onClick={() => setMobileDetailItemId(item.id)}
                             >
                               <div className="flex items-center gap-1">
@@ -1491,7 +1491,7 @@ export function BudgetTab({
                   <DeltaBadge value={totalExpCurrentYear} reference={totalExpPrevYear} inverted={false} />
                   {hasHistory && totalExpHistAvg > 0 && (
                     <>
-                      <span className="ml-2 text-purple-600 dark:text-purple-400">Media: {formatCurrency(totalExpHistAvg)}</span>
+                      <span className="ml-2 text-muted-foreground">Media: {formatCurrency(totalExpHistAvg)}</span>
                       <DeltaBadge value={totalExpCurrentYear} reference={totalExpHistAvg} inverted={false} />
                     </>
                   )}
@@ -1519,7 +1519,7 @@ export function BudgetTab({
                   <DeltaBadge value={totalIncCurrentYear} reference={totalIncPrevYear} inverted={true} />
                   {hasHistory && totalIncHistAvg > 0 && (
                     <>
-                      <span className="ml-2 text-purple-600 dark:text-purple-400">Media: {formatCurrency(totalIncHistAvg)}</span>
+                      <span className="ml-2 text-muted-foreground">Media: {formatCurrency(totalIncHistAvg)}</span>
                       <DeltaBadge value={totalIncCurrentYear} reference={totalIncHistAvg} inverted={true} />
                     </>
                   )}
@@ -1545,7 +1545,7 @@ export function BudgetTab({
                         <td className="py-2 text-right font-medium tabular-nums">{formatCurrency(detailItem.monthlyAmount * 12)}</td>
                       </tr>
                       <tr className="border-b">
-                        <td className="py-2 text-xs font-medium text-blue-600 dark:text-blue-400">{currentYear}</td>
+                        <td className="py-2 text-xs font-medium text-primary">{currentYear}</td>
                         <td className="py-2 text-right font-semibold tabular-nums">{formatCurrency(detailComp.currentYearTotal)}</td>
                       </tr>
                       <tr className="border-b">
@@ -1559,7 +1559,7 @@ export function BudgetTab({
                       </tr>
                       {hasHistory && detailComp.historicalAverage > 0 && (
                         <tr className="border-b">
-                          <td className="py-2 text-xs text-purple-600 dark:text-purple-400">Media storica</td>
+                          <td className="py-2 text-xs text-muted-foreground">Media storica</td>
                           <td className="py-2 text-right tabular-nums">
                             <div className="flex items-center justify-end gap-2">
                               <span className="text-muted-foreground">{formatCurrency(detailComp.historicalAverage)}</span>
@@ -1603,7 +1603,7 @@ export function BudgetTab({
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-xl font-semibold flex items-center gap-2">
-            <Target className="h-5 w-5 text-blue-500" />
+            <Target className="h-5 w-5 text-primary" />
             Budget
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
@@ -1656,15 +1656,15 @@ export function BudgetTab({
                 initial="hidden"
                 animate="visible"
                 exit="exit"
-                className="rounded-lg border border-blue-200 bg-blue-50/60 dark:bg-blue-950/10 dark:border-blue-800 p-4 text-sm space-y-3"
+                className="rounded-lg border border-border bg-muted/30 p-4 text-sm space-y-3"
               >
                 <p className="font-medium text-gray-700 dark:text-gray-300">Come leggere la tabella</p>
                 <ul className="space-y-1.5 text-gray-600 dark:text-gray-400 text-xs list-disc list-inside">
                   <li><span className="font-medium">Budget/anno</span> — il tetto annuale impostato (budget/mese × 12). Di default corrisponde al totale speso l&apos;anno precedente.</li>
-                  <li><span className="font-medium text-blue-600 dark:text-blue-400">{currentYear}</span> — quanto hai speso finora nell&apos;anno corrente.</li>
+                  <li><span className="font-medium text-primary">{currentYear}</span> — quanto hai speso finora nell&apos;anno corrente.</li>
                   <li><span className="font-medium text-amber-600 dark:text-amber-400">{currentYear - 1}</span> — totale speso nell&apos;anno precedente.</li>
                   <li><span className="font-medium">vs {currentYear - 1}</span> — variazione % rispetto all&apos;anno scorso (verde = stai spendendo meno, rosso = di più).</li>
-                  <li><span className="font-medium text-purple-600 dark:text-purple-400">Media storica</span> — media annuale dal {historyStartYear} al {currentYear - 1}.</li>
+                  <li><span className="font-medium text-muted-foreground">Media storica</span> — media annuale dal {historyStartYear} al {currentYear - 1}.</li>
                   <li><span className="font-medium">Avanzamento</span> — spesa corrente ÷ budget/anno. Verde &lt;80%, arancione 80–100%, rosso oltre.</li>
                   <li>Clicca sull&apos;intestazione di una sezione per espanderla o collassarla.</li>
                   <li>Clicca una voce per aprire l&apos;analisi storica anno per anno con dettaglio mensile.</li>

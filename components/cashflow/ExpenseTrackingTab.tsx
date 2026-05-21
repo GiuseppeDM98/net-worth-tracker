@@ -17,7 +17,7 @@
  */
 'use client';
 
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
@@ -32,13 +32,24 @@ import {
 } from '@/lib/services/expenseService';
 import { updateCashAssetBalance } from '@/lib/services/assetService';
 import { queryKeys } from '@/lib/query/queryKeys';
+import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Plus, TrendingUp, TrendingDown, Wallet, RefreshCw, Filter, ChevronDown, Scale, Check, X } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Plus, TrendingUp, TrendingDown, Wallet, Filter, ChevronDown, Scale, Check, X, Trash2 } from 'lucide-react';
 import { ExpenseDialog } from '@/components/expenses/ExpenseDialog';
 import { ExpenseTable } from '@/components/expenses/ExpenseTable';
 import { ExpenseCard } from '@/components/expenses/ExpenseCard';
@@ -84,7 +95,21 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
-  const [filtersOpen, setFiltersOpen] = useState<boolean>(true);
+  const [filtersOpen, setFiltersOpen] = useState<boolean>(false);
+
+  // 2-click inline delete state
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const pendingDeleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // AlertDialog for bulk delete (installments / recurring)
+  const [bulkDeleteDialog, setBulkDeleteDialog] = useState<{
+    open: boolean;
+    expense: Expense | null;
+    mode: 'installment' | 'recurring' | null;
+  }>({ open: false, expense: null, mode: null });
+
+  // Mobile load-more state
+  const [mobileShowCount, setMobileShowCount] = useState<number>(20);
 
   // Separate state for each filter level enables independent reset logic.
   // Single state object would complicate cascading resets (Type → Category → Subcategory).
@@ -224,6 +249,18 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
     });
   }, [allExpenses, selectedYear, selectedMonth]);
 
+  // Cleanup pending delete timer on unmount
+  useEffect(() => {
+    return () => {
+      if (pendingDeleteTimerRef.current) clearTimeout(pendingDeleteTimerRef.current);
+    };
+  }, []);
+
+  // Reset mobile show count when filters change
+  useEffect(() => {
+    setMobileShowCount(20);
+  }, [selectedYear, selectedMonth, selectedType, selectedCategoryId, selectedSubCategoryId]);
+
   /**
    * Click-outside handler for custom dropdowns
    *
@@ -271,72 +308,36 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   };
 
   /**
-   * Context-aware deletion with two-stage confirmation
-   *
-   * Three Deletion Modes:
-   *
-   * 1. INSTALLMENT EXPENSE (e.g., car payment 6/24):
-   *    First OK → Delete this installment only
-   *    Cancel then OK → Delete all 24 installments
-   *
-   * 2. RECURRING EXPENSE (e.g., Netflix subscription):
-   *    First OK → Delete this occurrence
-   *    Cancel then OK → Delete all recurring entries
-   *
-   * 3. REGULAR EXPENSE:
-   *    Single confirmation with expense details
-   *
-   * Why two-stage? Single prompt is ambiguous ("Delete" = one OR all?).
-   * Two-stage makes intent explicit, reduces accidental bulk deletion.
+   * 2-click inline delete: first click arms the button (3s disarm timer),
+   * second click executes. For installments/recurring, opens AlertDialog
+   * so the user can choose between single or bulk delete.
    */
-  const handleDeleteExpense = async (expense: Expense) => {
-    // Check if this is an installment expense
-    if (expense.isInstallment && expense.installmentParentId) {
-      const confirmMessage =
-        `Questa è la rata ${expense.installmentNumber}/${expense.installmentTotal}. Vuoi eliminare:\n\n` +
-        `[SOLO QUESTA RATA] - Solo questa rata singola\n` +
-        `[TUTTE LE RATE] - Tutte le ${expense.installmentTotal} rate\n\n` +
-        `Clicca OK per eliminare solo questa rata, Annulla per tornare indietro.`;
+  const handleDeleteExpense = useCallback((expense: Expense) => {
+    const isComplex = (expense.isInstallment && expense.installmentParentId) ||
+      (expense.isRecurring && expense.recurringParentId);
 
-      const deleteSingle = window.confirm(confirmMessage);
-
-      if (deleteSingle) {
-        await deleteSingleExpense(expense);
-      } else {
-        const deleteAll = window.confirm(`Vuoi eliminare TUTTE le ${expense.installmentTotal} rate?`);
-        if (deleteAll) {
-          await deleteAllInstallmentExpenses(expense.installmentParentId);
-        }
-      }
+    if (isComplex) {
+      // Open AlertDialog for bulk delete choice
+      const mode = expense.isInstallment ? 'installment' : 'recurring';
+      setBulkDeleteDialog({ open: true, expense, mode });
+      return;
     }
-    // Check if this is a recurring expense
-    else if (expense.isRecurring && expense.recurringParentId) {
-      const confirmMessage =
-        `Questa è una voce ricorrente. Vuoi eliminare:\n\n` +
-        `[SOLO QUESTA] - Solo questa voce singola\n` +
-        `[TUTTE] - Tutte le voci ricorrenti correlate\n\n` +
-        `Clicca OK per eliminare solo questa, Annulla per tornare indietro.`;
 
-      const deleteSingle = window.confirm(confirmMessage);
-
-      if (deleteSingle) {
-        await deleteSingleExpense(expense);
-      } else {
-        const deleteAll = window.confirm('Vuoi eliminare TUTTE le voci ricorrenti correlate?');
-        if (deleteAll) {
-          await deleteAllRecurringExpenses(expense.recurringParentId);
-        }
-      }
+    // 2-click inline for regular expenses
+    if (pendingDeleteId === expense.id) {
+      // Second click: confirm
+      if (pendingDeleteTimerRef.current) clearTimeout(pendingDeleteTimerRef.current);
+      setPendingDeleteId(null);
+      void deleteSingleExpense(expense);
     } else {
-      // Regular expense
-      const confirmDelete = window.confirm(
-        `Sei sicuro di voler eliminare questa voce?${expense.notes ? `\n\n"${expense.notes}"` : ''}`
-      );
-      if (confirmDelete) {
-        await deleteSingleExpense(expense);
-      }
+      // First click: arm
+      if (pendingDeleteTimerRef.current) clearTimeout(pendingDeleteTimerRef.current);
+      setPendingDeleteId(expense.id);
+      pendingDeleteTimerRef.current = setTimeout(() => {
+        setPendingDeleteId(null);
+      }, 3000);
     }
-  };
+  }, [pendingDeleteId]);
 
   const deleteSingleExpense = async (expense: Expense) => {
     try {
@@ -397,13 +398,6 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
       console.error('Error deleting installment expenses:', error);
       toast.error("Errore nell'eliminazione delle rate");
     }
-  };
-
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('it-IT', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(amount);
   };
 
   // Filter options for Type
@@ -524,10 +518,34 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
-          <p className="text-muted-foreground">Caricamento spese...</p>
+      <div className="space-y-6">
+        {/* KPI skeleton */}
+        <div className="grid gap-4 grid-cols-2 desktop:grid-cols-4">
+          {[0, 1, 2, 3].map(i => (
+            <div key={i} className="rounded-lg border p-4 space-y-2">
+              <div className="h-3 w-20 bg-muted animate-pulse rounded" />
+              <div className="h-6 w-28 bg-muted animate-pulse rounded" />
+              <div className="h-3 w-12 bg-muted animate-pulse rounded" />
+            </div>
+          ))}
+        </div>
+        {/* Filters skeleton */}
+        <div className="rounded-lg border p-4">
+          <div className="h-4 w-16 bg-muted animate-pulse rounded mb-3" />
+          <div className="grid grid-cols-2 desktop:grid-cols-4 gap-3">
+            {[0, 1, 2, 3].map(i => <div key={i} className="h-9 bg-muted animate-pulse rounded" />)}
+          </div>
+        </div>
+        {/* Table skeleton */}
+        <div className="rounded-lg border p-4 space-y-3">
+          <div className="h-4 w-32 bg-muted animate-pulse rounded" />
+          {[0, 1, 2, 3, 4].map(i => (
+            <div key={i} className="flex items-center gap-3 py-2 border-b last:border-0">
+              <div className="h-3 w-24 bg-muted animate-pulse rounded" />
+              <div className="flex-1 h-3 bg-muted animate-pulse rounded" />
+              <div className="h-3 w-20 bg-muted animate-pulse rounded" />
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -538,20 +556,20 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">
+          <h2 className="text-2xl font-bold tracking-tight">
             {selectedMonth !== 'all' ? `${MONTHS.find(m => m.value === selectedMonth)?.label} ` : ''}{selectedYear}
           </h2>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-muted-foreground mt-0.5 text-sm">
             Gestisci le tue entrate e uscite
           </p>
         </div>
-        <Button onClick={handleAddExpense} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined} className="hidden desktop:flex dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
+        <Button onClick={handleAddExpense} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined} className="hidden desktop:flex">
           <Plus className="mr-2 h-4 w-4" />
           Nuova Spesa
         </Button>
       </div>
 
-      {/* Mobile FAB - Fixed bottom-right */}
+      {/* Mobile FAB */}
       <Button
         onClick={handleAddExpense}
         disabled={isDemo}
@@ -561,145 +579,112 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
         <Plus className="h-6 w-6" />
       </Button>
 
-      {/* Statistics Cards */}
+      {/* KPI — Trade Republic dominant value blocks */}
       <div className="grid gap-4 grid-cols-2 desktop:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Entrate Totali</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg desktop:text-2xl font-bold text-green-600">
-              {formatCurrency(totalIncome)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {filteredExpenses.filter(e => e.type === 'income').length} voci
-            </p>
-          </CardContent>
-        </Card>
+        <div className="rounded-lg border p-4 space-y-1">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Entrate</p>
+          <p className="text-xl font-bold font-mono text-green-600 dark:text-green-500 tabular-nums">
+            {cachedFormatCurrencyEUR(totalIncome)}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {filteredExpenses.filter(e => e.type === 'income').length} voci
+          </p>
+        </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Spese Totali</CardTitle>
-            <TrendingDown className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg desktop:text-2xl font-bold text-red-600">
-              {formatCurrency(totalExpenses)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {filteredExpenses.filter(e => e.type !== 'income').length} voci
-            </p>
-          </CardContent>
-        </Card>
+        <div className="rounded-lg border p-4 space-y-1">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Spese</p>
+          <p className="text-xl font-bold font-mono text-red-600 dark:text-red-500 tabular-nums">
+            {cachedFormatCurrencyEUR(totalExpenses)}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {filteredExpenses.filter(e => e.type !== 'income').length} voci
+          </p>
+        </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Bilancio Netto</CardTitle>
-            <Wallet className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`text-lg desktop:text-2xl font-bold ${
-                netBalance >= 0 ? 'text-green-600' : 'text-red-600'
-              }`}
-            >
-              {formatCurrency(netBalance)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Totale: {filteredExpenses.length} voci
-            </p>
-          </CardContent>
-        </Card>
+        <div className="rounded-lg border p-4 space-y-1">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Bilancio</p>
+          <p className={cn(
+            'text-xl font-bold font-mono tabular-nums',
+            netBalance >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'
+          )}>
+            {cachedFormatCurrencyEUR(netBalance)}
+          </p>
+          <p className="text-xs text-muted-foreground">{filteredExpenses.length} voci totali</p>
+        </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Rapporto Entrate/Spese</CardTitle>
-            <Scale className="h-4 w-4 text-purple-600" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-lg desktop:text-2xl font-bold ${getRatioColor(incomeExpenseRatio)}`}>
-              {formatRatio(incomeExpenseRatio)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {incomeExpenseRatio !== null && incomeExpenseRatio >= 1.2 && 'Salute finanziaria ottima'}
-              {incomeExpenseRatio !== null && incomeExpenseRatio >= 0.8 && incomeExpenseRatio < 1.2 && 'In equilibrio'}
-              {incomeExpenseRatio !== null && incomeExpenseRatio < 0.8 && 'Attenzione alle spese'}
-              {incomeExpenseRatio === null && 'Nessuna spesa registrata'}
-            </p>
-          </CardContent>
-        </Card>
+        <div className="rounded-lg border p-4 space-y-1">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Rapporto</p>
+          <p className={cn('text-xl font-bold font-mono tabular-nums', getRatioColor(incomeExpenseRatio))}>
+            {formatRatio(incomeExpenseRatio)}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {incomeExpenseRatio !== null && incomeExpenseRatio >= 1.2 && 'Salute ottima'}
+            {incomeExpenseRatio !== null && incomeExpenseRatio >= 0.8 && incomeExpenseRatio < 1.2 && 'In equilibrio'}
+            {incomeExpenseRatio !== null && incomeExpenseRatio < 0.8 && 'Attenzione'}
+            {incomeExpenseRatio === null && 'Nessun dato'}
+          </p>
+        </div>
       </div>
 
-      {/* Year Selection */}
-      {availableYears.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Seleziona Anno</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {availableYears.map(year => (
-                <Button
-                  key={year}
-                  variant={selectedYear === year ? "default" : "outline"}
-                  onClick={() => handleYearChange(year)}
-                  className={cn("min-w-[100px]", selectedYear === year && "dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600")}
-                >
-                  {year}
-                </Button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Filters */}
+      {/* Filters — includes year selector (integrated, not a separate card) */}
       <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
         <Card>
           <CardHeader>
             <CollapsibleTrigger asChild>
               <div className="flex items-center justify-between cursor-pointer w-full">
                 <div className="flex items-center gap-2">
-                  <Filter className="h-5 w-5 text-muted-foreground" />
-                  <CardTitle>Filtri</CardTitle>
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-base">Filtri</CardTitle>
+                  {hasActiveFilters && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                  )}
                 </div>
-                <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', filtersOpen && 'rotate-180')} />
               </div>
             </CollapsibleTrigger>
           </CardHeader>
           <CollapsibleContent>
             <CardContent>
               <div className="grid grid-cols-1 gap-3 desktop:flex desktop:flex-wrap desktop:items-end desktop:gap-4">
-                {/* Month Filter + current month quick button, always side by side */}
+                {/* Anno filter (integrated — replaces the separate Year card) */}
+                {availableYears.length > 0 && (
+                  <div className="flex flex-col gap-2 desktop:min-w-[110px]">
+                    <label className="text-sm font-medium">Anno</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {availableYears.map(year => (
+                        <Button
+                          key={year}
+                          variant={selectedYear === year ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => handleYearChange(year)}
+                          className="h-8 px-3 text-sm"
+                        >
+                          {year}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Month Filter + current month quick button */}
                 <div className="flex flex-col gap-2 desktop:min-w-[150px]">
                   <label className="text-sm font-medium">Mese</label>
                   <div className="flex items-center gap-2">
                     <div className="flex-1 min-w-0">
-                      <Select
-                        value={selectedMonth}
-                        onValueChange={setSelectedMonth}
-                      >
+                      <Select value={selectedMonth} onValueChange={setSelectedMonth}>
                         <SelectTrigger>
                           <SelectValue placeholder="Seleziona mese" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">Tutti</SelectItem>
                           {MONTHS.map(month => (
-                            <SelectItem key={month.value} value={month.value}>
-                              {month.label}
-                            </SelectItem>
+                            <SelectItem key={month.value} value={month.value}>{month.label}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
-                    <Button
-                      onClick={handleCurrentMonth}
-                      variant="secondary"
-                      size="default"
-                      className="shrink-0"
-                    >
-                      Mese corrente
+                    <Button onClick={handleCurrentMonth} variant="secondary" size="default" className="shrink-0">
+                      Corrente
                     </Button>
                   </div>
                 </div>
@@ -756,10 +741,10 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                       <button
                         type="button"
                         onClick={handleClearType}
-                        className="ml-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full p-0.5 transition-colors"
+                        className="ml-1 hover:bg-muted rounded-full p-0.5 transition-colors"
                         aria-label="Rimuovi filtro tipo"
                       >
-                        <X className="h-3 w-3 text-gray-600 dark:text-gray-400" />
+                        <X className="h-3 w-3 text-muted-foreground" />
                       </button>
                     </div>
                   )}
@@ -838,10 +823,10 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                       <button
                         type="button"
                         onClick={handleClearCategory}
-                        className="ml-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full p-0.5 transition-colors"
+                        className="ml-1 hover:bg-muted rounded-full p-0.5 transition-colors"
                         aria-label="Rimuovi filtro categoria"
                       >
-                        <X className="h-3 w-3 text-gray-600 dark:text-gray-400" />
+                        <X className="h-3 w-3 text-muted-foreground" />
                       </button>
                     </div>
                   )}
@@ -908,10 +893,10 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                       <button
                         type="button"
                         onClick={handleClearSubCategory}
-                        className="ml-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full p-0.5 transition-colors"
+                        className="ml-1 hover:bg-muted rounded-full p-0.5 transition-colors"
                         aria-label="Rimuovi filtro sottocategoria"
                       >
-                        <X className="h-3 w-3 text-gray-600 dark:text-gray-400" />
+                        <X className="h-3 w-3 text-muted-foreground" />
                       </button>
                     </div>
                   )}
@@ -946,7 +931,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
         </CardHeader>
         <CardContent>
           {/* Desktop: Table */}
-          <div className="hidden md:block">
+          <div className="hidden desktop:block">
             <ExpenseTable
               expenses={filteredExpenses}
               onEdit={handleEditExpense}
@@ -956,17 +941,17 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
           </div>
 
           {/* Mobile: Cards */}
-          <div className="md:hidden space-y-3">
+          <div className="desktop:hidden space-y-3">
             {filteredExpenses.length === 0 ? (
               <div className="rounded-md border border-dashed p-8 text-center">
                 <p className="text-muted-foreground">Nessuna voce trovata</p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Clicca su "Nuova Spesa" per aggiungere la prima voce
+                  Usa il pulsante + per aggiungere la prima voce
                 </p>
               </div>
             ) : (
               <>
-                {filteredExpenses.slice(0, 20).map((expense) => (
+                {filteredExpenses.slice(0, mobileShowCount).map((expense) => (
                   <ExpenseCard
                     key={expense.id}
                     expense={expense}
@@ -975,10 +960,19 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                     isDemo={isDemo}
                   />
                 ))}
-                {filteredExpenses.length > 20 && (
-                  <p className="text-sm text-muted-foreground text-center pt-2">
-                    Visualizzate 20 di {filteredExpenses.length} voci. Usa i filtri per ridurre i risultati.
-                  </p>
+                {filteredExpenses.length > mobileShowCount && (
+                  <div className="pt-2 text-center">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setMobileShowCount(prev => prev + 20)}
+                    >
+                      Carica altri {Math.min(20, filteredExpenses.length - mobileShowCount)}
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {mobileShowCount} di {filteredExpenses.length} voci
+                    </p>
+                  </div>
                 )}
               </>
             )}
@@ -993,6 +987,57 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
         expense={editingExpense}
         onSuccess={handleSuccess}
       />
+
+      {/* Bulk delete AlertDialog — for installments and recurring expenses */}
+      <AlertDialog
+        open={bulkDeleteDialog.open}
+        onOpenChange={(open) => {
+          if (!open) setBulkDeleteDialog({ open: false, expense: null, mode: null });
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {bulkDeleteDialog.mode === 'installment' ? 'Elimina rata' : 'Elimina voce ricorrente'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {bulkDeleteDialog.mode === 'installment' && bulkDeleteDialog.expense
+                ? `Questa è la rata ${bulkDeleteDialog.expense.installmentNumber}/${bulkDeleteDialog.expense.installmentTotal}. Vuoi eliminare solo questa rata o tutte le ${bulkDeleteDialog.expense.installmentTotal} rate?`
+                : 'Questa è una voce ricorrente. Vuoi eliminare solo questa voce o tutte le occorrenze correlate?'
+              }
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
+            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (bulkDeleteDialog.expense) void deleteSingleExpense(bulkDeleteDialog.expense);
+                setBulkDeleteDialog({ open: false, expense: null, mode: null });
+              }}
+            >
+              Solo questa
+            </Button>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                const exp = bulkDeleteDialog.expense;
+                if (!exp) return;
+                if (bulkDeleteDialog.mode === 'installment' && exp.installmentParentId) {
+                  void deleteAllInstallmentExpenses(exp.installmentParentId);
+                } else if (bulkDeleteDialog.mode === 'recurring' && exp.recurringParentId) {
+                  void deleteAllRecurringExpenses(exp.recurringParentId);
+                }
+                setBulkDeleteDialog({ open: false, expense: null, mode: null });
+              }}
+            >
+              {bulkDeleteDialog.mode === 'installment'
+                ? `Tutte le ${bulkDeleteDialog.expense?.installmentTotal ?? ''} rate`
+                : 'Tutte le ricorrenti'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

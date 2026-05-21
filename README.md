@@ -45,11 +45,9 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 
 ### Cashflow
 - Income and expense tracking with custom categories and subcategories, entered via a guided two-step dialog: pick the expense type first (Variable, Fixed, Debt/Installment, Income), then fill in only the relevant fields for that type
-- **Budget tab**: automatic budget tracking for all expense categories — items auto-generated from your categories with no manual setup; annual view with progress bars comparing current year vs budget, previous year, and historical average; click any row (category, section subtotal, or Total Expenses/Income) to open a historical year×month panel with min/max month highlights; Total Expenses also shows a per-type breakdown (Fixed / Variable / Debt) as separate month-by-month tables; collapsible sections with reordering; fully responsive on mobile with tappable cards and a per-item detail dialog
+- **Analisi tab**: unified period analysis with a three-state selector (current year / specific year + optional month / full history). 5-layer Sankey diagram, 4-level drill-down with breadcrumb navigation and hierarchical back-navigation, monthly and annual trend charts in a collapsible section. All charts respect the "history start year" preference from Settings
+- **Budget tab**: automatic budget tracking for all expense categories — items auto-generated from your categories with no manual setup; annual view with progress bars comparing current year vs budget, previous year, and historical average; click any row to open a historical year×month panel; collapsible sections with reordering; fully responsive on mobile
 - Bulk move transactions between categories/subcategories (cross-type supported)
-- 5-layer Sankey diagram visualization
-- 4-level drill-down for detailed expense analysis with hierarchical back-navigation that returns to the immediate parent view before the full flow
-- Period analysis with year and month filters — filtered sections include expense type breakdown (Fixed / Variable / Debt) pie chart that updates with the active filter
 - CSV export
 
 ### Dividends

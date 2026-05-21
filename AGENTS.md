@@ -393,11 +393,12 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - Applied in Allocazione (`AllocationCard` + page render functions) vs Patrimonio (`AssetCard` card grid). The distinction: allocation items are affordances, asset cards are information blocks.
 
 ### Mobile Tab Switcher: Segmented Pill vs Select
-- **≤3 tabs → segmented pill control**, never a `Select` dropdown. `Select` is a form-input pattern (2 taps, hidden options, overlay); a segmented pill is a navigation affordance (1 tap, all options visible at a glance).
-- **Pattern**: module-level `TABS` constant (stable reference for React Compiler), `role="tablist"` on the container div, `role="tab"` + `aria-selected={activeTab === value}` + `type="button"` on each button. Framer Motion `layoutId` spring pill (stiffness 400, damping 35) behind the active segment. Abbreviated labels (≤8 chars) to survive iPhone SE widths — icon + label always fits at `text-xs` in `flex-1 h-9` segments.
-- **Anti-pattern: floating pill for page-local tabs**. The floating pill (bottom nav style) is reserved for global page navigation. Using it for within-page section switching creates a semantic mismatch — floating signals "always accessible regardless of scroll", which is inappropriate for local tabs. Keep page-local switchers inline and let them scroll away.
-- **4+ tabs**: reconsider the pattern — horizontal scroll tab bar or a Select may be appropriate when 4+ labels can't fit equally. The ≤3 rule is strict.
-- Applied in `app/dashboard/assets/page.tsx` (Gestione / Corrente / Storico).
+- **Never use `Select` for tab navigation** — `Select` is a form-input pattern (2 taps, hidden options, overlay modal). A segmented pill is a navigation affordance (1 tap, all options visible).
+- **Pattern**: module-level `TABS` constant (stable reference for React Compiler), `role="tablist"` on the container div, `role="tab"` + `aria-selected={activeTab === value}` + `type="button"` on each button. Framer Motion `layoutId` spring pill (stiffness 400, damping 35) behind the active segment. Abbreviated labels (≤8 chars) to survive iPhone SE widths — icon + label fits at `text-xs` in `flex-1 h-9` segments.
+- **≤3 tabs**: full labels usually fit. **4–5 tabs**: works with abbreviated labels (e.g. "Spese" / "Dividendi" / "Analisi" / "Budget" / "C.Costo"). **6+ tabs**: reconsider — horizontal scroll `TabsList` with `overflow-x-auto flex-nowrap` may be more honest than cramming 6 pills.
+- On pages where a 5th tab is async-gated (e.g. `costCentersEnabled`), build the tab array dynamically inside the render but keep the base constant at module level: `const ALL_TABS = costCentersEnabled ? [...BASE_TABS, extraTab] : BASE_TABS`.
+- **Anti-pattern: floating pill for page-local tabs**. The floating pill (bottom nav style) is reserved for global page navigation. Keep page-local switchers inline so they scroll away naturally.
+- Applied in `app/dashboard/assets/page.tsx` (3 tabs) and `app/dashboard/cashflow/page.tsx` (4–5 tabs with abbreviated mobile labels).
 
 ### Mobile Header Trash Icon Pattern
 - In a card header that has a title/subtitle block on the left and a destructive icon button on the right, always use `flex items-start justify-between` (not `flex-col` + `sm:flex-row`). `flex-col` puts the trash button on its own row on mobile, wasting vertical space and breaking visual grouping. The subtitle text stays under the title in the left block; the button stays top-right in all viewports.
@@ -497,10 +498,9 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - Fix: ensure inactive tab panels are explicitly removed from layout with `data-[state=inactive]:hidden` (see `components/ui/tabs.tsx`)
 
 ### Skeleton as Dead Code — Loading State Silent Failure
-- Symptom: a skeleton component file exists and is well-implemented, but the page shows a blank flash (or nothing) during load.
-- Cause: the skeleton was never imported or used in the page. `if (loading) return null` (or no loading guard at all) was left in place — the skeleton was effectively dead code.
-- Fix: always verify the loading branch actively uses `<PageSkeleton />`. After creating or rewriting a skeleton, search for `return null` and `if (loading)` in the page file to confirm the skeleton is wired up. The TypeScript compiler does not catch an unused component.
-- Applied in `app/dashboard/allocation/page.tsx`: `AllocationPageSkeleton` existed for months but was never imported.
+- Symptom: a skeleton component exists and is well-implemented, but the page shows a blank flash (or nothing) during load.
+- Cause: the skeleton was never imported or used. `if (loading) return null` was left in place — the skeleton is dead code.
+- Fix: after creating or rewriting a skeleton, search for `return null` and `if (loading)` in the page file to confirm it's wired up. The TypeScript compiler does not catch an unused component.
 
 ### Recharts Legend and Tooltip Mismatch
 - `Legend` reads `<Bar fill>`, not `<Cell>`

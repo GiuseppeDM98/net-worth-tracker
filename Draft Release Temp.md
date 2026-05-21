@@ -24,6 +24,14 @@
 
 ## 🔧 Improvements
 
+- Merged the "Anno Corrente" and "Storico Totale" tabs in Cashflow into a single **"Analisi"** tab — choose between current year, a specific year (with optional month filter), or full history from a single period selector. A "Ripristina" button appears whenever a non-default period is active, returning to the current year in one tap
+- Cashflow tab navigation on mobile now uses a **smooth sliding pill control** — all tabs are visible at a glance with a spring animation between them, replacing the previous horizontal-scroll tab bar that required swiping to discover hidden tabs
+- Expense deletion in the Cashflow tracking tab now uses **inline two-tap confirmation** — first tap arms the button, second tap executes (auto-disarms after 3 seconds) — replacing the browser's native blocking pop-up dialog
+- Expense tracking tab now shows a **structural skeleton** while data loads — mirrors the real layout (KPI cards, filters, transaction list) instead of a bare spinner
+- Expense tracking tab filters are now **collapsed by default** — the transaction list is immediately visible when opening the tab, without having to scroll past four filter inputs
+- Expense tracking tab now shows a **"Mostra altri" button** instead of silently capping the mobile list at 20 items — tap to load more in batches of 20
+- Budget category subcategory rows now use a **neutral top border** for indentation instead of the previous left accent bar, which was inconsistent with the rest of the app's design
+
 - Redesigned the **Allocation (Allocazione)** page with a cleaner, Trade Republic-inspired layout: each asset class now shows its current value as a large dominant number, with current %, target %, and the buy/sell delta as a compact secondary line — replacing the previous dense four-section cards (eyebrow label, progress bar, value grid, difference banner) where no single number stood out. On mobile, allocation items are now a flat scrollable list instead of a card grid, making the drill-down navigation clearer. On desktop, the eight-column flat table is now a five-column table where value and percentage are stacked in the same cell, reducing visual noise while keeping all the same information
 - The action signal on each allocation item (COMPRA / VENDI / OK) is now a compact colored chip — no more color-coded progress bars filling the card; the chip communicates the rebalancing action at a glance
 - The Allocation page skeleton (shown while data loads) now accurately mirrors the real page layout — previously it showed a different card structure that caused a visible layout shift when data arrived
@@ -71,6 +79,9 @@
 - Redesigned the mobile bottom navigation as a centered floating pill bar with rounded corners and a smoother active-tab transition — replacing the previous full-width fixed bar
 
 ## 🐛 Bug Fixes
+
+- Fixed Cashflow "Analisi" tab showing all-time data when switching from "Storico" to "Anno" mode — the selected year now initializes correctly when entering year mode, so the displayed data matches the year shown in the selector
+- Fixed Cashflow trend charts ("Trend storici") not respecting the history start year configured in Settings — the "N anni di dati" count and all chart data now only include years from the configured start year onward
 
 - Fixed single stocks not appearing in the Sectors tab of Portfolio Exposure — direct stock positions now contribute to the sector breakdown based on their Yahoo Finance sector classification. Previously, only ETF holdings were aggregated into sectors; individual stocks were silently excluded even though they appeared correctly in the Top Holdings tab
 - Fixed stale data appearing in the Add Asset dialog when opening it a second time immediately after adding an asset — all fields now reset cleanly on every open
