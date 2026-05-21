@@ -119,7 +119,13 @@ components:
 
 **Creative North Star: "The Precision Instrument"**
 
-This system is built for one purpose: total clarity about your financial position. Every element earns its place by communicating a number, a trend, or a relationship. The aesthetic is Linear/Vercel clarity pushed further — not a design exercise, but an instrument. The default palette is achromatic by conviction. Color belongs to the data.
+This system is built for one purpose: total clarity about your financial position. Every element earns its place by communicating a number, a trend, or a relationship. The aesthetic draws from two co-primary references: Linear/Vercel clarity and Trade Republic hierarchy. Neither is secondary.
+
+**Linear / Vercel** provides the structural foundation: tight geometry, achromatic palette, strong typography, physics-native motion, zero decorative chrome.
+
+**Trade Republic** provides the data hierarchy: the primary number dominates physically and visually. Layout flows vertically — dominant value → inline variation chip → small label metadata. Flat `divide-y` lists instead of card-within-card nesting. No decorative progress bars. No box-within-box. Visual chrome is reduced to its structural minimum: only what separates, never what decorates.
+
+The two references are compatible. Both share dark mode as a premium experience, typography as structure, and zero tolerance for decoration that doesn't carry information.
 
 Dark mode is the primary experience. An Italian investor reviewing portfolio performance at their desk, evening light off, monitor close, expects precision: sharp contrasts, monospaced figures, no visual noise competing with numbers that represent years of work. Light mode is fully supported and equally refined, but the design intent was formed in darkness.
 
@@ -133,7 +139,9 @@ This system explicitly rejects three aesthetic modes: Bloomberg terminal coldnes
 - Radius is tight: 8px (inputs, buttons), 14px (cards) — never pill-shaped for containers
 - Elevation is ambient: surfaces layer through background steps, shadows are atmospheric whispers
 - Motion is physics-native: spring dialogs, ease-out-quart state transitions, circle-reveal theme toggle
-- Density is intentional — information is not hidden unless the data genuinely requires progressive disclosure
+- Hierarchy is Trade Republic-style: one dominant value per section, everything else is context
+- Chrome reduction is deliberate: flat lists over nested cards, divide-y over borders-on-boxes
+- Mobile-first: layouts are designed at 390px first; desktop adds columns, never simplifies
 
 ## 2. Colors: The Zero-Chroma Foundation
 
@@ -279,6 +287,69 @@ Periodic changes (monthly, YTD) are displayed as compact inline chips directly b
 
 **Rules:** Only render when snapshot data exists (at least one prior period). Never show a placeholder chip — absence communicates "no prior data" cleanly. Icon is `TrendingUp` or `TrendingDown` at `h-3 w-3`. Multiple chips wrap naturally via `flex-wrap gap-2`.
 
+### Dominant Value Block (Trade Republic Pattern)
+
+The canonical layout for any section where one number is the primary takeaway — asset value, allocation total, account balance.
+
+**Structure:**
+```
+[label — text-sm text-muted-foreground]
+[primary value — text-2xl font-bold font-mono]
+[variation chip + secondary metric — text-sm]
+[tertiary metadata — text-xs text-muted-foreground]
+```
+
+**Rules:**
+- Primary value is always `text-2xl font-bold font-mono` minimum. For page heroes, `text-3xl` or `text-4xl`.
+- The label above is small (`text-sm`) and muted — it names the number, it does not compete with it.
+- Variation (gain/loss, percentage) appears inline directly below the value as a chip or compact colored span, never as a separate card or column.
+- Tertiary metadata (date, ticker, ISIN) uses `text-xs text-muted-foreground` — it is present for reference, invisible at a glance.
+- Never place two equally-weighted numbers side by side. One must dominate; the other is context.
+
+### Flat List Row (Trade Republic Chrome Reduction)
+
+The canonical pattern for lists of financial items — assets, allocation rows, transaction history — where card-within-card nesting would add visual weight without adding information.
+
+**Structure:** `divide-y divide-border` container, each row is a `flex items-center justify-between py-3 px-0` div (no background, no border-radius, no shadow).
+
+**Rules:**
+- No card box per row. The `divide-y` line is the only separator.
+- Container may live inside a Card for page-level organization, but rows inside are always flat.
+- Hover state: `hover:bg-muted/30` — barely perceptible, confirms interactivity without adding chrome.
+- Row content follows Dominant Value Block hierarchy: primary value right-aligned in `font-mono`, label left-aligned.
+- Use this pattern wherever a `<ul>` of items would otherwise become a grid of `<Card>` boxes.
+
+### ActionChip
+
+A compact, text-only chip for contextual financial actions (buy / sell / hold signals, allocation status). Replaces color-coded icons where the action label carries more information than the icon.
+
+**Variants:**
+- **COMPRA** (buy signal): `bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20`
+- **VENDI** (sell signal): `bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20`
+- **OK** (on-target): `bg-muted text-muted-foreground border border-border`
+
+**Structure:** `inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium`
+
+**Rules:**
+- Text only — no icons inside an ActionChip. The label is the signal.
+- Never use ActionChip for navigation or primary actions. It is a status indicator, not a button.
+- On touch devices, ensure minimum 32px tap height via parent padding.
+
+### Segmented Pill Control
+
+A tab switcher for 2–4 mutually exclusive views within a section. Replaces `<Select>` dropdowns where options are few, short, and always visible. The active pill animates via Framer Motion `layoutId` spring.
+
+**Structure:** `role="tablist"` container with `bg-muted rounded-lg p-1`, each option is a `role="tab"` button. Active pill is a `motion.div` with `layoutId` that slides between options.
+
+**Spring:** `stiffness: 400, damping: 35` — snappy without overshooting.
+
+**Rules:**
+- 2–4 options maximum. Beyond 4, use a Select or vertical nav.
+- Labels are abbreviated for mobile (≤10 chars preferred). Full labels on `desktop:`.
+- Full ARIA: `role="tablist"` on container, `role="tab"` + `aria-selected` per button.
+- Only use for view-switching within a page section. Global navigation uses the bottom pill or sidebar.
+- Desktop may use shadcn `TabsList` when the design calls for a more open tab style. The segmented pill is the mobile-first default.
+
 ## 6. Do's and Don'ts
 
 ### Do:
@@ -303,3 +374,8 @@ Periodic changes (monthly, YTD) are displayed as compact inline chips directly b
 - **Don't** use glassmorphism (`backdrop-filter: blur`) decoratively. A blurred surface must be structurally justified.
 - **Don't** use proportional figures for financial numbers in tabular contexts. `font-variant-numeric: tabular-nums` or `font-feature-settings: "tnum" 1` is required wherever numbers appear in column-aligned positions.
 - **Don't** add shadows larger than Lift to in-document cards. Float shadow creates false depth hierarchy when applied to surfaces that haven't left document flow.
+- **Don't** nest cards inside cards (box-within-box). If a list of items lives inside a Card container, the rows are flat — no individual card per item.
+- **Don't** use progress bars to communicate allocation or weight unless the visual fill carries information the number alone cannot convey. A dominant `font-mono` value + label is almost always clearer.
+- **Don't** give equal visual weight to multiple values when one is the primary takeaway. Apply the Dominant Value Block: one number commands, the rest are context.
+- **Don't** use `lg:` (1024px) as a layout breakpoint for wide-screen changes. iPad Mini in landscape is 1024px and receives the mobile treatment by design. Use `desktop:` (1440px) for all layout switches.
+- **Don't** design the desktop version first and then adapt it for mobile. Mobile layout is the base; desktop adds columns, tables, and sidebar — it does not simplify a desktop original.
