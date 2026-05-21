@@ -36,6 +36,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 ### shadcn Card Built-in Padding
 - `Card` (new-york) has `py-6` built-in via its own className. When there is no `CardHeader`, `CardContent` is the first child — no manual `pt-6` is needed on `CardContent`. Add it only if you need extra top spacing beyond the Card's own `py-6`.
 - `CardContent` adds `px-6` only (no vertical padding). The vertical rhythm comes entirely from the Card's `py-6` + the `gap-6` between children.
+- **`CardHeader` applies `flex flex-col` — breaks inner flex-1 truncation**: shadcn's `CardHeader` renders as `flex flex-col`. If you place a `flex justify-between` row inside it, any `flex-1` grandchild acts on the vertical axis instead of horizontal — text `truncate` stops working and `shrink-0` siblings get pushed off-screen. Fix: replace `CardHeader` with a plain `<div className="px-4 py-3 flex items-start gap-2">` (or whatever padding you need) when you need a horizontal flex layout in a card header. This was the root cause of long asset names overflowing `AssetCard` and hiding the chevron. Applied in `components/assets/AssetCard.tsx`.
 
 ### Layout Tokens
 - Never hardcode structural layout colors in shell components
@@ -99,6 +100,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Aggregate keys: `__subtotal_{type}__`, `__total_expenses__`, `__total_income__`
 - `BudgetItem.order` is required, including in tests and helper fixtures
 - In Budget desktop flows, prefer rendering large local subtrees as pure render helpers or top-level components, not nested JSX component definitions inside the page component; otherwise simple row selection can remount the whole table and cause visible flashes
+- **React Compiler: components must be at module level** — never define a component (function that returns JSX) inside another component's body, even as a helper. React Compiler detects this and throws "Cannot create components during render" at every call site. The component can close over parent state IF state is passed as explicit props; if it needs parent state, move it to module level and pass state + setters as props. Applied to `SortHead` in `AssetManagementTab.tsx` (receives `sortState` + `onSort` as props) and `MobileHistoricalView` in `assets/page.tsx` (own `useState` for open/close).
 
 ### Settings Synchronization
 - Every new settings field must be handled in three places: type definition, `getSettings()`, `setSettings()`
@@ -374,6 +376,9 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - History chapter intro pattern: use a short editorial intro plus 2-3 sentence section headers to orient the user before dense chart clusters; keep these blocks informational, not decorative
 - Dev/internal tool sections in settings pages: isolate with `border-t border-border pt-6` + a `text-xs uppercase tracking-widest` eyebrow label in a distinct color (e.g. orange for dev/danger zones); never co-locate dev tools in a functional product tab (dividendi, spese, etc.)
 - For refresh affordances on dense historical tables, highlight only the active shell/header and timestamp the refresh there; avoid flashing rows or cells broadly
+
+### Mobile Layout for Large Monetary Values
+- **Side-by-side `text-2xl`+ values overflow on mobile**: a `flex justify-between` row with two large numbers (e.g. `text-3xl` portfolio total + `text-xl` G/P amount) will overflow on narrow screens — the combined width exceeds the card. Fix: use a stacked vertical layout — primary value at full width, secondary value as a smaller colored line below with the percentage as an inline `<span>`. Pattern: `<p className="text-3xl font-bold font-mono">{primary}</p><p className="text-sm font-semibold font-mono {color}">{secondary} <span className="text-xs opacity-80">({pct}%)</span></p>`. This is impossible to overflow regardless of viewport width and follows Trade Republic hierarchy. Applied in `AssetManagementTab` summary card and `AssetCard` Valore Totale + G/P section.
 
 ### Mobile Header Trash Icon Pattern
 - In a card header that has a title/subtitle block on the left and a destructive icon button on the right, always use `flex items-start justify-between` (not `flex-col` + `sm:flex-row`). `flex-col` puts the trash button on its own row on mobile, wasting vertical space and breaking visual grouping. The subtitle text stays under the title in the left block; the button stays top-right in all viewports.

@@ -24,6 +24,17 @@
 
 ## 🔧 Improvements
 
+- Redesigned the **Patrimonio (Asset Management)** page with a cleaner, Trade Republic-inspired layout: portfolio total and individual asset values are now displayed as dominant numbers, with gain/loss shown as a compact colored secondary line below — eliminating the side-by-side layout that caused values to overflow on narrow screens
+- Added **column sorting** to the desktop asset table — click Valore Totale, G/P%, Peso%, Nome, or Classe to sort; click again to reverse direction
+- Added a **compact 3-month summary** for the Current Year and History tabs on mobile: shows the last three available months per asset with color-coded month-over-month changes, replacing the previous "desktop recommended" banner that provided no useful information on mobile
+- The **expand/collapse chevron** on mobile asset cards now has a visible bordered button style, making it clearly recognizable as an interactive control
+- Asset management now uses **2-click inline delete confirmation** — first click arms the button ("Conferma?"), second click executes; auto-disarms after 3 seconds — replacing the browser's native `confirm()` dialog
+- Asset cards on mobile now correctly truncate long instrument names and always show the asset class badge and chevron — previously long names could push controls off screen
+- Asset management table and cards now correctly follow the active color theme — previously some elements used hardcoded gray colors that didn't adapt to Solar Dusk, Cyberpunk, and other themes
+- Asset history table summary columns (Mese Prec. %, YTD %, Da Inizio %) no longer show colored left-border accents — replaced with a subtle neutral background that works across all themes
+- The "From Start %" column in asset history tables is now correctly labeled "Da Inizio %"
+- Gain/loss (G/P) is now shown for assets that have a cost basis but no tax rate configured — previously the metric was hidden unless both fields were set
+
 - Added a **12-month sparkline** to the Overview hero card — a compact trend line appears below the monthly and YTD variation chips, showing how your net worth has moved over the past year. Start and end values are labelled for immediate context without having to open the History page
 - Added a **permanent savings rate** to the Overview cashflow card — your current month's savings rate (income minus expenses ÷ income) is now always visible below the income and expense figures, color-coded by level: green above 20%, amber between 10–20%, red below 10%
 - The **fiscal detail cards** on the Overview page (Net Total, Net Liquid, Unrealized Gains, Estimated Taxes) are now collapsible under a "Dettaglio Fiscale" header — expanded by default so nothing is hidden, but can be collapsed to reduce visual noise for users who check this section less often

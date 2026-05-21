@@ -8,16 +8,15 @@
  * - Macro-tabs ('anno-corrente', 'storico') mounted only when first activated
  * - Once mounted, stay mounted (no re-mounting on switch)
  * - Sub-tabs inside each macro-tab mount all at once (data is already in memory)
- * - Improves initial load performance
  *
  * TAB STRUCTURE:
  * - Gestione Asset: asset table with CRUD operations
  * - Anno Corrente: Prezzi / Valori / Asset Class for the current calendar year
  * - Storico: Prezzi / Valori / Asset Class for all history (from Nov 2025)
  *
- * REFRESH FUNCTIONALITY:
- * Manual refresh button invalidates React Query cache and refetches all data.
- * Useful after external price updates or when data seems stale.
+ * MOBILE HISTORICAL TABS:
+ * Banner rimosso. Sostituito con AssetMobileSummary (ultimi 3 mesi compatti) +
+ * Collapsible per la tabella completa. Desktop: tabella sempre visibile.
  */
 
 'use client';
@@ -29,21 +28,59 @@ import { useAssets } from '@/lib/hooks/useAssets';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Wallet, CalendarClock, History, Monitor } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Button } from '@/components/ui/button';
+import { Wallet, CalendarClock, History, ChevronDown } from 'lucide-react';
 import { AssetManagementTab } from '@/components/assets/AssetManagementTab';
 import { AssetPriceHistoryTable } from '@/components/assets/AssetPriceHistoryTable';
 import { AssetClassHistoryTable } from '@/components/assets/AssetClassHistoryTable';
+import { AssetMobileSummary } from '@/components/assets/AssetMobileSummary';
 import { getCurrentYear } from '@/lib/utils/assetPriceHistoryUtils';
-import { cn } from '@/lib/utils';
 import { tabPanelSwitch } from '@/lib/utils/motionVariants';
+import type { ComponentProps } from 'react';
 
 type MacroTabId = 'management' | 'anno-corrente' | 'storico';
 type HistoricalSubTabId = 'prezzi' | 'valori' | 'asset-class';
 
+// Mobile-only wrapper: compact 3-month summary above a collapsible full table.
+// Defined at module level so React sees a stable component reference each render.
+// Each instance owns its own open state — no shared state needed in the page.
+function MobileHistoricalView({
+  summaryProps,
+  tableNode,
+}: {
+  summaryProps: ComponentProps<typeof AssetMobileSummary>;
+  tableNode: React.ReactNode;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <div className="desktop:hidden space-y-4">
+      <AssetMobileSummary {...summaryProps} />
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CollapsibleTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="w-full flex items-center justify-center gap-1.5 text-muted-foreground"
+          >
+            {isOpen ? 'Nascondi tabella' : 'Mostra tabella completa'}
+            <ChevronDown
+              className={`h-4 w-4 transition-transform duration-200 motion-reduce:transition-none ${
+                isOpen ? 'rotate-180' : ''
+              }`}
+            />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>{tableNode}</CollapsibleContent>
+      </Collapsible>
+    </div>
+  );
+}
+
 export default function AssetsPage() {
   const { user } = useAuth();
 
-  // React Query hooks - automatic caching and invalidation
   const { data: assets = [], isLoading: loading, refetch: refetchAssets } = useAssets(user?.uid);
   const {
     data: snapshots = [],
@@ -51,7 +88,6 @@ export default function AssetsPage() {
     refetch: refetchSnapshots,
   } = useSnapshots(user?.uid);
 
-  // Macro-tab state — lazy loading applied only to 'anno-corrente' and 'storico'
   const [mountedTabs, setMountedTabs] = useState<Set<MacroTabId>>(new Set(['management']));
   const [activeTab, setActiveTab] = useState<MacroTabId>('management');
   const [mountedHistoricalSubTabs, setMountedHistoricalSubTabs] = useState<
@@ -81,10 +117,7 @@ export default function AssetsPage() {
     value: string
   ) => {
     const nextValue = value as HistoricalSubTabId;
-    setHistoricalSubTabs((prev) => ({
-      ...prev,
-      [tab]: nextValue,
-    }));
+    setHistoricalSubTabs((prev) => ({ ...prev, [tab]: nextValue }));
     setMountedHistoricalSubTabs((prev) => ({
       ...prev,
       [tab]: new Set(prev[tab]).add(nextValue),
@@ -99,7 +132,6 @@ export default function AssetsPage() {
   const handleRefresh = async () => {
     const refreshViewKey = activeViewKey;
     setIsRefreshing(true);
-
     try {
       await Promise.all([refetchAssets(), refetchSnapshots()]);
       setLastRefreshAt(new Date());
@@ -110,35 +142,13 @@ export default function AssetsPage() {
     }
   };
 
-  const formatRefreshTime = (date: Date | null) => {
-    if (!date) return null;
-
-    return new Intl.DateTimeFormat('it-IT', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    }).format(date);
-  };
-
-  const lastRefreshLabel = formatRefreshTime(lastRefreshAt);
-  const mobileBannerClassName = cn(
-    'desktop:hidden mb-4 flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm',
-    'border-border bg-card text-muted-foreground',
-    isRefreshing && 'border-primary/30 bg-primary/5 text-foreground'
-  );
-
-  // Anno Corrente: only active (quantity > 0) assets with the flag enabled.
-  // Sold assets are excluded here — they can't have meaningful current-year data
-  // if sold before this year, and if sold during the year they'd appear via snapshots
-  // anyway (but we keep this strict for simplicity).
+  // Anno Corrente: only active (quantity > 0) assets with the flag enabled
   const historyTableAssets = useMemo(
     () => assets.filter((a) => a.quantity > 0 && a.includeInHistoryTables === true),
     [assets]
   );
 
-  // Storico: includes sold assets (quantity === 0) with the flag enabled so their
-  // historical months still show with a "Venduto" badge. Assets completely removed
-  // from Firestore can't be recovered (flag lost), so only qty=0 ones are preserved.
+  // Storico: includes sold assets (quantity === 0) with the flag enabled
   const historyTableAssetsAll = useMemo(
     () => assets.filter((a) => a.includeInHistoryTables === true),
     [assets]
@@ -146,8 +156,14 @@ export default function AssetsPage() {
 
   if (loading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-gray-500 dark:text-gray-400">Caricamento...</div>
+      <div className="space-y-6 max-desktop:portrait:pb-20">
+        <div className="space-y-2">
+          <div className="h-8 w-40 rounded-lg bg-muted animate-pulse" />
+          <div className="h-4 w-56 rounded bg-muted animate-pulse" />
+        </div>
+        <div className="h-10 w-80 rounded-xl bg-muted animate-pulse" />
+        <div className="h-24 rounded-xl bg-muted animate-pulse" />
+        <div className="h-64 rounded-xl bg-muted animate-pulse" />
       </div>
     );
   }
@@ -155,12 +171,10 @@ export default function AssetsPage() {
   return (
     <div className="space-y-6 max-desktop:portrait:pb-20">
       <div>
-        <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Patrimonio</p>
-        <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Patrimonio</h1>
+        <h1 className="text-2xl font-bold text-foreground">Patrimonio</h1>
         <p className="mt-2 text-muted-foreground">Gestisci e monitora il tuo patrimonio</p>
       </div>
 
-      {/* Outer tabs: 3 macro-tabs */}
       <Tabs defaultValue="management" value={activeTab} onValueChange={handleTabChange} className="w-full">
         {/* Mobile (< 1440px): Radix Select for section switching */}
         <div className="desktop:hidden mb-4">
@@ -205,35 +219,18 @@ export default function AssetsPage() {
           </motion.div>
         </TabsContent>
 
-        {/* Macro-tab 2: Anno Corrente (lazy-loaded) — sub-tabs: Prezzi, Valori, Asset Class */}
+        {/* Macro-tab 2: Anno Corrente (lazy-loaded) */}
         {mountedTabs.has('anno-corrente') && (
           <TabsContent value="anno-corrente" className="mt-6" forceMount>
-            <div className={mobileBannerClassName}>
-              <div className="flex items-center gap-2">
-                <Monitor className="h-4 w-4 shrink-0" />
-                <span>Per una migliore esperienza si consiglia la visualizzazione su desktop.</span>
-              </div>
-              {lastRefreshLabel && activeTab === 'anno-corrente' ? (
-                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                  Agg. {lastRefreshLabel}
-                </span>
-              ) : null}
-            </div>
             <Tabs
               value={historicalSubTabs['anno-corrente']}
               onValueChange={(value) => handleHistoricalSubTabChange('anno-corrente', value)}
               className="w-full"
             >
               <TabsList className="grid grid-cols-3 mb-4">
-                <TabsTrigger value="prezzi" className="text-xs sm:text-sm">
-                  Prezzi
-                </TabsTrigger>
-                <TabsTrigger value="valori" className="text-xs sm:text-sm">
-                  Valori
-                </TabsTrigger>
-                <TabsTrigger value="asset-class" className="text-xs sm:text-sm">
-                  Asset Class
-                </TabsTrigger>
+                <TabsTrigger value="prezzi" className="text-xs sm:text-sm">Prezzi</TabsTrigger>
+                <TabsTrigger value="valori" className="text-xs sm:text-sm">Valori</TabsTrigger>
+                <TabsTrigger value="asset-class" className="text-xs sm:text-sm">Asset Class</TabsTrigger>
               </TabsList>
 
               {mountedHistoricalSubTabs['anno-corrente'].has('prezzi') && (
@@ -243,22 +240,52 @@ export default function AssetsPage() {
                     animate={historicalSubTabs['anno-corrente'] === 'prezzi' ? 'visible' : 'hidden'}
                     variants={tabPanelSwitch}
                   >
-                    <AssetPriceHistoryTable
-                      assets={historyTableAssets}
-                      snapshots={snapshots}
-                      filterYear={getCurrentYear()}
-                      displayMode="price"
-                      includePreviousMonthBaseline={true}
-                      restrictToPassedAssets={true}
-                      showTotalRow={false}
-                      loading={snapshotsLoading}
-                      onRefresh={handleRefresh}
-                      isRefreshing={isRefreshing}
-                      isActiveView={activeViewKey === 'anno-corrente:prezzi'}
-                      isLatestRefreshedView={lastRefreshedViewKey === 'anno-corrente:prezzi'}
-                      refreshToken={refreshToken}
-                      lastRefreshAt={lastRefreshAt}
+                    <MobileHistoricalView
+                      summaryProps={{
+                        assets: historyTableAssets,
+                        snapshots,
+                        filterYear: getCurrentYear(),
+                        displayMode: 'price',
+                        includePreviousMonthBaseline: true,
+                        restrictToPassedAssets: true,
+                      }}
+                      tableNode={
+                        <AssetPriceHistoryTable
+                          assets={historyTableAssets}
+                          snapshots={snapshots}
+                          filterYear={getCurrentYear()}
+                          displayMode="price"
+                          includePreviousMonthBaseline={true}
+                          restrictToPassedAssets={true}
+                          showTotalRow={false}
+                          loading={snapshotsLoading}
+                          onRefresh={handleRefresh}
+                          isRefreshing={isRefreshing}
+                          isActiveView={activeViewKey === 'anno-corrente:prezzi'}
+                          isLatestRefreshedView={lastRefreshedViewKey === 'anno-corrente:prezzi'}
+                          refreshToken={refreshToken}
+                          lastRefreshAt={lastRefreshAt}
+                        />
+                      }
                     />
+                    <div className="hidden desktop:block">
+                      <AssetPriceHistoryTable
+                        assets={historyTableAssets}
+                        snapshots={snapshots}
+                        filterYear={getCurrentYear()}
+                        displayMode="price"
+                        includePreviousMonthBaseline={true}
+                        restrictToPassedAssets={true}
+                        showTotalRow={false}
+                        loading={snapshotsLoading}
+                        onRefresh={handleRefresh}
+                        isRefreshing={isRefreshing}
+                        isActiveView={activeViewKey === 'anno-corrente:prezzi'}
+                        isLatestRefreshedView={lastRefreshedViewKey === 'anno-corrente:prezzi'}
+                        refreshToken={refreshToken}
+                        lastRefreshAt={lastRefreshAt}
+                      />
+                    </div>
                   </motion.div>
                 </TabsContent>
               )}
@@ -270,22 +297,52 @@ export default function AssetsPage() {
                     animate={historicalSubTabs['anno-corrente'] === 'valori' ? 'visible' : 'hidden'}
                     variants={tabPanelSwitch}
                   >
-                    <AssetPriceHistoryTable
-                      assets={historyTableAssets}
-                      snapshots={snapshots}
-                      filterYear={getCurrentYear()}
-                      displayMode="totalValue"
-                      includePreviousMonthBaseline={true}
-                      restrictToPassedAssets={true}
-                      showTotalRow={true}
-                      loading={snapshotsLoading}
-                      onRefresh={handleRefresh}
-                      isRefreshing={isRefreshing}
-                      isActiveView={activeViewKey === 'anno-corrente:valori'}
-                      isLatestRefreshedView={lastRefreshedViewKey === 'anno-corrente:valori'}
-                      refreshToken={refreshToken}
-                      lastRefreshAt={lastRefreshAt}
+                    <MobileHistoricalView
+                      summaryProps={{
+                        assets: historyTableAssets,
+                        snapshots,
+                        filterYear: getCurrentYear(),
+                        displayMode: 'totalValue',
+                        includePreviousMonthBaseline: true,
+                        restrictToPassedAssets: true,
+                      }}
+                      tableNode={
+                        <AssetPriceHistoryTable
+                          assets={historyTableAssets}
+                          snapshots={snapshots}
+                          filterYear={getCurrentYear()}
+                          displayMode="totalValue"
+                          includePreviousMonthBaseline={true}
+                          restrictToPassedAssets={true}
+                          showTotalRow={true}
+                          loading={snapshotsLoading}
+                          onRefresh={handleRefresh}
+                          isRefreshing={isRefreshing}
+                          isActiveView={activeViewKey === 'anno-corrente:valori'}
+                          isLatestRefreshedView={lastRefreshedViewKey === 'anno-corrente:valori'}
+                          refreshToken={refreshToken}
+                          lastRefreshAt={lastRefreshAt}
+                        />
+                      }
                     />
+                    <div className="hidden desktop:block">
+                      <AssetPriceHistoryTable
+                        assets={historyTableAssets}
+                        snapshots={snapshots}
+                        filterYear={getCurrentYear()}
+                        displayMode="totalValue"
+                        includePreviousMonthBaseline={true}
+                        restrictToPassedAssets={true}
+                        showTotalRow={true}
+                        loading={snapshotsLoading}
+                        onRefresh={handleRefresh}
+                        isRefreshing={isRefreshing}
+                        isActiveView={activeViewKey === 'anno-corrente:valori'}
+                        isLatestRefreshedView={lastRefreshedViewKey === 'anno-corrente:valori'}
+                        refreshToken={refreshToken}
+                        lastRefreshAt={lastRefreshAt}
+                      />
+                    </div>
                   </motion.div>
                 </TabsContent>
               )}
@@ -316,35 +373,18 @@ export default function AssetsPage() {
           </TabsContent>
         )}
 
-        {/* Macro-tab 3: Storico (lazy-loaded) — sub-tabs: Prezzi, Valori, Asset Class */}
+        {/* Macro-tab 3: Storico (lazy-loaded) */}
         {mountedTabs.has('storico') && (
           <TabsContent value="storico" className="mt-6" forceMount>
-            <div className={mobileBannerClassName}>
-              <div className="flex items-center gap-2">
-                <Monitor className="h-4 w-4 shrink-0" />
-                <span>Per una migliore esperienza si consiglia la visualizzazione su desktop.</span>
-              </div>
-              {lastRefreshLabel && activeTab === 'storico' ? (
-                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                  Agg. {lastRefreshLabel}
-                </span>
-              ) : null}
-            </div>
             <Tabs
               value={historicalSubTabs.storico}
               onValueChange={(value) => handleHistoricalSubTabChange('storico', value)}
               className="w-full"
             >
               <TabsList className="grid grid-cols-3 mb-4">
-                <TabsTrigger value="prezzi" className="text-xs sm:text-sm">
-                  Prezzi
-                </TabsTrigger>
-                <TabsTrigger value="valori" className="text-xs sm:text-sm">
-                  Valori
-                </TabsTrigger>
-                <TabsTrigger value="asset-class" className="text-xs sm:text-sm">
-                  Asset Class
-                </TabsTrigger>
+                <TabsTrigger value="prezzi" className="text-xs sm:text-sm">Prezzi</TabsTrigger>
+                <TabsTrigger value="valori" className="text-xs sm:text-sm">Valori</TabsTrigger>
+                <TabsTrigger value="asset-class" className="text-xs sm:text-sm">Asset Class</TabsTrigger>
               </TabsList>
 
               {mountedHistoricalSubTabs.storico.has('prezzi') && (
@@ -354,21 +394,49 @@ export default function AssetsPage() {
                     animate={historicalSubTabs.storico === 'prezzi' ? 'visible' : 'hidden'}
                     variants={tabPanelSwitch}
                   >
-                    <AssetPriceHistoryTable
-                      assets={historyTableAssetsAll}
-                      snapshots={snapshots}
-                      filterStartDate={{ year: 2025, month: 11 }}
-                      displayMode="price"
-                      restrictToPassedAssets={true}
-                      showTotalRow={false}
-                      loading={snapshotsLoading}
-                      onRefresh={handleRefresh}
-                      isRefreshing={isRefreshing}
-                      isActiveView={activeViewKey === 'storico:prezzi'}
-                      isLatestRefreshedView={lastRefreshedViewKey === 'storico:prezzi'}
-                      refreshToken={refreshToken}
-                      lastRefreshAt={lastRefreshAt}
+                    <MobileHistoricalView
+                      summaryProps={{
+                        assets: historyTableAssetsAll,
+                        snapshots,
+                        filterStartDate: { year: 2025, month: 11 },
+                        displayMode: 'price',
+                        restrictToPassedAssets: true,
+                      }}
+                      tableNode={
+                        <AssetPriceHistoryTable
+                          assets={historyTableAssetsAll}
+                          snapshots={snapshots}
+                          filterStartDate={{ year: 2025, month: 11 }}
+                          displayMode="price"
+                          restrictToPassedAssets={true}
+                          showTotalRow={false}
+                          loading={snapshotsLoading}
+                          onRefresh={handleRefresh}
+                          isRefreshing={isRefreshing}
+                          isActiveView={activeViewKey === 'storico:prezzi'}
+                          isLatestRefreshedView={lastRefreshedViewKey === 'storico:prezzi'}
+                          refreshToken={refreshToken}
+                          lastRefreshAt={lastRefreshAt}
+                        />
+                      }
                     />
+                    <div className="hidden desktop:block">
+                      <AssetPriceHistoryTable
+                        assets={historyTableAssetsAll}
+                        snapshots={snapshots}
+                        filterStartDate={{ year: 2025, month: 11 }}
+                        displayMode="price"
+                        restrictToPassedAssets={true}
+                        showTotalRow={false}
+                        loading={snapshotsLoading}
+                        onRefresh={handleRefresh}
+                        isRefreshing={isRefreshing}
+                        isActiveView={activeViewKey === 'storico:prezzi'}
+                        isLatestRefreshedView={lastRefreshedViewKey === 'storico:prezzi'}
+                        refreshToken={refreshToken}
+                        lastRefreshAt={lastRefreshAt}
+                      />
+                    </div>
                   </motion.div>
                 </TabsContent>
               )}
@@ -380,21 +448,49 @@ export default function AssetsPage() {
                     animate={historicalSubTabs.storico === 'valori' ? 'visible' : 'hidden'}
                     variants={tabPanelSwitch}
                   >
-                    <AssetPriceHistoryTable
-                      assets={historyTableAssetsAll}
-                      snapshots={snapshots}
-                      filterStartDate={{ year: 2025, month: 11 }}
-                      displayMode="totalValue"
-                      restrictToPassedAssets={true}
-                      showTotalRow={true}
-                      loading={snapshotsLoading}
-                      onRefresh={handleRefresh}
-                      isRefreshing={isRefreshing}
-                      isActiveView={activeViewKey === 'storico:valori'}
-                      isLatestRefreshedView={lastRefreshedViewKey === 'storico:valori'}
-                      refreshToken={refreshToken}
-                      lastRefreshAt={lastRefreshAt}
+                    <MobileHistoricalView
+                      summaryProps={{
+                        assets: historyTableAssetsAll,
+                        snapshots,
+                        filterStartDate: { year: 2025, month: 11 },
+                        displayMode: 'totalValue',
+                        restrictToPassedAssets: true,
+                      }}
+                      tableNode={
+                        <AssetPriceHistoryTable
+                          assets={historyTableAssetsAll}
+                          snapshots={snapshots}
+                          filterStartDate={{ year: 2025, month: 11 }}
+                          displayMode="totalValue"
+                          restrictToPassedAssets={true}
+                          showTotalRow={true}
+                          loading={snapshotsLoading}
+                          onRefresh={handleRefresh}
+                          isRefreshing={isRefreshing}
+                          isActiveView={activeViewKey === 'storico:valori'}
+                          isLatestRefreshedView={lastRefreshedViewKey === 'storico:valori'}
+                          refreshToken={refreshToken}
+                          lastRefreshAt={lastRefreshAt}
+                        />
+                      }
                     />
+                    <div className="hidden desktop:block">
+                      <AssetPriceHistoryTable
+                        assets={historyTableAssetsAll}
+                        snapshots={snapshots}
+                        filterStartDate={{ year: 2025, month: 11 }}
+                        displayMode="totalValue"
+                        restrictToPassedAssets={true}
+                        showTotalRow={true}
+                        loading={snapshotsLoading}
+                        onRefresh={handleRefresh}
+                        isRefreshing={isRefreshing}
+                        isActiveView={activeViewKey === 'storico:valori'}
+                        isLatestRefreshedView={lastRefreshedViewKey === 'storico:valori'}
+                        refreshToken={refreshToken}
+                        lastRefreshAt={lastRefreshAt}
+                      />
+                    </div>
                   </motion.div>
                 </TabsContent>
               )}

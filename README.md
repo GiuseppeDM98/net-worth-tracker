@@ -26,6 +26,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Hierarchical asset allocation analysis with desktop drill-down and mobile bottom-sheet navigation
 - **Portfolio exposure breakdown**: a collapsible section at the bottom of the Allocation page that aggregates underlying-company, sector, and ETF-issuer exposure across all your ETFs plus direct stocks. See your true exposure to a single company (e.g. Nvidia) when it's split across multiple ETFs, with click-to-expand calculation drill-down showing the formula per source ("X% di €Y = €Z") and a total per row. Data sourced server-side from Yahoo Finance and cached per user; the "Aggiorna" button forces a fresh server-side computation when needed
 - Current-year historical tables use a hidden previous-month baseline so January can show growth vs the previous December without rendering an extra visible column
+- Asset management table supports column sorting (Valore Totale, G/P%, Peso%, Nome, Classe); mobile view shows a compact 3-month summary for historical tabs instead of a "desktop recommended" banner
 
 ### Performance Analytics
 - Comprehensive metrics: ROI, CAGR, TWR, IRR, Sharpe Ratio, Maximum Drawdown

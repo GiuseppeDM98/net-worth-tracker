@@ -10,11 +10,8 @@
  * - Tax calculator integration for capital gains analysis
  * - Real-time asset value calculations (quantity × current price)
  * - Cost basis tracking and unrealized gains display
- *
- * State Management:
- * - 6 useState hooks for UI state (dialogs, modals, loading)
- * - React Query for cache invalidation after mutations
- * - Parent refresh callback for coordinating with other tabs
+ * - Column sorting: Valore Totale, G/P%, Peso%, Nome, Classe
+ * - 2-click inline delete confirmation with 3s auto-disarm
  *
  * Why POST /api/prices/update instead of client-side fetching?
  * - Yahoo Finance rate limits would fail for many assets
@@ -24,7 +21,7 @@
  */
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { Asset } from '@/types/assets';
@@ -38,6 +35,7 @@ import { useDeleteAsset } from '@/lib/hooks/useAssets';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { getAssetClassColor } from '@/lib/constants/colors';
+import { formatAssetClassName } from '@/lib/utils/assetUtils';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -56,32 +54,51 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Plus, RefreshCw, Pencil, Trash2, Info, Calculator } from 'lucide-react';
+import { Plus, RefreshCw, Pencil, Trash2, Info, Calculator, ArrowUpDown, ChevronUp, ChevronDown, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import { AssetDialog } from '@/components/assets/AssetDialog';
 import { AssetCard } from '@/components/assets/AssetCard';
 import { TaxCalculatorModal } from '@/components/assets/TaxCalculatorModal';
-import { format } from 'date-fns';
-import { it } from 'date-fns/locale';
 
-// Helper function to format asset class and type names
-const formatAssetName = (name: string): string => {
-  const nameMap: Record<string, string> = {
-    realestate: 'Real Estate',
-    equity: 'Equity',
-    bonds: 'Bonds',
-    crypto: 'Crypto',
-    cash: 'Cash',
-    commodity: 'Commodity',
-  };
-
-  return nameMap[name.toLowerCase()] || name.charAt(0).toUpperCase() + name.slice(1);
-};
+type SortColumn = 'value' | 'gainPct' | 'weight' | 'name' | 'class';
+type SortDir = 'asc' | 'desc';
+interface SortState { column: SortColumn; dir: SortDir }
 
 interface AssetManagementTabProps {
   assets: Asset[];
   loading: boolean;
   onRefresh: () => Promise<void>;
+}
+
+interface SortHeadProps {
+  column: SortColumn;
+  children: React.ReactNode;
+  className?: string;
+  sortState: SortState | null;
+  onSort: (column: SortColumn) => void;
+}
+
+function SortHead({ column, children, className, sortState, onSort }: SortHeadProps) {
+  const isActive = sortState?.column === column;
+  return (
+    <TableHead
+      className={`cursor-pointer select-none hover:text-foreground ${className ?? ''}`}
+      onClick={() => onSort(column)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {children}
+        {isActive ? (
+          sortState.dir === 'asc' ? (
+            <ChevronUp className="h-3 w-3" />
+          ) : (
+            <ChevronDown className="h-3 w-3" />
+          )
+        ) : (
+          <ArrowUpDown className="h-3 w-3 opacity-40" />
+        )}
+      </span>
+    </TableHead>
+  );
 }
 
 export function AssetManagementTab({ assets, loading, onRefresh }: AssetManagementTabProps) {
@@ -96,20 +113,11 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [taxCalculatorOpen, setTaxCalculatorOpen] = useState(false);
   const [calculatingAsset, setCalculatingAsset] = useState<Asset | null>(null);
+  const [sortState, setSortState] = useState<SortState | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | undefined>(undefined);
+  const pendingDeleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /**
-   * Batch update prices for all assets via server-side Yahoo Finance API
-   *
-   * Why server-side batch operation?
-   * - Client-side would hit Yahoo Finance rate limits with many assets
-   * - Server can implement retry logic and exponential backoff
-   * - Centralized error handling for failed price fetches
-   * - Avoids CORS issues with third-party financial APIs
-   *
-   * API Contract: POST /api/prices/update
-   * Request: { userId: string }
-   * Response: { updated: number, failed: string[] }
-   */
+  // Batch update prices for all assets via server-side Yahoo Finance API
   const handleUpdatePrices = async () => {
     if (!user) return;
 
@@ -129,7 +137,6 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
             data.failed.length > 0 ? `, ${data.failed.length} falliti` : ''
           }`
         );
-        // Call parent refresh handler to update all tabs
         await onRefresh();
       } else {
         toast.error("Errore nell'aggiornamento dei prezzi");
@@ -142,28 +149,27 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
     }
   };
 
-  /**
-   * Delete asset with optimistic UI updates
-   *
-   * Uses React Query mutation which automatically:
-   * - Invalidates cache on success (refreshes asset list)
-   * - Rolls back optimistic update on error
-   * - Handles loading/error states
-   */
   const handleDelete = async (assetId: string) => {
     if (!user) return;
-
-    if (!confirm('Sei sicuro di voler eliminare questo asset?')) {
-      return;
-    }
-
     try {
-      // Use React Query mutation - will auto-invalidate cache on success
       await deleteAssetMutation.mutateAsync(assetId);
       toast.success('Asset eliminato con successo');
     } catch (error) {
       console.error('Error deleting asset:', error);
       toast.error("Errore nell'eliminazione dell'asset");
+    }
+  };
+
+  // 2-click inline delete with 3s auto-disarm (same pattern as Assistente AI delete)
+  const handleDeleteClick = (assetId: string) => {
+    if (pendingDeleteId === assetId) {
+      if (pendingDeleteTimerRef.current) clearTimeout(pendingDeleteTimerRef.current);
+      setPendingDeleteId(undefined);
+      handleDelete(assetId);
+    } else {
+      if (pendingDeleteTimerRef.current) clearTimeout(pendingDeleteTimerRef.current);
+      setPendingDeleteId(assetId);
+      pendingDeleteTimerRef.current = setTimeout(() => setPendingDeleteId(undefined), 3000);
     }
   };
 
@@ -175,8 +181,6 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
   const handleDialogClose = () => {
     setDialogOpen(false);
     setEditingAsset(null);
-    // Invalidate assets cache globally - updates all pages using useAssets hook
-    // This ensures allocation, performance, and other tabs reflect the changes
     if (user?.uid) {
       queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
     }
@@ -192,138 +196,185 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
     setCalculatingAsset(null);
   };
 
-  // Check if an asset has cost basis tracking enabled
+  // An asset has cost basis tracking when averageCost is set and positive.
+  // taxRate is NOT required — a user may know their PMC without having set a tax rate.
   const hasCostBasisTracking = (asset: Asset) => {
-    return !!(asset.averageCost && asset.averageCost > 0 && asset.taxRate && asset.taxRate >= 0);
+    return !!(asset.averageCost && asset.averageCost > 0);
   };
 
   const totalValue = calculateTotalValue(assets);
 
-  /**
-   * Determine if asset requires manual price updates
-   *
-   * Complex decision tree based on asset characteristics:
-   * 1. If autoUpdatePrice explicitly false → manual (user override)
-   * 2. If type is real estate or cash → manual (no market price)
-   * 3. If subcategory is Private Equity → manual (fund valuations)
-   * 4. Otherwise → automatic via Yahoo Finance
-   *
-   * Why this matters?
-   * - Manual assets show "Update Price" button instead of auto-refresh
-   * - Batch price update skips manual assets to avoid API errors
-   * - UI tooltips explain why price can't be automatically fetched
-   *
-   * @param asset - The asset to check
-   * @returns true if asset requires manual price entry
-   */
+  // Determine if asset requires manual price updates (no market ticker available)
   const requiresManualPricing = (asset: Asset) => {
-    // If autoUpdatePrice is explicitly set to false (user override)
-    if (asset.autoUpdatePrice === false) {
-      return true;
-    }
-    // Types that don't support automatic updates (no market price available)
+    if (asset.autoUpdatePrice === false) return true;
     const manualTypes = ['realestate', 'cash'];
-    if (manualTypes.includes(asset.type)) {
-      return true;
-    }
-    // Private Equity subcategory (periodic fund valuations, not daily prices)
-    if (asset.subCategory === 'Private Equity') {
-      return true;
-    }
+    if (manualTypes.includes(asset.type)) return true;
+    if (asset.subCategory === 'Private Equity') return true;
     return false;
   };
 
+  // Sort handler — first click defaults to desc (numerics) or asc (alpha)
+  const handleSort = (column: SortColumn) => {
+    setSortState((prev) => {
+      if (prev?.column === column) {
+        return { column, dir: prev.dir === 'asc' ? 'desc' : 'asc' };
+      }
+      const defaultDir: SortDir = column === 'name' || column === 'class' ? 'asc' : 'desc';
+      return { column, dir: defaultDir };
+    });
+  };
+
+  const sortedAssets = useMemo(() => {
+    if (!sortState) return assets;
+    return [...assets].sort((a, b) => {
+      const aValue = calculateAssetValue(a);
+      const bValue = calculateAssetValue(b);
+      let cmp = 0;
+      switch (sortState.column) {
+        case 'value':
+          cmp = aValue - bValue;
+          break;
+        case 'gainPct': {
+          const aPct = a.averageCost && a.averageCost > 0
+            ? (calculateUnrealizedGains(a) / (a.quantity * a.averageCost)) * 100
+            : 0;
+          const bPct = b.averageCost && b.averageCost > 0
+            ? (calculateUnrealizedGains(b) / (b.quantity * b.averageCost)) * 100
+            : 0;
+          cmp = aPct - bPct;
+          break;
+        }
+        case 'weight':
+          cmp = (aValue / totalValue) - (bValue / totalValue);
+          break;
+        case 'name':
+          cmp = a.name.localeCompare(b.name, 'it');
+          break;
+        case 'class':
+          cmp = a.assetClass.localeCompare(b.assetClass, 'it');
+          break;
+      }
+      return sortState.dir === 'asc' ? cmp : -cmp;
+    });
+  }, [assets, sortState, totalValue]);
+
+  // Total G/P across assets with cost basis
+  const assetsWithCostBasis = assets.filter((a) => a.averageCost);
+  const totalGainLoss = assetsWithCostBasis.reduce(
+    (sum, asset) => sum + calculateUnrealizedGains(asset),
+    0
+  );
+  const totalCostBasis = assetsWithCostBasis.reduce(
+    (sum, asset) => sum + asset.quantity * asset.averageCost!,
+    0
+  );
+  const totalGainPct = totalCostBasis > 0 ? (totalGainLoss / totalCostBasis) * 100 : 0;
+  const totalIsPositive = totalGainLoss > 0;
+  const totalIsNegative = totalGainLoss < 0;
+  const totalGainColor = totalIsPositive
+    ? 'text-green-600'
+    : totalIsNegative
+    ? 'text-red-600'
+    : 'text-muted-foreground';
+
   if (loading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-gray-500 dark:text-gray-400">Caricamento...</div>
+      <div className="space-y-6">
+        {/* Header skeleton */}
+        <div className="flex flex-col gap-3 landscape:flex-row landscape:items-center landscape:justify-between">
+          <div className="space-y-2">
+            <div className="h-6 w-40 rounded-lg bg-muted animate-pulse" />
+            <div className="h-4 w-48 rounded bg-muted animate-pulse" />
+          </div>
+          <div className="flex gap-2">
+            <div className="h-9 w-36 rounded-md bg-muted animate-pulse" />
+            <div className="h-9 w-32 rounded-md bg-muted animate-pulse" />
+          </div>
+        </div>
+        {/* Summary card skeleton */}
+        <div className="h-24 rounded-xl bg-muted animate-pulse" />
+        {/* Mobile cards skeleton */}
+        <div className="desktop:hidden grid grid-cols-1 gap-4 landscape:grid-cols-2">
+          {[1, 2, 3].map((i) => <div key={i} className="h-48 rounded-xl bg-muted animate-pulse" />)}
+        </div>
+        {/* Desktop table skeleton */}
+        <div className="hidden desktop:block h-64 rounded-xl bg-muted animate-pulse" />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header with action buttons — stacks vertically on portrait, row on landscape/desktop */}
+      {/* Header with actions + last-update timestamp */}
       <div className="flex flex-col gap-3 landscape:flex-row landscape:items-center landscape:justify-between">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Gestione Asset</h2>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Gestisci i tuoi asset di investimento
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
+            <Wallet className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">Gestione Asset</h2>
+            <p className="text-xs text-muted-foreground">{assets.length} asset nel portfolio</p>
+          </div>
         </div>
         <div className="flex flex-col landscape:flex-row gap-2">
           <Button
+            type="button"
             variant="outline"
             onClick={handleUpdatePrices}
             disabled={isDemo || updating || assets.length === 0}
             title={isDemo ? 'Non disponibile in modalità demo' : undefined}
-            className="w-full landscape:w-auto dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+            className="w-full landscape:w-auto"
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${updating ? 'animate-spin' : ''}`} />
             Aggiorna Prezzi
           </Button>
-          <Button onClick={() => setDialogOpen(true)} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined} className="w-full landscape:w-auto dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
+          <Button
+            type="button"
+            onClick={() => setDialogOpen(true)}
+            disabled={isDemo}
+            title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+            className="w-full landscape:w-auto"
+          >
             <Plus className="mr-2 h-4 w-4" />
             Aggiungi Asset
           </Button>
         </div>
       </div>
 
-      {/* Total Summary Card - Shown at top for both mobile and desktop */}
-      <Card className="border-2 border-primary">
+      {/* Total Summary Card — stacked layout: value dominates, G/P as secondary line */}
+      <Card>
         <CardContent className="p-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Totale Patrimonio</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{formatCurrency(totalValue)}</p>
-            </div>
-            {(() => {
-              const assetsWithCostBasis = assets.filter((a) => a.averageCost);
-              if (assetsWithCostBasis.length === 0) return null;
-
-              const totalGainLoss = assetsWithCostBasis.reduce(
-                (sum, asset) => sum + calculateUnrealizedGains(asset),
-                0
-              );
-              const totalCostBasis = assetsWithCostBasis.reduce(
-                (sum, asset) => sum + asset.quantity * asset.averageCost!,
-                0
-              );
-              const totalPercentage = totalCostBasis > 0 ? (totalGainLoss / totalCostBasis) * 100 : 0;
-
-              const isPositive = totalGainLoss > 0;
-              const isNegative = totalGainLoss < 0;
-              const textColor = isPositive
-                ? 'text-green-600'
-                : isNegative
-                ? 'text-red-600'
-                : 'text-gray-600 dark:text-gray-400';
-
-              return (
-                <div className="text-right">
-                  <p className="text-sm text-gray-500 dark:text-gray-400">G/P Totale</p>
-                  <div className={`font-semibold ${textColor}`}>
-                    <div className="text-lg">
-                      {isPositive ? '+' : ''}
-                      {formatCurrency(totalGainLoss)}
-                    </div>
-                    <div className="text-xs">
-                      {isPositive ? '+' : ''}
-                      {formatNumber(totalPercentage, 2)}%
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
+          <p className="text-xs text-muted-foreground mb-1">Totale Patrimonio</p>
+          <p className="text-3xl font-bold text-foreground font-mono tracking-tight">
+            {formatCurrency(totalValue)}
+          </p>
+          {assetsWithCostBasis.length > 0 && (
+            <p className={`text-sm font-semibold font-mono mt-1.5 ${totalGainColor}`}>
+              {totalIsPositive ? '+' : ''}
+              {formatCurrency(totalGainLoss)}
+              <span className="text-xs ml-1.5 opacity-80">
+                ({totalIsPositive ? '+' : ''}{formatNumber(totalGainPct, 2)}%)
+              </span>
+            </p>
+          )}
         </CardContent>
       </Card>
 
       <Card>
         <CardContent>
           {assets.length === 0 ? (
-            <div className="flex h-64 items-center justify-center text-gray-500 dark:text-gray-400">
-              Nessun asset presente. Clicca su "Aggiungi Asset" per iniziare.
+            <div className="flex h-64 flex-col items-center justify-center gap-3 text-muted-foreground">
+              <Wallet className="h-10 w-10 opacity-30" />
+              <p className="text-sm">Nessun asset presente.</p>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setDialogOpen(true)}
+                disabled={isDemo}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Aggiungi il tuo primo asset
+              </Button>
             </div>
           ) : (
             <>
@@ -343,32 +394,30 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
                 ))}
               </div>
 
-              {/* Desktop Table Layout (1440px+) */}
+              {/* Desktop Table Layout (1440px+) — 11 columns (Aggiornato removed) */}
               <div className="hidden desktop:block overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Nome</TableHead>
+                      <SortHead column="name" sortState={sortState} onSort={handleSort}>Nome</SortHead>
                       <TableHead>Ticker</TableHead>
-                      <TableHead>Classe</TableHead>
+                      <SortHead column="class" sortState={sortState} onSort={handleSort}>Classe</SortHead>
                       <TableHead className="text-right">Quantità</TableHead>
                       <TableHead className="text-right">Prezzo</TableHead>
                       <TableHead className="text-right">PMC</TableHead>
                       <TableHead className="text-right">TER</TableHead>
-                      <TableHead className="text-right">Valore Totale</TableHead>
-                      <TableHead className="text-right">Peso in %</TableHead>
-                      <TableHead className="text-right">G/P</TableHead>
-                      <TableHead>Aggiornato</TableHead>
+                      <SortHead column="value" className="text-right" sortState={sortState} onSort={handleSort}>Valore Totale</SortHead>
+                      <SortHead column="weight" className="text-right" sortState={sortState} onSort={handleSort}>Peso %</SortHead>
+                      <SortHead column="gainPct" className="text-right" sortState={sortState} onSort={handleSort}>G/P</SortHead>
                       <TableHead className="text-right">Azioni</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {assets.map((asset) => {
+                    {sortedAssets.map((asset) => {
                       const value = calculateAssetValue(asset);
-                      const lastUpdate =
-                        asset.lastPriceUpdate instanceof Date ? asset.lastPriceUpdate : new Date();
                       const isManualPrice = requiresManualPricing(asset);
                       const assetClassColor = getAssetClassColor(asset.assetClass);
+                      const isPending = pendingDeleteId === asset.id;
 
                       return (
                         <TableRow key={asset.id} className={isManualPrice ? 'bg-amber-50 dark:bg-amber-950/20' : ''}>
@@ -383,7 +432,7 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
                                 </Tooltip>
                               </TooltipProvider>
                               {asset.quantity === 0 && (
-                                <span className="shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-500 border border-gray-300 dark:bg-gray-700 dark:text-gray-400 dark:border-gray-600">
+                                <span className="shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground border border-border">
                                   Azzerato
                                 </span>
                               )}
@@ -399,26 +448,26 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
                                 border: `1px solid ${assetClassColor}40`,
                               }}
                             >
-                              {formatAssetName(asset.assetClass)}
+                              {formatAssetClassName(asset.assetClass)}
                             </span>
                           </TableCell>
-                          <TableCell className="text-right">{formatNumber(asset.quantity, 2)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(asset.currentPrice, asset.currency, 4)}</TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right tabular-nums">{formatNumber(asset.quantity, 2)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{formatCurrency(asset.currentPrice, asset.currency, 4)}</TableCell>
+                          <TableCell className="text-right tabular-nums">
                             {asset.averageCost ? (
                               formatCurrency(asset.averageCost, asset.currency, 4)
                             ) : (
                               <span className="text-muted-foreground">-</span>
                             )}
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right tabular-nums">
                             {asset.totalExpenseRatio ? (
-                              <span className="text-purple-600">{asset.totalExpenseRatio.toFixed(2)}%</span>
+                              <span className="text-muted-foreground">{asset.totalExpenseRatio.toFixed(2)}%</span>
                             ) : (
                               <span className="text-muted-foreground">-</span>
                             )}
                           </TableCell>
-                          <TableCell className="text-right font-semibold">
+                          <TableCell className="text-right font-semibold tabular-nums">
                             {asset.assetClass === 'realestate' &&
                             asset.outstandingDebt &&
                             asset.outstandingDebt > 0 ? (
@@ -427,7 +476,7 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
                                   <TooltipTrigger asChild>
                                     <div className="flex items-center justify-end gap-1 cursor-help">
                                       {formatCurrency(value)}
-                                      <Info className="h-3 w-3 text-gray-400" />
+                                      <Info className="h-3 w-3 text-muted-foreground" />
                                     </div>
                                   </TooltipTrigger>
                                   <TooltipContent>
@@ -450,7 +499,7 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
                               formatCurrency(value)
                             )}
                           </TableCell>
-                          <TableCell className="text-right font-medium text-blue-600">
+                          <TableCell className="text-right font-medium tabular-nums">
                             {totalValue > 0 ? `${((value / totalValue) * 100).toFixed(2)}%` : '-'}
                           </TableCell>
                           <TableCell className="text-right">
@@ -459,22 +508,22 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
                                 const gainLoss = calculateUnrealizedGains(asset);
                                 const costBasis = asset.quantity * asset.averageCost;
                                 const percentage = costBasis > 0 ? (gainLoss / costBasis) * 100 : 0;
-                                const isPositive = gainLoss > 0;
-                                const isNegative = gainLoss < 0;
-                                const textColor = isPositive
+                                const isPos = gainLoss > 0;
+                                const isNeg = gainLoss < 0;
+                                const textColor = isPos
                                   ? 'text-green-600'
-                                  : isNegative
+                                  : isNeg
                                   ? 'text-red-600'
-                                  : 'text-gray-600 dark:text-gray-400';
+                                  : 'text-muted-foreground';
 
                                 return (
-                                  <div className={`${textColor} font-medium`}>
+                                  <div className={`${textColor} font-medium tabular-nums`}>
                                     <div>
-                                      {isPositive ? '+' : ''}
+                                      {isPos ? '+' : ''}
                                       {formatCurrency(gainLoss)}
                                     </div>
                                     <div className="text-xs">
-                                      {isPositive ? '+' : ''}
+                                      {isPos ? '+' : ''}
                                       {formatNumber(percentage, 2)}%
                                     </div>
                                   </div>
@@ -484,28 +533,42 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
                               <span className="text-muted-foreground">-</span>
                             )}
                           </TableCell>
-                          <TableCell>
-                            {format(lastUpdate, 'dd/MM/yyyy HH:mm', {
-                              locale: it,
-                            })}
-                          </TableCell>
                           <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
+                            <div className="flex justify-end gap-1">
                               {hasCostBasisTracking(asset) && (
                                 <Button
+                                  type="button"
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => handleCalculateTaxes(asset)}
                                   title="Calcola Plusvalenze"
                                 >
-                                  <Calculator className="h-4 w-4 text-blue-600" />
+                                  <Calculator className="h-4 w-4" />
                                 </Button>
                               )}
-                              <Button variant="ghost" size="sm" onClick={() => handleEdit(asset)} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined}>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEdit(asset)}
+                                disabled={isDemo}
+                                title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+                              >
                                 <Pencil className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleDelete(asset.id)} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined}>
-                                <Trash2 className="h-4 w-4 text-red-500" />
+                              <Button
+                                type="button"
+                                variant={isPending ? 'destructive' : 'ghost'}
+                                size="sm"
+                                onClick={() => handleDeleteClick(asset.id)}
+                                disabled={isDemo}
+                                title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+                              >
+                                {isPending ? (
+                                  <span className="text-xs px-1">Conferma?</span>
+                                ) : (
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                )}
                               </Button>
                             </div>
                           </TableCell>
@@ -518,48 +581,25 @@ export function AssetManagementTab({ assets, loading, onRefresh }: AssetManageme
                       <TableCell colSpan={7} className="text-right font-semibold">
                         Totale:
                       </TableCell>
-                      <TableCell className="text-right font-semibold">{formatCurrency(totalValue)}</TableCell>
-                      <TableCell className="text-right font-semibold text-blue-600">100.00%</TableCell>
-                      <TableCell className="text-right font-semibold">
-                        {(() => {
-                          // Calculate total gain/loss
-                          const assetsWithCostBasis = assets.filter((a) => a.averageCost);
-                          const totalGainLoss = assetsWithCostBasis.reduce(
-                            (sum, asset) => sum + calculateUnrealizedGains(asset),
-                            0
-                          );
-                          const totalCostBasis = assetsWithCostBasis.reduce(
-                            (sum, asset) => sum + asset.quantity * asset.averageCost!,
-                            0
-                          );
-                          const totalPercentage =
-                            totalCostBasis > 0 ? (totalGainLoss / totalCostBasis) * 100 : 0;
-
-                          const isPositive = totalGainLoss > 0;
-                          const isNegative = totalGainLoss < 0;
-                          const textColor = isPositive
-                            ? 'text-green-600'
-                            : isNegative
-                            ? 'text-red-600'
-                            : 'text-gray-600 dark:text-gray-400';
-
-                          return assetsWithCostBasis.length > 0 ? (
-                            <div className={`${textColor}`}>
-                              <div>
-                                {isPositive ? '+' : ''}
-                                {formatCurrency(totalGainLoss)}
-                              </div>
-                              <div className="text-xs">
-                                {isPositive ? '+' : ''}
-                                {formatNumber(totalPercentage, 2)}%
-                              </div>
+                      <TableCell className="text-right font-semibold tabular-nums">{formatCurrency(totalValue)}</TableCell>
+                      <TableCell className="text-right font-semibold tabular-nums">100.00%</TableCell>
+                      <TableCell className="text-right font-semibold tabular-nums">
+                        {assetsWithCostBasis.length > 0 ? (
+                          <div className={totalGainColor}>
+                            <div>
+                              {totalIsPositive ? '+' : ''}
+                              {formatCurrency(totalGainLoss)}
                             </div>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          );
-                        })()}
+                            <div className="text-xs">
+                              {totalIsPositive ? '+' : ''}
+                              {formatNumber(totalGainPct, 2)}%
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </TableCell>
-                      <TableCell colSpan={2}></TableCell>
+                      <TableCell />
                     </TableRow>
                   </TableFooter>
                 </Table>
