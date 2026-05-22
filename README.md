@@ -61,11 +61,12 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 
 ### Historical Analysis
 - Automatic monthly portfolio snapshots (via Vercel cron)
-- Net worth evolution, asset class breakdown, and liquidity charts
-- Year-over-Year variation analysis
+- Page opens with a **hero block** showing current net worth, total growth since tracking began, and estimated CAGR — with section navigation pills to jump to any chapter
+- Net worth evolution, asset class breakdown, and liquidity charts — all colors theme-aware across the six color themes
+- **Doubling time analysis** with geometric calculations and fixed milestone thresholds — promoted to the top of the page as the most distinctive analysis; summary cards show fastest doubling, average time, and progress toward the next milestone
 - Savings vs Investment Growth comparison (annual and monthly views)
-- **Labor & Investments section**: lifetime KPI cards for Earned from Work, Saved from Work, Investment Growth Gross/Net, plus counters for positive and negative months based on total monthly net worth growth, and a monthly breakdown chart — visible when labor income categories are configured in Settings
-- Doubling time analysis with geometric calculations and fixed thresholds
+- **Labor & Investments section**: lifetime KPI cards for Earned from Work, Saved from Work, Investment Growth Gross/Net, plus positive/negative month counters and a monthly breakdown chart — shows a setup prompt linking to Settings when labor categories are not yet configured
+- Year-over-Year variation and raw monthly snapshot data available in a collapsible section (collapsed by default)
 
 ### FIRE Planning
 - FIRE calculator with primary residence exclusion

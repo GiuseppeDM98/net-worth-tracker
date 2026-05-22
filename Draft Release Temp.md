@@ -24,6 +24,15 @@
 
 ## 🔧 Improvements
 
+- Redesigned the **History (Storico)** page with a cleaner, more narrative structure: the page now opens with a hero block showing your current net worth, total growth since tracking began, and estimated CAGR — the answer to "am I growing fast enough?" is visible in the first two seconds, before any scrolling
+- **Doubling Time analysis** is now the first section you see after the main chart — it was previously at the bottom of the page despite being the most distinctive and informative analysis
+- Chart colors on the **History page** are now theme-aware across all six color themes — previously the charts always used hardcoded blue/green/amber regardless of the active theme (Solar Dusk, Cyberpunk, Midnight Bloom, etc.)
+- Multi-series charts on the History page now show a **legend on mobile** — a compact row of colored dots and labels appears below each chart, replacing the previous behavior of hiding the legend entirely on small screens
+- The **"Lavoro & Investimenti"** section on the History page now shows a clear setup prompt when labor income categories haven't been configured in Settings — previously the entire section silently disappeared with no explanation or link to enable it
+- Year-over-year data and raw monthly snapshots are now in a **collapsible "Dati storici" section** (collapsed by default) — reduces page length and focuses the main view on the narrative charts, while keeping the data one tap away
+- The view toggles on the History page (**Annual / Monthly** and **Geometric / Thresholds**) now use the same smooth segmented pill control as the Performance, Patrimonio, and Cashflow pages — replacing the previous two-button pair that used different visual styling
+- Fixed the **Doubling Time summary card** wrapping the date range and value progression (e.g. "01/23 – 10/24 · €164k → €201k") in a way that caused overflow on narrow screens — the text is now left-aligned below the card title where it has room to wrap naturally
+
 - Redesigned the **Performance (Rendimenti)** page with a cleaner, Trade Republic-inspired layout: each metric section now has one dominant number at the top (Time-Weighted Return for Returns, Sharpe Ratio for Risk, Net Cash Flow for Context, Net YOC for Dividends) displayed large and bold — replacing the previous grid of 16 equal-weight cards where nothing stood out
 - Performance metric definitions now open as **inline popovers** (tap the ? icon on any metric row) — replaced the previous custom tooltip that could be clipped on mobile
 - Period selector on the **Performance page on mobile** now uses the same segmented pill control as Patrimonio and Cashflow — all five periods (YTD / 1A / 3A / 5A / Stor.) are visible at a glance with a smooth spring animation between them, replacing the previous dropdown
