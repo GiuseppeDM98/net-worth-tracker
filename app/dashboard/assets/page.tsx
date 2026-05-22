@@ -233,7 +233,12 @@ export default function AssetsPage() {
             animate={activeTab === 'management' ? 'visible' : 'hidden'}
             variants={tabPanelSwitch}
           >
-            <AssetManagementTab assets={assets} loading={loading} onRefresh={handleRefresh} />
+            <AssetManagementTab
+              assets={scopedAssets}
+              hasAnyAssets={assets.length > 0}
+              loading={loading}
+              onRefresh={handleRefresh}
+            />
           </motion.div>
         </TabsContent>
 
