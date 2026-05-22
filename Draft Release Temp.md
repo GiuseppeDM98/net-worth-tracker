@@ -24,6 +24,14 @@
 
 ## 🔧 Improvements
 
+- Redesigned the **FIRE Calculator** tab with a cleaner, Trade Republic-inspired layout: the FIRE Number now dominates the screen as a large bold hero metric — the answer to "how close am I to financial independence?" is visible in the first two seconds without scrolling through a form
+- The FIRE settings panel (withdrawal rate, planned expenses, primary residence toggle) is now collapsed by default and opens automatically when you make a change — the data you care about is always visible first, settings appear only when needed
+- Added an **"Annulla"** button to the FIRE settings panel — reset any unsaved change back to the last saved values in a single tap, without having to remember what the original number was
+- The passive income section (Reddito Passivo Sostenibile) now uses a flat list layout — monthly and daily allowances appear as compact rows below the annual figure, replacing the previous three identical cards where nothing stood out
+- Years of expenses breakdown now shows total, liquid, and illiquid figures in a clear hierarchy — "di cui liquidi" and "di cui illiquidi" are explicit subsets of the total, eliminating the previous confusing layout where "illiquid" appeared to be a subset of "liquid"
+- The scenario projection section (Bear / Base / Bull) now uses your active color theme for all chart lines, reference lines, scenario card titles, and result numbers — previously all colors were hardcoded and clashed with Solar Dusk, Cyberpunk, Midnight Bloom, and other themes
+- Chart tooltips across the FIRE section now adapt to dark mode — previously the month label and tooltip text were hardcoded dark and became invisible against the dark tooltip background
+
 - Redesigned the **Hall of Fame** page with a cleaner, Trade Republic-inspired layout: an absolute record hero block now opens the page showing your all-time best month and best year in large bold numbers — the answer to "what's my personal record?" is visible in the first two seconds without scrolling
 - Hall of Fame now shows rankings as a single focused card with two pill selectors (Monthly / Annual and Patrimonio / Entrate / Spese) — replacing the previous four identical side-by-side tables where nothing stood out and every section needed to be scrolled separately
 - Added **mobile section navigation** to Hall of Fame — a three-section pill (Overview / Monthly / Annual) shows one section at a time on mobile, replacing the previous layout that stacked all four monthly ranking tables and all four annual ranking tables in a single continuous scroll
