@@ -92,7 +92,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - **Color Themes** — Six selectable color themes (Default, Solar Dusk, Elegant Luxury, Midnight Bloom, Cyberpunk, Retro Arcade) with per-user persistence in Firestore and localStorage. Theme selector in Settings → Aspetto with light/dark preview swatches. Switching dark/light mode plays a circle-reveal animation from the toggle. Charts update their palette to match the active theme
 - **Dark mode** — Full dark/light/system theme support. The header toggle cycles through three states: Light, Dark, and System (follows OS preference), using Sun, Moon, and Monitor icons. Every page, chart tooltip, and UI component is properly themed
 - **Authentication flow** — Login and registration screens follow the same visual language as the dashboard, with accessible focus states, keyboard-friendly password toggles, and clearer in-place submit feedback
-- **Hall of Fame** — Monthly and annual performance rankings with current-period spotlight cards, contextual notes, and fully responsive mobile/tablet layouts
+- **Hall of Fame** — Personal records dashboard with an all-time best hero block, monthly and annual ranking tables, current-period spotlight, and contextual notes. Mobile navigation shows one section at a time; desktop tables are full-height with no internal scroll
 - **PDF Export** — 8 configurable sections with custom year/month period selection; sections auto-disabled for past periods when historical data is unavailable
 - **Settings** — Unsaved-change feedback, smooth nested allocation editing, and contextual confirmations for sensitive category actions
 

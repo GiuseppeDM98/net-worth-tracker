@@ -117,90 +117,56 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Sensitive Settings dialogs (move/delete) should open with trigger continuity via `transform-origin` from the clicked control, and clear custom origin on close
 
 ### Assistant SSE Streaming State
-- Never clear `streamingMessages` in a `useEffect([selectedThreadId])` — the SSE `meta` event sets `selectedThreadId` mid-stream, causing the effect to fire and wipe the buffer before text arrives
-- Clear streaming state explicitly only on user-initiated thread switches (click handler), not reactively
-- The `context` SSE event fires before text streaming begins; handle it separately from `text` events to populate the numeric panel without touching the message buffer
-- When loading a thread, sync `mode` and `selectedMonth` to `thread.pinnedMonth`/`thread.mode` via a `useEffect([threadDetail])` guarded by `streamingMessages.length === 0`
-- Track `streamingMessageId` (the ID of the assistant message slot currently receiving tokens) and pass it to the message renderer to switch between plain-text and ReactMarkdown — plain text during stream avoids re-parse layout jumps on every chunk; markdown renders on `done`
-- Do NOT auto-select the most recent thread on first load — it causes a jarring double-load (skeleton → hero → immediate thread fetch). Show the hero state and let the user pick a thread. `hasAutoSelectedRef` has been removed.
-- After "new thread" deselection, React Query keeps the previous thread's data in cache (query disabled but stale data present); guard `renderedMessages` with `!selectedThreadId` to return `[]` and show the hero immediately
-- `handleStreamSubmit` accepts optional `promptOverride`/`modeOverride` so chip clicks can pass values synchronously — React state updates are async; relying on updated state after `setDraft`/`setMode` inside the same handler does not work
-- Button `onClick` always passes the `MouseEvent` as the first argument; if the handler signature accepts an optional string (`promptOverride?`), wrap as `onClick={() => onSubmit()}` — never `onClick={onSubmit}` — or the event object is received as the prompt and `.trim()` throws
-- **AbortController for SSE**: store `new AbortController()` in a ref (`abortControllerRef`) at submit time, pass `signal` via `authenticatedFetch` init. In the catch block, detect user-initiated stops with `(error as Error).name !== 'AbortError'` and skip `toast.error` — partial text stays visible, `isInterrupted` is set. Clear the ref in `finally`. The stop button must be a separate element that is always enabled during streaming (not conditionally disabled via `canSubmit`); swap the send icon for Square and use `variant="destructive"` to signal the destructive action.
-- **React Query stale cache after new thread**: `handleStreamSubmit` captures `selectedThreadId` as a closure value at call time (e.g. `undefined` for a brand-new thread). The SSE `meta` event calls `setSelectedThreadId(newId)` (async React update) but the closure value doesn't change. Post-stream invalidation must use a local `resolvedThreadId` variable updated synchronously from the `meta` event — never `selectedThreadId` from the closure. Otherwise the new thread's React Query cache is never invalidated and shows stale data (missing the assistant message) until a hard refresh.
-- Use `renderedMessages` (not `threadDetail?.messages`) as the base when building `streamingMessages` at submit time — React Query may not have reloaded the thread yet after the previous stream's cache invalidation, so `threadDetail` is stale and excludes the last exchange
-- `scrollIntoView` must be gated on `renderedMessages.length > 0 && !(loadingThreadDetail && !isStreaming)` — without it, selecting a thread scrolls the page to the bottom before any messages arrive, leaving the user staring at empty space
-- **`scrollIntoView` behavior during streaming must be `'instant'`, not `'smooth'`** — `smooth` schedules a CSS scroll animation on every SSE token, saturating the browser's animation thread and causing visible jank on slow devices. Reserve `{ behavior: 'smooth' }` for non-streaming events (initial thread load). Pattern: `if (isStreaming) el.scrollIntoView({ behavior: 'instant' }); else el.scrollIntoView({ behavior: 'smooth' })`
+- Never clear `streamingMessages` in a `useEffect([selectedThreadId])` — the SSE `meta` event sets `selectedThreadId` mid-stream, causing the effect to fire and wipe the buffer before text arrives. Clear only on user-initiated thread switches (click handler)
+- **React Query stale cache after new thread**: `handleStreamSubmit` captures `selectedThreadId` as a closure value at call time (`undefined` for a new thread). The SSE `meta` event fires async. Post-stream invalidation must use a local `resolvedThreadId` updated synchronously from `meta` — never the closure value. Otherwise the new thread cache is never invalidated and shows stale data until hard refresh
+- `handleStreamSubmit` accepts optional `promptOverride`/`modeOverride` for chip clicks — React state updates are async; do not rely on `setDraft`/`setMode` updating before the same handler reads them
+- Button `onClick` always passes `MouseEvent` as first arg; if handler accepts `promptOverride?: string`, wrap as `onClick={() => onSubmit()}` — never `onClick={onSubmit}` or the event object lands as the prompt and `.trim()` throws
+- **`scrollIntoView` during streaming must be `'instant'`**, not `'smooth'` — smooth schedules a CSS animation on every SSE token and causes jank on mobile
+- Use `renderedMessages` (not `threadDetail?.messages`) as the base when building `streamingMessages` — React Query may be stale at submit time and exclude the last exchange
 
 ### Assistant Month Context Service
-- `assistantMonthContextService.ts` runs server-side inside an API route — use `adminDb` (Firebase Admin SDK) directly, not `getUserSnapshots`/`getExpensesByDateRange`/`getSettings` (client SDK, requires browser auth session)
-- Pattern: inline Admin SDK queries matching `dashboardOverviewService.ts`; mock `adminDb.collection` in tests, not the service functions
-- The server never trusts client-supplied numbers: always rebuild the bundle from the period selector. For year_analysis/ytd/history the client only supplies the mode + year; the builder fetches everything from Firestore.
-- `bySubCategoryAllocation` is built by fetching live `Asset` records (which have `subCategory`) and cross-referencing with `currentSnapshot.byAsset` (which has `assetId + value`). Slight historical inaccuracy is acceptable — subCategory changes are not tracked historically.
-- All 5 builders (`buildAssistantMonthContext`, `buildAssistantYearContext`, `buildAssistantYtdContext`, `buildAssistantHistoryContext`, `buildAssistantQuarterContext`) return the same `AssistantMonthContextBundle` type; the `selector.month` encoding distinguishes period type downstream. For quarterly, `selector = { year, month: quarter * 3, quarter }` — e.g. Q1 → `{ year: 2026, month: 3, quarter: 1 }`. The `quarter` field is what distinguishes it from a regular March monthly.
-- All 4 builders accept an optional `includeDummySnapshots = false` param that propagates to the 3 snapshot finder functions (`findSnapshot`, `findLatestSnapshotInYear`, `findLatestSnapshotAtOrBeforeYear`). Default is false — dummy snapshots are excluded for all real users.
-- `includeDummySnapshots` flows differently between the two context endpoints: `stream/route.ts` receives it from `body.preferences` (client-sent); `context/route.ts` must re-read it from `getAssistantMemoryDocument()` because it is a GET request with no body.
+- Runs server-side — use `adminDb` directly, not client SDK (`getUserSnapshots` etc. require browser auth)
+- All 5 period builders return `AssistantMonthContextBundle`; `selector.month` encoding: `>0`=monthly, `0`=year, `-1`=YTD, `-2`=history. Quarterly: `selector = { year, month: quarter * 3, quarter }`
+- `includeDummySnapshots` flows differently: `stream/route.ts` reads from `body.preferences`; `context/route.ts` must re-read from `getAssistantMemoryDocument()` (GET has no body)
 
 ### Assistant Prompt Builder (`formatBundleForPrompt`)
-- Always include a full `--- ALLOCAZIONE CORRENTE (tutte le classi) ---` section built from `currentSnapshot.byAssetClass` before the top-5 movers section. Without it, Claude only sees the 5 largest monthly movers and labels stable asset classes (real estate, pension funds) as "unclassified" patrimony — producing hallucinated gap analysis.
-- `allocationChanges` is already capped at 5 by the context builder; render it as a *separate* section labelled `--- VARIAZIONI ALLOCAZIONE MENSILI (top 5) ---` so the distinction between "current holdings" and "this month's movement" is explicit in the prompt.
-- `currentSnapshot` was already present in `AssistantMonthContextBundle` but `formatBundleForPrompt` was destructuring only named fields — adding a new field to the prompt requires explicitly reading it from `bundle`, not from the destructured const.
+- Always include `--- ALLOCAZIONE CORRENTE ---` from `currentSnapshot.byAssetClass` before the movers section — without it Claude hallucinates "unclassified" gaps for stable asset classes
+- Adding a new field to the prompt requires reading it from `bundle` explicitly — `formatBundleForPrompt` destructures named fields only; new fields are silently missing if not explicitly added
 
 ### Assistant Thread Store
-- `deleteAssistantThread` must delete the `messages` subcollection in batches (≤400 docs per batch) before deleting the parent document — Firestore Admin SDK does not cascade-delete subcollections automatically.
-- Use `FieldValue.increment(1)` (from `firebase-admin/firestore`) inside `appendAssistantMessage` to atomically increment `messageCount` on the thread document without a separate read-modify-write cycle.
-- `ThreadList` is defined as a module-level component (not nested inside the page component) and rendered both in the desktop right panel and in the mobile `Sheet` drawer — keeps selection, date formatting, and delete behaviour in one place. Never inline it as JSX inside the page or selection updates will remount the whole list.
-- **Conversation history injection**: load `getAssistantThreadDetail` BEFORE `appendAssistantMessage` in `stream/route.ts` — so the new user message is not included in the history passed to Claude. Loading after would include the just-appended message and duplicate it in the Anthropic payload. Pass the result as `conversationHistory` to `streamAssistantResponse`.
-- **Multi-turn messages array**: `buildMessagesArray()` in `anthropicStream.ts` prepends history before the current user turn. Filter to `role === 'user' | 'assistant'` only — Anthropic's messages array does not accept `role: 'system'`. Cap: chat → last 20 msgs (10 pairs); structured analysis → last 6 msgs (3 pairs) because those prompts already carry large context bundles.
+- `deleteAssistantThread` must delete `messages` subcollection in batches (≤400 docs) before deleting parent — Admin SDK does not cascade-delete subcollections
+- Load `getAssistantThreadDetail` BEFORE `appendAssistantMessage` in `stream/route.ts` — loading after would duplicate the just-appended message in the Anthropic payload
+- `buildMessagesArray()` filters to `role === 'user' | 'assistant'` only — Anthropic rejects `role: 'system'`. Cap: chat → 20 msgs (10 pairs); structured → 6 msgs (3 pairs)
 
 ### Assistant Memory Injection
-- Saving items to `assistantMemory/{userId}` is not enough — Claude has no implicit access to Firestore. Items must be serialized into the prompt via `formatMemoryForPrompt()` in `prompts.ts`. A generic instruction like "you can reuse saved preferences" without the actual text is useless.
-- Only `status === 'active'` items are injected. `completed` and `archived` items are explicitly excluded.
-- Memory fetch in the stream route is wrapped in `.catch(() => null)` — memory failure must never block the chat stream.
-- `extractAndSaveMemory` is fire-and-forget: call with `.catch(...)` after `appendAssistantMessage`, never `await` it inside the stream. Errors are logged server-side only.
-- Memory extraction runs in **all modes**, not just chat. The only gate is `memoryEnabled` in `AssistantPreferences` — mode is irrelevant.
-- The Anthropic client for memory extraction is instantiated lazily inside `extractAndSaveMemory` (dynamic import), not at module level — module-level `new Anthropic()` breaks test environments where `ANTHROPIC_API_KEY` is absent.
-- `hasDummySnapshots` in `AssistantMemoryDocument` is a computed field injected **only** by `GET /api/ai/assistant/memory` via a parallel Firestore `limit(1)` query — never persisted to Firestore. All return sites in `store.ts` use `hasDummySnapshots: false` as a placeholder; the real value is overlaid by the route handler. Pattern for other computed UI flags: same approach — don't store them, compute at the read boundary.
-- Goal lifecycle lives in the same memory document: `AssistantMemoryItem.status` now supports `active | completed | archived`, while pending completion proposals live in a separate `suggestions` array. Do not overload archived items to mean "goal reached".
-- Goal-completion suggestions must come from authoritative portfolio data (`AssistantMonthContextBundle`), never from assistant prose or previously extracted memory facts. Semantic split: `liquidità` means cash only (`currentSnapshot.byAssetClass.cash`), while `patrimonio liquido` / `asset liquidi` use `currentSnapshot.liquidNetWorth`.
-- Structured goal parsing is pattern-based and runs when a goal item is created or updated. If parsing semantics change later, existing saved goals keep their old `structuredGoal` shape until re-saved; during testing, do not mistake that for an evaluation bug.
+- Memory items must be serialized into the prompt via `formatMemoryForPrompt()` — Claude has no implicit Firestore access. Only `status === 'active'` items are injected
+- Memory fetch is wrapped in `.catch(() => null)` — failure must never block the stream
+- `extractAndSaveMemory` is fire-and-forget: call with `.catch(...)` after `appendAssistantMessage`, never `await` inside the stream
+- Anthropic client for memory extraction is lazily instantiated (dynamic import) — module-level `new Anthropic()` breaks test environments where `ANTHROPIC_API_KEY` is absent
+- `hasDummySnapshots` is a computed field overlaid by `GET /api/ai/assistant/memory` — never persisted. All `store.ts` return sites use `false` as placeholder
+- Goal-completion suggestions must come from `AssistantMonthContextBundle` (authoritative data), not from assistant prose. `liquidità` = cash only; `patrimonio liquido` = `liquidNetWorth`
 
 ### Assistant Chat Mode Unification
-- Chat mode can receive numeric context from any period builder. The `chatContext` field in the stream request (`'none' | 'month' | 'year' | 'ytd' | 'history'`) selects the builder; `'none'` skips all context and sends Claude no portfolio data.
-- `enableWebSearch` must be passed from `streamAssistantResponse` through `buildPrompt` → `buildChatPrompt` — without it, the chat prompt has no instruction to use web results for specific recent events even when the tool is active.
-- **Web search policy for chat** (`webSearchPolicy.ts`): `return preferences.includeMacroContext || shouldUseWebSearch(prompt)`. Toggle ON → always enable in chat. Toggle OFF → keyword detection only (inflazione, tassi, BCE…). Structured analysis modes use only the toggle, not keyword detection.
-- Chat max_tokens is 3000 normally, 5000 when web search is enabled — macro/geopolitical responses with web search are structurally longer and need headroom. Structured analysis max_tokens is 7000 (thinking budget 4000).
-- The SSE `context` event (numeric panel) is sent for all analysis modes and for chat when a context bundle was built. Chat mode with `chatContext: 'none'` produces no panel.
+- `chatContext` field (`'none' | 'month' | 'year' | 'ytd' | 'history'`) selects the period builder; `'none'` sends Claude no portfolio data
+- Web search policy: toggle ON → always active in chat; toggle OFF → keyword detection only (`webSearchPolicy.ts`). Structured modes use toggle only, not keyword detection
+- Chat max_tokens: 3000 normally, 5000 when web search enabled (macro responses need headroom). Structured analysis: 7000 (thinking budget 4000)
 
 ### Assistant Context Panel Persistence
-- The context bundle lives in React state, populated by the SSE `context` event during streaming. On reload or thread switch the panel is empty even if the thread has a pinned period.
-- Pattern to repopulate: `GET /api/ai/assistant/context?userId=&mode=&year=&month=` rebuilds the bundle via the matching builder. Hook: `useAssistantPeriodContext(userId, mode, pinnedMonth, pinnedYear, currentYear, 0, enabled)` — calls all 4 specialized hooks always (React hook rules) but enables only the matching one.
-- Enable the fetch only when `shouldFetchContext` is true: thread is loaded + has a pinned period for its mode + `streamingMessages.length === 0` + `contextBundle === null`. All conditions matter — without the `streamingMessages` guard the hook fires while SSE is delivering its own bundle.
-- `selector.month` encoding convention: `>0` = monthly analysis, `0` = full-year (`pinnedYear`), `-1` = YTD, `-2` = total history. `AssistantContextCard.getPeriodLabel` handles all four cases inline (cannot import from `lib/server/assistant/prompts.ts` — server-only module).
-- Never persist the bundle to the thread Firestore document. Rebuilding from source keeps the streaming and storage layers independent.
-- The `AssistantContextCard` renders a skeleton (plain `animate-pulse` divs) when `isLoading` is passed. Pass `bundle={{} as AssistantMonthContextBundle} isLoading` — the prop is safe because `isLoading` short-circuits before any field access.
+- Context bundle lives in React state (SSE `context` event). On reload the panel is empty — repopulate via `GET /api/ai/assistant/context` using `useAssistantPeriodContext` hook
+- Gate the fetch: thread loaded + has pinned period + `streamingMessages.length === 0` + `contextBundle === null`. The `streamingMessages` guard prevents firing while SSE is delivering its own bundle
+- Never persist the bundle to Firestore — rebuilding from source keeps streaming and storage independent
 
 ### Assistant Retry Pattern
-- `handleRetry` must use a ref (`lastSentPromptRef`) to store the last successfully submitted prompt before `setDraft('')` clears it. Calling `handleStreamSubmit()` without an override after draft is cleared sends an empty string and exits silently — no error, no visible feedback.
-- Update `lastSentPromptRef.current` only after `response.ok` — not on click — so a failed network request before the stream starts doesn't overwrite the ref with a prompt that was never sent.
+- Store last successful prompt in `lastSentPromptRef` — update only after `response.ok`, not on click. Calling retry after `setDraft('')` with no override sends empty string silently
 
 ### Assistant Thread List UX
-- Thread dates: use `formatDistanceToNow` (date-fns, Italian locale) for dates within the past 7 days; fall back to `toLocaleDateString('it-IT', ...)` for older. Never relative-only.
-- Mobile thread list: `Sheet` (`side="right"`) triggered from page header (`desktop:hidden`). Desktop right panel: `hidden desktop:block`. Same `ThreadList` component in both surfaces.
-- Desktop right column: `sticky top-6` + `max-h-[calc(100vh-6rem)] overflow-y-auto`. Order: Threads → Context panel → Memory (collapsible). Preferences in header Popover.
-- Mobile hero: chips first, then last 5 threads as "Riprendi conversazione" (`desktop:hidden`).
-- **Do not use `DropdownMenu` for panels containing `Select` or `Switch`** — it closes on any click inside. Use `Popover` instead.
-- **Mobile Sheet auto-close**: use controlled `open`/`onOpenChange` state; call `setIsThreadSheetOpen(false)` in the `onSelect` handler.
-- **Inline destructive confirmation**: first click arms (`isPendingDelete` + 3s timeout ref); second confirms. Use `pendingDeleteId: string | undefined` for list-level state. Clear timer in all branches.
+- **Do not use `DropdownMenu` for panels containing `Select` or `Switch`** — it closes on any click inside. Use `Popover` instead
+- Mobile Sheet: use controlled `open`/`onOpenChange`; call `setIsThreadSheetOpen(false)` in `onSelect` handler
+- Inline destructive confirmation: first click arms (`isPendingDelete` + 3s timeout ref); second confirms. Clear timer in all branches
 
 ### Assistant Markdown Rendering
-- Use `remark-gfm` with `ReactMarkdown` — without it markdown tables (`| col | col |`) render as raw pipe characters. `remark-gfm@4.0.1` is already installed.
-- Override `table`/`thead`/`th`/`td`/`tr` components explicitly — Tailwind `prose` does not add cell borders or padding. `th` must include `text-left` because some browsers default table headers to `text-center`.
-- **MARKDOWN_COMPONENTS must be defined at module level** (outside the render function), not inline in JSX. An inline `components={{ table: ..., th: ... }}` object creates a new reference on every render; ReactMarkdown treats it as changed and re-mounts even when message content hasn't changed. On long conversations with many completed messages this causes cascading re-renders. Pattern: `const MARKDOWN_COMPONENTS: React.ComponentProps<typeof ReactMarkdown>['components'] = { ... }` before the export.
-
-### Assistant Rollout Flag
-- `NEXT_PUBLIC_ASSISTANT_AI_ENABLED=false` → `notFound()` in `app/dashboard/assistant/page.tsx` + nav item filtered out of Sidebar, SecondaryMenuDrawer, and `secondaryHrefs` in BottomNavigation. Default is enabled when the variable is absent.
-- The flag is inlined at build time (`NEXT_PUBLIC_`), so filtering the nav arrays at module level is safe and has zero runtime overhead.
+- `MARKDOWN_COMPONENTS` must be at module level — an inline `components={{ ... }}` creates a new reference every render, causing ReactMarkdown to re-mount on every chunk. Devastating on long conversations
+- `remark-gfm` required for table rendering (`| col | col |` otherwise renders as raw pipes). Override `table/th/td` components explicitly — Tailwind `prose` adds no cell borders. `th` must include `text-left`
 
 ### Private API Authorization
 - Any App Router API route that uses Firebase Admin SDK must authenticate server-side; Firestore rules do not protect Admin SDK calls
@@ -212,46 +178,23 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - For user-owned conversational features (assistant threads, messages, memory), generate authoritative thread metadata server-side; do not let the client decide persisted titles or ownership-bound identifiers
 
 ### Demo Mode
-- **`useDemoMode()` hook** (`lib/hooks/useDemoMode.ts`): compares `user.uid` against `NEXT_PUBLIC_DEMO_USER_ID`. Returns `false` if either is absent — safe on self-hosted deploys without a demo account.
-- **Button disable pattern**: `disabled={isDemo || <other conditions>}` + `title={isDemo ? 'Non disponibile in modalità demo' : <other title or undefined>}`. When a button already has a `title`, merge into a single ternary to avoid duplicate JSX attributes (`TS17001`).
-- **Header buttons outside conditional blocks**: if a page renders `{isDemo ? <LockScreen /> : <Content />}`, buttons in the `<header>` above that conditional are still rendered and must be disabled explicitly — they are NOT covered by the conditional.
-- **Credentials in bundle**: `NEXT_PUBLIC_DEMO_EMAIL` / `NEXT_PUBLIC_DEMO_PASSWORD` are baked into the JS bundle at build time. Acceptable for a non-sensitive public demo. Leave vars empty to hide the CTA automatically (`DEMO_ENABLED = Boolean(DEMO_EMAIL && DEMO_PASSWORD)`).
-- The demo user owns their own Firestore data — Firestore rules already protect other users. Client-side `disabled` is the only guard needed; no server-side role system is required.
+- `useDemoMode()` compares `user.uid` against `NEXT_PUBLIC_DEMO_USER_ID`; returns `false` if either absent
+- Button disable pattern: `disabled={isDemo || <other>}` + `title` ternary — merge into one ternary to avoid duplicate JSX `title` attributes (`TS17001`)
+- **Header buttons outside `{isDemo ? ... : ...}` conditionals are still rendered and must be disabled explicitly** — the conditional does not cover them
 
 ### FX Conversion for Non-EUR Assets
-- `Asset.currentPriceEur` stores the EUR-converted price, populated server-side during price updates (`priceUpdater.ts`) and at creation (`/api/prices/quote`). `calculateAssetValue()` uses it for non-EUR assets; falls back to `currentPrice` for EUR assets and pre-migration docs.
-- **GBp (pence) ≠ GBP**: Yahoo Finance returns LSE prices in pence (`quote.currency === 'GBp'`). Normalize with `price / 100` and treat currency as `'GBP'` before any FX call. Failing to do this inflates values 100×. Applied in both `priceUpdater.ts` and `/api/prices/quote/route.ts`.
-- **Never call Frankfurter from the browser**: client-side `fetch('https://api.frankfurter.app/...')` is silently blocked by Next.js security headers / network policy. All FX calls must be server-side. Pattern: extend the existing `/api/prices/quote` route to return `currentPriceEur` alongside `price` and `currency`; the client reads from the API response, never calls Frankfurter directly.
-- `priceUpdater.ts` always overwrites the asset's `currency` field from `quote.currency` (after GBp normalization) — this self-corrects assets created with the wrong currency in the form.
-- Cron (`monthly-snapshot` → `portfolio/snapshot` → `priceUpdater`) propagates the fix automatically to all users on each snapshot run.
-
-### Asset Sparklines (Mobile)
-- `AssetSparkline` component (`components/assets/AssetSparkline.tsx`) reuses the `NetWorthSparkline` pattern: Recharts `LineChart` + `<YAxis hide domain={['auto','auto']} />` + rAF defer (`requestAnimationFrame` before mount) + `useReducedMotion()`. Height 32px, no start/end labels.
-- **`price` vs `totalValue` for fixed-price assets**: cash, real estate, private equity, and any asset with `autoUpdatePrice=false` have their unit price permanently fixed at €1. A sparkline on `price` would be a flat horizontal line. Use `entry.totalValue` from `MonthlySnapshot.byAsset` for these assets, `entry.price` for all others. Gate: `requiresManualPricing(asset)` in `AssetManagementTab.tsx` already encodes this logic — reuse it.
-- Data field: name it `value` (not `price`) in the interface so the component is agnostic to the underlying source.
-- Data is extracted from snapshots as `useMemo` in `AssetManagementTab`, keyed by `asset.id`, last 12 months, sorted chronologically. Passed as `sparklineData?` prop to `AssetCard`. Guard in `AssetCard`: only render when `sparklineData && sparklineData.length >= 2`.
-- Render inside `<div className="desktop:hidden">` — sparklines are mobile-only; the desktop table already has the price column.
+- **GBp (pence) ≠ GBP**: Yahoo Finance LSE prices are in pence (`quote.currency === 'GBp'`). Normalize with `price / 100` before any FX call — failing to do this inflates values 100×
+- **Never call Frankfurter from the browser** — silently blocked by Next.js headers. All FX calls are server-side via `/api/prices/quote`
+- `priceUpdater.ts` always overwrites `currency` from `quote.currency` (after GBp normalization) — self-corrects wrong-currency assets
 
 ### Asset and FIRE Rules
-- `quantity = 0` is valid and marks sold assets in history logic
-- Cash asset balance lives in `quantity`, not via price updates
-- Do not filter `cash` out of Patrimonio historical tables unless the product request is explicit; the default behavior keeps liquidity visible in both `Anno Corrente` and `Storico`
+- `quantity = 0` marks sold assets — valid in history logic. Cash balance lives in `quantity`, not price
 - Borsa Italiana bond prices are `% of par`; store converted EUR values
-- **Patrimonio history tables** (Anno Corrente + Storico) show only assets with `includeInHistoryTables === true` (set via "Includi nelle tabelle storiche" toggle in AssetDialog). Anno Corrente additionally requires `quantity > 0`; Storico includes `quantity === 0` so sold assets show historical months with a "Venduto" badge. Assets deleted from Firestore entirely lose the flag and can't be recovered from snapshots.
-- **`restrictToPassedAssets` pattern**: when you pre-filter the `assets` array before passing to `AssetPriceHistoryTable`, always set `restrictToPassedAssets={true}` or the transform's snapshot-scan step will silently re-add excluded assets as `isDeleted: true` ("Venduto"). The two arrays in the page (`historyTableAssets` for Anno Corrente, `historyTableAssetsAll` for Storico) both require this flag.
-- FIRE annual expenses must use the last completed year
-- `includePrimaryResidence` must flow through both React Query key and query function
-- FIRE calculator unsaved preview is local-only: metrics may react immediately to form edits, but milestone surfaces like the "FIRE raggiunto" banner should remain anchored to saved/loaded data until persistence completes
-- **Historical FIRE runway**: use rolling 12-month expenses, not a fixed annual denominator. The first runway point requires 12 snapshots; same-month YoY delta needs 24 snapshots; missing cashflow months inside the window count as `0`.
-- If runway cards show values rounded to 1 decimal, compute summary deltas from the same rounded values. If the UI exposes both total and liquid runway cards, keep the deltas split too (`Totale` and `Liquido`).
-- **Coast FIRE inputs**: current age comes from `settings.userAge`; retirement age is a separate persisted field (`coastFireRetirementAge`) with an initial fallback of `60`. If `userAge` is missing, keep the input blank and do not run the calculation.
-- **Coast FIRE methodology**: use real annual expenses from the last completed year by default; override with `coastFireCustomExpenses` when the user wants to model different retirement spending. The effective value is resolved once as `effectiveAnnualExpenses` and used everywhere — calculations, display cards, and interpretation text. Scenario math reuses FIRE Bear/Base/Bull with `real return = growthRate - inflationRate`.
-- **Coast FIRE state pensions**: pensions live only in the `Coast FIRE` tab, use `startDate` as the canonical retirement-start field, and keep `startAge` only as a legacy read fallback. Pension inputs are gross future nominal monthly amounts; the model annualizes them, deflates them to real terms, applies progressive IRPEF per pension, and reduces the portfolio need only from each pension's own start date onward.
-- **Coast FIRE persistence gotcha**: nested pension rows must be serialized without `undefined` fields before writing settings to Firestore. Leaving legacy keys like `startAge: undefined` inside `coastFirePensions[]` can break persistence silently on refresh.
-- **Coast FIRE outputs**: `Valore stimato a pensione` is only the future value of the current FIRE-eligible patrimonio without new contributions; `gap residuo` clamps at `0` once Coast FIRE is reached, while progress `%` may exceed `100`.
-- **Coast FIRE pension UX**: summary-first layout; configuration collapsible (auto-open when empty/incomplete/unsaved); separate informational warnings (pension after target age, bridge years) from hard-stop errors (missing start date, zero amount). `buildPensionDraftIssues` is a pure function — pass `now: Date` explicitly.
-- **Annual-need wording**: when UI copy appends `l'anno` to a formatted amount, prefer a dedicated helper such as `formatCurrencyPerYear()` instead of manual JSX concatenation. This avoids regressions like `€l'anno`.
-- **`resolveBondPrice` centralizes % of par conversion**: `rawPrice * (nominalValue / 100)`, file-scope in `AssetDialog.tsx`. The `nominalValue <= 1` check is intentional — retail bonds with par=1 don't use the Borsa Italiana convention and passthrough unchanged. Both manual entry (Path 1) and auto-fetch (Path 2) call the same helper so the conversion can never diverge.
+- **Patrimonio history tables**: show only `includeInHistoryTables === true` assets. Anno Corrente: `quantity > 0` only; Storico includes `quantity === 0` with "Venduto" badge. Set `restrictToPassedAssets={true}` when pre-filtering — otherwise the snapshot-scan step silently re-adds excluded assets as `isDeleted: true`
+- FIRE annual expenses must use the last completed year; `includePrimaryResidence` must flow through both React Query key and query function
+- **Historical FIRE runway**: rolling 12-month expenses (not fixed annual); first point needs 12 snapshots; missing months count as `0`
+- **Coast FIRE persistence gotcha**: nested pension rows must be serialized without `undefined` fields — `startAge: undefined` breaks Firestore persistence silently on refresh
+- **`resolveBondPrice`**: `rawPrice * (nominalValue / 100)` in `AssetDialog.tsx`. `nominalValue <= 1` check is intentional — retail bonds with par=1 passthrough unchanged
 
 ### Firestore Optional Field Deletion
 - `updateDoc` only touches fields present in the update object — omitting a field leaves the old value intact in Firestore
@@ -260,15 +203,9 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Applied in `updateAsset` for `averageCost` and `taxRate`. Follow this pattern for any other nullable asset/settings fields that users can toggle off
 - **`deleteField()` is NOT allowed with `setDoc()` without `merge:true`** — calling it throws `FirebaseError: deleteField() cannot be used with set() unless you pass {merge:true}`. The settings save path in `assetAllocationService.ts` uses full `setDoc` (no merge), so omitting the field from `docData` is the correct deletion strategy: `delete docData.fieldName`. The full overwrite drops fields that are absent from the written object.
 
-### Formatter Cache
-- `lib/utils/formatters.ts` exports `cachedFormatCurrencyEUR(amount, compact?)` backed by two module-level `Intl.NumberFormat` instances
-- Use `cachedFormatCurrencyEUR` in components that format inside animation loops (count-up rAF ticks, Recharts tooltips rendered at 60fps)
-- `formatCurrency(amount, 'EUR')` also reuses the cached instance internally — the cache benefit is automatic for the common EUR path
-- Add a new cached instance only for a genuinely distinct locale/format combination; do not cache per-call options objects
-- `compact=true` → `_fmtEURCompact` (0 decimal places, `it-IT`, EUR) — use this for any assistant context panel value that previously used `new Intl.NumberFormat(..., { maximumFractionDigits: 0 })`
-
 ### Shared Constants
-- Italian month names live in `lib/constants/months.ts` as `MONTH_NAMES` (`as const` array). Import from there — do not redeclare inline in assistant components
+- Italian month names: `MONTH_NAMES` from `lib/constants/months.ts` — do not redeclare inline
+- Hall of Fame section labels and key arrays: `SECTION_LABELS`, `MONTHLY_SECTION_KEYS`, `YEARLY_SECTION_KEYS` from `lib/constants/hallOfFame.ts`
 
 ### Firestore Pre-Computed Cache Pattern
 For pages that aggregate large collections (many snapshots + all expenses) on every load, store pre-computed results in a dedicated Firestore collection rather than re-reading and re-calculating each visit.
@@ -305,9 +242,8 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
   - Wire UI "Aggiorna" buttons to `refresh()`, never to bare React Query `refetch()`. Bare `refetch` re-hits the endpoint but receives the same cached doc when the cacheKey is unchanged. Applied in `usePortfolioExposure` + `/api/portfolio/exposure?force=true`.
 
 ### Fixed Hooks for Variable-Length Data Sources
-- When a component needs data from a variable number of sources (e.g. user toggles which of N benchmarks to show), declare N fixed hook instances (`b0`–`bN`) at component level with `enabled: false` for inactive ones — never loop over hooks. React enforces stable hook call counts and throws at runtime otherwise
-- Applied in `BenchmarkComparisonSection`: 6 fixed `useBenchmarkReturns` hooks, one per benchmark constant
-- **Adding a new benchmark**: (1) add entry to `BENCHMARKS[]` in `lib/constants/benchmarks.ts`, (2) add `const bN = useBenchmarkReturns(BENCHMARKS[N].id, ...)` in `BenchmarkComparisonSection.tsx`, (3) add `bN` to `hookResults` array and update `b*.data`/`b*.isError` dependency arrays in `benchmarkData`/`benchmarkErrors` memos
+- Declare N fixed hook instances at component level with `enabled: false` for inactive ones — never loop over hooks. React enforces stable hook call counts and throws at runtime
+- Adding a new benchmark: (1) add entry to `BENCHMARKS[]`, (2) add fixed `const bN = useBenchmarkReturns(...)`, (3) add to `hookResults` array and dependency memos
 
 ### Cross-Component Metric Consistency
 - When a derived value shown in a chart or table must match a KPI card exactly, pass the pre-computed figure as a prop from the page — do not recompute from chart data. The most common drift source is annualization denominator: chart return-point count = n−1, `metrics.numberOfMonths` = n. A 1-month difference produces ~0.4pp divergence at 14% TWR
@@ -325,7 +261,7 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 
 ### Motion and Charts
 - Shared variants live in `lib/utils/motionVariants.ts`
-- For long, data-dense pages like History, prefer chapter-level reveals (`chapterReveal`) over one global stagger; reveal only the main sections on first entry
+- For long, data-dense pages like History/Hall of Fame, prefer scroll-gated chapter reveals over a global stagger: `whileInView="visible" viewport={{ once: true, margin: "-80px" }}` on each `motion.section`. Using `animate="visible"` instead fires all sections simultaneously at mount — they all appear at once regardless of scroll position
 - For dense tabbed data views, prefer short container transitions (`tabPanelSwitch`, `tableShellSettle`) and scoped refresh feedback on the active panel only; do not animate table geometry or whole row sets
 - Performance page pattern: derive `chartData`, heatmap data, and underwater data with `useMemo`; do not store them in local state via `useEffect + setState`
 - Performance period morph: do not key KPI sections or metric cards by selected period; on period switches, values jump silently to the new number (no re-animation); chart shells can re-key only when a first-class staged reveal is intentional
@@ -404,44 +340,30 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - **Period selector without Tabs context**: when a selector must work across multiple return paths (e.g. `hasInsufficientData` + normal), use plain `<button role="tab">` + Framer Motion `layoutId` at module level. shadcn `<Tabs>` requires `<TabsContent>` — using it without children is semantically wrong and creates coupling. Applied as `PerformancePeriodSelector` in `app/dashboard/performance/page.tsx`.
 
 ### Mobile Tab Switcher: Segmented Pill vs Select
-- **Never use `Select` for tab navigation** — `Select` is a form-input pattern (2 taps, hidden options, overlay modal). A segmented pill is a navigation affordance (1 tap, all options visible).
-- **Pattern**: module-level `TABS` constant (stable reference for React Compiler), `role="tablist"` on the container div, `role="tab"` + `aria-selected={activeTab === value}` + `type="button"` on each button. Framer Motion `layoutId` spring pill (stiffness 400, damping 35) behind the active segment. Abbreviated labels (≤8 chars) to survive iPhone SE widths — icon + label fits at `text-xs` in `flex-1 h-9` segments.
-- **≤3 tabs**: full labels usually fit. **4–5 tabs**: works with abbreviated labels (e.g. "Spese" / "Dividendi" / "Analisi" / "Budget" / "C.Costo"). **6+ tabs**: reconsider — horizontal scroll `TabsList` with `overflow-x-auto flex-nowrap` may be more honest than cramming 6 pills.
-- On pages where a 5th tab is async-gated (e.g. `costCentersEnabled`), build the tab array dynamically inside the render but keep the base constant at module level: `const ALL_TABS = costCentersEnabled ? [...BASE_TABS, extraTab] : BASE_TABS`.
-- **Anti-pattern: floating pill for page-local tabs**. The floating pill (bottom nav style) is reserved for global page navigation. Keep page-local switchers inline so they scroll away naturally.
-- Applied in `app/dashboard/assets/page.tsx` (3 tabs) and `app/dashboard/cashflow/page.tsx` (4–5 tabs with abbreviated mobile labels).
+- **Never use `Select` for tab navigation** — 2 taps, hidden options. Segmented pill = 1 tap, all options visible
+- **Pattern**: module-level `TABS` constant, `role="tablist"` wrapper, `role="tab"` + `aria-selected` + `type="button"` per button, Framer Motion `layoutId` spring pill (400/35). Abbreviated labels (≤8 chars) for iPhone SE
+- Async-gated tab: build array dynamically inside render but keep base constant at module level: `const ALL_TABS = flag ? [...BASE, extra] : BASE`
+- Floating pill is reserved for global page navigation — page-local switchers must be inline and scroll away
 
 ### Mobile Header Trash Icon Pattern
 - In a card header that has a title/subtitle block on the left and a destructive icon button on the right, always use `flex items-start justify-between` (not `flex-col` + `sm:flex-row`). `flex-col` puts the trash button on its own row on mobile, wasting vertical space and breaking visual grouping. The subtitle text stays under the title in the left block; the button stays top-right in all viewports.
 
-### Resend Integration
-- Use a **static import** (`import { Resend } from 'resend'`) not a dynamic one. `vi.mock` only intercepts static imports.
-- `onboarding@resend.dev` delivers only to the Resend account owner's email. Custom domain required for arbitrary recipients.
-
 ### Periodic Email Service (`lib/server/monthlyEmailService.ts`)
-- **Firestore query depth**: max 3 `.where()` calls per query — a 4th breaks test chain mocks. Filter post-fetch in code instead.
-- **Expense field name**: `notes` (not `note`). Wrong field silently falls back to category name.
-- **`buildPeriodEmailData`**: single builder for monthly/quarterly/yearly — one function, adjust date window and snapshot coords per type. Do not split into separate builders.
-- **Settings 3-place rule**: email toggles must be added to `types/assets.ts`, `getSettings()`, AND both branches of `setSettings()`.
-- **AI comment failure must never block email**: `generateEmailAiComment` returns `null` on any error — email sends without the AI section.
-- **`simpleMarkdownToHtml` order**: strip `<details>/<summary>` first; process `**bold**` before `*italic*`; collapse blank lines between `<li>` items before `<ul>` wrap regex; use CSS `margin` on `<li>` for spacing, not `<br/>`.
+- **Firestore query depth**: max 3 `.where()` calls — a 4th breaks test chain mocks. Filter post-fetch instead
+- **Expense field name**: `notes` (not `note`) — wrong field silently falls back to category name
+- AI comment failure must never block email: `generateEmailAiComment` returns `null` on any error
+- **`simpleMarkdownToHtml` order**: strip `<details>/<summary>` first; `**bold**` before `*italic*`; collapse blank `<li>` gaps before `<ul>` wrap regex
 
 ### Firestore Query Chain Depth in Tests
 - Keep Admin SDK query chains to **3 `.where()` calls max** when the function will be unit-tested. A 4th `.where()` (e.g. `isDummy != true`) causes `TypeError: .where(...).where(...).where(...).where is not a function` in tests because the mock chain only goes 3 levels deep.
 - Workaround: apply the 4th condition as a post-fetch code filter (`docs.filter(d => !d.data().isDummy)`) — one extra doc fetched at most (with `.limit(1)` the cost is negligible).
 
 ### Server-Side Layer Separation (`lib/server/`)
-- `lib/server/` hosts server-only modules that sit between API routes and services: use cases, processors, and Admin SDK repositories
-- `lib/server/assetAdminRepository.ts` — canonical Admin SDK asset fetch (`getUserAssetsAdmin`). Import from here in all API routes that need server-side asset access; do not re-declare the function inline
-- `lib/server/dividendUseCase.ts` — dividend creation orchestration (`createDividendWithOptionalExpense`). Contains coupon cleanup, costPerShare enrichment, and conditional expense creation. Route retains only auth, validation, asset fetch, and ownership check
-- `lib/server/dividendProcessor.ts` — 3 cron phases (`runDividendScraping`, `runExpenseCreation`, `runNextCouponScheduling`) with explicit typed result interfaces. Cron route delegates to these; do not add phase logic back into the route handler
-- Pattern rule: API route = auth → validate → fetch → ownership check → delegate to use case/processor → return response. No Firestore queries, business logic, or multi-step orchestration in the handler body itself
+- API route = auth → validate → fetch → ownership check → delegate to use case/processor → return. No Firestore queries or business logic in the handler body
+- `assetAdminRepository.ts` — canonical Admin SDK asset fetch. `dividendUseCase.ts` — creation orchestration. `dividendProcessor.ts` — 3 cron phases with typed result interfaces
 
 ### Pure Functions and Testability
-- If a utility function calls `new Date()` internally to get "now", it is impure and cannot be tested for time-sensitive branches without fake timers. Pass `now: Date` as an explicit parameter. The call site passes `new Date()` — the function stays pure and test code can inject any date. Applied to `buildPensionDraftIssues(drafts, currentAge, retirementAge, now)`.
-
-### Collapsible Config Panel Auto-Open
-- When a config panel uses a `useEffect` to auto-open based on a `shouldAutoOpen` condition, only ever call `setIsOpen(true)` — never `setIsOpen(shouldAutoOpen)`. Setting to `false` causes the panel to collapse silently after save (when `hasUnsavedChanges` turns false), which is disorienting if the user wants to continue editing.
+- Functions that call `new Date()` internally are untestable without fake timers. Pass `now: Date` as explicit param — call site passes `new Date()`. Applied to `buildPensionDraftIssues`
 
 ### Progress Bar ARIA
 - A visual progress bar (`<div>` animated with Framer Motion) has no semantic meaning to screen readers. Always add `role="progressbar"`, `aria-valuenow={Math.round(value)}`, `aria-valuemin={0}`, `aria-valuemax={100}`, and `aria-label` describing what is being measured.
@@ -459,59 +381,31 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 
 ## Testing and Workflow
 ### Commands
-- `npm test -- <file>` or `npx vitest run <file>` for targeted tests
-- `npx tsc --noEmit` for repo-wide TypeScript checking without generating build output
-- For Overview data-pipeline / materialized-summary changes, run `npx tsc --noEmit`, `npx vitest run __tests__/apiAuthRoutes.test.ts`, and `npx vitest run __tests__/dashboardOverviewService.test.ts`
-- For Patrimonio historical-table baseline changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/assetHistoryUtils.test.ts` before manual validation
-- For auth UX-only changes, run `npx tsc --noEmit` and then manually validate keyboard tab flow, password toggle focus continuity, and inline submit feedback on both `/login` and `/register`
-- For motion/perceived-performance changes, compare `npm run dev` against `npm run build && npm run start` before optimizing away production-safe motion
-- For Hall of Fame UX/motion changes, run `npx tsc --noEmit` and then manually validate current-period spotlight cards, ranking highlight continuity, and note dialog trigger continuity on both desktop and mobile
-- For FIRE / Monte Carlo / Goal-based investing UX or motion changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/fireService.test.ts` and `npx vitest run __tests__/goalService.test.ts` before manual validation
-- For FIRE runway / sensitivity matrix changes, manually validate all of: rolling-12M runway card values, total vs liquid deltas, tooltip copy, and desktop/mobile readability of the matrix
-- For Dividendi & Cedole UX/motion changes, run `npx tsc --noEmit` and then manually validate calendar focus, table/detail continuity, and tooltip anchoring in the cashflow dividends tab
-- For Performance page UX/motion changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/performanceService.test.ts` before manual validation
-- For History page UX/motion changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/chartService.test.ts` before manual validation
-- For Assistant AI foundation changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/assistantRoutes.test.ts __tests__/assistantWebSearchPolicy.test.ts __tests__/assistantMonthContextService.test.ts` before manual validation
-- For dividend route / cron handler changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/dividendUseCase.test.ts __tests__/dividendProcessor.test.ts` before manual validation
-- For monthly email changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/monthlyEmailService.test.ts` before manual validation
+- `npm test -- <file>` or `npx vitest run <file>` for targeted tests; `npx tsc --noEmit` for type checking
+- Always run `npx tsc --noEmit` before any PR. For feature area changes, also run the matching test suite:
+  - Overview/materialized-summary: `apiAuthRoutes` + `dashboardOverviewService`
+  - Performance: `performanceService` | History: `chartService` | FIRE/Goals: `fireService` + `goalService`
+  - Assistant: `assistantRoutes` + `assistantWebSearchPolicy` + `assistantMonthContextService`
+  - Dividends/cron: `dividendUseCase` + `dividendProcessor` | Email: `monthlyEmailService`
+  - Assets/bonds: `assetDialogHelpers` + `couponUtils` | Cashflow/Budget: `budgetUtils`
+- For motion/perceived-performance changes, compare `npm run dev` vs `npm run build && npm run start` — dev can exaggerate cost
 
 ### Test Patterns
-- Use local `new Date(year, monthIndex, day)` in tests, not ISO strings
-- Use `toBeCloseTo()` for floats
-- Use fake timers when testing helpers that depend on the current date
-- Keep test fixtures aligned with current required types, especially `BudgetItem.order`
-- For private route auth tests, prefer route-handler unit tests with mocked `adminAuth.verifyIdToken` and Admin SDK service calls over heavier browser/E2E coverage
-- For Cashflow/Budget UX changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/budgetUtils.test.ts` before manual validation
-- For asset creation / bond dialog changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/assetDialogHelpers.test.ts __tests__/couponUtils.test.ts` before manual validation of the create-bond-with-ISIN flow
-- For snapshot route changes, run `npx tsc --noEmit` plus `npx vitest run __tests__/snapshotHelpers.test.ts` before manual validation
-- If a test imports a service that transitively pulls in `lib/firebase/config.ts`, mock `@/lib/firebase/config` at the test boundary; otherwise Firebase client init runs during import and fails on missing/invalid test env vars.
-- Materialized-summary tests must keep `updatedAt`/`computedAt` inside the 5-minute TTL when the intent is to exercise the cached branch; older dates intentionally force live recompute and require fuller Admin SDK query mocks.
+- Use `new Date(year, monthIndex, day)` in tests (not ISO strings); `toBeCloseTo()` for floats; fake timers for time-sensitive branches
+- Keep test fixtures aligned with current required types — `BudgetItem.order` is required
+- If a test imports a service that pulls in `lib/firebase/config.ts`, mock `@/lib/firebase/config` at the test boundary — Firebase init fails without valid env vars
+- Materialized-summary tests: keep `updatedAt`/`computedAt` inside the 5-minute TTL to hit the cached branch; older dates force live recompute and need fuller Admin SDK mocks
 ---
 ## Common Errors to Avoid
-### Timezone Boundary Bugs
-- Symptom: entries appear in the wrong month near midnight
-- Fix: group with Italy timezone helpers, never native `Date.getMonth()`
-
-### Settings Persistence Bugs
-- Symptom: toggles save but reset after reload
-- Fix: update both `getSettings()` and both branches of `setSettings()`
-
-### Admin SDK Auth Gaps
-- Symptom: private API route accepts `userId`/resource IDs from the client and works without a verified Firebase ID token
-- Fix: require server-side token verification plus `decodedToken.uid` matching or explicit resource ownership checks; Admin SDK bypasses Firestore rules
-
-### Radix Select Empty String
-- Symptom: runtime error from `SelectItem`
-- Fix: use sentinels like `__all__`, `__none__`, `__create_new__`
-
-### Radix Tabs forceMount Layout Gap
-- Symptom: switching a `TabsContent forceMount` view leaves blank vertical space even though the old panel looks hidden
-- Fix: ensure inactive tab panels are explicitly removed from layout with `data-[state=inactive]:hidden` (see `components/ui/tabs.tsx`)
+### Quick-Fix Reference
+- **Timezone bug** (wrong month near midnight): use Italy timezone helpers, never `Date.getMonth()`
+- **Settings toggle resets on reload**: update both `getSettings()` and BOTH branches of `setSettings()`
+- **Admin SDK auth gap**: always verify Firebase ID token server-side; Admin SDK bypasses Firestore rules
+- **Radix Select runtime error**: never use empty string as value — use sentinels `__all__`, `__none__`, `__create_new__`
+- **Radix Tabs forceMount gap** (blank space on hidden panel): add `data-[state=inactive]:hidden` to `TabsContent` in `components/ui/tabs.tsx`
 
 ### Skeleton as Dead Code — Loading State Silent Failure
-- Symptom: a skeleton component exists and is well-implemented, but the page shows a blank flash (or nothing) during load.
-- Cause: the skeleton was never imported or used. `if (loading) return null` was left in place — the skeleton is dead code.
-- Fix: after creating or rewriting a skeleton, search for `return null` and `if (loading)` in the page file to confirm it's wired up. The TypeScript compiler does not catch an unused component.
+- Skeleton exists but page shows blank flash: the skeleton was never imported — `if (loading) return null` is still in place. TypeScript does not catch unused components. After writing a skeleton, verify it's wired up in the page
 
 ### Recharts Legend and Tooltip Mismatch
 - `Legend` reads `<Bar fill>`, not `<Cell>`
@@ -521,13 +415,10 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - **BarChart hover cursor overlay**: the default cursor is an opaque light rectangle — too visible in dark mode. Set `cursor={{ fill: 'rgba(128, 128, 128, 0.1)' }}` on `<Tooltip>` for a subtle semi-transparent overlay that works in both modes.
 
 ### Cashflow Null State vs Genuine Zero
-- Symptom: user sees `€0,00` when no expense data has been entered yet; indistinguishable from a month with zero real spend
-- Fix: branch on `expenseStats === null` (data absent) vs `expenseStats` truthy (data present, value may legitimately be zero). For the null case, render an icon + message empty state (e.g. `<Receipt>` + "Nessuna spesa registrata questo mese") instead of a formatted zero. `€0,00` is reserved for confirmed real zero — absence is not zero.
+- `expenseStats === null` (no data) ≠ `expenseStats = 0` (real zero). Render empty state for null; `€0,00` is reserved for confirmed zero
 
-### Recharts Sparkline — flat line when values are large absolute numbers
-- Symptom: a sparkline for net worth (e.g. 260k → 284k, +8% growth) renders as a completely flat horizontal line.
-- Cause: Recharts' default Y-axis domain starts from `0`. Relative to a 0–284k scale, an 8% variation is imperceptible.
-- Fix: add `<YAxis hide domain={['auto', 'auto']} />` — the `hide` prop removes visual rendering while `domain={['auto', 'auto']}` scales the Y range to the data min/max. Applied in `components/dashboard/NetWorthSparkline.tsx`.
+### Recharts Sparkline — flat line on large absolute numbers
+- Symptom: 260k → 284k sparkline is a flat horizontal line. Fix: `<YAxis hide domain={['auto', 'auto']} />` — scales Y to data range instead of starting from 0
 
 ### Recharts ResponsiveContainer -1 Warning
 - Symptom: `The width(-1) and height(-1) of chart should be greater than 0` (fires twice) when a chart appears after an async state change (e.g. after a fetch completes and `loading` flips to `false`).

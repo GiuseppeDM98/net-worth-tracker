@@ -1,30 +1,22 @@
 'use client';
 
 /**
- * HallOfFameNoteDialog Component
- *
- * Create/edit notes for Hall of Fame periods with multi-section support
+ * HallOfFameNoteDialog — create/edit notes for Hall of Fame periods.
  *
  * Features:
- * - Period selection: Year + optional month combobox (similar to SnapshotSearchDialog)
- * - Multi-section checkboxes: Select which ranking tables should show this note
+ * - Period selection: year + optional month
+ * - Multi-section checkboxes: select which ranking tables show this note
  * - Text editor: 500 character max with real-time counter
- * - Edit mode: Pre-populate when editing existing note
- * - Delete button: Only shown when editing existing note
- *
- * UX Flow:
- * 1. User selects year (always required)
- * 2. User selects month (auto-hides for yearly sections, optional for monthly)
- * 3. User checks relevant sections (at least 1 required)
- * 4. User enters note text (max 500 chars)
- * 5. Save → validates → calls service → shows toast → closes dialog
+ * - Edit mode: pre-populate when editing existing note
+ * - Delete button: 2-click inline confirmation with 3s auto-disarm
  */
 
 import type { CSSProperties, RefObject } from 'react';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -40,62 +32,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { HallOfFameNote, HallOfFameSectionKey } from '@/types/hall-of-fame';
+import { MONTH_NAMES } from '@/lib/constants/months';
+import { SECTION_LABELS, MONTHLY_SECTION_KEYS, YEARLY_SECTION_KEYS } from '@/lib/constants/hallOfFame';
 import { getItalyYear } from '@/lib/utils/dateHelpers';
 
 const MAX_NOTE_LENGTH = 500;
 
-// Section labels in Italian (user-friendly display names)
-const SECTION_LABELS: Record<HallOfFameSectionKey, string> = {
-  bestMonthsByNetWorthGrowth: 'Miglior Mese: Differenza NW',
-  bestMonthsByIncome: 'Miglior Mese: Entrate',
-  worstMonthsByNetWorthDecline: 'Peggior Mese: Differenza NW',
-  worstMonthsByExpenses: 'Peggior Mese: Spese',
-  bestYearsByNetWorthGrowth: 'Miglior Anno: Differenza NW',
-  bestYearsByIncome: 'Miglior Anno: Entrate',
-  worstYearsByNetWorthDecline: 'Peggior Anno: Differenza NW',
-  worstYearsByExpenses: 'Peggior Anno: Spese',
-};
-
-// Group sections by type (monthly vs yearly)
-const MONTHLY_SECTIONS: HallOfFameSectionKey[] = [
-  'bestMonthsByNetWorthGrowth',
-  'bestMonthsByIncome',
-  'worstMonthsByNetWorthDecline',
-  'worstMonthsByExpenses',
-];
-
-const YEARLY_SECTIONS: HallOfFameSectionKey[] = [
-  'bestYearsByNetWorthGrowth',
-  'bestYearsByIncome',
-  'worstYearsByNetWorthDecline',
-  'worstYearsByExpenses',
-];
-
-// Italian month names
-const ITALIAN_MONTHS = [
-  'Gennaio',
-  'Febbraio',
-  'Marzo',
-  'Aprile',
-  'Maggio',
-  'Giugno',
-  'Luglio',
-  'Agosto',
-  'Settembre',
-  'Ottobre',
-  'Novembre',
-  'Dicembre',
-];
-
 interface HallOfFameNoteDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  editNote?: HallOfFameNote | null; // If provided, dialog is in edit mode
-  availableYears: number[]; // Years that have data (from rankings)
+  editNote?: HallOfFameNote | null;
+  availableYears: number[];
   onSave: (noteData: {
-    id?: string; // Present if editing
+    id?: string;
     text: string;
     sections: HallOfFameSectionKey[];
     year: number;
@@ -116,54 +68,56 @@ export function HallOfFameNoteDialog({
   dialogRef,
   style,
 }: HallOfFameNoteDialogProps) {
-  // Form state
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [noteText, setNoteText] = useState('');
   const [selectedSections, setSelectedSections] = useState<Set<HallOfFameSectionKey>>(new Set());
   const [saving, setSaving] = useState(false);
 
-  // Initialize form when editing or opening
+  // 2-click inline delete state
+  const [pendingDelete, setPendingDelete] = useState(false);
+  const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
-    if (open) {
-      if (editNote) {
-        // Edit mode: pre-populate form
-        setSelectedYear(editNote.year);
-        setSelectedMonth(editNote.month || null);
-        setNoteText(editNote.text);
-        setSelectedSections(new Set(editNote.sections));
-      } else {
-        // Create mode: reset to defaults
-        const currentYear = getItalyYear();
-        setSelectedYear(availableYears.includes(currentYear) ? currentYear : availableYears[0] || null);
-        setSelectedMonth(null);
-        setNoteText('');
-        setSelectedSections(new Set());
-      }
+    if (!open) return;
+
+    if (editNote) {
+      setSelectedYear(editNote.year);
+      setSelectedMonth(editNote.month ?? null);
+      setNoteText(editNote.text);
+      setSelectedSections(new Set(editNote.sections));
+    } else {
+      const currentYear = getItalyYear();
+      setSelectedYear(availableYears.includes(currentYear) ? currentYear : (availableYears[0] ?? null));
+      setSelectedMonth(null);
+      setNoteText('');
+      setSelectedSections(new Set());
     }
+
+    // Reset delete state when dialog reopens
+    setPendingDelete(false);
+    if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
   }, [open, editNote, availableYears]);
 
-  // Determine if month is required based on selected sections
-  const monthRequired = useMemo(() => {
-    return Array.from(selectedSections).some((section) => MONTHLY_SECTIONS.includes(section));
-  }, [selectedSections]);
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => { if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current); };
+  }, []);
 
-  // Determine if month should be hidden (only yearly sections selected)
+  const monthRequired = useMemo(
+    () => Array.from(selectedSections).some((s) => MONTHLY_SECTION_KEYS.includes(s)),
+    [selectedSections]
+  );
+
   const monthHidden = useMemo(() => {
-    const hasMonthly = Array.from(selectedSections).some((section) =>
-      MONTHLY_SECTIONS.includes(section)
-    );
-    const hasYearly = Array.from(selectedSections).some((section) =>
-      YEARLY_SECTIONS.includes(section)
-    );
+    const hasMonthly = Array.from(selectedSections).some((s) => MONTHLY_SECTION_KEYS.includes(s));
+    const hasYearly = Array.from(selectedSections).some((s) => YEARLY_SECTION_KEYS.includes(s));
     return hasYearly && !hasMonthly && selectedSections.size > 0;
   }, [selectedSections]);
 
-  // Character count
   const remainingChars = MAX_NOTE_LENGTH - noteText.length;
   const isOverLimit = remainingChars < 0;
 
-  // Validation
   const canSave =
     selectedYear !== null &&
     (!monthRequired || selectedMonth !== null) &&
@@ -171,20 +125,14 @@ export function HallOfFameNoteDialog({
     !isOverLimit &&
     selectedSections.size > 0;
 
-  // Toggle section checkbox
-  const toggleSection = (section: HallOfFameSectionKey) => {
-    const newSections = new Set(selectedSections);
-    if (newSections.has(section)) {
-      newSections.delete(section);
-    } else {
-      newSections.add(section);
-    }
-    setSelectedSections(newSections);
-  };
+  function toggleSection(section: HallOfFameSectionKey) {
+    const next = new Set(selectedSections);
+    if (next.has(section)) next.delete(section); else next.add(section);
+    setSelectedSections(next);
+  }
 
-  const handleSave = async () => {
+  async function handleSave() {
     if (!canSave || selectedYear === null) return;
-
     setSaving(true);
     try {
       await onSave({
@@ -192,9 +140,8 @@ export function HallOfFameNoteDialog({
         text: noteText.trim(),
         sections: Array.from(selectedSections),
         year: selectedYear,
-        month: monthRequired ? selectedMonth || undefined : undefined,
+        month: monthRequired ? (selectedMonth ?? undefined) : undefined,
       });
-
       toast.success(editNote ? 'Nota aggiornata' : 'Nota creata');
       onOpenChange(false);
     } catch (error) {
@@ -203,23 +150,27 @@ export function HallOfFameNoteDialog({
     } finally {
       setSaving(false);
     }
-  };
+  }
 
-  const handleDelete = async () => {
+  // First click arms; second click within 3s confirms
+  function handleDeleteClick() {
     if (!editNote || !onDelete) return;
 
-    setSaving(true);
-    try {
-      await onDelete(editNote.id);
-      toast.success('Nota eliminata');
-      onOpenChange(false);
-    } catch (error) {
-      console.error('Error deleting note:', error);
-      toast.error("Errore nell'eliminazione della nota");
-    } finally {
-      setSaving(false);
+    if (!pendingDelete) {
+      setPendingDelete(true);
+      deleteTimerRef.current = setTimeout(() => setPendingDelete(false), 3000);
+      return;
     }
-  };
+
+    // Second click — confirmed
+    if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
+    setPendingDelete(false);
+    setSaving(true);
+    onDelete(editNote.id)
+      .then(() => { toast.success('Nota eliminata'); onOpenChange(false); })
+      .catch((err) => { console.error('Error deleting note:', err); toast.error("Errore nell'eliminazione della nota"); })
+      .finally(() => setSaving(false));
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -232,16 +183,20 @@ export function HallOfFameNoteDialog({
           <DialogTitle>
             {editNote ? 'Modifica Nota Hall of Fame' : 'Aggiungi Nota Hall of Fame'}
           </DialogTitle>
+          <DialogDescription>
+            {editNote
+              ? 'Modifica il testo o le sezioni associate a questa nota.'
+              : 'Aggiungi un commento contestuale per un periodo specifico.'}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
           {/* Period Selection */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Year Selection */}
             <div className="space-y-2">
               <Label htmlFor="year-select">Anno *</Label>
               <Select
-                value={selectedYear?.toString() || ''}
+                value={selectedYear?.toString() ?? ''}
                 onValueChange={(value) => setSelectedYear(Number(value))}
               >
                 <SelectTrigger id="year-select">
@@ -249,30 +204,25 @@ export function HallOfFameNoteDialog({
                 </SelectTrigger>
                 <SelectContent>
                   {availableYears.map((year) => (
-                    <SelectItem key={year} value={year.toString()}>
-                      {year}
-                    </SelectItem>
+                    <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Month Selection (conditional) */}
             {!monthHidden && (
               <div className="space-y-2">
                 <Label htmlFor="month-select">Mese {monthRequired ? '*' : '(opzionale)'}</Label>
                 <Select
-                  value={selectedMonth?.toString() || undefined}
+                  value={selectedMonth?.toString() ?? undefined}
                   onValueChange={(value) => setSelectedMonth(value ? Number(value) : null)}
                 >
                   <SelectTrigger id="month-select">
                     <SelectValue placeholder="Seleziona mese" />
                   </SelectTrigger>
                   <SelectContent>
-                    {ITALIAN_MONTHS.map((month, idx) => (
-                      <SelectItem key={idx + 1} value={(idx + 1).toString()}>
-                        {month}
-                      </SelectItem>
+                    {MONTH_NAMES.map((month, idx) => (
+                      <SelectItem key={idx + 1} value={(idx + 1).toString()}>{month}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -283,44 +233,34 @@ export function HallOfFameNoteDialog({
           {/* Section Selection */}
           <div className="space-y-3">
             <Label>Sezioni * (seleziona almeno una)</Label>
-
-            {/* Monthly Sections */}
             <div className="space-y-2">
               <p className="text-sm font-medium text-muted-foreground">Ranking Mensili</p>
               <div className="grid grid-cols-1 gap-2 ml-4">
-                {MONTHLY_SECTIONS.map((section) => (
+                {MONTHLY_SECTION_KEYS.map((section) => (
                   <div key={section} className="flex items-center space-x-2">
                     <Checkbox
                       id={section}
                       checked={selectedSections.has(section)}
                       onCheckedChange={() => toggleSection(section)}
                     />
-                    <label
-                      htmlFor={section}
-                      className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                    >
+                    <label htmlFor={section} className="text-sm font-normal leading-none cursor-pointer peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                       {SECTION_LABELS[section]}
                     </label>
                   </div>
                 ))}
               </div>
             </div>
-
-            {/* Yearly Sections */}
             <div className="space-y-2">
               <p className="text-sm font-medium text-muted-foreground">Ranking Annuali</p>
               <div className="grid grid-cols-1 gap-2 ml-4">
-                {YEARLY_SECTIONS.map((section) => (
+                {YEARLY_SECTION_KEYS.map((section) => (
                   <div key={section} className="flex items-center space-x-2">
                     <Checkbox
                       id={section}
                       checked={selectedSections.has(section)}
                       onCheckedChange={() => toggleSection(section)}
                     />
-                    <label
-                      htmlFor={section}
-                      className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                    >
+                    <label htmlFor={section} className="text-sm font-normal leading-none cursor-pointer peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                       {SECTION_LABELS[section]}
                     </label>
                   </div>
@@ -336,26 +276,26 @@ export function HallOfFameNoteDialog({
               id="note-text"
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}
-              placeholder="Es: Acquisto auto - €22.000, Bonus lavorativo, Spese mediche straordinarie..."
+              placeholder="Es: Acquisto auto - 22.000 euro, Bonus lavorativo, Spese mediche straordinarie..."
               rows={4}
               className={isOverLimit ? 'border-destructive' : ''}
             />
             <p
-              className={`text-xs text-right ${
+              className={cn(
+                'text-xs text-right',
                 isOverLimit
                   ? 'text-destructive'
                   : remainingChars < 50
-                  ? 'text-orange-500'
+                  ? 'text-amber-500 dark:text-amber-400'
                   : 'text-muted-foreground'
-              }`}
+              )}
             >
               {remainingChars} caratteri rimanenti
             </p>
           </div>
 
-          {/* Validation hint */}
           {!canSave && selectedSections.size === 0 && (
-            <p className="text-sm text-amber-600">
+            <p className="text-sm text-amber-600 dark:text-amber-400">
               Seleziona almeno una sezione dove mostrare questa nota
             </p>
           )}
@@ -364,18 +304,18 @@ export function HallOfFameNoteDialog({
         <DialogFooter className="flex justify-between sm:justify-between">
           <div>
             {editNote && onDelete && (
-              <Button type="button" variant="destructive" onClick={handleDelete} disabled={saving}>
-                Elimina
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleDeleteClick}
+                disabled={saving}
+              >
+                {pendingDelete ? 'Conferma eliminazione' : 'Elimina'}
               </Button>
             )}
           </div>
           <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={saving}
-            >
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
               Annulla
             </Button>
             <Button type="button" onClick={handleSave} disabled={!canSave || saving}>

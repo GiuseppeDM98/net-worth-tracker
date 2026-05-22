@@ -24,6 +24,14 @@
 
 ## 🔧 Improvements
 
+- Redesigned the **Hall of Fame** page with a cleaner, Trade Republic-inspired layout: an absolute record hero block now opens the page showing your all-time best month and best year in large bold numbers — the answer to "what's my personal record?" is visible in the first two seconds without scrolling
+- Hall of Fame now shows rankings as a single focused card with two pill selectors (Monthly / Annual and Patrimonio / Entrate / Spese) — replacing the previous four identical side-by-side tables where nothing stood out and every section needed to be scrolled separately
+- Added **mobile section navigation** to Hall of Fame — a three-section pill (Overview / Monthly / Annual) shows one section at a time on mobile, replacing the previous layout that stacked all four monthly ranking tables and all four annual ranking tables in a single continuous scroll
+- Desktop ranking tables in Hall of Fame no longer have a fixed height with internal scroll — the full table is now visible at once and the page scrolls naturally, eliminating the double-scroll trap
+- Mobile ranking lists in Hall of Fame now show the top 5 entries immediately, with a "Vedi tutti" expand button for the rest — replacing the previous full dump of up to 20 cards per section
+- The current-period spotlight section in Hall of Fame now uses a flat list layout — removing the nested card boxes that appeared inside each spotlight item (card-within-card pattern)
+- The note trigger icon in Hall of Fame ranking rows is now hover-only on desktop and always visible on touch — it previously occupied a permanent 40×40px space in every row regardless of whether a note existed, wasting vertical space on mobile
+- Added **2-click inline delete confirmation** to the Hall of Fame note editor — first click arms the button, second click executes (auto-disarms after 3 seconds). Previously the delete button executed immediately without any confirmation
 - Redesigned the **History (Storico)** page with a cleaner, more narrative structure: the page now opens with a hero block showing your current net worth, total growth since tracking began, and estimated CAGR — the answer to "am I growing fast enough?" is visible in the first two seconds, before any scrolling
 - **Doubling Time analysis** is now the first section you see after the main chart — it was previously at the bottom of the page despite being the most distinctive and informative analysis
 - Chart colors on the **History page** are now theme-aware across all six color themes — previously the charts always used hardcoded blue/green/amber regardless of the active theme (Solar Dusk, Cyberpunk, Midnight Bloom, etc.)
