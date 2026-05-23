@@ -26,6 +26,11 @@
 
 - The tab switcher on the **FIRE e Simulazioni** page on mobile now uses a segmented pill control — all four tabs (FIRE, Coast, Monte Carlo, Obiettivi) are visible at a glance with a smooth spring animation between them, replacing the previous dropdown that required two taps and hid the other options
 
+- Redesigned the **Goals (Obiettivi)** tab with a cleaner, Trade Republic-inspired layout: the total allocated portfolio value now dominates the screen as a large bold hero metric — the answer to "how much of my wealth is mapped to a goal?" is visible in the first two seconds without scrolling. Flat secondary rows below show active goal count, unallocated value, and average progress across all goals with targets
+- Goals are now displayed as a single flat list — each row shows the goal name (with color dot), current allocated value, and progress percentage; tapping a row expands it inline to show the progress bar, assigned assets table, recommended allocation comparison bars, notes, and action buttons. Previously goals appeared twice: once as a summary card and again as a detail card, tripling the visual noise
+- Goal deletion now uses **inline two-tap confirmation** — first tap arms the button, second tap executes (auto-disarms after 3 seconds). Previously the browser's native blocking dialog interrupted the flow
+- The allocation pie chart has been removed from the Goals tab — the same proportional information is already conveyed by the currency values in the flat goal list, without the added interaction complexity
+
 - Redesigned the **Monte Carlo** tab with a cleaner, Trade Republic-inspired layout: the Success Rate (probability of not running out of money) now dominates the screen as a large bold hero metric — always visible before and after running a simulation, showing `--` with a clear call to action on first load. A flat secondary row below shows the median final portfolio value once a simulation has run
 - The Monte Carlo settings panel is now split into two tiers: core inputs (starting wealth, years, annual withdrawal, allocation) are always visible, while market parameters (return and volatility per asset class, number of simulations) are collapsed by default and open automatically if any value differs from the defaults — reducing the form from 18 simultaneous fields to the 6 that matter most
 - The Monte Carlo tab mode switcher (Single Simulation / Scenario Comparison) now uses the same smooth animated pill control as the rest of the app — a spring animation slides between modes instead of a hard visual swap
@@ -128,6 +133,10 @@
 - Redesigned the mobile bottom navigation as a centered floating pill bar with rounded corners and a smoother active-tab transition — replacing the previous full-width fixed bar
 
 ## 🐛 Bug Fixes
+
+- Fixed the asset assignment dialog in Goals allowing allocations beyond 100% when an asset is already fully distributed across goals — if two goals each hold 50% of the same asset, the dialog now correctly caps each goal's assignment at its current 50% and shows "Nessuna quota libera" instead of the misleading "50% disponibile"
+- Fixed the asset assignment dialog not resetting its search field, selected asset, and percentage input when reopened — stale values from the previous open were silently carried over
+- Fixed the Goals tab showing hardcoded gray colors on all six color themes — all elements now use semantic design tokens and correctly adapt to Solar Dusk, Cyberpunk, Midnight Bloom, and other themes
 
 - Fixed Cashflow "Analisi" tab showing all-time data when switching from "Storico" to "Anno" mode — the selected year now initializes correctly when entering year mode, so the displayed data matches the year shown in the selector
 - Fixed Cashflow trend charts ("Trend storici") not respecting the history start year configured in Settings — the "N anni di dati" count and all chart data now only include years from the configured start year onward

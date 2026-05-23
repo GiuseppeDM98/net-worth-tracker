@@ -75,7 +75,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Multi-scenario projections (Bear / Base / Bull) with inflation adjustment
 - Per-scenario FIRE numbers with automatic savings stop at FIRE reached
 - Historical FIRE runway view with rolling 12-month expenses, separate total/liquid deltas, and a sensitivity matrix for annual spending vs annual savings
-- **Goal-Based Investing**: allocate portfolio portions to financial goals (house, retirement, emergency fund, etc.) with progress tracking, recommended allocation comparison, and open-ended goal support
+- **Goal-Based Investing**: allocate portfolio portions to financial goals (house, retirement, emergency fund, etc.) with progress tracking and recommended asset class comparison. The tab opens with a hero block showing total allocated value; goals are displayed as a single flat list — tap any row to expand it inline and see the progress bar, assigned assets, allocation comparison bars, and edit/delete actions. Two-tap inline delete confirmation prevents accidental removal
 - **Goal-Driven Allocation**: optionally derive portfolio allocation targets as a weighted average of goal recommended allocations, with automatic fallback to manual targets
 - Fully responsive on mobile and tablet — tab navigation uses a dropdown on small screens, year-by-year projection table switches to a card layout
 

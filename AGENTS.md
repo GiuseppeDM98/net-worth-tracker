@@ -470,3 +470,9 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 
 ### Async Tab Count: boolean | null Pattern
 - Tab count depends on async settings: init `useState<boolean | null>(null)`. While `null`, render a `h-10 animate-pulse rounded-md bg-muted` placeholder to hold space. Mount real `TabsList` only after settings arrive — avoids a visible column-count reflow flash.
+
+### `getAvailablePercentage` with `excludeGoalId` — double-counting trap
+- `getAvailablePercentage(assetId, assignments, excludeGoalId)` returns `100 - sum(other goals)`, effectively the **total cap** a goal can hold (free pool + its own existing allocation, since its own is excluded from the sum).
+- **Do NOT add `existingAssignment` on top**: `maxAllowedPct = available + existingAssignment.percentage` double-counts. If Giulia has 50% and Isabella has 50%, `available=50` (excludes Isabella) + `existingAssignment=50` = 100% — lets Isabella increase to 100%, putting total at 150%.
+- **Correct**: `maxAllowedPct = available`. The cap is already the right value.
+- **For display** (showing truly free space to the user): use `getAvailablePercentage(assetId, assignments)` with **no exclusion** — returns globally free space. If 0% free and the goal already has an assignment, show "Nessuna quota libera", not "X% disponibile". Applied in `AssetAssignmentDialog.tsx`.
