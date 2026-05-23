@@ -112,6 +112,86 @@ interface DrillDownState {
 
 type PeriodMode = 'current' | 'year' | 'history';
 
+// ── TopExpenseRow ────────────────────────────────────────────────────────────
+// Module-level component required by React Compiler (no nested components).
+
+function TopExpenseRow({ expense }: { expense: Expense }) {
+  const date = toDate(expense.date);
+  const dateStr = format(date, 'd MMM', { locale: it });
+  const typeLabel = EXPENSE_TYPE_LABELS[expense.type as ExpenseType] ?? expense.type;
+
+  return (
+    <div className="flex items-center justify-between px-6 py-3.5 gap-4">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-muted-foreground tabular-nums shrink-0">{dateStr}</span>
+          <span className="text-sm font-medium text-foreground truncate">{expense.categoryName}</span>
+          {expense.subCategoryName && (
+            <span className="text-xs text-muted-foreground truncate">{'·'} {expense.subCategoryName}</span>
+          )}
+          <span className="text-xs text-muted-foreground/60 shrink-0">[{typeLabel}]</span>
+        </div>
+        {expense.notes && (
+          <p className="text-xs text-muted-foreground/70 truncate mt-0.5">{expense.notes}</p>
+        )}
+      </div>
+      <span className="text-sm font-semibold font-mono tabular-nums text-red-600 dark:text-red-500 shrink-0">
+        {formatCurrency(Math.abs(expense.amount))}
+      </span>
+    </div>
+  );
+}
+
+// ── TopExpensesBlock ─────────────────────────────────────────────────────────
+// Shows top N expenses for the selected period, sorted by absolute amount desc.
+// Default: 5 visible + collapsible "Mostra tutte" for the rest.
+
+const TOP_EXPENSES_DEFAULT_LIMIT = 5;
+
+function TopExpensesBlock({
+  expenses,
+  periodLabel,
+}: {
+  expenses: Expense[];
+  periodLabel: string;
+}) {
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll ? expenses : expenses.slice(0, TOP_EXPENSES_DEFAULT_LIMIT);
+
+  return (
+    <Card className="overflow-hidden">
+      <div className="px-6 py-4 flex items-center justify-between border-b border-border">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">
+            Spese Maggiori
+          </p>
+          <p className="text-sm font-medium text-foreground">{periodLabel}</p>
+        </div>
+        <span className="text-xs text-muted-foreground">{expenses.length} spese</span>
+      </div>
+      <div className="divide-y divide-border">
+        {visible.map(e => (
+          <TopExpenseRow key={e.id} expense={e} />
+        ))}
+      </div>
+      {expenses.length > TOP_EXPENSES_DEFAULT_LIMIT && (
+        <div className="px-6 py-3 border-t border-border">
+          <Button
+            variant="ghost"
+            size="sm"
+            type="button"
+            className="w-full text-muted-foreground"
+            onClick={() => setShowAll(v => !v)}
+          >
+            {showAll ? 'Mostra meno' : `Mostra tutte (${expenses.length})`}
+            <ChevronDown className={cn('h-4 w-4 ml-1 transition-transform duration-200 motion-reduce:transition-none', showAll && 'rotate-180')} />
+          </Button>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 interface AnalisiTabProps {
   allExpenses: Expense[];
   loading: boolean;
@@ -246,6 +326,13 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
   const totalExpenses = calculateTotalExpenses(periodFilteredExpenses);
   const netBalance = totalIncome - totalExpenses;
   const ratio = calculateIncomeExpenseRatio(periodFilteredExpenses);
+
+  // Sort non-income expenses by amount ascending — most negative amount = largest expense first
+  const topExpenses = useMemo(() => {
+    return periodFilteredExpenses
+      .filter(e => e.type !== 'income')
+      .sort((a, b) => a.amount - b.amount);
+  }, [periodFilteredExpenses]);
 
   // ── Pie/drill-down helpers ─────────────────────────────────────────────
 
@@ -791,6 +878,11 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
           </p>
         </div>
       </div>
+
+      {/* ── Spese Maggiori ────────────────────────────────────────────── */}
+      {topExpenses.length > 0 && (
+        <TopExpensesBlock key={periodLabel} expenses={topExpenses} periodLabel={periodLabel} />
+      )}
 
       {/* ── Analisi flusso ────────────────────────────────────────────── */}
       {periodFilteredExpenses.length === 0 ? (

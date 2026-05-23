@@ -1,5 +1,7 @@
 ## ✨ New Features
 
+- Added a **Top Expenses block** to the Cashflow Analysis tab — instantly see the largest individual expenses for any selected period. The "Spese Maggiori" card appears after the KPI summary, listing the top 5 expenses sorted by amount with date, category, subcategory, expense type, and optional notes. Tap "Show all (N)" to expand the full ranked list; the view automatically collapses and resets when you switch between periods or months
+
 - Redesigned the **Add Expense** dialog with a guided two-step flow: first pick the expense type from a visual card grid (Variable Expense, Fixed Expense, Debt / Installment, Income), then fill in only the fields that matter for that type — no more scrolling past installment or recurring fields for a simple purchase. The expense type picker uses the same design language as the Add Asset dialog: icon cards with a short description, animated step transitions, and a "← Change type" ghost button to go back without losing your context
 - Redesigned the **Add Asset** dialog with a guided two-step flow: first pick the asset type from a visual card grid (Stocks, ETFs, Bonds, Crypto, Cash, Real Estate, Commodities), then fill in only the fields that matter for that type — no more scrolling past irrelevant inputs. Ticker, ISIN, cost basis, TER, coupon details, and debt fields appear only when relevant to the chosen type
 
