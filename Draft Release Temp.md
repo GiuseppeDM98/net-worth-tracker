@@ -24,6 +24,8 @@
 
 ## 🔧 Improvements
 
+- The tab switcher on the **FIRE e Simulazioni** page on mobile now uses a segmented pill control — all four tabs (FIRE, Coast, Monte Carlo, Obiettivi) are visible at a glance with a smooth spring animation between them, replacing the previous dropdown that required two taps and hid the other options
+
 - Redesigned the **Monte Carlo** tab with a cleaner, Trade Republic-inspired layout: the Success Rate (probability of not running out of money) now dominates the screen as a large bold hero metric — always visible before and after running a simulation, showing `--` with a clear call to action on first load. A flat secondary row below shows the median final portfolio value once a simulation has run
 - The Monte Carlo settings panel is now split into two tiers: core inputs (starting wealth, years, annual withdrawal, allocation) are always visible, while market parameters (return and volatility per asset class, number of simulations) are collapsed by default and open automatically if any value differs from the defaults — reducing the form from 18 simultaneous fields to the 6 that matter most
 - The Monte Carlo tab mode switcher (Single Simulation / Scenario Comparison) now uses the same smooth animated pill control as the rest of the app — a spring animation slides between modes instead of a hard visual swap

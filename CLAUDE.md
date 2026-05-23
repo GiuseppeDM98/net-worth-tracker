@@ -94,7 +94,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Mobile perf: `lib/hooks/useMediaQuery.ts`
 - Server-side use cases / processors: `lib/server/assetAdminRepository.ts`, `lib/server/dividendUseCase.ts`, `lib/server/dividendProcessor.ts`, `lib/server/monthlyEmailService.ts`
 
-**Last updated**: 2026-05-23 (session UI/UX-improvements — Monte Carlo Tab full redesign: Trade Republic hierarchy, hero block, mode toggle pill, collapsible params, module-level tooltips, theme-aware charts)
+**Last updated**: 2026-05-23 (session UI/UX-improvements — FIRE page shell: token fixes + mobile Select → segmented pill)
 
 ## Design Context
 
