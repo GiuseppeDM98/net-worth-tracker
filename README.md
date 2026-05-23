@@ -70,8 +70,8 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 
 ### FIRE Planning
 - FIRE calculator with primary residence exclusion
-- Dedicated Coast FIRE tab with saved retirement age, no-new-contributions projections, and Bear / Base / Bull real-return scenarios
-- Coast FIRE supports one or more state pensions with editable IRPEF brackets, exact pension start dates, scenario-specific real net conversion, a guided summary that separates target-age need, bridge years, and post-pension steady state, plus a collapsible configuration panel that keeps the active inputs visible
+- **Coast FIRE tab** — Trade Republic-inspired layout: Coast FIRE number as a dominant hero metric (always visible without scrolling), settings panel collapsed by default with auto-open on changes, narrative order (hero → config → projection chart → Bear/Base/Bull scenarios → coverage phases → detail → pension impact → interpretation). Hero rows show overall progress, liquid-only progress, total net worth, and liquid net worth. "Annulla" button resets unsaved changes in one tap. All chart colors theme-aware
+- Coast FIRE supports one or more state pensions with editable IRPEF brackets, exact pension start dates, scenario-specific real net conversion, a guided summary that separates target-age need, bridge years, and post-pension steady state
 - Multi-scenario projections (Bear / Base / Bull) with inflation adjustment
 - Per-scenario FIRE numbers with automatic savings stop at FIRE reached
 - Historical FIRE runway view with rolling 12-month expenses, separate total/liquid deltas, and a sensitivity matrix for annual spending vs annual savings

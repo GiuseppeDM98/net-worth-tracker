@@ -32,6 +32,13 @@
 - The scenario projection section (Bear / Base / Bull) now uses your active color theme for all chart lines, reference lines, scenario card titles, and result numbers — previously all colors were hardcoded and clashed with Solar Dusk, Cyberpunk, Midnight Bloom, and other themes
 - Chart tooltips across the FIRE section now adapt to dark mode — previously the month label and tooltip text were hardcoded dark and became invisible against the dark tooltip background
 
+- Redesigned the **Coast FIRE** tab with a cleaner, Trade Republic-inspired layout: the Coast FIRE number now dominates the screen as a large bold hero metric — the answer to "have I reached Coast FIRE?" is visible in the first two seconds without scrolling
+- The Coast FIRE settings panel is now collapsed by default and opens automatically when you make a change — projection results are always visible first, settings appear only when needed
+- Added an **"Annulla"** button to the Coast FIRE settings panel — reset any unsaved change back to the last saved values in a single tap, without having to remember what the original number was
+- The Coast FIRE hero now shows four summary rows beneath the main number: overall progress toward the Coast FIRE target, liquid-only progress (assets you could actually retire on), total net worth, and liquid net worth — giving an immediate read on both "am I there?" and "how much is actually usable?"
+- Coast FIRE chart colors now adapt to your active color theme — previously all four scenario lines (Bear, Base, Bull, Target) used hardcoded colors that clashed with Solar Dusk, Cyberpunk, Midnight Bloom, and other themes
+- Chart tooltips on the Coast FIRE projection chart now adapt to dark mode — scenario names and month labels are readable in all six color themes
+
 - Redesigned the **Hall of Fame** page with a cleaner, Trade Republic-inspired layout: an absolute record hero block now opens the page showing your all-time best month and best year in large bold numbers — the answer to "what's my personal record?" is visible in the first two seconds without scrolling
 - Hall of Fame now shows rankings as a single focused card with two pill selectors (Monthly / Annual and Patrimonio / Entrate / Spese) — replacing the previous four identical side-by-side tables where nothing stood out and every section needed to be scrolled separately
 - Added **mobile section navigation** to Hall of Fame — a three-section pill (Overview / Monthly / Annual) shows one section at a time on mobile, replacing the previous layout that stacked all four monthly ranking tables and all four annual ranking tables in a single continuous scroll

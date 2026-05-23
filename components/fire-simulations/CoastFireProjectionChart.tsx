@@ -11,6 +11,7 @@
 
 import { CoastFIREProjectionPoint } from '@/lib/services/fireService';
 import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
+import { useChartColors } from '@/lib/hooks/useChartColors';
 import {
   CartesianGrid,
   Legend,
@@ -33,9 +34,11 @@ export function CoastFireProjectionChart({
   height = 340,
   marginLeft = 50,
 }: CoastFireProjectionChartProps) {
+  const chartColors = useChartColors();
+
   if (projectionData.length === 0) {
     return (
-      <div className="flex h-64 items-center justify-center text-gray-500">
+      <div className="flex h-64 items-center justify-center text-muted-foreground">
         Nessun dato di proiezione disponibile.
       </div>
     );
@@ -44,7 +47,7 @@ export function CoastFireProjectionChart({
   return (
     <ResponsiveContainer width="100%" height={height}>
       <LineChart data={projectionData} margin={{ left: marginLeft, bottom: 20 }}>
-        <CartesianGrid strokeDasharray="3 3" />
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.5} />
         <XAxis dataKey="calendarYear" />
         <YAxis width={marginLeft <= 20 ? 70 : 100} tickFormatter={(value) => formatCurrencyCompact(value)} />
         <Tooltip
@@ -53,13 +56,18 @@ export function CoastFireProjectionChart({
             const age = payload?.[0]?.payload?.age;
             return age ? `Anno ${label} · Età ${age}` : `Anno ${label}`;
           }}
-          labelStyle={{ color: '#000' }}
+          contentStyle={{
+            backgroundColor: 'var(--card)',
+            border: '1px solid var(--border)',
+            color: 'var(--card-foreground)',
+          }}
+          labelStyle={{ fontWeight: 600, color: 'var(--card-foreground)' }}
         />
         <Legend />
         <Line
           type="monotone"
           dataKey="bearPortfolioValue"
-          stroke="#EF4444"
+          stroke={chartColors[4]}
           strokeWidth={2}
           name="Patrimonio Orso"
           dot={false}
@@ -69,7 +77,7 @@ export function CoastFireProjectionChart({
         <Line
           type="monotone"
           dataKey="basePortfolioValue"
-          stroke="#6366F1"
+          stroke={chartColors[0]}
           strokeWidth={2}
           name="Patrimonio Base"
           dot={false}
@@ -79,23 +87,23 @@ export function CoastFireProjectionChart({
         <Line
           type="monotone"
           dataKey="bullPortfolioValue"
-          stroke="#10B981"
+          stroke={chartColors[1]}
           strokeWidth={2}
           name="Patrimonio Toro"
           dot={false}
           animationDuration={800}
           animationEasing="ease-out"
         />
+        {/* Target line is a static reference — no animation needed */}
         <Line
           type="monotone"
           dataKey="fireNumberTarget"
-          stroke="#F59E0B"
+          stroke={chartColors[2]}
           strokeWidth={2}
           strokeDasharray="8 4"
           name="Capitale richiesto a pensione"
           dot={false}
-          animationDuration={800}
-          animationEasing="ease-out"
+          isAnimationActive={false}
         />
       </LineChart>
     </ResponsiveContainer>

@@ -423,20 +423,9 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - Symptom: 260k → 284k sparkline is a flat horizontal line. Fix: `<YAxis hide domain={['auto', 'auto']} />` — scales Y to data range instead of starting from 0
 
 ### Recharts ResponsiveContainer -1 Warning
-- Symptom: `The width(-1) and height(-1) of chart should be greater than 0` (fires twice) when a chart appears after an async state change (e.g. after a fetch completes and `loading` flips to `false`).
-- Cause: React mounts the chart section in one render cycle; `ResizeObserver` fires immediately before the browser completes layout, measuring `-1`.
-- Fix: defer mount with `requestAnimationFrame`. Pattern:
-  ```tsx
-  const [chartReady, setChartReady] = useState(false);
-  const rafRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (loading) return;
-    rafRef.current = requestAnimationFrame(() => setChartReady(true));
-    return () => { if (rafRef.current !== null) cancelAnimationFrame(rafRef.current); };
-  }, [loading]);
-  // In JSX: {chartReady && <ResponsiveContainer ...>}
-  ```
-- `minWidth={0}` alone is not sufficient — it only prevents negative width assertions, not the timing issue.
+- Symptom: `The width(-1) and height(-1) of chart should be greater than 0` fires when a chart mounts after an async state flip.
+- Cause: `ResizeObserver` fires before the browser completes layout on the same render cycle.
+- Fix: defer mount with `requestAnimationFrame` — gate `{chartReady && <ResponsiveContainer>}` behind a `useEffect` that sets `chartReady` inside an `rAF` callback, with cleanup via `cancelAnimationFrame`. `minWidth={0}` alone is not sufficient.
 
 ### Radix CollapsibleTrigger Nested Button
 - Symptom: `<button> cannot be a descendant of <button>` hydration error in console
@@ -478,8 +467,4 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - Fix: use `div.flex-1.overflow-y-auto.min-h-0` as the scrollable container (no `relative`), plain padding classes on the `motion.div` children, and move the sticky footer outside `AnimatePresence` as a `shrink-0` sibling. Connect the submit button with `<form id="expense-form">` + `<button type="submit" form="expense-form">` so it doesn't need to be physically inside the `<form>` tag.
 
 ### Async Tab Count: boolean | null Pattern
-- Tab count depends on async settings: init `useState<boolean | null>(null)`. While `null`, render `<div className="hidden desktop:block h-10 animate-pulse rounded-md bg-muted" />` to hold the space. Mount real `TabsList` only after settings arrive — avoids a 5→6 column reflow flash.
-
-
-
-
+- Tab count depends on async settings: init `useState<boolean | null>(null)`. While `null`, render a `h-10 animate-pulse rounded-md bg-muted` placeholder to hold space. Mount real `TabsList` only after settings arrive — avoids a visible column-count reflow flash.
