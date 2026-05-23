@@ -4,17 +4,18 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { TrendingDown, Target, TrendingUp, RotateCcw, Save } from 'lucide-react';
 import { MonteCarloScenarios, MonteCarloScenarioParams } from '@/types/assets';
+import { useChartColors } from '@/lib/hooks/useChartColors';
 
-// Consistent scenario styling, same pattern as FIREProjectionSection
+// Static config — colors derived at render time from useChartColors() to stay theme-aware
 const SCENARIO_CONFIG = {
-  bear: { label: 'Scenario Orso', icon: TrendingDown, bgColor: 'bg-red-50 dark:bg-red-950/20', borderColor: 'border-red-200 dark:border-red-800', textColor: 'text-red-600', boldColor: 'text-red-700' },
-  base: { label: 'Scenario Base', icon: Target, bgColor: 'bg-indigo-50 dark:bg-indigo-950/20', borderColor: 'border-indigo-200 dark:border-indigo-800', textColor: 'text-indigo-600', boldColor: 'text-indigo-700' },
-  bull: { label: 'Scenario Toro', icon: TrendingUp, bgColor: 'bg-green-50 dark:bg-green-950/20', borderColor: 'border-green-200 dark:border-green-800', textColor: 'text-green-600', boldColor: 'text-green-700' },
+  bear: { label: 'Scenario Orso', icon: TrendingDown, colorIndex: 4 as const },
+  base: { label: 'Scenario Base', icon: Target, colorIndex: 0 as const },
+  bull: { label: 'Scenario Toro', icon: TrendingUp, colorIndex: 1 as const },
 } as const;
 
 type ScenarioKey = keyof typeof SCENARIO_CONFIG;
 
-// Grouping of fields for display in the card
+// Grouping of fields for display in each card
 const ASSET_CLASS_FIELDS: {
   label: string;
   returnKey: keyof MonteCarloScenarioParams;
@@ -38,8 +39,7 @@ interface ScenarioParameterCardsProps {
  * Three side-by-side scenario parameter cards for Bear/Base/Bull configuration.
  *
  * Each card contains 9 editable fields: 4 return rates, 4 volatilities, and 1 inflation rate.
- * Uses compact layout (small inputs, grouped by return/volatility) to fit all params.
- * Parameters are persisted to Firestore via save button.
+ * Parameters are persisted to Firestore via the save button.
  */
 export function ScenarioParameterCards({
   scenarios,
@@ -48,6 +48,7 @@ export function ScenarioParameterCards({
   onReset,
   isSaving,
 }: ScenarioParameterCardsProps) {
+  const chartColors = useChartColors();
 
   const updateScenarioField = (
     scenarioKey: ScenarioKey,
@@ -62,10 +63,7 @@ export function ScenarioParameterCards({
 
     onScenariosChange({
       ...scenarios,
-      [scenarioKey]: {
-        ...scenarios[scenarioKey],
-        [field]: numValue,
-      },
+      [scenarioKey]: { ...scenarios[scenarioKey], [field]: numValue },
     });
   };
 
@@ -75,11 +73,21 @@ export function ScenarioParameterCards({
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-base font-semibold">Parametri Scenari</h3>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={onReset} className="flex-1 sm:flex-none dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onReset}
+            className="flex-1 sm:flex-none"
+          >
             <RotateCcw className="h-3.5 w-3.5 mr-1" />
             Ripristina Default
           </Button>
-          <Button size="sm" onClick={onSave} disabled={isSaving} className="flex-1 sm:flex-none dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
+          <Button
+            size="sm"
+            onClick={onSave}
+            disabled={isSaving}
+            className="flex-1 sm:flex-none"
+          >
             <Save className="h-3.5 w-3.5 mr-1" />
             {isSaving ? 'Salvataggio...' : 'Salva Parametri'}
           </Button>
@@ -92,23 +100,33 @@ export function ScenarioParameterCards({
           const config = SCENARIO_CONFIG[key];
           const Icon = config.icon;
           const scenario = scenarios[key];
+          const color = chartColors[config.colorIndex];
 
           return (
-            <Card key={key} className={`${config.borderColor} ${config.bgColor}`}>
+            <Card
+              key={key}
+              className="overflow-hidden"
+              style={{
+                borderColor: `color-mix(in srgb, ${color} 35%, transparent)`,
+                background: `color-mix(in srgb, ${color} 6%, transparent)`,
+              }}
+            >
               <CardHeader className="pb-2">
-                <CardTitle className={`flex items-center gap-2 text-base ${config.boldColor}`}>
+                <CardTitle className="flex items-center gap-2 text-base" style={{ color }}>
                   <Icon className="h-4 w-4" />
                   {config.label}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {/* Rendimenti + Volatilita per asset class */}
+                {/* Return + Volatility per asset class */}
                 <div>
-                  <p className="text-xs font-semibold text-muted-foreground mb-2">Rendimenti e Volatilità (%)</p>
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">
+                    Rendimenti e Volatilità (%)
+                  </p>
                   <div className="space-y-1.5">
                     {/* Header row */}
                     <div className="grid grid-cols-3 gap-1 text-[10px] text-muted-foreground font-medium">
-                      <span></span>
+                      <span />
                       <span className="text-center">Rend.</span>
                       <span className="text-center">Vol.</span>
                     </div>
@@ -127,7 +145,9 @@ export function ScenarioParameterCards({
                           type="number"
                           step="0.5"
                           value={scenario[field.volatilityKey]}
-                          onChange={(e) => updateScenarioField(key, field.volatilityKey, e.target.value)}
+                          onChange={(e) =>
+                            updateScenarioField(key, field.volatilityKey, e.target.value)
+                          }
                           onWheel={(e) => e.currentTarget.blur()}
                           className="h-7 text-xs text-center px-1"
                         />

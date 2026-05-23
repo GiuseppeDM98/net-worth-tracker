@@ -18,6 +18,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
+import { useChartColors } from '@/lib/hooks/useChartColors';
 import { cardItem, goalLinkSettle, simulationShellSettle, simulationStagger } from '@/lib/utils/motionVariants';
 
 interface ScenarioComparisonResultsProps {
@@ -29,20 +30,82 @@ interface ScenarioComparisonResultsProps {
   refreshKey?: number;
 }
 
-// Scenario styling
-const SCENARIOS = [
-  { key: 'bear' as const, label: 'Scenario Orso', icon: TrendingDown, color: '#EF4444', bgColor: 'bg-red-50 dark:bg-red-950/20', borderColor: 'border-red-200 dark:border-red-800', textColor: 'text-red-700' },
-  { key: 'base' as const, label: 'Scenario Base', icon: Target, color: '#6366F1', bgColor: 'bg-indigo-50 dark:bg-indigo-950/20', borderColor: 'border-indigo-200 dark:border-indigo-800', textColor: 'text-indigo-700' },
-  { key: 'bull' as const, label: 'Scenario Toro', icon: TrendingUp, color: '#10B981', bgColor: 'bg-green-50 dark:bg-green-950/20', borderColor: 'border-green-200 dark:border-green-800', textColor: 'text-green-700' },
+// Static scenario definitions — colors resolved at runtime from useChartColors()
+const SCENARIO_DEFS = [
+  { key: 'bear' as const, label: 'Scenario Orso', icon: TrendingDown, colorIndex: 4 as const },
+  { key: 'base' as const, label: 'Scenario Base', icon: Target, colorIndex: 0 as const },
+  { key: 'bull' as const, label: 'Scenario Toro', icon: TrendingUp, colorIndex: 1 as const },
 ] as const;
+
+type ScenarioDef = (typeof SCENARIO_DEFS)[number];
+
+// Module-level tooltip — Recharts cloneElement passes active/payload/label at render time,
+// while our extra props (e.g. scenarioDefs, colors) are preserved from instantiation.
+function ScenarioOverlayTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  // Read median lines only; identify scenario by matching the stroke color from payload
+  const medianLines = payload.filter((p: any) => p.dataKey?.endsWith('P50'));
+  return (
+    <div
+      style={{
+        backgroundColor: 'var(--card)',
+        border: '1px solid var(--border)',
+        borderRadius: '8px',
+        padding: '12px',
+        color: 'var(--card-foreground)',
+      }}
+    >
+      <p className="font-semibold mb-2" style={{ color: 'var(--card-foreground)' }}>
+        Anno {label}
+      </p>
+      <div className="space-y-1.5 text-sm">
+        {medianLines.map((p: any) => (
+          <p key={p.dataKey} style={{ color: p.stroke || p.color }}>
+            {p.name}: {formatCurrency(p.value)}
+          </p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DistributionBarTooltip({ active, payload }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div
+      style={{
+        backgroundColor: 'var(--card)',
+        border: '1px solid var(--border)',
+        borderRadius: '8px',
+        padding: '8px',
+        color: 'var(--card-foreground)',
+        fontSize: '12px',
+      }}
+    >
+      <p className="font-semibold mb-1">{payload[0].payload.range}</p>
+      <p>Simulazioni: {payload[0].value.toLocaleString('it-IT')}</p>
+      <p>Percentuale: {payload[0].payload.percentage.toFixed(1)}%</p>
+    </div>
+  );
+}
+
+const successIcon = (rate: number) => {
+  if (rate >= 90) return <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />;
+  if (rate >= 80) return <AlertTriangle className="h-5 w-5 text-amber-500 dark:text-amber-400" />;
+  return <XCircle className="h-5 w-5 text-destructive" />;
+};
+
+const overlayTooltipEl = <ScenarioOverlayTooltip />;
+const distTooltipEl = <DistributionBarTooltip />;
 
 /**
  * Displays comparison results for Bear/Base/Bull Monte Carlo scenarios.
  *
  * Layout:
- * 1. Three success rate cards side-by-side with scenario-colored borders
+ * 1. Three success rate cards with scenario-colored borders (color-mix for theme-awareness)
  * 2. Overlay chart with 3 median lines + p10-p90 bands per scenario
- * 3. Comparison table with median values at 5-year intervals
+ * 3. Distribution histograms side-by-side
+ * 4. Comparison table with median values at 5-year intervals
  */
 export function ScenarioComparisonResults({
   bear,
@@ -53,8 +116,9 @@ export function ScenarioComparisonResults({
   refreshKey = 0,
 }: ScenarioComparisonResultsProps) {
   const reducedMotion = useReducedMotion();
+  const chartColors = useChartColors();
   const resultsByKey = { bear, base, bull };
-  const [activeScenario, setActiveScenario] = useState<typeof SCENARIOS[number]['key']>('base');
+  const [activeScenario, setActiveScenario] = useState<ScenarioDef['key']>('base');
   const [resultsAnimationState, setResultsAnimationState] = useState<'idle' | 'settle'>('idle');
 
   useEffect(() => {
@@ -62,13 +126,11 @@ export function ScenarioComparisonResults({
       setResultsAnimationState('idle');
       return;
     }
-
     setResultsAnimationState('settle');
     const timer = window.setTimeout(() => setResultsAnimationState('idle'), 320);
     return () => window.clearTimeout(timer);
   }, [reducedMotion, refreshKey]);
 
-  // ===== Build overlay chart data =====
   // Merge percentile data from all 3 scenarios into a single dataset keyed by year
   const overlayData = base.percentiles.map((baseP, i) => ({
     year: baseP.year,
@@ -83,32 +145,11 @@ export function ScenarioComparisonResults({
     bullP90: bull.percentiles[i]?.p90 ?? 0,
   }));
 
-  // ===== Success rate icon selection =====
-  const getSuccessIcon = (rate: number) => {
-    if (rate >= 90) return <CheckCircle2 className="h-5 w-5 text-green-600" />;
-    if (rate >= 80) return <AlertTriangle className="h-5 w-5 text-amber-500" />;
-    return <XCircle className="h-5 w-5 text-red-600" />;
-  };
-
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-background border border-border p-3 rounded-lg shadow-lg">
-          <p className="font-semibold mb-2">Anno {label}</p>
-          <div className="space-y-1.5 text-sm">
-            {SCENARIOS.map((s) => {
-              const p50 = payload.find((p: any) => p.dataKey === `${s.key}P50`)?.value;
-              return p50 !== undefined ? (
-                <p key={s.key} style={{ color: s.color }}>
-                  {s.label}: {formatCurrency(p50)}
-                </p>
-              ) : null;
-            })}
-          </div>
-        </div>
-      );
-    }
-    return null;
+  // Derive runtime colors: bear=warning, base=primary, bull=positive
+  const scenarioColors: Record<ScenarioDef['key'], string> = {
+    bear: chartColors[4],
+    base: chartColors[0],
+    bull: chartColors[1],
   };
 
   return (
@@ -120,54 +161,58 @@ export function ScenarioComparisonResults({
     >
       {/* ===== Success Rate Cards ===== */}
       <motion.div
-        className="grid gap-4 md:grid-cols-3"
+        className="grid gap-4 desktop:grid-cols-3"
         variants={simulationStagger}
         initial={reducedMotion ? false : 'hidden'}
         animate="visible"
       >
-        {SCENARIOS.map((s) => {
+        {SCENARIO_DEFS.map((s) => {
           const result = resultsByKey[s.key];
           const Icon = s.icon;
           const isActive = activeScenario === s.key;
+          const color = scenarioColors[s.key];
           return (
             <motion.div key={s.key} variants={cardItem}>
-            <Card
-              className={`${s.borderColor} ${s.bgColor} transition-[transform,box-shadow,border-color] duration-200 ${isActive ? 'shadow-md ring-1 ring-border/60' : 'opacity-90'}`}
-            >
-              <CardHeader className="pb-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveScenario(s.key)}
-                  className="w-full text-left"
-                >
-                  <CardTitle className={`flex items-center gap-2 text-base ${s.textColor}`}>
-                    <Icon className="h-4 w-4" />
-                    {s.label}
-                  </CardTitle>
-                </button>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-3 mb-3">
-                  {getSuccessIcon(result.successRate)}
-                  <span className={`text-3xl font-bold ${s.textColor}`}>
-                    {result.successRate.toFixed(1)}%
-                  </span>
-                </div>
-                <div className="space-y-1 text-sm text-muted-foreground">
-                  <p>
-                    {result.successCount.toLocaleString('it-IT')}/{numberOfSimulations.toLocaleString('it-IT')} simulazioni riuscite
-                  </p>
-                  <p>
-                    Valore mediano finale: {formatCurrencyCompact(result.medianFinalValue)}
-                  </p>
-                  {result.failureAnalysis && (
-                    <p className="text-red-600">
-                      Fallimento medio: anno {Math.round(result.failureAnalysis.averageFailureYear)}
+              <Card
+                className={`overflow-hidden transition-[box-shadow,opacity] duration-200 ${isActive ? 'shadow-md' : 'opacity-90'}`}
+                style={{
+                  borderColor: `color-mix(in srgb, ${color} 35%, transparent)`,
+                  background: `color-mix(in srgb, ${color} 6%, transparent)`,
+                }}
+              >
+                <CardHeader className="pb-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveScenario(s.key)}
+                    className="w-full text-left"
+                  >
+                    <CardTitle className="flex items-center gap-2 text-base" style={{ color }}>
+                      <Icon className="h-4 w-4" />
+                      {s.label}
+                    </CardTitle>
+                  </button>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-3 mb-3">
+                    {successIcon(result.successRate)}
+                    <span className="text-3xl font-bold font-mono" style={{ color }}>
+                      {result.successRate.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="space-y-1 text-sm text-muted-foreground">
+                    <p>
+                      {result.successCount.toLocaleString('it-IT')}/
+                      {numberOfSimulations.toLocaleString('it-IT')} simulazioni riuscite
                     </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                    <p>Valore mediano finale: {formatCurrencyCompact(result.medianFinalValue)}</p>
+                    {result.failureAnalysis && (
+                      <p style={{ color: 'var(--destructive)' }}>
+                        Fallimento medio: anno {Math.round(result.failureAnalysis.averageFailureYear)}
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             </motion.div>
           );
         })}
@@ -175,70 +220,110 @@ export function ScenarioComparisonResults({
 
       {/* ===== Overlay Chart ===== */}
       <motion.div variants={goalLinkSettle} initial={false} animate={resultsAnimationState}>
-      <Card>
-        <CardHeader>
-          <CardTitle>Confronto Scenari ({retirementYears} anni)</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Linee: mediana (50° percentile). Bande colorate: range 10°-90° percentile per scenario.
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Focus attivo: {SCENARIOS.find((scenario) => scenario.key === activeScenario)?.label}. Le altre traiettorie restano visibili ma subordinate.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={400}>
-            <LineChart data={overlayData} margin={{ left: 50 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
-              <XAxis
-                dataKey="year"
-                label={{ value: 'Anni', position: 'insideBottom', offset: -5 }}
-                stroke="#9CA3AF"
-              />
-              <YAxis
-                width={100}
-                tickFormatter={(value) => formatCurrencyCompact(value)}
-                stroke="#9CA3AF"
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend />
-              <ReferenceLine
-                y={0}
-                stroke="#ef4444"
-                strokeDasharray="3 3"
-              />
+        <Card>
+          <CardHeader>
+            <CardTitle>Confronto Scenari ({retirementYears} anni)</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Linee: mediana (50° percentile). Bande colorate: range 10°-90° per scenario.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Focus attivo:{' '}
+              {SCENARIO_DEFS.find((s) => s.key === activeScenario)?.label}. Le altre traiettorie
+              restano visibili ma subordinate.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={400}>
+              <LineChart data={overlayData} margin={{ left: 50 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis
+                  dataKey="year"
+                  label={{ value: 'Anni', position: 'insideBottom', offset: -5 }}
+                  stroke="var(--border)"
+                  tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
+                />
+                <YAxis
+                  width={100}
+                  tickFormatter={(value) => formatCurrencyCompact(value)}
+                  stroke="var(--border)"
+                  tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
+                />
+                <Tooltip content={overlayTooltipEl} cursor={{ fill: 'rgba(128, 128, 128, 0.1)' }} />
+                <Legend />
+                <ReferenceLine y={0} stroke="var(--destructive)" strokeDasharray="3 3" />
 
-              {/* p10-p90 bands for each scenario (semi-transparent) — isAnimationActive={false}
-                  perché sono 6 aree decorative sovrapposte: animarle singolarmente causerebbe
-                  una sequenza visivamente caotica. Le linee mediane animano al loro posto. */}
-              <Area type="monotone" dataKey="bearP90" stroke="none" fill="#EF4444" fillOpacity={activeScenario === 'bear' ? 0.11 : 0.04} name="Orso p90" legendType="none" isAnimationActive={false} />
-              <Area type="monotone" dataKey="bearP10" stroke="none" fill="#EF4444" fillOpacity={activeScenario === 'bear' ? 0.11 : 0.04} name="Orso p10" legendType="none" isAnimationActive={false} />
-              <Area type="monotone" dataKey="baseP90" stroke="none" fill="#6366F1" fillOpacity={activeScenario === 'base' ? 0.12 : 0.04} name="Base p90" legendType="none" isAnimationActive={false} />
-              <Area type="monotone" dataKey="baseP10" stroke="none" fill="#6366F1" fillOpacity={activeScenario === 'base' ? 0.12 : 0.04} name="Base p10" legendType="none" isAnimationActive={false} />
-              <Area type="monotone" dataKey="bullP90" stroke="none" fill="#10B981" fillOpacity={activeScenario === 'bull' ? 0.11 : 0.04} name="Toro p90" legendType="none" isAnimationActive={false} />
-              <Area type="monotone" dataKey="bullP10" stroke="none" fill="#10B981" fillOpacity={activeScenario === 'bull' ? 0.11 : 0.04} name="Toro p10" legendType="none" isAnimationActive={false} />
+                {/* p10-p90 bands for each scenario — isAnimationActive={false} because 6
+                    stacked decorative areas animating individually produces a chaotic sequence.
+                    The median lines animate cleanly in their place. */}
+                {SCENARIO_DEFS.map((s) => {
+                  const opacity = activeScenario === s.key ? 0.11 : 0.04;
+                  const color = scenarioColors[s.key];
+                  return [
+                    <Area
+                      key={`${s.key}P90`}
+                      type="monotone"
+                      dataKey={`${s.key}P90`}
+                      stroke="none"
+                      fill={color}
+                      fillOpacity={opacity}
+                      legendType="none"
+                      isAnimationActive={false}
+                    />,
+                    <Area
+                      key={`${s.key}P10`}
+                      type="monotone"
+                      dataKey={`${s.key}P10`}
+                      stroke="none"
+                      fill={color}
+                      fillOpacity={opacity}
+                      legendType="none"
+                      isAnimationActive={false}
+                    />,
+                  ];
+                })}
 
-              {/* Median lines */}
-              <Line type="monotone" dataKey="bearP50" stroke="#EF4444" strokeOpacity={activeScenario === 'bear' ? 1 : 0.5} strokeWidth={activeScenario === 'bear' ? 3 : 2} dot={false} name="Orso (mediana)" animationDuration={800} animationEasing="ease-out" />
-              <Line type="monotone" dataKey="baseP50" stroke="#6366F1" strokeOpacity={activeScenario === 'base' ? 1 : 0.5} strokeWidth={activeScenario === 'base' ? 3 : 2} dot={false} name="Base (mediana)" animationDuration={800} animationEasing="ease-out" />
-              <Line type="monotone" dataKey="bullP50" stroke="#10B981" strokeOpacity={activeScenario === 'bull' ? 1 : 0.5} strokeWidth={activeScenario === 'bull' ? 3 : 2} dot={false} name="Toro (mediana)" animationDuration={800} animationEasing="ease-out" />
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+                {/* Median lines */}
+                {SCENARIO_DEFS.map((s) => {
+                  const isActive = activeScenario === s.key;
+                  const color = scenarioColors[s.key];
+                  return (
+                    <Line
+                      key={`${s.key}P50`}
+                      type="monotone"
+                      dataKey={`${s.key}P50`}
+                      stroke={color}
+                      strokeOpacity={isActive ? 1 : 0.5}
+                      strokeWidth={isActive ? 3 : 2}
+                      dot={false}
+                      name={`${s.label} (mediana)`}
+                      animationDuration={800}
+                      animationEasing="ease-out"
+                    />
+                  );
+                })}
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
       </motion.div>
 
       {/* ===== Distribution Charts (3 side-by-side) ===== */}
-      <div className="grid gap-4 md:grid-cols-3">
-        {SCENARIOS.map((s) => {
+      <div className="grid gap-4 desktop:grid-cols-3">
+        {SCENARIO_DEFS.map((s) => {
           const result = resultsByKey[s.key];
           const Icon = s.icon;
           const isActive = activeScenario === s.key;
+          const color = scenarioColors[s.key];
           return (
-            <Card key={s.key} className={`${s.borderColor} transition-[transform,box-shadow,opacity] duration-200 ${isActive ? 'shadow-sm' : 'opacity-80'}`}>
+            <Card
+              key={s.key}
+              className={`overflow-hidden transition-[opacity] duration-200 ${isActive ? '' : 'opacity-80'}`}
+              style={{ borderColor: `color-mix(in srgb, ${color} 30%, transparent)` }}
+            >
               <CardHeader className="pb-2">
-                <CardTitle className={`flex items-center gap-2 text-sm ${s.textColor}`}>
+                <CardTitle className="flex items-center gap-2 text-sm" style={{ color }}>
                   <Icon className="h-3.5 w-3.5" />
-                  Distribuzione - {s.label}
+                  Distribuzione — {s.label}
                 </CardTitle>
                 <p className="text-xs text-muted-foreground">
                   Valori finali dopo {retirementYears} anni
@@ -247,36 +332,28 @@ export function ScenarioComparisonResults({
               <CardContent>
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={result.distribution} margin={{ left: 10, right: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis
                       dataKey="range"
                       angle={-45}
                       textAnchor="end"
                       height={60}
-                      stroke="#9CA3AF"
-                      tick={{ fontSize: 9 }}
+                      stroke="var(--border)"
+                      tick={{ fontSize: 9, fill: 'var(--muted-foreground)' }}
                     />
                     <YAxis
                       width={40}
-                      stroke="#9CA3AF"
-                      tick={{ fontSize: 9 }}
+                      stroke="var(--border)"
+                      tick={{ fontSize: 9, fill: 'var(--muted-foreground)' }}
                     />
-                    <Tooltip
-                      cursor={{ fill: 'rgba(128, 128, 128, 0.1)' }}
-                      content={({ active, payload }: any) => {
-                        if (active && payload && payload.length) {
-                          return (
-                            <div className="bg-background border border-border p-2 rounded-lg shadow-lg text-xs">
-                              <p className="font-semibold mb-1">{payload[0].payload.range}</p>
-                              <p>Simulazioni: {payload[0].value.toLocaleString('it-IT')}</p>
-                              <p>Percentuale: {payload[0].payload.percentage.toFixed(1)}%</p>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
+                    <Tooltip cursor={{ fill: 'rgba(128, 128, 128, 0.1)' }} content={distTooltipEl} />
+                    <Bar
+                      dataKey="count"
+                      fill={color}
+                      radius={[2, 2, 0, 0]}
+                      animationDuration={600}
+                      animationEasing="ease-out"
                     />
-                    <Bar dataKey="count" fill={s.color} radius={[2, 2, 0, 0]} animationDuration={600} animationEasing="ease-out" />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -299,24 +376,45 @@ export function ScenarioComparisonResults({
               <thead>
                 <tr className="border-b">
                   <th className="text-left p-2">Anno</th>
-                  <th className="text-right p-2 text-red-700">Orso (p50)</th>
-                  <th className="text-right p-2 text-indigo-700 font-bold">Base (p50)</th>
-                  <th className="text-right p-2 text-green-700">Toro (p50)</th>
+                  {SCENARIO_DEFS.map((s) => (
+                    <th
+                      key={s.key}
+                      className="text-right p-2"
+                      style={{ color: scenarioColors[s.key] }}
+                    >
+                      {s.label} (p50)
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {base.percentiles
                   .filter((_, index) => index % 5 === 0)
-                  .map((baseP, i) => {
+                  .map((baseP) => {
                     const year = baseP.year;
                     const bearP50 = bear.percentiles.find((p) => p.year === year)?.p50 ?? 0;
                     const bullP50 = bull.percentiles.find((p) => p.year === year)?.p50 ?? 0;
                     return (
                       <tr key={year} className="border-b">
                         <td className="p-2">{year}</td>
-                        <td className="text-right p-2 text-red-700">{formatCurrencyCompact(bearP50)}</td>
-                        <td className="text-right p-2 text-indigo-700 font-bold">{formatCurrencyCompact(baseP.p50)}</td>
-                        <td className="text-right p-2 text-green-700">{formatCurrencyCompact(bullP50)}</td>
+                        <td
+                          className="text-right p-2"
+                          style={{ color: scenarioColors.bear }}
+                        >
+                          {formatCurrencyCompact(bearP50)}
+                        </td>
+                        <td
+                          className="text-right p-2 font-bold"
+                          style={{ color: scenarioColors.base }}
+                        >
+                          {formatCurrencyCompact(baseP.p50)}
+                        </td>
+                        <td
+                          className="text-right p-2"
+                          style={{ color: scenarioColors.bull }}
+                        >
+                          {formatCurrencyCompact(bullP50)}
+                        </td>
                       </tr>
                     );
                   })}

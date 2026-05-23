@@ -24,6 +24,13 @@
 
 ## 🔧 Improvements
 
+- Redesigned the **Monte Carlo** tab with a cleaner, Trade Republic-inspired layout: the Success Rate (probability of not running out of money) now dominates the screen as a large bold hero metric — always visible before and after running a simulation, showing `--` with a clear call to action on first load. A flat secondary row below shows the median final portfolio value once a simulation has run
+- The Monte Carlo settings panel is now split into two tiers: core inputs (starting wealth, years, annual withdrawal, allocation) are always visible, while market parameters (return and volatility per asset class, number of simulations) are collapsed by default and open automatically if any value differs from the defaults — reducing the form from 18 simultaneous fields to the 6 that matter most
+- The Monte Carlo tab mode switcher (Single Simulation / Scenario Comparison) now uses the same smooth animated pill control as the rest of the app — a spring animation slides between modes instead of a hard visual swap
+- The "How Monte Carlo simulations work" explainer is now collapsed in a disclosure section at the bottom of the tab, not occupying the top of the screen where users expect data. For returning users the tab now opens on the results immediately
+- Chart colors across all Monte Carlo charts (percentile fan, distribution histogram, scenario overlay, scenario distribution side-by-sides) now adapt to the active color theme — previously all colors were hardcoded and clashed with Solar Dusk, Cyberpunk, Midnight Bloom, and other themes
+- Chart tooltips across all Monte Carlo charts now adapt to dark mode — previously tooltip backgrounds and text were hardcoded and became invisible or unreadable in dark themes
+
 - Redesigned the **FIRE Calculator** tab with a cleaner, Trade Republic-inspired layout: the FIRE Number now dominates the screen as a large bold hero metric — the answer to "how close am I to financial independence?" is visible in the first two seconds without scrolling through a form
 - The FIRE settings panel (withdrawal rate, planned expenses, primary residence toggle) is now collapsed by default and opens automatically when you make a change — the data you care about is always visible first, settings appear only when needed
 - Added an **"Annulla"** button to the FIRE settings panel — reset any unsaved change back to the last saved values in a single tap, without having to remember what the original number was

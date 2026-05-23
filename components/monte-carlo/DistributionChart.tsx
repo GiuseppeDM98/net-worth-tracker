@@ -10,6 +10,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import { useChartColors } from '@/lib/hooks/useChartColors';
 
 interface DistributionChartProps {
   data: {
@@ -22,27 +23,45 @@ interface DistributionChartProps {
 }
 
 /**
- * Histogram showing the distribution of final portfolio values across all Monte Carlo simulations.
+ * Custom tooltip at module level — safe for React Compiler.
+ * Recharts cloneElement preserves extra props passed at instantiation.
+ */
+function DistributionTooltip({ active, payload }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div
+      style={{
+        backgroundColor: 'var(--card)',
+        border: '1px solid var(--border)',
+        borderRadius: '8px',
+        padding: '16px',
+        color: 'var(--card-foreground)',
+      }}
+    >
+      <p className="font-semibold mb-2">{payload[0].payload.range}</p>
+      <div className="space-y-1 text-sm">
+        <p>Simulazioni: {payload[0].value.toLocaleString('it-IT')}</p>
+        <p>Percentuale: {payload[0].payload.percentage.toFixed(1)}%</p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Histogram showing the distribution of final portfolio values across all simulations.
  *
- * What this chart shows:
- * After running N simulations (e.g., 10,000), each simulation ends with a different final
- * portfolio value. This chart groups those final values into bins (ranges) and displays
- * how many simulations ended in each range.
+ * Bars enter in sequence — each bucket reveals left-to-right to let the reader parse
+ * the distribution shape before it completes. isAnimationActive={false} on the Bar
+ * prevents Recharts from animating the staged data changes (which would fight the
+ * progressive reveal timing).
  *
- * Interpretation guide:
- * - Tall bars = Many simulations ended in that value range (more likely outcome)
- * - Short bars = Few simulations ended in that range (less likely outcome)
- * - Bars near €0 = Failed simulations (portfolio depleted before retirement end)
- * - Distribution shape reveals risk profile (wide spread = high uncertainty, narrow = predictable)
- *
- * The x-axis shows portfolio value ranges (e.g., "€0-€50k", "€50k-€100k").
- * The y-axis shows the count of simulations that ended in each range.
- *
- * @param data - Array of distribution bins with range labels, counts, and percentages
+ * @param data - Distribution bins with range labels, counts, and percentages
  * @param retirementYears - Simulation duration in years (used in subtitle)
+ * @param revealKey - Incrementing key triggers a fresh bar reveal on each new run
  */
 export function DistributionChart({ data, retirementYears, revealKey = 0 }: DistributionChartProps) {
   const reducedMotion = useReducedMotion();
+  const chartColors = useChartColors();
   const [visibleBars, setVisibleBars] = useState(reducedMotion ? data.length : 0);
 
   useEffect(() => {
@@ -50,53 +69,19 @@ export function DistributionChart({ data, retirementYears, revealKey = 0 }: Dist
       setVisibleBars(data.length);
       return;
     }
-
     setVisibleBars(0);
     const timers = data.map((_, index) =>
-      window.setTimeout(() => {
-        setVisibleBars(index + 1);
-      }, 80 + (index * 45))
+      window.setTimeout(() => setVisibleBars(index + 1), 80 + index * 45)
     );
-
-    return () => {
-      timers.forEach((timer) => window.clearTimeout(timer));
-    };
+    return () => timers.forEach((t) => window.clearTimeout(t));
   }, [data, reducedMotion, revealKey]);
 
   const stagedData = useMemo(
-    () =>
-      data.map((entry, index) => ({
-        ...entry,
-        count: index < visibleBars ? entry.count : 0,
-      })),
+    () => data.map((entry, index) => ({ ...entry, count: index < visibleBars ? entry.count : 0 })),
     [data, visibleBars]
   );
 
-  /**
-   * Custom tooltip displayed on bar hover.
-   *
-   * Shows:
-   * - Range label (e.g., "€100k-€150k")
-   * - Number of simulations in that range
-   * - Percentage of total simulations
-   *
-   * Note: Uses `any` type due to Recharts' loosely typed tooltip props.
-   * Ideally would use proper Recharts TooltipProps<ValueType, NameType> typing.
-   */
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-background border border-border p-4 rounded-lg shadow-lg">
-          <p className="font-semibold mb-2">{payload[0].payload.range}</p>
-          <div className="space-y-1 text-sm">
-            <p>Simulazioni: {payload[0].value.toLocaleString('it-IT')}</p>
-            <p>Percentuale: {payload[0].payload.percentage.toFixed(1)}%</p>
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
+  const tooltipEl = <DistributionTooltip />;
 
   return (
     <Card>
@@ -106,32 +91,38 @@ export function DistributionChart({ data, retirementYears, revealKey = 0 }: Dist
           Distribuzione dei valori del patrimonio dopo {retirementYears} anni
         </p>
         <p className="text-xs text-muted-foreground">
-          I bucket entrano in sequenza per aiutare a leggere la probabilita&apos; relativa dei risultati finali.
+          I bucket entrano in sequenza per aiutare a leggere la probabilità relativa dei risultati finali.
         </p>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={400}>
           <BarChart data={stagedData} margin={{ left: 50 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
             <XAxis
               dataKey="range"
               angle={-45}
               textAnchor="end"
               height={80}
-              stroke="#9CA3AF"
-              tick={{ fontSize: 11 }}
+              stroke="var(--border)"
+              tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
             />
             <YAxis
               width={100}
-              label={{
-                value: 'Numero di Simulazioni',
-                angle: -90,
-                position: 'insideLeft',
-              }}
-              stroke="#9CA3AF"
+              label={{ value: 'Numero di Simulazioni', angle: -90, position: 'insideLeft' }}
+              stroke="var(--border)"
+              tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
             />
-            <Tooltip cursor={{ fill: 'rgba(128, 128, 128, 0.1)' }} content={<CustomTooltip />} />
-            <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} animationDuration={600} animationEasing="ease-out" />
+            <Tooltip
+              cursor={{ fill: 'rgba(128, 128, 128, 0.1)' }}
+              content={tooltipEl}
+            />
+            <Bar
+              dataKey="count"
+              fill={chartColors[0]}
+              radius={[4, 4, 0, 0]}
+              animationDuration={600}
+              animationEasing="ease-out"
+            />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>

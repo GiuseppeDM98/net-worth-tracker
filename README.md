@@ -80,10 +80,15 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Fully responsive on mobile and tablet — tab navigation uses a dropdown on small screens, year-by-year projection table switches to a card layout
 
 ### Monte Carlo Simulations
-- 4 asset classes: Equity, Bonds, Real Estate, Commodities
-- Editable parameters per asset class (returns, volatility)
-- Bear/Base/Bull scenario comparison with overlay charts and distribution analysis
+- Trade Republic-inspired layout: Success Rate (probability of not depleting the portfolio) is the dominant hero metric, always visible before and after a simulation run
+- Settings split into core inputs (always visible) and market parameters (collapsible, auto-opens when values differ from defaults) — reduces cognitive load from 18 simultaneous fields to 6
+- Animated mode switcher between Single Simulation and Bear/Base/Bull Scenario Comparison with spring pill animation
+- 4 asset classes: Equity, Bonds, Real Estate, Commodities — editable return and volatility per class
+- Progressive percentile fan chart (p10/p25/p50/p75/p90) and final-value distribution histogram with staged bar reveal
+- Bear/Base/Bull scenario comparison with overlay chart (3 median lines + p10–p90 bands), side-by-side distribution histograms, and a 5-year-interval comparison table
+- All chart colors and tooltips theme-aware across all six color themes
 - Auto-fill allocation from real portfolio (crypto and cash excluded, normalized to 100%)
+- Scenario parameters (return, volatility, inflation per asset class) saved to Firestore per user
 - Fully responsive on mobile and tablet — percentile table switches to a card layout, scenario parameter cards stack vertically
 
 ### Other
