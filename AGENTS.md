@@ -346,6 +346,7 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - **Never use `Select` for tab navigation** — 2 taps, hidden options. Segmented pill = 1 tap, all options visible
 - **Pattern**: module-level `TABS` constant, `role="tablist"` wrapper, `role="tab"` + `aria-selected` + `type="button"` per button, Framer Motion `layoutId` spring pill (400/35). Abbreviated labels (≤8 chars) for iPhone SE
 - Async-gated tab: build array dynamically inside render but keep base constant at module level: `const ALL_TABS = flag ? [...BASE, extra] : BASE`
+- **`shortLabel` for diverging mobile/desktop labels**: when tab labels are too long for the mobile pill (>8 chars) but appropriate for the desktop TabsList, add a `shortLabel` field to the TABS array and use it only in the mobile pill. Keeps both renderers driven by the same source of truth. Applied in `app/dashboard/fire-simulations/page.tsx` (FIRE / Coast / M. Carlo / Obiett.).
 - Floating pill is reserved for global page navigation — page-local switchers must be inline and scroll away
 
 ### Mobile Header Trash Icon Pattern
