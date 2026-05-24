@@ -99,7 +99,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - **Authentication flow** — Login and registration screens follow the same visual language as the dashboard, with accessible focus states, keyboard-friendly password toggles, and clearer in-place submit feedback
 - **Hall of Fame** — Personal records dashboard with an all-time best hero block, monthly and annual ranking tables, current-period spotlight, and contextual notes. Mobile navigation shows one section at a time; desktop tables are full-height with no internal scroll
 - **PDF Export** — 8 configurable sections with custom year/month period selection; sections auto-disabled for past periods when historical data is unavailable
-- **Settings** — Unsaved-change feedback, smooth nested allocation editing, and contextual confirmations for sensitive category actions
+- **Settings** — Trade Republic-inspired layout: the Allocation tab opens with a hero block showing the total allocation percentage, followed by a single unified flat list for all six asset classes (Equity, Bonds, Real Estate, Crypto, Commodities, Cash) — sub-categories expand inline without nested cards. Mobile tab navigation uses a segmented pill control (all five tabs visible at a glance). Unsaved-change feedback, smooth nested allocation editing, and inline two-tap confirmations for sensitive category actions
 
 ## Quick Start
 

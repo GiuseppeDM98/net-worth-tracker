@@ -29,7 +29,8 @@
 
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
@@ -116,6 +117,16 @@ const roundToTwoDecimals = (value: number): number => {
   return Math.round(value * 100) / 100;
 };
 
+// Module-level tab definitions drive both the mobile pill and the desktop TabsList.
+// shortLabel must be ≤8 chars for the iPhone SE pill width.
+const SETTINGS_TABS: { value: string; label: string; shortLabel: string; icon: React.ElementType }[] = [
+  { value: 'allocazione', label: 'Allocazione', shortLabel: 'Alloc.',  icon: PieChart },
+  { value: 'generale',    label: 'Preferenze',  shortLabel: 'Pref.',   icon: Settings },
+  { value: 'spese',       label: 'Spese',       shortLabel: 'Spese',   icon: Receipt  },
+  { value: 'dividendi',   label: 'Dividendi',   shortLabel: 'Divid.',  icon: Coins    },
+  { value: 'aspetto',     label: 'Aspetto',     shortLabel: 'Aspetto', icon: Palette  },
+];
+
 export default function SettingsPage() {
   const { user } = useAuth();
   const isDemo = useDemoMode();
@@ -175,6 +186,14 @@ export default function SettingsPage() {
   const [dividendIncomeCategoryId, setDividendIncomeCategoryId] = useState<string>('');
   const [dividendIncomeSubCategoryId, setDividendIncomeSubCategoryId] = useState<string>('');
   const [syncingDividends, setSyncingDividends] = useState(false);
+
+  // 2-click disarm for zero-expense category deletion (avoids window.confirm)
+  const [pendingDeleteDirectCategoryId, setPendingDeleteDirectCategoryId] = useState<string | null>(null);
+  const pendingDeleteDirectTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 2-click disarm for dividend sync confirmation (avoids window.confirm)
+  const [syncConfirmArmed, setSyncConfirmArmed] = useState(false);
+  const syncConfirmTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Progressive disclosure: notes block in Allocazione tab
   const [isNotesOpen, setIsNotesOpen] = useState(false);
@@ -411,7 +430,7 @@ export default function SettingsPage() {
           subCategoryEnabled: subCategoryConfig?.enabled || false,
           categories: subCategoryConfig?.categories || [],
           subTargets: subTargetsArray,
-          expanded: assetClass === 'equity', // Solo equity espanso di default
+          expanded: false,
         };
       });
 
@@ -433,13 +452,11 @@ export default function SettingsPage() {
               states[assetClass]?.targetPercentage || 0
             ),
             subCategoryEnabled: states[assetClass]?.subCategoryEnabled || false,
-            expanded: states[assetClass]?.expanded || false,
             categories: states[assetClass]?.categories || [],
             subTargets: (states[assetClass]?.subTargets || []).map((target) => ({
               name: target.name,
               percentage: roundToTwoDecimals(target.percentage),
               specificAssetsEnabled: target.specificAssetsEnabled || false,
-              expanded: target.expanded || false,
               specificAssets: (target.specificAssets || []).map((asset) => ({
                 name: asset.name,
                 targetPercentage: roundToTwoDecimals(asset.targetPercentage),
@@ -535,12 +552,14 @@ export default function SettingsPage() {
           setDeleteConfirmDialogOpen(true);
         }
       } else {
-        // No expenses, proceed with direct deletion after confirmation
-        if (window.confirm(`Sei sicuro di voler eliminare la categoria "${categoryName}"?`)) {
-          await deleteCategory(categoryId);
-          toast.success('Categoria eliminata con successo');
-          await loadExpenseCategories();
-        }
+        // No expenses: arm the 2-click disarm instead of blocking window.confirm.
+        // First click sets the pending state; the button turns destructive.
+        // Second click calls handleConfirmDirectDelete. Auto-disarms after 3s.
+        if (pendingDeleteDirectTimerRef.current) clearTimeout(pendingDeleteDirectTimerRef.current);
+        setPendingDeleteDirectCategoryId(categoryId);
+        pendingDeleteDirectTimerRef.current = setTimeout(() => {
+          setPendingDeleteDirectCategoryId(null);
+        }, 3000);
       }
     } catch (error) {
       console.error('Error deleting category:', error);
@@ -619,6 +638,20 @@ export default function SettingsPage() {
     } catch (error) {
       console.error('Error during reassignment and deletion:', error);
       toast.error('Errore durante la riassegnazione delle spese');
+    }
+  };
+
+  // Executes the deletion after the 2-click disarm is confirmed (zero-expense path).
+  const handleConfirmDirectDelete = async (categoryId: string) => {
+    if (pendingDeleteDirectTimerRef.current) clearTimeout(pendingDeleteDirectTimerRef.current);
+    setPendingDeleteDirectCategoryId(null);
+    try {
+      await deleteCategory(categoryId);
+      toast.success('Categoria eliminata con successo');
+      await loadExpenseCategories();
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      toast.error("Errore nell'eliminazione della categoria");
     }
   };
 
@@ -750,11 +783,18 @@ export default function SettingsPage() {
       return;
     }
 
-    const confirmSync = window.confirm(
-      'Sincronizzare tutti i dividendi esistenti creando le relative entrate nel tracking cashflow?'
-    );
+    // 2-click disarm: first click arms the button; second click proceeds.
+    // Avoids blocking window.confirm which breaks the app visual system.
+    if (!syncConfirmArmed) {
+      setSyncConfirmArmed(true);
+      if (syncConfirmTimerRef.current) clearTimeout(syncConfirmTimerRef.current);
+      syncConfirmTimerRef.current = setTimeout(() => setSyncConfirmArmed(false), 3000);
+      return;
+    }
 
-    if (!confirmSync) return;
+    // Second click: disarm and proceed
+    if (syncConfirmTimerRef.current) clearTimeout(syncConfirmTimerRef.current);
+    setSyncConfirmArmed(false);
 
     try {
       setSyncingDividends(true);
@@ -1053,7 +1093,7 @@ export default function SettingsPage() {
               }
             })
           : [],
-        expanded: assetClass === 'equity',
+        expanded: false,
       };
     });
 
@@ -1286,13 +1326,11 @@ export default function SettingsPage() {
             assetClassStates[assetClass]?.targetPercentage || 0
           ),
           subCategoryEnabled: assetClassStates[assetClass]?.subCategoryEnabled || false,
-          expanded: assetClassStates[assetClass]?.expanded || false,
           categories: assetClassStates[assetClass]?.categories || [],
           subTargets: (assetClassStates[assetClass]?.subTargets || []).map((target) => ({
             name: target.name,
             percentage: roundToTwoDecimals(target.percentage),
             specificAssetsEnabled: target.specificAssetsEnabled || false,
-            expanded: target.expanded || false,
             specificAssets: (target.specificAssets || []).map((asset) => ({
               name: asset.name,
               targetPercentage: roundToTwoDecimals(asset.targetPercentage),
@@ -1414,42 +1452,50 @@ export default function SettingsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        {/* Mobile: Radix Select, Desktop: TabsList — same pattern as Assets/FIRE/Performance pages */}
+        {/* Mobile/tablet: segmented pill — 1 tap, all options visible. Matches FIRE & Simulazioni pattern. */}
         <div className="desktop:hidden mb-4">
-          <Select value={activeTab} onValueChange={handleTabChange}>
-            <SelectTrigger className={cn('w-full', interactiveControlClass)}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="allocazione">Allocazione</SelectItem>
-              <SelectItem value="generale">Preferenze</SelectItem>
-              <SelectItem value="spese">Spese</SelectItem>
-              <SelectItem value="dividendi">Dividendi</SelectItem>
-              <SelectItem value="aspetto">Aspetto</SelectItem>
-            </SelectContent>
-          </Select>
+          <div role="tablist" className="inline-flex w-full rounded-lg border bg-muted p-1 gap-0.5">
+            {SETTINGS_TABS.map((tab) => {
+              const isActive = activeTab === tab.value;
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.value}
+                  role="tab"
+                  type="button"
+                  aria-selected={isActive}
+                  onClick={() => handleTabChange(tab.value)}
+                  className={cn(
+                    'relative flex flex-1 items-center justify-center gap-1 rounded-md px-1.5 py-2 text-xs font-medium transition-colors',
+                    isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  {isActive && (
+                    <motion.div
+                      layoutId="settings-tab-pill"
+                      className="absolute inset-0 rounded-md bg-background shadow-sm"
+                      transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+                    />
+                  )}
+                  <Icon className="relative z-10 h-3.5 w-3.5 shrink-0" />
+                  <span className="relative z-10">{tab.shortLabel}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
+
+        {/* Desktop: standard TabsList driven by the same SETTINGS_TABS constant */}
         <TabsList className="hidden desktop:grid desktop:grid-cols-5 w-full">
-          <TabsTrigger value="allocazione" className="flex items-center gap-2">
-            <PieChart className="h-4 w-4" />
-            Allocazione
-          </TabsTrigger>
-          <TabsTrigger value="generale" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            Preferenze
-          </TabsTrigger>
-          <TabsTrigger value="spese" className="flex items-center gap-2">
-            <Receipt className="h-4 w-4" />
-            Spese
-          </TabsTrigger>
-          <TabsTrigger value="dividendi" className="flex items-center gap-2">
-            <Coins className="h-4 w-4" />
-            Dividendi
-          </TabsTrigger>
-          <TabsTrigger value="aspetto" className="flex items-center gap-2">
-            <Palette className="h-4 w-4" />
-            Aspetto
-          </TabsTrigger>
+          {SETTINGS_TABS.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2">
+                <Icon className="h-4 w-4" />
+                {tab.label}
+              </TabsTrigger>
+            );
+          })}
         </TabsList>
 
         {/* Tab: Impostazioni Generali (lazy) */}
@@ -1557,7 +1603,7 @@ export default function SettingsPage() {
             </div>
 
             {stampDutyEnabled && (
-              <div className="space-y-4 rounded-lg border p-4">
+              <div className="space-y-4 border-t pt-4">
                 <div className="space-y-2">
                   <Label htmlFor="stampDutyRate">Aliquota (%)</Label>
                   <Input
@@ -2005,7 +2051,6 @@ export default function SettingsPage() {
                 <Button
                   variant="destructive"
                   onClick={() => setDeleteDummyDataDialogOpen(true)}
-                  className="bg-red-600 hover:bg-red-700"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Elimina Tutti i Dati Dummy
@@ -2027,34 +2072,86 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* Performance & Profile Settings */}
+      {/* Hero — allocation total as dominant primary number */}
       <Card>
-        <CardHeader>
-          <CardTitle>Profilo</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 sm:p-6">
-          <div className="space-y-4 sm:space-y-6">
-            <div className="grid gap-6 desktop:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="userAge">Età (anni)</Label>
-                <Input
-                  id="userAge"
-                  type="number"
-                  min="0"
-                  max="120"
-                  value={userAge || ''}
-                  onChange={(e) => {
-                    const value = e.target.value ? parseInt(e.target.value) : undefined;
-                    setUserAge(value);
-                  }}
-                  placeholder="Inserisci la tua età"
-                  className={interactiveControlClass}
-                />
+        <CardContent className="px-6 pt-6 pb-5">
+          <p className="text-xs uppercase tracking-widest text-muted-foreground/70">Allocazione Configurata</p>
+          <div className="flex items-end gap-3 mt-1">
+            <p className={`text-4xl font-bold font-mono ${isValidTotal ? 'text-foreground' : 'text-destructive'}`}>
+              {formatPercentage(total)}
+            </p>
+            {cashUseFixedAmount && (
+              <span className="text-sm text-muted-foreground mb-1">esclusa liquidità fissa</span>
+            )}
+          </div>
+          <div className="divide-y border-t mt-4">
+            <div className="flex items-center justify-between py-2.5">
+              <span className="text-sm text-muted-foreground">Classi con allocazione &gt; 0%</span>
+              <span className="text-sm font-semibold font-mono">
+                {Object.values(assetClassStates).filter((s) => s && s.targetPercentage > 0).length}
+              </span>
+            </div>
+            {autoCalculate && userAge !== undefined && riskFreeRate !== undefined && (
+              <div className="flex items-center justify-between py-2.5">
+                <span className="text-sm text-muted-foreground">Auto-calc attivo</span>
+                <span className="text-sm font-semibold font-mono text-primary">
+                  {calculateEquityPercentage(userAge, riskFreeRate).toFixed(1)}% Azioni
+                </span>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="riskFreeRate">
-                  Tasso Risk-Free Rate (%)
-                </Label>
+            )}
+            {!isValidTotal && (
+              <div className="flex items-center justify-between py-2.5">
+                <span className="text-sm text-destructive">Residuo da allocare</span>
+                <span className="text-sm font-semibold font-mono text-destructive">
+                  {formatPercentage(Math.abs(100 - total))}
+                </span>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Profilo — flat divide-y rows: age, risk-free rate, auto-calc */}
+      <Card>
+        <CardContent className="p-0">
+          <div className="divide-y">
+            {/* Età */}
+            <div className="flex items-center justify-between gap-4 px-6 py-4">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">Età</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Usata per il calcolo automatico dei target</p>
+              </div>
+              <Input
+                id="userAge"
+                type="number"
+                min="0"
+                max="120"
+                value={userAge || ''}
+                onChange={(e) => {
+                  const value = e.target.value ? parseInt(e.target.value) : undefined;
+                  setUserAge(value);
+                }}
+                placeholder="anni"
+                className={cn('w-24 text-right font-mono shrink-0', interactiveControlClass)}
+              />
+            </div>
+            {/* Risk-free rate */}
+            <div className="flex items-center justify-between gap-4 px-6 py-4">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">Risk-Free Rate</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  <a
+                    href="https://www.investing.com/rates-bonds/italy-10-year-bond-yield"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    BTP 10 anni
+                  </a>
+                  {' '}su Investing.com
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
                 <Input
                   id="riskFreeRate"
                   type="number"
@@ -2066,25 +2163,38 @@ export default function SettingsPage() {
                     const value = e.target.value ? parseFloat(e.target.value) : undefined;
                     setRiskFreeRate(value);
                   }}
-                  placeholder="Es: 3.5"
-                  className={interactiveControlClass}
+                  placeholder="es. 3.5"
+                  className={cn('w-24 text-right font-mono', interactiveControlClass)}
                 />
-                {/* Inline hint so the source is visible next to the input */}
-                <p className="text-xs text-muted-foreground">
-                  Recupera il valore attuale da{' '}
-                  <a
-                    href="https://www.investing.com/rates-bonds/italy-10-year-bond-yield"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline"
-                  >
-                    BTP 10 anni Italia su Investing.com
-                  </a>
-                </p>
+                <span className="text-sm text-muted-foreground">%</span>
               </div>
             </div>
-
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-2">
+            {/* Auto-calculate toggle — disabled until both age and rate are set */}
+            <div className="flex items-center justify-between gap-4 px-6 py-4">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">Calcolo automatico Azioni/Obbligazioni</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Formula di{' '}
+                  <a
+                    href="https://www.youtube.com/channel/UCNp1e5n6rlnfm5aWbHe3cJw"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    The Bull
+                  </a>
+                  : 125 {'−'} età {'−'} (rate {'×'} 5) = % Azioni
+                </p>
+                {autoCalculate && userAge !== undefined && riskFreeRate !== undefined && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Risultato:{' '}
+                    <strong className="text-foreground">
+                      {calculateEquityPercentage(userAge, riskFreeRate).toFixed(2)}% Azioni
+                    </strong>
+                    {' '}· Obbligazioni calcolate come residuo
+                  </p>
+                )}
+              </div>
               <Switch
                 id="autoCalculate"
                 checked={autoCalculate}
@@ -2092,88 +2202,67 @@ export default function SettingsPage() {
                 disabled={userAge === undefined || riskFreeRate === undefined}
                 className={cn('shrink-0', interactiveControlClass)}
               />
-              <Label htmlFor="autoCalculate" className="text-sm block">
-                Calcola automaticamente % Azioni e Obbligazioni (Formula di{' '}
-                <a
-                  href="https://www.youtube.com/channel/UCNp1e5n6rlnfm5aWbHe3cJw"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
-                >
-                  The Bull
-                </a>
-                )
-              </Label>
             </div>
-
-            {autoCalculate && userAge !== undefined && riskFreeRate !== undefined && (
-              <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 p-4">
-                <p className="text-sm text-blue-900 dark:text-blue-200">
-                  <strong>Formula applicata:</strong> 125 - {userAge} - ({riskFreeRate} × 5) ={' '}
-                  <strong>{calculateEquityPercentage(userAge, riskFreeRate).toFixed(2)}% Azioni</strong>
-                </p>
-                <p className="mt-1 text-sm text-blue-800 dark:text-blue-300">
-                  La percentuale di Obbligazioni sarà calcolata come: 100% - (somma delle altre asset class)
-                </p>
-              </div>
-            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Asset Class Targets */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Target Allocazione Asset Class</CardTitle>
-            <div
-              className={`text-sm font-semibold ${
-                isValidTotal ? 'text-green-600' : 'text-red-600'
-              }`}
-            >
-              Totale: {formatPercentage(total)}
-              {cashUseFixedAmount && ' (escl. liquidità fissa)'}
-              {!isValidTotal && ' (deve essere 100%)'}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="p-4 sm:p-6">
-          <div className="grid gap-6 desktop:grid-cols-2">
-            {assetClasses.map((assetClass) => {
-              const isAutoCalculated = autoCalculate && (assetClass === 'equity' || assetClass === 'bonds');
-              const isCash = assetClass === 'cash';
-              return (
-                <div key={assetClass} className="space-y-2">
-                  <Label htmlFor={assetClass}>
-                    {assetClassLabels[assetClass]}
+      {/* Unified target card — one card, flat divide-y, sub-categories expandable inline */}
+      <Card className="overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <p className="text-sm font-semibold">Target per Asset Class</p>
+          <span
+            className={`text-xs font-semibold font-mono ${isValidTotal ? 'text-green-600' : 'text-red-600'}`}
+          >
+            {formatPercentage(total)}
+            {cashUseFixedAmount && ' (excl. cash)'}
+            {!isValidTotal && ' ≠ 100%'}
+          </span>
+        </div>
+        <div className="divide-y">
+          {assetClasses.map((assetClass) => {
+            const state = assetClassStates[assetClass];
+            if (!state) return null;
+
+            const isAutoCalculated = autoCalculate && (assetClass === 'equity' || assetClass === 'bonds');
+            const isCash = assetClass === 'cash';
+            const subTotal = calculateSubTargetTotal(assetClass);
+            const isValidSubTotal = Math.abs(subTotal - 100) < 0.01;
+
+            return (
+              <div key={assetClass}>
+                {/* Asset class main row */}
+                <div className="flex items-center gap-3 px-6 py-4">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{assetClassLabels[assetClass]}</p>
                     {isAutoCalculated && (
-                      <span className="ml-2 text-xs text-blue-600">(Calcolato automaticamente)</span>
+                      <p className="text-xs text-primary mt-0.5">Calcolato automaticamente</p>
                     )}
-                  </Label>
-                  {isCash && (
-                    <div className="flex items-center gap-2">
+                  </div>
+                  {isCash && !isAutoCalculated && (
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <Switch
                         id="cashFixedToggle"
                         checked={cashUseFixedAmount}
                         onCheckedChange={setCashUseFixedAmount}
                         className={interactiveControlClass}
                       />
-                      <Label htmlFor="cashFixedToggle" className="text-sm">
-                        Valore fisso in €
+                      <Label htmlFor="cashFixedToggle" className="text-xs text-muted-foreground whitespace-nowrap">
+                        fisso €
                       </Label>
                     </div>
                   )}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <Input
                       id={assetClass}
                       type="number"
                       step="0.01"
                       min="0"
-                      max={isCash && cashUseFixedAmount ? undefined : "100"}
+                      max={isCash && cashUseFixedAmount ? undefined : '100'}
                       value={
                         isCash && cashUseFixedAmount
                           ? cashFixedAmount
-                          : assetClassStates[assetClass]?.targetPercentage || 0
+                          : state.targetPercentage || 0
                       }
                       onChange={(e) => {
                         if (isCash && cashUseFixedAmount) {
@@ -2186,310 +2275,318 @@ export default function SettingsPage() {
                       }}
                       disabled={isAutoCalculated}
                       className={cn(
+                        'w-28 text-right font-mono',
                         interactiveControlClass,
-                        isAutoCalculated ? 'bg-gray-100 dark:bg-muted' : ''
+                        isAutoCalculated ? 'bg-muted' : ''
                       )}
                     />
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-sm text-muted-foreground w-4 shrink-0">
                       {isCash && cashUseFixedAmount ? '€' : '%'}
                     </span>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Sub-Categories for each Asset Class */}
-      {assetClasses.map((assetClass) => {
-        const state = assetClassStates[assetClass];
-        if (!state) return null;
-
-        const subTotal = calculateSubTargetTotal(assetClass);
-        const isValidSubTotal = Math.abs(subTotal - 100) < 0.01;
-
-        return (
-          <Card key={`sub-${assetClass}`}>
-            <CardHeader>
-              {/* Two-row on mobile, single row on desktop — title is too long to share a line with controls */}
-              <div className="flex flex-col gap-2 desktop:flex-row desktop:items-center desktop:justify-between">
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() =>
-                      updateAssetClassState(assetClass, {
-                        expanded: !state.expanded,
-                      })
-                    }
+                  {/* Sub-category expand/collapse */}
+                  <button
+                    type="button"
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0 p-1"
+                    onClick={() => updateAssetClassState(assetClass, { expanded: !state.expanded })}
+                    aria-expanded={state.expanded}
+                    aria-label={`${state.expanded ? 'Chiudi' : 'Apri'} sotto-categorie`}
                   >
-                    {state.expanded ? (
-                      <ChevronUp className="h-4 w-4" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4" />
-                    )}
-                  </Button>
-                  <CardTitle>
-                    Sotto-Categorie {assetClassLabels[assetClass]}
-                  </CardTitle>
-                </div>
-                <div className="flex items-center gap-4 justify-between desktop:justify-start">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor={`toggle-${assetClass}`} className="text-sm">
-                      Abilita
-                    </Label>
-                    <Switch
-                      id={`toggle-${assetClass}`}
-                      checked={state.subCategoryEnabled}
-                      onCheckedChange={(checked: boolean) =>
-                        handleToggleSubCategories(assetClass, checked)
-                      }
-                      className={interactiveControlClass}
+                    <span className="hidden sm:inline">Sotto-cat.</span>
+                    <ChevronDown
+                      className={cn(
+                        'h-4 w-4 transition-transform duration-200 motion-reduce:transition-none',
+                        state.expanded && 'rotate-180'
+                      )}
                     />
-                  </div>
-                  {state.subCategoryEnabled && (
-                    <div
-                      className={`text-sm font-semibold ${
-                        isValidSubTotal ? 'text-green-600' : 'text-red-600'
-                      }`}
-                    >
-                      Totale: {formatPercentage(subTotal)}
-                      {!isValidSubTotal && ' (deve essere 100%)'}
-                    </div>
-                  )}
+                  </button>
                 </div>
-              </div>
-            </CardHeader>
-            <Collapsible open={state.expanded && state.subCategoryEnabled}>
-              <CollapsibleContent
-                forceMount
-                className={cn(
-                  'overflow-hidden motion-safe:transition-all motion-safe:duration-200 motion-reduce:transition-none',
-                  'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
-                  'data-[state=closed]:hidden'
-                )}
-              >
-                <CardContent className="p-4 sm:p-6">
-                <div className="space-y-4">
-                  {/* Sub-Targets */}
-                  <div className="space-y-3">
-                    {state.subTargets
-                      .map((target, originalIndex) => ({ target, originalIndex }))
-                      .sort((a, b) => a.target.name.localeCompare(b.target.name))
-                      .map(({ target, originalIndex }) => {
-                        const specificAssetTotal = calculateSpecificAssetTotal(assetClass, originalIndex);
-                        const isValidSpecificTotal = Math.abs(specificAssetTotal - 100) < 0.01;
 
-                        return (
-                          <div key={originalIndex} className="space-y-3 border rounded-lg p-2 sm:p-3 bg-muted/40 dark:bg-muted/20">
-                            {/* Main subcategory row */}
-                            <div className="flex items-center gap-3">
-                              <div className="flex-1">
-                                <Input
-                                  placeholder="Nome sottocategoria"
-                                  value={target.name}
-                                  onChange={(e) =>
-                                    handleSubTargetChange(
-                                      assetClass,
-                                      originalIndex,
-                                      'name',
-                                      e.target.value
-                                    )
-                                  }
-                                  list={`${assetClass}-categories`}
-                                  className={interactiveControlClass}
-                                />
-                                <datalist id={`${assetClass}-categories`}>
-                                  {state.categories.map((cat) => (
-                                    <option key={cat} value={cat} />
-                                  ))}
-                                </datalist>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  max="100"
-                                  className={cn('w-24', interactiveControlClass)}
-                                  value={target.percentage}
-                                  onChange={(e) =>
-                                    handleSubTargetChange(
-                                      assetClass,
-                                      originalIndex,
-                                      'percentage',
-                                      roundToTwoDecimals(parseFloat(e.target.value) || 0)
-                                    )
-                                  }
-                                />
-                                <span className="text-sm text-muted-foreground">%</span>
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRemoveSubTarget(assetClass, originalIndex)}
-                              >
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </Button>
-                            </div>
+                {/* Sub-categories — expandable, indented within the same card */}
+                <Collapsible open={state.expanded}>
+                  <CollapsibleContent
+                    forceMount
+                    className={cn(
+                      'overflow-hidden motion-safe:transition-all motion-safe:duration-200 motion-reduce:transition-none',
+                      'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
+                      'data-[state=closed]:hidden'
+                    )}
+                  >
+                    <div className="bg-muted/20 border-t">
+                      {/* Enable toggle + sub-total */}
+                      <div className="flex items-center justify-between px-6 py-3">
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            id={`toggle-${assetClass}`}
+                            checked={state.subCategoryEnabled}
+                            onCheckedChange={(checked: boolean) =>
+                              handleToggleSubCategories(assetClass, checked)
+                            }
+                            className={interactiveControlClass}
+                          />
+                          <Label htmlFor={`toggle-${assetClass}`} className="text-sm">
+                            Abilita sotto-categorie
+                          </Label>
+                        </div>
+                        {state.subCategoryEnabled && (
+                          <span
+                            className={`text-xs font-semibold font-mono ${
+                              isValidSubTotal ? 'text-green-600' : 'text-red-600'
+                            }`}
+                          >
+                            {formatPercentage(subTotal)}
+                            {!isValidSubTotal && ' ≠ 100%'}
+                          </span>
+                        )}
+                      </div>
 
-                            {/* Specific Assets Section */}
-                            {target.name && (
-                              <div className="ml-3 sm:ml-6 space-y-3 border-l-2 border-blue-200 dark:border-blue-800 pl-2 sm:pl-4">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <Switch
-                                      id={`specific-${assetClass}-${originalIndex}`}
-                                      checked={target.specificAssetsEnabled || false}
-                                      onCheckedChange={(checked) =>
-                                        handleToggleSpecificAssets(assetClass, originalIndex, checked)
-                                      }
-                                      className={interactiveControlClass}
-                                    />
-                                    <Label
-                                      htmlFor={`specific-${assetClass}-${originalIndex}`}
-                                      className="text-sm cursor-pointer"
-                                    >
-                                      Abilita tracciamento asset specifici
-                                    </Label>
-                                  </div>
-                                  {target.specificAssetsEnabled && (
-                                    <div
-                                      className={`text-xs font-semibold ${
-                                        isValidSpecificTotal ? 'text-green-600' : 'text-red-600'
-                                      }`}
-                                    >
-                                      Totale: {formatPercentage(specificAssetTotal)}
-                                      {!isValidSpecificTotal && ' (deve essere 100%)'}
-                                    </div>
-                                  )}
-                                </div>
+                      {/* Sub-target rows */}
+                      {state.subCategoryEnabled && (
+                        <div className="px-6 pb-4">
+                          <div className="divide-y border-t">
+                            {state.subTargets
+                              .map((target, originalIndex) => ({ target, originalIndex }))
+                              .sort((a, b) => a.target.name.localeCompare(b.target.name))
+                              .map(({ target, originalIndex }) => {
+                                const specificAssetTotal = calculateSpecificAssetTotal(assetClass, originalIndex);
+                                const isValidSpecificTotal = Math.abs(specificAssetTotal - 100) < 0.01;
 
-                                {target.specificAssetsEnabled && (
-                                  <div className="space-y-2">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="w-full justify-start text-xs"
-                                      onClick={() => toggleSubCategoryExpanded(assetClass, originalIndex)}
-                                    >
-                                      {target.expanded ? (
-                                        <ChevronUp className="mr-2 h-3 w-3" />
-                                      ) : (
-                                        <ChevronDown className="mr-2 h-3 w-3" />
-                                      )}
-                                      {target.expanded ? 'Nascondi' : 'Mostra'} specific assets
-                                      {target.specificAssets && target.specificAssets.length > 0 && (
-                                        <span className="ml-2 text-muted-foreground">
-                                          ({target.specificAssets.length})
-                                        </span>
-                                      )}
-                                    </Button>
-
-                                    <Collapsible open={target.expanded}>
-                                      <CollapsibleContent
-                                        forceMount
+                                return (
+                                  <div key={originalIndex} className="space-y-3 py-3">
+                                    {/* Name + % + delete */}
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex-1 min-w-0">
+                                        <Input
+                                          placeholder="Nome sottocategoria"
+                                          value={target.name}
+                                          onChange={(e) =>
+                                            handleSubTargetChange(
+                                              assetClass,
+                                              originalIndex,
+                                              'name',
+                                              e.target.value
+                                            )
+                                          }
+                                          list={`${assetClass}-categories`}
+                                          className={cn('text-sm', interactiveControlClass)}
+                                        />
+                                        <datalist id={`${assetClass}-categories`}>
+                                          {state.categories.map((cat) => (
+                                            <option key={cat} value={cat} />
+                                          ))}
+                                        </datalist>
+                                      </div>
+                                      <Input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        max="100"
                                         className={cn(
-                                          'overflow-hidden motion-safe:transition-all motion-safe:duration-200 motion-reduce:transition-none',
-                                          'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
-                                          'data-[state=closed]:hidden'
+                                          'w-24 text-right font-mono shrink-0',
+                                          interactiveControlClass
                                         )}
+                                        value={target.percentage}
+                                        onChange={(e) =>
+                                          handleSubTargetChange(
+                                            assetClass,
+                                            originalIndex,
+                                            'percentage',
+                                            roundToTwoDecimals(parseFloat(e.target.value) || 0)
+                                          )
+                                        }
+                                      />
+                                      <span className="text-sm text-muted-foreground shrink-0">%</span>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleRemoveSubTarget(assetClass, originalIndex)}
+                                        className="shrink-0"
                                       >
-                                      <div className="space-y-2 ml-2 sm:ml-4">
-                                        {target.specificAssets && target.specificAssets.map((specificAsset, specificIndex) => (
-                                          <div key={specificIndex} className="flex items-center gap-2">
-                                            <Input
-                                              placeholder="Ticker/Nome (es. AAPL)"
-                                              value={specificAsset.name}
-                                              onChange={(e) =>
-                                                handleSpecificAssetChange(
+                                        <Trash2 className="h-4 w-4 text-muted-foreground" />
+                                      </Button>
+                                    </div>
+
+                                    {/* Specific assets toggle + expand */}
+                                    {target.name && (
+                                      <div className="ml-4 space-y-2">
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-2">
+                                            <Switch
+                                              id={`specific-${assetClass}-${originalIndex}`}
+                                              checked={target.specificAssetsEnabled || false}
+                                              onCheckedChange={(checked) =>
+                                                handleToggleSpecificAssets(
                                                   assetClass,
                                                   originalIndex,
-                                                  specificIndex,
-                                                  'name',
-                                                  e.target.value
+                                                  checked
                                                 )
                                               }
-                                              className={cn(
-                                                'flex-1 text-sm',
-                                                interactiveControlClass
-                                              )}
+                                              className={interactiveControlClass}
                                             />
-                                            <Input
-                                              type="number"
-                                              step="0.01"
-                                              min="0"
-                                              max="100"
-                                              className={cn(
-                                                'w-20 text-sm',
-                                                interactiveControlClass
-                                              )}
-                                              value={specificAsset.targetPercentage}
-                                              onChange={(e) =>
-                                                handleSpecificAssetChange(
-                                                  assetClass,
-                                                  originalIndex,
-                                                  specificIndex,
-                                                  'targetPercentage',
-                                                  roundToTwoDecimals(parseFloat(e.target.value) || 0)
-                                                )
-                                              }
-                                            />
-                                            <span className="text-xs text-muted-foreground">%</span>
+                                            <Label
+                                              htmlFor={`specific-${assetClass}-${originalIndex}`}
+                                              className="text-xs text-muted-foreground cursor-pointer"
+                                            >
+                                              Traccia asset specifici
+                                            </Label>
+                                          </div>
+                                          {target.specificAssetsEnabled && (
+                                            <span
+                                              className={`text-xs font-semibold font-mono ${
+                                                isValidSpecificTotal ? 'text-green-600' : 'text-red-600'
+                                              }`}
+                                            >
+                                              {formatPercentage(specificAssetTotal)}
+                                              {!isValidSpecificTotal && ' ≠ 100%'}
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        {target.specificAssetsEnabled && (
+                                          <>
                                             <Button
                                               variant="ghost"
                                               size="sm"
+                                              className="w-full justify-start text-xs h-8"
                                               onClick={() =>
-                                                handleRemoveSpecificAsset(assetClass, originalIndex, specificIndex)
+                                                toggleSubCategoryExpanded(assetClass, originalIndex)
                                               }
                                             >
-                                              <Trash2 className="h-3 w-3 text-red-500" />
+                                              <ChevronDown
+                                                className={cn(
+                                                  'mr-1.5 h-3 w-3 transition-transform duration-200 motion-reduce:transition-none',
+                                                  target.expanded && 'rotate-180'
+                                                )}
+                                              />
+                                              {target.expanded ? 'Nascondi' : 'Mostra'} asset specifici
+                                              {target.specificAssets &&
+                                                target.specificAssets.length > 0 && (
+                                                  <span className="ml-1.5 text-muted-foreground">
+                                                    ({target.specificAssets.length})
+                                                  </span>
+                                                )}
                                             </Button>
-                                          </div>
-                                        ))}
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          className="w-full text-xs"
-                                          onClick={() => handleAddSpecificAsset(assetClass, originalIndex)}
-                                        >
-                                          <Plus className="mr-2 h-3 w-3" />
-                                          Aggiungi Specific Asset
-                                        </Button>
+
+                                            <Collapsible open={target.expanded}>
+                                              <CollapsibleContent
+                                                forceMount
+                                                className={cn(
+                                                  'overflow-hidden motion-safe:transition-all motion-safe:duration-200 motion-reduce:transition-none',
+                                                  'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
+                                                  'data-[state=closed]:hidden'
+                                                )}
+                                              >
+                                                <div className="space-y-2 mt-1">
+                                                  {target.specificAssets &&
+                                                    target.specificAssets.map(
+                                                      (specificAsset, specificIndex) => (
+                                                        <div
+                                                          key={specificIndex}
+                                                          className="flex items-center gap-2"
+                                                        >
+                                                          <Input
+                                                            placeholder="Ticker/Nome (es. AAPL)"
+                                                            value={specificAsset.name}
+                                                            onChange={(e) =>
+                                                              handleSpecificAssetChange(
+                                                                assetClass,
+                                                                originalIndex,
+                                                                specificIndex,
+                                                                'name',
+                                                                e.target.value
+                                                              )
+                                                            }
+                                                            className={cn(
+                                                              'flex-1 text-sm',
+                                                              interactiveControlClass
+                                                            )}
+                                                          />
+                                                          <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            min="0"
+                                                            max="100"
+                                                            className={cn(
+                                                              'w-24 text-sm text-right font-mono shrink-0',
+                                                              interactiveControlClass
+                                                            )}
+                                                            value={specificAsset.targetPercentage}
+                                                            onChange={(e) =>
+                                                              handleSpecificAssetChange(
+                                                                assetClass,
+                                                                originalIndex,
+                                                                specificIndex,
+                                                                'targetPercentage',
+                                                                roundToTwoDecimals(
+                                                                  parseFloat(e.target.value) || 0
+                                                                )
+                                                              )
+                                                            }
+                                                          />
+                                                          <span className="text-xs text-muted-foreground shrink-0">
+                                                            %
+                                                          </span>
+                                                          <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() =>
+                                                              handleRemoveSpecificAsset(
+                                                                assetClass,
+                                                                originalIndex,
+                                                                specificIndex
+                                                              )
+                                                            }
+                                                          >
+                                                            <Trash2 className="h-3 w-3 text-muted-foreground" />
+                                                          </Button>
+                                                        </div>
+                                                      )
+                                                    )}
+                                                  <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="w-full text-xs"
+                                                    onClick={() =>
+                                                      handleAddSpecificAsset(assetClass, originalIndex)
+                                                    }
+                                                  >
+                                                    <Plus className="mr-1.5 h-3 w-3" />
+                                                    Aggiungi asset specifico
+                                                  </Button>
+                                                </div>
+                                              </CollapsibleContent>
+                                            </Collapsible>
+                                          </>
+                                        )}
                                       </div>
-                                      </CollapsibleContent>
-                                    </Collapsible>
+                                    )}
                                   </div>
-                                )}
-                              </div>
-                            )}
+                                );
+                              })}
                           </div>
-                        );
-                      })}
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleAddSubTarget(assetClass)}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Aggiungi Sotto-Categoria
-                  </Button>
-
-                  <p className="text-sm text-muted-foreground">
-                    Le percentuali delle sotto-categorie sono relative al totale
-                    della classe asset {assetClassLabels[assetClass]} (
-                    {formatPercentage(state.targetPercentage)})
-                  </p>
-                </div>
-                </CardContent>
-              </CollapsibleContent>
-            </Collapsible>
-          </Card>
-        );
-      })}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="mt-3 w-full sm:w-auto"
+                            onClick={() => handleAddSubTarget(assetClass)}
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Aggiungi Sotto-Categoria
+                          </Button>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Le sotto-categorie sono espresse come percentuale di{' '}
+                            {assetClassLabels[assetClass]} ({formatPercentage(state.targetPercentage)})
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
 
       {/* Notes block: collapsed by default to reduce visual noise */}
       <Collapsible open={isNotesOpen} onOpenChange={setIsNotesOpen}>
@@ -2503,8 +2600,8 @@ export default function SettingsPage() {
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent className="overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-200">
-          <div className="rounded-b-lg border border-t-0 border-border bg-blue-50 dark:bg-blue-950/20 px-4 py-4">
-            <ul className="space-y-1 text-sm text-blue-800 dark:text-blue-300">
+          <div className="rounded-b-lg border border-t-0 border-border bg-muted/30 px-4 py-4">
+            <ul className="space-y-1 text-sm text-muted-foreground">
               <li>• Il totale delle allocazioni delle asset class deve essere esattamente 100%</li>
               <li>• La liquidità può essere impostata come valore fisso in euro. In questo caso, le percentuali delle altre asset class si applicheranno al patrimonio rimanente (totale - liquidità fissa)</li>
               <li>• Per ogni asset class con sotto-categorie abilitate, il totale delle sotto-categorie deve essere esattamente 100%</li>
@@ -2554,11 +2651,11 @@ export default function SettingsPage() {
                         Nessuna categoria creata
                       </p>
                     ) : (
-                      <div className="grid gap-2">
+                      <div className="divide-y">
                         {categories.map((category) => (
                           <div
                             key={category.id}
-                            className="flex items-center justify-between p-3 bg-muted rounded-md hover:bg-muted/80 transition-colors"
+                            className="flex items-center justify-between py-3 hover:bg-muted/30 transition-colors"
                           >
                             <div className="flex items-center gap-3">
                               <div
@@ -2594,20 +2691,40 @@ export default function SettingsPage() {
                                 }
                                 title="Sposta tutte le transazioni"
                               >
-                                <ArrowRightLeft className="h-4 w-4 text-blue-500" />
+                                <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
                               </Button>
+                              {/* Delete button — 2-click disarm: first click arms (red Elimina),
+                                  second click confirms, auto-disarms after 3s. */}
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={(event) =>
-                                  handleDeleteExpenseCategory(
-                                    category.id,
-                                    category.name,
-                                    calculateDialogOrigin(event.currentTarget)
-                                  )
+                                className={
+                                  pendingDeleteDirectCategoryId === category.id
+                                    ? 'text-destructive hover:text-destructive hover:bg-destructive/10'
+                                    : ''
                                 }
+                                onClick={(event) => {
+                                  if (pendingDeleteDirectCategoryId === category.id) {
+                                    handleConfirmDirectDelete(category.id);
+                                  } else {
+                                    handleDeleteExpenseCategory(
+                                      category.id,
+                                      category.name,
+                                      calculateDialogOrigin(event.currentTarget)
+                                    );
+                                  }
+                                }}
                               >
-                                <Trash2 className="h-4 w-4 text-red-500" />
+                                <Trash2
+                                  className={`h-4 w-4 ${
+                                    pendingDeleteDirectCategoryId === category.id
+                                      ? ''
+                                      : 'text-muted-foreground'
+                                  }`}
+                                />
+                                {pendingDeleteDirectCategoryId === category.id && (
+                                  <span className="ml-1 text-xs">Elimina</span>
+                                )}
                               </Button>
                             </div>
                           </div>
@@ -2638,7 +2755,7 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Coins className="h-5 w-5 text-green-600" />
+            <Coins className="h-5 w-5 text-primary" />
             <CardTitle>Impostazioni Dividendi</CardTitle>
           </div>
         </CardHeader>
@@ -2740,14 +2857,20 @@ export default function SettingsPage() {
               {saving ? 'Salvataggio...' : 'Salva Impostazioni'}
             </Button>
 
+            {/* Sync button — 2-click disarm: first click turns destructive ("Conferma"),
+                second click executes the sync. Auto-disarms after 3s if not confirmed. */}
             <Button
               onClick={handleSyncDividends}
               disabled={syncingDividends || !dividendIncomeCategoryId}
-              variant="outline"
+              variant={syncConfirmArmed ? 'destructive' : 'outline'}
               className="flex items-center gap-2"
             >
               <Coins className="h-4 w-4" />
-              {syncingDividends ? 'Sincronizzazione...' : 'Sincronizza Dividendi Esistenti'}
+              {syncingDividends
+                ? 'Sincronizzazione...'
+                : syncConfirmArmed
+                ? 'Conferma sincronizzazione'
+                : 'Sincronizza Dividendi Esistenti'}
             </Button>
           </div>
 

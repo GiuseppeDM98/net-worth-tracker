@@ -32,6 +32,10 @@
 
 ## 🔧 Improvements
 
+- Redesigned the **Settings (Impostazioni)** page with a cleaner, Trade Republic-inspired layout: the Allocation tab now opens with a large bold hero metric showing the total percentage allocated across all asset classes — replacing the previous unlabelled percentage counter buried in a card header. The six individual asset-class cards (Equity, Bonds, Real Estate, Crypto, Commodities, Cash) are now a single unified flat list — each row shows the asset class name, current target, and an expand button; sub-categories expand inline below their row without opening a separate nested card. The Profile section fields are now arranged as labeled rows instead of a disconnected grid
+- Settings tab navigation on mobile and tablet now uses a **segmented pill control** — all five tabs (Allocazione, Preferenze, Spese, Dividendi, Aspetto) are visible at a glance with a smooth spring animation between them, replacing the previous dropdown that required two taps and hid the other options
+- Deleting an expense category with no linked transactions and syncing dividends now use **inline two-tap confirmation** — first tap arms the button, second tap executes (auto-disarms after 3 seconds), replacing the browser's native blocking dialog that interrupted the flow and could not be styled
+
 - AI Assistant **conversation messages** are now visually distinct at a glance: your messages appear right-aligned with a muted background; assistant responses appear full-width with a card background — no more identical-looking bubbles that required reading the "Tu / Assistente" label to tell apart
 - AI Assistant **net worth hero** now shows a clear provenance row: "vs. last month · current prices · after estimated taxes" — making it immediately clear what the number represents and how the variation is measured
 - AI Assistant now correctly prevents horizontal scrolling on tablet and mobile when conversations contain long messages or tables — tables still scroll internally when wider than the screen
@@ -145,6 +149,11 @@
 - Redesigned the mobile bottom navigation as a centered floating pill bar with rounded corners and a smoother active-tab transition — replacing the previous full-width fixed bar
 
 ## 🐛 Bug Fixes
+
+- Fixed the Allocation tab in Settings expanding the Equity section by default — all asset-class rows now start collapsed, reducing visual noise when opening the tab
+- Fixed expanding or collapsing an asset-class row in Settings triggering the "Anteprima attiva: modifiche non salvate" indicator — the open/close state of a row is now correctly treated as a visual preference and no longer treated as an unsaved setting change
+- Fixed allocation percentage and fixed-amount input fields in Settings being too narrow to display values like "78,13" or "2.500 €" without clipping — inputs are now wide enough to show two-decimal values without overflow
+- Fixed the Settings page loading skeleton showing four tab columns on desktop instead of five, causing a visible layout shift when the real page replaced it
 
 - Fixed the asset assignment dialog in Goals allowing allocations beyond 100% when an asset is already fully distributed across goals — if two goals each hold 50% of the same asset, the dialog now correctly caps each goal's assignment at its current 50% and shows "Nessuna quota libera" instead of the misleading "50% disponibile"
 - Fixed the asset assignment dialog not resetting its search field, selected asset, and percentage input when reopened — stale values from the previous open were silently carried over

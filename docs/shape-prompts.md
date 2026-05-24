@@ -463,3 +463,110 @@ Contesto:
 - Leggi COMMENTS.md e APPLICALA mentre scrivi codice
 - Leggi DEVELOPMENT_GUIDELINES.md e APPLICALA mentre scrivi codice
 ```
+
+---
+
+## App Shell e Navigazione
+
+```
+/impeccable shape l'app shell e la navigazione
+
+Priority issues (P0/P1) da: [SLUG]
+File: app/dashboard/layout.tsx,
+      app/dashboard/template.tsx
+Componenti: components/layout/Sidebar.tsx,
+            components/layout/BottomNavigation.tsx,
+            components/layout/SecondaryMenuDrawer.tsx,
+            components/layout/AssistenteBanner.tsx,
+            components/layout/LogoutDialog.tsx
+
+Confronta con: nessuna pagina specifica — il benchmark è la coerenza interna tra
+sidebar desktop, bottom nav mobile e secondary drawer. Verifica che i token
+--sidebar-* siano correttamente applicati su tutti e 6 i temi.
+Design language atteso: Trade Republic hierarchy (text-4xl font-bold font-mono hero,
+divide-y flat rows, no card-in-card), useChartColors() per tutte le serie grafiche,
+token compliance su tutti e 6 i temi dell'app.
+
+Contesto:
+- Leggi AGENTS.md (pattern, convenzioni, gotcha)
+- Leggi CLAUDE.md (stato corrente, known issues)
+- Leggi COMMENTS.md e APPLICALA mentre scrivi codice
+- Leggi DEVELOPMENT_GUIDELINES.md e APPLICALA mentre scrivi codice
+```
+
+---
+
+## Landing e Auth
+
+### Landing Page
+
+```
+/impeccable shape la landing page
+
+Priority issues (P0/P1) da: [SLUG]
+File: app/page.tsx
+
+Confronta con: Panoramica (stesso brand, gerarchia coerente), Rendimenti (hero number).
+Design language atteso: Trade Republic hierarchy (text-4xl font-bold font-mono hero,
+divide-y flat rows, no card-in-card), useChartColors() per tutte le serie grafiche,
+token compliance su tutti e 6 i temi dell'app.
+
+Contesto:
+- Leggi AGENTS.md (pattern, convenzioni, gotcha)
+- Leggi CLAUDE.md (stato corrente, known issues)
+- Leggi COMMENTS.md e APPLICALA mentre scrivi codice
+- Leggi DEVELOPMENT_GUIDELINES.md e APPLICALA mentre scrivi codice
+```
+
+### Login e Register
+
+```
+/impeccable shape le pagine Login e Register
+
+Priority issues (P0/P1) da: [SLUG]
+File: app/login/page.tsx,
+      app/register/page.tsx
+
+Confronta con: Impostazioni (stessa vocabulary form: Input, Button, label/focus ring),
+Landing (stesso brand entry point, coerenza visiva).
+Design language atteso: Trade Republic hierarchy (text-4xl font-bold font-mono hero,
+divide-y flat rows, no card-in-card), useChartColors() per tutte le serie grafiche,
+token compliance su tutti e 6 i temi dell'app.
+
+Contesto:
+- Leggi AGENTS.md (pattern, convenzioni, gotcha)
+- Leggi CLAUDE.md (stato corrente, known issues)
+- Leggi COMMENTS.md e APPLICALA mentre scrivi codice
+- Leggi DEVELOPMENT_GUIDELINES.md e APPLICALA mentre scrivi codice
+```
+
+---
+
+## Cross-cutting: Sistema dei Dialog
+
+```
+/impeccable shape il sistema dei dialog dell'app
+
+Priority issues (P0/P1) da: [SLUG]
+Componenti: components/assets/AssetDialog.tsx,
+            components/expenses/ExpenseDialog.tsx,
+            components/goals/GoalFormDialog.tsx,
+            components/goals/AssetAssignmentDialog.tsx,
+            components/dividends/DividendDialog.tsx,
+            components/dividends/DividendDetailsDialog.tsx,
+            components/cashflow/CostCenterDialog.tsx,
+            components/layout/LogoutDialog.tsx
+
+Confronta con: ogni dialog rispetto agli altri — il benchmark è la coerenza interna.
+I P0/P1 su questo sistema riguardano tipicamente: struttura mancante (DialogDescription
+assente), footer pattern inconsistente, sizing breakpoint difformi, motion non uniforme.
+Design language atteso: Trade Republic hierarchy (text-4xl font-bold font-mono hero,
+divide-y flat rows, no card-in-card), useChartColors() per tutte le serie grafiche,
+token compliance su tutti e 6 i temi dell'app.
+
+Contesto:
+- Leggi AGENTS.md (pattern, convenzioni, gotcha)
+- Leggi CLAUDE.md (stato corrente, known issues)
+- Leggi COMMENTS.md e APPLICALA mentre scrivi codice
+- Leggi DEVELOPMENT_GUIDELINES.md e APPLICALA mentre scrivi codice
+```

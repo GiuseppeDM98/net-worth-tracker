@@ -591,18 +591,156 @@ servirà come input per il prossimo step:
 
 ---
 
+## App Shell e Navigazione
+
+```
+/impeccable critique l'app shell e la navigazione
+
+File: app/dashboard/layout.tsx,
+      app/dashboard/template.tsx
+Componenti: components/layout/Sidebar.tsx,
+            components/layout/BottomNavigation.tsx,
+            components/layout/SecondaryMenuDrawer.tsx,
+            components/layout/AssistenteBanner.tsx,
+            components/layout/LogoutDialog.tsx
+
+Questi file definiscono la struttura permanente dell'app: layout wrapper (main padding,
+demo banner, landscape header bar con SidebarTrigger), page transitions (template.tsx),
+sidebar desktop con nav items e voce attiva, bottom navigation mobile portrait con
+theme sync via --sidebar-* CSS vars, secondary menu drawer per voci overflow su mobile.
+Nota: layout.tsx ha già due problemi noti — bg-gray-50/dark:bg-gray-950 hardcoded nel
+<main> e md:p-6 invece di desktop:p-6.
+Confronta con: nessuna pagina specifica — il benchmark è la coerenza interna tra
+sidebar desktop, bottom nav mobile e secondary drawer.
+Design language atteso: Trade Republic hierarchy (text-4xl font-bold font-mono hero,
+divide-y flat rows, no card-in-card), useChartColors() per tutte le serie grafiche,
+token compliance su tutti e 6 i temi dell'app.
+
+Contesto:
+- Leggi AGENTS.md (pattern, convenzioni, gotcha)
+- Leggi CLAUDE.md (stato corrente, known issues)
+
+Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
+servirà come input per il prossimo step:
+- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
+- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
+- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+```
+
+---
+
+## Landing e Auth
+
+### Landing Page
+
+```
+/impeccable critique la landing page
+
+File: app/page.tsx
+
+Questa è la landing page pubblica: mostra il valore dell'app con una hero section,
+feature overview e CTA "Prova la Demo" (condizionale a NEXT_PUBLIC_DEMO_EMAIL).
+È il primo contatto dell'utente con il prodotto — brand impression, motion di entrata,
+gerarchia visiva delle feature, call to action.
+Confronta con: Panoramica (stesso brand, gerarchia coerente), Rendimenti (hero number).
+Design language atteso: Trade Republic hierarchy (text-4xl font-bold font-mono hero,
+divide-y flat rows, no card-in-card), useChartColors() per tutte le serie grafiche,
+token compliance su tutti e 6 i temi dell'app.
+
+Contesto:
+- Leggi AGENTS.md (pattern, convenzioni, gotcha)
+- Leggi CLAUDE.md (stato corrente, known issues)
+
+Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
+servirà come input per il prossimo step:
+- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
+- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
+- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+```
+
+### Login e Register
+
+```
+/impeccable critique le pagine Login e Register
+
+File: app/login/page.tsx,
+      app/register/page.tsx
+
+Le pagine di autenticazione: form con email+password, toggle visibilità password
+keyboard-reachable, feedback inline su submit (Loader2 animate-spin durante pending),
+motion di entrata "calmer" rispetto al vecchio design. Login ha link a Register e viceversa.
+Confronta con: Impostazioni (stessa vocabulary form: Input, Button, label/focus ring),
+Landing (stesso brand entry point, coerenza visiva).
+Design language atteso: Trade Republic hierarchy (text-4xl font-bold font-mono hero,
+divide-y flat rows, no card-in-card), useChartColors() per tutte le serie grafiche,
+token compliance su tutti e 6 i temi dell'app.
+
+Contesto:
+- Leggi AGENTS.md (pattern, convenzioni, gotcha)
+- Leggi CLAUDE.md (stato corrente, known issues)
+
+Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
+servirà come input per il prossimo step:
+- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
+- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
+- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+```
+
+---
+
+## Cross-cutting: Sistema dei Dialog
+
+```
+/impeccable critique il sistema dei dialog dell'app
+
+Componenti: components/assets/AssetDialog.tsx,
+            components/expenses/ExpenseDialog.tsx,
+            components/goals/GoalFormDialog.tsx,
+            components/goals/AssetAssignmentDialog.tsx,
+            components/dividends/DividendDialog.tsx,
+            components/dividends/DividendDetailsDialog.tsx,
+            components/cashflow/CostCenterDialog.tsx,
+            components/layout/LogoutDialog.tsx
+
+Questa critique valuta la coerenza del sistema dei dialog come unità: struttura
+(DialogTitle + DialogDescription presente in tutti?), footer pattern (primario destra /
+ghost sinistra), sizing breakpoint, loading state (Loader2 su tutti i submit pending?),
+2-step flow in AssetDialog e ExpenseDialog (AnimatePresence mode="wait", spring config),
+motion consistency e token compliance cross-dialog.
+Confronta con: ogni dialog rispetto agli altri — il benchmark è la coerenza interna.
+Design language atteso: Trade Republic hierarchy (text-4xl font-bold font-mono hero,
+divide-y flat rows, no card-in-card), useChartColors() per tutte le serie grafiche,
+token compliance su tutti e 6 i temi dell'app.
+
+Contesto:
+- Leggi AGENTS.md (pattern, convenzioni, gotcha)
+- Leggi CLAUDE.md (stato corrente, known issues)
+
+Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
+servirà come input per il prossimo step:
+- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
+- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
+- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+```
+
+---
+
 ## Ordine consigliato di esecuzione
 
 Dalla meno redesignata alla più redesignata, per trovare i delta maggiori prima:
 
 1. Cashflow / tab "Dividendi" ← mai redesignato, delta atteso alto
-2. Impostazioni ← redesign parziale
-3. Panoramica ← molte feature aggiunte incrementalmente
-4. Patrimonio (3 tab) ← redesignata ma con tab separati da verificare singolarmente
-5. Cashflow / tab "Tracciamento" e "Budget" ← da verificare dopo AnalisiTab
-6. Allocazione
-7. Rendimenti
-8. Storico
-9. Hall of Fame
-10. FIRE e Simulazioni (4 tab)
-11. Assistente AI ← rieseguire dopo redesign (baseline: 25/40)
+2. App Shell e Navigazione ← fondamentale, problemi noti già in layout.tsx
+3. Cross-cutting: Sistema dei Dialog ← usati ovunque, coerenza mai verificata
+4. Impostazioni ← redesign parziale
+5. Landing Page ← primo contatto utente, mai critiquata
+6. Login e Register ← già migliorati ma mai critiquati formalmente
+7. Panoramica ← molte feature aggiunte incrementalmente
+8. Patrimonio (3 tab) ← redesignata ma con tab separati da verificare singolarmente
+9. Cashflow / tab "Tracciamento" e "Budget" ← da verificare dopo AnalisiTab
+10. Allocazione
+11. Rendimenti
+12. Storico
+13. Hall of Fame
+14. FIRE e Simulazioni (4 tab)
+15. Assistente AI ← rieseguire dopo redesign (baseline: 25/40)

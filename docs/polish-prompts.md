@@ -368,3 +368,85 @@ Contesto:
 - Leggi COMMENTS.md e APPLICALA mentre scrivi codice
 - Leggi DEVELOPMENT_GUIDELINES.md e APPLICALA mentre scrivi codice
 ```
+
+---
+
+## App Shell e Navigazione
+
+```
+/impeccable polish l'app shell e la navigazione
+
+Priority issues (P2/P3) da: [SLUG]
+File: app/dashboard/layout.tsx,
+      app/dashboard/template.tsx
+Componenti: components/layout/Sidebar.tsx,
+            components/layout/BottomNavigation.tsx,
+            components/layout/SecondaryMenuDrawer.tsx,
+            components/layout/AssistenteBanner.tsx,
+            components/layout/LogoutDialog.tsx
+
+Contesto:
+- Leggi AGENTS.md (pattern, convenzioni, gotcha)
+- Leggi CLAUDE.md (stato corrente, known issues)
+- Leggi COMMENTS.md e APPLICALA mentre scrivi codice
+- Leggi DEVELOPMENT_GUIDELINES.md e APPLICALA mentre scrivi codice
+```
+
+---
+
+## Landing e Auth
+
+### Landing Page
+
+```
+/impeccable polish la landing page
+
+Priority issues (P2/P3) da: [SLUG]
+File: app/page.tsx
+
+Contesto:
+- Leggi AGENTS.md (pattern, convenzioni, gotcha)
+- Leggi CLAUDE.md (stato corrente, known issues)
+- Leggi COMMENTS.md e APPLICALA mentre scrivi codice
+- Leggi DEVELOPMENT_GUIDELINES.md e APPLICALA mentre scrivi codice
+```
+
+### Login e Register
+
+```
+/impeccable polish le pagine Login e Register
+
+Priority issues (P2/P3) da: [SLUG]
+File: app/login/page.tsx,
+      app/register/page.tsx
+
+Contesto:
+- Leggi AGENTS.md (pattern, convenzioni, gotcha)
+- Leggi CLAUDE.md (stato corrente, known issues)
+- Leggi COMMENTS.md e APPLICALA mentre scrivi codice
+- Leggi DEVELOPMENT_GUIDELINES.md e APPLICALA mentre scrivi codice
+```
+
+---
+
+## Cross-cutting: Sistema dei Dialog
+
+```
+/impeccable polish il sistema dei dialog dell'app
+
+Priority issues (P2/P3) da: [SLUG]
+Componenti: components/assets/AssetDialog.tsx,
+            components/expenses/ExpenseDialog.tsx,
+            components/goals/GoalFormDialog.tsx,
+            components/goals/AssetAssignmentDialog.tsx,
+            components/dividends/DividendDialog.tsx,
+            components/dividends/DividendDetailsDialog.tsx,
+            components/cashflow/CostCenterDialog.tsx,
+            components/layout/LogoutDialog.tsx
+
+Contesto:
+- Leggi AGENTS.md (pattern, convenzioni, gotcha)
+- Leggi CLAUDE.md (stato corrente, known issues)
+- Leggi COMMENTS.md e APPLICALA mentre scrivi codice
+- Leggi DEVELOPMENT_GUIDELINES.md e APPLICALA mentre scrivi codice
+```
