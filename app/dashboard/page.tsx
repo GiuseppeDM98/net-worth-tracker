@@ -150,7 +150,10 @@ export default function DashboardPage() {
     {
       id: 'assetClass',
       title: 'Distribuzione per Asset Class',
-      data: overview?.charts.assetClassData ?? [],
+      data: (overview?.charts.assetClassData ?? []).map((d, i) => ({
+        ...d,
+        color: chartColors[i] ?? d.color,
+      })),
     },
     {
       id: 'asset',
@@ -390,19 +393,19 @@ export default function DashboardPage() {
                   className="text-[44px] font-bold font-mono tracking-[-0.03em] desktop:text-[54px]"
                 />
 
-                {/* Variation chips — larger, more readable than before */}
-                <div className="mt-2 flex flex-wrap gap-1.5">
+                {/* Variation chips */}
+                <div className="mt-2 flex flex-wrap gap-2">
                   {overview?.variations.monthly && (
                     <span className={cn(
-                      'inline-flex items-center gap-1.5 rounded-[7px] px-[9px] py-[4px]',
-                      'text-[11px] font-semibold font-mono tracking-[-0.01em]',
+                      'inline-flex items-center gap-2 rounded-[9px] px-[13px] py-[6px]',
+                      'text-[15px] font-semibold font-mono tracking-[-0.01em]',
                       overview.variations.monthly.value >= 0
                         ? 'bg-green-500/10 text-green-500 dark:text-green-400'
                         : 'bg-red-500/10 text-red-500 dark:text-red-400'
                     )}>
                       {overview.variations.monthly.value >= 0
-                        ? <TrendingUp className="h-[9px] w-[9px]" />
-                        : <TrendingDown className="h-[9px] w-[9px]" />
+                        ? <TrendingUp className="h-[13px] w-[13px]" />
+                        : <TrendingDown className="h-[13px] w-[13px]" />
                       }
                       {overview.variations.monthly.value >= 0 ? '+' : ''}
                       {formatCurrency(overview.variations.monthly.value)}{' '}
@@ -412,15 +415,15 @@ export default function DashboardPage() {
                   )}
                   {overview?.variations.yearly && (
                     <span className={cn(
-                      'inline-flex items-center gap-1.5 rounded-[7px] px-[9px] py-[4px]',
-                      'text-[11px] font-semibold font-mono tracking-[-0.01em]',
+                      'inline-flex items-center gap-2 rounded-[9px] px-[13px] py-[6px]',
+                      'text-[15px] font-semibold font-mono tracking-[-0.01em]',
                       overview.variations.yearly.value >= 0
                         ? 'bg-green-500/10 text-green-500 dark:text-green-400'
                         : 'bg-red-500/10 text-red-500 dark:text-red-400'
                     )}>
                       {overview.variations.yearly.value >= 0
-                        ? <TrendingUp className="h-[9px] w-[9px]" />
-                        : <TrendingDown className="h-[9px] w-[9px]" />
+                        ? <TrendingUp className="h-[13px] w-[13px]" />
+                        : <TrendingDown className="h-[13px] w-[13px]" />
                       }
                       {overview.variations.yearly.value >= 0 ? '+' : ''}
                       {formatCurrency(overview.variations.yearly.value)}{' '}

@@ -127,15 +127,6 @@
 - The "From Start %" column in asset history tables is now correctly labeled "Da Inizio %"
 - Gain/loss (G/P) is now shown for assets that have a cost basis but no tax rate configured — previously the metric was hidden unless both fields were set
 
-- Added a **12-month sparkline** to the Overview hero card — a compact trend line appears below the monthly and YTD variation chips, showing how your net worth has moved over the past year. Start and end values are labelled for immediate context without having to open the History page
-- Added a **permanent savings rate** to the Overview cashflow card — your current month's savings rate (income minus expenses ÷ income) is now always visible below the income and expense figures, color-coded by level: green above 20%, amber between 10–20%, red below 10%
-- The **fiscal detail cards** on the Overview page (Net Total, Net Liquid, Unrealized Gains, Estimated Taxes) are now collapsible under a "Dettaglio Fiscale" header — expanded by default so nothing is hidden, but can be collapsed to reduce visual noise for users who check this section less often
-
-- Redesigned the **Overview (Panoramica)** page with a bolder, cleaner layout: the total portfolio value is now displayed in a larger typeface that dominates the screen; monthly and YTD variations are shown as compact inline chips directly below the main number instead of separate cards; income and expenses are combined into a single "Cashflow" card with a two-column layout — reducing visual noise while keeping all the same information
-- Improved the Overview loading experience: the page now shows a structural skeleton that mirrors the real layout (header, hero number, secondary KPI, cashflow card) while data loads, instead of a bare spinner in an empty page
-- Improved the Overview "Cashflow" section empty state: when no expenses have been recorded for the current month, the section now shows a clear message instead of displaying `€0.00`, which was visually indistinguishable from a real zero-spend month
-- Removed the redundant "Number of Assets" card from the Overview secondary KPI row — the asset count was already shown as a caption below the portfolio total; the "Net Liquid Assets" card now takes the full row width for improved readability
-
 - Improved the **Edit Expense** form: the expense type is now shown as a read-only badge instead of a disabled dropdown, making it immediately clear that the type is fixed after creation. The form opens directly in the relevant field view without requiring a type selection step
 - Improved the **Edit Asset** form to show only the fields relevant to the asset type being edited — previously all fields were always visible regardless of type, so editing a cash account showed bond coupon fields, TER, and ISIN. The form now matches what you see when adding that asset type
 - Added gross TTM dividend amount ("Dividendi/Cedole TTM (Lordo)") to the Yield on Cost card in the Dividends & Coupons page — the numerator is now visible alongside the YOC percentage, making it clear which income is being measured
@@ -152,7 +143,14 @@
 - Redesigned the dashboard navigation: the sidebar now hosts the user profile, theme selector (light / dark / system), and logout in a single dropdown in the footer, replacing the separate top header bar. The Assistente AI entry has been promoted to a quick-access banner in the same footer
 - Redesigned the mobile bottom navigation as a centered floating pill bar with rounded corners and a smoother active-tab transition — replacing the previous full-width fixed bar
 
+## 🔧 Improvements
+
+- The **net worth variation chips** on the Overview hero (month and YTD) are now larger and easier to read — font size increased from 11px to 15px with proportionally larger icons and more padding
+
 ## 🐛 Bug Fixes
+
+- Fixed the **Asset Class pie chart** in the Overview Composizione section ignoring your active color theme — it now uses the same theme-aware palette as every other chart in the app (Solar Dusk, Cyberpunk, Midnight Bloom, etc.)
+- Fixed a browser console warning (`The width(-1) and height(-1) of chart should be greater than 0`) appearing on every visit to the Overview page — caused by the compact pie charts using `ResponsiveContainer` with a fixed-size parent; they now use explicit dimensions and the warning is eliminated
 
 - Fixed the savings ring chart on the Overview page restarting its animation every time the Fiscal Detail or Patrimonio Liquido sections were expanded or collapsed — the ring now animates exactly once on page load and stays still afterward
 - Fixed the composition charts on the Overview page showing two legends at the same time (one inside the chart, one alongside it) — now only one legend is shown per chart

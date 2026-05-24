@@ -188,13 +188,14 @@ const OverviewChartsSectionInner = ({
               <LoadingPlaceholder />
             ) : (
               <div className="flex items-center gap-5">
-                {/* Fixed-size container so ResponsiveContainer measures correctly */}
-                <div className="flex-shrink-0" style={{ width: 150, height: 150 }}>
+                <div className="flex-shrink-0">
                   <PieChartComponent
                     data={activeSection.data}
                     animateOnMount={!revealedCharts.has(activeSection.id)}
                     onFirstRender={() => markRevealed(activeSection.id)}
                     compact
+                    width={150}
+                    height={150}
                   />
                 </div>
                 <div className="flex-1 flex flex-col gap-[7px] min-w-0">
@@ -238,13 +239,14 @@ const OverviewChartsSectionInner = ({
                 <LoadingPlaceholder />
               ) : (
                 <div className="flex items-center gap-4">
-                  {/* Fixed-size container so ResponsiveContainer measures correctly */}
-                  <div className="flex-shrink-0" style={{ width: 160, height: 160 }}>
+                  <div className="flex-shrink-0">
                     <PieChartComponent
                       data={section.data}
                       animateOnMount={!revealedCharts.has(section.id)}
                       onFirstRender={() => markRevealed(section.id)}
                       compact
+                      width={160}
+                      height={160}
                     />
                   </div>
                   <div className="flex-1 flex flex-col gap-[7px] min-w-0">

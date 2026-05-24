@@ -11,10 +11,18 @@ interface PieChartProps {
   animateOnMount?: boolean;
   onFirstRender?: () => void;
   /**
-   * compact=true: small fixed-height donut with no internal labels or legend.
+   * compact=true: small fixed-size donut with no internal labels or legend.
    * Used by OverviewChartsSection which supplies its own custom legend.
+   * In compact mode, pass explicit `width` and `height` (pixels) to bypass
+   * ResponsiveContainer entirely — ResponsiveContainer always initialises with
+   * width/height = -1 and logs a warning before ResizeObserver fires, even
+   * with a fixed-size parent. Explicit dimensions eliminate the warning.
    */
   compact?: boolean;
+  /** Pixel width for compact mode (default 160). */
+  width?: number;
+  /** Pixel height for compact mode (default 160). */
+  height?: number;
 }
 
 export function PieChart({
@@ -22,23 +30,15 @@ export function PieChart({
   animateOnMount = true,
   onFirstRender,
   compact = false,
+  width: explicitWidth = 160,
+  height: explicitHeight = 160,
 }: PieChartProps) {
-  // Detect mobile screen for responsive sizing
+  // Detect mobile screen for responsive sizing (full-size mode only).
   const isMobile = useMediaQuery('(max-width: 768px)');
   const prefersReducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
   const [isAnimationActive, setIsAnimationActive] = useState(animateOnMount);
 
-  if (!data || data.length === 0) {
-    return (
-      <div className="flex h-64 items-center justify-center text-muted-foreground">
-        Nessun dato disponibile. Aggiungi assets per visualizzare il grafico.
-      </div>
-    );
-  }
-
-  // Ensure data is sorted by value descending for legend order
-  const sortedData = [...data].sort((a, b) => b.value - a.value);
-
+  // All hooks must appear before any conditional return (React rules of hooks).
   useEffect(() => {
     onFirstRender?.();
     // We only need to mark the chart as seen once for the parent page.
@@ -59,52 +59,64 @@ export function PieChart({
     return () => cancelAnimationFrame(frameId);
   }, [animateOnMount, prefersReducedMotion]);
 
-  // compact mode: no internal labels/legend, small fixed size.
-  // Used by OverviewChartsSection which renders its own custom legend.
+  if (!data || data.length === 0) {
+    return (
+      <div className="flex h-64 items-center justify-center text-muted-foreground">
+        Nessun dato disponibile. Aggiungi assets per visualizzare il grafico.
+      </div>
+    );
+  }
+
+  // Ensure data is sorted by value descending for legend order
+  const sortedData = [...data].sort((a, b) => b.value - a.value);
+
+  // compact mode: explicit pixel dimensions passed by the caller so we can skip
+  // ResponsiveContainer. ResponsiveContainer always initialises with {-1, -1}
+  // and emits a warning before ResizeObserver fires its first measurement —
+  // there is no rAF/rIC workaround that reliably suppresses this. Passing width
+  // and height directly to the Recharts PieChart removes the dependency entirely.
   if (compact) {
     return (
-      <ResponsiveContainer width="100%" height="100%">
-        <RechartsPC>
-          <Pie
-            data={sortedData as any}
-            cx="50%"
-            cy="50%"
-            labelLine={false}
-            label={false}
-            outerRadius={72}
-            fill="#8884d8"
-            dataKey="value"
-            isAnimationActive={isAnimationActive}
-            animationBegin={0}
-            animationDuration={600}
-            animationEasing="ease-out"
-          >
-            {sortedData.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={entry.color} />
-            ))}
-          </Pie>
-          <Tooltip
-            content={({ active, payload }) => {
-              if (!active || !payload || !payload.length) return null;
-              const entry = payload[0];
-              const color = (entry.payload as any)?.color ?? entry.color;
-              return (
-                <div style={{
-                  backgroundColor: 'var(--card)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '4px',
-                  padding: '6px 10px',
-                  fontSize: '13px',
-                }}>
-                  <span style={{ color }}>
-                    {entry.name}: {(entry.payload as any)?.percentage?.toFixed(1)}%
-                  </span>
-                </div>
-              );
-            }}
-          />
-        </RechartsPC>
-      </ResponsiveContainer>
+      <RechartsPC width={explicitWidth} height={explicitHeight}>
+        <Pie
+          data={sortedData as any}
+          cx="50%"
+          cy="50%"
+          labelLine={false}
+          label={false}
+          outerRadius={72}
+          fill="#8884d8"
+          dataKey="value"
+          isAnimationActive={isAnimationActive}
+          animationBegin={0}
+          animationDuration={600}
+          animationEasing="ease-out"
+        >
+          {sortedData.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={entry.color} />
+          ))}
+        </Pie>
+        <Tooltip
+          content={({ active, payload }) => {
+            if (!active || !payload || !payload.length) return null;
+            const entry = payload[0];
+            const color = (entry.payload as any)?.color ?? entry.color;
+            return (
+              <div style={{
+                backgroundColor: 'var(--card)',
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+                padding: '6px 10px',
+                fontSize: '13px',
+              }}>
+                <span style={{ color }}>
+                  {entry.name}: {(entry.payload as any)?.percentage?.toFixed(1)}%
+                </span>
+              </div>
+            );
+          }}
+        />
+      </RechartsPC>
     );
   }
 

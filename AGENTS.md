@@ -304,7 +304,7 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - **Firestore rules for `userPreferences/{userId}`**: use `isOwner(userId)` directly — the document has no `userId` field, the doc ID *is* the userId. Do NOT use `hasValidUserId()` (which checks a field).
 - **`useChartColors` timing**: use `useEffect + useState + requestAnimationFrame` to read CSS vars, NOT `useMemo`. `useMemo` reads `getComputedStyle` synchronously during render, before next-themes has updated the DOM — produces stale colors on dark↔light transitions.
 - **oklch luminance filter**: when adding chart colors from tweakcn themes, check L channel. Thresholds in `useChartColors`: L > 0.82 in light mode → fallback; L < 0.30 in dark mode → fallback. Themes with chart colors at extreme luminance (e.g. L≈0.92 or L≈0.28) will always fall back — avoid or fix at the CSS level.
-- **Server-cached chart data**: `prepareAssetDistributionData` runs server-side; colors are baked into React Query cache. Remap colors at render time in the page component (`assetData.map((d, i) => ({ ...d, color: chartColors[i] ?? d.color }))`); do not invalidate the cache.
+- **Server-cached chart data**: `prepareAssetDistributionData` runs server-side; colors are baked into React Query cache. Remap colors at render time in the page component (`assetData.map((d, i) => ({ ...d, color: chartColors[i] ?? d.color }))`); do not invalidate the cache. **Apply this remap to EVERY chart data array** — the Overview had `assetData` remapped but `assetClassData` missing, causing the Asset Class pie to ignore the active theme.
 - **View Transition circle-reveal**: remove `disableTransitionOnChange` from `ThemeProvider` or the CSS animation is blocked. Set `--vt-cx`, `--vt-cy`, `--vt-r` inline before calling `document.startViewTransition(() => setTheme(next))`. TypeScript already knows `startViewTransition` — no `@ts-expect-error` needed.
 - **Adding a new theme checklist**: (1) add CSS blocks `[data-theme="name"]` + `.dark[data-theme="name"]` in `globals.css`, (2) add `'name'` to `ColorTheme` union in `userPreferencesService.ts`, (3) add swatch object to the themes array in `settings/page.tsx`, (4) update grid cols if needed, (5) `npx tsc --noEmit`.
 - **Dark theme chroma gotcha**: in oklch, chroma values below ~0.015 are invisible on dark backgrounds — all themes look identical gray. When adding or editing a `.dark[data-theme="..."]` block, verify `--card`, `--background`, and `--muted` have chroma ≥ 0.020. Themes sourced from tweakcn usually have adequate chroma; hand-edited or copy-pasted dark blocks often don't. Also verify the **hue** matches the theme personality — elegant-luxury had hue 56° (amber) instead of ~20° (burgundy) because it was copied from solar-dusk.
@@ -427,9 +427,11 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - Symptom: 260k → 284k sparkline is a flat horizontal line. Fix: `<YAxis hide domain={['auto', 'auto']} />` — scales Y to data range instead of starting from 0
 
 ### Recharts ResponsiveContainer -1 Warning
-- Symptom: `The width(-1) and height(-1) of chart should be greater than 0` fires when a chart mounts after an async state flip.
-- Cause: `ResizeObserver` fires before the browser completes layout on the same render cycle.
-- Fix: defer mount with `requestAnimationFrame` — gate `{chartReady && <ResponsiveContainer>}` behind a `useEffect` that sets `chartReady` inside an `rAF` callback, with cleanup via `cancelAnimationFrame`. `minWidth={0}` alone is not sufficient.
+- Symptom: `The width(-1) and height(-1) of chart should be greater than 0` fires on mount.
+- Root cause: `ResponsiveContainer` always initialises its state with `{ width: -1, height: -1 }` and logs the warning in the render body before `ResizeObserver` fires its first measurement — on every mount, regardless of parent container size.
+- **rAF workarounds do not work**: deferring mount by one `requestAnimationFrame` only delays the problem. When the component remounts after `rafReady` becomes `true`, `ResponsiveContainer` initialises with -1 again and logs again.
+- **Real fix for fixed-size containers**: when chart dimensions are known at compile time (e.g. compact donut 160×160), bypass `ResponsiveContainer` entirely — pass `width` and `height` props directly to the Recharts chart component (`<PieChart width={160} height={160}>`). No measurement needed, no warning. Applied in `components/ui/pie-chart.tsx` compact mode via `width`/`height` props.
+- **For variable-size containers**: `ResponsiveContainer` is still necessary. The -1 warning fires once on mount then disappears — cosmetic only.
 
 ### Radix CollapsibleTrigger Nested Button
 - Symptom: `<button> cannot be a descendant of <button>` hydration error in console
@@ -516,7 +518,7 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - **Root cause**: `<ResponsiveContainer width="100%">` measures its parent's width. Inside a `flex` row, the parent is a flex item without an explicit width — the flex algorithm doesn't resolve it before `ResizeObserver` fires, so the container gets zero or the full width.
 - **Fix**: wrap the chart component in a fixed-size `div` (`style={{ width: 160, height: 160, flexShrink: 0 }}`). `ResponsiveContainer` then measures that fixed parent unambiguously. The sibling legend takes the remaining `flex-1` space.
 - **Double-legend corollary**: if the embedded chart has an internal `<Legend>` and the parent renders a second custom legend, suppress the chart's internal one (`compact` prop, or `showLegend={false}`). Two legends is always a bug — one from Recharts SVG, one from the parent JSX.
-- Applied in `OverviewChartsSection.tsx`: `compact` prop added to `PieChart`; pie wrapped in `style={{ width: 160/150, height: 160/150 }}` div.
+- Applied in `OverviewChartsSection.tsx`: `compact` prop on `PieChart`; `width`/`height` passed as explicit props (160 desktop, 150 mobile) — no fixed-size wrapper div needed since compact mode bypasses `ResponsiveContainer` entirely.
 
 ### `getAvailablePercentage` with `excludeGoalId` — double-counting trap
 - `getAvailablePercentage(assetId, assignments, excludeGoalId)` returns `100 - sum(other goals)`, effectively the **total cap** a goal can hold (free pool + its own existing allocation, since its own is excluded from the sum).
