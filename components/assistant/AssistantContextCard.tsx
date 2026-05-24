@@ -2,7 +2,6 @@
 
 import { TrendingDown, TrendingUp, Minus, AlertCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AssistantMonthContextBundle } from '@/types/assistant';
@@ -28,17 +27,13 @@ function getPeriodLabel(selector: { year: number; month: number }): string {
   return `${selector.year}`;
 }
 
-/**
- * Returns a human-readable "in progress" badge label for the period.
- */
+/** Returns a "in progress" badge label for the period. */
 function getPartialLabel(selector: { year: number; month: number }): string {
   if (selector.month > 0) return 'Mese in corso';
   if (selector.month === 0) return 'Anno in corso';
   return 'In corso';
 }
 
-// Reuse the module-level cached formatter instead of allocating a new
-// Intl.NumberFormat instance on every render of the context card.
 const eur = (value: number) => cachedFormatCurrencyEUR(value, true);
 
 function pct(value: number): string {
@@ -48,62 +43,53 @@ function pct(value: number): string {
 interface KpiRowProps {
   label: string;
   value: string;
-  sub?: string;
   positive?: boolean | null;
 }
 
-function KpiRow({ label, value, sub, positive }: KpiRowProps) {
+/** Flat divide-y row — no nested cards, no progress bars. */
+function KpiRow({ label, value, positive }: KpiRowProps) {
   return (
-    <div className="flex items-center justify-between gap-3 py-1.5">
+    <div className="flex items-center justify-between gap-3 px-4 py-2.5">
       <span className="text-sm text-muted-foreground">{label}</span>
-      <div className="text-right">
-        <span
-          className={cn(
-            'text-sm font-medium tabular-nums',
-            positive === true && 'text-green-600 dark:text-green-400',
-            positive === false && 'text-red-600 dark:text-red-400',
-            positive === null && 'text-foreground'
-          )}
-        >
-          {value}
-        </span>
-        {sub && (
-          <p className="text-xs text-muted-foreground">{sub}</p>
+      <span
+        className={cn(
+          'text-sm font-semibold tabular-nums font-mono',
+          positive === true && 'text-green-600 dark:text-green-400',
+          positive === false && 'text-red-600 dark:text-red-400',
+          positive === null && 'text-foreground'
         )}
-      </div>
+      >
+        {value}
+      </span>
     </div>
   );
 }
 
 /**
- * Skeleton shown while the context bundle is being fetched after thread selection.
- * Mirrors the card structure so the layout shift is minimal on data arrival.
+ * Skeleton for the context block while the bundle is being fetched.
+ * Flat structure (no Card wrapper) — caller decides the container.
  */
-function AssistantContextCardSkeleton({ className }: { className?: string }) {
+export function AssistantContextCardSkeleton({ className }: { className?: string }) {
   return (
-    <Card className={cn('overflow-hidden animate-pulse', className)}>
-      <CardHeader className="border-b border-border pb-3 pt-4">
-        <div className="h-4 w-36 rounded bg-muted" />
-      </CardHeader>
-      <CardContent className="space-y-5 p-4">
-        {/* Hero KPI placeholder */}
-        <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
-          <div className="h-3 w-28 rounded bg-muted" />
-          <div className="h-6 w-32 rounded bg-muted" />
-          <div className="h-3 w-48 rounded bg-muted" />
+    <div className={cn('animate-pulse space-y-0 overflow-hidden rounded-xl border border-border', className)}>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <div className="h-3 w-28 rounded bg-muted" />
+        <div className="h-5 w-20 rounded bg-muted" />
+      </div>
+      {/* Hero row */}
+      <div className="px-4 py-4 border-b border-border/50">
+        <div className="h-3 w-24 rounded bg-muted mb-2" />
+        <div className="h-7 w-32 rounded bg-muted" />
+        <div className="h-3 w-40 rounded bg-muted mt-2" />
+      </div>
+      {/* KPI rows */}
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="flex justify-between px-4 py-2.5 border-b border-border/50 last:border-0">
+          <div className="h-3 w-16 rounded bg-muted" />
+          <div className="h-3 w-20 rounded bg-muted" />
         </div>
-        {/* Cashflow rows placeholder */}
-        <div className="space-y-1">
-          <div className="h-3 w-16 rounded bg-muted mb-2" />
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="flex justify-between py-1.5">
-              <div className="h-3 w-20 rounded bg-muted" />
-              <div className="h-3 w-24 rounded bg-muted" />
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+      ))}
+    </div>
   );
 }
 
@@ -114,18 +100,14 @@ interface AssistantContextCardProps {
 }
 
 /**
- * Numeric context panel shown in the right sidebar during and after month analysis.
- * All data comes from the server-built bundle — no additional fetches needed.
+ * Numeric context block shown in the right sidebar during and after analysis.
  *
- * When isLoading is true (bundle being fetched for an existing thread), renders a
- * skeleton that matches the card structure to minimise layout shift on data arrival.
+ * Flat design: no nested card-in-card. The variazione patrimonio is a dominant
+ * text-2xl row at the top, followed by flat divide-y KPI rows for cashflow and
+ * allocation changes. No rounded inner boxes — the outer container (caller-provided)
+ * is the only visual boundary.
  *
- * Layout: Net worth delta at the top (hero KPI), then cashflow rows, then allocation changes.
- * Data quality notes are rendered as a light callout below.
- *
- * Animation: the card content fades + slides up whenever the period key changes
- * (mode switch or month picker change). The skeleton-to-data transition also
- * animates so the arrival of numbers feels deliberate rather than sudden.
+ * Animation: content fades + slides up when periodLabel changes (period switch).
  */
 export function AssistantContextCard({ bundle, className, isLoading }: AssistantContextCardProps) {
   const prefersReducedMotion = useReducedMotion();
@@ -133,23 +115,16 @@ export function AssistantContextCard({ bundle, className, isLoading }: Assistant
   if (isLoading) {
     return <AssistantContextCardSkeleton className={className} />;
   }
+
   const { selector, netWorth, cashflow, allocationChanges, dataQuality } = bundle;
   const periodLabel = getPeriodLabel(selector);
-
-  const deltaPositive =
-    netWorth.delta !== null ? netWorth.delta >= 0 : null;
+  const deltaPositive = netWorth.delta !== null ? netWorth.delta >= 0 : null;
 
   const DeltaIcon =
-    deltaPositive === true
-      ? TrendingUp
-      : deltaPositive === false
-        ? TrendingDown
-        : Minus;
+    deltaPositive === true ? TrendingUp : deltaPositive === false ? TrendingDown : Minus;
 
   return (
-    // AnimatePresence + keyed motion.div: the entire card re-animates whenever
-    // periodLabel changes (mode switch, month picker). mode="wait" ensures the old
-    // content fades out fully before the new one fades in, preventing visual overlap.
+    // AnimatePresence mode="wait": old content fades out before new one fades in on period change.
     <AnimatePresence mode="wait" initial={false}>
       <motion.div
         key={periodLabel}
@@ -157,27 +132,27 @@ export function AssistantContextCard({ bundle, className, isLoading }: Assistant
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: prefersReducedMotion ? 0 : -4 }}
         transition={{ duration: prefersReducedMotion ? 0 : 0.28, ease: EASE_OUT_QUINT }}
+        className={cn('overflow-hidden rounded-xl border border-border', className)}
       >
-    <Card className={cn('overflow-hidden', className)}>
-      <CardHeader className="border-b border-border pb-3 pt-4">
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-sm font-medium">Contesto {periodLabel}</CardTitle>
+        {/* Header: period label + partial badge */}
+        <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            Contesto {periodLabel}
+          </p>
           {dataQuality.isPartialMonth && (
             <Badge variant="outline" className="text-[10px]">{getPartialLabel(selector)}</Badge>
           )}
         </div>
-      </CardHeader>
 
-      <CardContent className="space-y-5 p-4">
-        {/* Hero: net worth delta */}
-        <div className="rounded-lg border border-border bg-muted/30 p-4">
-          <p className="mb-2 text-xs font-medium uppercase tracking-widest text-muted-foreground">
+        {/* Hero: net worth delta as dominant value — no inner box, just prominent text */}
+        <div className="border-b border-border/50 px-4 py-4">
+          <p className="mb-1 text-xs uppercase tracking-widest text-muted-foreground/70">
             Variazione patrimonio
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex items-baseline gap-2">
             <DeltaIcon
               className={cn(
-                'h-4 w-4 shrink-0',
+                'h-4 w-4 shrink-0 self-center',
                 deltaPositive === true && 'text-green-600 dark:text-green-400',
                 deltaPositive === false && 'text-red-600 dark:text-red-400',
                 deltaPositive === null && 'text-muted-foreground'
@@ -185,7 +160,7 @@ export function AssistantContextCard({ bundle, className, isLoading }: Assistant
             />
             <span
               className={cn(
-                'text-lg font-semibold tabular-nums',
+                'text-2xl font-bold tabular-nums font-mono',
                 deltaPositive === true && 'text-green-600 dark:text-green-400',
                 deltaPositive === false && 'text-red-600 dark:text-red-400',
                 deltaPositive === null && 'text-muted-foreground'
@@ -194,74 +169,67 @@ export function AssistantContextCard({ bundle, className, isLoading }: Assistant
               {netWorth.delta !== null ? eur(netWorth.delta) : 'N/D'}
             </span>
             {netWorth.deltaPct !== null && (
-              <span className="text-sm text-muted-foreground">
+              <span className="text-sm text-muted-foreground tabular-nums">
                 ({pct(netWorth.deltaPct)})
               </span>
             )}
           </div>
+          {/* Start → end sub-row */}
           <div className="mt-1 flex gap-4 text-xs text-muted-foreground">
             <span>Inizio: {netWorth.start !== null ? eur(netWorth.start) : 'N/D'}</span>
             <span>Fine: {netWorth.end !== null ? eur(netWorth.end) : 'N/D'}</span>
           </div>
         </div>
 
-        {/* Cashflow rows */}
+        {/* Cashflow rows — flat divide-y, no inner border-box */}
         {dataQuality.hasCashflowData && (
-          <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-widest text-muted-foreground">
+          <div className="border-b border-border/50">
+            <p className="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
               Cashflow
             </p>
-            <div className="divide-y divide-border/50 rounded-lg border border-border">
-              <div className="px-3">
-                <KpiRow
-                  label="Entrate"
-                  value={eur(cashflow.totalIncome)}
-                  positive={cashflow.totalIncome > 0 ? true : null}
-                />
-              </div>
-              <div className="px-3">
-                <KpiRow
-                  label="Dividendi"
-                  value={eur(cashflow.totalDividends)}
-                  positive={cashflow.totalDividends > 0 ? true : null}
-                />
-              </div>
-              <div className="px-3">
-                <KpiRow
-                  label="Uscite"
-                  value={eur(cashflow.totalExpenses)}
-                  positive={cashflow.totalExpenses >= 0 ? null : false}
-                />
-              </div>
-              <div className="px-3">
-                <KpiRow
-                  label="Flusso netto"
-                  value={eur(cashflow.netCashFlow)}
-                  positive={cashflow.netCashFlow >= 0 ? true : false}
-                />
-              </div>
+            <div className="divide-y divide-border/50">
+              <KpiRow
+                label="Entrate"
+                value={eur(cashflow.totalIncome)}
+                positive={cashflow.totalIncome > 0 ? true : null}
+              />
+              <KpiRow
+                label="Dividendi"
+                value={eur(cashflow.totalDividends)}
+                positive={cashflow.totalDividends > 0 ? true : null}
+              />
+              <KpiRow
+                label="Uscite"
+                value={eur(cashflow.totalExpenses)}
+                positive={cashflow.totalExpenses >= 0 ? null : false}
+              />
+              <KpiRow
+                label="Flusso netto"
+                value={eur(cashflow.netCashFlow)}
+                positive={cashflow.netCashFlow >= 0 ? true : false}
+              />
             </div>
           </div>
         )}
 
-        {/* Top allocation changes */}
+        {/* Allocation changes — flat rows */}
         {allocationChanges.length > 0 && (
-          <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-widest text-muted-foreground">
-              Allocazione (top variazioni)
+          <div className="border-b border-border/50">
+            <p className="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              Allocazione
             </p>
-            <div className="space-y-1">
+            <div className="divide-y divide-border/50">
               {allocationChanges.map((change) => (
                 <div
                   key={change.assetClass}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-1.5"
+                  className="flex items-center justify-between gap-2 px-4 py-2.5"
                 >
-                  <span className="truncate text-xs text-muted-foreground">
+                  <span className="truncate text-sm text-muted-foreground">
                     {change.assetClass}
                   </span>
                   <span
                     className={cn(
-                      'text-xs font-medium tabular-nums',
+                      'text-sm font-semibold tabular-nums font-mono',
                       change.absoluteChange >= 0
                         ? 'text-green-600 dark:text-green-400'
                         : 'text-red-600 dark:text-red-400'
@@ -276,25 +244,25 @@ export function AssistantContextCard({ bundle, className, isLoading }: Assistant
           </div>
         )}
 
-        {/* Data quality callout */}
+        {/* Data quality notes */}
         {dataQuality.notes.length > 0 && (
-          <Alert className="border-amber-200 bg-amber-50/50 py-2 dark:border-amber-800 dark:bg-amber-950/10">
-            <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-            <AlertDescription className="ml-1 text-xs text-amber-700 dark:text-amber-400">
-              {dataQuality.notes.map((note, i) => (
-                <span key={i} className="block">{note}</span>
-              ))}
-            </AlertDescription>
-          </Alert>
+          <div className="px-4 py-3">
+            <Alert className="border-amber-200 bg-amber-50/50 py-2 dark:border-amber-800 dark:bg-amber-950/10">
+              <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+              <AlertDescription className="ml-1 text-xs text-amber-700 dark:text-amber-400">
+                {dataQuality.notes.map((note, i) => (
+                  <span key={i} className="block">{note}</span>
+                ))}
+              </AlertDescription>
+            </Alert>
+          </div>
         )}
 
         {!dataQuality.hasSnapshot && !dataQuality.hasCashflowData && (
-          <p className="text-center text-xs text-muted-foreground py-2">
-            Nessun dato disponibile per questo mese.
+          <p className="px-4 py-4 text-center text-xs text-muted-foreground">
+            Nessun dato disponibile per questo periodo.
           </p>
         )}
-      </CardContent>
-    </Card>
       </motion.div>
     </AnimatePresence>
   );
@@ -303,7 +271,7 @@ export function AssistantContextCard({ bundle, className, isLoading }: Assistant
 /**
  * Compact single-line context strip for mobile — sits inside the conversation header.
  * Shows net worth delta + percentage so the user always has the key number at a glance
- * without having to scroll to the full context card.
+ * without having to scroll to the full context block.
  */
 export function AssistantContextPill({ bundle }: { bundle: AssistantMonthContextBundle }) {
   const { selector, netWorth } = bundle;

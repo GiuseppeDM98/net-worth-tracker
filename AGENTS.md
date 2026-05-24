@@ -435,6 +435,30 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - Fix: always use `asChild` on `CollapsibleTrigger` so it clones the first child element (typically a `div` or `CardHeader`) as the interactive trigger instead of generating its own `<button>`. The child must be a single non-button React element. `disabled` and other props still work correctly via prop merging.
 - Applied in `AssistantMemoryPanel` — the `CardHeader` (div) becomes the trigger, keeping the inner `Button` (trash icon) at a safe nesting level.
 
+### CSS Grid Mobile Overflow: `auto` Tracks vs `minmax(0, 1fr)`
+- **Symptom**: on mobile, a page scrolls horizontally — long text in message cards or tables causes the page to expand beyond the viewport.
+- **Root cause**: a `grid` without explicit column definitions uses implicit `auto` tracks. `auto` tracks have `min-width: auto` — they expand to accommodate the widest child, even beyond the viewport. On desktop, `minmax(0, 1.7fr)` prevents this; but the mobile fallback has no constraint.
+- **Fix**: always add `grid-cols-1` explicitly on mobile for single-column grids. `grid-cols-1` = `repeat(1, minmax(0, 1fr))` — the `minmax(0, ...)` forces the column to be allowed to shrink, so long text wraps instead of expanding the layout. Apply `min-w-0` to the direct flex/grid children as well — flex items have `min-width: auto` by default and resist shrinking.
+- **Pattern**: `<div className="grid grid-cols-1 gap-6 desktop:grid-cols-[minmax(0,1.7fr)_...]">` + `<div className="flex min-w-0 flex-col">`.
+- Applied in `AssistantPageClient.tsx` — without this, assistant message cards caused horizontal page scroll on tablet/mobile.
+
+### `overflow-x-hidden` on Ancestor Breaks Scroll Containers
+- **Symptom**: adding `overflow-x-hidden` to a wrapper stops the page scrolling horizontally, but content inside is truncated (clipped) rather than scrolling — tables, code blocks, and long text are cut off.
+- **Root cause**: `overflow-x: hidden` creates a new block formatting context and clips ALL overflow from descendants. Any child with `overflow-x: auto` can no longer create a visible scrollbar — the clipping happens at the ancestor before the scroll container has a chance to render. This also applies to `overflow-y: auto` on `<main>`: setting one overflow axis to non-`visible` implicitly sets the other to `auto`, enabling horizontal scroll as a side effect.
+- **Correct fix**: resolve the actual source of overflow (negative margins, `auto` grid tracks, missing `min-w-0`) rather than clamping with `overflow-x-hidden`. Reserve `overflow-x-hidden` only for decorative elements (reveal effects, slide-in panels) that have no scrollable descendants.
+- Applied in `AssistantPageClient.tsx` — `overflow-x-hidden` on the page wrapper was clipping table content and text; the real fix was `grid-cols-1` + `min-w-0` + removing `-mx-4`.
+
+### JSX Comment Cannot Be a Sibling in a Ternary Else Branch
+- **Symptom**: TypeScript parse errors like `TS1005: ')' expected` or `TS1382: Unexpected token. Did you mean {'>'}?` immediately after adding a `{/* comment */}` before a JSX element inside a ternary.
+- **Root cause**: a ternary expression requires a single expression for each branch. `{/* comment */} <div ...>` is two expressions — the comment is a JSX expression (`{...}`), and the element is a second one. The parser sees two children and fails.
+- **Fix**: remove the comment, or wrap both in a fragment `<>...</>` if you need the comment. Alternatively, move the comment inside the element itself.
+- This error is subtle because the parse failure points at a closing brace or `>` character far from the actual comment.
+
+### `useCountUp` Has No `enabled` Option
+- `UseCountUpOptions` interface only has `startDelay`, `duration`, `once`, `fromPrevious`. There is no `enabled` field.
+- **Pattern when conditionally animating**: always call `useCountUp(value ?? 0, opts)` unconditionally (hook rules). Gate the display in JSX: `{value !== null ? cachedFormatCurrencyEUR(animated ?? 0) : '—'}`. The `?? 0` on the animated value handles the `number | null` return type.
+- Do NOT try to skip the animation by passing `enabled: false` — it doesn't exist and TypeScript will error.
+
 ### iOS Safe Area on Sticky Composers
 - Sticky input bars positioned with `bottom-N` in a scrollable layout need `padding-bottom: env(safe-area-inset-bottom, 0px)` for iOS devices with home indicator. Use the CSS property directly (not Tailwind class) for reliable cross-browser support: `style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}` or via arbitrary value `pb-[env(safe-area-inset-bottom,0px)]`. The fallback `0px` ensures no extra padding on non-notched devices.
 - Do NOT add extra bottom padding to account for BottomNav clearance if the sticky wrapper already uses `bottom-N` — that double-counts. Only the iOS safe area needs a top-up beyond the sticky offset.

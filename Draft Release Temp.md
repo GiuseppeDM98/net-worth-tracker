@@ -1,5 +1,11 @@
 ## ✨ New Features
 
+- Redesigned the **AI Assistant (Assistente AI)** page with a cleaner, Trade Republic-inspired layout: the current net worth is now the dominant number at the top of the page — shown in large bold figures with the month-over-month variation, current-price note, and after-tax clarification — replacing the previous generic "How can I help you?" chat opener that looked identical to every other AI product
+- **Analysis mode switching** is now a persistent tab strip at the top of the conversation (Mese / Anno / YTD / Storico / Chat), replacing the hidden selector inside the composer — the most important decision is now visible at all times, not buried below the text input
+- The right column on desktop has been reorganized: Conversations and Memory are now two tabs inside a single card, with the context panel as a flat data block below — replacing the previous three separate stacked cards that had no clear hierarchy
+- The **"Come funziona" guide** now opens automatically the first time you visit the page (when you have no conversations yet) — explaining the five analysis modes, web search behavior, and automatic memory before you send your first message
+- Memory category badges (Goal, Preference, Risk, Fact) now use **theme-aware colors** — they adapt to your active color theme (Solar Dusk, Cyberpunk, Midnight Bloom, etc.) instead of using hardcoded green/blue/violet/amber that clashed with non-default themes
+
 - Added a **Top Expenses block** to the Cashflow Analysis tab — instantly see the largest individual expenses for any selected period. The "Spese Maggiori" card appears after the KPI summary, listing the top 5 expenses sorted by amount with date, category, subcategory, expense type, and optional notes. Tap "Show all (N)" to expand the full ranked list; the view automatically collapses and resets when you switch between periods or months
 
 - Redesigned the **Add Expense** dialog with a guided two-step flow: first pick the expense type from a visual card grid (Variable Expense, Fixed Expense, Debt / Installment, Income), then fill in only the fields that matter for that type — no more scrolling past installment or recurring fields for a simple purchase. The expense type picker uses the same design language as the Add Asset dialog: icon cards with a short description, animated step transitions, and a "← Change type" ghost button to go back without losing your context
@@ -25,6 +31,10 @@
 - Added a confirmation dialog before logging out — prevents accidental sign-outs by asking "Esci dall'account?" before completing the action
 
 ## 🔧 Improvements
+
+- AI Assistant **conversation messages** are now visually distinct at a glance: your messages appear right-aligned with a muted background; assistant responses appear full-width with a card background — no more identical-looking bubbles that required reading the "Tu / Assistente" label to tell apart
+- AI Assistant **net worth hero** now shows a clear provenance row: "vs. last month · current prices · after estimated taxes" — making it immediately clear what the number represents and how the variation is measured
+- AI Assistant now correctly prevents horizontal scrolling on tablet and mobile when conversations contain long messages or tables — tables still scroll internally when wider than the screen
 
 - The tab switcher on the **FIRE e Simulazioni** page on mobile now uses a segmented pill control — all four tabs (FIRE, Coast, Monte Carlo, Obiettivi) are visible at a glance with a smooth spring animation between them, replacing the previous dropdown that required two taps and hid the other options
 

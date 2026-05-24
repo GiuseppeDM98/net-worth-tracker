@@ -8,6 +8,7 @@ import { AssistantMemoryItemRow } from '@/components/assistant/AssistantMemoryIt
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { useChartColors } from '@/lib/hooks/useChartColors';
 import {
   Dialog,
   DialogContent,
@@ -74,6 +75,9 @@ export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onTogg
 
   const isMutating = updateMutation.isPending || deleteMutation.isPending;
   const memoryEnabled = memory?.preferences.memoryEnabled ?? true;
+  const chartColors = useChartColors();
+  // goal → [0] gives a theme-aware accent for the suggestions block header icon/border
+  const suggestionColor = chartColors[0] ?? 'var(--chart-1)';
   const pendingSuggestions = (memory?.suggestions ?? []).filter((suggestion) => suggestion.status === 'pending');
 
   // Group items by category preserving the canonical display order
@@ -227,9 +231,16 @@ export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onTogg
           <CollapsibleContent>
             <CardContent className="space-y-5">
           {!isLoading && pendingSuggestions.length > 0 && (
-            <div className="space-y-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
+            // Theme-aware suggestion block: border and bg use color-mix() from chart color [0]
+            <div
+              className="space-y-2 rounded-xl p-3"
+              style={{
+                border: `1px solid color-mix(in srgb, ${suggestionColor} 25%, transparent)`,
+                backgroundColor: `color-mix(in srgb, ${suggestionColor} 6%, transparent)`,
+              }}
+            >
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                <CheckCircle2 className="h-4 w-4" style={{ color: suggestionColor }} />
                 <p className="text-sm font-medium text-foreground">Suggerimenti</p>
               </div>
               {pendingSuggestions.map((suggestion) => {

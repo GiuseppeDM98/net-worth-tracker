@@ -22,8 +22,6 @@ interface AssistantStreamingResponseProps {
    * to avoid ReactMarkdown re-parsing partial/incomplete markdown on every chunk.
    * Once streaming finishes (this prop is undefined or points to a different message),
    * the message renders as full markdown.
-   *
-   * Pattern mirrors AIAnalysisDialog.tsx: plain text during stream → markdown on done.
    */
   streamingMessageId?: string;
 }
@@ -60,16 +58,13 @@ const EASE_OUT_QUINT = [0.22, 1, 0.36, 1] as const;
 
 /**
  * Renders the conversation message list.
+ *
+ * Visual differentiation (Trade Republic pattern):
+ * - User messages: right-aligned, max-w-[85%], muted background — clearly the outgoing side
+ * - Assistant messages: full-width, card background with subtle border — the data surface
+ *
  * User messages are always plain text.
- * Assistant messages show plain text while streaming, then switch to ReactMarkdown on completion.
- *
- * Each message fades + slides up on entry so new exchanges feel like they surface naturally
- * rather than flashing into existence. The animation is intentionally subtle (6 px travel,
- * 300 ms) — it should be felt rather than noticed.
- *
- * NOTE: We deliberately do NOT animate the streaming text container itself (no layout
- * animations per chunk) — that would re-trigger the animation on every SSE token and
- * cause jank on slow connections.
+ * Assistant messages render as plain text during streaming, switch to ReactMarkdown on completion.
  */
 export function AssistantStreamingResponse({
   messages,
@@ -79,8 +74,7 @@ export function AssistantStreamingResponse({
 }: AssistantStreamingResponseProps) {
   const prefersReducedMotion = useReducedMotion();
 
-  // Entrance variants for each message bubble.
-  // Reduced-motion users get an opacity-only transition (no spatial movement).
+  // Entrance variants — subtle lift into view, not a flashy reveal.
   const messageVariants = {
     hidden: { opacity: 0, y: prefersReducedMotion ? 0 : 6 },
     visible: {
@@ -92,14 +86,18 @@ export function AssistantStreamingResponse({
 
   return (
     // aria-live="polite" announces new assistant messages to screen readers.
-    // aria-atomic="false" lets individual chunks be read as they arrive instead of
-    // re-reading the entire region on every update.
-    <div className="space-y-4" aria-live="polite" aria-atomic="false" aria-label="Conversazione con l'assistente">
+    // aria-atomic="false" lets individual chunks be read as they arrive.
+    <div
+      className="space-y-4"
+      aria-live="polite"
+      aria-atomic="false"
+      aria-label="Conversazione con l'assistente"
+    >
       <AnimatePresence initial={false}>
         {messages.map((message) => {
+          const isUser = message.role === 'user';
           // An assistant message is "streaming" while its id matches the active stream slot.
-          // User messages are never streamed — always plain text.
-          const isActiveStream = message.role === 'assistant' && message.id === streamingMessageId;
+          const isActiveStream = !isUser && message.id === streamingMessageId;
 
           return (
             <motion.div
@@ -107,59 +105,68 @@ export function AssistantStreamingResponse({
               variants={messageVariants}
               initial="hidden"
               animate="visible"
-              // Exit is intentionally absent — messages are permanent once in the list.
+              // Exit intentionally absent — messages are permanent once in the list.
+              // min-w-0 prevents the flex/grid child from overflowing its grid cell on narrow viewports.
               className={cn(
-                'rounded-xl border px-4 py-4 text-sm',
-                message.role === 'user'
-                  ? 'border-primary/25 bg-primary/5'
-                  : 'border-border bg-background',
+                'min-w-0',
+                isUser
+                  // User: right-aligned bubble, softer muted background
+                  ? 'ml-auto max-w-[85%]'
+                  // Assistant: full-width, card surface for readable prose
+                  : 'w-full'
               )}
             >
-              <div className="mb-2.5 flex items-center justify-between gap-3">
-                <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                  {message.role === 'user' ? 'Tu' : 'Assistente'}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {formatDate(message.createdAt)}
-                </span>
-              </div>
+              <div
+                className={cn(
+                  'rounded-xl border px-4 py-4 text-sm',
+                  isUser
+                    ? 'border-border bg-muted/40'
+                    : 'border-border bg-card'
+                )}
+              >
+                {/* Role label + timestamp */}
+                <div className="mb-2.5 flex items-center justify-between gap-3">
+                  <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                    {isUser ? 'Tu' : 'Assistente'}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatDate(message.createdAt)}
+                  </span>
+                </div>
 
-              {message.role === 'assistant' ? (
-                isActiveStream ? (
-                  // Plain text during streaming: avoids ReactMarkdown re-parse on every chunk
-                  // which causes layout jumps when markdown syntax is incomplete mid-stream.
-                  <p className="whitespace-pre-wrap text-foreground">
-                    {message.content || <span className="italic text-muted-foreground">…</span>}
-                  </p>
+                {/* Content */}
+                {!isUser ? (
+                  isActiveStream ? (
+                    // Plain text during streaming — avoids ReactMarkdown re-parse on every chunk
+                    <p className="whitespace-pre-wrap text-foreground">
+                      {message.content || <span className="italic text-muted-foreground">…</span>}
+                    </p>
+                  ) : (
+                    // Full markdown once the stream is complete
+                    <div className="prose prose-sm dark:prose-invert max-w-none text-foreground prose-headings:text-foreground prose-strong:text-foreground prose-li:text-foreground">
+                      {message.content ? (
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={MARKDOWN_COMPONENTS}
+                        >
+                          {message.content}
+                        </ReactMarkdown>
+                      ) : (
+                        <span className="italic text-muted-foreground">…</span>
+                      )}
+                    </div>
+                  )
                 ) : (
-                  // Full markdown once the stream is done
-                  <div className="prose prose-sm dark:prose-invert max-w-none text-foreground prose-headings:text-foreground prose-strong:text-foreground prose-li:text-foreground">
-                    {message.content ? (
-                      // remarkGfm enables tables, strikethrough, task lists, and autolinks
-                      // — without it markdown tables render as raw pipe characters.
-                      // Table components are overridden to apply explicit borders and padding
-                      // because Tailwind prose does not add cell structure by default.
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        components={MARKDOWN_COMPONENTS}
-                      >
-                        {message.content}
-                      </ReactMarkdown>
-                    ) : (
-                      <span className="italic text-muted-foreground">…</span>
-                    )}
-                  </div>
-                )
-              ) : (
-                <p className="whitespace-pre-wrap text-foreground">{message.content}</p>
-              )}
+                  <p className="whitespace-pre-wrap text-foreground">{message.content}</p>
+                )}
 
-              {message.webSearchUsed && (
-                <Badge variant="outline" className="mt-2 gap-1.5 text-[11px]">
-                  <Globe className="h-3 w-3" />
-                  Web search usata
-                </Badge>
-              )}
+                {message.webSearchUsed && (
+                  <Badge variant="outline" className="mt-2 gap-1.5 text-[11px]">
+                    <Globe className="h-3 w-3" />
+                    Web search usata
+                  </Badge>
+                )}
+              </div>
             </motion.div>
           );
         })}
