@@ -62,6 +62,7 @@ rounded:
   md: "8px"
   lg: "10px"
   xl: "14px"
+  2xl: "16px"
   pill: "9999px"
 spacing:
   xs: "4px"
@@ -191,11 +192,14 @@ Five chart colors cover the semantic range of portfolio data. These are the syst
 
 ### Hierarchy
 
-- **Display** (600 weight, `clamp(1.75rem, 3.5vw, 3rem)`, lh 1.1, ls -0.02em): Page heroes, net worth totals on Overview. Tight tracking at large sizes; tight leading. One instance per view maximum. In Tailwind: `text-4xl font-bold tracking-tight desktop:text-5xl`.
+- **Display — Page Hero** (700 weight, `44px` mobile / `54px` desktop, lh implicit, ls `-0.03em`): The single dominant number on the page — net worth total on Overview. Always `font-mono tabular-nums`. In Tailwind: `text-[44px] font-bold font-mono tracking-[-0.03em] desktop:text-[54px]`. One instance per view maximum.
+- **Display — Section Hero** (700 weight, `36px`, lh 1, ls `-0.03em`): Primary metric in a bento card or section hero block — e.g. TER, Annual Cost, FIRE Number. In Tailwind: `text-[36px] font-bold font-mono tabular-nums tracking-[-0.03em] leading-none`.
+- **Sub-hero Value** (700 weight, `22px`, lh 1, ls `-0.025em`): Secondary metrics that sit below the dominant number or in paired value blocks — e.g. Liquid / Illiquid amounts, Entrate / Spese figures. In Tailwind: `text-[22px] font-bold font-mono tracking-[-0.025em] tabular-nums leading-none`.
 - **Headline** (600 weight, 1.25rem, lh 1.25, ls -0.01em): Section headers, dialog titles, card-level titles where data density demands authority.
 - **Title** (600 weight, 1rem, lh 1.4, ls -0.005em): Sub-section headers, table group labels, the step below Headline.
 - **Body** (400 weight, 0.875rem, lh 1.6): All prose, descriptions, note content. Max line length 65ch.
 - **Label** (500 weight, 0.75rem, lh 1.4, ls +0.01em): Input labels, tags, stat captions, tab text. Slightly tracked for legibility at small sizes.
+- **Eyebrow Label** (600 weight, `10px`, uppercase, ls `0.1em`, muted): Section eyebrow — the small all-caps label placed above a dominant number. In Tailwind: `text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground`. Never competes with the number it names. Use 9px / `tracking-[0.08em]` for sub-eyebrows inside compact cells.
 - **Numeric** (Geist Mono, 400 weight, 0.875rem, lh 1.4, `font-feature-settings: "tnum" 1`): All monetary values, percentages, dates, quantities in financial contexts. Tabular figures always enabled.
 
 ### Named Rules
@@ -241,11 +245,21 @@ Each variant has a physical quality: an opacity shift on hover that reads as gen
 
 Cards organize data panels, KPI groups, and chart containers. Structural, not decorative.
 
-- **Corner Style:** Extended curvature (14px radius). Visually distinct from buttons and inputs, signaling a container rather than an interactive target.
+- **Corner Style:** `rounded-2xl` (16px). This is the standard for all primary cards, hero cards, and bento cells. Use `rounded-xl` (14px) only for sub-elements inside a card (e.g. muted sub-tiles). Buttons and inputs remain at 8px (md) — the larger radius signals a container, not an interactive target.
 - **Background:** `--card` (dark: Charcoal Surface `oklch(0.205 0 0)`; light: Near-White `oklch(1 0 0)`).
 - **Shadow Strategy:** Lift shadow (`0 1px 3px rgba(0,0,0,0.1)`). Always present; always quiet.
 - **Border:** 1px, `--border` (Border Ghost dark; Border Stone light). The border carries most of the compositional separation work.
-- **Internal Padding:** 24px uniform (`py-6 px-6`). Card headers grid-lay title + optional action in the same horizontal row.
+- **Internal Padding:** `p-[22px]` (22px) for primary hero cards and featured content cards. `p-5` (20px) for compact bento cells and chart containers. The older `p-6` (24px) is only acceptable in dialogs or settings forms. The difference is intentional: 22px feels tighter and more "instrument-like" than 24px at data density.
+
+#### Bento Cell (Naked Card Variant)
+
+For bento grid cells that sit alongside a Card component, use the naked pattern — raw `div` instead of the `Card` component — to avoid shadcn's internal flex-col that can break inner layouts:
+
+```tsx
+<div className="bg-card border border-border rounded-2xl p-5 flex flex-col justify-between">
+```
+
+This is preferred over `<Card><CardContent>` when the cell needs explicit flex direction control or when `flex-1` / `h-full` behavior is critical for grid row height matching.
 
 ### Inputs / Fields
 
@@ -277,15 +291,17 @@ The animated currency counter in Overview KPI cards is the system's most distinc
 
 Periodic changes (monthly, YTD) are displayed as compact inline chips directly below the hero number — not as separate cards. This keeps the primary number dominant while giving immediate trend context.
 
-**Structure:** `inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium`
+**Structure:** `inline-flex items-center gap-2 rounded-[9px] px-[13px] py-[6px] text-[15px] font-semibold font-mono tracking-[-0.01em]`
 
 **Colors:**
-- Positive: `bg-green-500/10 text-green-600 dark:text-green-400`
-- Negative: `bg-red-500/10 text-red-600 dark:text-red-400`
+- Positive: `bg-green-500/10 text-green-500 dark:text-green-400`
+- Negative: `bg-red-500/10 text-red-500 dark:text-red-400`
 
 **Content:** `{icon} {+/-}{formattedValue} ({+/-}{pct}%) {period label}` — e.g. `↗ +€1.240,00 (+2.34%) questo mese`
 
-**Rules:** Only render when snapshot data exists (at least one prior period). Never show a placeholder chip — absence communicates "no prior data" cleanly. Icon is `TrendingUp` or `TrendingDown` at `h-3 w-3`. Multiple chips wrap naturally via `flex-wrap gap-2`.
+**Rules:** Only render when snapshot data exists (at least one prior period). Never show a placeholder chip — absence communicates "no prior data" cleanly. Icon is `TrendingUp` or `TrendingDown` at `h-[13px] w-[13px]`. Multiple chips wrap naturally via `flex-wrap gap-2`. Use `font-mono` for the value — the chip contains a financial number and must satisfy the Mono Mandate.
+
+**Note (delta semantics):** For expense metrics, the sign convention is inverted: a positive delta on Spese is bad (spending went up), a negative delta is good. The color logic must be parameterized, not hard-coded: `positiveGood: boolean` governs green/red assignment.
 
 ### Dominant Value Block (Trade Republic Pattern)
 
@@ -293,17 +309,17 @@ The canonical layout for any section where one number is the primary takeaway �
 
 **Structure:**
 ```
-[label — text-sm text-muted-foreground]
-[primary value — text-2xl font-bold font-mono]
-[variation chip + secondary metric — text-sm]
-[tertiary metadata — text-xs text-muted-foreground]
+[eyebrow label — text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground]
+[primary value — text-[44px] desktop:text-[54px] font-bold font-mono tracking-[-0.03em]]
+[variation chips — inline-flex, wrapped via flex-wrap gap-2]
+[tertiary metadata — text-[11px] text-muted-foreground]
 ```
 
 **Rules:**
-- Primary value is always `text-2xl font-bold font-mono` minimum. For page heroes, `text-3xl` or `text-4xl`.
-- The label above is small (`text-sm`) and muted — it names the number, it does not compete with it.
-- Variation (gain/loss, percentage) appears inline directly below the value as a chip or compact colored span, never as a separate card or column.
-- Tertiary metadata (date, ticker, ISIN) uses `text-xs text-muted-foreground` — it is present for reference, invisible at a glance.
+- Primary value is always `font-bold font-mono`. Page heroes use `text-[44px] desktop:text-[54px]`. Section heroes use `text-[36px]`. Sub-hero paired values use `text-[22px]`. Never `text-2xl` (24px) for a page or section hero — the jump from 22→36→44→54 is intentional.
+- The eyebrow label above is `text-[10px]` uppercase and muted — it names the number without competing with it.
+- Variation (gain/loss, percentage) appears inline directly below the value as chips, never as a separate card or column.
+- Tertiary metadata (count, footnote) uses `text-[11px] text-muted-foreground` — present for reference, invisible at a glance.
 - Never place two equally-weighted numbers side by side. One must dominate; the other is context.
 
 ### Flat List Row (Trade Republic Chrome Reduction)
@@ -350,6 +366,179 @@ A tab switcher for 2–4 mutually exclusive views within a section. Replaces `<S
 - Only use for view-switching within a page section. Global navigation uses the bottom pill or sidebar.
 - Desktop may use shadcn `TabsList` when the design calls for a more open tab style. The segmented pill is the mobile-first default.
 
+### Bento Asymmetric Hero Layout
+
+The canonical top-of-page layout when a hero card needs a companion context card (e.g. Overview: Net Worth + Liquidity, Performance: TWR + period selector).
+
+**Structure:** `grid gap-4 desktop:grid-cols-[2fr_1fr]`
+
+- The `[2fr_1fr]` ratio gives the hero approximately 66% width and the companion 33%. This is not a 50/50 split — the asymmetry is intentional and communicates hierarchy through space allocation.
+- On mobile, the grid stacks: hero first, companion second.
+- The companion card uses `h-full` to match the hero's variable height (sparkline, chips, etc.).
+- Below the hero row, a secondary bento row uses equal `grid-cols-3` (or `grid-cols-2`) for metric cards of equal weight.
+
+**Section separator:** Use `border-t border-border/40 pt-4` between major page sections. The 40% border opacity is lighter than the standard `border-border` — it suggests chapter separation without visual interruption.
+
+### Hero Sparkline (Edge-to-Edge Area Chart)
+
+A minimal area chart rendered inside the hero card, breaking out of card padding to fill the full card width. No axes, no grid, no tooltip, no legend — the variation chips above carry numeric context; the sparkline adds only visual shape.
+
+**Implementation:**
+```tsx
+{/* Container with negative margin matching the card padding */}
+<div className="-mx-[22px] mt-3" style={{ height: 68 }}>
+  <NetWorthSparkline data={sparkline12m} filled={true} color="var(--chart-1)" height={68} />
+</div>
+{/* Start/end labels rendered by parent, outside the -mx container */}
+<div className="flex justify-between mt-1 px-px text-[10px] text-muted-foreground font-mono">
+  <span>{cachedFormatCurrencyEUR(sparkline12m[0].totalNetWorth, true)}</span>
+  <span>{cachedFormatCurrencyEUR(sparkline12m[sparkline12m.length - 1].totalNetWorth, true)}</span>
+</div>
+```
+
+**Rules:**
+- The `-mx-[N]` value must match the card's padding exactly (e.g. `-mx-[22px]` for `p-[22px]`). The SVG uses `preserveAspectRatio="none"` and `width="100%"` to fill the container.
+- When `filled=true`, the `NetWorthSparkline` component expects the parent to render the start/end labels externally — it does not render them internally to avoid misalignment with the bleed.
+- Use `color="var(--chart-1)"` so the sparkline respects theme. Never hard-code a hex.
+- Gradient fill: opacity `0.22` at top, `0` at bottom. This is intentionally subtle — the area shape conveys trend, not emphasis.
+
+### Animated SVG Donut (Inline Data Viz)
+
+A two-color SVG donut rendered directly inside a card (no Recharts), with a `motion.circle` for the animated segment. Used when a pie metaphor must integrate tightly with text values in a flex layout.
+
+**Anatomy:**
+- Full background ring: static `<circle>` in color A (e.g. illiquid / base category).
+- Animated segment: `<motion.circle>` in color B (e.g. liquid / primary category), animating `strokeDasharray` from `0 circ` to `liquidDash circ-liquidDash`.
+- Center label: `absolute inset-0 flex flex-col items-center justify-center` with the percentage in `font-mono font-bold` at `fontSize={17}` (matching the center of the 116px ring).
+- SVG rotated `-90deg` so the segment starts at the top (12 o'clock position).
+
+**Geometry:**
+- `size = 116`, `strokeW = 12`, `r = (size - strokeW) / 2`
+- `circ = 2 * Math.PI * r` — do not hard-code; always derive from `r`.
+
+**Animation:** `duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.15` — expo-out feel with a brief delay after the hero number starts.
+
+**Colors:** Always from `useChartColors()`. The first time `chartColors` is read, it may be `[]` (post-hydration); default to CSS vars (`var(--chart-1)`, `var(--chart-2)`) as fallbacks.
+
+**Rules:**
+- Use this pattern when the donut is integral to the card layout and must flex-align with text. Use Recharts `PieChart` only for standalone chart sections.
+- `strokeLinecap="butt"` — not `"round"`, which would add visual overlap at 0% and 100% endpoints.
+- Center text font size should scale with `size`: `fontSize = Math.round(size * 0.147)` (approx).
+
+### Savings / Metric Ring Chart
+
+An SVG ring chart for a single percentage metric (e.g. savings rate). Structurally similar to the animated donut but single-color on a muted track ring.
+
+**Color thresholds (savings rate):**
+- `≥ 20%`: green — `oklch(0.696 0.17 142.5)`
+- `10–19%`: amber — `var(--chart-3)`
+- `< 10%` or negative: red/coral — `oklch(0.645 0.246 16.439)`
+
+**Single-mount animation pattern:** The ring animates once when the component mounts — never on parent re-renders. Achieved via `useAnimation` + `useEffect` with an empty dependency array (`[]`):
+
+```tsx
+const controls = useAnimation();
+useEffect(() => {
+  const timer = setTimeout(() => {
+    controls.start({
+      strokeDasharray: `${dash} ${circ - dash}`,
+      transition: { duration: 0.9, ease: [0.16, 1, 0.3, 1] },
+    });
+  }, 400);
+  return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []); // intentionally empty — animate once on mount only
+```
+
+**Rules:**
+- The `[]` dependency on the animation effect is intentional — the ring is a "snapshot display" of the current rate, not a live-updating gauge. If the ring must react to data changes, use explicit `key` prop rotation on the parent to force re-mount.
+- For a deficit (rate < 0): render the track ring only, show the negative label in red, suppress the filled segment entirely.
+
+### Collapsible with Framer Motion Height
+
+The pattern for smooth expand/collapse of a section that has variable or unknown height. Combines Radix `Collapsible` (for ARIA state and keyboard accessibility) with Framer Motion (for the height animation that Radix alone cannot provide smoothly).
+
+**Structure:**
+```tsx
+<Collapsible open={open} onOpenChange={setOpen}>
+  <CollapsibleTrigger asChild>
+    <div className="flex items-center justify-between cursor-pointer select-none px-5 py-4">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+        Section Title
+      </p>
+      <ChevronDown className={cn('h-3.5 w-3.5 transition-transform duration-200', open && 'rotate-180')} />
+    </div>
+  </CollapsibleTrigger>
+  <AnimatePresence initial={false}>
+    {open && (
+      <motion.div
+        key="content-key"
+        initial={{ height: 0, opacity: 0 }}
+        animate={{ height: 'auto', opacity: 1 }}
+        exit={{ height: 0, opacity: 0 }}
+        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+        style={{ overflow: 'hidden' }}
+      >
+        {/* content */}
+      </motion.div>
+    )}
+  </AnimatePresence>
+</Collapsible>
+```
+
+**Rules:**
+- `AnimatePresence initial={false}` — prevents the exit animation from playing on the first render (the section starts closed; no exit needed before it was ever opened).
+- `overflow: 'hidden'` on the `motion.div` (inline style, not className) — prevents content from visually overflowing during the height-0 phase.
+- `height: 'auto'` as the animate target works correctly with Framer Motion; no `maxHeight` hack needed.
+- The `ChevronDown rotate-180` transform should use `transition-transform duration-200` (CSS) not a Framer Motion variant — it's a decorative indicator, not a structural animation.
+- Collapsibles default to **closed** for secondary/optional content. Auto-open only when there is unsaved state or a first-use condition that justifies it.
+
+### Muted Sub-tile
+
+A tinted grid item used inside a collapsible or compact section to present multiple KPIs in a `grid-cols-2` or `grid-cols-4` layout. This is the only permitted departure from flat `divide-y` rows when a compact grid layout is needed.
+
+**Structure:**
+```tsx
+<div className="bg-muted rounded-xl p-3.5 border border-border">
+  <p className="text-[9.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-1.5">
+    Label
+  </p>
+  <p className="text-[16px] font-bold font-mono tabular-nums">Value</p>
+</div>
+```
+
+**Rules:**
+- Background is `bg-muted` (tinted, never `bg-card` — that would be a card-within-card violation).
+- Radius is `rounded-xl` (14px), one step smaller than the containing card's `rounded-2xl`.
+- Use only inside collapsible sections where the grid provides scan-order clarity. Do not use as a persistent visible element on the page.
+
+### Deferred Chart Mount (Performance Pattern)
+
+When heavy SVG charts (Recharts, custom SVG) would compete with a count-up animation on the same page, defer their mount until the animation completes.
+
+**Implementation:**
+1. The hero count-up component (`OverviewAnimatedCurrency`) accepts an `onSettled` callback that fires exactly once when `animated === value` (after the rAF loop ends).
+2. The page sets a `heroSettled` boolean when `onSettled` fires.
+3. The chart section watches `heroSettled` and schedules its own `chartRenderReady` state via `requestIdleCallback` (with `setTimeout(0)` fallback):
+
+```tsx
+useEffect(() => {
+  if (!heroSettled || chartRenderReady) return;
+  if (typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(() => setChartRenderReady(true), { timeout: 800 });
+  } else {
+    setTimeout(() => setChartRenderReady(true), 0);
+  }
+}, [heroSettled, chartRenderReady]);
+```
+
+4. Until `chartRenderReady`, the chart section renders a loading placeholder (`<Loader2 animate-spin>`).
+5. On mobile or with `prefers-reduced-motion`, skip the delay entirely (`chartRenderReady` starts `true`).
+
+**Count-up isolation:** The count-up `useCountUp` hook lives in a leaf `OverviewAnimatedCurrency` component — **not** in the page component. Each rAF tick only re-renders the tiny leaf span, not the entire page tree. This is non-negotiable: a count-up inside a page component will re-render every card on every frame.
+
+**Revealed-charts tracking:** Use a `Set<string>` (`revealedCharts`) to track which chart IDs have already completed their entrance animation. Pass `animateOnMount={!revealedCharts.has(id)}` to prevent Recharts from replaying entrance animations when tabs switch or data refreshes.
+
 ## 6. Do's and Don'ts
 
 ### Do:
@@ -362,6 +551,12 @@ A tab switcher for 2–4 mutually exclusive views within a section. Replaces `<S
 - **Do** use `oklch()` for all custom color definitions. This project is OKLCH-native; hex values in CSS are approximations of the canonical color.
 - **Do** let the five named themes handle personality. Resist adding theme-like color to the default palette.
 - **Do** use the view-transition circle reveal (`0.45s cubic-bezier(0.4, 0, 0.2, 1)`) for dark/light mode toggling. The origin coordinates are set inline from the click position.
+- **Do** use `requestIdleCallback` (with `setTimeout(0)` fallback) to schedule heavy SVG mount after a count-up animation settles. The `heroSettled + chartRenderReady` pattern prevents frame budget competition between animations and chart render.
+- **Do** isolate count-up animations in leaf components (`OverviewAnimatedCurrency`), not in the page component. Each rAF tick re-renders only the leaf, keeping the rest of the tree stable.
+- **Do** use `useAnimation + useEffect([])` (empty deps) for "animate once on mount" ring charts. This prevents the ring from restarting whenever a parent component re-renders due to unrelated state changes.
+- **Do** use `-mx-[N]px` negative margin (matching the card padding) to create edge-to-edge charts inside a card — `preserveAspectRatio="none"` on the SVG fills the broken-out container correctly.
+- **Do** use `desktop:grid-cols-[2fr_1fr]` for the primary hero+companion layout at the top of a page. The asymmetric ratio communicates hierarchy through space, not just typography.
+- **Do** use `border-t border-border/40 pt-4` for section separators within a page scroll flow. The 40% opacity is lighter than structural borders — it suggests chapter, not division.
 
 ### Don't:
 
@@ -379,3 +574,7 @@ A tab switcher for 2–4 mutually exclusive views within a section. Replaces `<S
 - **Don't** give equal visual weight to multiple values when one is the primary takeaway. Apply the Dominant Value Block: one number commands, the rest are context.
 - **Don't** use `lg:` (1024px) as a layout breakpoint for wide-screen changes. iPad Mini in landscape is 1024px and receives the mobile treatment by design. Use `desktop:` (1440px) for all layout switches.
 - **Don't** design the desktop version first and then adapt it for mobile. Mobile layout is the base; desktop adds columns, tables, and sidebar — it does not simplify a desktop original.
+- **Don't** use `bg-card` for sub-items nested inside a Card. Sub-tiles inside a card must use `bg-muted` — the card background repeated creates a card-within-card violation even when the inner element has no explicit `<Card>` wrapper.
+- **Don't** use a Recharts `<ResponsiveContainer>` in compact pie chart mode when the width is known. Pass `width` and `height` directly to `<PieChart>` to avoid the "width: -1" warning and prevent layout reflows during animation.
+- **Don't** place count-up animation logic (`useCountUp`, `rAF` loops) in a page-level component. Every frame tick re-renders the entire tree. Animation state belongs in a dedicated leaf component.
+- **Don't** render a ring or donut chart with `strokeLinecap="round"` when the segment can be near 0% or near 100% — the round caps visually overlap the track ring and distort the reading. Use `strokeLinecap="butt"` for data-accurate arcs.

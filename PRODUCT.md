@@ -22,7 +22,9 @@ I due riferimenti sono complementari: condividono dark mode premium, tipografia 
 
 **Visual tone**: Ultra-clean con personalità. Spazio intenzionale. Gerarchia tipografica netta. Dati che respirano. Animazioni che informano, non intrattengono.
 
-**Direzione**: Overdrive — implementazioni tecnicamente ambiziose che fanno alzare il sopracciglio. Fisica spring su dialog, scroll-driven reveals, counter animati, transizioni che sembrano impossibili per una web app.
+**Layout vocabulary**: La pagina Panoramica definisce il vocabolario di layout per tutte le pagine. Hero asimmetrico `[2fr_1fr]` in cima (numero dominante + contesto); riga bento secondaria `grid-cols-3` per KPI di pari peso; sezioni secondarie collassabili (Radix Collapsible + Framer Motion height:auto) per non sovraccaricare la fold; separatori `border-t border-border/40` tra capitoli. I grafici sono deferiti via `requestIdleCallback` fino al completamento dell'animazione hero, per non competere sul frame budget.
+
+**Direzione**: Overdrive — implementazioni tecnicamente ambiziose che fanno alzare il sopracciglio. Fisica spring su dialog, scroll-driven reveals, counter animati, sparkline edge-to-edge con gradiente, donut SVG animato con `motion.circle`, transizioni che sembrano impossibili per una web app.
 
 **Anti-riferimenti**: Bloomberg terminal (troppo freddo/denso), consumer fintech colorato alla Revolut (troppo leggero per dati seri), Material Design (troppo generico).
 
@@ -32,13 +34,13 @@ I due riferimenti sono complementari: condividono dark mode premium, tipografia 
 
 1. **Dati prima, chrome mai** — ogni elemento visivo guadagna il suo spazio comunicando un'informazione. Se togliendolo la pagina è più chiara, va tolto. Box decorative, progress bar estetiche, divisori ridondanti: fuori.
 
-2. **Il numero comanda** — il dato primario di ogni schermata occupa il massimo spazio fisico e visivo disponibile. Gerarchia Trade Republic: valore in `text-2xl font-bold font-mono` (o più grande), variazione come chip compatto inline, tutto il resto come label/metadato. L'utente capisce il numero più importante in meno di 2 secondi, senza cercare.
+2. **Il numero comanda** — il dato primario di ogni schermata occupa il massimo spazio fisico e visivo disponibile. Gerarchia Trade Republic: valore in `text-[44px] desktop:text-[54px] font-bold font-mono` per hero di pagina, `text-[36px]` per hero di sezione, `text-[22px]` per valori secondari accoppiati. Eyebrow label `text-[10px] uppercase tracking-[0.1em]` sopra il numero. Variazione come chip `text-[15px] font-semibold font-mono rounded-[9px] px-[13px] py-[6px]` sotto il numero. L'utente capisce il numero più importante in meno di 2 secondi, senza cercare.
 
 3. **Sezioni che respirano** — la densità è una feature, ma solo se leggibile. Padding generoso tra sezioni. Separatori `divide-y` invece di nested card. Liste piatte invece di griglie di box. Lo spazio bianco è strutturale, non decorativo.
 
 4. **Mobile-first, desktop-elevated** — il layout base è progettato per 390px. Il desktop aggiunge colonne, tabelle e sidebar — non è una versione semplificata di un layout desktop. Il breakpoint primario è `desktop:` (1440px). Mai `lg:` per layout wide-screen (iPad Mini in landscape = 1024px, trattato come mobile per design).
 
-5. **Movimento con intenzione** — le animazioni rivelano struttura e relazioni, non distraggono. Fisica spring come standard (stiffness 400, damping 35). Rispetta sempre `prefers-reduced-motion` via `useReducedMotion()`.
+5. **Movimento con intenzione** — le animazioni rivelano struttura e relazioni, non distraggono. Fisica spring come standard (stiffness 400, damping 35). Rispetta sempre `prefers-reduced-motion` via `useReducedMotion()`. Le animazioni di montaggio (count-up, ring chart, donut) si eseguono **una volta sola** alla prima visualizzazione — non si riavviano su ogni re-render del padre. Grafici pesanti vengono deferiti via `requestIdleCallback` per non competere con l'animazione hero.
 
 6. **Fiducia attraverso la precisione** — font monospaziato per valori (`font-mono` + `tnum`), allineamento decimale, consistenza nei formati. Il dato deve sembrare assolutamente affidabile.
 
