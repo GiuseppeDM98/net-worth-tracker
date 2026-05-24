@@ -10,12 +10,18 @@ interface PieChartProps {
   data: PieChartData[];
   animateOnMount?: boolean;
   onFirstRender?: () => void;
+  /**
+   * compact=true: small fixed-height donut with no internal labels or legend.
+   * Used by OverviewChartsSection which supplies its own custom legend.
+   */
+  compact?: boolean;
 }
 
 export function PieChart({
   data,
   animateOnMount = true,
   onFirstRender,
+  compact = false,
 }: PieChartProps) {
   // Detect mobile screen for responsive sizing
   const isMobile = useMediaQuery('(max-width: 768px)');
@@ -53,7 +59,56 @@ export function PieChart({
     return () => cancelAnimationFrame(frameId);
   }, [animateOnMount, prefersReducedMotion]);
 
-  // Responsive configuration
+  // compact mode: no internal labels/legend, small fixed size.
+  // Used by OverviewChartsSection which renders its own custom legend.
+  if (compact) {
+    return (
+      <ResponsiveContainer width="100%" height="100%">
+        <RechartsPC>
+          <Pie
+            data={sortedData as any}
+            cx="50%"
+            cy="50%"
+            labelLine={false}
+            label={false}
+            outerRadius={72}
+            fill="#8884d8"
+            dataKey="value"
+            isAnimationActive={isAnimationActive}
+            animationBegin={0}
+            animationDuration={600}
+            animationEasing="ease-out"
+          >
+            {sortedData.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={entry.color} />
+            ))}
+          </Pie>
+          <Tooltip
+            content={({ active, payload }) => {
+              if (!active || !payload || !payload.length) return null;
+              const entry = payload[0];
+              const color = (entry.payload as any)?.color ?? entry.color;
+              return (
+                <div style={{
+                  backgroundColor: 'var(--card)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '4px',
+                  padding: '6px 10px',
+                  fontSize: '13px',
+                }}>
+                  <span style={{ color }}>
+                    {entry.name}: {(entry.payload as any)?.percentage?.toFixed(1)}%
+                  </span>
+                </div>
+              );
+            }}
+          />
+        </RechartsPC>
+      </ResponsiveContainer>
+    );
+  }
+
+  // Responsive configuration for full-size mode
   const chartConfig = {
     height: isMobile ? 350 : 500,
     outerRadius: isMobile ? 90 : 140,

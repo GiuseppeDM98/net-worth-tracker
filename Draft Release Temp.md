@@ -32,6 +32,10 @@
 
 ## 🔧 Improvements
 
+- Redesigned the **Overview (Panoramica)** page with an asymmetric bento layout: the portfolio total is now displayed in a larger dominant typeface; the Patrimonio Liquido card shows an animated two-color donut chart (liquid vs illiquid split with a percentage label in the center, color-coded by your active theme); cashflow on desktop shows the savings ring alongside income and expenses side by side with month-over-month delta percentages; expanding the Fiscal Detail or the Liquid card detail now animates smoothly (height slides open) instead of snapping open instantly
+- The **Portfolio Composition** section on the Overview page now shows two focused charts (Asset Class and Per Asset) instead of three — the Liquidity chart has been removed since the same information is now shown directly in the Patrimonio Liquido hero card. Each chart legend now only shows slices that represent 5% or more of the portfolio, reducing visual noise for diversified portfolios
+- Fixed the composition chart legends showing raw euro values with a `%` sign (e.g. "164853.40%") — percentages now display correctly (e.g. "57.5%")
+
 - Redesigned the **Settings (Impostazioni)** page with a cleaner, Trade Republic-inspired layout: the Allocation tab now opens with a large bold hero metric showing the total percentage allocated across all asset classes — replacing the previous unlabelled percentage counter buried in a card header. The six individual asset-class cards (Equity, Bonds, Real Estate, Crypto, Commodities, Cash) are now a single unified flat list — each row shows the asset class name, current target, and an expand button; sub-categories expand inline below their row without opening a separate nested card. The Profile section fields are now arranged as labeled rows instead of a disconnected grid
 - Settings tab navigation on mobile and tablet now uses a **segmented pill control** — all five tabs (Allocazione, Preferenze, Spese, Dividendi, Aspetto) are visible at a glance with a smooth spring animation between them, replacing the previous dropdown that required two taps and hid the other options
 - Deleting an expense category with no linked transactions and syncing dividends now use **inline two-tap confirmation** — first tap arms the button, second tap executes (auto-disarms after 3 seconds), replacing the browser's native blocking dialog that interrupted the flow and could not be styled
@@ -149,6 +153,9 @@
 - Redesigned the mobile bottom navigation as a centered floating pill bar with rounded corners and a smoother active-tab transition — replacing the previous full-width fixed bar
 
 ## 🐛 Bug Fixes
+
+- Fixed the savings ring chart on the Overview page restarting its animation every time the Fiscal Detail or Patrimonio Liquido sections were expanded or collapsed — the ring now animates exactly once on page load and stays still afterward
+- Fixed the composition charts on the Overview page showing two legends at the same time (one inside the chart, one alongside it) — now only one legend is shown per chart
 
 - Fixed the Allocation tab in Settings expanding the Equity section by default — all asset-class rows now start collapsed, reducing visual noise when opening the tab
 - Fixed expanding or collapsing an asset-class row in Settings triggering the "Anteprima attiva: modifiche non salvate" indicator — the open/close state of a row is now correctly treated as a visual preference and no longer treated as an unsaved setting change

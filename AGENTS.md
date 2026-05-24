@@ -497,6 +497,27 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 ### Async Tab Count: boolean | null Pattern
 - Tab count depends on async settings: init `useState<boolean | null>(null)`. While `null`, render a `h-10 animate-pulse rounded-md bg-muted` placeholder to hold space. Mount real `TabsList` only after settings arrive — avoids a visible column-count reflow flash.
 
+### Components Defined Inside Render — Remount Anti-Pattern
+- **Symptom A**: `AnimatePresence initial={false}` enter animation appears instant (never plays). The setup looks correct — the pattern is fine — but it always looks like a fresh mount with no prior state.
+- **Symptom B**: `useEffect` with empty deps `[]` fires on every parent state change (e.g. expanding an unrelated collapsible), not just on true mount.
+- **Root cause**: defining `const Foo = () => {...}` inside another component's render body creates a new function reference on every call. React uses the function reference as the component type key. When the type changes each render, React fully unmounts the old instance and mounts a new one — even if the rendered output looks identical. Result: `AnimatePresence initial={false}` on a freshly-mounted `AnimatePresence` sees its child already present and skips the enter animation; `useEffect([])` fires because it IS a true new mount.
+- **Fix**: never define components inside a render function. Two options: (1) move to module level and pass parent state as explicit props; (2) inline the JSX directly in the return using IIFEs for local variable scoping (`{overview?.expenseStats && (() => { const { income } = ...; return (<div>...); })()} `).
+- **Related AGENTS note**: "React Compiler: components must be at module level" covers the React Compiler-specific error. This pattern causes silent remounting even without the Compiler.
+- Applied in `app/dashboard/page.tsx`: `FiscalSection`, `CashflowCard`, `VariationBlocks` converted to inline JSX; fiscalItems pre-computed via `useMemo` before the loading early return.
+
+### All Hooks Must Precede Conditional Early Returns
+- **Symptom**: `Uncaught Error: Rendered more hooks than during the previous render` at the first `useMemo`/`useEffect`/`useState` call placed after an `if (loading) return (...)`.
+- **Rule**: React hooks must be called in the same order on every render. An early return causes renders that hit the guard to skip every hook below it — React detects the count mismatch and throws.
+- **Fix**: move ALL hook calls (including "derived data" `useMemo`s that feel close to their usage) above any `if (...) return` guard. Use optional chaining inside the hook body to handle undefined data: `useMemo(() => { if (!overview?.metrics) return []; ... }, [overview])`.
+- Applied in `app/dashboard/page.tsx`: `fiscalItems` useMemo initially placed after `if (loading) return (...)` — moved to the derived metrics section above it.
+
+### Recharts ResponsiveContainer inside Flex Row with Sibling Legend
+- **Symptom**: the chart takes all available space, squishing the sibling legend column to near-zero width; or the chart reports width/height of `-1` and renders a flat line.
+- **Root cause**: `<ResponsiveContainer width="100%">` measures its parent's width. Inside a `flex` row, the parent is a flex item without an explicit width — the flex algorithm doesn't resolve it before `ResizeObserver` fires, so the container gets zero or the full width.
+- **Fix**: wrap the chart component in a fixed-size `div` (`style={{ width: 160, height: 160, flexShrink: 0 }}`). `ResponsiveContainer` then measures that fixed parent unambiguously. The sibling legend takes the remaining `flex-1` space.
+- **Double-legend corollary**: if the embedded chart has an internal `<Legend>` and the parent renders a second custom legend, suppress the chart's internal one (`compact` prop, or `showLegend={false}`). Two legends is always a bug — one from Recharts SVG, one from the parent JSX.
+- Applied in `OverviewChartsSection.tsx`: `compact` prop added to `PieChart`; pie wrapped in `style={{ width: 160/150, height: 160/150 }}` div.
+
 ### `getAvailablePercentage` with `excludeGoalId` — double-counting trap
 - `getAvailablePercentage(assetId, assignments, excludeGoalId)` returns `100 - sum(other goals)`, effectively the **total cap** a goal can hold (free pool + its own existing allocation, since its own is excluded from the sum).
 - **Do NOT add `existingAssignment` on top**: `maxAllowedPct = available + existingAssignment.percentage` double-counts. If Giulia has 50% and Isabella has 50%, `available=50` (excludes Isabella) + `existingAssignment=50` = 100% — lets Isabella increase to 100%, putting total at 150%.

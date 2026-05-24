@@ -287,15 +287,18 @@ function buildLiveOverviewPayload(
       hasStampDuty: !!(settings?.stampDutyEnabled && annualStampDuty > 0),
       currentMonthSnapshotExists: !!currentMonthSnapshot,
     },
-    // Last 3 historical snapshots + current live value for the hero sparkline.
+    // Up to 40 historical snapshots + current live value for the hero sparkline.
+    // 40 covers the 3A period selector (36 months) plus a baseline point.
     // The current-month snapshot (if it exists) is excluded because totalValue
     // already reflects the live state and avoids duplicating the last point.
     // Appending totalValue ensures the line always ends at today's actual net worth,
     // not at the previous month's snapshot (which would lag by weeks mid-month).
+    // Each point is tiny ({month, year, totalNetWorth}) so expanding from 11→40 is
+    // negligible on payload size.
     sparklineData: [
       ...snapshots
         .filter((s) => !(s.year === currentYear && s.month === currentMonth))
-        .slice(-11)
+        .slice(-40)
         .map((s) => ({ month: s.month, year: s.year, totalNetWorth: s.totalNetWorth })),
       { month: currentMonth, year: currentYear, totalNetWorth: totalValue },
     ],
