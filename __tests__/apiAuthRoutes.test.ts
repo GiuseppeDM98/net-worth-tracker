@@ -145,13 +145,26 @@ vi.mock('@/lib/helpers/priceUpdater', () => ({
   updateUserAssetPrices: updateUserAssetPricesMock,
 }));
 
-vi.mock('@/lib/services/assetService', () => ({
-  calculateAssetValue: vi.fn((asset: any) => asset.quantity * asset.currentPrice),
-  calculateTotalValue: vi.fn(() => 1000),
-  calculateLiquidNetWorth: vi.fn(() => 700),
-  calculateIlliquidNetWorth: vi.fn(() => 300),
-  calculateFIRENetWorth: vi.fn(() => 900),
-}));
+// Use importOriginal so any new exports from assetService are included automatically.
+// Only override the functions whose return values matter for the route tests.
+vi.mock('@/lib/services/assetService', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/services/assetService')>();
+  return {
+    ...actual,
+    calculateAssetValue: vi.fn((asset: any) => asset.quantity * asset.currentPrice),
+    calculateTotalValue: vi.fn(() => 1000),
+    calculateLiquidNetWorth: vi.fn(() => 700),
+    calculateIlliquidNetWorth: vi.fn(() => 300),
+    calculateFIRENetWorth: vi.fn(() => 900),
+    calculateTotalEstimatedTaxes: vi.fn(() => 0),
+    calculateLiquidEstimatedTaxes: vi.fn(() => 0),
+    calculateNetTotal: vi.fn(() => 1000),
+    calculateTotalUnrealizedGains: vi.fn(() => 0),
+    calculatePortfolioWeightedTER: vi.fn(() => 0),
+    calculateAnnualPortfolioCost: vi.fn(() => 0),
+    calculateStampDuty: vi.fn(() => 0),
+  };
+});
 
 vi.mock('@/lib/utils/dateHelpers', async () => {
   const actual = await vi.importActual<typeof import('@/lib/utils/dateHelpers')>('@/lib/utils/dateHelpers');
@@ -334,7 +347,7 @@ describe('Private API route auth', () => {
         },
         updatedAt: new Date(),
         computedAt: new Date(),
-        sourceVersion: 1,
+        sourceVersion: 3, // must match DASHBOARD_OVERVIEW_SOURCE_VERSION in dashboardOverviewConstants.ts
         invalidatedAt: null,
       }),
     });
@@ -354,7 +367,7 @@ describe('Private API route auth', () => {
       },
       freshness: {
         source: 'materialized_summary',
-        sourceVersion: 1,
+        sourceVersion: 3, // must match DASHBOARD_OVERVIEW_SOURCE_VERSION in dashboardOverviewConstants.ts
         stale: false,
       },
     });

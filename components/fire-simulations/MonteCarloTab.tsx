@@ -10,14 +10,12 @@
  * Each simulation uses random sampling from normal distributions defined by return/volatility params.
  * Success rate = % of simulations where portfolio doesn't run out before retirement ends.
  *
- * Supports 4 asset classes (equity, bonds, real estate, commodities) and two modes:
- * - Single Simulation: one set of market parameters, full results
+ * Supports two modes:
+ * - Single Simulation: one set of market parameters, full fan chart + distribution
  * - Scenario Comparison: Bear/Base/Bull scenarios run in parallel for side-by-side comparison
- *
- * @returns Tab component with parameter form, simulation button, and results visualization
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -29,19 +27,38 @@ import {
   getDefaultMonteCarloScenarios,
   buildParamsFromScenario,
 } from '@/lib/services/monteCarloService';
-import { formatCurrencyCompact } from '@/lib/services/chartService';
+import { formatCurrency, formatCurrencyCompact, formatPercentage } from '@/lib/services/chartService';
 import { MonteCarloParams, MonteCarloResults, MonteCarloScenarios } from '@/types/assets';
 import { toast } from 'sonner';
-import { Dices, Loader2 } from 'lucide-react';
+import { Dices, Loader2, ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useCountUp } from '@/lib/utils/useCountUp';
 import { MonteCarloSkeleton } from '@/components/fire-simulations/MonteCarloSkeleton';
 import { SimulationChart } from '@/components/monte-carlo/SimulationChart';
-import { SuccessRateCard } from '@/components/monte-carlo/SuccessRateCard';
 import { ParametersForm } from '@/components/monte-carlo/ParametersForm';
 import { DistributionChart } from '@/components/monte-carlo/DistributionChart';
 import { ScenarioParameterCards } from '@/components/monte-carlo/ScenarioParameterCards';
 import { ScenarioComparisonResults } from '@/components/monte-carlo/ScenarioComparisonResults';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { chartReveal, simulationShellSettle } from '@/lib/utils/motionVariants';
+
+// ===== Module-level pure helpers =====
+
+function getSuccessLabel(rate: number): string {
+  if (rate >= 95) return 'Eccellente';
+  if (rate >= 90) return 'Molto buono';
+  if (rate >= 80) return 'Buono';
+  if (rate >= 70) return 'Moderato';
+  return 'Attenzione';
+}
+
+function getSuccessLabelColor(rate: number): string {
+  if (rate >= 90) return 'text-green-600 dark:text-green-400 border-green-200 dark:border-green-800';
+  if (rate >= 80) return 'text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800';
+  return 'text-destructive border-destructive/30';
+}
 
 export function MonteCarloTab() {
   // ========== State and Data Fetching ==========
@@ -55,7 +72,6 @@ export function MonteCarloTab() {
   const [scenarioRunVersion, setScenarioRunVersion] = useState(0);
   const [resultsAnimationState, setResultsAnimationState] = useState<'idle' | 'settle'>('idle');
 
-  // Scenario mode state
   const [scenarioMode, setScenarioMode] = useState(false);
   const [scenarios, setScenarios] = useState<MonteCarloScenarios>(getDefaultMonteCarloScenarios());
   const [scenarioResults, setScenarioResults] = useState<{
@@ -69,7 +85,6 @@ export function MonteCarloTab() {
       setResultsAnimationState('idle');
       return;
     }
-
     const version = scenarioMode ? scenarioRunVersion : singleRunVersion;
     if (version === 0) return;
 
@@ -78,28 +93,37 @@ export function MonteCarloTab() {
     return () => window.clearTimeout(timer);
   }, [reducedMotion, scenarioMode, scenarioRunVersion, singleRunVersion]);
 
+  // ===== Hero count-up animations =====
+  // Both hooks must be called unconditionally; active one selected at render time
+  const animatedSingleRate = useCountUp(results?.successRate ?? null, {
+    fromPrevious: true,
+    once: true,
+    duration: 520,
+  });
+  const animatedScenarioRate = useCountUp(scenarioResults?.base.successRate ?? null, {
+    fromPrevious: true,
+    once: true,
+    duration: 520,
+  });
+
   /**
    * React Query Integration: Both queries run in parallel and are cached for 5 minutes.
-   * This prevents redundant API calls when switching between tabs or re-rendering.
    */
-
-  // Fetch assets data (will be cached)
   const { data: assets, isLoading: isLoadingAssets } = useQuery({
     queryKey: ['assets', user?.uid],
     queryFn: () => getAllAssets(user!.uid),
     enabled: !!user,
-    staleTime: 300000, // 5 minutes
+    staleTime: 300000,
   });
 
-  // Fetch settings data (will be cached)
   const { data: settings, isLoading: isLoadingSettings } = useQuery({
     queryKey: ['settings', user?.uid],
     queryFn: () => getSettings(user!.uid),
     enabled: !!user,
-    staleTime: 300000, // 5 minutes
+    staleTime: 300000,
   });
 
-  // Derived data calculations
+  // Derived data
   const totalNetWorth = assets ? calculateTotalValue(assets) : 0;
   const liquidNetWorth = assets ? calculateLiquidNetWorth(assets) : 0;
 
@@ -142,15 +166,12 @@ export function MonteCarloTab() {
   useEffect(() => {
     if (totalNetWorth > 0) {
       setParams((prev) => {
-        const updates: Partial<MonteCarloParams> = {
-          initialPortfolio: totalNetWorth,
-        };
+        const updates: Partial<MonteCarloParams> = { initialPortfolio: totalNetWorth };
 
         if (settings) {
           updates.annualWithdrawal = settings.plannedAnnualExpenses || 30000;
         }
 
-        // Derive allocation from real portfolio, filtering to the 4 MC classes
         if (assets && assets.length > 0) {
           const { byAssetClass } = calculateCurrentAllocation(assets);
           const equity = byAssetClass['equity'] || 0;
@@ -160,7 +181,7 @@ export function MonteCarloTab() {
           const total = equity + bonds + realEstate + commodities;
 
           if (total > 0) {
-            // Sort by value descending so rounding residual goes to smallest class
+            // Sort descending so rounding residual goes to the smallest class
             const classes = [
               { key: 'equityPercentage' as const, value: equity },
               { key: 'bondsPercentage' as const, value: bonds },
@@ -168,7 +189,6 @@ export function MonteCarloTab() {
               { key: 'commoditiesPercentage' as const, value: commodities },
             ].sort((a, b) => b.value - a.value);
 
-            // Round first 3, compute last as remainder to guarantee sum = 100
             let allocated = 0;
             for (let i = 0; i < classes.length - 1; i++) {
               const pct = Math.round((classes[i].value / total) * 100);
@@ -220,10 +240,11 @@ export function MonteCarloTab() {
       toast.error('Inserisci un prelievo annuale valido');
       return false;
     }
-
-    // All 4 asset classes must sum to 100%
-    const allocationSum = params.equityPercentage + params.bondsPercentage +
-      params.realEstatePercentage + params.commoditiesPercentage;
+    const allocationSum =
+      params.equityPercentage +
+      params.bondsPercentage +
+      params.realEstatePercentage +
+      params.commoditiesPercentage;
     if (Math.abs(allocationSum - 100) > 0.01) {
       toast.error('La somma delle allocazioni deve essere 100%');
       return false;
@@ -239,20 +260,18 @@ export function MonteCarloTab() {
 
   const handleRunSimulation = () => {
     if (!validateParams()) return;
-
     setIsRunning(true);
-    toast.info('Esecuzione simulazione in corso...');
 
     /**
      * Why setTimeout with 100ms delay?
-     * Monte Carlo simulation is CPU-intensive and blocks the main thread.
+     * Monte Carlo is CPU-intensive and blocks the main thread.
      * The delay lets the browser render the "running" state before computation starts.
      */
     setTimeout(() => {
       try {
         const simulationResults = runMonteCarloSimulation(params);
         setResults(simulationResults);
-        setSingleRunVersion((current) => current + 1);
+        setSingleRunVersion((v) => v + 1);
         toast.success(`Simulazione completata! Tasso di successo: ${simulationResults.successRate.toFixed(1)}%`);
       } catch (error) {
         console.error('Error running simulation:', error);
@@ -265,22 +284,15 @@ export function MonteCarloTab() {
 
   const handleRunScenarioSimulation = () => {
     if (!validateParams()) return;
-
     setIsRunning(true);
-    toast.info('Esecuzione 3 scenari in corso...');
 
     setTimeout(() => {
       try {
-        const bearParams = buildParamsFromScenario(params, scenarios.bear);
-        const baseParams = buildParamsFromScenario(params, scenarios.base);
-        const bullParams = buildParamsFromScenario(params, scenarios.bull);
-
-        const bearResults = runMonteCarloSimulation(bearParams);
-        const baseResults = runMonteCarloSimulation(baseParams);
-        const bullResults = runMonteCarloSimulation(bullParams);
-
+        const bearResults = runMonteCarloSimulation(buildParamsFromScenario(params, scenarios.bear));
+        const baseResults = runMonteCarloSimulation(buildParamsFromScenario(params, scenarios.base));
+        const bullResults = runMonteCarloSimulation(buildParamsFromScenario(params, scenarios.bull));
         setScenarioResults({ bear: bearResults, base: baseResults, bull: bullResults });
-        setScenarioRunVersion((current) => current + 1);
+        setScenarioRunVersion((v) => v + 1);
         toast.success('Simulazione scenari completata!');
       } catch (error) {
         console.error('Error running scenario simulation:', error);
@@ -291,80 +303,107 @@ export function MonteCarloTab() {
     }, 100);
   };
 
+  // ========== Derived flags (must be before early return to avoid hooks ordering issues) =====
+
+  const hasVisibleResults =
+    (!scenarioMode && !!results) || (scenarioMode && !!scenarioResults);
+
+  // Active hero value depends on mode
+  const heroAnimatedRate = scenarioMode ? animatedScenarioRate : animatedSingleRate;
+  const heroHasResult = scenarioMode ? !!scenarioResults : !!results;
+
   // ========== Render ==========
 
   if (isLoadingAssets || isLoadingSettings) {
     return <MonteCarloSkeleton />;
   }
 
-  const hasVisibleResults = useMemo(
-    () => (!scenarioMode && !!results) || (scenarioMode && !!scenarioResults),
-    [results, scenarioMode, scenarioResults]
-  );
-
   return (
-    <div className="space-y-6">
-      {/* ========== Information Card ========== */}
-      <Card className="bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200 dark:from-purple-950/30 dark:to-blue-950/30 dark:border-purple-800">
-        <CardHeader>
-          <CardTitle className="text-lg">Come Funzionano le Simulazioni</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          <div>
-            <p className="font-semibold mb-1">Parametri di Mercato</p>
-            <ul className="list-disc list-inside space-y-1 text-gray-700 dark:text-gray-300 ml-2">
-              <li>
-                <strong>4 Asset Class:</strong> Equity, Bonds, Immobili e Materie Prime con
-                rendimenti e volatilità personalizzabili
-              </li>
-              <li>
-                <strong>Scenari:</strong> Confronta scenari Orso/Base/Toro con parametri
-                diversi per ogni asset class
-              </li>
-            </ul>
+    <div className="space-y-6 max-desktop:portrait:pb-20">
+      {/* ========== 1. Hero Block — Tasso di Successo ========== */}
+      <Card className="overflow-hidden">
+        <div className="px-6 py-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1 space-y-1">
+              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/70">
+                {scenarioMode ? 'Probabilità di Successo (Scenario Base)' : 'Probabilità di Successo'}
+              </p>
+              <p
+                className={cn(
+                  'font-mono text-4xl font-bold tabular-nums leading-none tracking-tight',
+                  heroHasResult ? 'text-foreground' : 'text-muted-foreground/30'
+                )}
+                aria-label={
+                  heroHasResult && heroAnimatedRate !== null
+                    ? `Probabilità di successo: ${heroAnimatedRate.toFixed(1)}%`
+                    : 'Nessuna simulazione eseguita'
+                }
+              >
+                {heroHasResult && heroAnimatedRate !== null
+                  ? formatPercentage(heroAnimatedRate)
+                  : '--'}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {heroHasResult
+                  ? scenarioMode
+                    ? `${scenarioResults!.base.successCount.toLocaleString('it-IT')} / ${params.numberOfSimulations.toLocaleString('it-IT')} simulazioni riuscite`
+                    : `${results!.successCount.toLocaleString('it-IT')} / ${params.numberOfSimulations.toLocaleString('it-IT')} simulazioni riuscite`
+                  : 'Configura i parametri ed esegui la simulazione'}
+              </p>
+            </div>
+            {heroHasResult && heroAnimatedRate !== null && (
+              <Badge
+                variant="outline"
+                className={cn('mt-1 shrink-0 text-xs', getSuccessLabelColor(heroAnimatedRate))}
+              >
+                {getSuccessLabel(heroAnimatedRate)}
+              </Badge>
+            )}
           </div>
-          <div>
-            <p className="font-semibold mb-1">Interpretazione Risultati</p>
-            <ul className="list-disc list-inside space-y-1 text-gray-700 dark:text-gray-300 ml-2">
-              <li>
-                <strong>Tasso di Successo:</strong> % di simulazioni dove il patrimonio
-                dura almeno N anni
-              </li>
-              <li>
-                <strong>&gt;90%:</strong> Piano molto sicuro | <strong>80-90%:</strong> Rischio moderato | <strong>&lt;80%:</strong> Considera aggiustamenti
-              </li>
-            </ul>
+        </div>
+        {/* Median final value flat row — only in single mode */}
+        {!scenarioMode && results && results.medianFinalValue > 0 && (
+          <div className="flex items-center justify-between px-6 py-3.5 border-t border-border">
+            <span className="text-sm text-muted-foreground">Valore mediano (sim. riuscite)</span>
+            <span className="text-sm font-semibold font-mono">
+              {formatCurrency(results.medianFinalValue)}
+            </span>
           </div>
-        </CardContent>
+        )}
       </Card>
 
-      {/* ========== Mode Toggle ========== */}
+      {/* ========== 2. Mode Toggle ========== */}
       <div className="flex items-center justify-center">
-        <div className="inline-flex rounded-lg border bg-muted p-1">
-          <button
-            onClick={() => setScenarioMode(false)}
-            className={`px-3 py-1.5 sm:px-4 sm:py-2 text-sm font-medium rounded-md transition-colors ${
-              !scenarioMode
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Simulazione Singola
-          </button>
-          <button
-            onClick={() => setScenarioMode(true)}
-            className={`px-3 py-1.5 sm:px-4 sm:py-2 text-sm font-medium rounded-md transition-colors ${
-              scenarioMode
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Confronto Scenari
-          </button>
+        <div role="tablist" className="inline-flex rounded-lg border bg-muted p-1 gap-0.5">
+          {[
+            { id: 'single', label: 'Simulazione Singola', active: !scenarioMode },
+            { id: 'scenario', label: 'Confronto Scenari', active: scenarioMode },
+          ].map(({ id, label, active }) => (
+            <button
+              key={id}
+              role="tab"
+              type="button"
+              aria-selected={active}
+              onClick={() => setScenarioMode(id === 'scenario')}
+              className={cn(
+                'relative px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+                active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {active && (
+                <motion.div
+                  layoutId="montecarlo-mode-pill"
+                  className="absolute inset-0 rounded-md bg-background shadow-sm"
+                  transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+                />
+              )}
+              <span className="relative z-10">{label}</span>
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Parameters Form — hides market params in scenario mode */}
+      {/* ========== 3. Parameters Form ========== */}
       <ParametersForm
         params={params}
         onParamsChange={setParams}
@@ -375,7 +414,7 @@ export function MonteCarloTab() {
         hideMarketParams={scenarioMode}
       />
 
-      {/* ========== Scenario Parameter Cards (only in scenario mode) ========== */}
+      {/* ========== 4. Scenario Parameter Cards (scenario mode only) ========== */}
       {scenarioMode && (
         <ScenarioParameterCards
           scenarios={scenarios}
@@ -386,18 +425,20 @@ export function MonteCarloTab() {
         />
       )}
 
+      {/* ========== Ricalcolo in corso banner ========== */}
       {isRunning && hasVisibleResults && (
         <Card className="border-border bg-muted/40">
           <CardContent className="flex items-center gap-3 py-4 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="h-4 w-4 animate-spin shrink-0" />
             <span>
-              Ricalcolo in corso. Manteniamo visibile l&apos;ultima simulazione valida finche&apos; il nuovo scenario non si assesta.
+              Ricalcolo in corso. Manteniamo visibile l&apos;ultima simulazione valida finché
+              il nuovo scenario non si assesta.
             </span>
           </CardContent>
         </Card>
       )}
 
-      {/* ========== Single Mode Results ========== */}
+      {/* ========== 5. Single Mode Results ========== */}
       {!scenarioMode && results && (
         <motion.div
           className="space-y-6"
@@ -405,17 +446,12 @@ export function MonteCarloTab() {
           initial={false}
           animate={resultsAnimationState}
         >
-          {/* Success Rate Card */}
-          <SuccessRateCard
-            successRate={results.successRate}
-            successCount={results.successCount}
-            totalSimulations={params.numberOfSimulations}
-            retirementYears={params.retirementYears}
-            medianFinalValue={results.medianFinalValue}
-          />
-
-          {/* Simulation Chart (Fan Chart) */}
-          <motion.div variants={chartReveal} initial={reducedMotion ? false : 'hidden'} animate="visible">
+          {/* Fan Chart */}
+          <motion.div
+            variants={chartReveal}
+            initial={reducedMotion ? false : 'hidden'}
+            animate="visible"
+          >
             <SimulationChart
               data={results.percentiles}
               retirementYears={params.retirementYears}
@@ -424,7 +460,11 @@ export function MonteCarloTab() {
           </motion.div>
 
           {/* Distribution Chart */}
-          <motion.div variants={chartReveal} initial={reducedMotion ? false : 'hidden'} animate="visible">
+          <motion.div
+            variants={chartReveal}
+            initial={reducedMotion ? false : 'hidden'}
+            animate="visible"
+          >
             <DistributionChart
               data={results.distribution}
               retirementYears={params.retirementYears}
@@ -432,30 +472,37 @@ export function MonteCarloTab() {
             />
           </motion.div>
 
-          {/* Failure Analysis (if applicable) */}
+          {/* Failure Analysis — only when there are failures */}
           {results.failureAnalysis && (
-            <Card className="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800">
+            <Card
+              className="overflow-hidden"
+              style={{
+                borderColor: 'color-mix(in srgb, var(--destructive) 35%, transparent)',
+                background: 'color-mix(in srgb, var(--destructive) 6%, transparent)',
+              }}
+            >
               <CardHeader>
-                <CardTitle className="text-red-900 dark:text-red-200">Analisi Fallimenti</CardTitle>
+                <CardTitle style={{ color: 'var(--destructive)' }}>Analisi Fallimenti</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4 desktop:grid-cols-2">
                   <div>
-                    <p className="text-sm text-red-700 dark:text-red-300 mb-1">Anno Medio di Fallimento</p>
-                    <p className="text-2xl font-bold text-red-900 dark:text-red-200">
+                    <p className="text-sm text-muted-foreground mb-1">Anno Medio di Fallimento</p>
+                    <p className="text-2xl font-bold font-mono">
                       Anno {Math.round(results.failureAnalysis.averageFailureYear)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-red-700 dark:text-red-300 mb-1">Anno Mediano di Fallimento</p>
-                    <p className="text-2xl font-bold text-red-900 dark:text-red-200">
+                    <p className="text-sm text-muted-foreground mb-1">Anno Mediano di Fallimento</p>
+                    <p className="text-2xl font-bold font-mono">
                       Anno {results.failureAnalysis.medianFailureYear}
                     </p>
                   </div>
                 </div>
-                <p className="mt-4 text-sm text-red-800 dark:text-red-300">
-                  In {results.failureCount} simulazioni ({(results.failureCount / params.numberOfSimulations * 100).toFixed(1)}%)
-                  il patrimonio si è esaurito prima di raggiungere {params.retirementYears} anni.
+                <p className="mt-4 text-sm text-muted-foreground">
+                  In {results.failureCount} simulazioni (
+                  {((results.failureCount / params.numberOfSimulations) * 100).toFixed(1)}%) il
+                  patrimonio si è esaurito prima di raggiungere {params.retirementYears} anni.
                 </p>
               </CardContent>
             </Card>
@@ -470,32 +517,32 @@ export function MonteCarloTab() {
               </p>
             </CardHeader>
             <CardContent>
-              {/* Mobile/tablet: card view — one card per row */}
+              {/* Mobile: card view — one card per year */}
               <div className="desktop:hidden space-y-2">
                 {results.percentiles
                   .filter((_, index) => index % 5 === 0)
                   .map((p) => (
-                    <div key={p.year} className="rounded-lg border bg-gray-50/50 p-3">
+                    <div key={p.year} className="rounded-lg border bg-muted/30 p-3">
                       <p className="font-semibold text-sm mb-2">Anno {p.year}</p>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                         <div className="flex justify-between">
-                          <span className="text-gray-500">10° %ile</span>
+                          <span className="text-muted-foreground">10° %ile</span>
                           <span>{formatCurrencyCompact(p.p10)}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-gray-500">25° %ile</span>
+                          <span className="text-muted-foreground">25° %ile</span>
                           <span>{formatCurrencyCompact(p.p25)}</span>
                         </div>
                         <div className="flex justify-between font-bold">
-                          <span className="text-gray-500">Mediana</span>
+                          <span className="text-muted-foreground">Mediana</span>
                           <span>{formatCurrencyCompact(p.p50)}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-gray-500">75° %ile</span>
+                          <span className="text-muted-foreground">75° %ile</span>
                           <span>{formatCurrencyCompact(p.p75)}</span>
                         </div>
                         <div className="flex justify-between col-span-2">
-                          <span className="text-gray-500">90° %ile</span>
+                          <span className="text-muted-foreground">90° %ile</span>
                           <span>{formatCurrencyCompact(p.p90)}</span>
                         </div>
                       </div>
@@ -537,7 +584,7 @@ export function MonteCarloTab() {
         </motion.div>
       )}
 
-      {/* ========== Scenario Mode Results ========== */}
+      {/* ========== 6. Scenario Mode Results ========== */}
       {scenarioMode && scenarioResults && (
         <ScenarioComparisonResults
           bear={scenarioResults.bear}
@@ -549,18 +596,72 @@ export function MonteCarloTab() {
         />
       )}
 
-      {/* Empty State */}
+      {/* ========== Empty State ========== */}
       {((!scenarioMode && !results) || (scenarioMode && !scenarioResults)) && !isRunning && (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <Dices className="h-16 w-16 text-gray-400 mb-4" />
-            <p className="text-gray-600 text-center">
+            <Dices className="h-16 w-16 text-muted-foreground mb-4" />
+            <p className="text-muted-foreground text-center">
               Configura i parametri sopra e clicca su &quot;Esegui Simulazione&quot; per
               vedere i risultati
             </p>
           </CardContent>
         </Card>
       )}
+
+      {/* ========== 7. Appendice — Come funziona (Collapsible, default closed) ========== */}
+      <Collapsible>
+        <CollapsibleTrigger asChild>
+          <div className="group flex cursor-pointer select-none items-center justify-between border-t border-border pt-4 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            <span>Come funziona</span>
+            <ChevronDown className="h-4 w-4 transition-transform duration-200 motion-reduce:transition-none group-data-[state=open]:rotate-180" />
+          </div>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="pt-4 space-y-4 text-sm text-muted-foreground">
+            <div>
+              <p className="font-semibold text-foreground mb-1">Come Funziona la Simulazione</p>
+              <ul className="list-disc list-inside space-y-1 ml-1">
+                <li>Vengono eseguite migliaia di simulazioni con rendimenti casuali</li>
+                <li>Ogni simulazione parte dal patrimonio iniziale e preleva annualmente</li>
+                <li>I rendimenti sono generati seguendo una distribuzione normale</li>
+                <li>
+                  La <strong className="text-foreground">probabilità di successo</strong> indica
+                  in quante simulazioni il patrimonio dura almeno N anni
+                </li>
+              </ul>
+            </div>
+            <div>
+              <p className="font-semibold text-foreground mb-1">Parametri di Mercato</p>
+              <ul className="list-disc list-inside space-y-1 ml-1">
+                <li>
+                  <strong className="text-foreground">4 Asset Class:</strong> Equity, Bonds,
+                  Immobili e Materie Prime con rendimenti e volatilità personalizzabili
+                </li>
+                <li>
+                  <strong className="text-foreground">Scenari:</strong> Confronta scenari
+                  Orso/Base/Toro con parametri diversi per ogni asset class
+                </li>
+              </ul>
+            </div>
+            <div>
+              <p className="font-semibold text-foreground mb-1">Interpretazione dei Risultati</p>
+              <ul className="list-disc list-inside space-y-1 ml-1">
+                <li>
+                  <strong className="text-foreground">≥95%:</strong> Piano molto sicuro (Eccellente)
+                </li>
+                <li>
+                  <strong className="text-foreground">80–94%:</strong> Rischio moderato (Buono)
+                </li>
+                <li>
+                  <strong className="text-foreground">&lt;80%:</strong> Considera di aumentare il
+                  patrimonio o ridurre i prelievi
+                </li>
+              </ul>
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }

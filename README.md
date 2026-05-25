@@ -23,17 +23,19 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Bond coupon scheduling: automatic coupon generation with step-up rate tiers and final premium (Premio Finale) support — full BTP Valore compatible
 - Average cost tracking with 4-decimal precision, including a built-in multi-broker PMC calculator for positions spread across multiple brokers
 - Current vs target asset allocation visualization
-- Hierarchical asset allocation analysis with desktop drill-down and mobile bottom-sheet navigation
+- Hierarchical asset allocation analysis with desktop drill-down and mobile bottom-sheet navigation — Trade Republic-inspired layout with dominant value numbers, action chips (COMPRA / VENDI / OK), and flat list items on mobile
 - **Portfolio exposure breakdown**: a collapsible section at the bottom of the Allocation page that aggregates underlying-company, sector, and ETF-issuer exposure across all your ETFs plus direct stocks. See your true exposure to a single company (e.g. Nvidia) when it's split across multiple ETFs, with click-to-expand calculation drill-down showing the formula per source ("X% di €Y = €Z") and a total per row. Data sourced server-side from Yahoo Finance and cached per user; the "Aggiorna" button forces a fresh server-side computation when needed
 - Current-year historical tables use a hidden previous-month baseline so January can show growth vs the previous December without rendering an extra visible column
+- Asset management table supports column sorting (Valore Totale, G/P%, Peso%, Nome, Classe); mobile view shows a compact 3-month summary for historical tabs instead of a "desktop recommended" banner; individual asset cards show a 12-month price sparkline on mobile; the Gestione / Anno Corrente / Storico section switcher on mobile uses a segmented pill control so all three sections are visible at a glance
 
 ### Performance Analytics
-- Comprehensive metrics: ROI, CAGR, TWR, IRR, Sharpe Ratio, Maximum Drawdown
+- Comprehensive metrics across 4 sections (Returns, Risk, Context, Dividends) — each section leads with a dominant hero number (TWR, Sharpe, Net Cash Flow, YOC Net) followed by compact secondary rows; metric definitions accessible via inline popovers
+- Period selector (YTD / 1Y / 3Y / 5Y / All-time) uses a segmented pill control on mobile with spring animation; custom date ranges appear as a dismissible chip, not a permanent tab slot
 - Yield on Cost (YOC) and Current Yield calculations
-- Monthly returns heatmap and underwater drawdown chart
-- Rolling performance charts
+- Monthly returns heatmap and underwater drawdown chart (theme-aware colors, boosted contrast in dark themes)
+- Rolling 12-month CAGR and Sharpe Ratio charts with 3-month moving average; always visible with an informative empty state when data is insufficient
 - **Benchmark comparison**: compare your portfolio against six model portfolios (60/40, All Weather, Buffett 90/10, Golden Butterfly, Permanent Portfolio, 100% ACWI) with an indexed growth-of-100 chart and a comprehensive risk/return table — TWR, Volatility, Sharpe, Sortino, Calmar, Max Drawdown, best/worst month, and positive/negative month counts; optional USD→EUR conversion via Frankfurter API
-- Progressive disclosure: methodology section collapsed by default; one-time guide strip for new users; "Avanzato" badge on technical metrics (TWR, IRR, Sharpe, YOC); each chart has an inline 2-line reading hint
+- Progressive disclosure: methodology section collapsed by default; one-time guide strip for new users; "Avanzato" badge on technical metrics (TWR, IRR, Sharpe, YOC)
 - Animated metric cards: values count up on load and settle more naturally during period changes; staggered entrance cascade per section
 - Dashboard KPI cards (Total Portfolio, Liquid Net Worth, Unrealized Gains, Taxes) animate their values on page load — numbers count up from zero once on mount; each card animates independently so the rest of the page stays stable during the animation
 - All major pages (Dashboard, Hall of Fame, History, Performance, Dividends) animate on load with staggered card entrances and smooth expand/collapse transitions; respects system "Reduce Motion" preference
@@ -44,11 +46,9 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 
 ### Cashflow
 - Income and expense tracking with custom categories and subcategories, entered via a guided two-step dialog: pick the expense type first (Variable, Fixed, Debt/Installment, Income), then fill in only the relevant fields for that type
-- **Budget tab**: automatic budget tracking for all expense categories — items auto-generated from your categories with no manual setup; annual view with progress bars comparing current year vs budget, previous year, and historical average; click any row (category, section subtotal, or Total Expenses/Income) to open a historical year×month panel with min/max month highlights; Total Expenses also shows a per-type breakdown (Fixed / Variable / Debt) as separate month-by-month tables; collapsible sections with reordering; fully responsive on mobile with tappable cards and a per-item detail dialog
+- **Analisi tab**: unified period analysis with a three-state selector (current year / specific year + optional month / full history). **Top Expenses block** shows the largest individual expenses for the selected period sorted by amount (top 5 by default, expandable); resets automatically when the period changes. 5-layer Sankey diagram, 4-level drill-down with breadcrumb navigation and hierarchical back-navigation, monthly and annual trend charts in a collapsible section. All charts respect the "history start year" preference from Settings
+- **Budget tab**: automatic budget tracking for all expense categories — items auto-generated from your categories with no manual setup; annual view with progress bars comparing current year vs budget, previous year, and historical average; click any row to open a historical year×month panel; collapsible sections with reordering; fully responsive on mobile
 - Bulk move transactions between categories/subcategories (cross-type supported)
-- 5-layer Sankey diagram visualization
-- 4-level drill-down for detailed expense analysis with hierarchical back-navigation that returns to the immediate parent view before the full flow
-- Period analysis with year and month filters — filtered sections include expense type breakdown (Fixed / Variable / Debt) pie chart that updates with the active filter
 - CSV export
 
 ### Dividends
@@ -61,28 +61,34 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 
 ### Historical Analysis
 - Automatic monthly portfolio snapshots (via Vercel cron)
-- Net worth evolution, asset class breakdown, and liquidity charts
-- Year-over-Year variation analysis
+- Page opens with a **hero block** showing current net worth, total growth since tracking began, and estimated CAGR — with section navigation pills to jump to any chapter
+- Net worth evolution, asset class breakdown, and liquidity charts — all colors theme-aware across the six color themes
+- **Doubling time analysis** with geometric calculations and fixed milestone thresholds — promoted to the top of the page as the most distinctive analysis; summary cards show fastest doubling, average time, and progress toward the next milestone
 - Savings vs Investment Growth comparison (annual and monthly views)
-- **Labor & Investments section**: lifetime KPI cards for Earned from Work, Saved from Work, Investment Growth Gross/Net, plus counters for positive and negative months based on total monthly net worth growth, and a monthly breakdown chart — visible when labor income categories are configured in Settings
-- Doubling time analysis with geometric calculations and fixed thresholds
+- **Labor & Investments section**: lifetime KPI cards for Earned from Work, Saved from Work, Investment Growth Gross/Net, plus positive/negative month counters and a monthly breakdown chart — shows a setup prompt linking to Settings when labor categories are not yet configured
+- Year-over-Year variation and raw monthly snapshot data available in a collapsible section (collapsed by default)
 
 ### FIRE Planning
 - FIRE calculator with primary residence exclusion
-- Dedicated Coast FIRE tab with saved retirement age, no-new-contributions projections, and Bear / Base / Bull real-return scenarios
-- Coast FIRE supports one or more state pensions with editable IRPEF brackets, exact pension start dates, scenario-specific real net conversion, a guided summary that separates target-age need, bridge years, and post-pension steady state, plus a collapsible configuration panel that keeps the active inputs visible
+- **Coast FIRE tab** — Trade Republic-inspired layout: Coast FIRE number as a dominant hero metric (always visible without scrolling), settings panel collapsed by default with auto-open on changes, narrative order (hero → config → projection chart → Bear/Base/Bull scenarios → coverage phases → detail → pension impact → interpretation). Hero rows show overall progress, liquid-only progress, total net worth, and liquid net worth. "Annulla" button resets unsaved changes in one tap. All chart colors theme-aware
+- Coast FIRE supports one or more state pensions with editable IRPEF brackets, exact pension start dates, scenario-specific real net conversion, a guided summary that separates target-age need, bridge years, and post-pension steady state
 - Multi-scenario projections (Bear / Base / Bull) with inflation adjustment
 - Per-scenario FIRE numbers with automatic savings stop at FIRE reached
 - Historical FIRE runway view with rolling 12-month expenses, separate total/liquid deltas, and a sensitivity matrix for annual spending vs annual savings
-- **Goal-Based Investing**: allocate portfolio portions to financial goals (house, retirement, emergency fund, etc.) with progress tracking, recommended allocation comparison, and open-ended goal support
+- **Goal-Based Investing**: allocate portfolio portions to financial goals (house, retirement, emergency fund, etc.) with progress tracking and recommended asset class comparison. The tab opens with a hero block showing total allocated value; goals are displayed as a single flat list — tap any row to expand it inline and see the progress bar, assigned assets, allocation comparison bars, and edit/delete actions. Two-tap inline delete confirmation prevents accidental removal
 - **Goal-Driven Allocation**: optionally derive portfolio allocation targets as a weighted average of goal recommended allocations, with automatic fallback to manual targets
 - Fully responsive on mobile and tablet — tab navigation uses a dropdown on small screens, year-by-year projection table switches to a card layout
 
 ### Monte Carlo Simulations
-- 4 asset classes: Equity, Bonds, Real Estate, Commodities
-- Editable parameters per asset class (returns, volatility)
-- Bear/Base/Bull scenario comparison with overlay charts and distribution analysis
+- Trade Republic-inspired layout: Success Rate (probability of not depleting the portfolio) is the dominant hero metric, always visible before and after a simulation run
+- Settings split into core inputs (always visible) and market parameters (collapsible, auto-opens when values differ from defaults) — reduces cognitive load from 18 simultaneous fields to 6
+- Animated mode switcher between Single Simulation and Bear/Base/Bull Scenario Comparison with spring pill animation
+- 4 asset classes: Equity, Bonds, Real Estate, Commodities — editable return and volatility per class
+- Progressive percentile fan chart (p10/p25/p50/p75/p90) and final-value distribution histogram with staged bar reveal
+- Bear/Base/Bull scenario comparison with overlay chart (3 median lines + p10–p90 bands), side-by-side distribution histograms, and a 5-year-interval comparison table
+- All chart colors and tooltips theme-aware across all six color themes
 - Auto-fill allocation from real portfolio (crypto and cash excluded, normalized to 100%)
+- Scenario parameters (return, volatility, inflation per asset class) saved to Firestore per user
 - Fully responsive on mobile and tablet — percentile table switches to a card layout, scenario parameter cards stack vertically
 
 ### Other
@@ -91,9 +97,9 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - **Color Themes** — Six selectable color themes (Default, Solar Dusk, Elegant Luxury, Midnight Bloom, Cyberpunk, Retro Arcade) with per-user persistence in Firestore and localStorage. Theme selector in Settings → Aspetto with light/dark preview swatches. Switching dark/light mode plays a circle-reveal animation from the toggle. Charts update their palette to match the active theme
 - **Dark mode** — Full dark/light/system theme support. The header toggle cycles through three states: Light, Dark, and System (follows OS preference), using Sun, Moon, and Monitor icons. Every page, chart tooltip, and UI component is properly themed
 - **Authentication flow** — Login and registration screens follow the same visual language as the dashboard, with accessible focus states, keyboard-friendly password toggles, and clearer in-place submit feedback
-- **Hall of Fame** — Monthly and annual performance rankings with current-period spotlight cards, contextual notes, and fully responsive mobile/tablet layouts
+- **Hall of Fame** — Personal records dashboard with an all-time best hero block, monthly and annual ranking tables, current-period spotlight, and contextual notes. Mobile navigation shows one section at a time; desktop tables are full-height with no internal scroll
 - **PDF Export** — 8 configurable sections with custom year/month period selection; sections auto-disabled for past periods when historical data is unavailable
-- **Settings** — Unsaved-change feedback, smooth nested allocation editing, and contextual confirmations for sensitive category actions
+- **Settings** — Trade Republic-inspired layout: the Allocation tab opens with a hero block showing the total allocation percentage, followed by a single unified flat list for all six asset classes (Equity, Bonds, Real Estate, Crypto, Commodities, Cash) — sub-categories expand inline without nested cards. Mobile tab navigation uses a segmented pill control (all five tabs visible at a glance). Unsaved-change feedback, smooth nested allocation editing, and inline two-tap confirmations for sensitive category actions
 
 ## Quick Start
 

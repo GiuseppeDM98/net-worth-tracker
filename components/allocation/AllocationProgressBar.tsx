@@ -96,6 +96,11 @@ export function AllocationProgressBar({
       <div
         className="relative w-full overflow-hidden rounded-full border border-border/70 bg-muted/70"
         style={{ height: `${height}px` }}
+        role="progressbar"
+        aria-valuenow={Math.round(currentPercentage)}
+        aria-valuemin={0}
+        aria-valuemax={Math.round(maxPercentage)}
+        aria-label={`Allocazione corrente ${formatPercentage(currentPercentage)}, target ${formatPercentage(targetPercentage)}`}
       >
         {/* Current allocation fill */}
         <motion.div

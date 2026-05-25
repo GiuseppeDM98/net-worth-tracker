@@ -6,10 +6,8 @@ import {
   AlertCircle,
   Bot,
   Brain,
-  CalendarDays,
   Check,
   ChevronDown,
-  Globe,
   HelpCircle,
   Loader2,
   Lock,
@@ -17,7 +15,6 @@ import {
   MessagesSquare,
   Plus,
   Settings2,
-  Sparkles,
   Trash2,
   X,
 } from 'lucide-react';
@@ -28,7 +25,7 @@ import { toast } from 'sonner';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { AssistantComposer } from '@/components/assistant/AssistantComposer';
 import { AssistantPageSkeleton } from '@/components/assistant/AssistantPageSkeleton';
-import { AssistantContextCard, AssistantContextPill } from '@/components/assistant/AssistantContextCard';
+import { AssistantContextCard, AssistantContextCardSkeleton, AssistantContextPill } from '@/components/assistant/AssistantContextCard';
 import { AssistantMemoryPanel } from '@/components/assistant/AssistantMemoryPanel';
 import { AssistantPromptChips } from '@/components/assistant/AssistantPromptChips';
 import { AssistantStreamingResponse } from '@/components/assistant/AssistantStreamingResponse';
@@ -43,6 +40,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
+import { useDashboardOverview } from '@/lib/hooks/useDashboardOverview';
+import { useCountUp } from '@/lib/utils/useCountUp';
+import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { useAssistantMemory, useUpdateAssistantMemory } from '@/lib/hooks/useAssistantMemory';
 import { useAssistantPeriodContext } from '@/lib/hooks/useAssistantMonthContext';
 import { useAssistantThread, useAssistantThreads, useDeleteAssistantThread } from '@/lib/hooks/useAssistantThreads';
@@ -392,8 +392,17 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   const [isThreadSheetOpen, setIsThreadSheetOpen] = useState(false);
   // Controls the mobile memory Sheet — keeps the panel accessible without occupying scroll space
   const [isMemorySheetOpen, setIsMemorySheetOpen] = useState(false);
-  // Guide section starts collapsed — it's supplementary, not the primary CTA
+  // Guide section — auto-opens for first-time users (no threads), user can toggle thereafter
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+  // Prevents the guide auto-open from re-triggering if the user manually closes it
+  const [guideAutoOpened, setGuideAutoOpened] = useState(false);
+  // Right column sidebar tab: 'threads' (Conversazioni) or 'memory' (Memoria)
+  const [activeSidebarTab, setActiveSidebarTab] = useState<'threads' | 'memory'>('threads');
+
+  // Dashboard overview — used to source the current net worth for the hero block.
+  // Reuses the React Query cache from Panoramica if the user visited it this session,
+  // so in practice this is a cache hit and adds no network latency.
+  const { data: overviewData } = useDashboardOverview(user?.uid);
 
   const { data: threads = [], isLoading: loadingThreads, error: threadsError } = useAssistantThreads(user?.uid);
   const { data: threadDetail, isLoading: loadingThreadDetail, error: threadError } = useAssistantThread(
@@ -502,6 +511,15 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     return () => clearTimeout(timer);
   }, [isStreaming]);
 
+  // Auto-open the guide for first-time users (threads array resolved empty).
+  // Only fires once — guideAutoOpened prevents re-triggering if the user closes it.
+  useEffect(() => {
+    if (!loadingThreads && threads.length === 0 && !guideAutoOpened) {
+      setIsGuideOpen(true);
+      setGuideAutoOpened(true);
+    }
+  }, [loadingThreads, threads.length, guideAutoOpened]);
+
   // NOTE: we do NOT clear streamingMessages in a useEffect([selectedThreadId]).
   // The meta event sets selectedThreadId mid-stream; a useEffect dependency on it
   // would fire and wipe the streaming buffer before text arrives. See AGENTS.md.
@@ -518,6 +536,17 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   );
 
   const canSubmit = draft.trim().length > 0 && !isStreaming && !isAnalysisBlocked;
+
+  // Hero patrimonio: current net worth from overview cache (no extra fetch on cache hit).
+  // useCountUp must be called before any early return — React hook rules.
+  const heroNetWorth = overviewData?.metrics.netTotal ?? null;
+  const heroNetWorthAnimated = useCountUp(heroNetWorth ?? 0, {
+    once: true,
+    fromPrevious: false,
+    startDelay: 80,
+  });
+  // Monthly variation for the hero chip (secondary info)
+  const heroVariation = overviewData?.variations.monthly ?? null;
 
   /**
    * Auto-selects an existing thread matching the new mode + period when the user switches modes.
@@ -1086,58 +1115,135 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
         </header>
 
         {isDemo ? (
-          <Card>
-            <CardContent className="py-10">
-              <EmptyState
-                icon={<Lock className="h-10 w-10" />}
-                title="Non disponibile in modalità demo"
-                description="L'Assistente AI non è accessibile nell'account demo."
-                action={
-                  <Button variant="outline" onClick={() => router.back()}>
-                    Torna indietro
-                  </Button>
-                }
-                className="py-4"
-              />
-            </CardContent>
-          </Card>
+          // No outer Card — EmptyState is self-contained
+          <EmptyState
+            icon={<Lock className="h-10 w-10" />}
+            title="Non disponibile in modalità demo"
+            description="L'Assistente AI non è accessibile nell'account demo."
+            action={
+              <Button variant="outline" onClick={() => router.back()}>
+                Torna indietro
+              </Button>
+            }
+            className="py-20"
+          />
         ) : !assistantConfigured ? (
-          <Card>
-            <CardContent className="py-10">
-              <EmptyState
-                icon={<Lock className="h-10 w-10" />}
-                title="Servizio AI non configurato"
-                description="La pagina resta accessibile, ma per usare l'assistente devi configurare ANTHROPIC_API_KEY nell'ambiente."
-                action={
-                  <Button variant="outline" onClick={() => router.back()}>
-                    Torna indietro
-                  </Button>
-                }
-                className="py-4"
-              />
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={<Lock className="h-10 w-10" />}
+            title="Servizio AI non configurato"
+            description="La pagina resta accessibile, ma per usare l'assistente devi configurare ANTHROPIC_API_KEY nell'ambiente."
+            action={
+              <Button variant="outline" onClick={() => router.back()}>
+                Torna indietro
+              </Button>
+            }
+            className="py-20"
+          />
         ) : (
-          <div className="grid gap-6 desktop:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.85fr)]">
-            {/* ── Left column: conversation + sticky composer ── */}
-            <div className="flex flex-col gap-0">
-              {/* Hero state: shown when no messages exist yet */}
+          <div className="grid grid-cols-1 gap-6 desktop:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.85fr)]">
+            {/* ── Left column: mode pill strip + conversation + sticky composer ── */}
+            {/* min-w-0 allows this flex column to shrink below its content width */}
+            <div className="flex min-w-0 flex-col gap-0">
+
+              {/* ── Mode pill strip ─────────────────────────────────────────────────
+                  Top-level navigation between analysis surfaces. Disabled during streaming
+                  so the user cannot switch context while a response is in flight.
+                  Uses layoutId spring (same pattern as Cashflow/Rendimenti) for the pill. */}
+              <div
+                role="tablist"
+                aria-label="Modalità di analisi"
+                className="mb-4 flex items-center gap-1 overflow-x-auto"
+                style={{ scrollbarWidth: 'none' }}
+              >
+                {([
+                  { value: 'month_analysis', label: 'Mese' },
+                  { value: 'year_analysis', label: 'Anno' },
+                  { value: 'ytd_analysis', label: 'YTD' },
+                  { value: 'history_analysis', label: 'Storico' },
+                  { value: 'chat', label: 'Chat' },
+                ] as { value: AssistantMode; label: string }[]).map((tab) => (
+                  <button
+                    key={tab.value}
+                    type="button"
+                    role="tab"
+                    aria-selected={mode === tab.value}
+                    onClick={() => !isStreaming && handleModeChange(tab.value)}
+                    disabled={isStreaming}
+                    className={cn(
+                      'relative shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors disabled:opacity-50',
+                      mode === tab.value
+                        ? 'text-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    {/* Animated pill behind active tab */}
+                    {mode === tab.value && (
+                      <motion.span
+                        layoutId="assistant-mode-pill"
+                        className="absolute inset-0 rounded-full bg-secondary"
+                        transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+                      />
+                    )}
+                    <span className="relative">{tab.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* ── Hero state: shown when no messages exist yet ──────────────────
+                  Patrimonio netto as dominant number anchors the user's financial reality
+                  before the first analysis. Replaces the generic AI-chat "Come posso aiutarti?"
+                  template that mirrored ChatGPT/Perplexity aesthetics. */}
               {renderedMessages.length === 0 && !loadingThreadDetail && (
                 <>
-                  {/* Chips card comes first so the primary CTA is above the fold on mobile.
-                      On desktop this order is less critical since threads are in the right column. */}
-                  <div className="mb-6 rounded-2xl border border-border bg-muted/20 p-6">
-                    <div className="mb-4 flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                        <Sparkles className="h-5 w-5 text-primary" />
+                  <div className="mb-6 space-y-5">
+                    {/* Patrimonio hero block */}
+                    <div className="rounded-2xl border border-border bg-card px-6 py-5">
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">
+                        Patrimonio netto
+                      </p>
+                      <div className="flex items-baseline gap-3">
+                        <span className="text-4xl font-bold font-mono text-foreground tabular-nums">
+                          {heroNetWorth !== null
+                            ? cachedFormatCurrencyEUR(heroNetWorthAnimated ?? 0, true)
+                            : '—'}
+                        </span>
+                        {heroVariation && (
+                          <span
+                            className={cn(
+                              'text-sm font-medium tabular-nums',
+                              heroVariation.value >= 0
+                                ? 'text-green-600 dark:text-green-400'
+                                : 'text-red-600 dark:text-red-400'
+                            )}
+                          >
+                            {heroVariation.value >= 0 ? '+' : ''}
+                            {cachedFormatCurrencyEUR(heroVariation.value, true)}
+                            {' '}
+                            <span className="opacity-70">
+                              ({heroVariation.percentage >= 0 ? '+' : ''}
+                              {heroVariation.percentage.toFixed(2)}%)
+                            </span>
+                          </span>
+                        )}
                       </div>
-                      <div>
-                        <p className="font-semibold text-foreground">Come posso aiutarti?</p>
-                        <p className="text-sm text-muted-foreground">
-                          Scegli un punto di partenza o scrivi direttamente nel composer.
-                        </p>
+                      {/* Secondary row: variation label + data provenance */}
+                      <div className="mt-1 flex items-center gap-2">
+                        {heroVariation && (
+                          <span className="text-xs text-muted-foreground/60">
+                            vs. mese scorso
+                          </span>
+                        )}
+                        <span className="text-xs text-muted-foreground/40">·</span>
+                        <span className="text-xs text-muted-foreground/60">prezzi correnti</span>
+                        <span className="text-xs text-muted-foreground/40">·</span>
+                        <span className="text-xs text-muted-foreground/60">al netto delle tasse stimate</span>
                       </div>
+                      <p className="mt-3 text-sm text-muted-foreground">
+                        Cosa vuoi analizzare?
+                      </p>
                     </div>
+
+                    {/* Prompt chips below hero as secondary CTA */}
                     <AssistantPromptChips
                       chips={assistantPromptChips}
                       onSelect={handleChipClick}
@@ -1145,18 +1251,18 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                     />
                   </div>
 
-                  {/* Mobile-only thread list: secondary section below chips so the primary
-                      CTA stays above the fold. Hidden on desktop where threads are in the
-                      right-column card. */}
+                  {/* Mobile-only thread list: secondary below chips.
+                      Hidden on desktop where threads are in the right-column tab. */}
                   {threads.length > 0 && (
                     <div className="mb-6 desktop:hidden">
                       <p className="mb-2 text-xs font-medium uppercase tracking-widest text-muted-foreground">
                         Riprendi conversazione
                       </p>
-                      <div className="space-y-1.5">
+                      <div className="divide-y divide-border overflow-hidden rounded-xl border border-border">
                         {threads.slice(0, 5).map((thread) => (
                           <button
                             key={thread.id}
+                            type="button"
                             onClick={() => {
                               setSelectedThreadId(thread.id);
                               setStreamingMessages([]);
@@ -1168,7 +1274,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                               if (thread.pinnedYear) setSelectedYear(thread.pinnedYear);
                             }}
                             disabled={isStreaming}
-                            className="w-full rounded-xl border border-border px-3 py-2.5 text-left transition-colors hover:bg-muted/40"
+                            className="w-full px-4 py-3 text-left transition-colors hover:bg-muted/40"
                           >
                             <div className="flex items-center justify-between gap-2">
                               <p className="text-sm font-medium text-foreground line-clamp-1">{thread.title}</p>
@@ -1291,7 +1397,6 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                   isStreaming={isStreaming}
                   canSubmit={canSubmit}
                   mode={mode}
-                  onModeChange={handleModeChange}
                   selectedMonth={selectedMonth}
                   monthOptions={monthOptions}
                   onMonthChange={setSelectedMonth}
@@ -1305,96 +1410,119 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
               </div>
             </div>
 
-            {/* ── Right column: sticky so panels stay visible while the conversation scrolls.
-                 max-h + overflow-y-auto lets the column scroll internally if content
-                 overflows the viewport (e.g. very long memory list). ── */}
-            <div className="space-y-6 desktop:sticky desktop:top-6 desktop:max-h-[calc(100vh-6rem)] desktop:overflow-y-auto desktop:pr-1">
-              {/* Thread list — on desktop always visible at the top so the user can
-                  jump to a previous conversation without scrolling past other panels.
-                  On mobile the drawer (header button) serves the same purpose. */}
-              <Card className="hidden desktop:block">
-                <CardHeader>
-                  <CardTitle>Conversazioni</CardTitle>
-                  <CardDescription>Ordinate per ultimo aggiornamento.</CardDescription>
-                </CardHeader>
-                <CardContent className="max-h-[400px] overflow-y-auto space-y-2 pr-1">
-                  <ThreadList
-                    threads={threads}
-                    loadingThreads={loadingThreads}
-                    selectedThreadId={selectedThreadId}
-                    isStreaming={isStreaming}
-                    isDeletingId={deleteThreadMutation.variables as string | undefined}
-                    onSelect={(thread) => {
-                      setSelectedThreadId(thread.id);
-                      setStreamingMessages([]);
-                      setStreamingMessageId(undefined);
-                      setIsInterrupted(false);
-                      setContextBundle(null);
-                      setMode(thread.mode);
-                      if (thread.pinnedMonth) setSelectedMonth(thread.pinnedMonth);
-                      if (thread.pinnedYear) setSelectedYear(thread.pinnedYear);
-                    }}
-                    onDelete={handleDeleteThread}
-                    onNewThread={handleNewThread}
-                  />
+            {/* ── Right column: sticky sidebar ────────────────────────────────────────
+                Single Card with Conversazioni/Memoria tabs (reduces from 3 coordinate
+                cards to one coherent surface). Context block sits below as a flat data
+                block — no Card wrapper, no nested boxes. ── */}
+            <div className="hidden desktop:flex desktop:flex-col desktop:gap-4 desktop:sticky desktop:top-6 desktop:max-h-[calc(100vh-6rem)] desktop:overflow-y-auto desktop:pr-1">
+
+              {/* Tab card: Conversazioni | Memoria */}
+              <Card className="overflow-hidden">
+                {/* Tab header */}
+                <div className="border-b border-border">
+                  <div
+                    role="tablist"
+                    aria-label="Pannello laterale"
+                    className="relative flex"
+                  >
+                    {([
+                      { value: 'threads', label: 'Conversazioni' },
+                      { value: 'memory', label: 'Memoria' },
+                    ] as { value: 'threads' | 'memory'; label: string }[]).map((tab) => (
+                      <button
+                        key={tab.value}
+                        type="button"
+                        role="tab"
+                        aria-selected={activeSidebarTab === tab.value}
+                        onClick={() => setActiveSidebarTab(tab.value)}
+                        className={cn(
+                          'relative flex-1 px-4 py-3 text-sm font-medium transition-colors',
+                          activeSidebarTab === tab.value
+                            ? 'text-foreground'
+                            : 'text-muted-foreground hover:text-foreground'
+                        )}
+                      >
+                        {activeSidebarTab === tab.value && (
+                          <motion.span
+                            layoutId="assistant-sidebar-tab-pill"
+                            className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground"
+                            transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+                          />
+                        )}
+                        {tab.label}
+                        {tab.value === 'memory' && (memory?.items ?? []).filter(i => i.status === 'active').length > 0 && (
+                          <span className="ml-1.5 text-xs text-muted-foreground">
+                            {(memory?.items ?? []).filter(i => i.status === 'active').length}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Tab content */}
+                <CardContent className="p-0">
+                  {activeSidebarTab === 'threads' && (
+                    <div className="max-h-[380px] overflow-y-auto p-4">
+                      <ThreadList
+                        threads={threads}
+                        loadingThreads={loadingThreads}
+                        selectedThreadId={selectedThreadId}
+                        isStreaming={isStreaming}
+                        isDeletingId={deleteThreadMutation.variables as string | undefined}
+                        onSelect={(thread) => {
+                          setSelectedThreadId(thread.id);
+                          setStreamingMessages([]);
+                          setStreamingMessageId(undefined);
+                          setIsInterrupted(false);
+                          setContextBundle(null);
+                          setMode(thread.mode);
+                          if (thread.pinnedMonth) setSelectedMonth(thread.pinnedMonth);
+                          if (thread.pinnedYear) setSelectedYear(thread.pinnedYear);
+                        }}
+                        onDelete={handleDeleteThread}
+                        onNewThread={handleNewThread}
+                      />
+                    </div>
+                  )}
+                  {activeSidebarTab === 'memory' && user?.uid && (
+                    <div className="max-h-[380px] overflow-y-auto p-4">
+                      <AssistantMemoryPanel
+                        userId={user.uid}
+                        memory={memory}
+                        isLoading={loadingMemory}
+                      />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
-              {/* Context panel — desktop only. On mobile, the context pill sits in the
-                  conversation header so the user sees the key number without scrolling. */}
-              <div className="hidden desktop:block">
-                {contextBundle ? (
-                  <AssistantContextCard bundle={contextBundle} />
-                ) : loadingContextBundle ? (
-                  <AssistantContextCard bundle={{} as AssistantMonthContextBundle} isLoading />
-                ) : (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Contesto numerico</CardTitle>
-                      <CardDescription>
-                        Appare qui al termine della prima analisi.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="rounded-xl border border-border p-3.5">
-                        <div className="mb-1.5 flex items-center gap-2 text-sm font-medium text-foreground">
-                          <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                          Periodo di riferimento
-                        </div>
-                        <p className="text-sm text-muted-foreground">{activePeriodLabel}</p>
-                      </div>
-                      <div className="rounded-xl border border-border p-3.5">
-                        <div className="mb-1.5 flex items-center gap-2 text-sm font-medium text-foreground">
-                          <Globe className="h-4 w-4 text-muted-foreground" />
-                          Web search
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          Attiva nelle analisi solo con contesto macro abilitato.
-                          In chat si attiva per richieste macro esplicite.
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-
-              {/* Memory panel — desktop only. On mobile, accessible via the Brain sheet
-                  button in the page header so it doesn't consume scroll space. */}
-              {user?.uid && (
-                <div className="hidden desktop:block">
-                  <AssistantMemoryPanel
-                    userId={user.uid}
-                    memory={memory}
-                    isLoading={loadingMemory}
-                    isOpen={isMemoryPanelOpen}
-                    onToggle={() => setIsMemoryPanelOpen((v) => !v)}
-                  />
+              {/* Context block — flat, no Card wrapper. Empty state is a single line (no nested boxes).
+                  Shown only when a context bundle is available or loading. */}
+              {(contextBundle || loadingContextBundle) && (
+                <div>
+                  {contextBundle ? (
+                    <AssistantContextCard bundle={contextBundle} />
+                  ) : (
+                    <AssistantContextCardSkeleton />
+                  )}
                 </div>
               )}
 
+              {/* Context empty state: period label + single-line hint — shown before first analysis */}
+              {!contextBundle && !loadingContextBundle && (
+                <div className="rounded-xl border border-border px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70 mb-1">
+                    {activePeriodLabel}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Avvia un&apos;analisi per popolare il contesto.
+                  </p>
+                </div>
+              )}
+
+              {/* Query-level error callout */}
               {(threadsError || threadError || memoryError) && (
-                // Surface query-level errors prominently — a bare <p> is too easy to miss
-                // given that the right column may have other content above it.
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>

@@ -21,6 +21,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useChartColors } from '@/lib/hooks/useChartColors';
 import { FIREProjectionScenarios, FIREScenarioParams } from '@/types/assets';
 import { Settings } from '@/types/settings';
 import { getAnnualCashflowData, getDefaultScenarios, calculateFIREProjection, calculateFIRESensitivityMatrix } from '@/lib/services/fireService';
@@ -47,11 +48,11 @@ interface FIREProjectionSectionProps {
   plannedAnnualExpensesPreview: number | null;
 }
 
-// Scenario display config for consistent UI rendering
+// Scenario display config — colors resolved at runtime via useChartColors()
 const SCENARIO_CONFIG = {
-  bear: { label: 'Scenario Orso', icon: TrendingDown, color: 'red', bgColor: 'bg-red-50 dark:bg-red-950/20', borderColor: 'border-red-200 dark:border-red-800', textColor: 'text-red-600', boldColor: 'text-red-700' },
-  base: { label: 'Scenario Base', icon: Target, color: 'indigo', bgColor: 'bg-indigo-50 dark:bg-indigo-950/20', borderColor: 'border-indigo-200 dark:border-indigo-800', textColor: 'text-indigo-600', boldColor: 'text-indigo-700' },
-  bull: { label: 'Scenario Toro', icon: TrendingUp, color: 'green', bgColor: 'bg-green-50 dark:bg-green-950/20', borderColor: 'border-green-200 dark:border-green-800', textColor: 'text-green-600', boldColor: 'text-green-700' },
+  bear: { label: 'Scenario Orso', icon: TrendingDown },
+  base: { label: 'Scenario Base', icon: Target },
+  bull: { label: 'Scenario Toro', icon: TrendingUp },
 } as const;
 
 type ScenarioKey = keyof typeof SCENARIO_CONFIG;
@@ -76,6 +77,13 @@ export function FIREProjectionSection({
   const queryClient = useQueryClient();
   const defaults = getDefaultScenarios();
   const isMobile = useMediaQuery('(max-width: 767px)');
+  const chartColors = useChartColors();
+  // Semantic mapping: Orso (bear) → red [4], Base → primary [0], Toro (bull) → green [1]
+  const scenarioColors: Record<ScenarioKey, string> = {
+    bear: chartColors[4],
+    base: chartColors[0],
+    bull: chartColors[1],
+  };
 
   // Local state for scenario parameters (editable, recalculates immediately)
   const [scenarios, setScenarios] = useState<FIREProjectionScenarios>(
@@ -176,7 +184,7 @@ export function FIREProjectionSection({
   if (isLoadingSavings) {
     return (
       <div className="flex h-32 items-center justify-center">
-        <div className="text-gray-500">Calcolo risparmi annuali...</div>
+        <div className="text-muted-foreground">Calcolo risparmi annuali...</div>
       </div>
     );
   }
@@ -185,8 +193,8 @@ export function FIREProjectionSection({
     <div className="space-y-6">
       {/* Section Header */}
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Proiezione Scenari</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
+        <h2 className="text-xl font-semibold text-foreground mb-2">Proiezione Scenari</h2>
+        <p className="text-sm text-muted-foreground">
           Proiezione del patrimonio sotto 3 scenari di mercato con inflazione sulle spese.
           Il FIRE Number cresce ogni anno perché le spese aumentano con l&apos;inflazione.
         </p>
@@ -196,24 +204,22 @@ export function FIREProjectionSection({
       </div>
 
       {/* Annual Cashflow Data Banner */}
-      <Card className={`${annualSavings > 0 ? 'border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-800' : 'border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800'}`}>
+      <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col gap-1 desktop:flex-row desktop:gap-6">
             <div className="flex items-center gap-2">
-              <Wallet className={`h-5 w-5 ${annualSavings > 0 ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`} />
-              <span className={`font-semibold ${annualSavings > 0 ? 'text-green-800 dark:text-green-200' : 'text-amber-800 dark:text-amber-200'}`}>
+              <Wallet className="h-5 w-5 text-muted-foreground" />
+              <span className="font-semibold text-foreground">
                 Risparmio Annuale: {formatCurrency(annualSavings)}
               </span>
             </div>
             {annualExpenses > 0 && (
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-green-800 dark:text-green-200">
-                  Spese Annuali: {formatCurrency(annualExpenses)}
-                </span>
-              </div>
+              <span className="font-semibold text-foreground">
+                Spese Annuali: {formatCurrency(annualExpenses)}
+              </span>
             )}
           </div>
-          <p className={`mt-1 text-xs ${annualSavings > 0 ? 'text-green-700 dark:text-green-300' : 'text-amber-700 dark:text-amber-300'}`}>
+          <p className="mt-1 text-xs text-muted-foreground">
             {cashflowData && annualSavings > 0
               ? `Dati dal ${cashflowData.referenceYear}${cashflowData.isAnnualized ? ' (annualizzati)' : ''}. Calcolati automaticamente dal cashflow (entrate - uscite).`
               : 'Nessun dato cashflow disponibile. Aggiungi entrate e uscite nella sezione Cashflow per una proiezione accurata.'
@@ -227,10 +233,11 @@ export function FIREProjectionSection({
         {(Object.keys(SCENARIO_CONFIG) as ScenarioKey[]).map((key) => {
           const config = SCENARIO_CONFIG[key];
           const Icon = config.icon;
+          const color = scenarioColors[key];
           return (
-            <Card key={key} className={`${config.borderColor} ${config.bgColor}`}>
+            <Card key={key}>
               <CardHeader className="pb-3">
-                <CardTitle className={`flex items-center gap-2 text-base ${config.boldColor}`}>
+                <CardTitle className="flex items-center gap-2 text-base" style={{ color }}>
                   <Icon className="h-4 w-4" />
                   {config.label}
                 </CardTitle>
@@ -245,7 +252,7 @@ export function FIREProjectionSection({
                     max="30"
                     value={scenarios[key].growthRate}
                     onChange={(e) => updateScenario(key, 'growthRate', e.target.value)}
-                    className="mt-1 h-8 bg-white dark:bg-gray-800"
+                    className="mt-1 h-8"
                   />
                 </div>
                 <div>
@@ -257,7 +264,7 @@ export function FIREProjectionSection({
                     max="15"
                     value={scenarios[key].inflationRate}
                     onChange={(e) => updateScenario(key, 'inflationRate', e.target.value)}
-                    className="mt-1 h-8 bg-white dark:bg-gray-800"
+                    className="mt-1 h-8"
                   />
                 </div>
               </CardContent>
@@ -267,12 +274,12 @@ export function FIREProjectionSection({
       </div>
 
       {/* Action Buttons */}
-      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-        <Button variant="outline" size="sm" onClick={handleResetDefaults} className="w-full sm:w-auto dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">
+      <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
+        <Button variant="outline" size="sm" onClick={handleResetDefaults} className="w-full sm:w-auto">
           <RotateCcw className="mr-2 h-4 w-4" />
           Ripristina Default
         </Button>
-        <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="w-full sm:w-auto dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
+        <Button variant="outline" size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="w-full sm:w-auto">
           <Save className="mr-2 h-4 w-4" />
           {saveMutation.isPending ? 'Salvataggio...' : 'Salva Parametri'}
         </Button>
@@ -290,22 +297,23 @@ export function FIREProjectionSection({
             {(Object.keys(SCENARIO_CONFIG) as ScenarioKey[]).map((key) => {
               const config = SCENARIO_CONFIG[key];
               const Icon = config.icon;
+              const color = scenarioColors[key];
               const yearsKey = `${key}YearsToFIRE` as keyof typeof projection;
               const years = projection[yearsKey] as number | null;
               return (
                 <Card key={key}>
                   <CardHeader className="pb-2">
-                    <CardTitle className={`flex items-center gap-2 text-base ${config.textColor}`}>
+                    <div className="flex items-center gap-2 text-sm font-medium" style={{ color }}>
                       <Icon className="h-4 w-4" />
                       {config.label}
-                    </CardTitle>
-                    <CardDescription>Anni al FIRE</CardDescription>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Anni al FIRE</p>
                   </CardHeader>
                   <CardContent>
-                    <div className={`text-3xl font-bold ${config.boldColor}`}>
+                    <div className="font-mono text-4xl font-bold tabular-nums" style={{ color }}>
                       <SettledYearsToFire years={years} />
                     </div>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {years !== null
                         ? `FIRE raggiunto nel ${getItalyYear() + years}`
                         : 'Non raggiunto entro 50 anni'
@@ -380,7 +388,7 @@ export function FIREProjectionSection({
                         <CardDescription>Scenario Base corrente</CardDescription>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-3xl font-bold text-indigo-600">
+                        <div className="font-mono text-3xl font-bold tabular-nums" style={{ color: scenarioColors.base }}>
                           <SettledYearsToFire years={sensitivityMatrix.baselineYearsToFIRE} />
                         </div>
                       </CardContent>
@@ -416,14 +424,15 @@ export function FIREProjectionSection({
                           {row.cells.map((cell, index) => (
                             <div
                               key={`${row.label}-${sensitivityMatrix.columns[index].label}`}
-                              className={
+                              className="rounded-md border p-2"
+                              style={
                                 cell.relationToBaseline === 'baseline'
-                                  ? 'rounded-md border border-indigo-300 bg-indigo-50 p-2 dark:border-indigo-700 dark:bg-indigo-950/25'
+                                  ? { borderColor: `color-mix(in srgb, ${scenarioColors.base} 40%, transparent)`, backgroundColor: `color-mix(in srgb, ${scenarioColors.base} 10%, transparent)` }
                                   : cell.relationToBaseline === 'better'
-                                    ? 'rounded-md border border-green-300 bg-green-50 p-2 dark:border-green-700 dark:bg-green-950/25'
+                                    ? { borderColor: `color-mix(in srgb, ${scenarioColors.bull} 40%, transparent)`, backgroundColor: `color-mix(in srgb, ${scenarioColors.bull} 10%, transparent)` }
                                     : cell.relationToBaseline === 'worse'
-                                      ? 'rounded-md border border-red-300 bg-red-50 p-2 dark:border-red-700 dark:bg-red-950/25'
-                                      : 'rounded-md border border-border bg-muted/20 p-2'
+                                      ? { borderColor: `color-mix(in srgb, ${scenarioColors.bear} 40%, transparent)`, backgroundColor: `color-mix(in srgb, ${scenarioColors.bear} 10%, transparent)` }
+                                      : {}
                               }
                             >
                               <p className="text-[11px] text-muted-foreground">{sensitivityMatrix.columns[index].label}</p>
@@ -461,14 +470,15 @@ export function FIREProjectionSection({
                             {row.cells.map((cell, index) => (
                               <td key={`${row.label}-${sensitivityMatrix.columns[index].label}`} className="px-3 py-3">
                                 <div
-                                  className={
+                                  className="rounded-md border px-3 py-2 text-center"
+                                  style={
                                     cell.relationToBaseline === 'baseline'
-                                      ? 'rounded-md border border-indigo-300 bg-indigo-50 px-3 py-2 text-center dark:border-indigo-700 dark:bg-indigo-950/25'
+                                      ? { borderColor: `color-mix(in srgb, ${scenarioColors.base} 40%, transparent)`, backgroundColor: `color-mix(in srgb, ${scenarioColors.base} 10%, transparent)` }
                                       : cell.relationToBaseline === 'better'
-                                        ? 'rounded-md border border-green-300 bg-green-50 px-3 py-2 text-center dark:border-green-700 dark:bg-green-950/25'
+                                        ? { borderColor: `color-mix(in srgb, ${scenarioColors.bull} 40%, transparent)`, backgroundColor: `color-mix(in srgb, ${scenarioColors.bull} 10%, transparent)` }
                                         : cell.relationToBaseline === 'worse'
-                                          ? 'rounded-md border border-red-300 bg-red-50 px-3 py-2 text-center dark:border-red-700 dark:bg-red-950/25'
-                                          : 'rounded-md border border-border bg-muted/20 px-3 py-2 text-center'
+                                          ? { borderColor: `color-mix(in srgb, ${scenarioColors.bear} 40%, transparent)`, backgroundColor: `color-mix(in srgb, ${scenarioColors.bear} 10%, transparent)` }
+                                          : { borderColor: 'var(--border)', backgroundColor: 'color-mix(in srgb, var(--muted) 20%, transparent)' }
                                   }
                                 >
                                   <span className="font-mono font-semibold text-foreground">
@@ -493,11 +503,11 @@ export function FIREProjectionSection({
       )}
 
       {/* Info Box */}
-      <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800">
+      <Card>
         <CardContent className="pt-6">
           <div className="flex items-start gap-2">
-            <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
-            <div className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
+            <Info className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+            <div className="space-y-2 text-sm text-muted-foreground">
               <p>
                 <strong>Come funziona la proiezione:</strong> Ogni anno il patrimonio cresce con il rendimento di mercato
                 dello scenario, poi si aggiungono i risparmi annuali (fino al raggiungimento del FIRE). Le spese aumentano

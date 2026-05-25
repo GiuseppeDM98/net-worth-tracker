@@ -24,12 +24,11 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
-import { Wallet, Receipt, TrendingUp, BarChart3, Coins, Target, Layers } from 'lucide-react';
+import { Wallet, Receipt, Coins, BarChart3, Target, Layers } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ExpenseTrackingTab } from '@/components/cashflow/ExpenseTrackingTab';
-import { CurrentYearTab } from '@/components/cashflow/CurrentYearTab';
-import { TotalHistoryTab } from '@/components/cashflow/TotalHistoryTab';
+import { AnalisiTab } from '@/components/cashflow/AnalisiTab';
 import { DividendTrackingTab } from '@/components/dividends/DividendTrackingTab';
 import { BudgetTab } from '@/components/cashflow/BudgetTab';
 import { CostCentersTab } from '@/components/cashflow/CostCentersTab';
@@ -48,6 +47,14 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+// Module-level constant: stable reference for React Compiler
+const CASHFLOW_TABS_BASE: Array<{ value: string; label: string; mobileLabel: string; icon: React.ElementType }> = [
+  { value: 'tracking',     label: 'Tracciamento', mobileLabel: 'Spese',     icon: Receipt  },
+  { value: 'dividends',    label: 'Dividendi',    mobileLabel: 'Dividendi', icon: Coins    },
+  { value: 'analisi',      label: 'Analisi',      mobileLabel: 'Analisi',   icon: BarChart3 },
+  { value: 'budget',       label: 'Budget',       mobileLabel: 'Budget',    icon: Target   },
+];
+
 export default function CashflowPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -61,7 +68,7 @@ export default function CashflowPage() {
   const { data: allExpenses = [], isLoading: expensesLoading } = useExpenses(user?.uid);
   const { data: categories = [], isLoading: categoriesLoading } = useExpenseCategories(user?.uid);
 
-  const [cashflowHistoryStartYear, setCashflowHistoryStartYear] = useState<number>(2025);
+  const [cashflowHistoryStartYear, setCashflowHistoryStartYear] = useState<number>(new Date().getFullYear() - 1);
 
   // Manual state for other tabs data (dividends, assets)
   const [dividends, setDividends] = useState<Dividend[]>([]);
@@ -171,63 +178,65 @@ export default function CashflowPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="tracking" value={activeTab} onValueChange={handleTabChange} className="w-full">
-        {/* Mobile tab selector — Radix Select replaces cramped 5-tab TabsList on small screens */}
-        <div className="desktop:hidden mb-2">
-          <Select value={activeTab} onValueChange={handleTabChange}>
-            <SelectTrigger className="w-full h-12 text-base">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="tracking">Tracciamento</SelectItem>
-              <SelectItem value="dividends">Dividendi &amp; Cedole</SelectItem>
-              <SelectItem value="current-year">Anno Corrente</SelectItem>
-              <SelectItem value="total-history">Storico Totale</SelectItem>
-              <SelectItem value="budget">Budget</SelectItem>
-              {costCentersEnabled && (
-                <SelectItem value="cost-centers">Centri di Costo</SelectItem>
-              )}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Desktop TabsList — hidden on mobile/tablet.
-            Rendered only after costCentersEnabled is resolved so the full tab list
-            mounts in one paint instead of reflowing from 5 to 6 columns. */}
         {costCentersEnabled === null ? (
-          // Placeholder that matches the TabsList height while settings load
-          <div className="hidden desktop:block h-10 w-full max-w-5xl rounded-md bg-muted animate-pulse" />
-        ) : (
-          <TabsList className={`hidden desktop:grid w-full max-w-5xl ${costCentersEnabled ? 'grid-cols-6' : 'grid-cols-5'}`}>
-            <TabsTrigger value="tracking" className="flex items-center gap-2">
-              <Receipt className="h-4 w-4" />
-              Tracciamento
-            </TabsTrigger>
-            <TabsTrigger value="dividends" className="flex items-center gap-2">
-              <Coins className="h-4 w-4" />
-              Dividendi &amp; Cedole
-            </TabsTrigger>
-            <TabsTrigger value="current-year" className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Anno Corrente
-            </TabsTrigger>
-            <TabsTrigger value="total-history" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Storico Totale
-            </TabsTrigger>
-            <TabsTrigger value="budget" className="flex items-center gap-2">
-              <Target className="h-4 w-4" />
-              Budget
-            </TabsTrigger>
-            {costCentersEnabled && (
-              <TabsTrigger value="cost-centers" className="flex items-center gap-2">
-                <Layers className="h-4 w-4" />
-                Centri di Costo
-              </TabsTrigger>
-            )}
-          </TabsList>
-        )}
+          <div className="h-10 w-full rounded-md bg-muted animate-pulse mb-6" />
+        ) : (() => {
+          const allTabs = costCentersEnabled
+            ? [...CASHFLOW_TABS_BASE, { value: 'cost-centers', label: 'Centri di Costo', mobileLabel: 'C.Costo', icon: Layers }]
+            : CASHFLOW_TABS_BASE;
+          return (
+            <>
+              {/* Mobile (<desktop): Framer Motion sliding pill */}
+              <div className="desktop:hidden mb-6">
+                <div role="tablist" aria-label="Sezioni cashflow" className="flex rounded-xl bg-muted p-1 gap-1">
+                  {allTabs.map(({ value, mobileLabel, icon: Icon }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      role="tab"
+                      aria-selected={activeTab === value}
+                      onClick={() => handleTabChange(value)}
+                      className={cn(
+                        'relative flex-1 flex items-center justify-center gap-1 h-9 rounded-lg text-xs font-medium',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
+                        activeTab !== value && 'text-muted-foreground hover:text-foreground transition-colors duration-150'
+                      )}
+                    >
+                      {activeTab === value && (
+                        <motion.span
+                          layoutId="cashflow-mobile-tab"
+                          className="absolute inset-0 rounded-lg bg-background shadow-sm"
+                          transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+                        />
+                      )}
+                      <span className={cn(
+                        'relative z-10 flex items-center gap-1',
+                        activeTab === value ? 'text-foreground' : 'text-muted-foreground'
+                      )}>
+                        <Icon className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{mobileLabel}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-        <TabsContent value="tracking" className="mt-6" forceMount>
+              {/* Desktop (1440px+): standard tab list */}
+              <div className="hidden desktop:block mb-6">
+                <TabsList className="w-full justify-start">
+                  {allTabs.map(({ value, label, icon: Icon }) => (
+                    <TabsTrigger key={value} value={value} className="flex items-center gap-1.5">
+                      <Icon className="h-3.5 w-3.5" />
+                      {label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </div>
+            </>
+          );
+        })()}
+
+        <TabsContent value="tracking" forceMount>
           <motion.div
             initial={false}
             animate={activeTab === 'tracking' ? 'visible' : 'hidden'}
@@ -243,7 +252,7 @@ export default function CashflowPage() {
         </TabsContent>
 
         {mountedTabs.has('dividends') && (
-          <TabsContent value="dividends" className="mt-6" forceMount>
+          <TabsContent value="dividends" forceMount>
             <motion.div
               initial={false}
               animate={activeTab === 'dividends' ? 'visible' : 'hidden'}
@@ -259,30 +268,14 @@ export default function CashflowPage() {
           </TabsContent>
         )}
 
-        {mountedTabs.has('current-year') && (
-          <TabsContent value="current-year" className="mt-6" forceMount>
+        {mountedTabs.has('analisi') && (
+          <TabsContent value="analisi" forceMount>
             <motion.div
               initial={false}
-              animate={activeTab === 'current-year' ? 'visible' : 'hidden'}
+              animate={activeTab === 'analisi' ? 'visible' : 'hidden'}
               variants={tabPanelSwitch}
             >
-              <CurrentYearTab
-                allExpenses={allExpenses}
-                loading={loading}
-                onRefresh={handleRefresh}
-              />
-            </motion.div>
-          </TabsContent>
-        )}
-
-        {mountedTabs.has('total-history') && (
-          <TabsContent value="total-history" className="mt-6" forceMount>
-            <motion.div
-              initial={false}
-              animate={activeTab === 'total-history' ? 'visible' : 'hidden'}
-              variants={tabPanelSwitch}
-            >
-              <TotalHistoryTab
+              <AnalisiTab
                 allExpenses={allExpenses}
                 loading={loading}
                 onRefresh={handleRefresh}
@@ -293,7 +286,7 @@ export default function CashflowPage() {
         )}
 
         {mountedTabs.has('budget') && (
-          <TabsContent value="budget" className="mt-6" forceMount>
+          <TabsContent value="budget" forceMount>
             <motion.div
               initial={false}
               animate={activeTab === 'budget' ? 'visible' : 'hidden'}
@@ -310,7 +303,7 @@ export default function CashflowPage() {
           </TabsContent>
         )}
         {costCentersEnabled && mountedTabs.has('cost-centers') && (
-          <TabsContent value="cost-centers" className="mt-6" forceMount>
+          <TabsContent value="cost-centers" forceMount>
             <motion.div
               initial={false}
               animate={activeTab === 'cost-centers' ? 'visible' : 'hidden'}

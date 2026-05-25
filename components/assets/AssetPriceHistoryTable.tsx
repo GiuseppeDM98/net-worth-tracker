@@ -77,7 +77,7 @@ interface AssetPriceHistoryTableProps {
 const colorClasses = {
   green: 'bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 font-medium',
   red: 'bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 font-medium',
-  neutral: 'bg-gray-50 dark:bg-gray-800/60 text-gray-700 dark:text-gray-300',
+  neutral: 'bg-muted/30 text-foreground',
 };
 
 export function AssetPriceHistoryTable({
@@ -195,10 +195,10 @@ export function AssetPriceHistoryTable({
           />
         ) : (
           <Table>
-            <TableHeader className="sticky top-0 bg-white dark:bg-gray-900 z-20">
+            <TableHeader className="sticky top-0 bg-card z-20">
               <TableRow>
                 {/* Sticky first column - Asset name */}
-                <TableHead className="sticky left-0 bg-white dark:bg-gray-900 z-10 min-w-[140px] sm:min-w-[200px] border-r">
+                <TableHead className="sticky left-0 bg-card z-10 min-w-[140px] sm:min-w-[200px] border-r">
                   Asset
                 </TableHead>
                 {/* Month columns */}
@@ -209,20 +209,20 @@ export function AssetPriceHistoryTable({
                 ))}
                 {/* Mese Prec. % column - shown only for current year filter */}
                 {filterYear !== undefined && (
-                  <TableHead className="text-right min-w-[70px] sm:min-w-[100px] bg-amber-50 dark:bg-amber-950/20 border-l-2 border-amber-300 dark:border-amber-800">
+                  <TableHead className="text-right min-w-[70px] sm:min-w-[100px] bg-muted/30">
                     Mese Prec. %
                   </TableHead>
                 )}
                 {/* YTD column - shown only for current year filter */}
                 {filterYear !== undefined && (
-                  <TableHead className="text-right min-w-[70px] sm:min-w-[100px] bg-blue-50 dark:bg-blue-950/20 border-l-2 border-blue-300 dark:border-blue-800">
+                  <TableHead className="text-right min-w-[70px] sm:min-w-[100px] bg-muted/30">
                     YTD %
                   </TableHead>
                 )}
-                {/* From Start column - shown only when filterStartDate is set */}
+                {/* Da Inizio % column - shown only when filterStartDate is set */}
                 {filterStartDate !== undefined && (
-                  <TableHead className="text-right min-w-[70px] sm:min-w-[100px] bg-purple-50 dark:bg-purple-950/20 border-l-2 border-purple-300 dark:border-purple-800">
-                    From Start %
+                  <TableHead className="text-right min-w-[70px] sm:min-w-[100px] bg-muted/30">
+                    Da Inizio %
                   </TableHead>
                 )}
               </TableRow>
@@ -231,11 +231,11 @@ export function AssetPriceHistoryTable({
               {assetRows.map((asset) => (
                 <TableRow key={asset.name}>
                   {/* Sticky first column: asset ticker + name + "Venduto" badge */}
-                  <TableCell className="sticky left-0 bg-white dark:bg-gray-900 z-10 border-r">
+                  <TableCell className="sticky left-0 bg-card z-10 border-r">
                     <div className="flex items-center gap-2">
                       <div>
                         <div className="font-semibold text-sm">{asset.ticker}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{asset.name}</div>
+                        <div className="text-xs text-muted-foreground">{asset.name}</div>
                       </div>
                       {asset.isDeleted && (
                         <Badge variant="outline" className="text-red-600 border-red-300">
@@ -254,11 +254,11 @@ export function AssetPriceHistoryTable({
                         key={month.key}
                         className={cn(
                           'text-right min-w-[100px]',
-                          cell.price === null ? 'text-gray-400' : colorClasses[cell.colorCode]
+                          cell.price === null ? 'text-muted-foreground' : colorClasses[cell.colorCode]
                         )}
                       >
                         {cell.price === null ? (
-                          <span className="text-gray-400">-</span>
+                          <span className="text-muted-foreground">-</span>
                         ) : (
                           <div>
                             {/* CONDITIONAL DISPLAY LOGIC */}
@@ -288,7 +288,7 @@ export function AssetPriceHistoryTable({
 
                   {/* Mese Prec. % cell - shown only for current year filter */}
                   {filterYear !== undefined && (
-                    <TableCell className="text-right min-w-[70px] sm:min-w-[100px] bg-amber-50 dark:bg-amber-950/20 border-l-2 border-amber-300 dark:border-amber-800">
+                    <TableCell className="text-right min-w-[70px] sm:min-w-[100px] bg-muted/30">
                       {asset.lastMonthChange !== undefined ? (
                         <div className="font-bold">
                           <span
@@ -296,7 +296,7 @@ export function AssetPriceHistoryTable({
                               'text-base',
                               asset.lastMonthChange > 0 && 'text-green-600',
                               asset.lastMonthChange < 0 && 'text-red-600',
-                              asset.lastMonthChange === 0 && 'text-gray-600 dark:text-gray-400'
+                              asset.lastMonthChange === 0 && 'text-muted-foreground'
                             )}
                           >
                             {asset.lastMonthChange > 0 ? '+' : ''}
@@ -304,14 +304,14 @@ export function AssetPriceHistoryTable({
                           </span>
                         </div>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
                   )}
 
                   {/* YTD cell - shown only for current year filter */}
                   {filterYear !== undefined && (
-                    <TableCell className="text-right min-w-[70px] sm:min-w-[100px] bg-blue-50 dark:bg-blue-950/20 border-l-2 border-blue-300 dark:border-blue-800">
+                    <TableCell className="text-right min-w-[70px] sm:min-w-[100px] bg-muted/30">
                       {asset.ytd !== undefined ? (
                         <div className="font-bold">
                           <span
@@ -319,7 +319,7 @@ export function AssetPriceHistoryTable({
                               'text-base',
                               asset.ytd > 0 && 'text-green-600',
                               asset.ytd < 0 && 'text-red-600',
-                              asset.ytd === 0 && 'text-gray-600 dark:text-gray-400'
+                              asset.ytd === 0 && 'text-muted-foreground'
                             )}
                           >
                             {asset.ytd > 0 ? '+' : ''}
@@ -327,14 +327,14 @@ export function AssetPriceHistoryTable({
                           </span>
                         </div>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
                   )}
 
-                  {/* From Start cell - shown only when filterStartDate is set */}
+                  {/* Da Inizio % cell - shown only when filterStartDate is set */}
                   {filterStartDate !== undefined && (
-                    <TableCell className="text-right min-w-[70px] sm:min-w-[100px] bg-purple-50 dark:bg-purple-950/20 border-l-2 border-purple-300 dark:border-purple-800">
+                    <TableCell className="text-right min-w-[70px] sm:min-w-[100px] bg-muted/30">
                       {asset.fromStart !== undefined ? (
                         <div className="font-bold">
                           <span
@@ -342,7 +342,7 @@ export function AssetPriceHistoryTable({
                               'text-base',
                               asset.fromStart > 0 && 'text-green-600',
                               asset.fromStart < 0 && 'text-red-600',
-                              asset.fromStart === 0 && 'text-gray-600 dark:text-gray-400'
+                              asset.fromStart === 0 && 'text-muted-foreground'
                             )}
                           >
                             {asset.fromStart > 0 ? '+' : ''}
@@ -350,7 +350,7 @@ export function AssetPriceHistoryTable({
                           </span>
                         </div>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
                   )}
@@ -395,7 +395,7 @@ export function AssetPriceHistoryTable({
                   })}
                   {/* Mese Prec. % column */}
                   {filterYear !== undefined && (
-                    <TableCell className="text-right min-w-[100px] bg-muted border-l-2 border-amber-300 dark:border-amber-800">
+                    <TableCell className="text-right min-w-[100px] bg-muted">
                       {totalRow.lastMonthChange !== undefined ? (
                         <div className="font-bold">
                           <span
@@ -403,7 +403,7 @@ export function AssetPriceHistoryTable({
                               'text-base',
                               totalRow.lastMonthChange > 0 && 'text-green-600',
                               totalRow.lastMonthChange < 0 && 'text-red-600',
-                              totalRow.lastMonthChange === 0 && 'text-gray-600 dark:text-gray-400'
+                              totalRow.lastMonthChange === 0 && 'text-muted-foreground'
                             )}
                           >
                             {totalRow.lastMonthChange > 0 ? '+' : ''}
@@ -411,13 +411,13 @@ export function AssetPriceHistoryTable({
                           </span>
                         </div>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
                   )}
                   {/* YTD column */}
                   {filterYear !== undefined && (
-                    <TableCell className="text-right min-w-[100px] bg-muted border-l-2 border-blue-300 dark:border-blue-800">
+                    <TableCell className="text-right min-w-[100px] bg-muted">
                       {totalRow.ytd !== undefined ? (
                         <div className="font-bold">
                           <span
@@ -425,7 +425,7 @@ export function AssetPriceHistoryTable({
                               'text-base',
                               totalRow.ytd > 0 && 'text-green-600',
                               totalRow.ytd < 0 && 'text-red-600',
-                              totalRow.ytd === 0 && 'text-gray-600 dark:text-gray-400'
+                              totalRow.ytd === 0 && 'text-muted-foreground'
                             )}
                           >
                             {totalRow.ytd > 0 ? '+' : ''}
@@ -433,13 +433,13 @@ export function AssetPriceHistoryTable({
                           </span>
                         </div>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
                   )}
-                  {/* From Start column */}
+                  {/* Da Inizio % column */}
                   {filterStartDate !== undefined && (
-                    <TableCell className="text-right min-w-[100px] bg-muted border-l-2 border-purple-300 dark:border-purple-800">
+                    <TableCell className="text-right min-w-[100px] bg-muted">
                       {totalRow.fromStart !== undefined ? (
                         <div className="font-bold">
                           <span
@@ -447,7 +447,7 @@ export function AssetPriceHistoryTable({
                               'text-base',
                               totalRow.fromStart > 0 && 'text-green-600',
                               totalRow.fromStart < 0 && 'text-red-600',
-                              totalRow.fromStart === 0 && 'text-gray-600 dark:text-gray-400'
+                              totalRow.fromStart === 0 && 'text-muted-foreground'
                             )}
                           >
                             {totalRow.fromStart > 0 ? '+' : ''}
@@ -455,7 +455,7 @@ export function AssetPriceHistoryTable({
                           </span>
                         </div>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
                   )}

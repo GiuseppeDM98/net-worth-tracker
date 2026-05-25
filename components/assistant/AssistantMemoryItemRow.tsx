@@ -5,6 +5,7 @@ import { Archive, ArchiveRestore, Check, Pencil, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { useChartColors } from '@/lib/hooks/useChartColors';
 import { AssistantMemoryItem } from '@/types/assistant';
 
 interface AssistantMemoryItemRowProps {
@@ -22,17 +23,16 @@ const CATEGORY_LABELS: Record<AssistantMemoryItem['category'], string> = {
   fact: 'Fatto',
 };
 
-// Color-coded category badges to give the panel visual hierarchy at a glance
-const CATEGORY_COLORS: Record<AssistantMemoryItem['category'], string> = {
-  goal: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
-  preference: 'bg-violet-500/10 text-violet-600 dark:text-violet-400',
-  risk: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-  fact: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+// Maps memory category to chartColors index for theme-aware badge color.
+// goal → [0], preference → [1], risk → [3], fact → [4]
+const CATEGORY_COLOR_INDEX: Record<AssistantMemoryItem['category'], number> = {
+  goal: 0,
+  preference: 1,
+  risk: 3,
+  fact: 4,
 };
 
-/**
- * Formats a date as DD/MM/YYYY — used for the item provenance label.
- */
+/** Formats a date as DD/MM/YYYY — used for the item provenance label. */
 function formatItemDate(date: Date): string {
   return date.toLocaleDateString('it-IT', {
     day: '2-digit',
@@ -43,7 +43,12 @@ function formatItemDate(date: Date): string {
 
 /**
  * Single memory item row with inline edit, archive/unarchive, and delete actions.
- * Edit mode replaces the text with an input; save/cancel buttons appear inline.
+ *
+ * Category badge colors are theme-aware via useChartColors() + color-mix() so they
+ * look correct across all 6 app themes (not hardcoded blue/violet/amber/emerald).
+ *
+ * Action buttons use [@media(pointer:fine)] so they are always visible on touch devices
+ * (no hover state available) but hide until hover/focus on mouse devices.
  */
 export function AssistantMemoryItemRow({
   item,
@@ -55,10 +60,14 @@ export function AssistantMemoryItemRow({
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(item.text);
   const [isSaving, setIsSaving] = useState(false);
-  // Inline delete confirmation: first click arms it, second click confirms.
-  // Auto-disarms after 3 seconds to prevent accidental deletions from stale UI.
+  // 2-click delete: first click arms, second confirms. Auto-disarms after 3s.
   const [isPendingDelete, setIsPendingDelete] = useState(false);
   const pendingDeleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Theme-aware chart colors — read from CSS vars after paint
+  const chartColors = useChartColors();
+  const colorIndex = CATEGORY_COLOR_INDEX[item.category];
+  const categoryColor = chartColors[colorIndex] ?? 'var(--muted-foreground)';
 
   const handleSave = async () => {
     const trimmed = editValue.trim();
@@ -81,7 +90,6 @@ export function AssistantMemoryItemRow({
     setEditValue(item.text);
   };
 
-  // Arm the delete confirmation and auto-disarm after 3 seconds
   const handleDeleteArm = () => {
     setIsPendingDelete(true);
     pendingDeleteTimerRef.current = setTimeout(() => {
@@ -109,26 +117,30 @@ export function AssistantMemoryItemRow({
         isArchived
           ? 'border-border/50 bg-muted/20 opacity-60'
           : isCompleted
-          ? 'border-emerald-500/20 bg-emerald-500/5'
+          ? 'border-border bg-muted/20'
           : 'border-border bg-background'
       )}
     >
       {/* Top row: category badge + actions */}
       <div className="flex items-center justify-between gap-2">
+        {/* Theme-aware badge: color from useChartColors(), tinted bg via color-mix() */}
         <span
-          className={cn(
-            'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide',
-            CATEGORY_COLORS[item.category]
-          )}
+          className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide"
+          style={{
+            color: categoryColor,
+            backgroundColor: `color-mix(in srgb, ${categoryColor} 12%, transparent)`,
+          }}
+          aria-label={`Categoria: ${CATEGORY_LABELS[item.category]}`}
         >
           {CATEGORY_LABELS[item.category]}
         </span>
 
-        {/* Action buttons: visible on hover, focus-within, or on touch (pointer: coarse).
-            opacity-0 is only applied for fine-pointer (mouse) devices so touch users always see actions. */}
+        {/* Action buttons: always visible on touch (pointer: coarse), hidden until hover/focus
+            on mouse devices (pointer: fine). This ensures touch-accessible controls. */}
         {!isEditing && !isPendingDelete && (
           <div className="flex items-center gap-0.5 transition-opacity [@media(pointer:fine)]:opacity-0 [@media(pointer:fine)]:group-hover:opacity-100 [@media(pointer:fine)]:group-focus-within:opacity-100">
             <Button
+              type="button"
               variant="ghost"
               size="icon"
               className="h-8 w-8 text-muted-foreground hover:text-foreground"
@@ -142,6 +154,7 @@ export function AssistantMemoryItemRow({
               <Pencil className="h-3 w-3" />
             </Button>
             <Button
+              type="button"
               variant="ghost"
               size="icon"
               className="h-8 w-8 text-muted-foreground hover:text-foreground"
@@ -155,8 +168,8 @@ export function AssistantMemoryItemRow({
                 <Archive className="h-3 w-3" />
               )}
             </Button>
-            {/* First click arms the confirmation; second click (on confirm) deletes */}
             <Button
+              type="button"
               variant="ghost"
               size="icon"
               className="h-8 w-8 text-muted-foreground hover:text-destructive"
@@ -169,12 +182,13 @@ export function AssistantMemoryItemRow({
           </div>
         )}
 
-        {/* Inline delete confirmation — shown after the first click on the trash icon.
-            Auto-disarms after 3 seconds so a stale hover state can't cause accidental deletion. */}
+        {/* Inline delete confirmation — shows after the first click on the trash icon.
+            Auto-disarms after 3 seconds. */}
         {!isEditing && isPendingDelete && (
           <div className="flex items-center gap-1">
             <span className="text-[11px] text-destructive font-medium">Elimina?</span>
             <Button
+              type="button"
               variant="ghost"
               size="icon"
               className="h-8 w-8 text-destructive hover:text-destructive"
@@ -185,6 +199,7 @@ export function AssistantMemoryItemRow({
               <Check className="h-3 w-3" />
             </Button>
             <Button
+              type="button"
               variant="ghost"
               size="icon"
               className="h-8 w-8 text-muted-foreground hover:text-foreground"
@@ -197,10 +212,11 @@ export function AssistantMemoryItemRow({
           </div>
         )}
 
-        {/* Inline edit save/cancel controls */}
+        {/* Inline edit save/cancel */}
         {isEditing && (
           <div className="flex items-center gap-0.5">
             <Button
+              type="button"
               variant="ghost"
               size="icon"
               className="h-8 w-8 text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
@@ -211,6 +227,7 @@ export function AssistantMemoryItemRow({
               <Check className="h-3 w-3" />
             </Button>
             <Button
+              type="button"
               variant="ghost"
               size="icon"
               className="h-8 w-8 text-muted-foreground hover:text-foreground"

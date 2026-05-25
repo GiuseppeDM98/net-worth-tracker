@@ -114,8 +114,8 @@ export function SettingsPageSkeleton() {
       </div>
 
       {/* Tab bar — desktop grid */}
-      <div className="hidden desktop:grid desktop:grid-cols-4 gap-1 rounded-lg bg-muted p-1">
-        {Array.from({ length: 4 }).map((_, i) => (
+      <div className="hidden desktop:grid desktop:grid-cols-5 gap-1 rounded-lg bg-muted p-1">
+        {Array.from({ length: 5 }).map((_, i) => (
           <SkeletonBar key={i} className="h-9 rounded-md" delayMs={120 + i * 30} />
         ))}
       </div>

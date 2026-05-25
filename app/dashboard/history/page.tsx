@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import Link from 'next/link';
 import {
   staggerContainer,
   cardItem,
@@ -14,11 +15,11 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { HistoryPageSkeleton } from '@/components/history/HistoryPageSkeleton';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
-import { getAllAssets, ASSET_CLASS_ORDER, calculateTotalEstimatedTaxes } from '@/lib/services/assetService';
+import { useChartColors } from '@/lib/hooks/useChartColors';
+import { getAllAssets, calculateTotalEstimatedTaxes } from '@/lib/services/assetService';
 import { getUserSnapshots, updateSnapshotNote } from '@/lib/services/snapshotService';
 import {
   getTargets,
-  compareAllocations,
   getDefaultTargets,
   getSettings,
 } from '@/lib/services/assetAllocationService';
@@ -37,6 +38,7 @@ import {
   formatPercentage,
 } from '@/lib/services/chartService';
 import LaborMetricsChart from '@/components/dashboard/LaborMetricsChart';
+import { HeroMetricBlock } from '@/components/performance/HeroMetricBlock';
 import {
   Select,
   SelectContent,
@@ -44,14 +46,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { Asset, MonthlySnapshot, AssetAllocationTarget, DoublingMode, AssetAllocationSettings } from '@/types/assets';
 import { DoublingTimeSummaryCards } from '@/components/history/DoublingTimeSummaryCards';
 import { DoublingMilestoneTimeline } from '@/components/history/DoublingMilestoneTimeline';
 import { Expense } from '@/types/expenses';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, Plus, MessageSquare, Briefcase, PiggyBank, TrendingUp, TrendingDown } from 'lucide-react';
+import {
+  Download,
+  Plus,
+  MessageSquare,
+  Briefcase,
+  PiggyBank,
+  TrendingUp,
+  TrendingDown,
+  ChevronDown,
+  Settings,
+} from 'lucide-react';
 import { getItalyYear } from '@/lib/utils/dateHelpers';
+import { MONTH_NAMES } from '@/lib/constants/months';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { CreateManualSnapshotModal } from '@/components/CreateManualSnapshotModal';
@@ -73,59 +91,53 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
-import { getAssetClassColor } from '@/lib/constants/colors';
 
 /**
  * HISTORY PAGE ARCHITECTURE
  *
- * This page displays historical portfolio analysis with multiple interactive charts.
+ * Narrative order: Hero → Evoluzione → Milestone (Doubling Time) → Composizione → Driver → Appendice
  *
  * DATA FLOW:
- * 1. Load snapshots + assets + targets from Firebase (parallel fetching)
- * 2. Transform snapshots → chart data structures using chartService
- * 3. Render 5 main charts with toggle between percentage and absolute value modes
+ * 1. Load snapshots + assets + targets + expenses from Firebase (parallel)
+ * 2. Transform snapshots → chart data via chartService
+ * 3. Render with chapter-reveal stagger (chapterReveal variant, 90ms per chapter)
  *
- * CHART TYPES:
- * - Net Worth Evolution: Line chart showing total portfolio growth over time
- * - Asset Class Evolution: Stacked area (€) or multi-line (%) showing allocation breakdown
- * - Liquidity Evolution: Overlapping areas (€) or separate lines (%) for liquid vs illiquid
- * - YoY Variation: Bar chart showing year-over-year changes
- * - Current vs Target: Progress bars comparing current allocation to user-defined targets
- *
- * RESPONSIVE DESIGN:
- * - Mobile (<768px): Smaller charts, hidden legends, compact labels
- * - Landscape: Reduced heights for better fit in constrained viewports
- * - Desktop: Full charts with legends and optimal sizing
- *
- * KEY TRADE-OFFS:
- * - Chart labels use custom SVG renderers for better visibility vs recharts defaults (more control, readable over chart lines)
- * - Notes displayed inline on chart vs separate section for immediate context
- * - Manual snapshot creation available for backfilling historical data vs automatic monthly only
- * - Dual chart types (stacked area vs line) for mode toggling vs dynamic data transformation (clearer separation of concerns)
+ * DESIGN PRINCIPLES (Trade Republic hierarchy):
+ * - Hero block: patrimonio attuale text-4xl + CAGR chip + pill nav shortcuts
+ * - No card-in-card: Lavoro KPIs use flat divide-y rows
+ * - No side-stripe borders: removed border-l-4 from evolution card
+ * - No hardcoded hex in chart series: all colors via useChartColors()
+ * - Segmented pills for Annuale/Mensile and Geometrico/Traguardi toggles
+ * - YoY + snapshot grid in collapsible appendice (default closed)
  */
 
-/**
- * Convert month number (1-12) to Italian month name.
- *
- * @param month - Month number where 1 = Gennaio (January), 12 = Dicembre (December)
- * @returns Italian month name as string
- */
-const getMonthName = (month: number): string => {
-  const months = [
-    'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
-    'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
-  ];
-  return months[month - 1];
-};
+// Module-level constants for segmented pill controls — stable reference for React Compiler
+const SAVINGS_VIEW_TABS = [
+  { value: 'annual' as const, label: 'Annuale' },
+  { value: 'monthly' as const, label: 'Mensile' },
+];
 
-type HistoryChapterId = 'overview' | 'growth' | 'drivers' | 'milestones' | 'reference';
+const DOUBLING_MODE_TABS = [
+  { value: 'geometric' as const, label: 'Geometrico' },
+  { value: 'threshold' as const, label: 'Traguardi' },
+];
+
+// Pill nav links that scroll to named section anchors in the page
+const SECTION_PILLS = [
+  { label: 'Evoluzione', href: '#section-evolution' },
+  { label: 'Raddoppi', href: '#section-milestones' },
+  { label: 'Composizione', href: '#section-composition' },
+  { label: 'Driver', href: '#section-drivers' },
+] as const;
+
+type HistoryChapterId = 'hero' | 'evolution' | 'milestones' | 'composition' | 'drivers';
 
 const HISTORY_CHAPTER_SEQUENCE: HistoryChapterId[] = [
-  'overview',
-  'growth',
-  'drivers',
+  'hero',
+  'evolution',
   'milestones',
-  'reference',
+  'composition',
+  'drivers',
 ];
 
 export default function HistoryPage() {
@@ -147,13 +159,16 @@ export default function HistoryPage() {
   // 'all' shows all years as a continuous monthly timeline; a number filters to that year
   const [savingsSelectedYear, setSavingsSelectedYear] = useState<number | 'all'>('all');
   const [visibleChapters, setVisibleChapters] = useState<HistoryChapterId[]>([]);
+  // Appendice collapsible — default closed so it doesn't overwhelm the page on first load
+  const [snapshotsOpen, setSnapshotsOpen] = useState(false);
   const prefersReducedMotion = useReducedMotion();
+
+  const chartColors = useChartColors();
 
   // Responsive breakpoints
   const isMobile = useMediaQuery('(max-width: 767px)');
   const isLandscape = useMediaQuery('(min-width: 568px) and (max-height: 500px) and (orientation: landscape)');
 
-  // Responsive helper functions
   const getChartHeight = () => {
     if (isLandscape) return 300;
     if (isMobile) return 280;
@@ -162,12 +177,33 @@ export default function HistoryPage() {
 
   const getChartMargins = () => {
     if (isMobile) return { left: 10, right: 10, top: 5, bottom: 5 };
-    // bottom: 20 prevents legend from overlapping X-axis labels (Recharts renders
-    // legend inside SVG height, eating into chart space without explicit bottom margin)
+    // bottom: 20 prevents legend from overlapping X-axis labels inside the SVG
     return { left: 50, bottom: 20 };
   };
 
   const getYAxisWidth = () => (isMobile ? 70 : 100);
+
+  // Shared tooltip style — reduced font size vs old 16px for cleaner desktop display
+  const tooltipStyle = {
+    contentStyle: {
+      backgroundColor: 'var(--card)',
+      border: '1px solid var(--border)',
+      borderRadius: '8px',
+      padding: isMobile ? '8px' : '12px',
+      fontSize: isMobile ? '12px' : '13px',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    },
+    labelStyle: {
+      color: 'var(--foreground)',
+      fontWeight: 600,
+      marginBottom: '4px',
+      fontSize: isMobile ? '12px' : '13px',
+    },
+    itemStyle: {
+      fontSize: isMobile ? '12px' : '13px',
+      padding: '2px 0',
+    },
+  };
 
   useEffect(() => {
     if (user) {
@@ -198,13 +234,7 @@ export default function HistoryPage() {
   /**
    * Load all data needed for history visualization.
    *
-   * Fetches in parallel for optimal performance:
-   * - Snapshots: Monthly portfolio snapshots used for all historical charts
-   * - Assets: Current assets needed for allocation comparison view
-   * - Targets: User's allocation targets for comparison (falls back to defaults if not set)
-   * - Expenses: Cashflow data needed for savings vs investment growth chart
-   *
-   * Snapshots are created automatically at month-end or manually via modal for backfilling.
+   * Fetches in parallel: snapshots, assets, allocation targets, expenses, portfolio settings.
    * All four queries run concurrently to minimize loading time.
    */
   const loadData = async () => {
@@ -236,12 +266,8 @@ export default function HistoryPage() {
   /**
    * Export snapshot history to CSV file for external analysis.
    *
-   * CSV Format:
-   * - Headers: Data (MM/YYYY), Patrimonio Totale, Patrimonio Liquido, Patrimonio Illiquido
-   * - Values: Raw numbers (not formatted as currency)
-   * - Filename includes timestamp to prevent overwrites
-   *
-   * Downloads file directly to browser's default download location.
+   * CSV headers: Data (MM/YYYY), Patrimonio Totale, Patrimonio Liquido, Patrimonio Illiquido.
+   * Downloads directly to the browser's default download location.
    */
   const handleExportCSV = () => {
     if (snapshots.length === 0) {
@@ -249,7 +275,6 @@ export default function HistoryPage() {
       return;
     }
 
-    // Create CSV content
     const headers = ['Data', 'Patrimonio Totale', 'Patrimonio Liquido', 'Patrimonio Illiquido'];
     const rows = snapshots.map((snapshot) => [
       `${String(snapshot.month).padStart(2, '0')}/${snapshot.year}`,
@@ -258,12 +283,7 @@ export default function HistoryPage() {
       snapshot.illiquidNetWorth || 0,
     ]);
 
-    const csvContent = [
-      headers.join(','),
-      ...rows.map((row) => row.join(',')),
-    ].join('\n');
-
-    // Download file
+    const csvContent = [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -278,23 +298,14 @@ export default function HistoryPage() {
   };
 
   /**
-   * Save user note for a specific snapshot month.
-   *
-   * Uses optimistic update pattern for immediate UI feedback:
-   * 1. Update Firestore first (persists note to database)
-   * 2. Update local state immediately (no need to wait for re-fetch)
-   * 3. Empty notes stored as undefined (Firebase best practice, avoids storing empty strings)
-   *
-   * @param year - Snapshot year
-   * @param month - Snapshot month (1-12)
-   * @param note - User's note text (empty string converted to undefined)
+   * Save user note for a specific snapshot month via optimistic update:
+   * writes to Firestore first, then updates local state without re-fetching.
    */
   const handleSaveNote = async (year: number, month: number, note: string) => {
     if (!user) return;
 
     await updateSnapshotNote(user.uid, year, month, note);
 
-    // Update local state immediately for instant UI feedback (optimistic update)
     setSnapshots((prevSnapshots) =>
       prevSnapshots.map((s) =>
         s.year === year && s.month === month
@@ -319,7 +330,6 @@ export default function HistoryPage() {
     () => prepareSavingsVsInvestmentDataAllMonths(snapshots, expenses),
     [snapshots, expenses]
   );
-  // Unique years from snapshots for the year selector, newest first
   const savingsAvailableYears = useMemo(
     () => [...new Set(snapshots.map((s) => s.year))].sort((a, b) => b - a),
     [snapshots]
@@ -332,20 +342,13 @@ export default function HistoryPage() {
   );
   const savingsViewLabel = savingsView === 'annual' ? 'Annuale' : 'Mensile';
   const savingsScopeLabel = useMemo(() => {
-    if (savingsView === 'annual') {
-      return 'Confronto per anno';
-    }
-
-    if (savingsSelectedYear === 'all') {
-      return 'Timeline mensile completa';
-    }
-
+    if (savingsView === 'annual') return 'Confronto per anno';
+    if (savingsSelectedYear === 'all') return 'Timeline mensile completa';
     return `Dettaglio ${savingsSelectedYear}`;
   }, [savingsSelectedYear, savingsView]);
 
-  // Aggregate lifetime labor/investment metrics for the 4 KPI cards.
-  // Mirrors the same calculation from the dashboard, using assets already loaded here
-  // to derive estimated taxes (avoids a separate Firestore call).
+  // Aggregate lifetime labor/investment metrics for the KPI rows.
+  // Only computed when laborIncomeCategoryIds is configured in Settings.
   const laborIncomeMetrics = useMemo(() => {
     const categoryIds = portfolioSettings?.laborIncomeCategoryIds;
     if (!categoryIds || categoryIds.length === 0 || expenses.length === 0) return null;
@@ -381,14 +384,19 @@ export default function HistoryPage() {
       totalInvestmentGrowthGross = netWorthDelta - (allIncomeSum + totalExpensesSum);
     }
 
-    // Use current assets to estimate capital gains taxes (same logic as dashboard)
     const estimatedTaxes = calculateTotalEstimatedTaxes(assets);
     const totalInvestmentGrowthNet = totalInvestmentGrowthGross - estimatedTaxes;
 
-    return { totalLaborIncome, totalSavedFromWork, totalExpensesSum, totalInvestmentGrowthGross, totalInvestmentGrowthNet, startYear };
+    return {
+      totalLaborIncome,
+      totalSavedFromWork,
+      totalExpensesSum,
+      totalInvestmentGrowthGross,
+      totalInvestmentGrowthNet,
+      startYear,
+    };
   }, [expenses, snapshots, portfolioSettings, assets]);
 
-  // Monthly labor vs investment breakdown — only when labor categories are configured in Settings
   const laborMetricsChartData = useMemo(() => {
     const categoryIds = portfolioSettings?.laborIncomeCategoryIds;
     if (!categoryIds || categoryIds.length === 0 || expenses.length === 0) return [];
@@ -407,10 +415,7 @@ export default function HistoryPage() {
     );
   }, [laborMetricsChartData]);
 
-  // Calculate percentage split of liquid vs illiquid for each snapshot.
-  // This enables the chart toggle between € values and % distribution.
-  // Percentages are pre-calculated here rather than in chart render
-  // to avoid recalculation on every chart update (performance optimization).
+  // Pre-calculate liquid/illiquid percentages for the liquidity chart toggle
   const liquidityHistory = netWorthHistory.map((item) => {
     const total = item.liquidNetWorth + item.illiquidNetWorth;
     return {
@@ -420,246 +425,54 @@ export default function HistoryPage() {
     };
   });
 
-  // Prepare current vs target data
-  const allocation = compareAllocations(
-    assets,
-    targets || getDefaultTargets()
-  );
-
-  // WARNING: If you add a new asset class, also update:
-  // - ASSET_CLASS_ORDER in lib/services/assetService.ts
-  // - getAssetClassColor() in lib/constants/colors.ts
-  // - AssetClass type definition in types/assets.ts
-  // - Target allocation settings in settings page
-  // Keep all locations in sync to prevent UI inconsistencies!
-  const assetClassLabels: Record<string, string> = {
-    equity: 'Azioni (Equity)',
-    bonds: 'Obbligazioni (Bonds)',
-    crypto: 'Criptovalute (Crypto)',
-    realestate: 'Immobili (Real Estate)',
-    cash: 'Liquidità (Cash)',
-    commodity: 'Materie Prime (Commodity)',
-  };
-
-  // Sort asset classes by predefined order (Equity → Bonds → Crypto → etc.)
-  // rather than alphabetically. This provides consistent UX across all views
-  // and matches the order users expect from finance conventions.
-  // Order defined in ASSET_CLASS_ORDER constant for centralized management.
-  const currentVsTargetData = Object.entries(allocation.byAssetClass)
-    .sort(([a], [b]) => {
-      const orderA = ASSET_CLASS_ORDER[a] || 999;
-      const orderB = ASSET_CLASS_ORDER[b] || 999;
-      return orderA - orderB;
-    })
-    .map(([assetClass, data]) => ({
-      name: assetClassLabels[assetClass] || assetClass,
-      corrente: data.currentPercentage,
-      target: data.targetPercentage,
-      color: getAssetClassColor(assetClass),
-    }));
-
-  /**
-   * Custom label renderer for net worth chart using SVG.
-   *
-   * WHY CUSTOM RENDERER:
-   * Recharts default labels don't support:
-   * - Background boxes for readability over chart lines
-   * - Border styling for visual hierarchy and emphasis
-   * - Precise positioning control for optimal label placement
-   *
-   * SVG STRUCTURE:
-   * <g> - Group container for rect + text elements
-   *   <rect> - White background with blue border (creates "pill" shape)
-   *   <text> - Currency value centered in rect
-   *
-   * POSITIONING LOGIC:
-   * - x, y coordinates from chart library (data point position)
-   * - rect centered horizontally: x - (textWidth / 2) - padding
-   * - text y-offset: -6px above rect bottom for vertical centering
-   *
-   * ACCESSIBILITY:
-   * - High contrast: dark text (#1F2937) on white background
-   * - Rounded corners (rx=4) for modern, friendly appearance
-   * - 95% opacity allows slight chart visibility through label
-   */
-  const renderNetWorthLabelTotal = (props: any) => {
-    const { x, y, value } = props;
-    const text = formatCurrency(value).replace(/,00$/, '');
-    const padding = 6;
-    const textWidth = text.length * 7; // Approximate width based on font size
-
-    return (
-      <g>
-        <rect
-          x={x - textWidth / 2 - padding}
-          y={y - 20}
-          width={textWidth + padding * 2}
-          height={20}
-          fill="white"
-          stroke="#3B82F6"
-          strokeWidth={1.5}
-          rx={4}
-          opacity={0.95}
-        />
-        <text
-          x={x}
-          y={y - 6}
-          fill="#1F2937"
-          fontSize={12}
-          textAnchor="middle"
-          fontWeight="600"
-        >
-          {text}
-        </text>
-      </g>
+  // Hero metrics: latest patrimonio, total growth %, and annualized CAGR
+  const heroMetrics = useMemo(() => {
+    if (snapshots.length === 0) return null;
+    const sorted = [...snapshots].sort((a, b) =>
+      a.year !== b.year ? a.year - b.year : a.month - b.month
     );
-  };
-
-
-  const renderLiquidityLabelIlliquid = (props: any) => {
-    const { x, y, value } = props;
-    const text = showLiquidityPercentage
-      ? `${value.toFixed(1)}%`
-      : formatCurrency(value).replace(/,00$/, '');
-    const padding = 6;
-    const textWidth = text.length * 7;
-
-    return (
-      <g>
-        <rect
-          x={x - textWidth / 2 - padding}
-          y={y - 10}
-          width={textWidth + padding * 2}
-          height={20}
-          fill="white"
-          stroke="#F59E0B"
-          strokeWidth={1.5}
-          rx={4}
-          opacity={0.95}
-        />
-        <text
-          x={x}
-          y={y + 4}
-          fill="#1F2937"
-          fontSize={12}
-          textAnchor="middle"
-          fontWeight="600"
-        >
-          {text}
-        </text>
-      </g>
-    );
-  };
-
-  const renderLiquidityLabelLiquid = (props: any) => {
-    const { x, y, value } = props;
-    const text = showLiquidityPercentage
-      ? `${value.toFixed(1)}%`
-      : formatCurrency(value).replace(/,00$/, '');
-    const padding = 6;
-    const textWidth = text.length * 7;
-
-    return (
-      <g>
-        <rect
-          x={x - textWidth / 2 - padding}
-          y={y - 20}
-          width={textWidth + padding * 2}
-          height={20}
-          fill="white"
-          stroke="#10B981"
-          strokeWidth={1.5}
-          rx={4}
-          opacity={0.95}
-        />
-        <text
-          x={x}
-          y={y - 6}
-          fill="#1F2937"
-          fontSize={12}
-          textAnchor="middle"
-          fontWeight="600"
-        >
-          {text}
-        </text>
-      </g>
-    );
-  };
-
-  /**
-   * Factory function for asset class label renderers with custom colors.
-   *
-   * Creates a custom SVG label renderer with specified color border.
-   * Same structure as renderNetWorthLabelTotal but allows dynamic color theming.
-   *
-   * @param color - Hex color for border stroke (matches asset class color)
-   * @param offsetY - Vertical offset from data point (default -10, negative = above)
-   * @returns Label render function compatible with Recharts label prop
-   */
-  const renderAssetClassLabel = (color: string, offsetY: number = -10) => (props: any) => {
-    const { x, y, value } = props;
-    if (!value || value === 0) return null;
-
-    const text = showAssetClassPercentage
-      ? `${value.toFixed(1)}%`
-      : formatCurrency(value).replace(/,00$/, '');
-    const padding = 6;
-    const textWidth = text.length * 7;
-
-    return (
-      <g>
-        <rect
-          x={x - textWidth / 2 - padding}
-          y={y + offsetY}
-          width={textWidth + padding * 2}
-          height={20}
-          fill="white"
-          stroke={color}
-          strokeWidth={1.5}
-          rx={4}
-          opacity={0.95}
-        />
-        <text
-          x={x}
-          y={y + offsetY + 14}
-          fill="#1F2937"
-          fontSize={12}
-          textAnchor="middle"
-          fontWeight="600"
-        >
-          {text}
-        </text>
-      </g>
-    );
-  };
-
-  const renderEquityLabel = renderAssetClassLabel('#3B82F6', -10);
-  const renderBondsLabel = renderAssetClassLabel('#EF4444', -10);
-  const renderCryptoLabel = renderAssetClassLabel('#F59E0B', -10);
-  const renderRealEstateLabel = renderAssetClassLabel('#10B981', -10);
-  const renderCashLabel = renderAssetClassLabel('#6B7280', -10);
-  const renderCommodityLabel = renderAssetClassLabel('#92400E', -10);
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+    const totalMonths = (last.year - first.year) * 12 + (last.month - first.month);
+    const totalGrowthPct =
+      first.totalNetWorth > 0
+        ? ((last.totalNetWorth / first.totalNetWorth) - 1) * 100
+        : null;
+    // CAGR requires at least 12 months of data to be meaningful
+    const cagr =
+      totalMonths >= 12 && first.totalNetWorth > 0
+        ? (Math.pow(last.totalNetWorth / first.totalNetWorth, 12 / totalMonths) - 1) * 100
+        : null;
+    return { latestNetWorth: last.totalNetWorth, totalGrowthPct, cagr, firstYear: first.year, totalMonths };
+  }, [snapshots]);
 
   if (loading) {
     return <HistoryPageSkeleton />;
   }
 
+  // Asset class series color assignments (consistent with ASSET_CLASS_ORDER)
+  const acColors = {
+    equity: chartColors[0],
+    bonds: chartColors[1],
+    crypto: chartColors[2],
+    realestate: chartColors[3],
+    cash: chartColors[4],
+    commodity: chartColors[5],
+  };
+
   return (
     <div className="space-y-6 max-desktop:portrait:pb-20">
-      {/* Page header — eyebrow label + title establish editorial entry point.
-          PDF export is the primary persistent action; CSV and snapshot insertion
-          are utility actions demoted to outline/ghost so the primary CTA is clear. */}
+      {/* Page header */}
       <div className="pb-4 border-b border-border">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex-1">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Patrimonio</p>
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Storico</h1>
             <p className="mt-1 sm:mt-2 text-sm sm:text-base text-muted-foreground">
-              Analizza l'evoluzione del tuo patrimonio (lordo) nel tempo
+              Analizza l&apos;evoluzione del tuo patrimonio (lordo) nel tempo
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto sm:items-center">
-            {/* PDF export is the primary download action */}
             <ExportPDFButton
               snapshots={snapshots}
               assets={assets}
@@ -682,1431 +495,977 @@ export default function HistoryPage() {
               className="w-full sm:w-auto text-muted-foreground hover:text-foreground"
             >
               <Plus className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Snapshot Passato</span>
-              <span className="sm:hidden">Snapshot Passato</span>
+              Snapshot Passato
             </Button>
           </div>
         </div>
       </div>
 
+      {/* ── HERO ──────────────────────────────────────────────────────── */}
       <motion.section
         variants={chapterReveal}
         initial="hidden"
-        animate={visibleChapterSet.has('overview') ? 'visible' : 'hidden'}
-        className="space-y-4"
+        animate={visibleChapterSet.has('hero') ? 'visible' : 'hidden'}
       >
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-xl border bg-card px-4 py-4">
-            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Capitolo 1</p>
-            <p className="mt-2 text-sm font-semibold text-foreground">Evoluzione del patrimonio</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Parti dal trend complessivo e usa le note per contestualizzare i punti di svolta.
-            </p>
+        <Card className="overflow-hidden">
+          <HeroMetricBlock
+            label="Patrimonio Attuale"
+            value={heroMetrics?.latestNetWorth ?? null}
+            format="currency"
+            subtitle={heroMetrics ? `Dal ${heroMetrics.firstYear}` : undefined}
+          />
+
+          {heroMetrics && (heroMetrics.cagr !== null || heroMetrics.totalGrowthPct !== null) && (
+            <div className="flex flex-wrap items-center gap-2 px-6 pb-4">
+              {heroMetrics.cagr !== null && (
+                <span className={cn(
+                  'inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium',
+                  heroMetrics.cagr >= 0
+                    ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                    : 'bg-red-500/10 text-red-600 dark:text-red-400'
+                )}>
+                  {heroMetrics.cagr >= 0 ? '+' : ''}{heroMetrics.cagr.toFixed(1)}% /anno (CAGR)
+                </span>
+              )}
+              {heroMetrics.totalGrowthPct !== null && (
+                <span className={cn(
+                  'inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium',
+                  heroMetrics.totalGrowthPct >= 0
+                    ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                    : 'bg-red-500/10 text-red-600 dark:text-red-400'
+                )}>
+                  {heroMetrics.totalGrowthPct >= 0 ? '+' : ''}{heroMetrics.totalGrowthPct.toFixed(1)}% totale
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Pill nav — scroll to named section anchors */}
+          <div className="border-t border-border/40 px-6 py-3 flex flex-wrap gap-2">
+            {SECTION_PILLS.map(({ label, href }) => (
+              <a
+                key={href}
+                href={href}
+                className="inline-flex items-center rounded-full border border-border/60 px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+              >
+                {label}
+              </a>
+            ))}
           </div>
-          <div className="rounded-xl border bg-card px-4 py-4">
-            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Capitolo 2</p>
-            <p className="mt-2 text-sm font-semibold text-foreground">Driver della crescita</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Separa risparmio, crescita degli investimenti e contributo del lavoro.
-            </p>
-          </div>
-          <div className="rounded-xl border bg-card px-4 py-4">
-            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Capitolo 3</p>
-            <p className="mt-2 text-sm font-semibold text-foreground">Milestone e assetto</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Chiudi con raddoppi, traguardi e confronto tra allocazione attuale e desiderata.
-            </p>
-          </div>
-        </div>
+        </Card>
       </motion.section>
 
-      {/* Net Worth History Chart — first chart on the page gets hero treatment:
-          left-accent border and a slightly larger title signal this is the primary
-          data story. All other charts follow at standard weight. */}
+      {/* ── EVOLUZIONE ────────────────────────────────────────────────── */}
       <motion.section
+        id="section-evolution"
         variants={chapterReveal}
         initial="hidden"
-        animate={visibleChapterSet.has('growth') ? 'visible' : 'hidden'}
+        animate={visibleChapterSet.has('evolution') ? 'visible' : 'hidden'}
         className="space-y-4 pt-6 border-t border-border/40"
       >
-      <div>
-        <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Capitolo 1</p>
-        <h2 className="mt-1 text-lg font-semibold text-foreground">Evoluzione e composizione</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          I blocchi principali sono allineati per raccontare prima il patrimonio totale, poi la sua composizione e infine la variazione anno su anno.
-        </p>
-      </div>
-      <div className="space-y-4">
-      <motion.div variants={cardItem} initial="hidden" animate="visible">
-      <Card className="border-l-4 border-l-primary">
-        <CardHeader>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-2">
-              <CardTitle className="text-xl sm:text-2xl">Evoluzione Patrimonio Netto</CardTitle>
-              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1 font-medium text-foreground">
-                  Vista principale
-                </span>
-                <span className="rounded-full border border-border bg-background px-2.5 py-1">
-                  {netWorthHistory.length} rilevazioni
-                </span>
-                <span className="rounded-full border border-border bg-background px-2.5 py-1">
-                  {notesCount} {notesCount === 1 ? 'nota' : 'note'}
-                </span>
-              </div>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-              {/* Toggle Visualizza Note */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowNotes(!showNotes)}
-                className="w-full sm:w-auto text-xs sm:text-sm"
-              >
-                {showNotes ? 'Nascondi Note' : 'Visualizza Note'}
-              </Button>
+        <div>
+          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Evoluzione</p>
+          <h2 className="mt-1 text-lg font-semibold text-foreground">Patrimonio nel tempo</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Trend complessivo del patrimonio. Usa le note per contestualizzare i punti di svolta.
+          </p>
+        </div>
 
-              {/* Bottone Inserisci Nota */}
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => setSnapshotSearchDialogOpen(true)}
-                className="w-full sm:w-auto text-xs sm:text-sm"
-              >
-                <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                Inserisci una nota
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {netWorthHistory.length === 0 ? (
-            <div className="flex h-64 items-center justify-center text-gray-500 dark:text-gray-400">
-              Nessuno storico disponibile. Gli snapshot mensili verranno creati
-              automaticamente.
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-net-worth-evolution">
-              <LineChart data={netWorthHistory} margin={getChartMargins()}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis
-                  width={getYAxisWidth()}
-                  tickFormatter={(value) => formatCurrencyCompact(value)}
-                  // Add 5% padding above/below data range to prevent chart clipping.
-                  // Data points at min/max would otherwise be partially cut off by chart edges.
-                  // Formula: min * 0.95 creates 5% space below, max * 1.05 creates 5% space above.
-                  domain={[(dataMin: number) => dataMin * 0.95, (dataMax: number) => dataMax * 1.05]}
-                />
-                <Tooltip
-                  formatter={(value) => formatCurrency(value as number)}
-                  contentStyle={{
-                    backgroundColor: 'var(--card)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    padding: isMobile ? '8px' : '12px',
-                    fontSize: isMobile ? '11px' : '13px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                  }}
-                  labelStyle={{
-                    color: 'var(--foreground)',
-                    fontWeight: 600,
-                    marginBottom: '4px',
-                    fontSize: isMobile ? '14px' : '16px',
-                  }}
-                  itemStyle={{
-                    fontSize: isMobile ? '14px' : '16px',
-                    padding: '2px 0',
-                  }}
-                  cursor={{ stroke: '#3B82F6', strokeWidth: 1, strokeDasharray: '5 5' }}
-                />
-                <Legend
-                  wrapperStyle={{
-                    display: isMobile ? 'none' : 'block',
-                    paddingTop: isMobile ? '0' : '20px'
-                  }}
-                  iconSize={isMobile ? 8 : 10}
-                  fontSize={isMobile ? 11 : 12}
-                />
-                {/*
-                  NOTES VISUALIZATION PATTERN
-
-                  Notes are no longer rendered as inline labels on the chart.
-                  Instead, when showNotes is true, a dedicated table appears below
-                  this chart showing all snapshots with notes in a readable format.
-
-                  Visual indicators remain: CustomChartDot renders amber dots with
-                  message icons for snapshots that have notes attached.
-                */}
-                <Line
-                  type="monotone"
-                  dataKey="totalNetWorth"
-                  stroke="#3B82F6"
-                  strokeWidth={2}
-                  name="Patrimonio Totale"
-                  dot={({ key, ...props }: any) => <CustomChartDot key={key} {...props} isMobile={isMobile} />}
-                  activeDot={{ r: 6 }}
-                  animationDuration={800}
-                  animationEasing="ease-out"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          )}
-        </CardContent>
-      </Card>
-      </motion.div>
-
-      {/*
-        NOTES TABLE PATTERN
-
-        When showNotes is true, display a dedicated table below the chart
-        showing all snapshots with notes in a clean, readable format.
-
-        DESIGN RATIONALE:
-        - Follows the same responsive pattern as cashflow drill-down (CurrentYearTab)
-        - Mobile: Card layout with stacked info
-        - Desktop: Table with sticky header, max-height scrolling
-        - Shows full note text (not truncated like old inline labels)
-        - Sorted newest to oldest for easy scanning
-
-        DATA FILTERING:
-        Filter snapshots to only those with note field present and non-empty.
-        The note field is optional in MonthlySnapshot, stored as undefined when empty
-        (Firebase best practice to avoid storing empty strings).
-      */}
-      <AnimatePresence>
-      {showNotes && (
-        <motion.div key="notes-section" variants={slideDown} initial="hidden" animate="visible" exit="exit">
-        {(() => {
-        // Filter snapshots that have notes (note field exists and is not empty).
-        // prepareNetWorthHistoryData() already includes note, month, year fields
-        // from the original snapshots, so we can use them directly without
-        // searching through the snapshots array again.
-        const snapshotsWithNotes = netWorthHistory
-          .filter(item => item.note && item.note.trim() !== '')
-          .map(item => ({
-            year: item.year,
-            month: item.month,
-            note: item.note!,
-            date: item.date
-          }))
-          .sort((a, b) => {
-            // Sort by year descending, then by month descending (newest first)
-            if (b.year !== a.year) return b.year - a.year;
-            return b.month - a.month;
-          });
-
-        return (
+        <motion.div variants={cardItem} initial="hidden" animate="visible">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg sm:text-xl">Note Patrimonio Netto</CardTitle>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowNotes(false)}
-                  className="text-xs sm:text-sm"
-                >
-                  Chiudi
-                </Button>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-2">
+                  <CardTitle className="text-xl sm:text-2xl">Evoluzione Patrimonio Netto</CardTitle>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1 font-medium text-foreground">
+                      Vista principale
+                    </span>
+                    <span className="rounded-full border border-border bg-background px-2.5 py-1">
+                      {netWorthHistory.length} rilevazioni
+                    </span>
+                    <span className="rounded-full border border-border bg-background px-2.5 py-1">
+                      {notesCount} {notesCount === 1 ? 'nota' : 'note'}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowNotes(!showNotes)}
+                    className="w-full sm:w-auto text-xs sm:text-sm"
+                  >
+                    {showNotes ? 'Nascondi Note' : 'Visualizza Note'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSnapshotSearchDialogOpen(true)}
+                    className="w-full sm:w-auto text-xs sm:text-sm"
+                  >
+                    <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                    Inserisci una nota
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
-              {snapshotsWithNotes.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  Nessuna nota disponibile
+              {netWorthHistory.length === 0 ? (
+                <div className="flex h-64 items-center justify-center text-muted-foreground text-sm">
+                  Nessuno storico disponibile. Gli snapshot mensili verranno creati automaticamente.
                 </div>
               ) : (
-                <>
-                  {/* Mobile layout: Card-based */}
-                  <div className="space-y-3 sm:hidden">
-                    {snapshotsWithNotes.map((item) => (
-                      <div key={`${item.year}-${item.month}`} className="rounded-md border p-3">
-                        <div className="font-medium text-sm text-muted-foreground mb-2">
-                          {getMonthName(item.month)} {item.year}
-                        </div>
-                        <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">
-                          {item.note}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Desktop layout: Table with sticky header */}
-                  <div className="hidden sm:block rounded-md border">
-                    <div className="max-h-[500px] overflow-y-auto">
-                      <table className="w-full">
-                        <thead className="sticky top-0 bg-muted/50 border-b">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-sm font-medium w-[200px]">
-                              Periodo
-                            </th>
-                            <th className="px-4 py-3 text-left text-sm font-medium">
-                              Nota
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {snapshotsWithNotes.map((item) => (
-                            <tr key={`${item.year}-${item.month}`} className="border-b hover:bg-muted/30">
-                              <td className="px-4 py-3 text-sm font-medium align-top">
-                                {getMonthName(item.month)} {item.year}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-muted-foreground whitespace-pre-line">
-                                {item.note}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Counter footer */}
-                  <div className="mt-4 text-sm text-muted-foreground">
-                    {snapshotsWithNotes.length} {snapshotsWithNotes.length === 1 ? 'nota trovata' : 'note trovate'}
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        );
-        })()}
-        </motion.div>
-      )}
-      </AnimatePresence>
-
-      {/* Asset Class Evolution Chart */}
-      <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.1 }}>
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="text-lg sm:text-xl">Patrimonio Netto per Asset Class</CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowAssetClassPercentage(!showAssetClassPercentage)}
-              className="w-full sm:w-auto text-xs sm:text-sm"
-            >
-              {showAssetClassPercentage ? '€ Valori Assoluti' : '% Percentuali'}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {assetClassHistory.length === 0 ? (
-            <div className="flex h-64 items-center justify-center text-gray-500 dark:text-gray-400">
-              Nessuno storico disponibile.
-            </div>
-          ) : (
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={showAssetClassPercentage ? 'asset-class-percentage' : 'asset-class-absolute'}
-                variants={tabPanelSwitch}
-                initial="hidden"
-                animate="visible"
-                exit="hidden"
-              >
-            <ResponsiveContainer key={isLandscape ? 'landscape' : 'portrait'} width="100%" height={getChartHeight()} id="chart-asset-class-evolution">
-              {/*
-                CHART MODE SWITCHING: Percentage vs Absolute Values
-
-                Two fundamentally different chart types for the same data:
-
-                1. PERCENTAGE MODE (LineChart):
-                   - Use case: Compare relative weights over time
-                   - Shows: % of total portfolio for each asset class
-                   - Math: assetValue / totalPortfolio * 100
-                   - Y-axis: Fixed 0-100% range
-                   - Why LineChart: Percentages don't stack (always sum to 100%)
-
-                2. ABSOLUTE MODE (Stacked AreaChart):
-                   - Use case: See actual € growth for each asset class
-                   - Shows: Total € value stacked on top of each other
-                   - Math: Raw asset values in EUR
-                   - Y-axis: Dynamic based on portfolio size
-                   - Why Stacked: Visual representation of total portfolio composition
-
-                TRADE-OFF:
-                Using two separate chart types instead of data transformation
-                because recharts doesn't support dynamic stacking. This duplicates
-                some code but provides clearer separation of concerns and better UX.
-              */}
-              {showAssetClassPercentage ? (
-                // Percentage mode: Use LineChart with separate lines
-                <LineChart data={assetClassHistory} margin={getChartMargins()}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis
-                    width={getYAxisWidth()}
-                    tickFormatter={(value) => `${value.toFixed(0)}%`}
-                    domain={[0, 100]}
-                  />
-                  <Tooltip
-                    formatter={(value) => `${(value as number).toFixed(2)}%`}
-                    contentStyle={{
-                      backgroundColor: 'var(--card)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '8px',
-                      padding: isMobile ? '8px' : '12px',
-                      fontSize: isMobile ? '14px' : '16px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                    }}
-                    labelStyle={{
-                      color: 'var(--foreground)',
-                      fontWeight: 600,
-                      marginBottom: '4px',
-                    }}
-                    itemStyle={{
-                      fontSize: isMobile ? '14px' : '16px',
-                      padding: '2px 0',
-                    }}
-                    cursor={{ fill: 'rgba(255,255,255,0.06)' }}
-                  />
-                  <Legend
-                    wrapperStyle={{
-                      display: isMobile ? 'none' : 'block',
-                      paddingTop: isMobile ? '0' : '20px'
-                    }}
-                    iconSize={isMobile ? 8 : 10}
-                    fontSize={isMobile ? 11 : 12}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="equityPercentage"
-                    stroke="#3B82F6"
-                    strokeWidth={2}
-                    name="Azioni"
-                    dot={{ r: 4 }}
-                    animationDuration={800}
-                    animationEasing="ease-out"
-                    label={false}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="bondsPercentage"
-                    stroke="#EF4444"
-                    strokeWidth={2}
-                    name="Obbligazioni"
-                    dot={{ r: 4 }}
-                    animationDuration={800}
-                    animationEasing="ease-out"
-                    label={false}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="cryptoPercentage"
-                    stroke="#F59E0B"
-                    strokeWidth={2}
-                    name="Criptovalute"
-                    dot={{ r: 4 }}
-                    animationDuration={800}
-                    animationEasing="ease-out"
-                    label={false}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="realestatePercentage"
-                    stroke="#10B981"
-                    strokeWidth={2}
-                    name="Immobili"
-                    dot={{ r: 4 }}
-                    animationDuration={800}
-                    animationEasing="ease-out"
-                    label={false}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="cashPercentage"
-                    stroke="#6B7280"
-                    strokeWidth={2}
-                    name="Liquidità"
-                    dot={{ r: 4 }}
-                    animationDuration={800}
-                    animationEasing="ease-out"
-                    label={false}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="commodityPercentage"
-                    stroke="#92400E"
-                    strokeWidth={2}
-                    name="Materie Prime"
-                    dot={{ r: 4 }}
-                    animationDuration={800}
-                    animationEasing="ease-out"
-                    label={false}
-                  />
-                </LineChart>
-              ) : (
-                // Absolute values mode: Use Stacked AreaChart
-                <AreaChart data={assetClassHistory} margin={getChartMargins()}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis
-                    width={getYAxisWidth()}
-                    tickFormatter={(value) => formatCurrencyCompact(value)}
-                  />
-                  <Tooltip
-                    formatter={(value) => formatCurrency(value as number)}
-                    contentStyle={{
-                      backgroundColor: 'var(--card)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '8px',
-                      padding: isMobile ? '8px' : '12px',
-                      fontSize: isMobile ? '14px' : '16px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                    }}
-                    labelStyle={{
-                      color: 'var(--foreground)',
-                      fontWeight: 600,
-                      marginBottom: '4px',
-                    }}
-                    itemStyle={{
-                      fontSize: isMobile ? '14px' : '16px',
-                      padding: '2px 0',
-                    }}
-                    cursor={{ fill: 'rgba(255,255,255,0.06)' }}
-                  />
-                  <Legend
-                    wrapperStyle={{
-                      display: isMobile ? 'none' : 'block',
-                      paddingTop: isMobile ? '0' : '20px'
-                    }}
-                    iconSize={isMobile ? 8 : 10}
-                    fontSize={isMobile ? 11 : 12}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="equity"
-                    stroke="#3B82F6"
-                    fill="#3B82F6"
-                    fillOpacity={0.8}
-                    name="Azioni"
-                    animationDuration={800}
-                    animationEasing="ease-out"
-                    label={false}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="bonds"
-                    stroke="#EF4444"
-                    fill="#EF4444"
-                    fillOpacity={0.8}
-                    name="Obbligazioni"
-                    animationDuration={800}
-                    animationEasing="ease-out"
-                    label={false}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="crypto"
-                    stroke="#F59E0B"
-                    fill="#F59E0B"
-                    fillOpacity={0.8}
-                    name="Criptovalute"
-                    animationDuration={800}
-                    animationEasing="ease-out"
-                    label={false}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="realestate"
-                    stroke="#10B981"
-                    fill="#10B981"
-                    fillOpacity={0.8}
-                    name="Immobili"
-                    animationDuration={800}
-                    animationEasing="ease-out"
-                    label={false}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="cash"
-                    stroke="#6B7280"
-                    fill="#6B7280"
-                    fillOpacity={0.8}
-                    name="Liquidità"
-                    animationDuration={800}
-                    animationEasing="ease-out"
-                    label={false}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="commodity"
-                    stroke="#92400E"
-                    fill="#92400E"
-                    fillOpacity={0.8}
-                    name="Materie Prime"
-                    animationDuration={800}
-                    animationEasing="ease-out"
-                    label={false}
-                  />
-                </AreaChart>
-              )}
-            </ResponsiveContainer>
-              </motion.div>
-            </AnimatePresence>
-          )}
-        </CardContent>
-      </Card>
-      </motion.div>
-
-      {/* Liquidity Evolution Chart */}
-      <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.2 }}>
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="text-lg sm:text-xl">Evoluzione Liquidità vs Illiquidità</CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowLiquidityPercentage(!showLiquidityPercentage)}
-              className="w-full sm:w-auto text-xs sm:text-sm"
-            >
-              {showLiquidityPercentage ? '€ Valori Assoluti' : '% Percentuali'}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {netWorthHistory.length === 0 ? (
-            <div className="flex h-64 items-center justify-center text-gray-500 dark:text-gray-400">
-              Nessuno storico disponibile.
-            </div>
-          ) : (
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={showLiquidityPercentage ? 'liquidity-percentage' : 'liquidity-absolute'}
-                variants={tabPanelSwitch}
-                initial="hidden"
-                animate="visible"
-                exit="hidden"
-              >
-            <ResponsiveContainer key={isLandscape ? 'landscape' : 'portrait'} width="100%" height={getChartHeight()} id="chart-liquidity">
-              {showLiquidityPercentage ? (
-                // Percentage mode: Use LineChart with separate lines
-                <LineChart data={liquidityHistory} margin={getChartMargins()}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis
-                    width={getYAxisWidth()}
-                    tickFormatter={(value) => `${value.toFixed(0)}%`}
-                    domain={[0, 100]}
-                  />
-                  <Tooltip
-                    formatter={(value) => `${(value as number).toFixed(2)}%`}
-                    contentStyle={{
-                      backgroundColor: 'var(--card)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '8px',
-                      padding: isMobile ? '8px' : '12px',
-                      fontSize: isMobile ? '14px' : '16px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                    }}
-                    labelStyle={{
-                      color: 'var(--foreground)',
-                      fontWeight: 600,
-                      marginBottom: '4px',
-                    }}
-                    itemStyle={{
-                      fontSize: isMobile ? '14px' : '16px',
-                      padding: '2px 0',
-                    }}
-                    cursor={{ fill: 'rgba(255,255,255,0.06)' }}
-                  />
-                  <Legend
-                    wrapperStyle={{
-                      display: isMobile ? 'none' : 'block',
-                      paddingTop: isMobile ? '0' : '20px'
-                    }}
-                    iconSize={isMobile ? 8 : 10}
-                    fontSize={isMobile ? 11 : 12}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="liquidPercentage"
-                    stroke="#10B981"
-                    strokeWidth={2}
-                    name="Liquido"
-                    dot={{ r: 4 }}
-                    animationDuration={800}
-                    animationEasing="ease-out"
-                    label={false}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="illiquidPercentage"
-                    stroke="#F59E0B"
-                    strokeWidth={2}
-                    name="Illiquido"
-                    dot={{ r: 4 }}
-                    animationDuration={800}
-                    animationEasing="ease-out"
-                    label={false}
-                  />
-                </LineChart>
-              ) : (
-                // Absolute values mode: Use AreaChart with overlapping areas (no stack)
-                <AreaChart data={liquidityHistory} margin={getChartMargins()}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis
-                    width={getYAxisWidth()}
-                    tickFormatter={(value) => formatCurrencyCompact(value)}
-                    domain={[(dataMin: number) => dataMin * 0.95, (dataMax: number) => dataMax * 1.05]}
-                  />
-                  <Tooltip
-                    formatter={(value) => formatCurrency(value as number)}
-                    contentStyle={{
-                      backgroundColor: 'var(--card)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '8px',
-                      padding: isMobile ? '8px' : '12px',
-                      fontSize: isMobile ? '14px' : '16px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                    }}
-                    labelStyle={{
-                      color: 'var(--foreground)',
-                      fontWeight: 600,
-                      marginBottom: '4px',
-                    }}
-                    itemStyle={{
-                      fontSize: isMobile ? '14px' : '16px',
-                      padding: '2px 0',
-                    }}
-                    cursor={{ fill: 'rgba(255,255,255,0.06)' }}
-                  />
-                  <Legend
-                    wrapperStyle={{
-                      display: isMobile ? 'none' : 'block',
-                      paddingTop: isMobile ? '0' : '20px'
-                    }}
-                    iconSize={isMobile ? 8 : 10}
-                    fontSize={isMobile ? 11 : 12}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="liquidNetWorth"
-                    stroke="#10B981"
-                    fill="#10B981"
-                    fillOpacity={0.6}
-                    name="Liquido"
-                    animationDuration={800}
-                    animationEasing="ease-out"
-                    label={false}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="illiquidNetWorth"
-                    stroke="#F59E0B"
-                    fill="#F59E0B"
-                    fillOpacity={0.6}
-                    name="Illiquido"
-                    animationDuration={800}
-                    animationEasing="ease-out"
-                    label={false}
-                  />
-                </AreaChart>
-              )}
-            </ResponsiveContainer>
-              </motion.div>
-            </AnimatePresence>
-          )}
-        </CardContent>
-      </Card>
-      </motion.div>
-
-      {/* YoY Variation Chart */}
-      <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.3 }}>
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="text-lg sm:text-xl">Storico YoY</CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowYoYPercentage(!showYoYPercentage)}
-              className="w-full sm:w-auto text-xs sm:text-sm"
-            >
-              {showYoYPercentage ? '€ Valori Assoluti' : '% Percentuali'}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {yoyVariationData.length === 0 ? (
-            <div className="flex h-64 items-center justify-center text-gray-500 dark:text-gray-400">
-              Nessuno storico disponibile.
-            </div>
-          ) : (
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={showYoYPercentage ? 'yoy-percentage' : 'yoy-absolute'}
-                variants={tabPanelSwitch}
-                initial="hidden"
-                animate="visible"
-                exit="hidden"
-              >
-            <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-yoy-variation">
-              <BarChart data={yoyVariationData} margin={getChartMargins()}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="year" />
-                <YAxis
-                  width={getYAxisWidth()}
-                  tickFormatter={(value) =>
-                    showYoYPercentage
-                      ? `${value.toFixed(0)}%`
-                      : formatCurrencyCompact(value)
-                  }
-                />
-                <Tooltip
-                  formatter={(value, name) => {
-                    const num = value as number;
-                    if (name === 'Variazione') {
-                      return showYoYPercentage ? `${num.toFixed(2)}%` : formatCurrency(num);
-                    }
-                    return formatCurrency(num);
-                  }}
-                  contentStyle={{
-                    backgroundColor: 'var(--card)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    padding: isMobile ? '8px' : '12px',
-                    fontSize: isMobile ? '14px' : '16px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                  }}
-                  labelStyle={{
-                    color: 'var(--foreground)',
-                    fontWeight: 600,
-                    marginBottom: '4px',
-                  }}
-                  itemStyle={{
-                    fontSize: isMobile ? '14px' : '16px',
-                    padding: '2px 0',
-                  }}
-                  cursor={{ fill: 'rgba(255,255,255,0.06)' }}
-                />
-                <Legend
-                  wrapperStyle={{
-                    display: isMobile ? 'none' : 'block',
-                    paddingTop: isMobile ? '0' : '20px'
-                  }}
-                  iconSize={isMobile ? 8 : 10}
-                  fontSize={isMobile ? 11 : 12}
-                />
-                {/* fill="#10B981" sets legend/tooltip color; Cell overrides each bar's actual color */}
-                <Bar
-                  dataKey={showYoYPercentage ? 'variationPercentage' : 'variation'}
-                  name="Variazione"
-                  fill="#10B981"
-                  animationDuration={600}
-                  animationEasing="ease-out"
-                >
-                  {yoyVariationData.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={entry.variation >= 0 ? '#10B981' : '#EF4444'}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-              </motion.div>
-            </AnimatePresence>
-          )}
-        </CardContent>
-      </Card>
-      </motion.div>
-      </div>
-      </motion.section>
-
-      {/* Savings vs Investment Growth Chart */}
-      {/* Shows breakdown of net worth growth into two components:
-          - Green bar (Net Savings): What user saved from income minus expenses
-          - Blue/Red bar (Investment Growth): What markets contributed (positive/negative)
-          Stacked bars sum to total Net Worth Growth for the period.
-          Supports annual view (per-year) and monthly view (per-month within a year). */}
-      {/* border-t signals zone shift: portfolio evolution (above) → cashflow analysis (below) */}
-      <motion.section
-        variants={chapterReveal}
-        initial="hidden"
-        animate={visibleChapterSet.has('drivers') ? 'visible' : 'hidden'}
-        className="space-y-4 pt-6 border-t border-border/40"
-      >
-      <div>
-        <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Capitolo 2</p>
-        <h2 className="mt-1 text-lg font-semibold text-foreground">Driver della crescita</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Questo capitolo separa il contributo del risparmio da quello del mercato e aggiunge la lettura lavoro vs investimenti solo quando la configurazione è completa.
-        </p>
-      </div>
-      <div className="space-y-4">
-      <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.4 }}>
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="space-y-2">
-              <CardTitle className="text-lg sm:text-xl">
-                Risparmio vs Crescita Investimenti
-              </CardTitle>
-              <motion.div
-                key={`${savingsView}-${savingsSelectedYear}`}
-                variants={periodContentSettle}
-                initial="idle"
-                animate="settle"
-                className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
-              >
-                <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1 font-medium text-foreground">
-                  Modalità {savingsViewLabel}
-                </span>
-                <span className="rounded-full border border-border bg-background px-2.5 py-1">
-                  {savingsScopeLabel}
-                </span>
-              </motion.div>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              {/* Annual / Monthly view toggle */}
-              <div className="flex gap-1">
-                <Button
-                  variant={savingsView === 'annual' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setSavingsView('annual')}
-                  className={cn("text-xs sm:text-sm", savingsView === 'annual' && "dark:bg-gray-700 dark:text-white")}
-                >
-                  Annuale
-                </Button>
-                <Button
-                  variant={savingsView === 'monthly' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setSavingsView('monthly')}
-                  className={cn("text-xs sm:text-sm", savingsView === 'monthly' && "dark:bg-gray-700 dark:text-white")}
-                >
-                  Mensile
-                </Button>
-              </div>
-              {/* Year selector shown only in monthly view */}
-              {savingsView === 'monthly' && savingsAvailableYears.length > 0 && (
-                <Select
-                  value={savingsSelectedYear.toString()}
-                  onValueChange={(v) => setSavingsSelectedYear(v === 'all' ? 'all' : Number(v))}
-                >
-                  <SelectTrigger className="w-28 h-8 text-xs sm:text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tutti</SelectItem>
-                    {savingsAvailableYears.map((year) => (
-                      <SelectItem key={year} value={year.toString()}>
-                        {year}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div
-              key={`${savingsView}-${savingsSelectedYear}`}
-              variants={tabPanelSwitch}
-              initial="hidden"
-              animate="visible"
-              exit="hidden"
-            >
-          {savingsView === 'annual' ? (
-            savingsVsInvestmentData.length === 0 ? (
-              <div className="flex h-64 items-center justify-center text-gray-500 dark:text-gray-400">
-                Dati insufficienti per la visualizzazione.
-                Servono snapshot e transazioni cashflow per ogni anno.
-              </div>
-            ) : (
-              <motion.div variants={chartShellSettle} initial="idle" animate="settle">
-              <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-savings-vs-investment">
-                <BarChart data={savingsVsInvestmentData} margin={getChartMargins()}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="year" />
-                  <YAxis
-                    width={getYAxisWidth()}
-                    tickFormatter={(value) => formatCurrencyCompact(value)}
-                  />
-                  <Tooltip
-                    formatter={(value, name) => [formatCurrency(value as number), name]}
-                    contentStyle={{
-                      backgroundColor: 'var(--card)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '8px',
-                      padding: isMobile ? '8px' : '12px',
-                      fontSize: isMobile ? '14px' : '16px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                    }}
-                    labelStyle={{
-                      color: 'var(--foreground)',
-                      fontWeight: 600,
-                      marginBottom: '4px',
-                    }}
-                    itemStyle={{
-                      fontSize: isMobile ? '14px' : '16px',
-                      padding: '2px 0',
-                    }}
-                    cursor={{ fill: 'rgba(255,255,255,0.06)' }}
-                  />
-                  <Legend
-                    wrapperStyle={{
-                      display: isMobile ? 'none' : 'block',
-                      paddingTop: isMobile ? '0' : '20px'
-                    }}
-                    iconSize={isMobile ? 8 : 10}
-                    fontSize={isMobile ? 11 : 12}
-                  />
-                  <Bar
-                    dataKey="netSavings"
-                    name="Risparmio Netto"
-                    fill="#10B981"
-                    stackId="a"
-                    animationDuration={600}
-                    animationEasing="ease-out"
-                  />
-                  {/* fill="#3B82F6" sets the legend color; Cell overrides each bar's actual color */}
-                  <Bar
-                    dataKey="investmentGrowth"
-                    name="Crescita Investimenti"
-                    fill="#3B82F6"
-                    stackId="a"
-                    animationDuration={600}
-                    animationEasing="ease-out"
-                  >
-                    {savingsVsInvestmentData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={entry.investmentGrowth >= 0 ? '#3B82F6' : '#EF4444'}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-              </motion.div>
-            )
-          ) : (
-            (() => {
-              const monthlyData =
-                savingsSelectedYear === 'all'
-                  ? savingsVsInvestmentDataAllMonths
-                  : savingsVsInvestmentDataMonthly;
-              return monthlyData.length === 0 ? (
-                <div className="flex h-64 items-center justify-center text-gray-500 dark:text-gray-400">
-                  Nessun dato per la selezione corrente.
-                  Servono snapshot consecutivi e transazioni cashflow.
-                </div>
-              ) : (
-                <motion.div variants={chartShellSettle} initial="idle" animate="settle">
-                <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-savings-vs-investment-monthly">
-                  <BarChart data={monthlyData} margin={getChartMargins()}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="period" tick={{ fontSize: savingsSelectedYear === 'all' ? 10 : 12 }} />
+                <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-net-worth-evolution">
+                  <LineChart data={netWorthHistory} margin={getChartMargins()}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.6} />
+                    <XAxis dataKey="date" />
                     <YAxis
                       width={getYAxisWidth()}
                       tickFormatter={(value) => formatCurrencyCompact(value)}
+                      domain={[(dataMin: number) => dataMin * 0.95, (dataMax: number) => dataMax * 1.05]}
                     />
                     <Tooltip
-                      formatter={(value, name) => [formatCurrency(value as number), name]}
-                      contentStyle={{
-                        backgroundColor: 'var(--card)',
-                        border: '1px solid var(--border)',
-                        borderRadius: '8px',
-                        padding: isMobile ? '8px' : '12px',
-                        fontSize: isMobile ? '14px' : '16px',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                      }}
-                      labelStyle={{
-                        color: 'var(--foreground)',
-                        fontWeight: 600,
-                        marginBottom: '4px',
-                      }}
-                      itemStyle={{
-                        fontSize: isMobile ? '14px' : '16px',
-                        padding: '2px 0',
-                      }}
-                      cursor={{ fill: 'rgba(255,255,255,0.06)' }}
+                      formatter={(value) => formatCurrency(value as number)}
+                      {...tooltipStyle}
+                      cursor={{ stroke: 'var(--border)', strokeWidth: 1, strokeDasharray: '5 5' }}
                     />
                     <Legend
-                      wrapperStyle={{
-                        display: isMobile ? 'none' : 'block',
-                        paddingTop: isMobile ? '0' : '20px'
-                      }}
-                      iconSize={isMobile ? 8 : 10}
-                      fontSize={isMobile ? 11 : 12}
+                      wrapperStyle={{ display: isMobile ? 'none' : 'block', paddingTop: '20px' }}
+                      iconSize={10}
+                      fontSize={12}
                     />
-                    <Bar
-                      dataKey="netSavings"
-                      name="Risparmio Netto"
-                      fill="#10B981"
-                      stackId="a"
-                      animationDuration={600}
+                    <Line
+                      type="monotone"
+                      dataKey="totalNetWorth"
+                      stroke={chartColors[0]}
+                      strokeWidth={2}
+                      name="Patrimonio Totale"
+                      dot={({ key, ...props }: any) => <CustomChartDot key={key} {...props} isMobile={isMobile} />}
+                      activeDot={{ r: 6 }}
+                      animationDuration={800}
                       animationEasing="ease-out"
                     />
-                    {/* fill="#3B82F6" sets the legend color; Cell overrides each bar's actual color */}
-                    <Bar
-                      dataKey="investmentGrowth"
-                      name="Crescita Investimenti"
-                      fill="#3B82F6"
-                      stackId="a"
-                      animationDuration={600}
-                      animationEasing="ease-out"
-                    >
-                      {monthlyData.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={entry.investmentGrowth >= 0 ? '#3B82F6' : '#EF4444'}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
+                  </LineChart>
                 </ResponsiveContainer>
-                </motion.div>
-              );
-            })()
-          )}
-            </motion.div>
-          </AnimatePresence>
-        </CardContent>
-      </Card>
-      </motion.div>
-
-      {/* Labor Income & Investment section — only visible when laborIncomeCategoryIds is configured in Settings */}
-      {laborIncomeMetrics && (
-        <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.45 }}>
-          <Card>
-            <CardHeader>
-              <CardTitle>Lavoro &amp; Investimenti</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                Risparmiato da Lavoro = entrate categorie &ldquo;reddito da lavoro&rdquo; meno tutte le spese.
-                Eventuali entrate non incluse (dividendi, affitti) non vengono conteggiate nel risparmio.
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* 4 KPI cards */}
-              <div className="grid gap-4 grid-cols-2 desktop:grid-cols-3">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Guadagnato da Lavoro</CardTitle>
-                    <Briefcase className="h-4 w-4 text-blue-500" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-lg desktop:text-2xl font-bold text-blue-600">
-                      {formatCurrency(laborIncomeMetrics.totalLaborIncome)}
-                    </div>
-                    <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear}</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Risparmiato da Lavoro</CardTitle>
-                    <PiggyBank className={`h-4 w-4 ${laborIncomeMetrics.totalSavedFromWork >= 0 ? 'text-green-500' : 'text-red-500'}`} />
-                  </CardHeader>
-                  <CardContent>
-                    <div className={`text-lg desktop:text-2xl font-bold ${laborIncomeMetrics.totalSavedFromWork >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {laborIncomeMetrics.totalSavedFromWork >= 0 ? '+' : ''}{formatCurrency(laborIncomeMetrics.totalSavedFromWork)}
-                    </div>
-                    <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Spese: {formatCurrency(laborIncomeMetrics.totalExpensesSum)}
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Crescita Investimenti (Lordo)</CardTitle>
-                    {laborIncomeMetrics.totalInvestmentGrowthGross >= 0
-                      ? <TrendingUp className="h-4 w-4 text-green-500" />
-                      : <TrendingDown className="h-4 w-4 text-red-500" />}
-                  </CardHeader>
-                  <CardContent>
-                    <div className={`text-lg desktop:text-2xl font-bold ${laborIncomeMetrics.totalInvestmentGrowthGross >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {laborIncomeMetrics.totalInvestmentGrowthGross >= 0 ? '+' : ''}{formatCurrency(laborIncomeMetrics.totalInvestmentGrowthGross)}
-                    </div>
-                    <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear}</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Crescita Investimenti (Netto)</CardTitle>
-                    {laborIncomeMetrics.totalInvestmentGrowthNet >= 0
-                      ? <TrendingUp className="h-4 w-4 text-green-500" />
-                      : <TrendingDown className="h-4 w-4 text-red-500" />}
-                  </CardHeader>
-                  <CardContent>
-                    <div className={`text-lg desktop:text-2xl font-bold ${laborIncomeMetrics.totalInvestmentGrowthNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {laborIncomeMetrics.totalInvestmentGrowthNet >= 0 ? '+' : ''}{formatCurrency(laborIncomeMetrics.totalInvestmentGrowthNet)}
-                    </div>
-                    <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear} · al netto tasse stimate</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Mesi in Positivo</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-green-500" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-lg desktop:text-2xl font-bold text-green-600">
-                      {laborMonthCounts.positiveMonths}
-                    </div>
-                    <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear} · patrimonio in crescita</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Mesi in Negativo</CardTitle>
-                    <TrendingDown className="h-4 w-4 text-red-500" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-lg desktop:text-2xl font-bold text-red-600">
-                      {laborMonthCounts.negativeMonths}
-                    </div>
-                    <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear} · patrimonio in calo</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Monthly breakdown chart */}
-              {laborMetricsChartData.length > 0 && (
-                <motion.div variants={chartShellSettle} initial="idle" animate="settle">
-                  <LaborMetricsChart data={laborMetricsChartData} isMobile={isMobile} />
-                </motion.div>
               )}
             </CardContent>
           </Card>
         </motion.div>
-      )}
-      </div>
+
+        {/* Notes panel — expands below the evolution chart */}
+        <AnimatePresence>
+          {showNotes && (
+            <motion.div key="notes-section" variants={slideDown} initial="hidden" animate="visible" exit="exit">
+              {(() => {
+                const snapshotsWithNotes = netWorthHistory
+                  .filter((item) => item.note && item.note.trim() !== '')
+                  .map((item) => ({ year: item.year, month: item.month, note: item.note!, date: item.date }))
+                  .sort((a, b) => b.year !== a.year ? b.year - a.year : b.month - a.month);
+
+                return (
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-lg sm:text-xl">Note Patrimonio Netto</CardTitle>
+                        <Button variant="ghost" size="sm" onClick={() => setShowNotes(false)} className="text-xs sm:text-sm">
+                          Chiudi
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {snapshotsWithNotes.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">Nessuna nota disponibile</div>
+                      ) : (
+                        <>
+                          {/* Mobile: card-based stacked layout */}
+                          <div className="space-y-3 sm:hidden">
+                            {snapshotsWithNotes.map((item) => (
+                              <div key={`${item.year}-${item.month}`} className="rounded-md border p-3">
+                                <div className="font-medium text-sm text-muted-foreground mb-2">
+                                  {MONTH_NAMES[item.month - 1]} {item.year}
+                                </div>
+                                <div className="text-sm text-foreground whitespace-pre-line">{item.note}</div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Desktop: sticky-header table */}
+                          <div className="hidden sm:block rounded-md border">
+                            <div className="max-h-[500px] overflow-y-auto">
+                              <table className="w-full">
+                                <thead className="sticky top-0 bg-muted/50 border-b">
+                                  <tr>
+                                    <th className="px-4 py-3 text-left text-sm font-medium w-[200px]">Periodo</th>
+                                    <th className="px-4 py-3 text-left text-sm font-medium">Nota</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {snapshotsWithNotes.map((item) => (
+                                    <tr key={`${item.year}-${item.month}`} className="border-b hover:bg-muted/30">
+                                      <td className="px-4 py-3 text-sm font-medium align-top">
+                                        {MONTH_NAMES[item.month - 1]} {item.year}
+                                      </td>
+                                      <td className="px-4 py-3 text-sm text-muted-foreground whitespace-pre-line">
+                                        {item.note}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 text-sm text-muted-foreground">
+                            {snapshotsWithNotes.length} {snapshotsWithNotes.length === 1 ? 'nota trovata' : 'note trovate'}
+                          </div>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })()}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.section>
 
-      {/* Doubling Time Analysis */}
-      {/* border-t signals zone shift: cashflow analysis (above) → context/reference (below) */}
+      {/* ── MILESTONE (DOUBLING TIME) ──────────────────────────────────── */}
+      {/* Moved to chapter 2: this is the most distinctive feature of the page */}
       <motion.section
+        id="section-milestones"
         variants={chapterReveal}
         initial="hidden"
         animate={visibleChapterSet.has('milestones') ? 'visible' : 'hidden'}
         className="space-y-4 pt-6 border-t border-border/40"
       >
-      <div>
-        <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Capitolo 3</p>
-        <h2 className="mt-1 text-lg font-semibold text-foreground">Milestone e assetto finale</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Prima leggi velocità e progressione delle milestone, poi confronta l’allocazione attuale con quella desiderata per capire dove si concentra il prossimo lavoro.
-        </p>
-      </div>
-      <div className="space-y-4">
-      <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.5 }}>
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <CardTitle className="text-lg sm:text-xl">Tempo di Raddoppio Patrimonio</CardTitle>
-              <p className="text-sm text-muted-foreground mt-2">
-                Mostra quanto tempo ha impiegato il tuo patrimonio per raddoppiare nei diversi periodi.
-                Ogni milestone rappresenta un traguardo significativo nella crescita del tuo portafoglio.
-              </p>
-            </div>
-            {/* Toggle button for switching between geometric and threshold modes */}
-            <div className="flex gap-2 shrink-0">
-              <Button
-                variant={doublingMode === 'geometric' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setDoublingMode('geometric')}
-                className={cn("text-xs sm:text-sm", doublingMode === 'geometric' && "dark:bg-gray-700 dark:text-white")}
-              >
-                Raddoppi (2x, 4x...)
-              </Button>
-              <Button
-                variant={doublingMode === 'threshold' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setDoublingMode('threshold')}
-                className={cn("text-xs sm:text-sm", doublingMode === 'threshold' && "dark:bg-gray-700 dark:text-white")}
-              >
-                Traguardi (€100k...)
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {doublingTimeSummary.totalDoublings === 0 && !doublingTimeSummary.currentDoublingInProgress ? (
-            <div className="flex h-32 items-center justify-center text-gray-500 dark:text-gray-400">
-              Nessuna milestone ancora completata. Continua a costruire il tuo patrimonio!
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <motion.div
-                key={doublingMode}
-                variants={periodContentSettle}
-                initial="idle"
-                animate="settle"
-                className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
-              >
-                <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1 font-medium text-foreground">
-                  Lettura {doublingMode === 'geometric' ? 'Geometrica' : 'a Traguardi'}
-                </span>
-                <span className="rounded-full border border-border bg-background px-2.5 py-1">
-                  {doublingTimeSummary.totalDoublings} milestone completate
-                </span>
-              </motion.div>
-              {/* Summary Metrics */}
-              <DoublingTimeSummaryCards summary={doublingTimeSummary} doublingMode={doublingMode} />
-
-              {/* Milestone Timeline */}
-              <div>
-                <h3 className="text-md font-semibold text-gray-900 dark:text-gray-100 mb-3">
-                  Storico {doublingMode === 'geometric' ? 'Raddoppi' : 'Traguardi'}
-                </h3>
-                <DoublingMilestoneTimeline
-                  milestones={doublingTimeSummary.milestones}
-                  currentInProgress={doublingTimeSummary.currentDoublingInProgress}
-                />
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Current vs Target Comparison — mt-6 separates it from Doubling Time card above (both inside same motion.div) */}
-      <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Asset Class: Corrente vs Desiderata</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {currentVsTargetData.length === 0 ? (
-              <div className="flex h-64 items-center justify-center text-gray-500 dark:text-gray-400">
-                Nessun dato disponibile.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {currentVsTargetData.map((item) => (
-                  <div key={item.name} className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">{item.name}</span>
-                      <span className="text-gray-600 dark:text-gray-400">
-                        {formatPercentage(item.corrente)} /{' '}
-                        {formatPercentage(item.target)}
-                      </span>
-                    </div>
-                    <div className="relative h-6 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-                      {/* Target bar (background) */}
-                      <div
-                        className="absolute h-full bg-gray-300 dark:bg-gray-600"
-                        style={{
-                          width: `${Math.min(item.target, 100)}%`,
-                        }}
-                      />
-                      {/* Current bar (foreground) */}
-                      <div
-                        className="absolute h-full transition-all"
-                        style={{
-                          width: `${Math.min(item.corrente, 100)}%`,
-                          backgroundColor: item.color,
-                          opacity: 0.8,
-                        }}
-                      />
-                      {/* Labels */}
-                      <div className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-white mix-blend-difference">
-                        Corrente
-                      </div>
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
-                      <span>Corrente: {formatPercentage(item.corrente)}</span>
-                      <span>Target: {formatPercentage(item.target)}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        </motion.div>
-      </div>
-      </motion.section>
-
-      {snapshots.length > 0 && (
-        <motion.section
-          variants={chapterReveal}
-          initial="hidden"
-          animate={visibleChapterSet.has('reference') ? 'visible' : 'hidden'}
-          className="space-y-4 pt-6 border-t border-border/40"
-        >
         <div>
-          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Appendice</p>
-          <h2 className="mt-1 text-lg font-semibold text-foreground">Snapshot recenti</h2>
+          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Milestone</p>
+          <h2 className="mt-1 text-lg font-semibold text-foreground">Tempo di raddoppio</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Gli ultimi snapshot servono come riferimento operativo rapido per controllare date di creazione, valori e note recenti.
+            Quanto tempo ha impiegato il tuo patrimonio per raddoppiare nei diversi periodi.
+            Ogni milestone rappresenta un traguardo significativo nella tua crescita.
           </p>
         </div>
-        <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0 }}>
-        <Card>
-          <CardHeader>
-            <CardTitle>Snapshot Mensili</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <motion.div
-              variants={staggerContainer}
-              initial="hidden"
-              animate="visible"
-              className={cn(
-                "grid gap-4",
-                isLandscape ? "grid-cols-2" : "grid-cols-1",
-                "md:grid-cols-2 desktop:grid-cols-3"
-              )}
-            >
-              {snapshots.slice(-6).reverse().map((snapshot) => (
-                <motion.div
-                  key={`${snapshot.year}-${snapshot.month}`}
-                  variants={cardItem}
-                  className="rounded-lg border p-4"
+
+        <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1] }}>
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <CardTitle className="text-lg sm:text-xl">Tempo di Raddoppio Patrimonio</CardTitle>
+
+                {/* Segmented pill: Geometrico / Traguardi */}
+                <div
+                  role="tablist"
+                  className="relative flex items-center gap-0.5 rounded-lg bg-muted p-1 shrink-0"
                 >
+                  {DOUBLING_MODE_TABS.map((tab) => (
+                    <button
+                      key={tab.value}
+                      role="tab"
+                      type="button"
+                      aria-selected={doublingMode === tab.value}
+                      onClick={() => setDoublingMode(tab.value)}
+                      className="relative z-10 flex h-7 flex-1 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors aria-selected:text-foreground aria-[selected=false]:text-muted-foreground"
+                    >
+                      {doublingMode === tab.value && (
+                        <motion.span
+                          layoutId="history-doubling-mode"
+                          className="absolute inset-0 rounded-md bg-background shadow-sm"
+                          transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+                        />
+                      )}
+                      <span className="relative">{tab.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {doublingTimeSummary.totalDoublings === 0 && !doublingTimeSummary.currentDoublingInProgress ? (
+                <div className="flex h-32 items-center justify-center text-muted-foreground text-sm">
+                  Nessuna milestone ancora completata. Continua a costruire il tuo patrimonio!
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <motion.div
+                    key={doublingMode}
+                    variants={periodContentSettle}
+                    initial="idle"
+                    animate="settle"
+                    className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
+                  >
+                    <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1 font-medium text-foreground">
+                      Lettura {doublingMode === 'geometric' ? 'Geometrica' : 'a Traguardi'}
+                    </span>
+                    <span className="rounded-full border border-border bg-background px-2.5 py-1">
+                      {doublingTimeSummary.totalDoublings} milestone completate
+                    </span>
+                  </motion.div>
+
+                  <DoublingTimeSummaryCards summary={doublingTimeSummary} doublingMode={doublingMode} />
+
                   <div>
-                    <div className="text-lg font-semibold">
-                      {getMonthName(snapshot.month)} {snapshot.year}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Creato il: {snapshot.createdAt.toLocaleString('it-IT', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </div>
+                    <h3 className="text-sm font-semibold text-foreground mb-3">
+                      Storico {doublingMode === 'geometric' ? 'Raddoppi' : 'Traguardi'}
+                    </h3>
+                    <DoublingMilestoneTimeline
+                      milestones={doublingTimeSummary.milestones}
+                      currentInProgress={doublingTimeSummary.currentDoublingInProgress}
+                    />
                   </div>
-                  <div className="mt-3">
-                    <div className="text-lg font-bold">
-                      {formatCurrency(snapshot.totalNetWorth)}
-                    </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      Liquido: {formatCurrency(snapshot.liquidNetWorth)}
-                    </div>
-                  </div>
-                  {snapshot.note && (
-                    <div className="mt-3 pt-3 border-t">
-                      <div className="text-xs text-amber-600 dark:text-amber-400 font-medium mb-1 flex items-center gap-1">
-                        <MessageSquare className="h-3 w-3" />
-                        Nota:
-                      </div>
-                      <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">
-                        {snapshot.note.length > 100
-                          ? snapshot.note.substring(0, 100) + '...'
-                          : snapshot.note}
-                      </div>
-                    </div>
-                  )}
-                </motion.div>
-              ))}
-            </motion.div>
-          </CardContent>
-        </Card>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* CTA to Allocation page — replaces the removed "Corrente vs Desiderata" section */}
+          <div className="mt-3 flex items-center justify-end">
+            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" asChild>
+              <Link href="/dashboard/allocation">Vai all&apos;Allocazione &rarr;</Link>
+            </Button>
+          </div>
         </motion.div>
-        </motion.section>
-      )}
+      </motion.section>
+
+      {/* ── COMPOSIZIONE ──────────────────────────────────────────────── */}
+      <motion.section
+        id="section-composition"
+        variants={chapterReveal}
+        initial="hidden"
+        animate={visibleChapterSet.has('composition') ? 'visible' : 'hidden'}
+        className="space-y-4 pt-6 border-t border-border/40"
+      >
+        <div>
+          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Composizione</p>
+          <h2 className="mt-1 text-lg font-semibold text-foreground">Asset class e liquidità</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Come si distribuisce il patrimonio tra le classi di investimento e quanto rimane liquido.
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          {/* Asset Class Evolution Chart */}
+          <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1] }}>
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <CardTitle className="text-lg sm:text-xl">Patrimonio per Asset Class</CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAssetClassPercentage(!showAssetClassPercentage)}
+                    className="w-full sm:w-auto text-xs sm:text-sm"
+                  >
+                    {showAssetClassPercentage ? '€ Valori Assoluti' : '% Percentuali'}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {assetClassHistory.length === 0 ? (
+                  <div className="flex h-64 items-center justify-center text-muted-foreground text-sm">
+                    Nessuno storico disponibile.
+                  </div>
+                ) : (
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.div
+                      key={showAssetClassPercentage ? 'ac-pct' : 'ac-abs'}
+                      variants={tabPanelSwitch}
+                      initial="hidden"
+                      animate="visible"
+                      exit="hidden"
+                    >
+                      <ResponsiveContainer key={isLandscape ? 'landscape' : 'portrait'} width="100%" height={getChartHeight()} id="chart-asset-class-evolution">
+                        {showAssetClassPercentage ? (
+                          <LineChart data={assetClassHistory} margin={getChartMargins()}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.6} />
+                            <XAxis dataKey="date" />
+                            <YAxis width={getYAxisWidth()} tickFormatter={(v) => `${v.toFixed(0)}%`} domain={[0, 100]} />
+                            <Tooltip
+                              formatter={(v) => `${(v as number).toFixed(2)}%`}
+                              {...tooltipStyle}
+                              cursor={{ fill: 'rgba(128,128,128,0.1)' }}
+                            />
+                            <Legend wrapperStyle={{ display: isMobile ? 'none' : 'block', paddingTop: '20px' }} iconSize={10} fontSize={12} />
+                            <Line type="monotone" dataKey="equityPercentage" stroke={acColors.equity} strokeWidth={2} name="Azioni" dot={{ r: 4 }} animationDuration={800} animationEasing="ease-out" label={false} />
+                            <Line type="monotone" dataKey="bondsPercentage" stroke={acColors.bonds} strokeWidth={2} name="Obbligazioni" dot={{ r: 4 }} animationDuration={800} animationEasing="ease-out" label={false} />
+                            <Line type="monotone" dataKey="cryptoPercentage" stroke={acColors.crypto} strokeWidth={2} name="Criptovalute" dot={{ r: 4 }} animationDuration={800} animationEasing="ease-out" label={false} />
+                            <Line type="monotone" dataKey="realestatePercentage" stroke={acColors.realestate} strokeWidth={2} name="Immobili" dot={{ r: 4 }} animationDuration={800} animationEasing="ease-out" label={false} />
+                            <Line type="monotone" dataKey="cashPercentage" stroke={acColors.cash} strokeWidth={2} name="Liquidità" dot={{ r: 4 }} animationDuration={800} animationEasing="ease-out" label={false} />
+                            <Line type="monotone" dataKey="commodityPercentage" stroke={acColors.commodity} strokeWidth={2} name="Materie Prime" dot={{ r: 4 }} animationDuration={800} animationEasing="ease-out" label={false} />
+                          </LineChart>
+                        ) : (
+                          <AreaChart data={assetClassHistory} margin={getChartMargins()}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.6} />
+                            <XAxis dataKey="date" />
+                            <YAxis width={getYAxisWidth()} tickFormatter={(v) => formatCurrencyCompact(v)} />
+                            <Tooltip formatter={(v) => formatCurrency(v as number)} {...tooltipStyle} cursor={{ fill: 'rgba(128,128,128,0.1)' }} />
+                            <Legend wrapperStyle={{ display: isMobile ? 'none' : 'block', paddingTop: '20px' }} iconSize={10} fontSize={12} />
+                            <Area type="monotone" dataKey="equity" stroke={acColors.equity} fill={acColors.equity} fillOpacity={0.8} name="Azioni" animationDuration={800} animationEasing="ease-out" label={false} />
+                            <Area type="monotone" dataKey="bonds" stroke={acColors.bonds} fill={acColors.bonds} fillOpacity={0.8} name="Obbligazioni" animationDuration={800} animationEasing="ease-out" label={false} />
+                            <Area type="monotone" dataKey="crypto" stroke={acColors.crypto} fill={acColors.crypto} fillOpacity={0.8} name="Criptovalute" animationDuration={800} animationEasing="ease-out" label={false} />
+                            <Area type="monotone" dataKey="realestate" stroke={acColors.realestate} fill={acColors.realestate} fillOpacity={0.8} name="Immobili" animationDuration={800} animationEasing="ease-out" label={false} />
+                            <Area type="monotone" dataKey="cash" stroke={acColors.cash} fill={acColors.cash} fillOpacity={0.8} name="Liquidità" animationDuration={800} animationEasing="ease-out" label={false} />
+                            <Area type="monotone" dataKey="commodity" stroke={acColors.commodity} fill={acColors.commodity} fillOpacity={0.8} name="Materie Prime" animationDuration={800} animationEasing="ease-out" label={false} />
+                          </AreaChart>
+                        )}
+                      </ResponsiveContainer>
+
+                      {/* Mobile inline legend — replaces hidden Recharts legend on narrow screens */}
+                      {isMobile && (
+                        <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-3 px-1">
+                          {(Object.entries(acColors) as [string, string][]).map(([key, color]) => {
+                            const labels: Record<string, string> = {
+                              equity: 'Azioni',
+                              bonds: 'Obblig.',
+                              crypto: 'Crypto',
+                              realestate: 'Immobili',
+                              cash: 'Liquidità',
+                              commodity: 'Commodity',
+                            };
+                            return (
+                              <div key={key} className="flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full shrink-0" style={{ background: color }} />
+                                <span className="text-xs text-muted-foreground">{labels[key]}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </motion.div>
+                  </AnimatePresence>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Liquidity Evolution Chart */}
+          <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.1 }}>
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <CardTitle className="text-lg sm:text-xl">Liquidità vs Illiquidità</CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowLiquidityPercentage(!showLiquidityPercentage)}
+                    className="w-full sm:w-auto text-xs sm:text-sm"
+                  >
+                    {showLiquidityPercentage ? '€ Valori Assoluti' : '% Percentuali'}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {netWorthHistory.length === 0 ? (
+                  <div className="flex h-64 items-center justify-center text-muted-foreground text-sm">
+                    Nessuno storico disponibile.
+                  </div>
+                ) : (
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.div
+                      key={showLiquidityPercentage ? 'liq-pct' : 'liq-abs'}
+                      variants={tabPanelSwitch}
+                      initial="hidden"
+                      animate="visible"
+                      exit="hidden"
+                    >
+                      <ResponsiveContainer key={isLandscape ? 'landscape' : 'portrait'} width="100%" height={getChartHeight()} id="chart-liquidity">
+                        {showLiquidityPercentage ? (
+                          <LineChart data={liquidityHistory} margin={getChartMargins()}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.6} />
+                            <XAxis dataKey="date" />
+                            <YAxis width={getYAxisWidth()} tickFormatter={(v) => `${v.toFixed(0)}%`} domain={[0, 100]} />
+                            <Tooltip formatter={(v) => `${(v as number).toFixed(2)}%`} {...tooltipStyle} cursor={{ fill: 'rgba(128,128,128,0.1)' }} />
+                            <Legend wrapperStyle={{ display: isMobile ? 'none' : 'block', paddingTop: '20px' }} iconSize={10} fontSize={12} />
+                            <Line type="monotone" dataKey="liquidPercentage" stroke={chartColors[0]} strokeWidth={2} name="Liquido" dot={{ r: 4 }} animationDuration={800} animationEasing="ease-out" label={false} />
+                            <Line type="monotone" dataKey="illiquidPercentage" stroke={chartColors[2]} strokeWidth={2} name="Illiquido" dot={{ r: 4 }} animationDuration={800} animationEasing="ease-out" label={false} />
+                          </LineChart>
+                        ) : (
+                          <AreaChart data={liquidityHistory} margin={getChartMargins()}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.6} />
+                            <XAxis dataKey="date" />
+                            <YAxis
+                              width={getYAxisWidth()}
+                              tickFormatter={(v) => formatCurrencyCompact(v)}
+                              domain={[(dataMin: number) => dataMin * 0.95, (dataMax: number) => dataMax * 1.05]}
+                            />
+                            <Tooltip formatter={(v) => formatCurrency(v as number)} {...tooltipStyle} cursor={{ fill: 'rgba(128,128,128,0.1)' }} />
+                            <Legend wrapperStyle={{ display: isMobile ? 'none' : 'block', paddingTop: '20px' }} iconSize={10} fontSize={12} />
+                            <Area type="monotone" dataKey="liquidNetWorth" stroke={chartColors[0]} fill={chartColors[0]} fillOpacity={0.6} name="Liquido" animationDuration={800} animationEasing="ease-out" label={false} />
+                            <Area type="monotone" dataKey="illiquidNetWorth" stroke={chartColors[2]} fill={chartColors[2]} fillOpacity={0.6} name="Illiquido" animationDuration={800} animationEasing="ease-out" label={false} />
+                          </AreaChart>
+                        )}
+                      </ResponsiveContainer>
+
+                      {isMobile && (
+                        <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-3 px-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: chartColors[0] }} />
+                            <span className="text-xs text-muted-foreground">Liquido</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: chartColors[2] }} />
+                            <span className="text-xs text-muted-foreground">Illiquido</span>
+                          </div>
+                        </div>
+                      )}
+                    </motion.div>
+                  </AnimatePresence>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+      </motion.section>
+
+      {/* ── DRIVER DELLA CRESCITA ─────────────────────────────────────── */}
+      <motion.section
+        id="section-drivers"
+        variants={chapterReveal}
+        initial="hidden"
+        animate={visibleChapterSet.has('drivers') ? 'visible' : 'hidden'}
+        className="space-y-4 pt-6 border-t border-border/40"
+      >
+        <div>
+          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Driver della crescita</p>
+          <h2 className="mt-1 text-lg font-semibold text-foreground">Risparmio vs investimenti</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Separa il contributo del risparmio da quello del mercato. Aggiunge la lettura lavoro vs investimenti quando configurata.
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          {/* Savings vs Investment Growth Chart */}
+          <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1] }}>
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="space-y-2">
+                    <CardTitle className="text-lg sm:text-xl">Risparmio vs Crescita Investimenti</CardTitle>
+                    <motion.div
+                      key={`${savingsView}-${savingsSelectedYear}`}
+                      variants={periodContentSettle}
+                      initial="idle"
+                      animate="settle"
+                      className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
+                    >
+                      <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1 font-medium text-foreground">
+                        Modalità {savingsViewLabel}
+                      </span>
+                      <span className="rounded-full border border-border bg-background px-2.5 py-1">
+                        {savingsScopeLabel}
+                      </span>
+                    </motion.div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Segmented pill: Annuale / Mensile */}
+                    <div
+                      role="tablist"
+                      className="relative flex items-center gap-0.5 rounded-lg bg-muted p-1"
+                    >
+                      {SAVINGS_VIEW_TABS.map((tab) => (
+                        <button
+                          key={tab.value}
+                          role="tab"
+                          type="button"
+                          aria-selected={savingsView === tab.value}
+                          onClick={() => setSavingsView(tab.value)}
+                          className="relative z-10 flex h-7 flex-1 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors aria-selected:text-foreground aria-[selected=false]:text-muted-foreground"
+                        >
+                          {savingsView === tab.value && (
+                            <motion.span
+                              layoutId="history-savings-view"
+                              className="absolute inset-0 rounded-md bg-background shadow-sm"
+                              transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+                            />
+                          )}
+                          <span className="relative">{tab.label}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Year selector — only in monthly view */}
+                    {savingsView === 'monthly' && savingsAvailableYears.length > 0 && (
+                      <Select
+                        value={savingsSelectedYear.toString()}
+                        onValueChange={(v) => setSavingsSelectedYear(v === 'all' ? 'all' : Number(v))}
+                      >
+                        <SelectTrigger className="w-28 h-8 text-xs sm:text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tutti</SelectItem>
+                          {savingsAvailableYears.map((year) => (
+                            <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.div
+                    key={`${savingsView}-${savingsSelectedYear}`}
+                    variants={tabPanelSwitch}
+                    initial="hidden"
+                    animate="visible"
+                    exit="hidden"
+                  >
+                    {savingsView === 'annual' ? (
+                      savingsVsInvestmentData.length === 0 ? (
+                        <div className="flex h-64 items-center justify-center text-muted-foreground text-sm">
+                          Dati insufficienti. Servono snapshot e transazioni cashflow per ogni anno.
+                        </div>
+                      ) : (
+                        <motion.div variants={chartShellSettle} initial="idle" animate="settle">
+                          <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-savings-vs-investment">
+                            <BarChart data={savingsVsInvestmentData} margin={getChartMargins()}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.6} />
+                              <XAxis dataKey="year" />
+                              <YAxis width={getYAxisWidth()} tickFormatter={(v) => formatCurrencyCompact(v)} />
+                              <Tooltip formatter={(v, name) => [formatCurrency(v as number), name]} {...tooltipStyle} cursor={{ fill: 'rgba(128,128,128,0.1)' }} />
+                              <Legend wrapperStyle={{ display: isMobile ? 'none' : 'block', paddingTop: '20px' }} iconSize={10} fontSize={12} />
+                              <Bar dataKey="netSavings" name="Risparmio Netto" fill={chartColors[1] || '#10B981'} stackId="a" animationDuration={600} animationEasing="ease-out" />
+                              {/* fill sets legend color; Cell overrides individual bar color based on sign */}
+                              <Bar dataKey="investmentGrowth" name="Crescita Investimenti" fill={chartColors[0] || '#3B82F6'} stackId="a" animationDuration={600} animationEasing="ease-out">
+                                {savingsVsInvestmentData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={entry.investmentGrowth >= 0 ? (chartColors[0] || '#3B82F6') : '#EF4444'} />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                          {isMobile && (
+                            <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-3 px-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full shrink-0" style={{ background: chartColors[1] || '#10B981' }} />
+                                <span className="text-xs text-muted-foreground">Risparmio</span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full shrink-0" style={{ background: chartColors[0] || '#3B82F6' }} />
+                                <span className="text-xs text-muted-foreground">Investimenti</span>
+                              </div>
+                            </div>
+                          )}
+                        </motion.div>
+                      )
+                    ) : (
+                      (() => {
+                        const monthlyData =
+                          savingsSelectedYear === 'all'
+                            ? savingsVsInvestmentDataAllMonths
+                            : savingsVsInvestmentDataMonthly;
+                        return monthlyData.length === 0 ? (
+                          <div className="flex h-64 items-center justify-center text-muted-foreground text-sm">
+                            Nessun dato per la selezione corrente.
+                          </div>
+                        ) : (
+                          <motion.div variants={chartShellSettle} initial="idle" animate="settle">
+                            <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-savings-vs-investment-monthly">
+                              <BarChart data={monthlyData} margin={getChartMargins()}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.6} />
+                                <XAxis dataKey="period" tick={{ fontSize: savingsSelectedYear === 'all' ? 10 : 12 }} />
+                                <YAxis width={getYAxisWidth()} tickFormatter={(v) => formatCurrencyCompact(v)} />
+                                <Tooltip formatter={(v, name) => [formatCurrency(v as number), name]} {...tooltipStyle} cursor={{ fill: 'rgba(128,128,128,0.1)' }} />
+                                <Legend wrapperStyle={{ display: isMobile ? 'none' : 'block', paddingTop: '20px' }} iconSize={10} fontSize={12} />
+                                <Bar dataKey="netSavings" name="Risparmio Netto" fill={chartColors[1] || '#10B981'} stackId="a" animationDuration={600} animationEasing="ease-out" />
+                                <Bar dataKey="investmentGrowth" name="Crescita Investimenti" fill={chartColors[0] || '#3B82F6'} stackId="a" animationDuration={600} animationEasing="ease-out">
+                                  {monthlyData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.investmentGrowth >= 0 ? (chartColors[0] || '#3B82F6') : '#EF4444'} />
+                                  ))}
+                                </Bar>
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </motion.div>
+                        );
+                      })()
+                    )}
+                  </motion.div>
+                </AnimatePresence>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Lavoro & Investimenti — flat divide-y rows (Trade Republic hierarchy) */}
+          <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0.1 }}>
+            {laborIncomeMetrics ? (
+              <Card className="overflow-hidden">
+                {/* Plain div header — avoids CardHeader flex-col breaking inner layout */}
+                <div className="px-6 pt-5 pb-3 border-b border-border">
+                  <h3 className="text-base font-semibold text-foreground">Lavoro &amp; Investimenti</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Risparmiato da lavoro = entrate "reddito da lavoro" meno tutte le spese.
+                    Dividendi e affitti non rientrano nel risparmio.
+                  </p>
+                </div>
+
+                {/* Flat divide-y KPI rows */}
+                <div className="divide-y divide-border">
+                  <div className="flex items-center justify-between px-6 py-3.5">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Briefcase className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground">Guadagnato da Lavoro</p>
+                        <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear}</p>
+                      </div>
+                    </div>
+                    <p className="text-base font-bold font-mono tabular-nums text-primary shrink-0 ml-4">
+                      {formatCurrency(laborIncomeMetrics.totalLaborIncome)}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between px-6 py-3.5">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <PiggyBank className={cn('h-4 w-4 shrink-0', laborIncomeMetrics.totalSavedFromWork >= 0 ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400')} />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground">Risparmiato da Lavoro</p>
+                        <p className="text-xs text-muted-foreground">
+                          Dal {laborIncomeMetrics.startYear} &middot; Spese: {formatCurrency(laborIncomeMetrics.totalExpensesSum)}
+                        </p>
+                      </div>
+                    </div>
+                    <p className={cn('text-base font-bold font-mono tabular-nums shrink-0 ml-4', laborIncomeMetrics.totalSavedFromWork >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')}>
+                      {laborIncomeMetrics.totalSavedFromWork >= 0 ? '+' : ''}{formatCurrency(laborIncomeMetrics.totalSavedFromWork)}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between px-6 py-3.5">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {laborIncomeMetrics.totalInvestmentGrowthGross >= 0
+                        ? <TrendingUp className="h-4 w-4 shrink-0 text-green-500 dark:text-green-400" />
+                        : <TrendingDown className="h-4 w-4 shrink-0 text-red-500 dark:text-red-400" />}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground">Crescita Investimenti (Lordo)</p>
+                        <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear}</p>
+                      </div>
+                    </div>
+                    <p className={cn('text-base font-bold font-mono tabular-nums shrink-0 ml-4', laborIncomeMetrics.totalInvestmentGrowthGross >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')}>
+                      {laborIncomeMetrics.totalInvestmentGrowthGross >= 0 ? '+' : ''}{formatCurrency(laborIncomeMetrics.totalInvestmentGrowthGross)}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between px-6 py-3.5">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {laborIncomeMetrics.totalInvestmentGrowthNet >= 0
+                        ? <TrendingUp className="h-4 w-4 shrink-0 text-green-500 dark:text-green-400" />
+                        : <TrendingDown className="h-4 w-4 shrink-0 text-red-500 dark:text-red-400" />}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground">Crescita Investimenti (Netto)</p>
+                        <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear} &middot; al netto tasse stimate</p>
+                      </div>
+                    </div>
+                    <p className={cn('text-base font-bold font-mono tabular-nums shrink-0 ml-4', laborIncomeMetrics.totalInvestmentGrowthNet >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')}>
+                      {laborIncomeMetrics.totalInvestmentGrowthNet >= 0 ? '+' : ''}{formatCurrency(laborIncomeMetrics.totalInvestmentGrowthNet)}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between px-6 py-3.5">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <TrendingUp className="h-4 w-4 shrink-0 text-green-500 dark:text-green-400" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground">Mesi in Positivo</p>
+                        <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear} &middot; patrimonio in crescita</p>
+                      </div>
+                    </div>
+                    <p className="text-base font-bold font-mono tabular-nums text-green-600 dark:text-green-400 shrink-0 ml-4">
+                      {laborMonthCounts.positiveMonths}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between px-6 py-3.5">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <TrendingDown className="h-4 w-4 shrink-0 text-red-500 dark:text-red-400" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground">Mesi in Negativo</p>
+                        <p className="text-xs text-muted-foreground">Dal {laborIncomeMetrics.startYear} &middot; patrimonio in calo</p>
+                      </div>
+                    </div>
+                    <p className="text-base font-bold font-mono tabular-nums text-red-600 dark:text-red-400 shrink-0 ml-4">
+                      {laborMonthCounts.negativeMonths}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Monthly breakdown chart below the flat rows */}
+                {laborMetricsChartData.length > 0 && (
+                  <div className="border-t border-border px-6 pt-4 pb-2">
+                    <motion.div variants={chartShellSettle} initial="idle" animate="settle">
+                      <LaborMetricsChart data={laborMetricsChartData} isMobile={isMobile} />
+                    </motion.div>
+                  </div>
+                )}
+              </Card>
+            ) : (
+              // Empty state — shown when laborIncomeCategoryIds is not configured in Settings
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Briefcase className="mx-auto h-8 w-8 text-muted-foreground/30 mb-3" />
+                  <p className="text-sm font-medium text-foreground">Analisi lavoro non configurata</p>
+                  <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
+                    Configura le categorie "Reddito da Lavoro" in Impostazioni per vedere
+                    quanto hai guadagnato, risparmiato e quanto ha contribuito il mercato.
+                  </p>
+                  <Button variant="outline" size="sm" className="mt-4" asChild>
+                    <Link href="/dashboard/settings">
+                      <Settings className="h-3.5 w-3.5 mr-1.5" />
+                      Configura in Impostazioni
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </motion.div>
+        </div>
+      </motion.section>
+
+      {/* ── APPENDICE (collapsible, default chiusa) ───────────────────── */}
+      {/* Contains YoY variation chart + raw snapshot grid */}
+      <div className="pt-6 border-t border-border/40">
+        <Collapsible open={snapshotsOpen} onOpenChange={setSnapshotsOpen}>
+          <CollapsibleTrigger asChild>
+            <div className="group flex cursor-pointer select-none items-center justify-between pb-2">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Appendice</p>
+                <h2 className="mt-1 text-lg font-semibold text-foreground">Storico YoY e dati grezzi</h2>
+              </div>
+              <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none group-data-[state=open]:rotate-180" />
+            </div>
+          </CollapsibleTrigger>
+
+          <CollapsibleContent>
+            <div className="space-y-4 mt-4">
+              {/* YoY Variation Chart */}
+              <Card>
+                <CardHeader>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <CardTitle className="text-lg sm:text-xl">Variazione Anno su Anno</CardTitle>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowYoYPercentage(!showYoYPercentage)}
+                      className="w-full sm:w-auto text-xs sm:text-sm"
+                    >
+                      {showYoYPercentage ? '€ Valori Assoluti' : '% Percentuali'}
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {yoyVariationData.length === 0 ? (
+                    <div className="flex h-64 items-center justify-center text-muted-foreground text-sm">
+                      Nessuno storico disponibile.
+                    </div>
+                  ) : (
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.div
+                        key={showYoYPercentage ? 'yoy-pct' : 'yoy-abs'}
+                        variants={tabPanelSwitch}
+                        initial="hidden"
+                        animate="visible"
+                        exit="hidden"
+                      >
+                        <ResponsiveContainer width="100%" height={getChartHeight()} id="chart-yoy-variation">
+                          <BarChart data={yoyVariationData} margin={getChartMargins()}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.6} />
+                            <XAxis dataKey="year" />
+                            <YAxis
+                              width={getYAxisWidth()}
+                              tickFormatter={(v) => showYoYPercentage ? `${v.toFixed(0)}%` : formatCurrencyCompact(v)}
+                            />
+                            <Tooltip
+                              formatter={(v, name) => {
+                                const num = v as number;
+                                if (name === 'Variazione') return showYoYPercentage ? `${num.toFixed(2)}%` : formatCurrency(num);
+                                return formatCurrency(num);
+                              }}
+                              {...tooltipStyle}
+                              cursor={{ fill: 'rgba(128,128,128,0.1)' }}
+                            />
+                            <Bar
+                              dataKey={showYoYPercentage ? 'variationPercentage' : 'variation'}
+                              name="Variazione"
+                              fill={chartColors[0]}
+                              animationDuration={600}
+                              animationEasing="ease-out"
+                            >
+                              {yoyVariationData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.variation >= 0 ? '#10B981' : '#EF4444'} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </motion.div>
+                    </AnimatePresence>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Raw Snapshot Grid */}
+              {snapshots.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Snapshot Mensili</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <motion.div
+                      variants={staggerContainer}
+                      initial="hidden"
+                      animate="visible"
+                      className={cn(
+                        'grid gap-4',
+                        isLandscape ? 'grid-cols-2' : 'grid-cols-1',
+                        'desktop:grid-cols-3'
+                      )}
+                    >
+                      {snapshots.slice(-6).reverse().map((snapshot) => (
+                        <motion.div
+                          key={`${snapshot.year}-${snapshot.month}`}
+                          variants={cardItem}
+                          className="rounded-lg border p-4"
+                        >
+                          <div>
+                            <div className="text-base font-semibold text-foreground">
+                              {MONTH_NAMES[snapshot.month - 1]} {snapshot.year}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Creato il:{' '}
+                              {snapshot.createdAt.toLocaleString('it-IT', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </div>
+                          </div>
+                          <div className="mt-3">
+                            <div className="text-lg font-bold font-mono tabular-nums text-foreground">
+                              {formatCurrency(snapshot.totalNetWorth)}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              Liquido: {formatCurrency(snapshot.liquidNetWorth)}
+                            </div>
+                          </div>
+                          {snapshot.note && (
+                            <div className="mt-3 pt-3 border-t">
+                              <div className="text-xs text-amber-600 dark:text-amber-400 font-medium mb-1 flex items-center gap-1">
+                                <MessageSquare className="h-3 w-3" />
+                                Nota:
+                              </div>
+                              <div className="text-sm text-muted-foreground whitespace-pre-line">
+                                {snapshot.note.length > 100 ? snapshot.note.substring(0, 100) + '...' : snapshot.note}
+                              </div>
+                            </div>
+                          )}
+                        </motion.div>
+                      ))}
+                    </motion.div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
 
       <CreateManualSnapshotModal
         open={showManualSnapshotModal}

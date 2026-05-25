@@ -15,6 +15,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
+import { useChartColors } from '@/lib/hooks/useChartColors';
 
 interface SimulationChartProps {
   data: PercentilesData[];
@@ -23,31 +24,51 @@ interface SimulationChartProps {
 }
 
 /**
- * "Fan chart" showing the evolution of portfolio value percentiles over retirement period.
+ * Custom tooltip at module level — safe for React Compiler.
+ * Recharts cloneElement preserves extra props (e.g. chartColors) passed at instantiation.
+ */
+function SimulationPercentileTooltip({ active, payload, label, chartColors }: any) {
+  if (!active || !payload?.length) return null;
+  const find = (key: string) => payload.find((p: any) => p.dataKey === key)?.value ?? 0;
+  const colors: string[] = chartColors ?? [];
+  return (
+    <div
+      style={{
+        backgroundColor: 'var(--card)',
+        border: '1px solid var(--border)',
+        borderRadius: '8px',
+        padding: '16px',
+        color: 'var(--card-foreground)',
+      }}
+    >
+      <p className="font-semibold mb-2">Anno {label}</p>
+      <div className="space-y-1 text-sm">
+        <p style={{ color: colors[1] }}>90° percentile: {formatCurrency(find('p90'))}</p>
+        <p style={{ color: colors[1] }}>75° percentile: {formatCurrency(find('p75'))}</p>
+        <p className="font-semibold" style={{ color: colors[0] }}>
+          Mediana (50°): {formatCurrency(find('p50'))}
+        </p>
+        <p style={{ color: colors[4] }}>25° percentile: {formatCurrency(find('p25'))}</p>
+        <p style={{ color: 'var(--destructive)' }}>10° percentile: {formatCurrency(find('p10'))}</p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * "Fan chart" showing the evolution of portfolio value percentiles over the retirement period.
  *
- * Percentile interpretation guide:
- * - 90th percentile (top green): 90% of simulations ended with portfolio values below this line
- * - 75th percentile (light green): 75% of simulations below this line
- * - 50th percentile/Median (bold blue): Half of simulations above, half below (typical outcome)
- * - 25th percentile (orange): 25% of simulations below this line
- * - 10th percentile (bottom red): Only 10% of simulations did worse than this
+ * Percentile bands enter progressively to help the reader parse the spread before it fills.
+ * The median line (p50) animates cleanly while the background bands use isAnimationActive={false}
+ * to avoid the chaotic multi-area animation sequence.
  *
- * Visual interpretation:
- * - Green shaded areas: Better-than-median outcomes (success zone)
- * - Orange/Red shaded areas: Worse-than-median outcomes (risk zone)
- * - Reference line at €0 (red dashed): Portfolio depletion (failure threshold)
- * - Wide spread between percentiles: High uncertainty/volatility
- * - Narrow spread: More predictable outcomes
- *
- * The "fan" shape emerges because compounding returns create increasing variance over time.
- * Early years show tight clustering, but outcomes diverge significantly after many years
- * due to accumulated random market variations.
- *
- * @param data - Array of percentile data for each year of retirement
- * @param retirementYears - Total duration of simulation in years
+ * @param data - Percentile data for each year of retirement
+ * @param retirementYears - Total simulation duration in years
+ * @param revealKey - Incrementing key triggers a fresh band reveal on each new run
  */
 export function SimulationChart({ data, retirementYears, revealKey = 0 }: SimulationChartProps) {
   const reducedMotion = useReducedMotion();
+  const chartColors = useChartColors();
   const [visibleBands, setVisibleBands] = useState(reducedMotion ? 4 : 0);
 
   useEffect(() => {
@@ -55,127 +76,70 @@ export function SimulationChart({ data, retirementYears, revealKey = 0 }: Simula
       setVisibleBands(4);
       return;
     }
-
     setVisibleBands(0);
     const timers = [0, 1, 2, 3].map((index) =>
-      window.setTimeout(() => {
-        setVisibleBands(index + 1);
-      }, 90 + (index * 70))
+      window.setTimeout(() => setVisibleBands(index + 1), 90 + index * 70)
     );
-
-    return () => {
-      timers.forEach((timer) => window.clearTimeout(timer));
-    };
+    return () => timers.forEach((t) => window.clearTimeout(t));
   }, [data, reducedMotion, revealKey]);
 
-  /**
-   * Custom tooltip displaying all five percentile values on hover.
-   *
-   * Why use dataKey lookup instead of array indices?
-   * Recharts can render chart elements in different orders depending on configuration changes,
-   * library version updates, or conditional rendering. Using payload.find() with dataKey
-   * ensures we always get the correct value for each percentile, regardless of rendering order.
-   * This is more robust than hardcoded indices like payload[0], payload[1], etc.
-   */
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      // Look up percentile values by dataKey (resilient to rendering order changes)
-      const p90 = payload.find((p: any) => p.dataKey === 'p90')?.value || 0;
-      const p75 = payload.find((p: any) => p.dataKey === 'p75')?.value || 0;
-      const p50 = payload.find((p: any) => p.dataKey === 'p50')?.value || 0;
-      const p25 = payload.find((p: any) => p.dataKey === 'p25')?.value || 0;
-      const p10 = payload.find((p: any) => p.dataKey === 'p10')?.value || 0;
-
-      return (
-        <div className="bg-background border border-border p-4 rounded-lg shadow-lg">
-          <p className="font-semibold mb-2">Anno {label}</p>
-          <div className="space-y-1 text-sm">
-            <p className="text-green-600">
-              90° percentile: {formatCurrency(p90)}
-            </p>
-            <p className="text-green-500">
-              75° percentile: {formatCurrency(p75)}
-            </p>
-            <p className="text-blue-600 font-semibold">
-              Mediana (50°): {formatCurrency(p50)}
-            </p>
-            <p className="text-orange-500">
-              25° percentile: {formatCurrency(p25)}
-            </p>
-            <p className="text-red-600">
-              10° percentile: {formatCurrency(p10)}
-            </p>
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
+  // Instantiated here so chartColors are captured; Recharts cloneElement adds active/payload/label
+  const tooltipEl = <SimulationPercentileTooltip chartColors={chartColors} />;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Proiezione Patrimonio ({retirementYears} anni)</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Il grafico mostra i percentili delle simulazioni. La linea blu rappresenta il
-          valore mediano (50° percentile).
+          La linea solida rappresenta il valore mediano (50° percentile). Le bande mostrano la
+          dispersione degli esiti.
         </p>
         <p className="text-xs text-muted-foreground">
-          Le bande percentile si compongono progressivamente per rendere piu&apos; leggibile l&apos;ampiezza degli esiti.
+          Le bande percentile entrano progressivamente per rendere più leggibile l&apos;ampiezza degli esiti.
         </p>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={400}>
           <LineChart data={data} margin={{ left: 50 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
             <XAxis
               dataKey="year"
               label={{ value: 'Anni', position: 'insideBottom', offset: -5 }}
-              stroke="#9CA3AF"
+              stroke="var(--border)"
+              tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
             />
             <YAxis
               width={100}
               tickFormatter={(value) => formatCurrencyCompact(value)}
               label={{ value: 'Patrimonio', angle: -90, position: 'insideLeft' }}
-              stroke="#9CA3AF"
+              stroke="var(--border)"
+              tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={tooltipEl} cursor={{ fill: 'rgba(128, 128, 128, 0.1)' }} />
             <Legend />
-
-            {/* Reference line at €0 (failure threshold).
-                Red dashed line marks portfolio depletion point - when simulations cross
-                below this line, they've run out of money (failure). */}
+            {/* Reference line at €0 marks portfolio depletion (failure threshold) */}
             <ReferenceLine
               y={0}
-              stroke="#ef4444"
+              stroke="var(--destructive)"
               strokeDasharray="3 3"
               label={{
                 value: 'Fallimento',
-                fill: '#ef4444',
+                fill: 'var(--destructive)',
                 fontSize: 14,
                 fontWeight: 'bold',
-                position: 'right'
+                position: 'right',
               }}
             />
-
-            {/* Area charts for percentile ranges creating the "fan" visualization.
-                Color gradient from green (good outcomes) to red (poor outcomes):
-                - p90 & p75: Green fills (above-median, success zone)
-                - p25: Orange fill (below-median, caution zone)
-                - p10: Red fill (bottom 10%, risk zone)
-
-                Fill opacity varies (0.1-0.15) to create visual depth when areas overlap.
-                Lower percentiles render later to ensure they appear on top in the stack. */}
-            {/* Percentile band areas — isAnimationActive={false} perché sono 4 aree decorative
-                sovrapposte: animarle individualmente causerebbe una sequenza visiva caotica.
-                La linea mediana anima in modo pulito al loro posto. */}
+            {/* Percentile band areas — isAnimationActive={false} because 4 stacked decorative
+                areas animating individually produces a chaotic sequence. The median line
+                animates cleanly in their place. */}
             {visibleBands >= 1 && (
               <Area
                 type="monotone"
                 dataKey="p90"
                 stroke="none"
-                fill="#10b981"
-                fillOpacity={0.1}
+                fill={chartColors[1]}
+                fillOpacity={0.12}
                 name="90° percentile"
                 isAnimationActive={false}
               />
@@ -185,8 +149,8 @@ export function SimulationChart({ data, retirementYears, revealKey = 0 }: Simula
                 type="monotone"
                 dataKey="p75"
                 stroke="none"
-                fill="#10b981"
-                fillOpacity={0.15}
+                fill={chartColors[1]}
+                fillOpacity={0.16}
                 name="75° percentile"
                 isAnimationActive={false}
               />
@@ -196,8 +160,8 @@ export function SimulationChart({ data, retirementYears, revealKey = 0 }: Simula
                 type="monotone"
                 dataKey="p25"
                 stroke="none"
-                fill="#f97316"
-                fillOpacity={0.15}
+                fill={chartColors[4]}
+                fillOpacity={0.14}
                 name="25° percentile"
                 isAnimationActive={false}
               />
@@ -207,18 +171,16 @@ export function SimulationChart({ data, retirementYears, revealKey = 0 }: Simula
                 type="monotone"
                 dataKey="p10"
                 stroke="none"
-                fill="#ef4444"
-                fillOpacity={0.1}
+                fill="var(--destructive)"
+                fillOpacity={0.10}
                 name="10° percentile"
                 isAnimationActive={false}
               />
             )}
-
-            {/* Median line */}
             <Line
               type="monotone"
               dataKey="p50"
-              stroke="#3b82f6"
+              stroke={chartColors[0]}
               strokeWidth={3}
               dot={false}
               name="Mediana (50° percentile)"

@@ -32,7 +32,7 @@ export function DoublingTimeSummaryCards({ summary, doublingMode }: DoublingTime
       variants={staggerContainer}
       initial="hidden"
       animate="visible"
-      className="grid grid-cols-1 md:grid-cols-2 desktop:grid-cols-3 gap-4"
+      className="grid grid-cols-1 desktop:grid-cols-3 gap-4"
     >
       {/* Card 1: Fastest milestone */}
       <motion.div variants={cardItem}>
@@ -40,11 +40,11 @@ export function DoublingTimeSummaryCards({ summary, doublingMode }: DoublingTime
           title={isThreshold ? 'Traguardo Più Rapido' : 'Raddoppio Più Rapido'}
           value={summary.fastestDoubling?.durationMonths ?? null}
           format="months"
-          subtitle={
+          description={
             summary.fastestDoubling
-              ? `${summary.fastestDoubling.periodLabel} (${formatCurrency(
+              ? `${summary.fastestDoubling.periodLabel} · ${formatCurrency(
                   summary.fastestDoubling.startValue
-                )} → ${formatCurrency(summary.fastestDoubling.endValue)})`
+                )} → ${formatCurrency(summary.fastestDoubling.endValue)}`
               : undefined
           }
           tooltip={

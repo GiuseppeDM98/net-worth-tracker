@@ -45,13 +45,15 @@ describe('Assistant web search policy', () => {
     ).toBe(true);
   });
 
-  it('chat: toggle on enables web search regardless of prompt keywords', () => {
+  it('chat: toggle on does NOT enable web search without keywords (chat is keyword-only)', () => {
+    // Chat mode ignores includeMacroContext — it uses prompt-based keyword detection only.
+    // The preference controls structured analysis modes (month/year/ytd/history), not chat.
     expect(
       resolveAssistantWebSearchPolicy('chat', 'Riorganizza le mie domande sul portafoglio', {
         ...getDefaultAssistantPreferences(),
         includeMacroContext: true,
       })
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('chat: toggle off and no keywords keeps web search disabled', () => {

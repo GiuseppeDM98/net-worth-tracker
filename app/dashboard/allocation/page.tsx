@@ -56,7 +56,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Settings, TrendingUp, TrendingDown, Minus, Info, ArrowLeft } from 'lucide-react';
+import { Settings, Info, ArrowLeft, LayoutGrid } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { AllocationCard } from '@/components/allocation/AllocationCard';
@@ -64,6 +64,7 @@ import { AllocationSheet } from '@/components/allocation/AllocationSheet';
 import { AnimatePresence, motion } from 'framer-motion';
 import { drillDownShell } from '@/lib/utils/motionVariants';
 import { cn } from '@/lib/utils';
+import { AllocationPageSkeleton } from '@/components/allocation/AllocationPageSkeleton';
 import dynamic from 'next/dynamic';
 
 const ExposureSection = dynamic(
@@ -195,32 +196,21 @@ export default function AllocationPage() {
     }
   };
 
-  const getActionIcon = (action: 'COMPRA' | 'VENDI' | 'OK') => {
-    switch (action) {
-      case 'COMPRA':
-        return <TrendingUp className="h-4 w-4 text-orange-500" />;
-      case 'VENDI':
-        return <TrendingDown className="h-4 w-4 text-red-500" />;
-      case 'OK':
-        return <Minus className="h-4 w-4 text-green-500" />;
-    }
-  };
-
-  const getActionColor = (action: 'COMPRA' | 'VENDI' | 'OK') => {
-    switch (action) {
-      case 'COMPRA':
-        return 'text-orange-600 bg-orange-50 dark:text-orange-400 dark:bg-orange-950/40';
-      case 'VENDI':
-        return 'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-950/40';
-      case 'OK':
-        return 'text-green-600 bg-green-50 dark:text-green-400 dark:bg-green-950/40';
-    }
-  };
-
   const getDifferenceColor = (difference: number) => {
     if (Math.abs(difference) <= 1) return 'text-green-600 dark:text-green-400';
     if (difference > 1) return 'text-red-600 dark:text-red-400';
     return 'text-orange-600 dark:text-orange-400';
+  };
+
+  const getActionChipClass = (action: 'COMPRA' | 'VENDI' | 'OK') => {
+    switch (action) {
+      case 'COMPRA':
+        return 'bg-orange-500/10 text-orange-600 border-orange-200 dark:text-orange-400 dark:border-orange-800';
+      case 'VENDI':
+        return 'bg-red-500/10 text-red-600 border-red-200 dark:text-red-400 dark:border-red-800';
+      case 'OK':
+        return 'bg-green-500/10 text-green-600 border-green-200 dark:text-green-400 dark:border-green-800';
+    }
   };
 
   const assetClassLabels: Record<string, string> = {
@@ -365,7 +355,7 @@ export default function AllocationPage() {
   };
 
   const renderAssetClassCards = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="overflow-hidden rounded-xl border border-border bg-card divide-y divide-border/50">
       {Object.entries(allocation!.byAssetClass)
         .sort(([a], [b]) => {
           const orderA = ASSET_CLASS_ORDER[a] || 999;
@@ -405,7 +395,7 @@ export default function AllocationPage() {
     if (!subCategories) return null;
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="overflow-hidden rounded-xl border border-border bg-card divide-y divide-border/50">
         {Object.entries(subCategories)
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([subCategory, data]) => {
@@ -452,7 +442,7 @@ export default function AllocationPage() {
     }
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="overflow-hidden rounded-xl border border-border bg-card divide-y divide-border/50">
         {Object.entries(specificAssets)
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([assetName, data]) => (
@@ -499,12 +489,12 @@ export default function AllocationPage() {
 
   // ========== LOADING & EMPTY STATES ==========
 
-  if (loading) return null;
+  if (loading) return <AllocationPageSkeleton />;
 
   if (!allocation) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="text-gray-500">Nessun dato disponibile</div>
+        <div className="text-muted-foreground">Nessun dato disponibile</div>
       </div>
     );
   }
@@ -560,21 +550,19 @@ export default function AllocationPage() {
           </CardHeader>
           <CardContent>
             {Object.keys(specificAssets).length === 0 ? (
-              <div className="flex h-32 items-center justify-center text-gray-500">
-                Nessun specific asset configurato per questa sottocategoria.
+              <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+                <LayoutGrid className="h-7 w-7 text-muted-foreground/40" />
+                <p className="text-sm text-muted-foreground">Nessun asset specifico configurato per questa sottocategoria.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Asset Name</TableHead>
-                      <TableHead className="text-right">Corrente %</TableHead>
-                      <TableHead className="text-right">Corrente €</TableHead>
-                      <TableHead className="text-right">Target %</TableHead>
-                      <TableHead className="text-right">Target €</TableHead>
-                      <TableHead className="text-right">Differenza %</TableHead>
-                      <TableHead className="text-right">Differenza €</TableHead>
+                      <TableHead className="w-[30%]">Nome Asset</TableHead>
+                      <TableHead className="text-right">Corrente</TableHead>
+                      <TableHead className="text-right text-muted-foreground/70">Target</TableHead>
+                      <TableHead className="text-right">Differenza</TableHead>
                       <TableHead className="text-center">
                         <span className="block">Azione</span>
                         <span className="block text-[10px] font-normal text-muted-foreground">±2% soglia</span>
@@ -590,41 +578,32 @@ export default function AllocationPage() {
                             {assetName}
                           </TableCell>
                           <TableCell className="text-right">
-                            {formatPercentage(data.currentPercentage)}
+                            <span className="block font-mono font-semibold tabular-nums text-foreground">
+                              {formatCurrency(data.currentValue)}
+                            </span>
+                            <span className="block font-mono text-xs tabular-nums text-muted-foreground">
+                              {formatPercentage(data.currentPercentage)}
+                            </span>
                           </TableCell>
                           <TableCell className="text-right">
-                            {formatCurrency(data.currentValue)}
+                            <span className="block font-mono text-sm tabular-nums text-muted-foreground">
+                              {formatCurrency(data.targetValue)}
+                            </span>
+                            <span className="block font-mono text-xs tabular-nums text-muted-foreground/60">
+                              {formatPercentage(data.targetPercentage)}
+                            </span>
                           </TableCell>
                           <TableCell className="text-right">
-                            {formatPercentage(data.targetPercentage)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {formatCurrency(data.targetValue)}
-                          </TableCell>
-                          <TableCell
-                            className={`text-right font-semibold ${getDifferenceColor(
-                              data.difference
-                            )}`}
-                          >
-                            {data.difference > 0 ? '+' : ''}
-                            {formatPercentage(data.difference)}
-                          </TableCell>
-                          <TableCell
-                            className={`text-right font-semibold ${getDifferenceColor(
-                              data.difference
-                            )}`}
-                          >
-                            {data.differenceValue > 0 ? '+' : ''}
-                            {formatCurrency(data.differenceValue)}
+                            <span className={`block font-mono font-semibold tabular-nums ${getDifferenceColor(data.difference)}`}>
+                              {data.difference > 0 ? '+' : ''}{formatPercentage(data.difference)}
+                            </span>
+                            <span className={`block font-mono text-xs tabular-nums opacity-70 ${getDifferenceColor(data.difference)}`}>
+                              {data.differenceValue > 0 ? '+' : ''}{formatCurrency(data.differenceValue)}
+                            </span>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center justify-center">
-                              <span
-                                className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${getActionColor(
-                                  data.action
-                                )}`}
-                              >
-                                {getActionIcon(data.action)}
+                              <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${getActionChipClass(data.action)}`}>
                                 {data.action}
                               </span>
                             </div>
@@ -698,13 +677,15 @@ export default function AllocationPage() {
       {/* ========== MOBILE + TABLET VIEW ========== */}
       {useCardView && (
         <>
-          {/* Asset Class Cards */}
+          {/* Asset Class list */}
           {Object.keys(allocation.byAssetClass).length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center text-gray-500">
-                Nessun asset presente. Aggiungi degli asset per vedere l'allocazione.
-              </CardContent>
-            </Card>
+            <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+              <LayoutGrid className="h-8 w-8 text-muted-foreground/40" />
+              <p className="text-sm text-muted-foreground">Nessun asset presente.</p>
+              <Link href="/dashboard/assets" className="text-xs text-muted-foreground/70 underline underline-offset-2">
+                Aggiungi asset per vedere l'allocazione
+              </Link>
+            </div>
           ) : (
             renderAssetClassCards()
           )}
@@ -720,7 +701,7 @@ export default function AllocationPage() {
             title={
               sheetNav.level === 'specificAsset'
                 ? 'Asset specifici'
-                : 'Sottocategoria'
+                : (sheetNav.assetClass ? (assetClassLabels[sheetNav.assetClass] ?? 'Sottocategoria') : 'Sottocategoria')
             }
             breadcrumbPath={sheetBreadcrumbPath}
             onBack={sheetNav.level === 'specificAsset' ? handleBack : undefined}
@@ -751,22 +732,22 @@ export default function AllocationPage() {
             </CardHeader>
             <CardContent>
               {Object.keys(allocation.byAssetClass).length === 0 ? (
-                <div className="flex h-32 items-center justify-center text-gray-500">
-                  Nessun asset presente. Aggiungi degli asset per vedere
-                  l'allocazione.
+                <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+                  <LayoutGrid className="h-7 w-7 text-muted-foreground/40" />
+                  <p className="text-sm text-muted-foreground">Nessun asset presente.</p>
+                  <Link href="/dashboard/assets" className="text-xs text-muted-foreground/70 underline underline-offset-2">
+                    Aggiungi asset per vedere l'allocazione
+                  </Link>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Classe Asset</TableHead>
-                        <TableHead className="text-right">Corrente %</TableHead>
-                        <TableHead className="text-right">Corrente €</TableHead>
-                        <TableHead className="text-right">Target %</TableHead>
-                        <TableHead className="text-right">Target €</TableHead>
-                        <TableHead className="text-right">Differenza %</TableHead>
-                        <TableHead className="text-right">Differenza €</TableHead>
+                        <TableHead className="w-[30%]">Classe Asset</TableHead>
+                        <TableHead className="text-right">Corrente</TableHead>
+                        <TableHead className="text-right text-muted-foreground/70">Target</TableHead>
+                        <TableHead className="text-right">Differenza</TableHead>
                         <TableHead className="text-center">
                           <span className="block">Azione</span>
                           <span className="block text-[10px] font-normal text-muted-foreground">±2% soglia</span>
@@ -786,48 +767,38 @@ export default function AllocationPage() {
                               {assetClassLabels[assetClass] || assetClass}
                             </TableCell>
                             <TableCell className="text-right">
-                              {formatPercentage(data.currentPercentage)}
+                              <span className="block font-mono font-semibold tabular-nums text-foreground">
+                                {formatCurrency(data.currentValue)}
+                              </span>
+                              <span className="block font-mono text-xs tabular-nums text-muted-foreground">
+                                {formatPercentage(data.currentPercentage)}
+                              </span>
                             </TableCell>
                             <TableCell className="text-right">
-                              {formatCurrency(data.currentValue)}
+                              <span className="block font-mono text-sm tabular-nums text-muted-foreground">
+                                {formatCurrency(data.targetValue)}
+                              </span>
+                              <span className="block font-mono text-xs tabular-nums text-muted-foreground/60">
+                                {formatPercentage(data.targetPercentage)}
+                              </span>
                             </TableCell>
                             <TableCell className="text-right">
-                              {formatPercentage(data.targetPercentage)}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {formatCurrency(data.targetValue)}
-                            </TableCell>
-                            <TableCell
-                              className={`text-right font-semibold ${getDifferenceColor(
-                                data.difference
-                              )}`}
-                            >
-                              {data.difference > 0 ? '+' : ''}
-                              {formatPercentage(data.difference)}
-                            </TableCell>
-                            <TableCell
-                              className={`text-right font-semibold ${getDifferenceColor(
-                                data.difference
-                              )}`}
-                            >
-                              {data.differenceValue > 0 ? '+' : ''}
-                              {formatCurrency(data.differenceValue)}
+                              <span className={`block font-mono font-semibold tabular-nums ${getDifferenceColor(data.difference)}`}>
+                                {data.difference > 0 ? '+' : ''}{formatPercentage(data.difference)}
+                              </span>
+                              <span className={`block font-mono text-xs tabular-nums opacity-70 ${getDifferenceColor(data.difference)}`}>
+                                {data.differenceValue > 0 ? '+' : ''}{formatCurrency(data.differenceValue)}
+                              </span>
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center justify-center">
-                                <span
-                                  className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${getActionColor(
-                                    data.action
-                                  )}`}
-                                >
-                                  {getActionIcon(data.action)}
+                                <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${getActionChipClass(data.action)}`}>
                                   {data.action}
                                 </span>
                               </div>
                             </TableCell>
                           </TableRow>
-                        )
-                      )}
+                        ))}
                     </TableBody>
                   </Table>
                 </div>
@@ -835,7 +806,7 @@ export default function AllocationPage() {
             </CardContent>
           </Card>
 
-          {/* Sub-Category Tables - One card per asset class */}
+          {/* Sub-Category Tables — one card per asset class */}
           {Object.entries(getSubCategoriesByAssetClass())
             .sort(([a], [b]) => {
               const orderA = ASSET_CLASS_ORDER[a] || 999;
@@ -846,25 +817,22 @@ export default function AllocationPage() {
               <Card key={`sub-${assetClass}`}>
                 <CardHeader>
                   <CardTitle>
-                    Allocazione Sottocategoria {assetClassLabels[assetClass]}
+                    {assetClassLabels[assetClass]} — Sottocategorie
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="overflow-x-auto">
                     <Table>
-                        <TableHeader>
+                      <TableHeader>
                         <TableRow>
-                          <TableHead>Sottocategoria</TableHead>
-                          <TableHead className="text-right">Corrente %</TableHead>
-                          <TableHead className="text-right">Corrente €</TableHead>
-                          <TableHead className="text-right">Target %</TableHead>
-                          <TableHead className="text-right">Target €</TableHead>
-                          <TableHead className="text-right">Differenza %</TableHead>
-                          <TableHead className="text-right">Differenza €</TableHead>
+                          <TableHead className="w-[30%]">Sottocategoria</TableHead>
+                          <TableHead className="text-right">Corrente</TableHead>
+                          <TableHead className="text-right text-muted-foreground/70">Target</TableHead>
+                          <TableHead className="text-right">Differenza</TableHead>
                           <TableHead className="text-center">
-                          <span className="block">Azione</span>
-                          <span className="block text-[10px] font-normal text-muted-foreground">±2% soglia</span>
-                        </TableHead>
+                            <span className="block">Azione</span>
+                            <span className="block text-[10px] font-normal text-muted-foreground">±2% soglia</span>
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -876,9 +844,7 @@ export default function AllocationPage() {
                             return (
                               <TableRow
                                 key={subCategory}
-                                className={cn(
-                                  hasSpecificAssets && 'cursor-pointer hover:bg-muted/50'
-                                )}
+                                className={cn(hasSpecificAssets && 'cursor-pointer hover:bg-muted/50')}
                                 onClick={() => {
                                   if (hasSpecificAssets) {
                                     handleDrillDownToSpecificAssets(assetClass, subCategory);
@@ -889,51 +855,42 @@ export default function AllocationPage() {
                                   <div className="flex items-center gap-2">
                                     {subCategory}
                                     {hasSpecificAssets && (
-                                      <Info className="h-4 w-4 text-blue-500" />
+                                      <Info className="h-3.5 w-3.5 text-muted-foreground/50" />
                                     )}
                                   </div>
                                 </TableCell>
-                              <TableCell className="text-right">
-                                {formatPercentage(data.currentPercentage)}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {formatCurrency(data.currentValue)}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {formatPercentage(data.targetPercentage)}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {formatCurrency(data.targetValue)}
-                              </TableCell>
-                              <TableCell
-                                className={`text-right font-semibold ${getDifferenceColor(
-                                  data.difference
-                                )}`}
-                              >
-                                {data.difference > 0 ? '+' : ''}
-                                {formatPercentage(data.difference)}
-                              </TableCell>
-                              <TableCell
-                                className={`text-right font-semibold ${getDifferenceColor(
-                                  data.difference
-                                )}`}
-                              >
-                                {data.differenceValue > 0 ? '+' : ''}
-                                {formatCurrency(data.differenceValue)}
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center justify-center">
-                                  <span
-                                    className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${getActionColor(
-                                      data.action
-                                    )}`}
-                                  >
-                                    {getActionIcon(data.action)}
-                                    {data.action}
+                                <TableCell className="text-right">
+                                  <span className="block font-mono font-semibold tabular-nums text-foreground">
+                                    {formatCurrency(data.currentValue)}
                                   </span>
-                                </div>
-                              </TableCell>
-                            </TableRow>
+                                  <span className="block font-mono text-xs tabular-nums text-muted-foreground">
+                                    {formatPercentage(data.currentPercentage)}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <span className="block font-mono text-sm tabular-nums text-muted-foreground">
+                                    {formatCurrency(data.targetValue)}
+                                  </span>
+                                  <span className="block font-mono text-xs tabular-nums text-muted-foreground/60">
+                                    {formatPercentage(data.targetPercentage)}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <span className={`block font-mono font-semibold tabular-nums ${getDifferenceColor(data.difference)}`}>
+                                    {data.difference > 0 ? '+' : ''}{formatPercentage(data.difference)}
+                                  </span>
+                                  <span className={`block font-mono text-xs tabular-nums opacity-70 ${getDifferenceColor(data.difference)}`}>
+                                    {data.differenceValue > 0 ? '+' : ''}{formatCurrency(data.differenceValue)}
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center justify-center">
+                                    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${getActionChipClass(data.action)}`}>
+                                      {data.action}
+                                    </span>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
                             );
                           })}
                       </TableBody>
@@ -941,8 +898,7 @@ export default function AllocationPage() {
                   </div>
                 </CardContent>
               </Card>
-            )
-          )}
+            ))}
         </motion.div>
         </AnimatePresence>
       )}

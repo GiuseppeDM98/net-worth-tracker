@@ -18,6 +18,7 @@
 
 import { FIREProjectionYearData } from '@/types/assets';
 import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
+import { useChartColors } from '@/lib/hooks/useChartColors';
 import {
   LineChart,
   Line,
@@ -42,9 +43,15 @@ interface FIREProjectionChartProps {
 }
 
 export function FIREProjectionChart({ yearlyData, bearYearsToFIRE, baseYearsToFIRE, bullYearsToFIRE, height = 400, marginLeft = 50 }: FIREProjectionChartProps) {
+  const chartColors = useChartColors();
+  // Semantic mapping: Orso (bear/pessimistic) → red token [4], Base → primary [0], Toro (bull) → green token [1]
+  const bearColor = chartColors[4];
+  const baseColor = chartColors[0];
+  const bullColor = chartColors[1];
+
   if (yearlyData.length === 0) {
     return (
-      <div className="flex h-64 items-center justify-center text-gray-500">
+      <div className="flex h-64 items-center justify-center text-muted-foreground">
         Nessun dato di proiezione disponibile.
       </div>
     );
@@ -62,13 +69,18 @@ export function FIREProjectionChart({ yearlyData, bearYearsToFIRE, baseYearsToFI
         <Tooltip
           formatter={(value, name) => [formatCurrency(value as number), name]}
           labelFormatter={(label) => `Anno ${label}`}
-          labelStyle={{ color: '#000' }}
+          contentStyle={{
+            backgroundColor: 'var(--card)',
+            border: '1px solid var(--border)',
+            color: 'var(--card-foreground)',
+          }}
+          labelStyle={{ fontWeight: 600, color: 'var(--card-foreground)' }}
         />
         <Legend />
         <Line
           type="monotone"
           dataKey="bearNetWorth"
-          stroke="#EF4444"
+          stroke={bearColor}
           strokeWidth={2}
           name="Scenario Orso"
           dot={false}
@@ -78,7 +90,7 @@ export function FIREProjectionChart({ yearlyData, bearYearsToFIRE, baseYearsToFI
         <Line
           type="monotone"
           dataKey="baseNetWorth"
-          stroke="#6366F1"
+          stroke={baseColor}
           strokeWidth={2}
           name="Scenario Base"
           dot={false}
@@ -88,7 +100,7 @@ export function FIREProjectionChart({ yearlyData, bearYearsToFIRE, baseYearsToFI
         <Line
           type="monotone"
           dataKey="bullNetWorth"
-          stroke="#10B981"
+          stroke={bullColor}
           strokeWidth={2}
           name="Scenario Toro"
           dot={false}
@@ -98,7 +110,7 @@ export function FIREProjectionChart({ yearlyData, bearYearsToFIRE, baseYearsToFI
         <Line
           type="monotone"
           dataKey="bearFireNumber"
-          stroke="#EF4444"
+          stroke={bearColor}
           strokeWidth={1.5}
           strokeDasharray="8 4"
           name="FIRE Nr. Orso"
@@ -109,7 +121,7 @@ export function FIREProjectionChart({ yearlyData, bearYearsToFIRE, baseYearsToFI
         <Line
           type="monotone"
           dataKey="baseFireNumber"
-          stroke="#6366F1"
+          stroke={baseColor}
           strokeWidth={2}
           strokeDasharray="8 4"
           name="FIRE Nr. Base"
@@ -120,7 +132,7 @@ export function FIREProjectionChart({ yearlyData, bearYearsToFIRE, baseYearsToFI
         <Line
           type="monotone"
           dataKey="bullFireNumber"
-          stroke="#10B981"
+          stroke={bullColor}
           strokeWidth={1.5}
           strokeDasharray="8 4"
           name="FIRE Nr. Toro"
@@ -132,28 +144,28 @@ export function FIREProjectionChart({ yearlyData, bearYearsToFIRE, baseYearsToFI
         {bullYearsToFIRE !== null && (
           <ReferenceLine
             x={yearlyData[0].calendarYear - 1 + bullYearsToFIRE}
-            stroke="#10B981"
+            stroke={bullColor}
             strokeWidth={1.5}
             strokeDasharray="4 3"
-            label={{ value: `FIRE Toro`, position: 'top', fill: '#10B981', fontSize: 11 }}
+            label={{ value: 'FIRE Toro', position: 'top', fill: bullColor, fontSize: 11 }}
           />
         )}
         {baseYearsToFIRE !== null && (
           <ReferenceLine
             x={yearlyData[0].calendarYear - 1 + baseYearsToFIRE}
-            stroke="#6366F1"
+            stroke={baseColor}
             strokeWidth={1.5}
             strokeDasharray="4 3"
-            label={{ value: `FIRE Base`, position: 'top', fill: '#6366F1', fontSize: 11 }}
+            label={{ value: 'FIRE Base', position: 'top', fill: baseColor, fontSize: 11 }}
           />
         )}
         {bearYearsToFIRE !== null && (
           <ReferenceLine
             x={yearlyData[0].calendarYear - 1 + bearYearsToFIRE}
-            stroke="#EF4444"
+            stroke={bearColor}
             strokeWidth={1.5}
             strokeDasharray="4 3"
-            label={{ value: `FIRE Orso`, position: 'top', fill: '#EF4444', fontSize: 11 }}
+            label={{ value: 'FIRE Orso', position: 'top', fill: bearColor, fontSize: 11 }}
           />
         )}
       </LineChart>
