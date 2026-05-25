@@ -1,87 +1,189 @@
 /**
  * ASSETS PAGE
  *
- * Tab management page for assets with lazy loading and manual data refresh.
+ * HERO CARDS:
+ * Replicated from Panoramica page — data comes from useDashboardOverview (shared RQ cache).
  *
- * LAZY LOADING PATTERN:
- * Same strategy as cashflow page:
- * - Macro-tabs ('anno-corrente', 'storico') mounted only when first activated
- * - Once mounted, stay mounted (no re-mounting on switch)
- * - Sub-tabs inside each macro-tab mount all at once (data is already in memory)
+ * CONTI CORRENTI:
+ * Assets with type=cash AND assetClass=cash are shown above the table as clickable cards.
+ * Clicking opens a read-only detail dialog with Modifica/Elimina actions.
+ * These assets are excluded from the Gestione Asset table.
  *
- * TAB STRUCTURE:
- * - Gestione Asset: asset table with CRUD operations
- * - Anno Corrente: Prezzi / Valori / Asset Class for the current calendar year
- * - Storico: Prezzi / Valori / Asset Class for all history (from Nov 2025)
- *
- * MOBILE HISTORICAL TABS:
- * Banner rimosso. Sostituito con AssetMobileSummary (ultimi 3 mesi compatti) +
- * Collapsible per la tabella completa. Desktop: tabella sempre visibile.
+ * PERFORMANCE METRICS:
+ * Each asset row/card shows Δ Mese, Δ YTD, Δ Inizio inline — computed from monthly snapshots.
+ * Desktop: toggle button swaps the table to a dedicated 8-column performance view.
+ * Mobile: 3 chip badges below the asset value.
  */
 
 'use client';
 
 import { motion } from 'framer-motion';
-import { useMemo, useState } from 'react';
+import { useRef, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useAssets } from '@/lib/hooks/useAssets';
+import { useAssets, useDeleteAsset } from '@/lib/hooks/useAssets';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { useDashboardOverview } from '@/lib/hooks/useDashboardOverview';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query/queryKeys';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Wallet, CalendarClock, History, ChevronDown } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, Pencil, Trash2 } from 'lucide-react';
 import { AssetManagementTab } from '@/components/assets/AssetManagementTab';
-import { AssetPriceHistoryTable } from '@/components/assets/AssetPriceHistoryTable';
-import { AssetClassHistoryTable } from '@/components/assets/AssetClassHistoryTable';
-import { AssetMobileSummary } from '@/components/assets/AssetMobileSummary';
-import { getCurrentYear } from '@/lib/utils/assetPriceHistoryUtils';
-import { tabPanelSwitch } from '@/lib/utils/motionVariants';
-import type { ComponentProps } from 'react';
+import { AssetDialog } from '@/components/assets/AssetDialog';
+import { OverviewAnimatedCurrency } from '@/components/dashboard/OverviewAnimatedCurrency';
+import { NetWorthSparkline } from '@/components/dashboard/NetWorthSparkline';
+import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
+import { formatCurrency } from '@/lib/services/chartService';
+import { calculateAssetValue, calculateUnrealizedGains } from '@/lib/services/assetService';
+import { formatNumber } from '@/lib/services/chartService';
+import {
+  staggerContainer,
+  cardItem,
+  heroMetricSettle,
+  springLayoutTransition,
+} from '@/lib/utils/motionVariants';
+import { toast } from 'sonner';
+import type { Asset } from '@/types/assets';
+import { Timestamp } from 'firebase/firestore';
 
-type MacroTabId = 'management' | 'anno-corrente' | 'storico';
-type HistoricalSubTabId = 'prezzi' | 'valori' | 'asset-class';
+// Format a Firebase Timestamp or JS Date as dd/MM/yyyy for display.
+function formatAssetDate(ts: Date | Timestamp | null | undefined): string {
+  if (!ts) return '—';
+  const d = ts instanceof Timestamp ? ts.toDate() : (ts as Date);
+  return new Intl.DateTimeFormat('it-IT', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(d);
+}
 
-// Abbreviated labels fit any mobile width (≤8 chars + icon per segment).
-const MOBILE_TABS: Array<{ value: MacroTabId; label: string; icon: React.ElementType }> = [
-  { value: 'management', label: 'Gestione', icon: Wallet },
-  { value: 'anno-corrente', label: 'Corrente', icon: CalendarClock },
-  { value: 'storico', label: 'Storico', icon: History },
-];
-
-// Mobile-only wrapper: compact 3-month summary above a collapsible full table.
-// Defined at module level so React sees a stable component reference each render.
-// Each instance owns its own open state — no shared state needed in the page.
-function MobileHistoricalView({
-  summaryProps,
-  tableNode,
+// Grid of cash account cards — module-level for stable reference.
+function CashAccountsSection({
+  assets,
+  onSelect,
 }: {
-  summaryProps: ComponentProps<typeof AssetMobileSummary>;
-  tableNode: React.ReactNode;
+  assets: Asset[];
+  onSelect: (asset: Asset) => void;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
+  if (assets.length === 0) return null;
   return (
-    <div className="desktop:hidden space-y-4">
-      <AssetMobileSummary {...summaryProps} />
-      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <CollapsibleTrigger asChild>
+    <div className="space-y-3">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+        Conti Correnti
+      </p>
+      <div className="grid grid-cols-2 desktop:grid-cols-4 gap-3">
+        {assets.map((asset) => (
+          <button
+            key={asset.id}
+            type="button"
+            onClick={() => onSelect(asset)}
+            className={cn(
+              'cursor-pointer rounded-xl border border-border bg-card p-4 text-left',
+              'hover:bg-muted/50 active:bg-muted/70 transition-colors duration-150',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1'
+            )}
+          >
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted mb-3">
+              <Wallet className="h-3.5 w-3.5 text-muted-foreground" />
+            </div>
+            <p className="text-xs text-muted-foreground truncate mb-0.5">{asset.name}</p>
+            <p className="text-lg font-bold font-mono tabular-nums tracking-tight text-foreground">
+              {formatCurrency(calculateAssetValue(asset), asset.currency)}
+            </p>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Read-only detail dialog for a single cash account asset.
+// Shows value, currency, name, last-updated date.
+// Modifica → opens AssetDialog; Elimina → 2-click disarm (same pattern as the rest of the app).
+function CashAccountDetailDialog({
+  asset,
+  open,
+  onClose,
+  onEdit,
+  pendingDeleteId,
+  onDeleteClick,
+}: {
+  asset: Asset | null;
+  open: boolean;
+  onClose: () => void;
+  onEdit: (asset: Asset) => void;
+  pendingDeleteId: string | undefined;
+  onDeleteClick: (assetId: string) => void;
+}) {
+  if (!asset) return null;
+  const value = calculateAssetValue(asset);
+  const isPending = pendingDeleteId === asset.id;
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="sm:max-w-[360px]">
+        <DialogHeader>
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
+              <Wallet className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <DialogTitle className="text-base">{asset.name}</DialogTitle>
+          </div>
+          <DialogDescription className="sr-only">
+            Dettagli del conto corrente {asset.name}
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Main value */}
+        <p className="text-3xl font-bold font-mono tabular-nums tracking-tight text-foreground">
+          {formatCurrency(value, asset.currency)}
+        </p>
+
+        {/* Detail rows */}
+        <div className="divide-y divide-border border-t border-border">
+          {[
+            { label: 'Valuta', value: asset.currency },
+            { label: 'Nome', value: asset.name },
+            { label: 'Aggiornato', value: formatAssetDate(asset.updatedAt) },
+          ].map((row) => (
+            <div key={row.label} className="flex items-center justify-between py-2.5">
+              <span className="text-sm text-muted-foreground">{row.label}</span>
+              <span className="text-sm font-mono text-foreground">{row.value}</span>
+            </div>
+          ))}
+        </div>
+
+        <DialogFooter className="flex gap-2 pt-1">
           <Button
             type="button"
-            variant="ghost"
-            size="sm"
-            className="w-full flex items-center justify-center gap-1.5 text-muted-foreground"
+            variant="outline"
+            className="flex-1"
+            onClick={() => onEdit(asset)}
           >
-            {isOpen ? 'Nascondi tabella' : 'Mostra tabella completa'}
-            <ChevronDown
-              className={`h-4 w-4 transition-transform duration-200 motion-reduce:transition-none ${
-                isOpen ? 'rotate-180' : ''
-              }`}
-            />
+            <Pencil className="mr-2 h-4 w-4" />
+            Modifica
           </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent>{tableNode}</CollapsibleContent>
-      </Collapsible>
-    </div>
+          <Button
+            type="button"
+            variant={isPending ? 'destructive' : 'outline'}
+            className={cn('flex-1', !isPending && 'text-destructive hover:text-destructive')}
+            onClick={() => onDeleteClick(asset.id)}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            {isPending ? 'Conferma?' : 'Elimina'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -89,87 +191,126 @@ export default function AssetsPage() {
   const { user } = useAuth();
 
   const { data: assets = [], isLoading: loading, refetch: refetchAssets } = useAssets(user?.uid);
-  const {
-    data: snapshots = [],
-    isLoading: snapshotsLoading,
-    refetch: refetchSnapshots,
-  } = useSnapshots(user?.uid);
+  const { data: snapshots = [], refetch: refetchSnapshots } = useSnapshots(user?.uid);
+  const { data: overview, isLoading: loadingOverview } = useDashboardOverview(user?.uid);
 
-  const [mountedTabs, setMountedTabs] = useState<Set<MacroTabId>>(new Set(['management']));
-  const [activeTab, setActiveTab] = useState<MacroTabId>('management');
-  const [mountedHistoricalSubTabs, setMountedHistoricalSubTabs] = useState<
-    Record<Exclude<MacroTabId, 'management'>, Set<HistoricalSubTabId>>
-  >({
-    'anno-corrente': new Set(['prezzi']),
-    storico: new Set(['prezzi']),
-  });
-  const [historicalSubTabs, setHistoricalSubTabs] = useState<
-    Record<Exclude<MacroTabId, 'management'>, HistoricalSubTabId>
-  >({
-    'anno-corrente': 'prezzi',
-    storico: 'prezzi',
-  });
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [refreshToken, setRefreshToken] = useState(0);
-  const [lastRefreshAt, setLastRefreshAt] = useState<Date | null>(null);
-  const [lastRefreshedViewKey, setLastRefreshedViewKey] = useState<string | null>(null);
+  const deleteAssetMutation = useDeleteAsset(user?.uid || '');
+  const queryClient = useQueryClient();
 
-  const handleTabChange = (value: string) => {
-    setActiveTab(value as MacroTabId);
-    setMountedTabs((prev) => new Set(prev).add(value as MacroTabId));
-  };
+  // ─── Cash detail dialog state ─────────────────────────────────────────────────
+  const [cashDetailOpen, setCashDetailOpen] = useState(false);
+  const [selectedCashAsset, setSelectedCashAsset] = useState<Asset | null>(null);
+  const [cashEditOpen, setCashEditOpen] = useState(false);
+  const [cashPendingDeleteId, setCashPendingDeleteId] = useState<string | undefined>();
+  const cashPendingDeleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleHistoricalSubTabChange = (
-    tab: Exclude<MacroTabId, 'management'>,
-    value: string
-  ) => {
-    const nextValue = value as HistoricalSubTabId;
-    setHistoricalSubTabs((prev) => ({ ...prev, [tab]: nextValue }));
-    setMountedHistoricalSubTabs((prev) => ({
-      ...prev,
-      [tab]: new Set(prev[tab]).add(nextValue),
-    }));
-  };
+  // ─── Derived metrics for hero cards ──────────────────────────────────────────
+  const totalValue = overview?.metrics.totalValue ?? 0;
+  const liquidNetTotal = overview?.metrics.liquidNetTotal ?? 0;
+  const sparkline12m = useMemo(() => {
+    if (!overview?.sparklineData) return [];
+    return overview.sparklineData.slice(-13);
+  }, [overview]);
 
-  const activeViewKey = useMemo(() => {
-    if (activeTab === 'management') return 'management';
-    return `${activeTab}:${historicalSubTabs[activeTab]}`;
-  }, [activeTab, historicalSubTabs]);
+  // Total unrealized G/P across all assets with cost basis.
+  const { totalGainLoss, totalGainPct } = useMemo(() => {
+    const withCost = assets.filter((a) => a.averageCost && a.averageCost > 0);
+    if (withCost.length === 0) return { totalGainLoss: 0, totalGainPct: 0 };
+    const gainLoss = withCost.reduce((sum, a) => sum + calculateUnrealizedGains(a), 0);
+    const costBasis = withCost.reduce((sum, a) => sum + a.quantity * a.averageCost!, 0);
+    return { totalGainLoss: gainLoss, totalGainPct: costBasis > 0 ? (gainLoss / costBasis) * 100 : 0 };
+  }, [assets]);
 
   const handleRefresh = async () => {
-    const refreshViewKey = activeViewKey;
-    setIsRefreshing(true);
+    await Promise.all([refetchAssets(), refetchSnapshots()]);
+  };
+
+  // ─── Cash / non-cash asset split ──────────────────────────────────────────────
+  // Cash accounts (type=cash AND assetClass=cash, active quantity) are shown in
+  // the dedicated "Conti Correnti" section above the table, not in the table.
+  const cashAssets = useMemo(
+    () => assets.filter((a) => a.type === 'cash' && a.assetClass === 'cash' && a.quantity > 0),
+    [assets]
+  );
+  const nonCashAssets = useMemo(
+    () => assets.filter((a) => !(a.type === 'cash' && a.assetClass === 'cash')),
+    [assets]
+  );
+
+  // ─── Cash asset handlers ──────────────────────────────────────────────────────
+  const handleCashDelete = async (assetId: string) => {
     try {
-      await Promise.all([refetchAssets(), refetchSnapshots()]);
-      setLastRefreshAt(new Date());
-      setLastRefreshedViewKey(refreshViewKey);
-      setRefreshToken((prev) => prev + 1);
-    } finally {
-      setIsRefreshing(false);
+      await deleteAssetMutation.mutateAsync(assetId);
+      toast.success('Asset eliminato con successo');
+      setCashDetailOpen(false);
+      setSelectedCashAsset(null);
+    } catch (error) {
+      console.error('Error deleting cash asset:', error);
+      toast.error("Errore nell'eliminazione dell'asset");
     }
   };
 
-  // Anno Corrente: only active (quantity > 0) assets with the flag enabled
-  const historyTableAssets = useMemo(
-    () => assets.filter((a) => a.quantity > 0 && a.includeInHistoryTables === true),
-    [assets]
-  );
+  // 2-click disarm pattern — consistent with AssetManagementTab and other pages.
+  const handleCashDeleteClick = (assetId: string) => {
+    if (cashPendingDeleteId === assetId) {
+      if (cashPendingDeleteTimerRef.current) clearTimeout(cashPendingDeleteTimerRef.current);
+      setCashPendingDeleteId(undefined);
+      handleCashDelete(assetId);
+    } else {
+      if (cashPendingDeleteTimerRef.current) clearTimeout(cashPendingDeleteTimerRef.current);
+      setCashPendingDeleteId(assetId);
+      cashPendingDeleteTimerRef.current = setTimeout(() => setCashPendingDeleteId(undefined), 3000);
+    }
+  };
 
-  // Storico: includes sold assets (quantity === 0) with the flag enabled
-  const historyTableAssetsAll = useMemo(
-    () => assets.filter((a) => a.includeInHistoryTables === true),
-    [assets]
-  );
+  const handleCashEdit = (asset: Asset) => {
+    setCashDetailOpen(false);
+    setSelectedCashAsset(asset);
+    setCashEditOpen(true);
+  };
 
-  if (loading) {
+  const handleCashDialogClose = () => {
+    setCashEditOpen(false);
+    setSelectedCashAsset(null);
+    // Invalidate assets so the card grid and the table reflect any changes.
+    if (user?.uid) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
+    }
+  };
+
+  // ─── Loading skeleton ─────────────────────────────────────────────────────────
+  if (loading || loadingOverview) {
     return (
       <div className="space-y-6 max-desktop:portrait:pb-20">
+        {/* Page header */}
         <div className="space-y-2">
           <div className="h-8 w-40 rounded-lg bg-muted animate-pulse" />
           <div className="h-4 w-56 rounded bg-muted animate-pulse" />
         </div>
-        <div className="h-10 w-80 rounded-xl bg-muted animate-pulse" />
-        <div className="h-24 rounded-xl bg-muted animate-pulse" />
+        {/* Hero + Liquid skeleton */}
+        <div className="grid gap-4 desktop:grid-cols-[2fr_1fr]">
+          <div className="rounded-2xl border border-border bg-card p-[22px]">
+            <div className="h-3 w-40 bg-muted rounded animate-pulse mb-3" />
+            <div className="h-12 w-52 bg-muted rounded animate-pulse mb-4" />
+            <div className="flex gap-1.5 mb-3">
+              <div className="h-6 w-40 bg-muted rounded animate-pulse" />
+              <div className="h-6 w-28 bg-muted rounded animate-pulse" />
+            </div>
+            <div className="h-[68px] bg-muted rounded animate-pulse mb-2" />
+            <div className="h-3 bg-muted rounded animate-pulse" />
+          </div>
+          <div className="rounded-2xl border border-border bg-card p-[22px]">
+            <div className="h-3 w-32 bg-muted rounded animate-pulse mb-3" />
+            <div className="h-8 w-36 bg-muted rounded animate-pulse mb-4" />
+            <div className="space-y-2">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-4 bg-muted rounded animate-pulse" />
+              ))}
+            </div>
+          </div>
+        </div>
+        {/* Asset table skeleton */}
+        <div className="h-10 w-64 rounded-xl bg-muted animate-pulse" />
         <div className="h-64 rounded-xl bg-muted animate-pulse" />
       </div>
     );
@@ -177,377 +318,274 @@ export default function AssetsPage() {
 
   return (
     <div className="space-y-6 max-desktop:portrait:pb-20">
+      {/* ── PAGE HEADER ── */}
       <div>
         <h1 className="text-2xl font-bold text-foreground">Patrimonio</h1>
         <p className="mt-2 text-muted-foreground">Gestisci e monitora il tuo patrimonio</p>
       </div>
 
-      <Tabs defaultValue="management" value={activeTab} onValueChange={handleTabChange} className="w-full">
-        {/* Mobile (<1440px): segmented pill — all 3 tabs visible, single tap */}
-        <div className="desktop:hidden mb-4">
-          <div role="tablist" aria-label="Sezioni patrimonio" className="flex rounded-xl bg-muted p-1 gap-1">
-            {MOBILE_TABS.map(({ value, label, icon: Icon }) => (
-              <button
-                key={value}
-                type="button"
-                role="tab"
-                aria-selected={activeTab === value}
-                onClick={() => handleTabChange(value)}
-                className={cn(
-                  'relative flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg text-xs font-medium',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
-                  activeTab !== value && 'text-muted-foreground hover:text-foreground transition-colors duration-150'
-                )}
-              >
-                {activeTab === value && (
-                  <motion.span
-                    layoutId="assets-mobile-tab"
-                    className="absolute inset-0 rounded-lg bg-background shadow-sm"
-                    transition={{ type: 'spring', stiffness: 400, damping: 35 }}
-                  />
-                )}
-                <span className={cn(
-                  'relative z-10 flex items-center gap-1.5',
-                  activeTab === value ? 'text-foreground' : 'text-muted-foreground'
-                )}>
-                  <Icon className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">{label}</span>
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
+      {/* ── HERO + LIQUID — same as Panoramica, data from shared RQ cache ── */}
+      <motion.section
+        layout="position"
+        transition={springLayoutTransition}
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+      >
+        <div className="grid gap-4 desktop:grid-cols-[2fr_1fr]">
 
-        {/* Desktop (1440px+): standard tab list */}
-        <div className="hidden desktop:block mb-4">
-          <TabsList className="grid grid-cols-3 w-auto">
-            <TabsTrigger value="management" className="flex items-center gap-2 text-sm px-4">
-              <Wallet className="h-4 w-4" />
-              Gestione Asset
-            </TabsTrigger>
-            <TabsTrigger value="anno-corrente" className="flex items-center gap-2 text-sm px-4">
-              <CalendarClock className="h-4 w-4" />
-              Anno Corrente
-            </TabsTrigger>
-            <TabsTrigger value="storico" className="flex items-center gap-2 text-sm px-4">
-              <History className="h-4 w-4" />
-              Storico
-            </TabsTrigger>
-          </TabsList>
-        </div>
+          {/* Hero Card */}
+          <motion.div layout="position" transition={springLayoutTransition} variants={heroMetricSettle}>
+            <Card className="rounded-2xl overflow-hidden h-full">
+              <CardContent className="p-[22px]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground mb-2">
+                  Patrimonio Totale Lordo
+                </p>
 
-        {/* Macro-tab 1: Gestione Asset (always mounted) */}
-        <TabsContent value="management" className="mt-6" forceMount>
-          <motion.div
-            initial={false}
-            animate={activeTab === 'management' ? 'visible' : 'hidden'}
-            variants={tabPanelSwitch}
-          >
-            <AssetManagementTab assets={assets} loading={loading} onRefresh={handleRefresh} snapshots={snapshots} />
+                <OverviewAnimatedCurrency
+                  value={totalValue}
+                  animateOnMount={true}
+                  className="text-[44px] font-bold font-mono tracking-[-0.03em] desktop:text-[54px]"
+                />
+
+                {/* Variation chips */}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {overview?.variations.monthly && (
+                    <span className={cn(
+                      'inline-flex items-center gap-2 rounded-[9px] px-[13px] py-[6px]',
+                      'text-[15px] font-semibold font-mono tracking-[-0.01em]',
+                      overview.variations.monthly.value >= 0
+                        ? 'bg-green-500/10 text-green-500 dark:text-green-400'
+                        : 'bg-red-500/10 text-red-500 dark:text-red-400'
+                    )}>
+                      {overview.variations.monthly.value >= 0
+                        ? <TrendingUp className="h-[13px] w-[13px]" />
+                        : <TrendingDown className="h-[13px] w-[13px]" />
+                      }
+                      {overview.variations.monthly.value >= 0 ? '+' : ''}
+                      {formatCurrency(overview.variations.monthly.value)}{' '}
+                      ({overview.variations.monthly.percentage >= 0 ? '+' : ''}
+                      {overview.variations.monthly.percentage.toFixed(2)}%) questo mese
+                    </span>
+                  )}
+                  {overview?.variations.yearly && (
+                    <span className={cn(
+                      'inline-flex items-center gap-2 rounded-[9px] px-[13px] py-[6px]',
+                      'text-[15px] font-semibold font-mono tracking-[-0.01em]',
+                      overview.variations.yearly.value >= 0
+                        ? 'bg-green-500/10 text-green-500 dark:text-green-400'
+                        : 'bg-red-500/10 text-red-500 dark:text-red-400'
+                    )}>
+                      {overview.variations.yearly.value >= 0
+                        ? <TrendingUp className="h-[13px] w-[13px]" />
+                        : <TrendingDown className="h-[13px] w-[13px]" />
+                      }
+                      {overview.variations.yearly.value >= 0 ? '+' : ''}
+                      {formatCurrency(overview.variations.yearly.value)}{' '}
+                      ({overview.variations.yearly.percentage >= 0 ? '+' : ''}
+                      {overview.variations.yearly.percentage.toFixed(2)}%) YTD
+                    </span>
+                  )}
+                </div>
+
+                {/* G/P non realizzato — shown only when at least one asset has cost basis */}
+                {totalGainLoss !== 0 && (
+                  <div className="mt-3 pt-3 border-t border-border flex items-center justify-between">
+                    <span className="text-[11px] text-muted-foreground">G/P non realizzato</span>
+                    <span className={cn(
+                      'text-[13px] font-semibold font-mono tabular-nums',
+                      totalGainLoss > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                    )}>
+                      {totalGainLoss > 0 ? '+' : ''}{formatCurrency(totalGainLoss)}
+                      <span className="ml-1.5 text-[11px] opacity-80">
+                        ({totalGainLoss > 0 ? '+' : ''}{formatNumber(totalGainPct, 2)}%)
+                      </span>
+                    </span>
+                  </div>
+                )}
+
+                {/* Area sparkline — last 12 months, edge-to-edge via -mx-[22px] */}
+                {sparkline12m.length >= 2 && (
+                  <>
+                    <div className="-mx-[22px] mt-3" style={{ height: 68 }}>
+                      <NetWorthSparkline
+                        data={sparkline12m}
+                        filled={true}
+                        color="var(--chart-1)"
+                        height={68}
+                      />
+                    </div>
+                    <div className="flex justify-between mt-1 mb-3 px-px text-[10px] text-muted-foreground font-mono">
+                      <span>{cachedFormatCurrencyEUR(sparkline12m[0].totalNetWorth, true)}</span>
+                      <span>{cachedFormatCurrencyEUR(sparkline12m[sparkline12m.length - 1].totalNetWorth, true)}</span>
+                    </div>
+                  </>
+                )}
+
+                <p className="text-[11px] text-muted-foreground mt-2.5">
+                  {(overview?.flags.assetCount ?? 0) === 0
+                    ? 'Aggiungi asset per iniziare'
+                    : `${overview?.flags.assetCount ?? 0} asset in portafoglio`}
+                </p>
+              </CardContent>
+            </Card>
           </motion.div>
-        </TabsContent>
 
-        {/* Macro-tab 2: Anno Corrente (lazy-loaded) */}
-        {mountedTabs.has('anno-corrente') && (
-          <TabsContent value="anno-corrente" className="mt-6" forceMount>
-            <Tabs
-              value={historicalSubTabs['anno-corrente']}
-              onValueChange={(value) => handleHistoricalSubTabChange('anno-corrente', value)}
-              className="w-full"
-            >
-              <TabsList className="grid grid-cols-3 mb-4">
-                <TabsTrigger value="prezzi" className="text-xs sm:text-sm">Prezzi</TabsTrigger>
-                <TabsTrigger value="valori" className="text-xs sm:text-sm">Valori</TabsTrigger>
-                <TabsTrigger value="asset-class" className="text-xs sm:text-sm">Asset Class</TabsTrigger>
-              </TabsList>
+          {/* Liquid Card */}
+          <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
+            <Card className="rounded-2xl h-full">
+              <CardContent className="p-[22px]">
+                <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-muted-foreground mb-2">
+                  Sintesi Patrimoniale
+                </p>
 
-              {mountedHistoricalSubTabs['anno-corrente'].has('prezzi') && (
-                <TabsContent value="prezzi" forceMount>
-                  <motion.div
-                    initial={false}
-                    animate={historicalSubTabs['anno-corrente'] === 'prezzi' ? 'visible' : 'hidden'}
-                    variants={tabPanelSwitch}
-                  >
-                    <MobileHistoricalView
-                      summaryProps={{
-                        assets: historyTableAssets,
-                        snapshots,
-                        filterYear: getCurrentYear(),
-                        displayMode: 'price',
-                        includePreviousMonthBaseline: true,
-                        restrictToPassedAssets: true,
-                      }}
-                      tableNode={
-                        <AssetPriceHistoryTable
-                          assets={historyTableAssets}
-                          snapshots={snapshots}
-                          filterYear={getCurrentYear()}
-                          displayMode="price"
-                          includePreviousMonthBaseline={true}
-                          restrictToPassedAssets={true}
-                          showTotalRow={false}
-                          loading={snapshotsLoading}
-                          onRefresh={handleRefresh}
-                          isRefreshing={isRefreshing}
-                          isActiveView={activeViewKey === 'anno-corrente:prezzi'}
-                          isLatestRefreshedView={lastRefreshedViewKey === 'anno-corrente:prezzi'}
-                          refreshToken={refreshToken}
-                          lastRefreshAt={lastRefreshAt}
-                        />
-                      }
-                    />
-                    <div className="hidden desktop:block">
-                      <AssetPriceHistoryTable
-                        assets={historyTableAssets}
-                        snapshots={snapshots}
-                        filterYear={getCurrentYear()}
-                        displayMode="price"
-                        includePreviousMonthBaseline={true}
-                        restrictToPassedAssets={true}
-                        showTotalRow={false}
-                        loading={snapshotsLoading}
-                        onRefresh={handleRefresh}
-                        isRefreshing={isRefreshing}
-                        isActiveView={activeViewKey === 'anno-corrente:prezzi'}
-                        isLatestRefreshedView={lastRefreshedViewKey === 'anno-corrente:prezzi'}
-                        refreshToken={refreshToken}
-                        lastRefreshAt={lastRefreshAt}
-                      />
+                <OverviewAnimatedCurrency
+                  value={liquidNetTotal}
+                  animateOnMount={true}
+                  startDelay={105}
+                  duration={390}
+                  className="text-[36px] font-bold font-mono tracking-[-0.025em]"
+                />
+
+                {/* 3-row breakdown + Patrimonio Totale Lordo footer */}
+                <div className="mt-3 pt-3 border-t border-border divide-y divide-border">
+                  {[
+                    {
+                      label: 'Liquidità',
+                      value: overview?.metrics.cashNetWorth ?? 0,
+                      pct: totalValue > 0 ? ((overview?.metrics.cashNetWorth ?? 0) / totalValue) * 100 : 0,
+                    },
+                    {
+                      label: 'Investimenti Liquidabili',
+                      value: overview?.metrics.liquidInvestmentsNetWorth ?? 0,
+                      pct: totalValue > 0 ? ((overview?.metrics.liquidInvestmentsNetWorth ?? 0) / totalValue) * 100 : 0,
+                    },
+                    {
+                      label: 'Investimenti Illiquidi',
+                      value: overview?.metrics.illiquidNetWorth ?? 0,
+                      pct: totalValue > 0 ? ((overview?.metrics.illiquidNetWorth ?? 0) / totalValue) * 100 : 0,
+                    },
+                  ].map((row) => (
+                    <div key={row.label} className="flex items-center justify-between py-[7px]">
+                      <span className="text-[14px] text-muted-foreground">{row.label}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[14px] font-mono tabular-nums text-foreground">
+                          {cachedFormatCurrencyEUR(row.value)}
+                        </span>
+                        <span className="text-[12px] font-mono tabular-nums text-muted-foreground w-[42px] text-right">
+                          {row.pct.toFixed(1)}%
+                        </span>
+                      </div>
                     </div>
-                  </motion.div>
-                </TabsContent>
-              )}
+                  ))}
 
-              {mountedHistoricalSubTabs['anno-corrente'].has('valori') && (
-                <TabsContent value="valori" forceMount>
-                  <motion.div
-                    initial={false}
-                    animate={historicalSubTabs['anno-corrente'] === 'valori' ? 'visible' : 'hidden'}
-                    variants={tabPanelSwitch}
-                  >
-                    <MobileHistoricalView
-                      summaryProps={{
-                        assets: historyTableAssets,
-                        snapshots,
-                        filterYear: getCurrentYear(),
-                        displayMode: 'totalValue',
-                        includePreviousMonthBaseline: true,
-                        restrictToPassedAssets: true,
-                      }}
-                      tableNode={
-                        <AssetPriceHistoryTable
-                          assets={historyTableAssets}
-                          snapshots={snapshots}
-                          filterYear={getCurrentYear()}
-                          displayMode="totalValue"
-                          includePreviousMonthBaseline={true}
-                          restrictToPassedAssets={true}
-                          showTotalRow={true}
-                          loading={snapshotsLoading}
-                          onRefresh={handleRefresh}
-                          isRefreshing={isRefreshing}
-                          isActiveView={activeViewKey === 'anno-corrente:valori'}
-                          isLatestRefreshedView={lastRefreshedViewKey === 'anno-corrente:valori'}
-                          refreshToken={refreshToken}
-                          lastRefreshAt={lastRefreshAt}
-                        />
-                      }
-                    />
-                    <div className="hidden desktop:block">
-                      <AssetPriceHistoryTable
-                        assets={historyTableAssets}
-                        snapshots={snapshots}
-                        filterYear={getCurrentYear()}
-                        displayMode="totalValue"
-                        includePreviousMonthBaseline={true}
-                        restrictToPassedAssets={true}
-                        showTotalRow={true}
-                        loading={snapshotsLoading}
-                        onRefresh={handleRefresh}
-                        isRefreshing={isRefreshing}
-                        isActiveView={activeViewKey === 'anno-corrente:valori'}
-                        isLatestRefreshedView={lastRefreshedViewKey === 'anno-corrente:valori'}
-                        refreshToken={refreshToken}
-                        lastRefreshAt={lastRefreshAt}
-                      />
+                  {/* Footer: Patrimonio Totale Lordo */}
+                  <div className="flex items-center justify-between py-[7px]">
+                    <span className="text-[14px] font-semibold text-foreground">Patrimonio Totale Lordo</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[14px] font-bold font-mono tabular-nums text-foreground">
+                        {cachedFormatCurrencyEUR(totalValue)}
+                      </span>
+                      <span className="text-[12px] font-mono tabular-nums text-muted-foreground w-[42px] text-right">
+                        100.0%
+                      </span>
                     </div>
-                  </motion.div>
-                </TabsContent>
-              )}
+                  </div>
+                </div>
 
-              {mountedHistoricalSubTabs['anno-corrente'].has('asset-class') && (
-                <TabsContent value="asset-class" forceMount>
-                  <motion.div
-                    initial={false}
-                    animate={historicalSubTabs['anno-corrente'] === 'asset-class' ? 'visible' : 'hidden'}
-                    variants={tabPanelSwitch}
-                  >
-                    <AssetClassHistoryTable
-                      snapshots={snapshots}
-                      filterYear={getCurrentYear()}
-                      includePreviousMonthBaseline={true}
-                      loading={snapshotsLoading}
-                      onRefresh={handleRefresh}
-                      isRefreshing={isRefreshing}
-                      isActiveView={activeViewKey === 'anno-corrente:asset-class'}
-                      isLatestRefreshedView={lastRefreshedViewKey === 'anno-corrente:asset-class'}
-                      refreshToken={refreshToken}
-                      lastRefreshAt={lastRefreshAt}
-                    />
-                  </motion.div>
-                </TabsContent>
-              )}
-            </Tabs>
-          </TabsContent>
-        )}
+                {/* ── Fiscal rows — shown only when cost basis tracking is enabled ── */}
+                {overview?.flags.hasCostBasisTracking && overview.metrics && (
+                  <div className="mt-3 pt-3 border-t border-border divide-y divide-border">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground pb-2">
+                      Impatto Fiscale
+                    </p>
+                    {[
+                      {
+                        label: 'Plusvalenze Non Realizzate',
+                        value: overview.metrics.unrealizedGains,
+                        className: overview.metrics.unrealizedGains >= 0
+                          ? 'text-green-500 dark:text-green-400'
+                          : 'text-red-500 dark:text-red-400',
+                        prefix: overview.metrics.unrealizedGains >= 0 ? '+' : '',
+                      },
+                      {
+                        label: 'Tasse Stimate',
+                        value: overview.metrics.estimatedTaxes,
+                        className: 'text-amber-500 dark:text-amber-400',
+                        prefix: '',
+                      },
+                      {
+                        label: 'Patrimonio Liquidabile Netto',
+                        value: overview.metrics.liquidNetTotal,
+                        className: 'text-foreground',
+                        prefix: '',
+                      },
+                      {
+                        label: 'Patrimonio Illiquido Netto',
+                        value: overview.metrics.netTotal - overview.metrics.liquidNetTotal,
+                        className: 'text-foreground',
+                        prefix: '',
+                      },
+                      {
+                        label: 'Pat. Netto Totale',
+                        value: overview.metrics.netTotal,
+                        className: 'text-foreground',
+                        prefix: '',
+                      },
+                    ].map((row) => (
+                      <div key={row.label} className="flex items-center justify-between py-[7px]">
+                        <span className="text-[14px] text-muted-foreground">{row.label}</span>
+                        <span className={cn('text-[14px] font-bold font-mono tabular-nums', row.className)}>
+                          {row.prefix}{cachedFormatCurrencyEUR(row.value)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
 
-        {/* Macro-tab 3: Storico (lazy-loaded) */}
-        {mountedTabs.has('storico') && (
-          <TabsContent value="storico" className="mt-6" forceMount>
-            <Tabs
-              value={historicalSubTabs.storico}
-              onValueChange={(value) => handleHistoricalSubTabChange('storico', value)}
-              className="w-full"
-            >
-              <TabsList className="grid grid-cols-3 mb-4">
-                <TabsTrigger value="prezzi" className="text-xs sm:text-sm">Prezzi</TabsTrigger>
-                <TabsTrigger value="valori" className="text-xs sm:text-sm">Valori</TabsTrigger>
-                <TabsTrigger value="asset-class" className="text-xs sm:text-sm">Asset Class</TabsTrigger>
-              </TabsList>
+        </div>
+      </motion.section>
 
-              {mountedHistoricalSubTabs.storico.has('prezzi') && (
-                <TabsContent value="prezzi" forceMount>
-                  <motion.div
-                    initial={false}
-                    animate={historicalSubTabs.storico === 'prezzi' ? 'visible' : 'hidden'}
-                    variants={tabPanelSwitch}
-                  >
-                    <MobileHistoricalView
-                      summaryProps={{
-                        assets: historyTableAssetsAll,
-                        snapshots,
-                        filterStartDate: { year: 2025, month: 11 },
-                        displayMode: 'price',
-                        restrictToPassedAssets: true,
-                      }}
-                      tableNode={
-                        <AssetPriceHistoryTable
-                          assets={historyTableAssetsAll}
-                          snapshots={snapshots}
-                          filterStartDate={{ year: 2025, month: 11 }}
-                          displayMode="price"
-                          restrictToPassedAssets={true}
-                          showTotalRow={false}
-                          loading={snapshotsLoading}
-                          onRefresh={handleRefresh}
-                          isRefreshing={isRefreshing}
-                          isActiveView={activeViewKey === 'storico:prezzi'}
-                          isLatestRefreshedView={lastRefreshedViewKey === 'storico:prezzi'}
-                          refreshToken={refreshToken}
-                          lastRefreshAt={lastRefreshAt}
-                        />
-                      }
-                    />
-                    <div className="hidden desktop:block">
-                      <AssetPriceHistoryTable
-                        assets={historyTableAssetsAll}
-                        snapshots={snapshots}
-                        filterStartDate={{ year: 2025, month: 11 }}
-                        displayMode="price"
-                        restrictToPassedAssets={true}
-                        showTotalRow={false}
-                        loading={snapshotsLoading}
-                        onRefresh={handleRefresh}
-                        isRefreshing={isRefreshing}
-                        isActiveView={activeViewKey === 'storico:prezzi'}
-                        isLatestRefreshedView={lastRefreshedViewKey === 'storico:prezzi'}
-                        refreshToken={refreshToken}
-                        lastRefreshAt={lastRefreshAt}
-                      />
-                    </div>
-                  </motion.div>
-                </TabsContent>
-              )}
+      {/* ── CONTI CORRENTI — cash accounts shown as clickable cards ── */}
+      <CashAccountsSection
+        assets={cashAssets}
+        onSelect={(asset) => {
+          setSelectedCashAsset(asset);
+          setCashDetailOpen(true);
+        }}
+      />
 
-              {mountedHistoricalSubTabs.storico.has('valori') && (
-                <TabsContent value="valori" forceMount>
-                  <motion.div
-                    initial={false}
-                    animate={historicalSubTabs.storico === 'valori' ? 'visible' : 'hidden'}
-                    variants={tabPanelSwitch}
-                  >
-                    <MobileHistoricalView
-                      summaryProps={{
-                        assets: historyTableAssetsAll,
-                        snapshots,
-                        filterStartDate: { year: 2025, month: 11 },
-                        displayMode: 'totalValue',
-                        restrictToPassedAssets: true,
-                      }}
-                      tableNode={
-                        <AssetPriceHistoryTable
-                          assets={historyTableAssetsAll}
-                          snapshots={snapshots}
-                          filterStartDate={{ year: 2025, month: 11 }}
-                          displayMode="totalValue"
-                          restrictToPassedAssets={true}
-                          showTotalRow={true}
-                          loading={snapshotsLoading}
-                          onRefresh={handleRefresh}
-                          isRefreshing={isRefreshing}
-                          isActiveView={activeViewKey === 'storico:valori'}
-                          isLatestRefreshedView={lastRefreshedViewKey === 'storico:valori'}
-                          refreshToken={refreshToken}
-                          lastRefreshAt={lastRefreshAt}
-                        />
-                      }
-                    />
-                    <div className="hidden desktop:block">
-                      <AssetPriceHistoryTable
-                        assets={historyTableAssetsAll}
-                        snapshots={snapshots}
-                        filterStartDate={{ year: 2025, month: 11 }}
-                        displayMode="totalValue"
-                        restrictToPassedAssets={true}
-                        showTotalRow={true}
-                        loading={snapshotsLoading}
-                        onRefresh={handleRefresh}
-                        isRefreshing={isRefreshing}
-                        isActiveView={activeViewKey === 'storico:valori'}
-                        isLatestRefreshedView={lastRefreshedViewKey === 'storico:valori'}
-                        refreshToken={refreshToken}
-                        lastRefreshAt={lastRefreshAt}
-                      />
-                    </div>
-                  </motion.div>
-                </TabsContent>
-              )}
+      {/* Cash account detail dialog */}
+      <CashAccountDetailDialog
+        asset={selectedCashAsset}
+        open={cashDetailOpen}
+        onClose={() => {
+          setCashDetailOpen(false);
+          setCashPendingDeleteId(undefined);
+        }}
+        onEdit={handleCashEdit}
+        pendingDeleteId={cashPendingDeleteId}
+        onDeleteClick={handleCashDeleteClick}
+      />
 
-              {mountedHistoricalSubTabs.storico.has('asset-class') && (
-                <TabsContent value="asset-class" forceMount>
-                  <motion.div
-                    initial={false}
-                    animate={historicalSubTabs.storico === 'asset-class' ? 'visible' : 'hidden'}
-                    variants={tabPanelSwitch}
-                  >
-                    <AssetClassHistoryTable
-                      snapshots={snapshots}
-                      filterStartDate={{ year: 2025, month: 11 }}
-                      loading={snapshotsLoading}
-                      onRefresh={handleRefresh}
-                      isRefreshing={isRefreshing}
-                      isActiveView={activeViewKey === 'storico:asset-class'}
-                      isLatestRefreshedView={lastRefreshedViewKey === 'storico:asset-class'}
-                      refreshToken={refreshToken}
-                      lastRefreshAt={lastRefreshAt}
-                    />
-                  </motion.div>
-                </TabsContent>
-              )}
-            </Tabs>
-          </TabsContent>
-        )}
-      </Tabs>
+      {/* AssetDialog for editing a cash account (opened from the detail dialog) */}
+      <AssetDialog
+        open={cashEditOpen}
+        asset={selectedCashAsset}
+        onClose={handleCashDialogClose}
+      />
+
+      {/* ── ASSET TABLE — cash assets excluded, performance metrics inline ── */}
+      <AssetManagementTab
+        assets={nonCashAssets}
+        allAssets={assets}
+        loading={loading}
+        onRefresh={handleRefresh}
+        snapshots={snapshots}
+      />
     </div>
   );
 }

@@ -13,7 +13,7 @@ import {
   calculateAssetValue,
   calculateUnrealizedGains,
 } from '@/lib/services/assetService';
-import { getAssetClassColor } from '@/lib/constants/colors';
+import { getAssetClassCssVar } from '@/lib/constants/colors';
 import { formatAssetClassName } from '@/lib/utils/assetUtils';
 import { Pencil, Trash2, Calculator, ChevronDown, Info } from 'lucide-react';
 import { format } from 'date-fns';
@@ -26,6 +26,14 @@ import {
 } from '@/components/ui/tooltip';
 import { AssetSparkline } from '@/components/assets/AssetSparkline';
 
+// Performance delta values for an asset derived from monthly snapshots.
+// null means no snapshot data available for that period.
+export interface AssetPerformanceData {
+  lastSnapshotDelta: number | null; // % change vs last snapshot
+  ytdDelta: number | null;          // % change vs first snapshot of current year
+  allTimeDelta: number | null;      // % change vs first ever snapshot
+}
+
 interface AssetCardProps {
   asset: Asset;
   totalValue: number;
@@ -35,6 +43,22 @@ interface AssetCardProps {
   isManualPrice: boolean;
   isDemo?: boolean;
   sparklineData?: { value: number }[];
+  performance?: AssetPerformanceData;
+}
+
+// Format a % delta for display: "+1.2%" or "-3.4%" or "—".
+function formatDeltaPct(delta: number | null): string {
+  if (delta === null) return '—';
+  const sign = delta >= 0 ? '+' : '';
+  return `${sign}${delta.toFixed(1)}%`;
+}
+
+// Tailwind color class for a % delta value.
+function deltaColorClass(delta: number | null): string {
+  if (delta === null) return 'text-muted-foreground';
+  if (delta > 0) return 'text-green-600 dark:text-green-400';
+  if (delta < 0) return 'text-red-600 dark:text-red-400';
+  return 'text-muted-foreground';
 }
 
 export function AssetCard({
@@ -46,6 +70,7 @@ export function AssetCard({
   isManualPrice,
   isDemo = false,
   sparklineData,
+  performance,
 }: AssetCardProps) {
   const [showDetails, setShowDetails] = useState(false);
   const [isPendingDelete, setIsPendingDelete] = useState(false);
@@ -56,7 +81,7 @@ export function AssetCard({
     asset.lastPriceUpdate instanceof Date
       ? asset.lastPriceUpdate
       : new Date();
-  const assetClassColor = getAssetClassColor(asset.assetClass);
+  const assetClassCssVar = getAssetClassCssVar(asset.assetClass);
 
   // Guards against division by zero when averageCost is absent or zero.
   // Some assets (cash, imported positions) have no cost basis and should
@@ -110,9 +135,9 @@ export function AssetCard({
         <div className="flex items-center gap-1 shrink-0">
           <Badge
             style={{
-              backgroundColor: `${assetClassColor}20`,
-              color: assetClassColor,
-              border: `1px solid ${assetClassColor}40`,
+              backgroundColor: `color-mix(in srgb, var(${assetClassCssVar}) 15%, transparent)`,
+              color: `var(${assetClassCssVar})`,
+              border: `1px solid color-mix(in srgb, var(${assetClassCssVar}) 30%, transparent)`,
             }}
           >
             {formatAssetClassName(asset.assetClass)}
@@ -185,6 +210,24 @@ export function AssetCard({
         {sparklineData && sparklineData.length >= 2 && (
           <div className="desktop:hidden mt-2 mb-1">
             <AssetSparkline data={sparklineData} />
+          </div>
+        )}
+
+        {/* Performance rows: Δ Mese / Δ YTD / Δ Inizio — vertical divide-y layout */}
+        {performance && (
+          <div className="mt-2 mb-1 divide-y divide-border border-t border-border">
+            {[
+              { label: 'Mese', delta: performance.lastSnapshotDelta },
+              { label: 'YTD', delta: performance.ytdDelta },
+              { label: 'Inizio', delta: performance.allTimeDelta },
+            ].map(({ label, delta }) => (
+              <div key={label} className="flex items-center justify-between py-1">
+                <span className="text-[11px] text-muted-foreground">{label}</span>
+                <span className={`text-[11px] font-mono font-semibold tabular-nums ${deltaColorClass(delta)}`}>
+                  {formatDeltaPct(delta)}
+                </span>
+              </div>
+            ))}
           </div>
         )}
 

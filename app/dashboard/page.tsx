@@ -21,8 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Collapsible, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Camera, ChevronDown, Receipt, TrendingDown, TrendingUp } from 'lucide-react';
+import { Camera, Receipt, TrendingDown, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCreateSnapshot } from '@/lib/hooks/useSnapshots';
 import { useDashboardOverview } from '@/lib/hooks/useDashboardOverview';
@@ -33,7 +32,6 @@ import { getGreeting } from '@/lib/utils/getGreeting';
 import { OverviewAnimatedCurrency } from '@/components/dashboard/OverviewAnimatedCurrency';
 import { OverviewChartsSection } from '@/components/dashboard/OverviewChartsSection';
 import { NetWorthSparkline } from '@/components/dashboard/NetWorthSparkline';
-import { SavingsRingChart } from '@/components/dashboard/SavingsRingChart';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
@@ -42,15 +40,32 @@ import { cn } from '@/lib/utils';
 const MotionButtonShell = motion.div;
 
 /**
- * MAIN DASHBOARD PAGE — "Bento Asimmetrico" redesign
+ * MAIN DASHBOARD PAGE — "Bento Asimmetrico" redesign (v2)
  *
  * Layout:
- *   Mobile:  Hero → Liquid → VariationBlocks → [Fiscal] → Cashflow → [Costs] → Charts
- *   Desktop: Hero(2/3)+Liquid(1/3) → BentoRow(4-col) → [Fiscal] → Charts(3-col)
+ *   Mobile:  Hero → Liquid → VariationBlocks → Cashflow → [Costs] → [Fiscal] → Assets → Charts
+ *   Desktop: Hero(2/3)+Liquid(1/3) → Cashflow(full) → [Costs 2-col] → [Fiscal] → Assets → Charts
  *
- * All existing data is preserved; only presentation changes.
+ * Changes from v1:
+ * - Liquid card: donut replaced by flat 3-row breakdown (Liquidità/Investimenti/Illiquidi)
+ * - Fiscal section: no longer collapsible, always visible when hasCostBasisTracking
+ * - Asset list card: new "N Asset in Portafoglio" card with value / weight / return columns
+ * - Cashflow card: full-width, 4 KPI chips + top-5 category bars; TER/Costo moved to 2-col row below
  */
 
+// Italian month names for the cashflow card header.
+const MONTH_NAMES_IT = [
+  'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+  'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
+];
+
+// Coverage ratio → Italian health label.
+function coverageHealthLabel(ratio: number): string {
+  if (ratio >= 2.0) return 'Salute ottima';
+  if (ratio >= 1.3) return 'Salute buona';
+  if (ratio >= 1.0) return 'In pareggio';
+  return 'In deficit';
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -75,10 +90,6 @@ export default function DashboardPage() {
   // ─── UI State ─────────────────────────────────────────────────────────────────
   const [creatingSnapshot, setCreatingSnapshot] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  // Fiscal detail section — starts closed (user opens on demand)
-  const [costBasisOpen, setCostBasisOpen] = useState(false);
-  // Liquid card expandable detail
-  const [liquidExpanded, setLiquidExpanded] = useState(false);
   const [snapshotDialogStyle, setSnapshotDialogStyle] = useState<CSSProperties | undefined>(undefined);
 
   const snapshotButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -93,9 +104,7 @@ export default function DashboardPage() {
 
   // ─── Derived metrics ──────────────────────────────────────────────────────────
   const totalValue = overview?.metrics.totalValue ?? 0;
-  const liquidValue = overview?.metrics.liquidNetWorth ?? 0;
-  const liquidPercent = totalValue > 0 ? (liquidValue / totalValue) * 100 : 0;
-  const investedAmount = totalValue - liquidValue;
+  const liquidNetTotal = overview?.metrics.liquidNetTotal ?? 0;
 
   const savingsRate = useMemo(() => {
     if (!overview?.expenseStats) return 0;
@@ -104,45 +113,19 @@ export default function DashboardPage() {
     return Math.round(((income - expenses) / income) * 100);
   }, [overview?.expenseStats]);
 
+  // Coverage ratio (income / expenses) for RAPPORTO KPI chip.
+  const coverageRatio = useMemo(() => {
+    if (!overview?.expenseStats) return null;
+    const { income, expenses } = overview.expenseStats.currentMonth;
+    if (expenses <= 0) return null;
+    return income / expenses;
+  }, [overview?.expenseStats]);
+
   // ─── Sparkline — last 13 points (12 months + baseline) ──────────────────────
   const sparkline12m = useMemo(() => {
     if (!overview?.sparklineData) return [];
     return overview.sparklineData.slice(-13);
   }, [overview?.sparklineData]);
-
-  // ─── Fiscal detail items (must be before early return — hooks rule) ─────────────
-  // Inline JSX in the return reads this; see note below near the render section.
-  const fiscalItems = useMemo(() => {
-    if (!overview?.flags.hasCostBasisTracking || !overview.metrics) return [];
-    return [
-      {
-        label: 'Pat. Netto Totale',
-        value: overview.metrics.netTotal,
-        className: 'text-foreground',
-        prefix: '',
-      },
-      {
-        label: 'Liquido Netto',
-        value: overview.metrics.liquidNetTotal,
-        className: 'text-[var(--chart-2)]',
-        prefix: '',
-      },
-      {
-        label: 'Plusvalenze',
-        value: overview.metrics.unrealizedGains,
-        className: overview.metrics.unrealizedGains >= 0
-          ? 'text-green-500 dark:text-green-400'
-          : 'text-red-500 dark:text-red-400',
-        prefix: overview.metrics.unrealizedGains >= 0 ? '+' : '',
-      },
-      {
-        label: 'Tasse Stimate',
-        value: overview.metrics.estimatedTaxes,
-        className: 'text-amber-500 dark:text-amber-400',
-        prefix: '',
-      },
-    ];
-  }, [overview]);
 
   // ─── Chart sections (stable memoized objects for memo isolation) ──────────────
   // Liquidity chart removed — now shown as the hero donut in the Patrimonio Liquido card.
@@ -243,95 +226,36 @@ export default function DashboardPage() {
           </div>
           <div className="rounded-2xl border border-border bg-card p-[22px]">
             <div className="h-3 w-32 bg-muted rounded animate-pulse mb-3" />
-            <div className="h-8 w-36 bg-muted rounded animate-pulse mb-2.5" />
-            <div className="h-1.5 bg-muted rounded animate-pulse mb-2" />
-            <div className="h-3 w-48 bg-muted rounded animate-pulse" />
-          </div>
-        </div>
-        {/* Variation blocks skeleton */}
-        <div className="grid grid-cols-2 gap-2.5">
-          <div className="rounded-2xl border border-border bg-card p-4">
-            <div className="h-2.5 w-20 bg-muted rounded animate-pulse mb-2" />
-            <div className="h-7 w-28 bg-muted rounded animate-pulse mb-2" />
-            <div className="h-5 w-16 bg-muted rounded animate-pulse" />
-          </div>
-          <div className="rounded-2xl border border-border bg-card p-4">
-            <div className="h-2.5 w-12 bg-muted rounded animate-pulse mb-2" />
-            <div className="h-7 w-28 bg-muted rounded animate-pulse mb-2" />
-            <div className="h-5 w-16 bg-muted rounded animate-pulse" />
+            <div className="h-8 w-36 bg-muted rounded animate-pulse mb-4" />
+            <div className="space-y-2">
+              <div className="h-4 bg-muted rounded animate-pulse" />
+              <div className="h-4 bg-muted rounded animate-pulse" />
+              <div className="h-4 bg-muted rounded animate-pulse" />
+              <div className="h-4 bg-muted rounded animate-pulse" />
+            </div>
           </div>
         </div>
         {/* Cashflow skeleton */}
         <div className="rounded-2xl border border-border bg-card p-[22px]">
           <div className="h-3 w-36 bg-muted rounded animate-pulse mb-4" />
-          <div className="flex gap-3.5">
-            <div className="flex-1 space-y-3">
-              <div className="h-6 w-28 bg-muted rounded animate-pulse" />
-              <div className="h-6 w-28 bg-muted rounded animate-pulse" />
+          <div className="grid grid-cols-2 desktop:grid-cols-4 gap-3 mb-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="rounded-xl bg-muted p-3 h-16 animate-pulse" />
+            ))}
+          </div>
+          <div className="h-3 bg-muted rounded animate-pulse mb-3" />
+          <div className="grid desktop:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              {[...Array(3)].map((_, i) => <div key={i} className="h-6 bg-muted rounded animate-pulse" />)}
             </div>
-            <div className="w-20 h-20 rounded-2xl bg-muted animate-pulse" />
+            <div className="space-y-2">
+              {[...Array(3)].map((_, i) => <div key={i} className="h-6 bg-muted rounded animate-pulse" />)}
+            </div>
           </div>
         </div>
       </div>
     );
   }
-
-  /** 2-col cost cards (mobile) */
-  const CostCards = () => {
-    if (!overview?.flags.hasTERTracking && !overview?.flags.hasStampDuty) return null;
-    const annualTotal = overview.metrics.annualPortfolioCost + overview.metrics.annualStampDuty;
-    const bothPresent = overview.flags.hasTERTracking && overview.flags.hasStampDuty;
-    return (
-      <motion.div
-        layout="position"
-        transition={springLayoutTransition}
-        variants={cardItem}
-        initial="hidden"
-        animate="visible"
-        className="grid grid-cols-2 gap-2.5"
-      >
-        {/* TER medio */}
-        {overview.flags.hasTERTracking && (
-          <div className="bg-card border border-border rounded-2xl p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
-              TER Medio
-            </p>
-            <p className="text-[20px] font-bold font-mono tabular-nums text-foreground">
-              {overview.metrics.portfolioTER.toFixed(2)}%
-            </p>
-          </div>
-        )}
-        {/* Costo annuale — con breakdown TER/bollo se entrambi presenti */}
-        <div className={cn(
-          'bg-card border border-border rounded-2xl p-4',
-          !overview.flags.hasTERTracking && 'col-span-2'
-        )}>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
-            Costo Annuale
-          </p>
-          <p className="text-[20px] font-bold font-mono tabular-nums text-amber-500 dark:text-amber-400">
-            {formatCurrency(annualTotal)}
-          </p>
-          {bothPresent && (
-            <div className="mt-2 pt-2 border-t border-border divide-y divide-border">
-              <div className="flex justify-between py-[4px] text-[10.5px]">
-                <span className="text-muted-foreground">Gestione (TER)</span>
-                <span className="font-mono tabular-nums text-foreground">
-                  {formatCurrency(overview.metrics.annualPortfolioCost)}
-                </span>
-              </div>
-              <div className="flex justify-between py-[4px] text-[10.5px]">
-                <span className="text-muted-foreground">Imposta di bollo</span>
-                <span className="font-mono tabular-nums text-foreground">
-                  {formatCurrency(overview.metrics.annualStampDuty)}
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-      </motion.div>
-    );
-  };
 
   // ─── Render ───────────────────────────────────────────────────────────────────
   return (
@@ -379,8 +303,8 @@ export default function DashboardPage() {
 
           {/* Hero Card */}
           <motion.div layout="position" transition={springLayoutTransition} variants={heroMetricSettle}>
-            <Card className="rounded-2xl overflow-hidden">
-              <CardContent className="p-[22px]">
+            <Card className="rounded-2xl overflow-hidden h-full">
+              <CardContent className="p-[22px] flex flex-col h-full">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground mb-2">
                   Patrimonio Totale Lordo
                 </p>
@@ -456,144 +380,166 @@ export default function DashboardPage() {
                     ? 'Aggiungi asset per iniziare'
                     : `${overview?.flags.assetCount ?? 0} asset in portafoglio`}
                 </p>
-              </CardContent>
-            </Card>
-          </motion.div>
 
-          {/* Liquid Card */}
-          <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
-            <Card className="rounded-2xl h-full">
-              <CardContent className="p-[22px]">
-                {/* Header row */}
-                <div className="flex items-start justify-between mb-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    Patrimonio Liquido
-                  </p>
-                  <button
-                    onClick={() => setLiquidExpanded(e => !e)}
-                    className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <span>{liquidExpanded ? 'Meno' : 'Dettaglio'}</span>
-                    <ChevronDown className={cn(
-                      'h-3 w-3 transition-transform duration-200',
-                      liquidExpanded && 'rotate-180'
-                    )} />
-                  </button>
-                </div>
-
-                {/* Donut chart + values side by side */}
-                {(() => {
-                  const size = 116;
-                  const strokeW = 12;
-                  const r = (size - strokeW) / 2;
-                  const circ = 2 * Math.PI * r;
-                  const liquidDash = (Math.min(liquidPercent, 100) / 100) * circ;
-                  const colorLiquid = chartColors[1] || 'var(--chart-2)';
-                  const colorIlliquid = chartColors[0] || 'var(--chart-1)';
+                {/* ── TER + Costo Annuale — desktop only, pinned to bottom of hero card ── */}
+                {(overview?.flags.hasTERTracking || overview?.flags.hasStampDuty) && (() => {
+                  const annualTotal = (overview.metrics.annualPortfolioCost ?? 0) + (overview.metrics.annualStampDuty ?? 0);
+                  const bothPresent = overview.flags.hasTERTracking && overview.flags.hasStampDuty;
                   return (
-                    <div className="flex items-center gap-4">
-                      {/* Values */}
-                      <div className="flex-1 flex flex-col gap-3.5">
-                        {/* Liquid */}
+                    <div className="hidden desktop:grid grid-cols-2 gap-4 mt-auto pt-4 border-t border-border">
+                      {overview.flags.hasTERTracking && (
                         <div>
-                          <div className="flex items-center gap-1.5 mb-0.5">
-                            <div className="w-2 h-2 rounded-[2px] flex-shrink-0" style={{ background: colorLiquid }} />
-                            <span className="text-[10px] text-muted-foreground">Liquido</span>
+                          <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground mb-2">
+                            TER Medio Ponderato
+                          </p>
+                          <p className="text-[28px] font-bold font-mono tabular-nums tracking-[-0.03em] text-foreground leading-none">
+                            {overview.metrics.portfolioTER.toFixed(2)}%
+                          </p>
+                        </div>
+                      )}
+                      <div className={cn(!overview.flags.hasTERTracking && 'col-span-2')}>
+                        <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground mb-2">
+                          Costo Annuale Stimato
+                        </p>
+                        <p className="text-[28px] font-bold font-mono tabular-nums tracking-[-0.03em] text-amber-500 dark:text-amber-400 leading-none">
+                          {formatCurrency(annualTotal)}
+                        </p>
+                        {bothPresent && (
+                          <div className="mt-2 pt-2 border-t border-border divide-y divide-border">
+                            <div className="flex justify-between py-[4px] text-[11px]">
+                              <span className="text-muted-foreground">Costi di gestione (TER)</span>
+                              <span className="font-mono tabular-nums text-foreground">
+                                {formatCurrency(overview.metrics.annualPortfolioCost)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between py-[4px] text-[11px]">
+                              <span className="text-muted-foreground">Imposta di bollo</span>
+                              <span className="font-mono tabular-nums text-foreground">
+                                {formatCurrency(overview.metrics.annualStampDuty)}
+                              </span>
+                            </div>
                           </div>
-                          <OverviewAnimatedCurrency
-                            value={liquidValue}
-                            animateOnMount={true}
-                            startDelay={105}
-                            duration={390}
-                            className="text-[22px] font-bold font-mono tracking-[-0.025em]"
-                          />
-                        </div>
-                        {/* Illiquid */}
-                        <div>
-                          <div className="flex items-center gap-1.5 mb-0.5">
-                            <div className="w-2 h-2 rounded-[2px] flex-shrink-0" style={{ background: colorIlliquid }} />
-                            <span className="text-[10px] text-muted-foreground">Illiquido</span>
-                          </div>
-                          <span className="text-[22px] font-bold font-mono tracking-[-0.025em] tabular-nums text-foreground">
-                            {cachedFormatCurrencyEUR(investedAmount)}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Donut — 2-color: illiquid base ring, liquid animated segment on top */}
-                      <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
-                        <svg
-                          width={size}
-                          height={size}
-                          style={{ transform: 'rotate(-90deg)', display: 'block' }}
-                        >
-                          {/* Illiquid: full background ring */}
-                          <circle
-                            cx={size / 2} cy={size / 2} r={r}
-                            fill="none"
-                            stroke={colorIlliquid}
-                            strokeWidth={strokeW}
-                          />
-                          {/* Liquid: animated segment on top */}
-                          <motion.circle
-                            cx={size / 2} cy={size / 2} r={r}
-                            fill="none"
-                            stroke={colorLiquid}
-                            strokeWidth={strokeW}
-                            strokeLinecap="butt"
-                            initial={{ strokeDasharray: `0 ${circ}` }}
-                            animate={{ strokeDasharray: `${liquidDash} ${circ - liquidDash}` }}
-                            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
-                          />
-                        </svg>
-                        {/* Center label */}
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-px">
-                          <span
-                            className="font-mono font-bold tabular-nums leading-none"
-                            style={{ fontSize: 17, color: colorLiquid }}
-                          >
-                            {liquidPercent.toFixed(1)}%
-                          </span>
-                          <span className="text-[8px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
-                            liquido
-                          </span>
-                        </div>
+                        )}
                       </div>
                     </div>
                   );
                 })()}
+              </CardContent>
+            </Card>
+          </motion.div>
 
-                {/* Expandable fiscal detail — smooth height animation */}
-                <AnimatePresence initial={false}>
-                  {liquidExpanded && (
-                    <motion.div
-                      key="liquid-detail"
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                      style={{ overflow: 'hidden' }}
-                    >
-                      <div className="mt-3.5 pt-3.5 border-t border-border divide-y divide-border">
-                        {[
-                          { label: 'Patrimonio Lordo', value: totalValue,                            className: 'text-foreground' },
-                          { label: 'Patrimonio Netto', value: overview?.metrics.netTotal ?? 0,       className: 'text-foreground' },
-                          { label: 'Liquido Netto',    value: overview?.metrics.liquidNetTotal ?? 0, className: '' },
-                        ].map((row, i) => (
-                          <div key={row.label} className="flex justify-between py-[5px] text-[12px]">
-                            <span className="text-muted-foreground">{row.label}</span>
-                            <span
-                              className={cn('font-mono font-semibold tabular-nums', row.className)}
-                              style={i === 2 ? { color: chartColors[1] } : undefined}
-                            >
-                              {formatCurrency(row.value)}
-                            </span>
-                          </div>
-                        ))}
+          {/* ── LIQUID CARD — redesigned: flat 3-row breakdown ── */}
+          <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
+            <Card className="rounded-2xl h-full">
+              <CardContent className="p-[22px]">
+                <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-muted-foreground mb-2">
+                  Sintesi Patrimoniale
+                </p>
+
+                {/* Main value: liquid net worth after estimated taxes */}
+                <OverviewAnimatedCurrency
+                  value={liquidNetTotal}
+                  animateOnMount={true}
+                  startDelay={105}
+                  duration={390}
+                  className="text-[36px] font-bold font-mono tracking-[-0.025em]"
+                />
+
+                {/* 3-row breakdown + Patrimonio Totale Lordo footer */}
+                <div className="mt-3 pt-3 border-t border-border divide-y divide-border">
+                  {[
+                    {
+                      label: 'Liquidità',
+                      value: overview?.metrics.cashNetWorth ?? 0,
+                      pct: totalValue > 0 ? ((overview?.metrics.cashNetWorth ?? 0) / totalValue) * 100 : 0,
+                    },
+                    {
+                      label: 'Investimenti Liquidabili',
+                      value: overview?.metrics.liquidInvestmentsNetWorth ?? 0,
+                      pct: totalValue > 0 ? ((overview?.metrics.liquidInvestmentsNetWorth ?? 0) / totalValue) * 100 : 0,
+                    },
+                    {
+                      label: 'Investimenti Illiquidi',
+                      value: overview?.metrics.illiquidNetWorth ?? 0,
+                      pct: totalValue > 0 ? ((overview?.metrics.illiquidNetWorth ?? 0) / totalValue) * 100 : 0,
+                    },
+                  ].map(row => (
+                    <div key={row.label} className="flex items-center justify-between py-[7px]">
+                      <span className="text-[14px] text-muted-foreground">{row.label}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[14px] font-mono tabular-nums text-foreground">
+                          {cachedFormatCurrencyEUR(row.value)}
+                        </span>
+                        <span className="text-[12px] font-mono tabular-nums text-muted-foreground w-[42px] text-right">
+                          {row.pct.toFixed(1)}%
+                        </span>
                       </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                    </div>
+                  ))}
+
+                  {/* Bottom row: Patrimonio Totale Lordo (bold) */}
+                  <div className="flex items-center justify-between py-[7px]">
+                    <span className="text-[14px] font-semibold text-foreground">Patrimonio Totale Lordo</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[14px] font-bold font-mono tabular-nums text-foreground">
+                        {cachedFormatCurrencyEUR(totalValue)}
+                      </span>
+                      <span className="text-[12px] font-mono tabular-nums text-muted-foreground w-[42px] text-right">
+                        100.0%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Fiscal rows — shown only when cost basis tracking is enabled ── */}
+                {overview?.flags.hasCostBasisTracking && overview.metrics && (
+                  <div className="mt-3 pt-3 border-t border-border divide-y divide-border">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground pb-2">
+                      Impatto Fiscale
+                    </p>
+                    {[
+                      {
+                        label: 'Plusvalenze Non Realizzate',
+                        value: overview.metrics.unrealizedGains,
+                        className: overview.metrics.unrealizedGains >= 0
+                          ? 'text-green-500 dark:text-green-400'
+                          : 'text-red-500 dark:text-red-400',
+                        prefix: overview.metrics.unrealizedGains >= 0 ? '+' : '',
+                      },
+                      {
+                        label: 'Tasse Stimate',
+                        value: overview.metrics.estimatedTaxes,
+                        className: 'text-amber-500 dark:text-amber-400',
+                        prefix: '',
+                      },
+                      {
+                        label: 'Patrimonio Liquidabile Netto',
+                        value: overview.metrics.liquidNetTotal,
+                        className: 'text-foreground',
+                        prefix: '',
+                      },
+                      {
+                        label: 'Patrimonio Illiquido Netto',
+                        value: overview.metrics.netTotal - overview.metrics.liquidNetTotal,
+                        className: 'text-foreground',
+                        prefix: '',
+                      },
+                      {
+                        label: 'Pat. Netto Totale',
+                        value: overview.metrics.netTotal,
+                        className: 'text-foreground',
+                        prefix: '',
+                      },
+                    ].map(row => (
+                      <div key={row.label} className="flex items-center justify-between py-[7px]">
+                        <span className="text-[14px] text-muted-foreground">{row.label}</span>
+                        <span className={cn('text-[14px] font-bold font-mono tabular-nums', row.className)}>
+                          {row.prefix}{cachedFormatCurrencyEUR(row.value)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </motion.div>
@@ -601,106 +547,49 @@ export default function DashboardPage() {
         </div>
       </motion.section>
 
-      {/* ── DESKTOP ONLY: 3-col bento (cashflow + TER + costo annuale) ── */}
-      {!isMobile && (
-        <motion.div
-          layout="position"
-          transition={springLayoutTransition}
-          variants={cardItem}
-          initial="hidden"
-          animate="visible"
-          className="grid grid-cols-3 gap-4"
-        >
-          {/* Cashflow */}
-          <div className="bg-card border border-border rounded-2xl p-5 flex flex-col gap-3">
-            <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-              Cashflow
-            </span>
-            {overview?.expenseStats ? (
-              <div className="flex items-center gap-5 mt-1">
-                <SavingsRingChart rate={savingsRate} size={116} />
-                {/* Entrate e Spese affiancate — c'è spazio su desktop */}
-                <div className="flex gap-6">
-                  {/* Entrate */}
-                  <div>
-                    <p className="text-[10px] text-muted-foreground mb-1">Entrate</p>
-                    <div className="text-[22px] font-bold font-mono text-green-500 dark:text-green-400 leading-none">
-                      {cachedFormatCurrencyEUR(overview.expenseStats.currentMonth.income, true)}
-                    </div>
-                    {(() => {
-                      const d = overview.expenseStats.delta.income;
-                      const pos = d >= 0;
-                      return (
-                        <p className={cn(
-                          'text-[10.5px] font-mono mt-1',
-                          pos ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400'
-                        )}>
-                          {pos ? '+' : ''}{d.toFixed(1)}% vs mese scorso
-                        </p>
-                      );
-                    })()}
-                  </div>
-                  {/* Spese */}
-                  <div>
-                    <p className="text-[10px] text-muted-foreground mb-1">Spese</p>
-                    <div className="text-[22px] font-bold font-mono text-red-500 dark:text-red-400 leading-none">
-                      {cachedFormatCurrencyEUR(overview.expenseStats.currentMonth.expenses, true)}
-                    </div>
-                    {(() => {
-                      const d = overview.expenseStats.delta.expenses;
-                      // Per le spese il segno è invertito: +% è negativo (hai speso di più)
-                      const pos = d >= 0;
-                      return (
-                        <p className={cn(
-                          'text-[10.5px] font-mono mt-1',
-                          pos ? 'text-red-500 dark:text-red-400' : 'text-green-500 dark:text-green-400'
-                        )}>
-                          {pos ? '+' : ''}{d.toFixed(1)}% vs mese scorso
-                        </p>
-                      );
-                    })()}
-                  </div>
+      {/* ── TER + COSTO ANNUALE — 2-col row (both platforms) ── */}
+      {(overview?.flags.hasTERTracking || overview?.flags.hasStampDuty) && (() => {
+        const annualTotal = (overview.metrics.annualPortfolioCost ?? 0) + (overview.metrics.annualStampDuty ?? 0);
+        const bothPresent = overview.flags.hasTERTracking && overview.flags.hasStampDuty;
+        return (
+          <motion.div
+            layout="position"
+            transition={springLayoutTransition}
+            variants={cardItem}
+            initial="hidden"
+            animate="visible"
+            className="grid grid-cols-2 gap-4 desktop:hidden"
+          >
+            {/* TER medio */}
+            {overview.flags.hasTERTracking && (
+              <div className="bg-card border border-border rounded-2xl p-5 flex flex-col justify-between">
+                <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                  TER Medio Ponderato
+                </span>
+                <div>
+                  <p className="text-[32px] font-bold font-mono tabular-nums tracking-[-0.03em] text-foreground leading-none mt-3">
+                    {overview.metrics.portfolioTER.toFixed(2)}%
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-2">
+                    Total Expense Ratio medio ponderato
+                  </p>
                 </div>
               </div>
-            ) : (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                <Receipt className="h-4 w-4" />
-                <span>Nessun dato questo mese</span>
-              </div>
             )}
-          </div>
 
-          {/* TER medio */}
-          <div className="bg-card border border-border rounded-2xl p-5 flex flex-col justify-between">
-            <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-              TER Medio Ponderato
-            </span>
-            {overview?.flags.hasTERTracking ? (
+            {/* Costo annuale */}
+            <div className={cn(
+              'bg-card border border-border rounded-2xl p-5 flex flex-col justify-between',
+              !overview.flags.hasTERTracking && 'col-span-2'
+            )}>
+              <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                Costo Annuale Stimato
+              </span>
               <div>
-                <p className="text-[36px] font-bold font-mono tabular-nums tracking-[-0.03em] text-foreground leading-none mt-3">
-                  {overview.metrics.portfolioTER.toFixed(2)}%
+                <p className="text-[32px] font-bold font-mono tabular-nums tracking-[-0.03em] text-amber-500 dark:text-amber-400 leading-none mt-3">
+                  {formatCurrency(annualTotal)}
                 </p>
-                <p className="text-[10px] text-muted-foreground mt-2">
-                  Total Expense Ratio medio ponderato
-                </p>
-              </div>
-            ) : (
-              <p className="text-[11px] text-muted-foreground mt-2">Nessun ETF/fondo configurato</p>
-            )}
-          </div>
-
-          {/* Costo annuale */}
-          <div className="bg-card border border-border rounded-2xl p-5 flex flex-col justify-between">
-            <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-              Costo Annuale Stimato
-            </span>
-            {(overview?.flags.hasTERTracking || overview?.flags.hasStampDuty) ? (
-              <div>
-                <p className="text-[36px] font-bold font-mono tabular-nums tracking-[-0.03em] text-amber-500 dark:text-amber-400 leading-none mt-3">
-                  {formatCurrency(overview.metrics.annualPortfolioCost + overview.metrics.annualStampDuty)}
-                </p>
-                {/* Breakdown — shown only when both components are present */}
-                {overview.flags.hasTERTracking && overview.flags.hasStampDuty && (
+                {bothPresent && (
                   <div className="mt-3 pt-3 border-t border-border space-y-0 divide-y divide-border">
                     <div className="flex justify-between py-[5px] text-[11px]">
                       <span className="text-muted-foreground">Costi di gestione (TER)</span>
@@ -716,79 +605,29 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 )}
-                {/* Single-line caption when only one component present */}
-                {!(overview.flags.hasTERTracking && overview.flags.hasStampDuty) && (
+                {!bothPresent && (
                   <p className="text-[10px] text-muted-foreground mt-2">
                     {overview.flags.hasTERTracking ? 'Costi di gestione annuali stimati' : 'Imposta di bollo annuale stimata'}
                   </p>
                 )}
               </div>
-            ) : (
-              <p className="text-[11px] text-muted-foreground mt-2">Nessun costo configurato</p>
-            )}
-          </div>
-        </motion.div>
-      )}
+            </div>
+          </motion.div>
+        );
+      })()}
 
-      {/* ── FISCAL SECTION — both platforms ── inline JSX (not a sub-component) ── */}
-      {overview?.flags.hasCostBasisTracking && (
-        <motion.div
-          layout="position"
-          transition={springLayoutTransition}
-          variants={cardItem}
-          initial="hidden"
-          animate="visible"
-        >
-          <Card className="rounded-2xl overflow-hidden">
-            <Collapsible open={costBasisOpen} onOpenChange={setCostBasisOpen}>
-              <CollapsibleTrigger asChild>
-                <div className="flex items-center justify-between cursor-pointer select-none px-5 py-4 group">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    Dettaglio Fiscale
-                  </p>
-                  <ChevronDown className={cn(
-                    'h-3.5 w-3.5 text-muted-foreground transition-transform duration-200',
-                    costBasisOpen && 'rotate-180'
-                  )} />
-                </div>
-              </CollapsibleTrigger>
-              <AnimatePresence initial={false}>
-                {costBasisOpen && (
-                  <motion.div
-                    key="fiscal-detail"
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                    style={{ overflow: 'hidden' }}
-                  >
-                    <div className="grid grid-cols-2 desktop:grid-cols-4 gap-2 pb-4 px-4">
-                      {fiscalItems.map(item => (
-                        <div
-                          key={item.label}
-                          className="bg-muted rounded-xl p-3.5 border border-border"
-                        >
-                          <p className="text-[9.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-1.5">
-                            {item.label}
-                          </p>
-                          <p className={cn('text-[16px] font-bold font-mono tabular-nums', item.className)}>
-                            {item.prefix}{formatCurrency(item.value)}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </Collapsible>
-          </Card>
-        </motion.div>
-      )}
-
-      {/* ── MOBILE ONLY: Cashflow card + Cost cards ── inline JSX (not a sub-component) ── */}
-      {isMobile && overview?.expenseStats && (() => {
-        const { income, expenses } = overview.expenseStats.currentMonth;
+      {/* ── CASHFLOW CARD — full-width, unified for mobile + desktop ── */}
+      {overview?.expenseStats && (() => {
+        const { income, expenses, net } = overview.expenseStats.currentMonth;
         const { income: incomeDelta, expenses: expensesDelta } = overview.expenseStats.delta;
+        const { month: italyMonth, year: italyYear } = getItalyMonthYear();
+        const monthLabel = `${MONTH_NAMES_IT[italyMonth - 1].toUpperCase()} ${italyYear}`;
+        const ratio = coverageRatio;
+
+        // Category bar color: chart-1 for expenses (blue-ish), chart-2 for income (green-ish).
+        const expenseColor = chartColors[0] || 'var(--chart-1)';
+        const incomeColor = chartColors[1] || 'var(--chart-2)';
+
         return (
           <motion.div
             layout="position"
@@ -799,50 +638,181 @@ export default function DashboardPage() {
           >
             <Card className="rounded-2xl">
               <CardContent className="p-[22px]">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground mb-4">
-                  Cashflow questo mese
+                {/* Header */}
+                <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground mb-3">
+                  Cashflow · {monthLabel}
                 </p>
-                <div className="flex items-center gap-3.5">
-                  <div className="flex-1 flex flex-col gap-3.5">
-                    {[
-                      { label: 'Entrate', value: income, delta: incomeDelta, positiveGood: true },
-                      { label: 'Spese',   value: expenses, delta: expensesDelta, positiveGood: false },
-                    ].map(row => {
-                      const valueColor = row.label === 'Entrate'
-                        ? 'text-green-500 dark:text-green-400'
-                        : 'text-red-500 dark:text-red-400';
-                      const deltaColor = row.positiveGood
-                        ? row.delta >= 0 ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400'
-                        : row.delta >= 0 ? 'text-red-500 dark:text-red-400'   : 'text-green-500 dark:text-green-400';
+
+                {/* 4 KPI chips */}
+                <div className="grid grid-cols-2 desktop:grid-cols-4 gap-3">
+                  {/* ENTRATE */}
+                  <div className="bg-muted/40 rounded-xl p-3.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-1.5">
+                      Entrate
+                    </p>
+                    <p className="text-[22px] font-bold font-mono tabular-nums text-green-500 dark:text-green-400 leading-none">
+                      {cachedFormatCurrencyEUR(income, true)}
+                    </p>
+                    {(() => {
+                      const pos = incomeDelta >= 0;
                       return (
-                        <div key={row.label}>
-                          <div className="flex items-center gap-1.5 mb-1">
-                            {row.label === 'Entrate'
-                              ? <TrendingUp className="h-3.5 w-3.5 text-green-500 dark:text-green-400" />
-                              : <TrendingDown className="h-3.5 w-3.5 text-red-500 dark:text-red-400" />
-                            }
-                            <p className="text-[11px] text-muted-foreground">{row.label}</p>
-                          </div>
-                          <div className={cn('text-[22px] font-bold font-mono tabular-nums leading-none', valueColor)}>
-                            {formatCurrency(row.value)}
-                          </div>
-                          <p className={cn('text-[10.5px] font-mono mt-0.5', deltaColor)}>
-                            {row.delta >= 0 ? '+' : ''}{row.delta.toFixed(1)}% vs mese scorso
-                          </p>
-                        </div>
+                        <p className={cn('text-[12px] font-mono mt-1.5', pos ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400')}>
+                          {pos ? '+' : ''}{incomeDelta.toFixed(1)}% vs mese scorso
+                        </p>
                       );
-                    })}
+                    })()}
                   </div>
-                  <div className="flex flex-col items-center gap-1.5 px-3.5 py-2.5 bg-muted rounded-2xl border border-border">
-                    <SavingsRingChart rate={savingsRate} size={96} />
+
+                  {/* SPESE */}
+                  <div className="bg-muted/40 rounded-xl p-3.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-1.5">
+                      Spese
+                    </p>
+                    <p className="text-[22px] font-bold font-mono tabular-nums text-red-500 dark:text-red-400 leading-none">
+                      {cachedFormatCurrencyEUR(expenses, true)}
+                    </p>
+                    {(() => {
+                      // For expenses: +% is negative (spent more) → red
+                      const pos = expensesDelta >= 0;
+                      return (
+                        <p className={cn('text-[12px] font-mono mt-1.5', pos ? 'text-red-500 dark:text-red-400' : 'text-green-500 dark:text-green-400')}>
+                          {pos ? '+' : ''}{expensesDelta.toFixed(1)}% vs mese scorso
+                        </p>
+                      );
+                    })()}
+                  </div>
+
+                  {/* RISPARMIO */}
+                  <div className="bg-muted/40 rounded-xl p-3.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-1.5">
+                      Risparmio
+                    </p>
+                    <p className={cn(
+                      'text-[22px] font-bold font-mono tabular-nums leading-none',
+                      net >= 0 ? 'text-foreground' : 'text-red-500 dark:text-red-400'
+                    )}>
+                      {cachedFormatCurrencyEUR(net, true)}
+                    </p>
+                    {income > 0 && (
+                      <p className="text-[12px] text-muted-foreground mt-1.5">
+                        {savingsRate}% del reddito
+                      </p>
+                    )}
+                  </div>
+
+                  {/* RAPPORTO */}
+                  <div className="bg-muted/40 rounded-xl p-3.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-1.5">
+                      Rapporto
+                    </p>
+                    <p className="text-[22px] font-bold font-mono tabular-nums text-foreground leading-none">
+                      {ratio !== null ? `${ratio.toFixed(2)}×` : '—'}
+                    </p>
+                    {ratio !== null && (
+                      <p className="text-[12px] text-muted-foreground mt-1.5">
+                        {coverageHealthLabel(ratio)}
+                      </p>
+                    )}
                   </div>
                 </div>
+
+                {/* Category breakdowns — only shown when there is data */}
+                {(overview.expenseStats.topExpenseCategories.length > 0 || overview.expenseStats.topIncomeCategories.length > 0) && (
+                  <>
+                    <div className="mt-4 border-t border-border" />
+                    <div className="grid desktop:grid-cols-2 gap-x-8 gap-y-4 mt-4">
+
+                      {/* SPESE PER CATEGORIA */}
+                      {overview.expenseStats.topExpenseCategories.length > 0 && (
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-3">
+                            Spese per Categoria
+                          </p>
+                          <div className="space-y-3">
+                            {overview.expenseStats.topExpenseCategories.map(cat => (
+                              <div key={cat.category} className="space-y-1">
+                                <div className="flex justify-between items-center">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: expenseColor }} />
+                                    <span className="text-[13px] text-foreground truncate">{cat.category}</span>
+                                  </div>
+                                  <span className="text-[13px] font-mono tabular-nums text-foreground ml-3 flex-shrink-0">
+                                    {cachedFormatCurrencyEUR(cat.amount, true)}
+                                  </span>
+                                </div>
+                                <div className="h-[3px] bg-muted rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full"
+                                    style={{ width: `${cat.percentage}%`, background: expenseColor }}
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ENTRATE PER CATEGORIA */}
+                      {overview.expenseStats.topIncomeCategories.length > 0 && (
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-3">
+                            Entrate per Categoria
+                          </p>
+                          <div className="space-y-3">
+                            {overview.expenseStats.topIncomeCategories.map(cat => (
+                              <div key={cat.category} className="space-y-1">
+                                <div className="flex justify-between items-center">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: incomeColor }} />
+                                    <span className="text-[13px] text-foreground truncate">{cat.category}</span>
+                                  </div>
+                                  <span className="text-[13px] font-mono tabular-nums text-foreground ml-3 flex-shrink-0">
+                                    {cachedFormatCurrencyEUR(cat.amount, true)}
+                                  </span>
+                                </div>
+                                <div className="h-[3px] bg-muted rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full"
+                                    style={{ width: `${cat.percentage}%`, background: incomeColor }}
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           </motion.div>
         );
       })()}
-      {isMobile && <CostCards />}
+
+      {/* No cashflow data fallback */}
+      {!overview?.expenseStats && (
+        <motion.div
+          layout="position"
+          transition={springLayoutTransition}
+          variants={cardItem}
+          initial="hidden"
+          animate="visible"
+        >
+          <Card className="rounded-2xl">
+            <CardContent className="p-[22px]">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground mb-3">
+                Cashflow
+              </p>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Receipt className="h-4 w-4" />
+                <span>Nessun dato questo mese</span>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* ── CHARTS SECTION ── */}
       <OverviewChartsSection

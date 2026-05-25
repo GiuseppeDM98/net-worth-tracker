@@ -49,12 +49,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, TrendingUp, TrendingDown, Wallet, Filter, ChevronDown, Scale, Check, X, Trash2 } from 'lucide-react';
+import { Plus, Filter, ChevronDown, Check, X, Trash2, Pencil } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ExpenseDialog } from '@/components/expenses/ExpenseDialog';
 import { ExpenseTable } from '@/components/expenses/ExpenseTable';
-import { ExpenseCard } from '@/components/expenses/ExpenseCard';
+import { Badge } from '@/components/ui/badge';
+import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useChartColors } from '@/lib/hooks/useChartColors';
 
 const MONTHS = [
   { value: '1', label: 'Gennaio' },
@@ -71,6 +74,169 @@ const MONTHS = [
   { value: '12', label: 'Dicembre' },
 ];
 
+// Coverage ratio → Italian health label (mirrors the same function in the dashboard overview page).
+function coverageHealthLabel(ratio: number): string {
+  if (ratio >= 2.0) return 'Salute ottima';
+  if (ratio >= 1.3) return 'Salute buona';
+  if (ratio >= 1.0) return 'In pareggio';
+  return 'In deficit';
+}
+
+// Safely coerce Expense.date (Date | Timestamp | string) to a native Date.
+const getExpenseDate = (d: Expense['date']): Date => {
+  if (d instanceof Date) return d;
+  if (typeof d === 'string') return new Date(d);
+  return (d as { toDate(): Date }).toDate();
+};
+
+// Tailwind dot-color classes keyed by expense type for the mobile list rows.
+const TYPE_DOT_CLASS: Record<ExpenseType, string> = {
+  income: 'bg-green-500',
+  fixed: 'bg-blue-500',
+  variable: 'bg-purple-500',
+  debt: 'bg-orange-500',
+};
+
+// ─── MobileExpenseRow ─────────────────────────────────────────────────────────
+
+interface MobileExpenseRowProps {
+  expense: Expense;
+  isExpanded: boolean;
+  onToggleExpand: (id: string) => void;
+  onEdit: (expense: Expense) => void;
+  onDelete: (expense: Expense) => void;
+  isPendingDelete: boolean;
+  isDemo: boolean;
+}
+
+/**
+ * Flat list row for mobile expense display (Trade Republic divide-y style).
+ *
+ * Interaction pattern:
+ * - Tapping the row body toggles an inline action area (Modifica + Elimina).
+ * - Elimina reuses the parent's 2-click arm pattern — isPendingDelete drives
+ *   the visual "confirm" state; actual logic lives in the parent handler.
+ * - Complex expenses (installments/recurring) open an AlertDialog on first tap
+ *   of Elimina, so no 2-click arm is needed; the parent handles the distinction.
+ */
+function MobileExpenseRow({
+  expense,
+  isExpanded,
+  onToggleExpand,
+  onEdit,
+  onDelete,
+  isPendingDelete,
+  isDemo,
+}: MobileExpenseRowProps) {
+  const date = getExpenseDate(expense.date);
+  const isIncome = expense.type === 'income';
+
+  // "20/5" short date shown in the subtitle (no year, no zero-padding).
+  const shortDate = format(date, 'd/M');
+
+  // Subtitle: category · subcategory · date — omit subcategory when absent.
+  const subtitle = [expense.categoryName, expense.subCategoryName || null, shortDate]
+    .filter(Boolean)
+    .join(' · ');
+
+  // Title: user-entered notes take priority; fall back to category name.
+  const title = expense.notes?.trim() || expense.categoryName;
+
+  const amountLabel = `${isIncome ? '+' : ''}${cachedFormatCurrencyEUR(Math.abs(expense.amount))}`;
+
+  return (
+    <div className="py-3">
+      {/* Tappable row — shows dot, title, subtitle and amount */}
+      <button
+        type="button"
+        className="w-full flex items-center gap-3 text-left"
+        onClick={() => onToggleExpand(expense.id)}
+        aria-expanded={isExpanded}
+      >
+        {/* Type color dot */}
+        <span
+          className={cn(
+            'w-2 h-2 rounded-full flex-shrink-0',
+            TYPE_DOT_CLASS[expense.type] ?? 'bg-muted-foreground',
+          )}
+        />
+
+        {/* Title + badges + subtitle */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-[14px] font-medium text-foreground truncate">{title}</span>
+            {expense.isInstallment && expense.installmentNumber && expense.installmentTotal && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0">
+                {expense.installmentNumber}/{expense.installmentTotal}
+              </Badge>
+            )}
+            {expense.isRecurring && !expense.isInstallment && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0">
+                Ric.
+              </Badge>
+            )}
+          </div>
+          <p className="text-[12px] text-muted-foreground truncate mt-0.5">{subtitle}</p>
+        </div>
+
+        {/* Amount — green for income, red for expenses */}
+        <span
+          className={cn(
+            'text-[14px] font-bold font-mono tabular-nums flex-shrink-0',
+            isIncome
+              ? 'text-green-600 dark:text-green-400'
+              : 'text-red-600 dark:text-red-400',
+          )}
+        >
+          {amountLabel}
+        </span>
+      </button>
+
+      {/* Inline action area — animated height 0 → auto on expand */}
+      <AnimatePresence initial={false}>
+        {isExpanded && (
+          <motion.div
+            key="actions"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18, ease: 'easeInOut' }}
+            className="overflow-hidden"
+          >
+            <div className="flex gap-2 mt-3 pl-5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onEdit(expense)}
+                disabled={isDemo}
+                title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+                className="flex-1 h-9"
+              >
+                <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                Modifica
+              </Button>
+              {/* Delete: first tap arms (destructive style), second tap confirms */}
+              <Button
+                variant={isPendingDelete ? 'destructive' : 'outline'}
+                size="sm"
+                onClick={() => onDelete(expense)}
+                disabled={isDemo}
+                title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+                className="flex-1 h-9"
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                {isPendingDelete ? 'Conferma' : 'Elimina'}
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
 interface ExpenseTrackingTabProps {
   allExpenses: Expense[];
   categories: ExpenseCategory[];
@@ -82,13 +248,15 @@ interface ExpenseTrackingTabProps {
  * CHECKLIST: When adding new ExpenseType values:
  * 1. Update EXPENSE_TYPE_LABELS in types/expenses.ts
  * 2. Add color mapping in ExpenseCard.tsx badge colors
- * 3. Update typeOptions array in this file (line ~310)
- * 4. Add type validation in ExpenseDialog schema
+ * 3. Add dot color entry in TYPE_DOT_CLASS (above)
+ * 4. Update typeOptions array in this file
+ * 5. Add type validation in ExpenseDialog schema
  */
 export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh }: ExpenseTrackingTabProps) {
   const { user } = useAuth();
   const isDemo = useDemoMode();
   const queryClient = useQueryClient();
+  const chartColors = useChartColors();
   const currentYear = new Date().getFullYear();
   const currentMonth = String(new Date().getMonth() + 1); // 1-based month (1-12)
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -96,6 +264,9 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [filtersOpen, setFiltersOpen] = useState<boolean>(false);
+
+  // Tracks which mobile row is expanded (shows Modifica + Elimina actions).
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
 
   // 2-click inline delete state
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -285,6 +456,11 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Toggling another row collapses the previously expanded one (accordion pattern).
+  const handleToggleExpand = useCallback((id: string) => {
+    setExpandedRowId(prev => (prev === id ? null : id));
   }, []);
 
   const handleAddExpense = () => {
@@ -503,31 +679,96 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   const netBalance = calculateNetBalance(filteredExpenses);
   const incomeExpenseRatio = calculateIncomeExpenseRatio(filteredExpenses);
 
-  // Determine ratio color based on thresholds
-  const getRatioColor = (ratio: number | null): string => {
-    if (ratio === null) return 'text-muted-foreground';
-    if (ratio >= 1.2) return 'text-green-600';
-    if (ratio >= 0.8) return 'text-yellow-600';
-    return 'text-red-600';
-  };
+  // ─── Hero card derived data ──────────────────────────────────────────────────
 
-  const formatRatio = (ratio: number | null): string => {
-    if (ratio === null) return 'N/A';
-    return ratio.toFixed(2);
-  };
+  // Header label for the hero card: "MAGGIO 2026" when month selected, else "2026".
+  const heroLabel = useMemo(() => {
+    if (selectedMonth !== 'all')
+      return `${MONTHS.find(m => m.value === selectedMonth)?.label.toUpperCase()} ${selectedYear}`;
+    return String(selectedYear);
+  }, [selectedYear, selectedMonth]);
+
+  // Expenses of the period immediately preceding the selected month.
+  // Used to compute MoM delta — only available when a specific month is selected.
+  const previousPeriodExpenses = useMemo(() => {
+    if (selectedMonth === 'all') return null;
+    const prevMonthNum = parseInt(selectedMonth) - 1;
+    const prevYear = prevMonthNum === 0 ? selectedYear - 1 : selectedYear;
+    const prevMonth = prevMonthNum === 0 ? 12 : prevMonthNum;
+    return allExpenses.filter(e => {
+      const date = getExpenseDate(e.date);
+      return date.getFullYear() === prevYear && date.getMonth() + 1 === prevMonth;
+    });
+  }, [allExpenses, selectedYear, selectedMonth]);
+
+  // MoM delta for income and expenses — null when viewing full year (no comparison).
+  const heroDelta = useMemo(() => {
+    if (!previousPeriodExpenses) return null;
+    const prevIncome = calculateTotalIncome(previousPeriodExpenses);
+    const prevExpenses = calculateTotalExpenses(previousPeriodExpenses);
+    const calcDelta = (curr: number, prev: number) =>
+      prev > 0 ? ((curr - prev) / prev) * 100 : 0;
+    return {
+      income: calcDelta(totalIncome, prevIncome),
+      expenses: calcDelta(totalExpenses, prevExpenses),
+    };
+  }, [previousPeriodExpenses, totalIncome, totalExpenses]);
+
+  // Savings rate as a percentage of income (shown in RISPARMIO chip).
+  const heroSavingsRate = useMemo(() => {
+    if (totalIncome <= 0) return 0;
+    return Math.round(((totalIncome - totalExpenses) / totalIncome) * 100);
+  }, [totalIncome, totalExpenses]);
+
+  // Top-5 expense categories aggregated from filteredExpenses for the hero bar chart.
+  const heroExpenseCategories = useMemo(() => {
+    const items = filteredExpenses.filter(e => e.type !== 'income');
+    const total = items.reduce((s, e) => s + Math.abs(e.amount), 0);
+    const byCategory = new Map<string, number>();
+    for (const e of items)
+      byCategory.set(e.categoryName, (byCategory.get(e.categoryName) ?? 0) + Math.abs(e.amount));
+    return Array.from(byCategory.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([category, amount]) => ({
+        category,
+        amount,
+        percentage: total > 0 ? (amount / total) * 100 : 0,
+      }));
+  }, [filteredExpenses]);
+
+  // Top-5 income categories aggregated from filteredExpenses for the hero bar chart.
+  const heroIncomeCategories = useMemo(() => {
+    const items = filteredExpenses.filter(e => e.type === 'income');
+    const total = items.reduce((s, e) => s + Math.abs(e.amount), 0);
+    const byCategory = new Map<string, number>();
+    for (const e of items)
+      byCategory.set(e.categoryName, (byCategory.get(e.categoryName) ?? 0) + Math.abs(e.amount));
+    return Array.from(byCategory.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([category, amount]) => ({
+        category,
+        amount,
+        percentage: total > 0 ? (amount / total) * 100 : 0,
+      }));
+  }, [filteredExpenses]);
 
   if (loading) {
     return (
       <div className="space-y-6">
-        {/* KPI skeleton */}
-        <div className="grid gap-4 grid-cols-2 desktop:grid-cols-4">
-          {[0, 1, 2, 3].map(i => (
-            <div key={i} className="rounded-lg border p-4 space-y-2">
-              <div className="h-3 w-20 bg-muted animate-pulse rounded" />
-              <div className="h-6 w-28 bg-muted animate-pulse rounded" />
-              <div className="h-3 w-12 bg-muted animate-pulse rounded" />
-            </div>
-          ))}
+        {/* Hero card skeleton */}
+        <div className="rounded-2xl border p-[22px] space-y-4">
+          <div className="h-3 w-36 bg-muted animate-pulse rounded" />
+          <div className="grid grid-cols-2 desktop:grid-cols-4 gap-3">
+            {[0, 1, 2, 3].map(i => (
+              <div key={i} className="bg-muted/40 rounded-xl p-3.5 space-y-2">
+                <div className="h-2.5 w-14 bg-muted animate-pulse rounded" />
+                <div className="h-6 w-24 bg-muted animate-pulse rounded" />
+                <div className="h-2.5 w-20 bg-muted animate-pulse rounded" />
+              </div>
+            ))}
+          </div>
         </div>
         {/* Filters skeleton */}
         <div className="rounded-lg border p-4">
@@ -536,14 +777,17 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
             {[0, 1, 2, 3].map(i => <div key={i} className="h-9 bg-muted animate-pulse rounded" />)}
           </div>
         </div>
-        {/* Table skeleton */}
-        <div className="rounded-lg border p-4 space-y-3">
-          <div className="h-4 w-32 bg-muted animate-pulse rounded" />
+        {/* List skeleton — flat rows */}
+        <div className="rounded-lg border p-4 divide-y divide-border">
+          <div className="h-4 w-32 bg-muted animate-pulse rounded mb-4" />
           {[0, 1, 2, 3, 4].map(i => (
-            <div key={i} className="flex items-center gap-3 py-2 border-b last:border-0">
-              <div className="h-3 w-24 bg-muted animate-pulse rounded" />
-              <div className="flex-1 h-3 bg-muted animate-pulse rounded" />
-              <div className="h-3 w-20 bg-muted animate-pulse rounded" />
+            <div key={i} className="flex items-center gap-3 py-3">
+              <div className="h-2 w-2 rounded-full bg-muted animate-pulse flex-shrink-0" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3 w-36 bg-muted animate-pulse rounded" />
+                <div className="h-2.5 w-24 bg-muted animate-pulse rounded" />
+              </div>
+              <div className="h-3 w-16 bg-muted animate-pulse rounded" />
             </div>
           ))}
         </div>
@@ -579,52 +823,164 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
         <Plus className="h-6 w-6" />
       </Button>
 
-      {/* KPI — Trade Republic dominant value blocks */}
-      <div className="grid gap-4 grid-cols-2 desktop:grid-cols-4">
-        <div className="rounded-lg border p-4 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Entrate</p>
-          <p className="text-xl font-bold font-mono text-green-600 dark:text-green-500 tabular-nums">
-            {cachedFormatCurrencyEUR(totalIncome)}
+      {/* ── Hero Cashflow Card ─────────────────────────────────────────────── */}
+      {/* Mirrors the cashflow card in the Overview/Panoramica page, but driven  */}
+      {/* by filteredExpenses (honours the active time + hierarchy filters).      */}
+      <Card className="rounded-2xl">
+        <CardContent className="p-[22px]">
+          {/* Header label: "MAGGIO 2026" or "2026" depending on filter state */}
+          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground mb-3">
+            Cashflow · {heroLabel}
           </p>
-          <p className="text-xs text-muted-foreground">
-            {filteredExpenses.filter(e => e.type === 'income').length} voci
-          </p>
-        </div>
 
-        <div className="rounded-lg border p-4 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Spese</p>
-          <p className="text-xl font-bold font-mono text-red-600 dark:text-red-500 tabular-nums">
-            {cachedFormatCurrencyEUR(totalExpenses)}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {filteredExpenses.filter(e => e.type !== 'income').length} voci
-          </p>
-        </div>
+          {/* 4 KPI chips */}
+          <div className="grid grid-cols-2 desktop:grid-cols-4 gap-3">
+            {/* ENTRATE */}
+            <div className="bg-muted/40 rounded-xl p-3.5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-1.5">
+                Entrate
+              </p>
+              <p className="text-[22px] font-bold font-mono tabular-nums text-green-500 dark:text-green-400 leading-none">
+                {cachedFormatCurrencyEUR(totalIncome, true)}
+              </p>
+              {heroDelta !== null && (() => {
+                const pos = heroDelta.income >= 0;
+                return (
+                  <p className={cn('text-[12px] font-mono mt-1.5', pos ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400')}>
+                    {pos ? '+' : ''}{heroDelta.income.toFixed(1)}% vs mese scorso
+                  </p>
+                );
+              })()}
+            </div>
 
-        <div className="rounded-lg border p-4 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Bilancio</p>
-          <p className={cn(
-            'text-xl font-bold font-mono tabular-nums',
-            netBalance >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'
-          )}>
-            {cachedFormatCurrencyEUR(netBalance)}
-          </p>
-          <p className="text-xs text-muted-foreground">{filteredExpenses.length} voci totali</p>
-        </div>
+            {/* SPESE */}
+            <div className="bg-muted/40 rounded-xl p-3.5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-1.5">
+                Spese
+              </p>
+              <p className="text-[22px] font-bold font-mono tabular-nums text-red-500 dark:text-red-400 leading-none">
+                {cachedFormatCurrencyEUR(totalExpenses, true)}
+              </p>
+              {heroDelta !== null && (() => {
+                // For expenses: +% means spent more → red (inverted logic vs income).
+                const pos = heroDelta.expenses >= 0;
+                return (
+                  <p className={cn('text-[12px] font-mono mt-1.5', pos ? 'text-red-500 dark:text-red-400' : 'text-green-500 dark:text-green-400')}>
+                    {pos ? '+' : ''}{heroDelta.expenses.toFixed(1)}% vs mese scorso
+                  </p>
+                );
+              })()}
+            </div>
 
-        <div className="rounded-lg border p-4 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Rapporto</p>
-          <p className={cn('text-xl font-bold font-mono tabular-nums', getRatioColor(incomeExpenseRatio))}>
-            {formatRatio(incomeExpenseRatio)}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {incomeExpenseRatio !== null && incomeExpenseRatio >= 1.2 && 'Salute ottima'}
-            {incomeExpenseRatio !== null && incomeExpenseRatio >= 0.8 && incomeExpenseRatio < 1.2 && 'In equilibrio'}
-            {incomeExpenseRatio !== null && incomeExpenseRatio < 0.8 && 'Attenzione'}
-            {incomeExpenseRatio === null && 'Nessun dato'}
-          </p>
-        </div>
-      </div>
+            {/* RISPARMIO */}
+            <div className="bg-muted/40 rounded-xl p-3.5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-1.5">
+                Risparmio
+              </p>
+              <p className={cn(
+                'text-[22px] font-bold font-mono tabular-nums leading-none',
+                netBalance >= 0 ? 'text-foreground' : 'text-red-500 dark:text-red-400',
+              )}>
+                {cachedFormatCurrencyEUR(netBalance, true)}
+              </p>
+              {totalIncome > 0 && (
+                <p className="text-[12px] text-muted-foreground mt-1.5">
+                  {heroSavingsRate}% del reddito
+                </p>
+              )}
+            </div>
+
+            {/* RAPPORTO */}
+            <div className="bg-muted/40 rounded-xl p-3.5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-1.5">
+                Rapporto
+              </p>
+              <p className="text-[22px] font-bold font-mono tabular-nums text-foreground leading-none">
+                {incomeExpenseRatio !== null ? `${incomeExpenseRatio.toFixed(2)}×` : '—'}
+              </p>
+              {incomeExpenseRatio !== null && (
+                <p className="text-[12px] text-muted-foreground mt-1.5">
+                  {coverageHealthLabel(incomeExpenseRatio)}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Category breakdowns — only shown when there is data */}
+          {(heroExpenseCategories.length > 0 || heroIncomeCategories.length > 0) && (
+            <>
+              <div className="mt-4 border-t border-border" />
+              <div className="grid desktop:grid-cols-2 gap-x-8 gap-y-4 mt-4">
+                {/* Spese per categoria */}
+                {heroExpenseCategories.length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-3">
+                      Spese per Categoria
+                    </p>
+                    <div className="space-y-3">
+                      {heroExpenseCategories.map(cat => (
+                        <div key={cat.category} className="space-y-1">
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div
+                                className="w-2 h-2 rounded-full flex-shrink-0"
+                                style={{ background: chartColors[0] || 'var(--chart-1)' }}
+                              />
+                              <span className="text-[13px] text-foreground truncate">{cat.category}</span>
+                            </div>
+                            <span className="text-[13px] font-mono tabular-nums text-foreground ml-3 flex-shrink-0">
+                              {cachedFormatCurrencyEUR(cat.amount, true)}
+                            </span>
+                          </div>
+                          <div className="h-[3px] bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full"
+                              style={{ width: `${cat.percentage}%`, background: chartColors[0] || 'var(--chart-1)' }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Entrate per categoria */}
+                {heroIncomeCategories.length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-3">
+                      Entrate per Categoria
+                    </p>
+                    <div className="space-y-3">
+                      {heroIncomeCategories.map(cat => (
+                        <div key={cat.category} className="space-y-1">
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div
+                                className="w-2 h-2 rounded-full flex-shrink-0"
+                                style={{ background: chartColors[1] || 'var(--chart-2)' }}
+                              />
+                              <span className="text-[13px] text-foreground truncate">{cat.category}</span>
+                            </div>
+                            <span className="text-[13px] font-mono tabular-nums text-foreground ml-3 flex-shrink-0">
+                              {cachedFormatCurrencyEUR(cat.amount, true)}
+                            </span>
+                          </div>
+                          <div className="h-[3px] bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full"
+                              style={{ width: `${cat.percentage}%`, background: chartColors[1] || 'var(--chart-2)' }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Filters — includes year selector (integrated, not a separate card) */}
       <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
@@ -940,8 +1296,8 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
             />
           </div>
 
-          {/* Mobile: Cards */}
-          <div className="desktop:hidden space-y-3">
+          {/* Mobile: flat divide-y list with tap-to-expand actions */}
+          <div className="desktop:hidden">
             {filteredExpenses.length === 0 ? (
               <div className="rounded-md border border-dashed p-8 text-center">
                 <p className="text-muted-foreground">Nessuna voce trovata</p>
@@ -951,17 +1307,22 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
               </div>
             ) : (
               <>
-                {filteredExpenses.slice(0, mobileShowCount).map((expense) => (
-                  <ExpenseCard
-                    key={expense.id}
-                    expense={expense}
-                    onEdit={handleEditExpense}
-                    onDelete={handleDeleteExpense}
-                    isDemo={isDemo}
-                  />
-                ))}
+                <div className="divide-y divide-border">
+                  {filteredExpenses.slice(0, mobileShowCount).map(expense => (
+                    <MobileExpenseRow
+                      key={expense.id}
+                      expense={expense}
+                      isExpanded={expandedRowId === expense.id}
+                      onToggleExpand={handleToggleExpand}
+                      onEdit={handleEditExpense}
+                      onDelete={handleDeleteExpense}
+                      isPendingDelete={pendingDeleteId === expense.id}
+                      isDemo={isDemo}
+                    />
+                  ))}
+                </div>
                 {filteredExpenses.length > mobileShowCount && (
-                  <div className="pt-2 text-center">
+                  <div className="pt-4 text-center">
                     <Button
                       variant="outline"
                       size="sm"

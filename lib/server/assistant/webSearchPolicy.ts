@@ -70,7 +70,9 @@ export function resolveAssistantWebSearchPolicy(
     return preferences.includeMacroContext;
   }
 
-  // When the toggle is on, always enable web search in chat too.
-  // When off, fall back to keyword detection so generic prompts stay cheap.
-  return preferences.includeMacroContext || shouldUseWebSearch(prompt);
+  // Chat mode: only prompt-based keyword detection triggers web search.
+  // The includeMacroContext preference is intentionally ignored here — it controls
+  // structured analysis modes (month/year/ytd/history) but should not cause every
+  // chat message to trigger an expensive web search when no macro keyword is present.
+  return shouldUseWebSearch(prompt);
 }

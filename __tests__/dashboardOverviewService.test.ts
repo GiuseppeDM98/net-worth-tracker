@@ -137,7 +137,9 @@ describe('dashboardOverviewService', () => {
         },
         updatedAt: new Date(),
         computedAt: new Date(),
-        sourceVersion: 1,
+        // Must match DASHBOARD_OVERVIEW_SOURCE_VERSION (currently 3) for the cache to be
+        // considered fresh. Tests that rely on recompute can use an old version number.
+        sourceVersion: 3,
         invalidatedAt: null,
       }),
     });

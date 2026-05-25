@@ -5,9 +5,15 @@ import { Timestamp } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { Asset, AssetAllocationSettings, MonthlySnapshot } from '@/types/assets';
 import { Expense } from '@/types/expenses';
-import { DashboardOverviewPayload, DashboardOverviewExpenseStats } from '@/types/dashboardOverview';
+import {
+  DashboardOverviewPayload,
+  DashboardOverviewExpenseStats,
+  DashboardOverviewTopAsset,
+  DashboardOverviewCategoryAmount,
+} from '@/types/dashboardOverview';
 import {
   calculateAnnualPortfolioCost,
+  calculateAssetValue,
   calculateIlliquidNetWorth,
   calculateLiquidEstimatedTaxes,
   calculateLiquidNetWorth,
@@ -156,15 +162,30 @@ async function getExpensesForMonth(userId: string, year: number, month: number):
   }) as Expense[];
 }
 
-function summarizeExpenses(expenses: Expense[]) {
+interface ExpenseSummary {
+  income: number;
+  expenses: number;
+  net: number;
+  // Aggregated totals per category name (denormalized on Expense docs).
+  incomeByCategory: Map<string, number>;
+  expensesByCategory: Map<string, number>;
+}
+
+function summarizeExpenses(expenses: Expense[]): ExpenseSummary {
   let income = 0;
   let totalExpenses = 0;
+  const incomeByCategory = new Map<string, number>();
+  const expensesByCategory = new Map<string, number>();
 
   for (const expense of expenses) {
+    const category = expense.categoryName ?? 'Altro';
     if (expense.type === 'income') {
       income += expense.amount;
+      incomeByCategory.set(category, (incomeByCategory.get(category) ?? 0) + expense.amount);
     } else {
-      totalExpenses += Math.abs(expense.amount);
+      const abs = Math.abs(expense.amount);
+      totalExpenses += abs;
+      expensesByCategory.set(category, (expensesByCategory.get(category) ?? 0) + abs);
     }
   }
 
@@ -172,15 +193,37 @@ function summarizeExpenses(expenses: Expense[]) {
     income,
     expenses: totalExpenses,
     net: income - totalExpenses,
+    incomeByCategory,
+    expensesByCategory,
   };
+}
+
+// Build a sorted top-5 category list from a category→amount map.
+function buildTopCategories(
+  categoryMap: Map<string, number>,
+  total: number,
+  limit = 5
+): DashboardOverviewCategoryAmount[] {
+  return [...categoryMap.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([category, amount]) => ({
+      category,
+      amount,
+      percentage: total > 0 ? (amount / total) * 100 : 0,
+    }));
 }
 
 function buildExpenseStats(
   currentExpenses: Expense[],
   previousExpenses: Expense[]
 ): DashboardOverviewExpenseStats {
-  const currentMonth = summarizeExpenses(currentExpenses);
-  const previousMonth = summarizeExpenses(previousExpenses);
+  const current = summarizeExpenses(currentExpenses);
+  const previous = summarizeExpenses(previousExpenses);
+
+  // Expose only the plain totals on currentMonth/previousMonth (no Maps on the wire).
+  const currentMonth = { income: current.income, expenses: current.expenses, net: current.net };
+  const previousMonth = { income: previous.income, expenses: previous.expenses, net: previous.net };
 
   return {
     currentMonth,
@@ -196,6 +239,8 @@ function buildExpenseStats(
         ? ((currentMonth.net - previousMonth.net) / Math.abs(previousMonth.net)) * 100
         : 0,
     },
+    topExpenseCategories: buildTopCategories(current.expensesByCategory, currentMonth.expenses),
+    topIncomeCategories: buildTopCategories(current.incomeByCategory, currentMonth.income),
   };
 }
 
@@ -215,6 +260,13 @@ function buildLiveOverviewPayload(
   const illiquidNetWorth = calculateIlliquidNetWorth(assets);
   const estimatedTaxes = calculateTotalEstimatedTaxes(assets);
   const liquidEstimatedTaxes = calculateLiquidEstimatedTaxes(assets);
+
+  // Cash sub-breakdown: pure cash accounts vs investable liquid assets.
+  // This splits liquidNetWorth into two sub-buckets shown on the Liquid card.
+  const cashNetWorth = assets
+    .filter(a => a.quantity > 0 && a.assetClass === 'cash')
+    .reduce((sum, a) => sum + calculateAssetValue(a), 0);
+  const liquidInvestmentsNetWorth = liquidNetWorth - cashNetWorth;
   const annualStampDuty = (settings?.stampDutyEnabled && settings?.stampDutyRate)
     ? calculateStampDuty(
         assets,
@@ -242,15 +294,42 @@ function buildLiveOverviewPayload(
     yearlyVariation = calculateYearlyChange(currentNetWorth, snapshots);
   }
 
+  // Top assets for the portfolio list card — active assets sorted by value desc, capped at 15.
+  const topAssets: DashboardOverviewTopAsset[] = assets
+    .filter(a => a.quantity > 0)
+    .map(a => {
+      const value = calculateAssetValue(a);
+      // Use null instead of undefined — Firestore rejects undefined values.
+      let returnPercent: number | null = null;
+      if (a.averageCost && a.averageCost > 0) {
+        const costBasis = a.quantity * a.averageCost;
+        returnPercent = costBasis > 0 ? ((value - costBasis) / costBasis) * 100 : null;
+      }
+      return {
+        id: a.id,
+        name: a.name,
+        assetType: a.type,
+        assetClass: a.assetClass,
+        totalValue: value,
+        portfolioPercent: totalValue > 0 ? (value / totalValue) * 100 : 0,
+        returnPercent,
+      };
+    })
+    .sort((a, b) => b.totalValue - a.totalValue)
+    .slice(0, 15);
+
   return {
     metrics: {
       totalValue,
       liquidNetWorth,
       illiquidNetWorth,
+      cashNetWorth,
+      liquidInvestmentsNetWorth,
       netTotal: calculateNetTotal(assets),
       liquidNetTotal: liquidNetWorth - liquidEstimatedTaxes,
       unrealizedGains: calculateTotalUnrealizedGains(assets),
       estimatedTaxes,
+      liquidEstimatedTaxes,
       portfolioTER: calculatePortfolioWeightedTER(assets),
       annualPortfolioCost: calculateAnnualPortfolioCost(assets),
       annualStampDuty,
@@ -287,6 +366,7 @@ function buildLiveOverviewPayload(
       hasStampDuty: !!(settings?.stampDutyEnabled && annualStampDuty > 0),
       currentMonthSnapshotExists: !!currentMonthSnapshot,
     },
+    topAssets,
     // Up to 40 historical snapshots + current live value for the hero sparkline.
     // 40 covers the 3A period selector (36 months) plus a baseline point.
     // The current-month snapshot (if it exists) is excluded because totalValue

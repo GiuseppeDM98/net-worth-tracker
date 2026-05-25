@@ -36,6 +36,25 @@ export function getAssetClassColor(assetClass: string): string {
 }
 
 /**
+ * Fixed mapping from asset class to CSS custom property (e.g. "--chart-1").
+ * Use this for badge/chip styling so colours follow the active theme.
+ * Recharts components must keep using getAssetClassColor (hex) since they
+ * cannot consume CSS variables at render time.
+ */
+const ASSET_CLASS_CSS_VAR: Record<string, string> = {
+  equity:     '--chart-1',
+  bonds:      '--chart-2',
+  realestate: '--chart-3',
+  crypto:     '--chart-4',
+  commodity:  '--chart-5',
+  cash:       '--muted-foreground',
+};
+
+export function getAssetClassCssVar(assetClass: string): string {
+  return ASSET_CLASS_CSS_VAR[assetClass] ?? '--muted-foreground';
+}
+
+/**
  * Get color from chart colors array by index
  * @param index - The index
  * @returns Hex color code
