@@ -35,8 +35,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ExternalLink } from 'lucide-react';
 import { chartReveal, fadeVariants } from '@/lib/utils/motionVariants';
+import { cn } from '@/lib/utils';
 
-// Color palette for categories (matches existing COLORS array in CurrentYearTab/TotalHistoryTab)
+// Color palette for income category nodes. These are semantic hex values that
+// remain stable across themes — the Sankey uses intentional semantic colors
+// (blue=fixed, red=variable, amber=debt) that should not follow the chart palette.
 const COLORS = [
   '#3b82f6', // blue
   '#ef4444', // red
@@ -173,7 +176,7 @@ const buildBudgetFlowData = (expenses: Expense[], isMobile: boolean): SankeyData
   // Step 6: Extract expense types and filter categories per type
   const expenseTypes: ExpenseType[] = ['fixed', 'variable', 'debt'];
   const typeColors: Record<ExpenseType, string> = {
-    fixed: '#3b82f6',     // blue
+    fixed: '#3b82f6',     // blue — intentional semantic color, not theme-dependent
     variable: '#8b5cf6',  // violet
     debt: '#f59e0b',      // amber
     income: '#10b981',    // green (not used in expense flow)
@@ -217,7 +220,7 @@ const buildBudgetFlowData = (expenses: Expense[], isMobile: boolean): SankeyData
     // Center-left: Budget node (green color)
     {
       id: 'Budget',
-      nodeColor: '#10b981' // green
+      nodeColor: '#10b981'
     },
     // Center-right: Expense type nodes (only if they have expenses)
     ...expenseTypes
@@ -237,10 +240,10 @@ const buildBudgetFlowData = (expenses: Expense[], isMobile: boolean): SankeyData
         nodeColor: derivedColors[index]
       }));
     }),
-    // Right: Savings (only if positive)
+    // Right: Savings (blue — flows out of the income stream)
     ...(savings > 0 ? [{
       id: 'Risparmi',
-      nodeColor: '#3b82f6' // blue
+      nodeColor: '#3b82f6'
     }] : [])
   ];
 
@@ -360,10 +363,10 @@ const buildBudgetFlowDataWithSubcategories = (expenses: Expense[], isMobile: boo
   // Step 6: Extract expense types
   const expenseTypes: ExpenseType[] = ['fixed', 'variable', 'debt'];
   const typeColors: Record<ExpenseType, string> = {
-    fixed: '#3b82f6',     // blue
-    variable: '#8b5cf6',  // violet
-    debt: '#f59e0b',      // amber
-    income: '#10b981',    // green (not used in expense flow)
+    fixed: '#3b82f6',
+    variable: '#8b5cf6',
+    debt: '#f59e0b',
+    income: '#10b981',
   };
 
   // Step 7: Build category and subcategory lists per type with mobile filtering
@@ -446,7 +449,7 @@ const buildBudgetFlowDataWithSubcategories = (expenses: Expense[], isMobile: boo
     // Layer 2 (Center-left): Budget node
     {
       id: 'Budget',
-      nodeColor: '#10b981' // green
+      nodeColor: '#10b981'
     },
     // Layer 3 (Center): Expense type nodes
     ...expenseTypes
@@ -484,10 +487,10 @@ const buildBudgetFlowDataWithSubcategories = (expenses: Expense[], isMobile: boo
         nodeColor: subcat.color
       }));
     }),
-    // Layer 5 (Right): Savings (only if positive)
+    // Layer 5 (Right): Savings
     ...(savings > 0 ? [{
       id: 'Risparmi',
-      nodeColor: '#3b82f6' // blue
+      nodeColor: '#3b82f6'
     }] : [])
   ];
 
@@ -734,7 +737,8 @@ export function CashflowSankeyChart({
     color: string;
     isIncome: boolean;
     mode?: 'type' | 'category' | 'transactions';
-    parentType?: string;             // Expense type name for breadcrumb (e.g., "Variabili")
+    parentType?: string;             // Expense type label for breadcrumb (e.g., "Variabili")
+    parentTypeColor?: string;        // Original type color — restored when navigating back to type view
     parentCategory?: string;         // Category name for transaction filtering
     selectedSubcategory?: string;    // Subcategory name for transaction filtering
   } | null>(null);
@@ -853,10 +857,13 @@ export function CashflowSankeyChart({
     // BUDGET VIEW: drill into type or category
     if (!selectedCategory) {
       if (isExpenseType) {
-        // Type drill-down: show expense type → categories
+        // Type drill-down: show expense type → categories.
+        // Store parentTypeColor so we can restore the exact type color if the user
+        // drills deeper (to a category/subcategory) and then navigates back.
         setSelectedCategory({
           name: node.id,
           color: node.color,
+          parentTypeColor: node.color,
           isIncome: false,
           mode: 'type'
         });
@@ -883,6 +890,9 @@ export function CashflowSankeyChart({
       setSelectedCategory({
         name: node.id,
         color: node.color,
+        // Propagate the original type color so handleBack can restore it correctly
+        // even after drilling down multiple levels.
+        parentTypeColor: selectedCategory.parentTypeColor || selectedCategory.color,
         isIncome,
         mode: hasSubcategories ? 'category' : 'transactions',
         parentType: selectedCategory.name,  // Track the expense type for breadcrumb
@@ -962,10 +972,14 @@ export function CashflowSankeyChart({
         } else {
           // No real subcategories → return to budget or type view
           if (selectedCategory.parentType) {
-            // Came from type drill-down → return to type view
+            // Came from type drill-down → return to type view.
+            // Use parentTypeColor (the original type node color) rather than prev.color
+            // (which is the category's derived color — lighter/darker variant).
+            // Without this, navigating back would show the wrong base color for the
+            // entire drill-down chart, making all nodes appear as shades of gray.
             setSelectedCategory(prev => prev ? {
               name: prev.parentType!,
-              color: prev.color,
+              color: prev.parentTypeColor || prev.color,
               isIncome: false,
               mode: 'type'
             } : null);
@@ -1182,13 +1196,11 @@ export function CashflowSankeyChart({
         {selectedCategory?.mode === 'transactions' && (() => {
           const filteredExpenses = getFilteredExpenses();
 
+          // Sum all transaction amounts to display the grand total alongside the row count.
+          const listTotal = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+
           return (
             <div className="mt-6">
-              {/* Transaction count */}
-              <div className="mb-4 text-sm text-muted-foreground">
-                Totale: {filteredExpenses.length} {filteredExpenses.length === 1 ? 'voce' : 'voci'}
-              </div>
-
               {/* Empty state */}
               {filteredExpenses.length === 0 && (
                 <div className="py-12 text-center text-muted-foreground">
@@ -1211,73 +1223,102 @@ export function CashflowSankeyChart({
                           </tr>
                         </thead>
                         <tbody>
-                          {filteredExpenses.map((expense) => (
-                            <tr key={expense.id} className="border-b hover:bg-muted/30 transition-colors">
-                              <td className="px-4 py-3 text-sm">
-                                {format(toDate(expense.date), 'dd/MM/yyyy', { locale: it })}
-                              </td>
-                              <td
-                                className="px-4 py-3 text-right text-sm font-medium"
-                                style={{
-                                  color: expense.type === 'income' ? '#10b981' : '#ef4444'
-                                }}
-                              >
-                                {formatCurrency(expense.amount)}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-muted-foreground">
-                                {expense.notes || '-'}
-                              </td>
-                              <td className="px-4 py-3 text-center">
-                                {expense.link && (
-                                  <a
-                                    href={expense.link}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center text-blue-600 hover:text-blue-800 transition-colors"
-                                  >
-                                    <ExternalLink className="h-4 w-4" />
-                                  </a>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
+                          {filteredExpenses.map((expense) => {
+                            // Use semantic Tailwind tokens instead of hardcoded hex colors.
+                            const rowAmountClass = expense.type === 'income'
+                              ? 'text-green-600 dark:text-green-500'
+                              : 'text-red-600 dark:text-red-500';
+                            return (
+                              <tr key={expense.id} className="border-b hover:bg-muted/30 transition-colors">
+                                <td className="px-4 py-3 text-sm">
+                                  {format(toDate(expense.date), 'dd/MM/yyyy', { locale: it })}
+                                </td>
+                                <td className={cn('px-4 py-3 text-right text-sm font-medium', rowAmountClass)}>
+                                  {formatCurrency(expense.amount)}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-muted-foreground">
+                                  {expense.notes || '-'}
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  {expense.link && (
+                                    <a
+                                      href={expense.link}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center text-primary hover:text-primary/80 transition-colors"
+                                    >
+                                      <ExternalLink className="h-4 w-4" />
+                                    </a>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
+                        {/* Total footer row — not sticky, appears naturally at end of table */}
+                        <tfoot className="bg-muted/50 border-t">
+                          <tr>
+                            <td className="px-4 py-3 text-sm font-semibold">
+                              Totale ({filteredExpenses.length} {filteredExpenses.length === 1 ? 'voce' : 'voci'})
+                            </td>
+                            <td className={cn(
+                              'px-4 py-3 text-sm text-right font-semibold font-mono',
+                              listTotal >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'
+                            )}>
+                              {formatCurrency(listTotal)}
+                            </td>
+                            <td colSpan={2} />
+                          </tr>
+                        </tfoot>
                       </table>
                     </div>
                   </div>
 
                   {/* Mobile card view (below sm) */}
                   <div className="space-y-3 sm:hidden">
-                    {filteredExpenses.map((expense) => (
-                      <div key={expense.id} className="rounded-md border p-3 bg-card">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">
-                            {format(toDate(expense.date), 'dd/MM/yyyy', { locale: it })}
-                          </span>
-                          <span
-                            className="text-sm font-medium"
-                            style={{
-                              color: expense.type === 'income' ? '#10b981' : '#ef4444'
-                            }}
-                          >
-                            {formatCurrency(expense.amount)}
-                          </span>
+                    {filteredExpenses.map((expense) => {
+                      const rowAmountClass = expense.type === 'income'
+                        ? 'text-green-600 dark:text-green-500'
+                        : 'text-red-600 dark:text-red-500';
+                      return (
+                        <div key={expense.id} className="rounded-md border p-3 bg-card">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">
+                              {format(toDate(expense.date), 'dd/MM/yyyy', { locale: it })}
+                            </span>
+                            <span className={cn('text-sm font-medium', rowAmountClass)}>
+                              {formatCurrency(expense.amount)}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            {expense.notes || '-'}
+                          </p>
+                          {expense.link && (
+                            <a
+                              href={expense.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-2 inline-flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors"
+                            >
+                              Apri link <ExternalLink className="h-4 w-4" />
+                            </a>
+                          )}
                         </div>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          {expense.notes || '-'}
-                        </p>
-                        {expense.link && (
-                          <a
-                            href={expense.link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-2 inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 transition-colors"
-                          >
-                            Apri link <ExternalLink className="h-4 w-4" />
-                          </a>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
+
+                    {/* Mobile total row */}
+                    <div className="rounded-md border border-border bg-muted/30 px-3 py-2.5 flex items-center justify-between">
+                      <span className="text-sm font-semibold">
+                        Totale ({filteredExpenses.length} {filteredExpenses.length === 1 ? 'voce' : 'voci'})
+                      </span>
+                      <span className={cn(
+                        'text-sm font-semibold font-mono',
+                        listTotal >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'
+                      )}>
+                        {formatCurrency(listTotal)}
+                      </span>
+                    </div>
                   </div>
                 </>
               )}

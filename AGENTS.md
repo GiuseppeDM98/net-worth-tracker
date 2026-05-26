@@ -75,6 +75,18 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - **`useWatch()` for render, `getValues()` for handlers — never `watch()`**: React Hook Form's `watch()` is incompatible with the React Compiler; the compiler skips the entire component and logs "Compilation Skipped". Convention: use `useWatch({ control, name: 'field' })` at the top of the component for all reactive render-time reads (including values referenced in JSX and render IIFEs). Use `getValues('field')` inside event handlers (`onChange`, `onCheckedChange`, `useEffect`) for point-in-time reads. Never call `watch('field')` directly — remove `watch` from all `useForm` destructures. Applied in `AssetDialog.tsx`, `ExpenseDialog.tsx`, `CategoryManagementDialog.tsx`, `DividendDialog.tsx` (session refactor-usewatch-2026-05-17).
 - **Submit button outside `<form>` via `form` attribute**: `<button type="submit" form="my-form-id">` connects a button to a form by ID without nesting. Critical when the form is inside a scrollable div and the footer button is a sibling outside that div — nesting would break the layout. The `<form>` tag just needs `id="my-form-id"`.
 
+### Cashflow Drill-Down: Two Independent Rendering Paths
+- The Cashflow Analisi tab has **two completely independent drill-down paths** that both render transaction lists:
+  1. **Pie chart drill-down** → `ExpenseList` component in `components/cashflow/AnalisiTab.tsx` (L.~1363)
+  2. **Sankey diagram drill-down** → inline IIFE in `components/cashflow/CashflowSankeyChart.tsx` when `mode === 'transactions'`
+- A change in one does NOT affect the other. Always apply parallel changes to both files when modifying the transaction list UI.
+
+### Sankey Drill-Down: Preserving Parent Color Through State Levels
+- The Sankey uses a 3-level state machine (`mode: 'type' | 'category' | 'transactions'`). Category node colors are derived from the parent type color via `deriveSubcategoryColors()` (darker hex variants).
+- **Problem**: `handleBack` from `mode='category'` → `mode='type'` restoring `prev.color` gets the derived (darker) category color, not the original type color → gray panel bug.
+- **Fix**: add `parentTypeColor?: string` to state. `handleNodeClick` saves `parentTypeColor: node.color` on the first type-level click and propagates it through category. `handleBack` restores `prev.parentTypeColor || prev.color`.
+- Applied in `CashflowSankeyChart.tsx`.
+
 ### Expense Sign Convention
 - Income is stored positive
 - Expenses are stored negative
@@ -419,6 +431,19 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - Do not set text `color` globally in tooltip style for line/area/bar charts
 - **Recharts tooltip — always use CSS vars, never hardcoded hex**: the correct pattern is to pass `contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', color: 'var(--card-foreground)' }}` and `labelStyle={{ fontWeight: 600, color: 'var(--card-foreground)' }}`. Never use `color: '#111827'` — it is invisible in dark mode since the tooltip background becomes dark via `var(--card)`. This applies to every `<Tooltip>` across all pages and charts. Applied in `FireCalculatorTab.tsx`, `FIREProjectionChart.tsx`.
 - **BarChart hover cursor overlay**: the default cursor is an opaque light rectangle — too visible in dark mode. Set `cursor={{ fill: 'rgba(128, 128, 128, 0.1)' }}` on `<Tooltip>` for a subtle semi-transparent overlay that works in both modes.
+
+### `sticky` on `tfoot` inside a div-scroll wrapper
+- **Symptom**: the total/summary footer row overlaps the last visible data rows when a table is inside a scrollable `<div>` — the tfoot appears to float on top of content.
+- **Root cause**: `sticky bottom-0` on `<tfoot>` positions relative to the nearest scroll ancestor. If the scroll container is a `<div>` wrapper (not the `<table>` itself), the tfoot sticks to the bottom of the visible viewport area, overlapping content. CSS `sticky` on table parts only works correctly when the table's own scroll context is the scroll container.
+- **Fix**: remove `sticky bottom-0` from `<tfoot>`. The total appears naturally at the end of the table after scrolling — correct UX for a long scrollable list.
+- Applied in `CashflowSankeyChart.tsx` and `AnalisiTab.tsx` (ExpenseList).
+
+### `@nivo/sankey` + `useChartColors()` → react-spring arity crash
+- **Symptom**: `createStringInterpolator2: The arity of each output value must be equal` on page load after making Sankey node colors theme-aware.
+- **Root cause**: `@nivo/sankey` v0.99 uses `@react-spring/web` internally. `useChartColors()` starts with hex values (CHART_COLORS), then after a `requestAnimationFrame` resolves CSS vars returning `oklch(...)` strings (Tailwind v4 format). When `sankeyData` recomputes with oklch values, react-spring tries to interpolate from hex → oklch — doesn't recognize oklch as a color format, parses it as a generic string with different numeric arity → crash.
+- **Workarounds that DO NOT work**: `animate={false}` on ResponsiveSankey (spring objects are initialized regardless); canvas-based oklch→hex normalization (the re-render itself triggers spring updates regardless of color format).
+- **Real fix**: Sankey node colors must remain hardcoded hex. Semantic colors (blue=fixed, violet=variable, amber=debt) are intentional — they must not follow the theme palette.
+- **General rule**: never pass `useChartColors()` values to any Nivo component backed by `@react-spring/web` (Sankey, Network, TreeMap). Only Recharts is safe (no react-spring dependency).
 
 ### Cashflow Null State vs Genuine Zero
 - `expenseStats === null` (no data) ≠ `expenseStats = 0` (real zero). Render empty state for null; `€0,00` is reserved for confirmed zero

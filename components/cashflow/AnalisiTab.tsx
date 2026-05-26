@@ -1368,7 +1368,11 @@ function ExpenseList({ expenses, isIncome }: { expenses: Expense[]; isIncome: bo
       </div>
     );
   }
+
+  // Sum all amounts — income entries are positive, expense entries are negative.
+  const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
   const amountClass = isIncome ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500';
+
   return (
     <div className="space-y-4">
       {/* Mobile list */}
@@ -1391,6 +1395,16 @@ function ExpenseList({ expenses, isIncome }: { expenses: Expense[]; isIncome: bo
             </div>
           );
         })}
+
+        {/* Mobile total row — mirrors the desktop tfoot style */}
+        <div className="rounded-md border border-border bg-muted/30 px-3 py-2.5 flex items-center justify-between">
+          <span className="text-sm font-semibold">
+            Totale ({expenses.length} {expenses.length === 1 ? 'voce' : 'voci'})
+          </span>
+          <span className={cn('text-sm font-semibold font-mono', amountClass)}>
+            {formatCurrency(totalAmount)}
+          </span>
+        </div>
       </div>
 
       {/* Desktop table */}
@@ -1424,13 +1438,21 @@ function ExpenseList({ expenses, isIncome }: { expenses: Expense[]; isIncome: bo
                 );
               })}
             </tbody>
+            {/* Total footer row — not sticky, appears naturally at end of table */}
+            <tfoot className="bg-muted/50 border-t">
+              <tr>
+                <td className="px-4 py-3 text-sm font-semibold">
+                  Totale ({expenses.length} {expenses.length === 1 ? 'voce' : 'voci'})
+                </td>
+                <td className={cn('px-4 py-3 text-sm text-right font-semibold font-mono', amountClass)}>
+                  {formatCurrency(totalAmount)}
+                </td>
+                <td colSpan={2} />
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>
-
-      <p className="text-sm text-muted-foreground">
-        Totale: {expenses.length} {expenses.length === 1 ? 'voce' : 'voci'}
-      </p>
     </div>
   );
 }
