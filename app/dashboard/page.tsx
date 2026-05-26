@@ -6,13 +6,12 @@ import {
   staggerContainer,
   cardItem,
   heroMetricSettle,
-  slideDown,
   springLayoutTransition,
 } from '@/lib/utils/motionVariants';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency } from '@/lib/services/chartService';
 import { updateHallOfFame } from '@/lib/services/hallOfFameService';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -22,7 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Wallet, TrendingUp, PieChart, DollarSign, Camera, TrendingDown, Receipt, Loader2 } from 'lucide-react';
+import { Camera, Receipt, TrendingDown, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCreateSnapshot } from '@/lib/hooks/useSnapshots';
 import { useAssets } from '@/lib/hooks/useAssets';
@@ -36,20 +35,22 @@ import { getItalyDate, getItalyMonthYear, toDate } from '@/lib/utils/dateHelpers
 import { getGreeting } from '@/lib/utils/getGreeting';
 import { OverviewAnimatedCurrency } from '@/components/dashboard/OverviewAnimatedCurrency';
 import { OverviewChartsSection } from '@/components/dashboard/OverviewChartsSection';
-import { HouseholdScopeSelect } from '@/components/household/HouseholdScopeSelect';
+import { NetWorthSparkline } from '@/components/dashboard/NetWorthSparkline';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
+import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
+import { cn } from '@/lib/utils';
 import {
   calculateAssetValue,
+  calculateAnnualPortfolioCost,
+  calculateIlliquidNetWorth,
   calculateLiquidEstimatedTaxes,
   calculateLiquidNetWorth,
   calculateNetTotal,
+  calculatePortfolioWeightedTER,
   calculateTotalEstimatedTaxes,
   calculateTotalUnrealizedGains,
   calculateTotalValue,
-  calculateAnnualPortfolioCost,
-  calculateIlliquidNetWorth,
-  calculatePortfolioWeightedTER,
 } from '@/lib/services/assetService';
 import { calculateNetBalance, calculateTotalExpenses, calculateTotalIncome } from '@/lib/services/expenseService';
 import { prepareAssetClassDistributionData, prepareAssetDistributionData } from '@/lib/services/chartService';
@@ -58,6 +59,7 @@ import {
   filterExpensesByAttributionScope,
   filterSnapshotsByOwnershipScope,
 } from '@/lib/utils/householdUtils';
+import { HouseholdScopeSelect } from '@/components/household/HouseholdScopeSelect';
 import type { DashboardOverviewExpenseStats, DashboardOverviewPayload } from '@/types/dashboardOverview';
 import type { Expense } from '@/types/expenses';
 import type { MonthlySnapshot } from '@/types/assets';
@@ -71,6 +73,7 @@ function summarizeScopedExpenses(expenses: Expense[]) {
     net: calculateNetBalance(expenses),
   };
 }
+
 
 function buildScopedTopCategories(
   expenses: Expense[],
@@ -152,15 +155,32 @@ function calculateSnapshotChange(currentValue: number, previousSnapshot: Monthly
 }
 
 /**
- * MAIN DASHBOARD PAGE
+ * MAIN DASHBOARD PAGE — "Bento Asimmetrico" redesign (v2)
  *
- * Central overview showing current portfolio state and key metrics.
+ * Layout:
+ *   Mobile:  Hero → Liquid → VariationBlocks → Cashflow → [Costs] → [Fiscal] → Assets → Charts
+ *   Desktop: Hero(2/3)+Liquid(1/3) → Cashflow(full) → [Costs 2-col] → [Fiscal] → Assets → Charts
  *
- * DATA LOADING STRATEGY:
- * The page now consumes a single server-aggregated overview query plus the
- * existing snapshot mutation. This keeps the render layer thin while preserving
- * the same cards, charts, and conditional sections users already see.
+ * Changes from v1:
+ * - Liquid card: donut replaced by flat 3-row breakdown (Liquidità/Investimenti/Illiquidi)
+ * - Fiscal section: no longer collapsible, always visible when hasCostBasisTracking
+ * - Asset list card: new "N Asset in Portafoglio" card with value / weight / return columns
+ * - Cashflow card: full-width, 4 KPI chips + top-5 category bars; TER/Costo moved to 2-col row below
  */
+
+// Italian month names for the cashflow card header.
+const MONTH_NAMES_IT = [
+  'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+  'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
+];
+
+// Coverage ratio → Italian health label.
+function coverageHealthLabel(ratio: number): string {
+  if (ratio >= 2.0) return 'Salute ottima';
+  if (ratio >= 1.3) return 'Salute buona';
+  if (ratio >= 1.0) return 'In pareggio';
+  return 'In deficit';
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -177,8 +197,6 @@ export default function DashboardPage() {
     householdLoading,
   } = useHouseholdScopeFilter(user?.uid);
 
-  // Calculated once at mount — no need to re-evaluate on every render.
-  // Hour extracted in Europe/Rome timezone so the greeting is always contextually correct.
   const greeting = useMemo(() => {
     const italyHour = getItalyDate(new Date()).getHours();
     const result = getGreeting(italyHour);
@@ -205,9 +223,11 @@ export default function DashboardPage() {
     loadingOverview ||
     (shouldLoadScopedData && (loadingScopedAssets || loadingScopedExpenses || loadingScopedSnapshots));
 
+  // ─── UI State ─────────────────────────────────────────────────────────────────
   const [creatingSnapshot, setCreatingSnapshot] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [snapshotDialogStyle, setSnapshotDialogStyle] = useState<CSSProperties | undefined>(undefined);
+
   const snapshotButtonRef = useRef<HTMLButtonElement | null>(null);
   const snapshotDialogRef = useRef<HTMLDivElement | null>(null);
 
@@ -215,41 +235,9 @@ export default function DashboardPage() {
   const chartColors = useChartColors();
 
   // heroSettled becomes true when the Patrimonio Totale Lordo count-up completes.
-  // OverviewChartsSection watches this flag to schedule the chart SVG mount via
-  // requestIdleCallback, ensuring charts never render while the hero is counting.
   const [heroSettled, setHeroSettled] = useState(false);
-
-  // Stable callback ref — prevents OverviewAnimatedCurrency from re-rendering
-  // just because DashboardPage re-renders while heroSettled is still false.
   const handleHeroSettled = useCallback(() => setHeroSettled(true), []);
 
-  useEffect(() => {
-    if (!showConfirmDialog || prefersReducedMotion) {
-      setSnapshotDialogStyle(undefined);
-      return;
-    }
-
-    const frameId = requestAnimationFrame(() => {
-      const trigger = snapshotButtonRef.current;
-      const dialog = snapshotDialogRef.current;
-
-      if (!trigger || !dialog) {
-        setSnapshotDialogStyle(undefined);
-        return;
-      }
-
-      const triggerRect = trigger.getBoundingClientRect();
-      const dialogRect = dialog.getBoundingClientRect();
-      const originX = triggerRect.left + (triggerRect.width / 2) - dialogRect.left;
-      const originY = triggerRect.top + (triggerRect.height / 2) - dialogRect.top;
-
-      setSnapshotDialogStyle({
-        transformOrigin: `${originX}px ${originY}px`,
-      });
-    });
-
-    return () => cancelAnimationFrame(frameId);
-  }, [showConfirmDialog, prefersReducedMotion]);
 
   const currentMonthReference = useMemo(() => getItalyMonthYear(), []);
 
@@ -350,28 +338,74 @@ export default function DashboardPage() {
 
   const overview = scopedOverview ?? rawOverview;
 
-  /**
-   * Create monthly snapshot of current portfolio state.
-   *
-   * Flow:
-   * 1. Check if snapshot already exists for current month
-   * 2. If exists: Show confirmation dialog with overwrite warning
-   * 3. If not: Proceed directly to snapshot creation
-   * 4. Update Hall of Fame rankings after successful snapshot creation
-   *
-   * Snapshot includes:
-   * - Total/liquid/illiquid net worth
-   * - Asset class breakdown for historical charts
-   * - Individual asset values and prices (enables price history tracking)
-   * - Timestamp for audit trail
-   *
-   * Note: Price updates automatically fetched before snapshot creation (handled by API route).
-   * This ensures snapshot captures most recent market prices.
-   */
+  // ─── Derived metrics ──────────────────────────────────────────────────────────
+  const totalValue = overview?.metrics.totalValue ?? 0;
+  const liquidNetTotal = overview?.metrics.liquidNetTotal ?? 0;
+
+  const savingsRate = useMemo(() => {
+    if (!overview?.expenseStats) return 0;
+    const { income, expenses } = overview.expenseStats.currentMonth;
+    if (income <= 0) return 0;
+    return Math.round(((income - expenses) / income) * 100);
+  }, [overview?.expenseStats]);
+
+  // Coverage ratio (income / expenses) for RAPPORTO KPI chip.
+  const coverageRatio = useMemo(() => {
+    if (!overview?.expenseStats) return null;
+    const { income, expenses } = overview.expenseStats.currentMonth;
+    if (expenses <= 0) return null;
+    return income / expenses;
+  }, [overview?.expenseStats]);
+
+  // ─── Sparkline — last 13 points (12 months + baseline) ──────────────────────
+  const sparkline12m = useMemo(() => {
+    if (!overview?.sparklineData) return [];
+    return overview.sparklineData.slice(-13);
+  }, [overview?.sparklineData]);
+
+  // ─── Chart sections (stable memoized objects for memo isolation) ──────────────
+  // Liquidity chart removed — now shown as the hero donut in the Patrimonio Liquido card.
+  const chartSections = useMemo(() => [
+    {
+      id: 'assetClass',
+      title: 'Distribuzione per Asset Class',
+      data: (overview?.charts.assetClassData ?? []).map((d, i) => ({
+        ...d,
+        color: chartColors[i] ?? d.color,
+      })),
+    },
+    {
+      id: 'asset',
+      title: 'Distribuzione per Asset',
+      data: (overview?.charts.assetData ?? []).map((d, i) => ({
+        ...d,
+        color: chartColors[i] ?? d.color,
+      })),
+    },
+  ] as const, [overview, chartColors]);
+
+  // ─── Dialog position animation ────────────────────────────────────────────────
+  useEffect(() => {
+    if (!showConfirmDialog || prefersReducedMotion) {
+      setSnapshotDialogStyle(undefined);
+      return;
+    }
+    const frameId = requestAnimationFrame(() => {
+      const trigger = snapshotButtonRef.current;
+      const dialog = snapshotDialogRef.current;
+      if (!trigger || !dialog) { setSnapshotDialogStyle(undefined); return; }
+      const triggerRect = trigger.getBoundingClientRect();
+      const dialogRect = dialog.getBoundingClientRect();
+      const originX = triggerRect.left + triggerRect.width / 2 - dialogRect.left;
+      const originY = triggerRect.top + triggerRect.height / 2 - dialogRect.top;
+      setSnapshotDialogStyle({ transformOrigin: `${originX}px ${originY}px` });
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [showConfirmDialog, prefersReducedMotion]);
+
+  // ─── Snapshot handlers ────────────────────────────────────────────────────────
   const handleCreateSnapshot = async () => {
     if (!user) return;
-
-    // Check if snapshot for current month already exists (prevent accidental duplicates)
     try {
       if (rawOverview?.flags.currentMonthSnapshotExists) {
         setShowConfirmDialog(true);
@@ -384,53 +418,16 @@ export default function DashboardPage() {
     }
   };
 
-  /**
-   * Execute snapshot creation and handle UI feedback.
-   *
-   * Uses React Query mutation hook for:
-   * - Automatic loading states (tracked in createSnapshotMutation.isLoading)
-   * - Cache invalidation (triggers automatic re-fetch of snapshots list)
-   * - Error handling with retry logic (built into React Query)
-   *
-   * Side effects:
-   * - Updates Hall of Fame rankings (non-critical, failure doesn't stop flow)
-   * - Toast notifications for user feedback (loading → success/error)
-   * - Cache invalidation triggers re-render with new snapshot data
-   *
-   * @mutates Firestore: Creates new snapshot document in user's snapshots collection
-   * @mutates Cache: Invalidates snapshots query to trigger automatic refetch
-   */
   const createSnapshot = async () => {
     if (!user) return;
-
     try {
       setCreatingSnapshot(true);
       setShowConfirmDialog(false);
-
-      // Show loading toast with unique ID for later dismissal
-      toast.loading('Aggiornamento prezzi e creazione snapshot...', {
-        id: 'snapshot-creation',
-      });
-
-      // Use mutation hook to create snapshot (handles API call + cache invalidation)
+      toast.loading('Aggiornamento prezzi e creazione snapshot...', { id: 'snapshot-creation' });
       const result = await createSnapshotMutation.mutateAsync({});
-
-      // Dismiss loading toast
       toast.dismiss('snapshot-creation');
-
       toast.success(result.message);
-
-      // Update Hall of Fame after successful snapshot creation.
-      // This is non-critical: failure doesn't block user flow or show error.
-      // Hall of Fame can be manually recalculated from Hall of Fame page if needed.
-      try {
-        await updateHallOfFame(user.uid);
-      } catch (error) {
-        console.error('Error updating Hall of Fame:', error);
-        // Don't show error to user - Hall of Fame update is non-critical
-      }
-
-      // React Query automatically refetches snapshots via cache invalidation in the mutation hook
+      try { await updateHallOfFame(user.uid); } catch { /* non-critical */ }
     } catch (error) {
       console.error('Error creating snapshot:', error);
       toast.dismiss('snapshot-creation');
@@ -440,57 +437,74 @@ export default function DashboardPage() {
     }
   };
 
-  // Chart sections are stable memoized objects so OverviewChartsSection's memo
-  // shallowly compares them without re-rendering during non-chart state updates.
-  const chartSections = useMemo(() => [
-    {
-      id: 'assetClass',
-      title: 'Distribuzione per Asset Class',
-      data: overview?.charts.assetClassData ?? [],
-    },
-    {
-      id: 'asset',
-      title: 'Distribuzione per Asset',
-      // Colors come from the server-cached service; remap here so theme changes
-      // take effect immediately without invalidating the React Query cache.
-      data: (overview?.charts.assetData ?? []).map((d, i) => ({
-        ...d,
-        color: chartColors[i] ?? d.color,
-      })),
-    },
-    {
-      id: 'liquidity',
-      title: 'Liquidità Portfolio',
-      data: overview?.charts.liquidityData ?? [],
-    },
-  ] as const, [overview, chartColors]);
-
+  // ─── Loading skeleton ─────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className="space-y-4 max-desktop:portrait:pb-20">
+        <div className="pb-4 border-b border-border">
+          <div className="h-3 w-20 bg-muted rounded animate-pulse mb-2" />
+          <div className="h-8 w-56 bg-muted rounded animate-pulse mb-2" />
+          <div className="h-4 w-44 bg-muted rounded animate-pulse" />
+        </div>
+        {/* Hero + Liquid skeleton */}
+        <div className="grid gap-4 desktop:grid-cols-[2fr_1fr]">
+          <div className="rounded-2xl border border-border bg-card p-[22px]">
+            <div className="h-3 w-40 bg-muted rounded animate-pulse mb-3" />
+            <div className="h-12 w-52 bg-muted rounded animate-pulse mb-4" />
+            <div className="flex gap-1.5 mb-3">
+              <div className="h-6 w-40 bg-muted rounded animate-pulse" />
+              <div className="h-6 w-28 bg-muted rounded animate-pulse" />
+            </div>
+            <div className="h-[68px] bg-muted rounded animate-pulse mb-2" />
+            <div className="h-7 bg-muted rounded animate-pulse" />
+          </div>
+          <div className="rounded-2xl border border-border bg-card p-[22px]">
+            <div className="h-3 w-32 bg-muted rounded animate-pulse mb-3" />
+            <div className="h-8 w-36 bg-muted rounded animate-pulse mb-4" />
+            <div className="space-y-2">
+              <div className="h-4 bg-muted rounded animate-pulse" />
+              <div className="h-4 bg-muted rounded animate-pulse" />
+              <div className="h-4 bg-muted rounded animate-pulse" />
+              <div className="h-4 bg-muted rounded animate-pulse" />
+            </div>
+          </div>
+        </div>
+        {/* Cashflow skeleton */}
+        <div className="rounded-2xl border border-border bg-card p-[22px]">
+          <div className="h-3 w-36 bg-muted rounded animate-pulse mb-4" />
+          <div className="grid grid-cols-2 desktop:grid-cols-4 gap-3 mb-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="rounded-xl bg-muted p-3 h-16 animate-pulse" />
+            ))}
+          </div>
+          <div className="h-3 bg-muted rounded animate-pulse mb-3" />
+          <div className="grid desktop:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              {[...Array(3)].map((_, i) => <div key={i} className="h-6 bg-muted rounded animate-pulse" />)}
+            </div>
+            <div className="space-y-2">
+              {[...Array(3)].map((_, i) => <div key={i} className="h-6 bg-muted rounded animate-pulse" />)}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
+  // ─── Render ───────────────────────────────────────────────────────────────────
   return (
-    // pb-20 on portrait mobile compensates for the BottomNavigation bar (h-16 = 64px)
     <motion.div
       layout="position"
       transition={springLayoutTransition}
-      className="space-y-6 max-desktop:portrait:pb-20"
+      className="space-y-4 max-desktop:portrait:pb-20"
     >
-      {/* Header — greeting text anchors the page; "Crea Snapshot" is the only primary
-          action on this view so it gets full emphasis. A bottom border separates the
-          editorial header zone from the data grid that follows. */}
+      {/* ── PAGE HEADER ── */}
       <div className="pb-4 border-b border-border">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Panoramica</p>
             <h1 className="text-2xl font-bold text-foreground sm:text-3xl">{greeting.label}</h1>
-            <p className="mt-1 text-muted-foreground sm:mt-2">
-              {greeting.subtitle}
-            </p>
+            <p className="mt-1 text-muted-foreground sm:mt-2">{greeting.subtitle}</p>
           </div>
           {householdEnabled && (
             <HouseholdScopeSelect
@@ -520,447 +534,523 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Hero KPI row — Patrimonio Totale Lordo is the single most important number
-          on the dashboard. Full-width, larger type, left-accent border communicate
-          primary status without adding decoration. The two secondary KPIs follow
-          in a 2-col row, visually subordinate by smaller font and narrower cards. */}
+      {/* ── HERO + LIQUID — desktop: 2/3 + 1/3 grid ── */}
       <motion.section
         layout="position"
         transition={springLayoutTransition}
         variants={staggerContainer}
         initial="hidden"
         animate="visible"
-        className="space-y-4"
       >
+        <div className="grid gap-4 desktop:grid-cols-[2fr_1fr]">
 
-        {/* Hero card — full-width, dominant number */}
-        <motion.div
-          layout="position"
-          transition={springLayoutTransition}
-          variants={heroMetricSettle}
-        >
-          <Card className="border-l-4 border-l-primary">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Patrimonio Totale Lordo</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {/* animateOnMount=true — hero is the primary KPI, animates once on load.
-                  onSettled triggers heroSettled so OverviewChartsSection can schedule
-                  chart mount via requestIdleCallback after the animation completes. */}
-              <OverviewAnimatedCurrency
-                value={overview?.metrics.totalValue ?? 0}
-                animateOnMount={true}
-                onSettled={handleHeroSettled}
-                className="text-3xl font-bold desktop:text-4xl"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                {(overview?.flags.assetCount ?? 0) === 0
-                  ? 'Aggiungi assets per iniziare'
-                  : `${overview?.flags.assetCount ?? 0} asset${(overview?.flags.assetCount ?? 0) !== 1 ? 's' : ''}`}
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Secondary KPI row — 2-col at sm+; these contextualize the hero number */}
-        <motion.div
-          layout="position"
-          transition={springLayoutTransition}
-          className="grid gap-4 sm:grid-cols-2"
-        >
-          <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
-            <Card className="h-full">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Patrimonio Liquido Lordo</CardTitle>
-                <Wallet className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <OverviewAnimatedCurrency
-                  value={overview?.metrics.liquidNetWorth ?? 0}
-                  animateOnMount={true}
-                  startDelay={105}
-                  duration={390}
-                  className="text-2xl font-bold"
-                />
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
-            <Card className="h-full">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Numero Assets</CardTitle>
-                <PieChart className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <OverviewAnimatedCurrency
-                  value={overview?.flags.assetCount ?? 0}
-                  animateOnMount={true}
-                  format="integer"
-                  startDelay={105}
-                  duration={390}
-                  className="text-2xl font-bold"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {(overview?.flags.assetCount ?? 0) === 0 ? 'Nessun asset presente' : 'Asset in portafoglio'}
+          {/* Hero Card */}
+          <motion.div layout="position" transition={springLayoutTransition} variants={heroMetricSettle}>
+            <Card className="rounded-2xl overflow-hidden h-full">
+              <CardContent className="p-[22px] flex flex-col h-full">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground mb-2">
+                  Patrimonio Totale Lordo
                 </p>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </motion.div>
 
-      </motion.section>
+                {/* Animated number */}
+                <OverviewAnimatedCurrency
+                  value={totalValue}
+                  animateOnMount={true}
+                  onSettled={handleHeroSettled}
+                  className="text-[44px] font-bold font-mono tracking-[-0.03em] desktop:text-[54px]"
+                />
 
-      {/* Cost Basis Cards - only show if any asset has cost basis tracking */}
-      <AnimatePresence initial={false} mode="popLayout">
-        {overview?.flags.hasCostBasisTracking && (
-          <motion.div
-            key="cost-basis-section"
-            layout
-            transition={springLayoutTransition}
-            variants={slideDown}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            className="space-y-6"
-          >
-            {/* Net Worth Cards */}
-            <motion.div
-              layout="position"
-              transition={springLayoutTransition}
-              variants={staggerContainer}
-              initial="hidden"
-              animate="visible"
-              className="grid gap-6 md:grid-cols-2"
-            >
-              <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Patrimonio Totale Netto</CardTitle>
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    {/* animateOnMount=true — second primary KPI per step-2 spec.
-                        No onSettled here; hero (Lordo) already drives the settled signal. */}
-                    <OverviewAnimatedCurrency
-                      value={overview.metrics.netTotal}
-                      animateOnMount={true}
-                      startDelay={125}
-                      duration={380}
-                      className="text-2xl font-bold text-blue-600"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Dopo tasse stimate
-                    </p>
-                  </CardContent>
-                </Card>
-              </motion.div>
+                {/* Variation chips */}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {overview?.variations.monthly && (
+                    <span className={cn(
+                      'inline-flex items-center gap-2 rounded-[9px] px-[13px] py-[6px]',
+                      'text-[15px] font-semibold font-mono tracking-[-0.01em]',
+                      overview.variations.monthly.value >= 0
+                        ? 'bg-green-500/10 text-green-500 dark:text-green-400'
+                        : 'bg-red-500/10 text-red-500 dark:text-red-400'
+                    )}>
+                      {overview.variations.monthly.value >= 0
+                        ? <TrendingUp className="h-[13px] w-[13px]" />
+                        : <TrendingDown className="h-[13px] w-[13px]" />
+                      }
+                      {overview.variations.monthly.value >= 0 ? '+' : ''}
+                      {formatCurrency(overview.variations.monthly.value)}{' '}
+                      ({overview.variations.monthly.percentage >= 0 ? '+' : ''}
+                      {overview.variations.monthly.percentage.toFixed(2)}%) questo mese
+                    </span>
+                  )}
+                  {overview?.variations.yearly && (
+                    <span className={cn(
+                      'inline-flex items-center gap-2 rounded-[9px] px-[13px] py-[6px]',
+                      'text-[15px] font-semibold font-mono tracking-[-0.01em]',
+                      overview.variations.yearly.value >= 0
+                        ? 'bg-green-500/10 text-green-500 dark:text-green-400'
+                        : 'bg-red-500/10 text-red-500 dark:text-red-400'
+                    )}>
+                      {overview.variations.yearly.value >= 0
+                        ? <TrendingUp className="h-[13px] w-[13px]" />
+                        : <TrendingDown className="h-[13px] w-[13px]" />
+                      }
+                      {overview.variations.yearly.value >= 0 ? '+' : ''}
+                      {formatCurrency(overview.variations.yearly.value)}{' '}
+                      ({overview.variations.yearly.percentage >= 0 ? '+' : ''}
+                      {overview.variations.yearly.percentage.toFixed(2)}%) YTD
+                    </span>
+                  )}
+                </div>
 
-              <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Patrimonio Liquido Netto</CardTitle>
-                    <Wallet className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <OverviewAnimatedCurrency
-                      value={overview.metrics.liquidNetTotal}
-                      animateOnMount={true}
-                      startDelay={140}
-                      duration={380}
-                      className="text-2xl font-bold text-blue-600"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Liquidità dopo tasse stimate
-                    </p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            </motion.div>
-
-            {/* Gains and Taxes Cards */}
-            <motion.div
-              layout="position"
-              transition={springLayoutTransition}
-              variants={staggerContainer}
-              initial="hidden"
-              animate="visible"
-              className="grid gap-6 md:grid-cols-2"
-            >
-              <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Plusvalenze Non Realizzate</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className={`text-2xl font-bold ${
-                      overview.metrics.unrealizedGains >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {overview.metrics.unrealizedGains >= 0 ? '+' : ''}
-                      <OverviewAnimatedCurrency
-                        value={overview.metrics.unrealizedGains}
-                        animateOnMount={true}
-                        startDelay={155}
-                        duration={380}
+                {/* Area sparkline — last 12 months, edge-to-edge via -mx-[22px] */}
+                {sparkline12m.length >= 2 && (
+                  <>
+                    <div className="-mx-[22px] mt-3" style={{ height: 68 }}>
+                      <NetWorthSparkline
+                        data={sparkline12m}
+                        filled={true}
+                        color="var(--chart-1)"
+                        height={68}
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Guadagno/perdita rispetto al costo medio
-                    </p>
-                  </CardContent>
-                </Card>
-              </motion.div>
+                    <div className="flex justify-between mt-1 mb-3 px-px text-[10px] text-muted-foreground font-mono">
+                      <span>{cachedFormatCurrencyEUR(sparkline12m[0].totalNetWorth, true)}</span>
+                      <span>{cachedFormatCurrencyEUR(sparkline12m[sparkline12m.length - 1].totalNetWorth, true)}</span>
+                    </div>
+                  </>
+                )}
 
-              <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Tasse Stimate</CardTitle>
-                    <Receipt className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <OverviewAnimatedCurrency
-                      value={overview.metrics.estimatedTaxes}
-                      animateOnMount={true}
-                      startDelay={170}
-                      duration={380}
-                      className="text-2xl font-bold text-orange-600"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Imposte su plusvalenze non realizzate
-                    </p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                <p className="text-[11px] text-muted-foreground mt-2.5">
+                  {(overview?.flags.assetCount ?? 0) === 0
+                    ? 'Aggiungi asset per iniziare'
+                    : `${overview?.flags.assetCount ?? 0} asset in portafoglio`}
+                </p>
 
-      {/* Secondary metrics group — tighter internal spacing (space-y-4) vs the
-          space-y-6 page-level gap groups these three clusters visually together,
-          subordinating them to the hero above and the composition zone below */}
-      <motion.div
-        layout="position"
-        transition={springLayoutTransition}
-        className="space-y-4"
-      >
-
-      {/* Variazioni Cards */}
-      <motion.div
-        layout="position"
-        transition={springLayoutTransition}
-        variants={staggerContainer}
-        initial="hidden"
-        animate="visible"
-        className="grid gap-6 md:grid-cols-2"
-      >
-        <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Variazione Mensile</CardTitle>
-            {overview?.variations.monthly && overview.variations.monthly.value < 0
-              ? <TrendingDown className="h-4 w-4 text-red-500" />
-              : <TrendingUp className="h-4 w-4 text-green-500" />
-            }
-          </CardHeader>
-          <CardContent>
-            {overview?.variations.monthly ? (
-              <>
-                <div className={`text-2xl font-bold ${
-                  overview.variations.monthly.value >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {overview.variations.monthly.value >= 0 ? '+' : ''}{formatCurrency(overview.variations.monthly.value)}
-                </div>
-                <p className={`text-xs ${
-                  overview.variations.monthly.percentage >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {overview.variations.monthly.percentage >= 0 ? '+' : ''}{overview.variations.monthly.percentage.toFixed(2)}%
-                </p>
-              </>
-            ) : (
-              <>
-                <div className="text-2xl font-bold">-</div>
-                <p className="text-xs text-muted-foreground">
-                  Dati non disponibili
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-        </motion.div>
-
-        <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Variazione Annuale (YTD)</CardTitle>
-            {overview?.variations.yearly && overview.variations.yearly.value < 0
-              ? <TrendingDown className="h-4 w-4 text-red-500" />
-              : <TrendingUp className="h-4 w-4 text-green-500" />
-            }
-          </CardHeader>
-          <CardContent>
-            {overview?.variations.yearly ? (
-              <>
-                <div className={`text-2xl font-bold ${
-                  overview.variations.yearly.value >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {overview.variations.yearly.value >= 0 ? '+' : ''}{formatCurrency(overview.variations.yearly.value)}
-                </div>
-                <p className={`text-xs ${
-                  overview.variations.yearly.percentage >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {overview.variations.yearly.percentage >= 0 ? '+' : ''}{overview.variations.yearly.percentage.toFixed(2)}%
-                </p>
-              </>
-            ) : (
-              <>
-                <div className="text-2xl font-bold">-</div>
-                <p className="text-xs text-muted-foreground">
-                  Dati non disponibili
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-        </motion.div>
-      </motion.div>
-
-      {/* Expense Stats Cards */}
-      <motion.div
-        layout="position"
-        transition={springLayoutTransition}
-        variants={staggerContainer}
-        initial="hidden"
-        animate="visible"
-        className="grid gap-6 md:grid-cols-2"
-      >
-        <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Entrate Questo Mese</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            {overview?.expenseStats ? (
-              <>
-                <div className="text-2xl font-bold text-green-600">
-                  {formatCurrency(overview.expenseStats.currentMonth.income)}
-                </div>
-                <p className={`text-xs ${
-                  overview.expenseStats.delta.income >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {overview.expenseStats.delta.income >= 0 ? '+' : ''}{overview.expenseStats.delta.income.toFixed(1)}% dal mese scorso
-                </p>
-              </>
-            ) : (
-              <>
-                <div className="text-2xl font-bold">€0,00</div>
-                <p className="text-xs text-muted-foreground">Nessun dato</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-        </motion.div>
-
-        <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Spese Questo Mese</CardTitle>
-            <TrendingDown className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            {overview?.expenseStats ? (
-              <>
-                <div className="text-2xl font-bold text-red-600">
-                  {formatCurrency(overview.expenseStats.currentMonth.expenses)}
-                </div>
-                <p className={`text-xs ${
-                  overview.expenseStats.delta.expenses >= 0 ? 'text-red-600' : 'text-green-600'
-                }`}>
-                  {overview.expenseStats.delta.expenses >= 0 ? '+' : ''}{overview.expenseStats.delta.expenses.toFixed(1)}% dal mese scorso
-                </p>
-              </>
-            ) : (
-              <>
-                <div className="text-2xl font-bold">€0,00</div>
-                <p className="text-xs text-muted-foreground">Nessun dato</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-        </motion.div>
-      </motion.div>
-
-      {/* Cost cards — shown if any asset has TER tracking or stamp duty is enabled */}
-      <AnimatePresence initial={false} mode="popLayout">
-        {(overview?.flags.hasTERTracking || overview?.flags.hasStampDuty) && (
-        <motion.div
-          key="cost-cards"
-          layout
-          transition={springLayoutTransition}
-          variants={staggerContainer}
-          initial="hidden"
-          animate="visible"
-          exit="exit"
-          className="grid gap-6 md:grid-cols-2"
-        >
-          {overview?.flags.hasTERTracking && (
-            <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
-            <Card className="h-full">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">TER Portfolio</CardTitle>
-                <Receipt className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-purple-600">
-                  {overview.metrics.portfolioTER.toFixed(2)}%
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Total Expense Ratio medio ponderato
-                </p>
+                {/* ── TER + Costo Annuale — desktop only, pinned to bottom of hero card ── */}
+                {(overview?.flags.hasTERTracking || overview?.flags.hasStampDuty) && (() => {
+                  const annualTotal = (overview.metrics.annualPortfolioCost ?? 0) + (overview.metrics.annualStampDuty ?? 0);
+                  const bothPresent = overview.flags.hasTERTracking && overview.flags.hasStampDuty;
+                  return (
+                    <div className="hidden desktop:grid grid-cols-2 gap-4 mt-auto pt-4 border-t border-border">
+                      {overview.flags.hasTERTracking && (
+                        <div>
+                          <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground mb-2">
+                            TER Medio Ponderato
+                          </p>
+                          <p className="text-[28px] font-bold font-mono tabular-nums tracking-[-0.03em] text-foreground leading-none">
+                            {overview.metrics.portfolioTER.toFixed(2)}%
+                          </p>
+                        </div>
+                      )}
+                      <div className={cn(!overview.flags.hasTERTracking && 'col-span-2')}>
+                        <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground mb-2">
+                          Costo Annuale Stimato
+                        </p>
+                        <p className="text-[28px] font-bold font-mono tabular-nums tracking-[-0.03em] text-amber-500 dark:text-amber-400 leading-none">
+                          {formatCurrency(annualTotal)}
+                        </p>
+                        {bothPresent && (
+                          <div className="mt-2 pt-2 border-t border-border divide-y divide-border">
+                            <div className="flex justify-between py-[4px] text-[11px]">
+                              <span className="text-muted-foreground">Costi di gestione (TER)</span>
+                              <span className="font-mono tabular-nums text-foreground">
+                                {formatCurrency(overview.metrics.annualPortfolioCost)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between py-[4px] text-[11px]">
+                              <span className="text-muted-foreground">Imposta di bollo</span>
+                              <span className="font-mono tabular-nums text-foreground">
+                                {formatCurrency(overview.metrics.annualStampDuty)}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
-            </motion.div>
-          )}
+          </motion.div>
 
+          {/* ── LIQUID CARD — redesigned: flat 3-row breakdown ── */}
+          <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
+            <Card className="rounded-2xl h-full">
+              <CardContent className="p-[22px]">
+                <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-muted-foreground mb-2">
+                  Sintesi Patrimoniale
+                </p>
+
+                {/* 3-row breakdown + Patrimonio Totale Lordo footer */}
+                <div className="pt-3 border-t border-border divide-y divide-border">
+                  {[
+                    {
+                      label: 'Liquidità',
+                      value: overview?.metrics.cashNetWorth ?? 0,
+                      pct: totalValue > 0 ? ((overview?.metrics.cashNetWorth ?? 0) / totalValue) * 100 : 0,
+                    },
+                    {
+                      label: 'Investimenti Liquidabili',
+                      value: overview?.metrics.liquidInvestmentsNetWorth ?? 0,
+                      pct: totalValue > 0 ? ((overview?.metrics.liquidInvestmentsNetWorth ?? 0) / totalValue) * 100 : 0,
+                    },
+                    {
+                      label: 'Investimenti Illiquidi',
+                      value: overview?.metrics.illiquidNetWorth ?? 0,
+                      pct: totalValue > 0 ? ((overview?.metrics.illiquidNetWorth ?? 0) / totalValue) * 100 : 0,
+                    },
+                  ].map(row => (
+                    <div key={row.label} className="flex items-center justify-between py-[7px]">
+                      <span className="text-[14px] text-muted-foreground">{row.label}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[14px] font-mono tabular-nums text-foreground">
+                          {cachedFormatCurrencyEUR(row.value)}
+                        </span>
+                        <span className="text-[12px] font-mono tabular-nums text-muted-foreground w-[42px] text-right">
+                          {row.pct.toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Bottom row: Patrimonio Totale Lordo (bold) */}
+                  <div className="flex items-center justify-between py-[7px]">
+                    <span className="text-[14px] font-semibold text-foreground">Patrimonio Totale Lordo</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[14px] font-bold font-mono tabular-nums text-foreground">
+                        {cachedFormatCurrencyEUR(totalValue)}
+                      </span>
+                      <span className="text-[12px] font-mono tabular-nums text-muted-foreground w-[42px] text-right">
+                        100.0%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Fiscal rows — shown only when cost basis tracking is enabled ── */}
+                {overview?.flags.hasCostBasisTracking && overview.metrics && (
+                  <div className="mt-3 pt-3 border-t border-border divide-y divide-border">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground pb-2">
+                      Impatto Fiscale
+                    </p>
+                    {[
+                      {
+                        label: 'Plusvalenze Non Realizzate',
+                        value: overview.metrics.unrealizedGains,
+                        className: overview.metrics.unrealizedGains >= 0
+                          ? 'text-green-500 dark:text-green-400'
+                          : 'text-red-500 dark:text-red-400',
+                        prefix: overview.metrics.unrealizedGains >= 0 ? '+' : '',
+                      },
+                      {
+                        label: 'Tasse Stimate',
+                        value: overview.metrics.estimatedTaxes,
+                        className: 'text-amber-500 dark:text-amber-400',
+                        prefix: '',
+                      },
+                      {
+                        label: 'Patrimonio Liquidabile Netto',
+                        value: overview.metrics.liquidNetTotal,
+                        className: 'text-foreground',
+                        prefix: '',
+                      },
+                      {
+                        label: 'Patrimonio Illiquido Netto',
+                        value: overview.metrics.netTotal - overview.metrics.liquidNetTotal,
+                        className: 'text-foreground',
+                        prefix: '',
+                      },
+                    ].map(row => (
+                      <div key={row.label} className="flex items-center justify-between py-[7px]">
+                        <span className="text-[14px] text-muted-foreground">{row.label}</span>
+                        <span className={cn('text-[14px] font-bold font-mono tabular-nums', row.className)}>
+                          {row.prefix}{cachedFormatCurrencyEUR(row.value)}
+                        </span>
+                      </div>
+                    ))}
+
+                    {/* Concluding row: Pat. Netto Totale — styled prominently as the bottom-line figure */}
+                    <div className="flex items-center justify-between py-[9px]">
+                      <span className="text-[14px] font-semibold text-foreground">Pat. Netto Totale</span>
+                      <span className="text-[14px] font-bold font-mono tabular-nums text-foreground">
+                        {cachedFormatCurrencyEUR(overview.metrics.netTotal)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+        </div>
+      </motion.section>
+
+      {/* ── TER + COSTO ANNUALE — 2-col row (both platforms) ── */}
+      {(overview?.flags.hasTERTracking || overview?.flags.hasStampDuty) && (() => {
+        const annualTotal = (overview.metrics.annualPortfolioCost ?? 0) + (overview.metrics.annualStampDuty ?? 0);
+        const bothPresent = overview.flags.hasTERTracking && overview.flags.hasStampDuty;
+        return (
           <motion.div
             layout="position"
             transition={springLayoutTransition}
             variants={cardItem}
-            className={!overview?.flags.hasTERTracking ? 'md:col-span-2' : ''}
+            initial="hidden"
+            animate="visible"
+            className="grid grid-cols-2 gap-4 desktop:hidden"
           >
-          <Card className="h-full">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Costo Annuale Portfolio</CardTitle>
-              <TrendingDown className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">
-                {formatCurrency(overview.metrics.annualPortfolioCost + overview.metrics.annualStampDuty)}
-              </div>
-              {overview.flags.hasTERTracking && overview.flags.hasStampDuty ? (
-                <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
-                  <div>TER: {formatCurrency(overview.metrics.annualPortfolioCost)}</div>
-                  <div>Bollo: {formatCurrency(overview.metrics.annualStampDuty)}</div>
+            {/* TER medio */}
+            {overview.flags.hasTERTracking && (
+              <div className="bg-card border border-border rounded-2xl p-5 flex flex-col justify-between">
+                <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                  TER Medio Ponderato
+                </span>
+                <div>
+                  <p className="text-[32px] font-bold font-mono tabular-nums tracking-[-0.03em] text-foreground leading-none mt-3">
+                    {overview.metrics.portfolioTER.toFixed(2)}%
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-2">
+                    Total Expense Ratio medio ponderato
+                  </p>
                 </div>
-              ) : overview.flags.hasTERTracking ? (
-                <p className="text-xs text-muted-foreground">Costi di gestione annuali stimati</p>
-              ) : (
-                <p className="text-xs text-muted-foreground">Imposta di bollo annuale stimata</p>
-              )}
+              </div>
+            )}
+
+            {/* Costo annuale */}
+            <div className={cn(
+              'bg-card border border-border rounded-2xl p-5 flex flex-col justify-between',
+              !overview.flags.hasTERTracking && 'col-span-2'
+            )}>
+              <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                Costo Annuale Stimato
+              </span>
+              <div>
+                <p className="text-[32px] font-bold font-mono tabular-nums tracking-[-0.03em] text-amber-500 dark:text-amber-400 leading-none mt-3">
+                  {formatCurrency(annualTotal)}
+                </p>
+                {bothPresent && (
+                  <div className="mt-3 pt-3 border-t border-border space-y-0 divide-y divide-border">
+                    <div className="flex justify-between py-[5px] text-[11px]">
+                      <span className="text-muted-foreground">Costi di gestione (TER)</span>
+                      <span className="font-mono tabular-nums text-foreground">
+                        {formatCurrency(overview.metrics.annualPortfolioCost)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-[5px] text-[11px]">
+                      <span className="text-muted-foreground">Imposta di bollo</span>
+                      <span className="font-mono tabular-nums text-foreground">
+                        {formatCurrency(overview.metrics.annualStampDuty)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {!bothPresent && (
+                  <p className="text-[10px] text-muted-foreground mt-2">
+                    {overview.flags.hasTERTracking ? 'Costi di gestione annuali stimati' : 'Imposta di bollo annuale stimata'}
+                  </p>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        );
+      })()}
+
+      {/* ── CASHFLOW CARD — full-width, unified for mobile + desktop ── */}
+      {overview?.expenseStats && (() => {
+        const { income, expenses, net } = overview.expenseStats.currentMonth;
+        const { income: incomeDelta, expenses: expensesDelta } = overview.expenseStats.delta;
+        const { month: italyMonth, year: italyYear } = getItalyMonthYear();
+        const monthLabel = `${MONTH_NAMES_IT[italyMonth - 1].toUpperCase()} ${italyYear}`;
+        const ratio = coverageRatio;
+
+        // Category bar color: chart-1 for expenses (blue-ish), chart-2 for income (green-ish).
+        const expenseColor = chartColors[0] || 'var(--chart-1)';
+        const incomeColor = chartColors[1] || 'var(--chart-2)';
+
+        return (
+          <motion.div
+            layout="position"
+            transition={springLayoutTransition}
+            variants={cardItem}
+            initial="hidden"
+            animate="visible"
+          >
+            <Card className="rounded-2xl">
+              <CardContent className="p-[22px]">
+                {/* Header */}
+                <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground mb-3">
+                  Cashflow · {monthLabel}
+                </p>
+
+                {/* 4 KPI chips */}
+                <div className="grid grid-cols-2 desktop:grid-cols-4 gap-3">
+                  {/* ENTRATE */}
+                  <div className="bg-muted/40 rounded-xl p-3.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-1.5">
+                      Entrate
+                    </p>
+                    <p className="text-[22px] font-bold font-mono tabular-nums text-green-500 dark:text-green-400 leading-none">
+                      {cachedFormatCurrencyEUR(income, true)}
+                    </p>
+                    {(() => {
+                      const pos = incomeDelta >= 0;
+                      return (
+                        <p className={cn('text-[12px] font-mono mt-1.5', pos ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400')}>
+                          {pos ? '+' : ''}{incomeDelta.toFixed(1)}% vs mese scorso
+                        </p>
+                      );
+                    })()}
+                  </div>
+
+                  {/* SPESE */}
+                  <div className="bg-muted/40 rounded-xl p-3.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-1.5">
+                      Spese
+                    </p>
+                    <p className="text-[22px] font-bold font-mono tabular-nums text-red-500 dark:text-red-400 leading-none">
+                      {cachedFormatCurrencyEUR(expenses, true)}
+                    </p>
+                    {(() => {
+                      // For expenses: +% is negative (spent more) → red
+                      const pos = expensesDelta >= 0;
+                      return (
+                        <p className={cn('text-[12px] font-mono mt-1.5', pos ? 'text-red-500 dark:text-red-400' : 'text-green-500 dark:text-green-400')}>
+                          {pos ? '+' : ''}{expensesDelta.toFixed(1)}% vs mese scorso
+                        </p>
+                      );
+                    })()}
+                  </div>
+
+                  {/* RISPARMIO */}
+                  <div className="bg-muted/40 rounded-xl p-3.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-1.5">
+                      Risparmio
+                    </p>
+                    <p className={cn(
+                      'text-[22px] font-bold font-mono tabular-nums leading-none',
+                      net >= 0 ? 'text-foreground' : 'text-red-500 dark:text-red-400'
+                    )}>
+                      {cachedFormatCurrencyEUR(net, true)}
+                    </p>
+                    {income > 0 && (
+                      <p className="text-[12px] text-muted-foreground mt-1.5">
+                        {savingsRate}% del reddito
+                      </p>
+                    )}
+                  </div>
+
+                  {/* RAPPORTO */}
+                  <div className="bg-muted/40 rounded-xl p-3.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-1.5">
+                      Rapporto
+                    </p>
+                    <p className="text-[22px] font-bold font-mono tabular-nums text-foreground leading-none">
+                      {ratio !== null ? `${ratio.toFixed(2)}×` : '—'}
+                    </p>
+                    {ratio !== null && (
+                      <p className="text-[12px] text-muted-foreground mt-1.5">
+                        {coverageHealthLabel(ratio)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Category breakdowns — only shown when there is data */}
+                {(overview.expenseStats.topExpenseCategories.length > 0 || overview.expenseStats.topIncomeCategories.length > 0) && (
+                  <>
+                    <div className="mt-4 border-t border-border" />
+                    <div className="grid desktop:grid-cols-2 gap-x-8 gap-y-4 mt-4">
+
+                      {/* SPESE PER CATEGORIA */}
+                      {overview.expenseStats.topExpenseCategories.length > 0 && (
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-3">
+                            Spese per Categoria
+                          </p>
+                          <div className="space-y-3">
+                            {overview.expenseStats.topExpenseCategories.map(cat => (
+                              <div key={cat.category} className="space-y-1">
+                                <div className="flex justify-between items-center">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: expenseColor }} />
+                                    <span className="text-[13px] text-foreground truncate">{cat.category}</span>
+                                  </div>
+                                  <span className="text-[13px] font-mono tabular-nums text-foreground ml-3 flex-shrink-0">
+                                    {cachedFormatCurrencyEUR(cat.amount, true)}
+                                  </span>
+                                </div>
+                                <div className="h-[3px] bg-muted rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full"
+                                    style={{ width: `${cat.percentage}%`, background: expenseColor }}
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ENTRATE PER CATEGORIA */}
+                      {overview.expenseStats.topIncomeCategories.length > 0 && (
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-3">
+                            Entrate per Categoria
+                          </p>
+                          <div className="space-y-3">
+                            {overview.expenseStats.topIncomeCategories.map(cat => (
+                              <div key={cat.category} className="space-y-1">
+                                <div className="flex justify-between items-center">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: incomeColor }} />
+                                    <span className="text-[13px] text-foreground truncate">{cat.category}</span>
+                                  </div>
+                                  <span className="text-[13px] font-mono tabular-nums text-foreground ml-3 flex-shrink-0">
+                                    {cachedFormatCurrencyEUR(cat.amount, true)}
+                                  </span>
+                                </div>
+                                <div className="h-[3px] bg-muted rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full"
+                                    style={{ width: `${cat.percentage}%`, background: incomeColor }}
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        );
+      })()}
+
+      {/* No cashflow data fallback */}
+      {!overview?.expenseStats && (
+        <motion.div
+          layout="position"
+          transition={springLayoutTransition}
+          variants={cardItem}
+          initial="hidden"
+          animate="visible"
+        >
+          <Card className="rounded-2xl">
+            <CardContent className="p-[22px]">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground mb-3">
+                Cashflow
+              </p>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Receipt className="h-4 w-4" />
+                <span>Nessun dato questo mese</span>
+              </div>
             </CardContent>
           </Card>
-          </motion.div>
         </motion.div>
-        )}
-      </AnimatePresence>
+      )}
 
-      </motion.div>
-
-      {/* Composition charts — isolated in a memoized subtree so count-up re-renders
-          in OverviewAnimatedCurrency leaf nodes never reach this section. */}
+      {/* ── CHARTS SECTION ── */}
       <OverviewChartsSection
         sections={chartSections}
         heroSettled={heroSettled}
@@ -968,13 +1058,11 @@ export default function DashboardPage() {
         prefersReducedMotion={!!prefersReducedMotion}
       />
 
-      {/* Confirm Dialog */}
+      {/* ── SNAPSHOT CONFIRM DIALOG ── */}
       <Dialog
         open={showConfirmDialog}
-        onOpenChange={(nextOpen: boolean) => {
-          if (!nextOpen) {
-            setSnapshotDialogStyle(undefined);
-          }
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setSnapshotDialogStyle(undefined);
           setShowConfirmDialog(nextOpen);
         }}
       >
@@ -1003,17 +1091,14 @@ export default function DashboardPage() {
             >
               Annulla
             </Button>
-            <Button
-              onClick={createSnapshot}
-              disabled={creatingSnapshot}
-            >
+            <Button onClick={createSnapshot} disabled={creatingSnapshot}>
               {creatingSnapshot ? 'Creazione...' : 'Sovrascrivi'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Savings rate celebration badge — shown once per session when last month > threshold */}
+      {/* Savings rate celebration badge */}
       {overview?.expenseStats && (
         <SavingsRateBadge
           previousMonthIncome={overview.expenseStats.previousMonth.income}

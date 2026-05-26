@@ -17,14 +17,14 @@
  */
 'use client';
 
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useHouseholdScopeFilter } from '@/lib/hooks/useHouseholdScopeFilter';
 import { useInternalTransfers, useInvestmentOperations } from '@/lib/hooks/useInvestmentOperations';
-import { Expense, ExpenseCategory, EXPENSE_TYPE_LABELS } from '@/types/expenses';
+import { Expense, ExpenseCategory, EXPENSE_TYPE_LABELS, ExpenseType } from '@/types/expenses';
 import { InternalTransfer, InvestmentOperation } from '@/types/investments';
 import {
   calculateTotalIncome,
@@ -37,25 +37,41 @@ import {
 import { updateCashAssetBalance, updateInvestmentAssetQuantity } from '@/lib/services/assetService';
 import { deleteInvestmentOperation } from '@/lib/services/investmentOperationService';
 import { queryKeys } from '@/lib/query/queryKeys';
+import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
+import { toDate } from '@/lib/utils/dateHelpers';
+import {
+  filterExpensesByAttributionScope,
+  filterInternalTransfersByOwnershipScope,
+  filterInvestmentOperationsByOwnershipScope,
+} from '@/lib/utils/householdUtils';
+import { HouseholdScopeSelect } from '@/components/household/HouseholdScopeSelect';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Plus, TrendingUp, TrendingDown, Wallet, RefreshCw, Filter, ChevronDown, Scale, Check, X, ArrowRightLeft, ChartCandlestick } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Plus, Filter, ChevronDown, Check, X, Trash2, Pencil, TrendingUp, TrendingDown, ArrowRightLeft, ChartCandlestick } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ExpenseDialog } from '@/components/expenses/ExpenseDialog';
 import { ExpenseTable } from '@/components/expenses/ExpenseTable';
-import { ExpenseCard } from '@/components/expenses/ExpenseCard';
-import { HouseholdScopeSelect } from '@/components/household/HouseholdScopeSelect';
-import {
-  filterExpensesByAttributionScope,
-  filterInternalTransfersByOwnershipScope,
-  filterInvestmentOperationsByOwnershipScope,
-} from '@/lib/utils/householdUtils';
+import { Badge } from '@/components/ui/badge';
+import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { toDate } from '@/lib/utils/dateHelpers';
+import { useChartColors } from '@/lib/hooks/useChartColors';
+
+const formatCurrency = cachedFormatCurrencyEUR;
 
 const MONTHS = [
   { value: '1', label: 'Gennaio' },
@@ -72,12 +88,169 @@ const MONTHS = [
   { value: '12', label: 'Dicembre' },
 ];
 
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('it-IT', {
-    style: 'currency',
-    currency: 'EUR',
-  }).format(amount);
+// Coverage ratio → Italian health label (mirrors the same function in the dashboard overview page).
+function coverageHealthLabel(ratio: number): string {
+  if (ratio >= 2.0) return 'Salute ottima';
+  if (ratio >= 1.3) return 'Salute buona';
+  if (ratio >= 1.0) return 'In pareggio';
+  return 'In deficit';
+}
+
+// Safely coerce Expense.date (Date | Timestamp | string) to a native Date.
+const getExpenseDate = (d: Expense['date']): Date => {
+  if (d instanceof Date) return d;
+  if (typeof d === 'string') return new Date(d);
+  return (d as { toDate(): Date }).toDate();
 };
+
+// Tailwind dot-color classes keyed by expense type for the mobile list rows.
+// Uses CSS variable references so they stay theme-aware across all 6 colour themes.
+const TYPE_DOT_CLASS: Record<ExpenseType, string> = {
+  income: 'bg-green-500 dark:bg-green-400',
+  fixed: 'bg-[var(--chart-2)]',
+  variable: 'bg-[var(--chart-4)]',
+  debt: 'bg-[var(--chart-3)]',
+};
+
+// ─── MobileExpenseRow ─────────────────────────────────────────────────────────
+
+interface MobileExpenseRowProps {
+  expense: Expense;
+  isExpanded: boolean;
+  onToggleExpand: (id: string) => void;
+  onEdit: (expense: Expense) => void;
+  onDelete: (expense: Expense) => void;
+  isPendingDelete: boolean;
+  isDemo: boolean;
+}
+
+/**
+ * Flat list row for mobile expense display (Trade Republic divide-y style).
+ *
+ * Interaction pattern:
+ * - Tapping the row body toggles an inline action area (Modifica + Elimina).
+ * - Elimina reuses the parent's 2-click arm pattern — isPendingDelete drives
+ *   the visual "confirm" state; actual logic lives in the parent handler.
+ * - Complex expenses (installments/recurring) open an AlertDialog on first tap
+ *   of Elimina, so no 2-click arm is needed; the parent handles the distinction.
+ */
+function MobileExpenseRow({
+  expense,
+  isExpanded,
+  onToggleExpand,
+  onEdit,
+  onDelete,
+  isPendingDelete,
+  isDemo,
+}: MobileExpenseRowProps) {
+  const date = getExpenseDate(expense.date);
+  const isIncome = expense.type === 'income';
+
+  // "20/5" short date shown in the subtitle (no year, no zero-padding).
+  const shortDate = format(date, 'd/M');
+
+  // Subtitle: category · subcategory · date — omit subcategory when absent.
+  const subtitle = [expense.categoryName, expense.subCategoryName || null, shortDate]
+    .filter(Boolean)
+    .join(' · ');
+
+  // Title: user-entered notes take priority; fall back to category name.
+  const title = expense.notes?.trim() || expense.categoryName;
+
+  const amountLabel = `${isIncome ? '+' : ''}${cachedFormatCurrencyEUR(Math.abs(expense.amount))}`;
+
+  return (
+    <div className="py-3">
+      {/* Tappable row — shows dot, title, subtitle and amount */}
+      <button
+        type="button"
+        className="w-full flex items-center gap-3 text-left"
+        onClick={() => onToggleExpand(expense.id)}
+        aria-expanded={isExpanded}
+      >
+        {/* Type color dot */}
+        <span
+          className={cn(
+            'w-2 h-2 rounded-full flex-shrink-0',
+            TYPE_DOT_CLASS[expense.type] ?? 'bg-muted-foreground',
+          )}
+        />
+
+        {/* Title + badges + subtitle */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-[14px] font-medium text-foreground truncate">{title}</span>
+            {expense.isInstallment && expense.installmentNumber && expense.installmentTotal && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0">
+                {expense.installmentNumber}/{expense.installmentTotal}
+              </Badge>
+            )}
+            {expense.isRecurring && !expense.isInstallment && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0">
+                Ric.
+              </Badge>
+            )}
+          </div>
+          <p className="text-[12px] text-muted-foreground truncate mt-0.5">{subtitle}</p>
+        </div>
+
+        {/* Amount — green for income, red for expenses */}
+        <span
+          className={cn(
+            'text-[14px] font-bold font-mono tabular-nums flex-shrink-0',
+            isIncome
+              ? 'text-green-600 dark:text-green-400'
+              : 'text-red-600 dark:text-red-400',
+          )}
+        >
+          {amountLabel}
+        </span>
+      </button>
+
+      {/* Inline action area — animated height 0 → auto on expand */}
+      <AnimatePresence initial={false}>
+        {isExpanded && (
+          <motion.div
+            key="actions"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18, ease: 'easeInOut' }}
+            className="overflow-hidden"
+          >
+            <div className="flex gap-2 mt-3 pl-5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onEdit(expense)}
+                disabled={isDemo}
+                title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+                className="flex-1 h-9"
+              >
+                <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                Modifica
+              </Button>
+              {/* Delete: first tap arms (destructive style), second tap confirms */}
+              <Button
+                variant={isPendingDelete ? 'destructive' : 'outline'}
+                size="sm"
+                onClick={() => onDelete(expense)}
+                disabled={isDemo}
+                title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+                className="flex-1 h-9"
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                {isPendingDelete ? 'Conferma' : 'Elimina'}
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 interface ExpenseTrackingTabProps {
   allExpenses: Expense[];
@@ -95,13 +268,15 @@ type UnifiedMovement =
  * CHECKLIST: When adding new ExpenseType values:
  * 1. Update EXPENSE_TYPE_LABELS in types/expenses.ts
  * 2. Add color mapping in ExpenseCard.tsx badge colors
- * 3. Update typeOptions array in this file (line ~310)
- * 4. Add type validation in ExpenseDialog schema
+ * 3. Add dot color entry in TYPE_DOT_CLASS (above)
+ * 4. Update typeOptions array in this file
+ * 5. Add type validation in ExpenseDialog schema
  */
 export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh }: ExpenseTrackingTabProps) {
   const { user } = useAuth();
   const isDemo = useDemoMode();
   const queryClient = useQueryClient();
+  const chartColors = useChartColors();
   const { data: assets = [] } = useAssets(user?.uid);
   const { data: investmentOperations = [] } = useInvestmentOperations(user?.uid);
   const { data: internalTransfers = [] } = useInternalTransfers(user?.uid);
@@ -119,7 +294,24 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
-  const [filtersOpen, setFiltersOpen] = useState<boolean>(true);
+  const [filtersOpen, setFiltersOpen] = useState<boolean>(false);
+
+  // Tracks which mobile row is expanded (shows Modifica + Elimina actions).
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
+
+  // 2-click inline delete state
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const pendingDeleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // AlertDialog for bulk delete (installments / recurring)
+  const [bulkDeleteDialog, setBulkDeleteDialog] = useState<{
+    open: boolean;
+    expense: Expense | null;
+    mode: 'installment' | 'recurring' | null;
+  }>({ open: false, expense: null, mode: null });
+
+  // Mobile load-more state
+  const [mobileShowCount, setMobileShowCount] = useState<number>(20);
 
   // Separate state for each filter level enables independent reset logic.
   // Single state object would complicate cascading resets (Type → Category → Subcategory).
@@ -280,6 +472,18 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
     });
   }, [attributionScopedExpenses, selectedYear, selectedMonth]);
 
+  // Cleanup pending delete timer on unmount
+  useEffect(() => {
+    return () => {
+      if (pendingDeleteTimerRef.current) clearTimeout(pendingDeleteTimerRef.current);
+    };
+  }, []);
+
+  // Reset mobile show count when filters change
+  useEffect(() => {
+    setMobileShowCount(20);
+  }, [selectedYear, selectedMonth, selectedType, selectedCategoryId, selectedSubCategoryId]);
+
   /**
    * Click-outside handler for custom dropdowns
    *
@@ -306,6 +510,11 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Toggling another row collapses the previously expanded one (accordion pattern).
+  const handleToggleExpand = useCallback((id: string) => {
+    setExpandedRowId(prev => (prev === id ? null : id));
+  }, []);
+
   const handleAddExpense = () => {
     setEditingExpense(null);
     setDialogOpen(true);
@@ -327,72 +536,36 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   };
 
   /**
-   * Context-aware deletion with two-stage confirmation
-   *
-   * Three Deletion Modes:
-   *
-   * 1. INSTALLMENT EXPENSE (e.g., car payment 6/24):
-   *    First OK → Delete this installment only
-   *    Cancel then OK → Delete all 24 installments
-   *
-   * 2. RECURRING EXPENSE (e.g., Netflix subscription):
-   *    First OK → Delete this occurrence
-   *    Cancel then OK → Delete all recurring entries
-   *
-   * 3. REGULAR EXPENSE:
-   *    Single confirmation with expense details
-   *
-   * Why two-stage? Single prompt is ambiguous ("Delete" = one OR all?).
-   * Two-stage makes intent explicit, reduces accidental bulk deletion.
+   * 2-click inline delete: first click arms the button (3s disarm timer),
+   * second click executes. For installments/recurring, opens AlertDialog
+   * so the user can choose between single or bulk delete.
    */
-  const handleDeleteExpense = async (expense: Expense) => {
-    // Check if this is an installment expense
-    if (expense.isInstallment && expense.installmentParentId) {
-      const confirmMessage =
-        `Questa è la rata ${expense.installmentNumber}/${expense.installmentTotal}. Vuoi eliminare:\n\n` +
-        `[SOLO QUESTA RATA] - Solo questa rata singola\n` +
-        `[TUTTE LE RATE] - Tutte le ${expense.installmentTotal} rate\n\n` +
-        `Clicca OK per eliminare solo questa rata, Annulla per tornare indietro.`;
+  const handleDeleteExpense = useCallback((expense: Expense) => {
+    const isComplex = (expense.isInstallment && expense.installmentParentId) ||
+      (expense.isRecurring && expense.recurringParentId);
 
-      const deleteSingle = window.confirm(confirmMessage);
-
-      if (deleteSingle) {
-        await deleteSingleExpense(expense);
-      } else {
-        const deleteAll = window.confirm(`Vuoi eliminare TUTTE le ${expense.installmentTotal} rate?`);
-        if (deleteAll) {
-          await deleteAllInstallmentExpenses(expense.installmentParentId);
-        }
-      }
+    if (isComplex) {
+      // Open AlertDialog for bulk delete choice
+      const mode = expense.isInstallment ? 'installment' : 'recurring';
+      setBulkDeleteDialog({ open: true, expense, mode });
+      return;
     }
-    // Check if this is a recurring expense
-    else if (expense.isRecurring && expense.recurringParentId) {
-      const confirmMessage =
-        `Questa è una voce ricorrente. Vuoi eliminare:\n\n` +
-        `[SOLO QUESTA] - Solo questa voce singola\n` +
-        `[TUTTE] - Tutte le voci ricorrenti correlate\n\n` +
-        `Clicca OK per eliminare solo questa, Annulla per tornare indietro.`;
 
-      const deleteSingle = window.confirm(confirmMessage);
-
-      if (deleteSingle) {
-        await deleteSingleExpense(expense);
-      } else {
-        const deleteAll = window.confirm('Vuoi eliminare TUTTE le voci ricorrenti correlate?');
-        if (deleteAll) {
-          await deleteAllRecurringExpenses(expense.recurringParentId);
-        }
-      }
+    // 2-click inline for regular expenses
+    if (pendingDeleteId === expense.id) {
+      // Second click: confirm
+      if (pendingDeleteTimerRef.current) clearTimeout(pendingDeleteTimerRef.current);
+      setPendingDeleteId(null);
+      void deleteSingleExpense(expense);
     } else {
-      // Regular expense
-      const confirmDelete = window.confirm(
-        `Sei sicuro di voler eliminare questa voce?${expense.notes ? `\n\n"${expense.notes}"` : ''}`
-      );
-      if (confirmDelete) {
-        await deleteSingleExpense(expense);
-      }
+      // First click: arm
+      if (pendingDeleteTimerRef.current) clearTimeout(pendingDeleteTimerRef.current);
+      setPendingDeleteId(expense.id);
+      pendingDeleteTimerRef.current = setTimeout(() => {
+        setPendingDeleteId(null);
+      }, 3000);
     }
-  };
+  }, [pendingDeleteId]);
 
   const deleteSingleExpense = async (expense: Expense) => {
     try {
@@ -641,25 +814,117 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   const netBalance = calculateNetBalance(filteredExpenses);
   const incomeExpenseRatio = calculateIncomeExpenseRatio(filteredExpenses);
 
-  // Determine ratio color based on thresholds
-  const getRatioColor = (ratio: number | null): string => {
-    if (ratio === null) return 'text-muted-foreground';
-    if (ratio >= 1.2) return 'text-green-600';
-    if (ratio >= 0.8) return 'text-yellow-600';
-    return 'text-red-600';
-  };
+  // ─── Hero card derived data ──────────────────────────────────────────────────
 
-  const formatRatio = (ratio: number | null): string => {
-    if (ratio === null) return 'N/A';
-    return ratio.toFixed(2);
-  };
+  // Header label for the hero card: "MAGGIO 2026" when month selected, else "2026".
+  const heroLabel = useMemo(() => {
+    if (selectedMonth !== 'all')
+      return `${MONTHS.find(m => m.value === selectedMonth)?.label.toUpperCase()} ${selectedYear}`;
+    return String(selectedYear);
+  }, [selectedYear, selectedMonth]);
+
+  // Expenses of the period immediately preceding the selected month.
+  // Used to compute MoM delta — only available when a specific month is selected.
+  const previousPeriodExpenses = useMemo(() => {
+    if (selectedMonth === 'all') return null;
+    const prevMonthNum = parseInt(selectedMonth) - 1;
+    const prevYear = prevMonthNum === 0 ? selectedYear - 1 : selectedYear;
+    const prevMonth = prevMonthNum === 0 ? 12 : prevMonthNum;
+    return allExpenses.filter(e => {
+      const date = getExpenseDate(e.date);
+      return date.getFullYear() === prevYear && date.getMonth() + 1 === prevMonth;
+    });
+  }, [allExpenses, selectedYear, selectedMonth]);
+
+  // MoM delta for income and expenses — null when viewing full year (no comparison).
+  const heroDelta = useMemo(() => {
+    if (!previousPeriodExpenses) return null;
+    const prevIncome = calculateTotalIncome(previousPeriodExpenses);
+    const prevExpenses = calculateTotalExpenses(previousPeriodExpenses);
+    const calcDelta = (curr: number, prev: number) =>
+      prev > 0 ? ((curr - prev) / prev) * 100 : 0;
+    return {
+      income: calcDelta(totalIncome, prevIncome),
+      expenses: calcDelta(totalExpenses, prevExpenses),
+    };
+  }, [previousPeriodExpenses, totalIncome, totalExpenses]);
+
+  // Savings rate as a percentage of income (shown in RISPARMIO chip).
+  const heroSavingsRate = useMemo(() => {
+    if (totalIncome <= 0) return 0;
+    return Math.round(((totalIncome - totalExpenses) / totalIncome) * 100);
+  }, [totalIncome, totalExpenses]);
+
+  // Top-5 expense categories aggregated from filteredExpenses for the hero bar chart.
+  const heroExpenseCategories = useMemo(() => {
+    const items = filteredExpenses.filter(e => e.type !== 'income');
+    const total = items.reduce((s, e) => s + Math.abs(e.amount), 0);
+    const byCategory = new Map<string, number>();
+    for (const e of items)
+      byCategory.set(e.categoryName, (byCategory.get(e.categoryName) ?? 0) + Math.abs(e.amount));
+    return Array.from(byCategory.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([category, amount]) => ({
+        category,
+        amount,
+        percentage: total > 0 ? (amount / total) * 100 : 0,
+      }));
+  }, [filteredExpenses]);
+
+  // Top-5 income categories aggregated from filteredExpenses for the hero bar chart.
+  const heroIncomeCategories = useMemo(() => {
+    const items = filteredExpenses.filter(e => e.type === 'income');
+    const total = items.reduce((s, e) => s + Math.abs(e.amount), 0);
+    const byCategory = new Map<string, number>();
+    for (const e of items)
+      byCategory.set(e.categoryName, (byCategory.get(e.categoryName) ?? 0) + Math.abs(e.amount));
+    return Array.from(byCategory.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([category, amount]) => ({
+        category,
+        amount,
+        percentage: total > 0 ? (amount / total) * 100 : 0,
+      }));
+  }, [filteredExpenses]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
-          <p className="text-muted-foreground">Caricamento spese...</p>
+      <div className="space-y-6">
+        {/* Hero card skeleton */}
+        <div className="rounded-2xl border p-[22px] space-y-4">
+          <div className="h-3 w-36 bg-muted animate-pulse rounded" />
+          <div className="grid grid-cols-2 desktop:grid-cols-4 gap-3">
+            {[0, 1, 2, 3].map(i => (
+              <div key={i} className="bg-muted/40 rounded-xl p-3.5 space-y-2">
+                <div className="h-2.5 w-14 bg-muted animate-pulse rounded" />
+                <div className="h-6 w-24 bg-muted animate-pulse rounded" />
+                <div className="h-2.5 w-20 bg-muted animate-pulse rounded" />
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Filters skeleton */}
+        <div className="rounded-lg border p-4">
+          <div className="h-4 w-16 bg-muted animate-pulse rounded mb-3" />
+          <div className="grid grid-cols-2 desktop:grid-cols-4 gap-3">
+            {[0, 1, 2, 3].map(i => <div key={i} className="h-9 bg-muted animate-pulse rounded" />)}
+          </div>
+        </div>
+        {/* List skeleton — flat rows */}
+        <div className="rounded-lg border p-4 divide-y divide-border">
+          <div className="h-4 w-32 bg-muted animate-pulse rounded mb-4" />
+          {[0, 1, 2, 3, 4].map(i => (
+            <div key={i} className="flex items-center gap-3 py-3">
+              <div className="h-2 w-2 rounded-full bg-muted animate-pulse flex-shrink-0" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3 w-36 bg-muted animate-pulse rounded" />
+                <div className="h-2.5 w-24 bg-muted animate-pulse rounded" />
+              </div>
+              <div className="h-3 w-16 bg-muted animate-pulse rounded" />
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -667,23 +932,15 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">
-            {selectedMonth !== 'all' ? `${MONTHS.find(m => m.value === selectedMonth)?.label} ` : ''}{selectedYear}
-          </h2>
-          <p className="text-muted-foreground mt-1">
-            Gestisci le tue entrate e uscite
-          </p>
-        </div>
-        <Button onClick={handleAddExpense} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined} className="hidden desktop:flex dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
+      {/* Desktop "Nuova Spesa" button — mobile uses FAB below */}
+      <div className="hidden desktop:flex justify-end">
+        <Button onClick={handleAddExpense} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined}>
           <Plus className="mr-2 h-4 w-4" />
           Nuova Spesa
         </Button>
       </div>
 
-      {/* Mobile FAB - Fixed bottom-right */}
+      {/* Mobile FAB */}
       <Button
         onClick={handleAddExpense}
         disabled={isDemo}
@@ -693,145 +950,224 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
         <Plus className="h-6 w-6" />
       </Button>
 
-      {/* Statistics Cards */}
-      <div className="grid gap-4 grid-cols-2 desktop:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Entrate Totali</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg desktop:text-2xl font-bold text-green-600">
-              {formatCurrency(totalIncome)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {filteredExpenses.filter(e => e.type === 'income').length} voci
-            </p>
-          </CardContent>
-        </Card>
+      {/* ── Hero Cashflow Card ─────────────────────────────────────────────── */}
+      {/* Mirrors the cashflow card in the Overview/Panoramica page, but driven  */}
+      {/* by filteredExpenses (honours the active time + hierarchy filters).      */}
+      <Card className="rounded-2xl">
+        <CardContent className="p-[22px]">
+          {/* Header label: "MAGGIO 2026" or "2026" depending on filter state */}
+          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground mb-3">
+            Cashflow · {heroLabel}
+          </p>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Spese Totali</CardTitle>
-            <TrendingDown className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg desktop:text-2xl font-bold text-red-600">
-              {formatCurrency(totalExpenses)}
+          {/* 4 KPI chips */}
+          <div className="grid grid-cols-2 desktop:grid-cols-4 gap-3">
+            {/* ENTRATE */}
+            <div className="bg-muted/40 rounded-xl p-3.5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-1.5">
+                Entrate
+              </p>
+              <p className="text-[22px] font-bold font-mono tabular-nums text-green-500 dark:text-green-400 leading-none">
+                {cachedFormatCurrencyEUR(totalIncome, true)}
+              </p>
+              {heroDelta !== null && (() => {
+                const pos = heroDelta.income >= 0;
+                return (
+                  <p className={cn('text-[12px] font-mono mt-1.5', pos ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400')}>
+                    {pos ? '+' : ''}{heroDelta.income.toFixed(1)}% vs mese scorso
+                  </p>
+                );
+              })()}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {filteredExpenses.filter(e => e.type !== 'income').length} voci
-            </p>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Bilancio Netto</CardTitle>
-            <Wallet className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`text-lg desktop:text-2xl font-bold ${
-                netBalance >= 0 ? 'text-green-600' : 'text-red-600'
-              }`}
-            >
-              {formatCurrency(netBalance)}
+            {/* SPESE */}
+            <div className="bg-muted/40 rounded-xl p-3.5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-1.5">
+                Spese
+              </p>
+              <p className="text-[22px] font-bold font-mono tabular-nums text-red-500 dark:text-red-400 leading-none">
+                {cachedFormatCurrencyEUR(totalExpenses, true)}
+              </p>
+              {heroDelta !== null && (() => {
+                // For expenses: +% means spent more → red (inverted logic vs income).
+                const pos = heroDelta.expenses >= 0;
+                return (
+                  <p className={cn('text-[12px] font-mono mt-1.5', pos ? 'text-red-500 dark:text-red-400' : 'text-green-500 dark:text-green-400')}>
+                    {pos ? '+' : ''}{heroDelta.expenses.toFixed(1)}% vs mese scorso
+                  </p>
+                );
+              })()}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Totale: {filteredExpenses.length} voci
-            </p>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Rapporto Entrate/Spese</CardTitle>
-            <Scale className="h-4 w-4 text-purple-600" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-lg desktop:text-2xl font-bold ${getRatioColor(incomeExpenseRatio)}`}>
-              {formatRatio(incomeExpenseRatio)}
+            {/* RISPARMIO */}
+            <div className="bg-muted/40 rounded-xl p-3.5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-1.5">
+                Risparmio
+              </p>
+              <p className={cn(
+                'text-[22px] font-bold font-mono tabular-nums leading-none',
+                netBalance >= 0 ? 'text-foreground' : 'text-red-500 dark:text-red-400',
+              )}>
+                {cachedFormatCurrencyEUR(netBalance, true)}
+              </p>
+              {totalIncome > 0 && (
+                <p className="text-[12px] text-muted-foreground mt-1.5">
+                  {heroSavingsRate}% del reddito
+                </p>
+              )}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {incomeExpenseRatio !== null && incomeExpenseRatio >= 1.2 && 'Salute finanziaria ottima'}
-              {incomeExpenseRatio !== null && incomeExpenseRatio >= 0.8 && incomeExpenseRatio < 1.2 && 'In equilibrio'}
-              {incomeExpenseRatio !== null && incomeExpenseRatio < 0.8 && 'Attenzione alle spese'}
-              {incomeExpenseRatio === null && 'Nessuna spesa registrata'}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
 
-      {/* Year Selection */}
-      {availableYears.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Seleziona Anno</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {availableYears.map(year => (
-                <Button
-                  key={year}
-                  variant={selectedYear === year ? "default" : "outline"}
-                  onClick={() => handleYearChange(year)}
-                  className={cn("min-w-[100px]", selectedYear === year && "dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600")}
-                >
-                  {year}
-                </Button>
-              ))}
+            {/* RAPPORTO */}
+            <div className="bg-muted/40 rounded-xl p-3.5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-1.5">
+                Rapporto
+              </p>
+              <p className="text-[22px] font-bold font-mono tabular-nums text-foreground leading-none">
+                {incomeExpenseRatio !== null ? `${incomeExpenseRatio.toFixed(2)}×` : '—'}
+              </p>
+              {incomeExpenseRatio !== null && (
+                <p className="text-[12px] text-muted-foreground mt-1.5">
+                  {coverageHealthLabel(incomeExpenseRatio)}
+                </p>
+              )}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
 
-      {/* Filters */}
+          {/* Category breakdowns — only shown when there is data */}
+          {(heroExpenseCategories.length > 0 || heroIncomeCategories.length > 0) && (
+            <>
+              <div className="mt-4 border-t border-border" />
+              <div className="grid desktop:grid-cols-2 gap-x-8 gap-y-4 mt-4">
+                {/* Spese per categoria */}
+                {heroExpenseCategories.length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-3">
+                      Spese per Categoria
+                    </p>
+                    <div className="space-y-3">
+                      {heroExpenseCategories.map(cat => (
+                        <div key={cat.category} className="space-y-1">
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div
+                                className="w-2 h-2 rounded-full flex-shrink-0"
+                                style={{ background: chartColors[0] || 'var(--chart-1)' }}
+                              />
+                              <span className="text-[13px] text-foreground truncate">{cat.category}</span>
+                            </div>
+                            <span className="text-[13px] font-mono tabular-nums text-foreground ml-3 flex-shrink-0">
+                              {cachedFormatCurrencyEUR(cat.amount, true)}
+                            </span>
+                          </div>
+                          <div className="h-[3px] bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full"
+                              style={{ width: `${cat.percentage}%`, background: chartColors[0] || 'var(--chart-1)' }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Entrate per categoria */}
+                {heroIncomeCategories.length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-3">
+                      Entrate per Categoria
+                    </p>
+                    <div className="space-y-3">
+                      {heroIncomeCategories.map(cat => (
+                        <div key={cat.category} className="space-y-1">
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div
+                                className="w-2 h-2 rounded-full flex-shrink-0"
+                                style={{ background: chartColors[1] || 'var(--chart-2)' }}
+                              />
+                              <span className="text-[13px] text-foreground truncate">{cat.category}</span>
+                            </div>
+                            <span className="text-[13px] font-mono tabular-nums text-foreground ml-3 flex-shrink-0">
+                              {cachedFormatCurrencyEUR(cat.amount, true)}
+                            </span>
+                          </div>
+                          <div className="h-[3px] bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full"
+                              style={{ width: `${cat.percentage}%`, background: chartColors[1] || 'var(--chart-2)' }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Filters — includes year selector (integrated, not a separate card) */}
       <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
         <Card>
           <CardHeader>
             <CollapsibleTrigger asChild>
               <div className="flex items-center justify-between cursor-pointer w-full">
                 <div className="flex items-center gap-2">
-                  <Filter className="h-5 w-5 text-muted-foreground" />
-                  <CardTitle>Filtri</CardTitle>
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-base">Filtri</CardTitle>
+                  {hasActiveFilters && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                  )}
                 </div>
-                <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', filtersOpen && 'rotate-180')} />
               </div>
             </CollapsibleTrigger>
           </CardHeader>
           <CollapsibleContent>
             <CardContent>
               <div className="grid grid-cols-1 gap-3 desktop:flex desktop:flex-wrap desktop:items-end desktop:gap-4">
-                {/* Month Filter + current month quick button, always side by side */}
+                {/* Anno filter (integrated — replaces the separate Year card) */}
+                {availableYears.length > 0 && (
+                  <div className="flex flex-col gap-2 desktop:min-w-[110px]">
+                    <label className="text-sm font-medium">Anno</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {availableYears.map(year => (
+                        <Button
+                          key={year}
+                          variant={selectedYear === year ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => handleYearChange(year)}
+                          className="h-8 px-3 text-sm"
+                        >
+                          {year}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Month Filter + current month quick button */}
                 <div className="flex flex-col gap-2 desktop:min-w-[150px]">
                   <label className="text-sm font-medium">Mese</label>
                   <div className="flex items-center gap-2">
                     <div className="flex-1 min-w-0">
-                      <Select
-                        value={selectedMonth}
-                        onValueChange={setSelectedMonth}
-                      >
+                      <Select value={selectedMonth} onValueChange={setSelectedMonth}>
                         <SelectTrigger>
                           <SelectValue placeholder="Seleziona mese" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">Tutti</SelectItem>
                           {MONTHS.map(month => (
-                            <SelectItem key={month.value} value={month.value}>
-                              {month.label}
-                            </SelectItem>
+                            <SelectItem key={month.value} value={month.value}>{month.label}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
-                    <Button
-                      onClick={handleCurrentMonth}
-                      variant="secondary"
-                      size="default"
-                      className="shrink-0"
-                    >
-                      Mese corrente
+                    <Button onClick={handleCurrentMonth} variant="secondary" size="default" className="shrink-0">
+                      Corrente
                     </Button>
                   </div>
                 </div>
@@ -888,10 +1224,10 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                       <button
                         type="button"
                         onClick={handleClearType}
-                        className="ml-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full p-0.5 transition-colors"
+                        className="ml-1 hover:bg-muted rounded-full p-0.5 transition-colors"
                         aria-label="Rimuovi filtro tipo"
                       >
-                        <X className="h-3 w-3 text-gray-600 dark:text-gray-400" />
+                        <X className="h-3 w-3 text-muted-foreground" />
                       </button>
                     </div>
                   )}
@@ -970,10 +1306,10 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                       <button
                         type="button"
                         onClick={handleClearCategory}
-                        className="ml-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full p-0.5 transition-colors"
+                        className="ml-1 hover:bg-muted rounded-full p-0.5 transition-colors"
                         aria-label="Rimuovi filtro categoria"
                       >
-                        <X className="h-3 w-3 text-gray-600 dark:text-gray-400" />
+                        <X className="h-3 w-3 text-muted-foreground" />
                       </button>
                     </div>
                   )}
@@ -1040,10 +1376,10 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                       <button
                         type="button"
                         onClick={handleClearSubCategory}
-                        className="ml-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full p-0.5 transition-colors"
+                        className="ml-1 hover:bg-muted rounded-full p-0.5 transition-colors"
                         aria-label="Rimuovi filtro sottocategoria"
                       >
-                        <X className="h-3 w-3 text-gray-600 dark:text-gray-400" />
+                        <X className="h-3 w-3 text-muted-foreground" />
                       </button>
                     </div>
                   )}
@@ -1149,7 +1485,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
         </CardHeader>
         <CardContent>
           {/* Desktop: Table */}
-          <div className="hidden md:block">
+          <div className="hidden desktop:block">
             <ExpenseTable
               expenses={filteredExpenses}
               onEdit={handleEditExpense}
@@ -1158,30 +1494,44 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
             />
           </div>
 
-          {/* Mobile: Cards */}
-          <div className="md:hidden space-y-3">
+          {/* Mobile: flat divide-y list with tap-to-expand actions */}
+          <div className="desktop:hidden">
             {filteredExpenses.length === 0 ? (
               <div className="rounded-md border border-dashed p-8 text-center">
                 <p className="text-muted-foreground">Nessuna voce trovata</p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Clicca su &quot;Nuova Spesa&quot; per aggiungere la prima voce
+                  Usa il pulsante + per aggiungere la prima voce
                 </p>
               </div>
             ) : (
               <>
-                {filteredExpenses.slice(0, 20).map((expense) => (
-                  <ExpenseCard
-                    key={expense.id}
-                    expense={expense}
-                    onEdit={handleEditExpense}
-                    onDelete={handleDeleteExpense}
-                    isDemo={isDemo}
-                  />
-                ))}
-                {filteredExpenses.length > 20 && (
-                  <p className="text-sm text-muted-foreground text-center pt-2">
-                    Visualizzate 20 di {filteredExpenses.length} voci. Usa i filtri per ridurre i risultati.
-                  </p>
+                <div className="divide-y divide-border">
+                  {filteredExpenses.slice(0, mobileShowCount).map(expense => (
+                    <MobileExpenseRow
+                      key={expense.id}
+                      expense={expense}
+                      isExpanded={expandedRowId === expense.id}
+                      onToggleExpand={handleToggleExpand}
+                      onEdit={handleEditExpense}
+                      onDelete={handleDeleteExpense}
+                      isPendingDelete={pendingDeleteId === expense.id}
+                      isDemo={isDemo}
+                    />
+                  ))}
+                </div>
+                {filteredExpenses.length > mobileShowCount && (
+                  <div className="pt-4 text-center">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setMobileShowCount(prev => prev + 20)}
+                    >
+                      Carica altri {Math.min(20, filteredExpenses.length - mobileShowCount)}
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {mobileShowCount} di {filteredExpenses.length} voci
+                    </p>
+                  </div>
                 )}
               </>
             )}
@@ -1196,6 +1546,57 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
         expense={editingExpense}
         onSuccess={handleSuccess}
       />
+
+      {/* Bulk delete AlertDialog — for installments and recurring expenses */}
+      <AlertDialog
+        open={bulkDeleteDialog.open}
+        onOpenChange={(open) => {
+          if (!open) setBulkDeleteDialog({ open: false, expense: null, mode: null });
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {bulkDeleteDialog.mode === 'installment' ? 'Elimina rata' : 'Elimina voce ricorrente'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {bulkDeleteDialog.mode === 'installment' && bulkDeleteDialog.expense
+                ? `Questa è la rata ${bulkDeleteDialog.expense.installmentNumber}/${bulkDeleteDialog.expense.installmentTotal}. Vuoi eliminare solo questa rata o tutte le ${bulkDeleteDialog.expense.installmentTotal} rate?`
+                : 'Questa è una voce ricorrente. Vuoi eliminare solo questa voce o tutte le occorrenze correlate?'
+              }
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
+            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (bulkDeleteDialog.expense) void deleteSingleExpense(bulkDeleteDialog.expense);
+                setBulkDeleteDialog({ open: false, expense: null, mode: null });
+              }}
+            >
+              Solo questa
+            </Button>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                const exp = bulkDeleteDialog.expense;
+                if (!exp) return;
+                if (bulkDeleteDialog.mode === 'installment' && exp.installmentParentId) {
+                  void deleteAllInstallmentExpenses(exp.installmentParentId);
+                } else if (bulkDeleteDialog.mode === 'recurring' && exp.recurringParentId) {
+                  void deleteAllRecurringExpenses(exp.recurringParentId);
+                }
+                setBulkDeleteDialog({ open: false, expense: null, mode: null });
+              }}
+            >
+              {bulkDeleteDialog.mode === 'installment'
+                ? `Tutte le ${bulkDeleteDialog.expense?.installmentTotal ?? ''} rate`
+                : 'Tutte le ricorrenti'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -17,6 +17,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -31,14 +32,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Check } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 import { createId } from '@/lib/utils/idHelpers';
 
 interface GoalFormDialogProps {
   open: boolean;
   onClose: () => void;
   onSave: (goal: InvestmentGoal) => Promise<void>;
-  goal: InvestmentGoal | null; // null = creating new
+  goal: InvestmentGoal | null;
   existingGoals: InvestmentGoal[];
 }
 
@@ -48,11 +49,10 @@ const PRIORITY_OPTIONS: { value: GoalPriority; label: string }[] = [
   { value: 'bassa', label: 'Bassa' },
 ];
 
-// Asset classes available for recommended allocation
 const ALLOCATION_CLASSES: { value: AssetClass; label: string }[] = [
   { value: 'equity', label: 'Azioni' },
   { value: 'bonds', label: 'Obbligazioni' },
-  { value: 'cash', label: 'Liquidità' },
+  { value: 'cash', label: 'Liquidita' },
   { value: 'realestate', label: 'Immobili' },
   { value: 'crypto', label: 'Crypto' },
   { value: 'commodity', label: 'Materie Prime' },
@@ -67,47 +67,40 @@ export function GoalFormDialog({
 }: GoalFormDialogProps) {
   const isEditing = !!goal;
 
-  // Form state
   const [name, setName] = useState('');
   const [targetAmount, setTargetAmount] = useState('');
   const [targetDate, setTargetDate] = useState('');
   const [priority, setPriority] = useState<GoalPriority>('media');
   const [color, setColor] = useState(GOAL_COLORS[0]);
   const [notes, setNotes] = useState('');
-  const [allocation, setAllocation] = useState<
-    Partial<Record<AssetClass, number>>
-  >({});
+  const [allocation, setAllocation] = useState<Partial<Record<AssetClass, number>>>({});
   const [saving, setSaving] = useState(false);
 
-  // Reset form when dialog opens
+  // Reset form on open; guard prevents spurious reset on close
   useEffect(() => {
-    if (open) {
-      if (goal) {
-        // Editing: populate form from goal
-        setName(goal.name);
-        setTargetAmount(goal.targetAmount?.toString() ?? '');
-        setTargetDate(goal.targetDate || '');
-        setPriority(goal.priority);
-        setColor(goal.color);
-        setNotes(goal.notes || '');
-        setAllocation(goal.recommendedAllocation || {});
-      } else {
-        // Creating: reset to defaults
-        setName('');
-        setTargetAmount('');
-        setTargetDate('');
-        setPriority('media');
-        setColor(GOAL_COLORS[0]);
-        setNotes('');
-        setAllocation({});
-      }
+    if (!open) return;
+    if (goal) {
+      setName(goal.name);
+      setTargetAmount(goal.targetAmount?.toString() ?? '');
+      setTargetDate(goal.targetDate || '');
+      setPriority(goal.priority);
+      setColor(goal.color);
+      setNotes(goal.notes || '');
+      setAllocation(goal.recommendedAllocation || {});
+    } else {
+      setName('');
+      setTargetAmount('');
+      setTargetDate('');
+      setPriority('media');
+      setColor(GOAL_COLORS[0]);
+      setNotes('');
+      setAllocation({});
     }
   }, [open, goal]);
 
   const handleTemplateSelect = (templateName: string) => {
     const template = GOAL_TEMPLATES.find((t) => t.name === templateName);
     if (!template) return;
-
     setName(template.name);
     setPriority(template.priority);
     setColor(template.color);
@@ -137,7 +130,6 @@ export function GoalFormDialog({
 
   const handleSubmit = async () => {
     if (!name.trim()) return;
-    // Target amount is optional — if provided, must be positive
     if (targetAmount && parseFloat(targetAmount) < 0) return;
     if (!isAllocationValid) return;
 
@@ -158,7 +150,6 @@ export function GoalFormDialog({
         createdAt: goal?.createdAt || now,
         updatedAt: now,
       };
-
       await onSave(goalData);
     } finally {
       setSaving(false);
@@ -172,17 +163,23 @@ export function GoalFormDialog({
           <DialogTitle>
             {isEditing ? 'Modifica Obiettivo' : 'Nuovo Obiettivo'}
           </DialogTitle>
+          <DialogDescription>
+            {isEditing
+              ? 'Modifica nome, importo target, data e priorita del tuo obiettivo.'
+              : 'Definisci nome, importo target, data e priorita per il tuo obiettivo.'}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          {/* Templates (only when creating) */}
+          {/* Quick templates (create mode only) */}
           {!isEditing && (
             <div className="space-y-2">
-              <Label className="text-xs text-gray-500 dark:text-gray-400">Template rapidi</Label>
+              <Label className="text-xs text-muted-foreground">Template rapidi</Label>
               <div className="flex flex-wrap gap-2">
                 {GOAL_TEMPLATES.map((t) => (
                   <Button
                     key={t.name}
+                    type="button"
                     variant="outline"
                     size="sm"
                     onClick={() => handleTemplateSelect(t.name)}
@@ -238,7 +235,7 @@ export function GoalFormDialog({
 
           {/* Priority */}
           <div className="space-y-1">
-            <Label>Priorità</Label>
+            <Label>Priorita</Label>
             <Select
               value={priority}
               onValueChange={(v) => setPriority(v as GoalPriority)}
@@ -256,18 +253,20 @@ export function GoalFormDialog({
             </Select>
           </div>
 
-          {/* Color */}
+          {/* Color picker */}
           <div className="space-y-1">
             <Label>Colore</Label>
             <div className="flex flex-wrap gap-2">
               {GOAL_COLORS.map((c) => (
                 <button
                   key={c}
+                  type="button"
                   onClick={() => setColor(c)}
                   className="w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all"
                   style={{
                     backgroundColor: c,
-                    borderColor: color === c ? '#1F2937' : 'transparent',
+                    // var(--foreground) adapts to theme; transparent when not active
+                    borderColor: color === c ? 'var(--foreground)' : 'transparent',
                   }}
                 >
                   {color === c && (
@@ -280,10 +279,8 @@ export function GoalFormDialog({
 
           {/* Recommended Allocation */}
           <div className="space-y-2">
-            <Label className="text-sm">
-              Allocazione Consigliata (opzionale)
-            </Label>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <Label className="text-sm">Allocazione Consigliata (opzionale)</Label>
+            <p className="text-xs text-muted-foreground">
               Definisci il mix ideale di asset class per questo obiettivo
             </p>
             <div className="grid grid-cols-2 gap-2">
@@ -301,14 +298,14 @@ export function GoalFormDialog({
                     }
                     placeholder="0"
                   />
-                  <span className="text-xs text-gray-600 dark:text-gray-400">% {cls.label}</span>
+                  <span className="text-xs text-muted-foreground">% {cls.label}</span>
                 </div>
               ))}
             </div>
             {Object.keys(allocation).length > 0 && (
               <p
                 className={`text-xs font-medium ${
-                  isAllocationValid ? 'text-green-600' : 'text-red-600'
+                  isAllocationValid ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'
                 }`}
               >
                 Totale: {allocationTotal.toFixed(1)}%
@@ -333,9 +330,9 @@ export function GoalFormDialog({
               className={`text-xs ${
                 notes.length > 400
                   ? notes.length > 480
-                    ? 'text-red-500'
-                    : 'text-orange-500'
-                  : 'text-gray-400'
+                    ? 'text-destructive'
+                    : 'text-amber-600 dark:text-amber-400'
+                  : 'text-muted-foreground/60'
               }`}
             >
               {notes.length}/500
@@ -344,10 +341,11 @@ export function GoalFormDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button type="button" variant="outline" onClick={onClose}>
             Annulla
           </Button>
           <Button
+            type="button"
             onClick={handleSubmit}
             disabled={
               saving ||
@@ -355,8 +353,8 @@ export function GoalFormDialog({
               (targetAmount !== '' && parseFloat(targetAmount) < 0) ||
               !isAllocationValid
             }
-            className="dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
           >
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {saving
               ? 'Salvataggio...'
               : isEditing
