@@ -61,23 +61,6 @@ Contesto:
 
 ## Cashflow
 
-### Tab "Analisi"
-
-```
-/impeccable polish il tab "Analisi" della pagina Cashflow
-
-Priority issues (P2/P3) da: [SLUG]
-File: app/dashboard/cashflow/page.tsx
-Componenti: components/cashflow/AnalisiTab.tsx,
-            components/cashflow/CashflowSankeyChart.tsx
-
-Contesto:
-- Leggi AGENTS.md (pattern, convenzioni, gotcha)
-- Leggi CLAUDE.md (stato corrente, known issues)
-- Leggi COMMENTS.md e APPLICALA mentre scrivi codice
-- Leggi DEVELOPMENT_GUIDELINES.md e APPLICALA mentre scrivi codice
-```
-
 ### Tab "Dividendi"
 
 ```
@@ -142,6 +125,29 @@ File: app/dashboard/cashflow/page.tsx
 Componenti: components/cashflow/CostCentersTab.tsx,
             components/cashflow/CostCenterDetail.tsx,
             components/cashflow/CostCenterDialog.tsx
+
+Contesto:
+- Leggi AGENTS.md (pattern, convenzioni, gotcha)
+- Leggi CLAUDE.md (stato corrente, known issues)
+- Leggi COMMENTS.md e APPLICALA mentre scrivi codice
+- Leggi DEVELOPMENT_GUIDELINES.md e APPLICALA mentre scrivi codice
+```
+
+---
+
+## Analisi
+
+```
+/impeccable polish la pagina Analisi
+
+Priority issues (P2/P3) da: [SLUG]
+File: app/dashboard/analisi/page.tsx
+Componenti: components/cashflow/AnalisiTab.tsx,
+            components/cashflow/CashflowSankeyChart.tsx,
+            components/cashflow/AnomalieBlock.tsx,
+            components/cashflow/ConfrontoAnnualeSection.tsx,
+            components/cashflow/SavingsRateTrendSection.tsx,
+            components/cashflow/CategoryTrendsGrid.tsx
 
 Contesto:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha)

@@ -21,11 +21,13 @@
  */
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useChartColors } from '@/lib/hooks/useChartColors';
+import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
+import { MONTH_NAMES } from '@/lib/constants/months';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
-import { calculateIncomeExpenseRatio, calculateTotalExpenses, calculateTotalIncome } from '@/lib/services/expenseService';
+import { calculateTotalExpenses, calculateTotalIncome } from '@/lib/services/expenseService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -41,19 +43,14 @@ import {
   ResponsiveContainer,
   Tooltip,
   Legend,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  LineChart,
-  Line,
-  ReferenceArea,
-  ReferenceLine,
 } from 'recharts';
-import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
-import { getItalyMonth, getItalyMonthYear, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
+import { formatCurrency } from '@/lib/services/chartService';
+import { getItalyMonth, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
 import { CashflowSankeyChart } from '@/components/cashflow/CashflowSankeyChart';
+import { ConfrontoAnnualeSection } from '@/components/cashflow/ConfrontoAnnualeSection';
+import { SavingsRateTrendSection } from '@/components/cashflow/SavingsRateTrendSection';
+import { CategoryTrendsGrid } from '@/components/cashflow/CategoryTrendsGrid';
+import { AnomalieBlock, AnomaliaItem } from '@/components/cashflow/AnomalieBlock';
 import { chartShellSettle, fadeVariants } from '@/lib/utils/motionVariants';
 import { cn } from '@/lib/utils';
 
@@ -64,10 +61,6 @@ interface ChartData {
   color: string;
 }
 
-const ITALIAN_MONTHS = [
-  'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
-  'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
-];
 
 const ChartTooltip = ({
   active,
@@ -110,7 +103,7 @@ interface DrillDownState {
   selectedSubCategory: string | null;
 }
 
-type PeriodMode = 'current' | 'year' | 'history';
+export type PeriodMode = 'current' | 'year' | 'history';
 
 // ── TopExpenseRow ────────────────────────────────────────────────────────────
 // Module-level component required by React Compiler (no nested components).
@@ -210,14 +203,9 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
   const [selectedYear, setSelectedYear] = useState<number | null>(currentYear);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
 
-  // Trend section collapsible
-  const [trendOpen, setTrendOpen] = useState(false);
-
-  // Percentage toggles for trend charts
-  const [showMonthlyTrendPercentage, setShowMonthlyTrendPercentage] = useState(false);
-  const [showYearlyTrendPercentage, setShowYearlyTrendPercentage] = useState(false);
-  const [showFullMonthlyHistory, setShowFullMonthlyHistory] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  // useMediaQuery avoids the manual matchMedia + listener pattern and integrates with the
+  // project's standard breakpoint hook (all callers are 'use client' post-login).
+  const isMobile = useMediaQuery('(max-width: 639px)');
 
   // Drill-down state machine
   const [drillDown, setDrillDown] = useState<DrillDownState>({
@@ -230,14 +218,6 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
 
   const expensesChartRef = useRef<HTMLDivElement>(null);
   const incomeChartRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const media = window.matchMedia('(max-width: 639px)');
-    const handleChange = () => setIsMobile(media.matches);
-    handleChange();
-    media.addEventListener('change', handleChange);
-    return () => media.removeEventListener('change', handleChange);
-  }, []);
 
   useEffect(() => {
     if (drillDown.level !== 'category' && drillDown.chartType) {
@@ -269,17 +249,20 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
       setSelectedYear(null);
       setSelectedMonth(null);
     } else if (mode === 'year') {
-      // Initialize to most recent year with data (or current year) so data is never null
-      setSelectedYear(prev => prev ?? availableYears[0] ?? currentYear);
+      // Initialize to the most recent *past* year — current year is handled by "Anno Corrente"
+      const firstPastYear = availableYears.find(y => y < currentYear) ?? currentYear - 1;
+      setSelectedYear(firstPastYear);
       setSelectedMonth(null);
     }
     resetDrillDown();
   };
 
-  const isFiltered = periodMode === 'year' && (selectedYear !== currentYear || selectedMonth !== null);
+  // True whenever a month filter is active — drives the "Ripristina" button
+  // in both "Anno Corrente" (month picker) and "Anno" (year + month picker)
+  const isMonthFiltered = selectedMonth !== null;
 
   const handleResetFilters = () => {
-    setSelectedYear(currentYear);
+    // Clear month only — year is intentional in "Anno" mode, currentYear is fixed in "Anno Corrente"
     setSelectedMonth(null);
     resetDrillDown();
   };
@@ -300,11 +283,19 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
     return allExpenses.filter(e => getItalyYear(toDate(e.date)) >= historyStartYear);
   }, [allExpenses, historyStartYear]);
 
+  // All years with data — used for baseExpenses filtering and "Anno Corrente" context.
+  // The "Anno" dropdown uses pastYears (excludes currentYear) since Anno Corrente
+  // is the dedicated entry point for the current year.
   const availableYears = useMemo(() => {
     const years = new Set<number>();
     baseExpenses.forEach(e => years.add(getItalyYear(toDate(e.date))));
     return Array.from(years).sort((a, b) => b - a);
   }, [baseExpenses]);
+
+  const pastYears = useMemo(
+    () => availableYears.filter(y => y < currentYear),
+    [availableYears, currentYear]
+  );
 
   const periodFilteredExpenses = useMemo(() => {
     if (selectedYear === null) return baseExpenses;
@@ -319,13 +310,14 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
   const periodLabel = selectedYear === null
     ? 'Storico Completo'
     : selectedMonth
-      ? `${ITALIAN_MONTHS[selectedMonth - 1]} ${selectedYear}`
+      ? `${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}`
       : `${selectedYear}`;
 
   const totalIncome = calculateTotalIncome(periodFilteredExpenses);
   const totalExpenses = calculateTotalExpenses(periodFilteredExpenses);
   const netBalance = totalIncome - totalExpenses;
-  const ratio = calculateIncomeExpenseRatio(periodFilteredExpenses);
+  // Savings rate as percentage (0–100). Drives the hero KPI color threshold.
+  const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : 0;
 
   // Sort non-income expenses by amount ascending — most negative amount = largest expense first
   const topExpenses = useMemo(() => {
@@ -333,6 +325,128 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
       .filter(e => e.type !== 'income')
       .sort((a, b) => a.amount - b.amount);
   }, [periodFilteredExpenses]);
+
+  /**
+   * Compute spending anomalies for the current month context.
+   *
+   * Anomalies are only meaningful at a monthly granularity.
+   * For annual or historical views, returns empty array.
+   *
+   * Algorithm: for each expense category in the anomaly month,
+   * compare current month total vs rolling 6-month average.
+   * Flag if delta > 25% AND absolute delta > €50.
+   * Skip categories with fewer than 3 months of history.
+   */
+  const anomalieData = useMemo<AnomaliaItem[]>(() => {
+    // Determine the anomaly month based on the current period mode
+    let anomalyMonth: number | null = null;
+    let anomalyYear: number | null = null;
+
+    if (periodMode === 'current') {
+      anomalyMonth = getItalyMonth();
+      anomalyYear = getItalyYear();
+    } else if (periodMode === 'year' && selectedMonth !== null && selectedYear !== null) {
+      anomalyMonth = selectedMonth;
+      anomalyYear = selectedYear;
+    } else {
+      return []; // Annual or historical view — no anomaly detection
+    }
+
+    // Collect non-income expenses for the anomaly month
+    const anomalyExpenses = allExpenses.filter(e => {
+      const d = toDate(e.date);
+      return (
+        e.type !== 'income' &&
+        getItalyYear(d) === anomalyYear &&
+        getItalyMonth(d) === anomalyMonth
+      );
+    });
+
+    // Build per-category totals for the anomaly month
+    const currentTotals = new Map<string, number>();
+    anomalyExpenses.forEach(e => {
+      currentTotals.set(e.categoryName, (currentTotals.get(e.categoryName) ?? 0) + Math.abs(e.amount));
+    });
+
+    if (currentTotals.size === 0) return [];
+
+    // Build 6-month reference window immediately preceding the anomaly month.
+    // We iterate backward from anomalyMonth-1, wrapping across year boundaries.
+    const referenceMonths: Array<{ year: number; month: number }> = [];
+    let refYear = anomalyYear!;
+    let refMonth = anomalyMonth! - 1;
+    for (let i = 0; i < 6; i++) {
+      if (refMonth < 1) { refMonth = 12; refYear--; }
+      referenceMonths.push({ year: refYear, month: refMonth });
+      refMonth--;
+    }
+
+    // For each category in the anomaly month, check against the reference window
+    const results: AnomaliaItem[] = [];
+
+    currentTotals.forEach((currentTotal, category) => {
+      const monthlyTotals = referenceMonths.map(({ year, month }) => {
+        return allExpenses
+          .filter(e => {
+            const d = toDate(e.date);
+            return (
+              e.type !== 'income' &&
+              e.categoryName === category &&
+              getItalyYear(d) === year &&
+              getItalyMonth(d) === month
+            );
+          })
+          .reduce((s, e) => s + Math.abs(e.amount), 0);
+      });
+
+      const monthsWithData = monthlyTotals.filter(t => t > 0).length;
+      // Skip categories with insufficient history — too new or too irregular
+      if (monthsWithData < 3) return;
+
+      // Average over all 6 months (not just months with data) — penalizes sparse spenders
+      const referenceAverage = monthlyTotals.reduce((s, t) => s + t, 0) / 6;
+      // Skip if category was never spent before — avoids division by zero
+      if (referenceAverage === 0) return;
+
+      const deltaPercent = ((currentTotal - referenceAverage) / referenceAverage) * 100;
+      const absoluteDelta = currentTotal - referenceAverage;
+
+      // Only flag increases: reductions are good news, not anomalies (v1)
+      if (deltaPercent > 25 && absoluteDelta > 50) {
+        results.push({ category, currentTotal, referenceAverage, deltaPercent, absoluteDelta });
+      }
+    });
+
+    return results.sort((a, b) => b.deltaPercent - a.deltaPercent);
+  }, [allExpenses, periodMode, selectedMonth, selectedYear]);
+
+  // Ref for scrolling to the distribution section (Sankey + Pie) from anomaly chips
+  const distributionRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Navigate from anomaly chip to the pie chart drill-down for that category.
+   * Scrolls to the distribution section and pre-selects the category.
+   * Uses 'instant' (not 'smooth') per AGENTS.md scrollIntoView convention.
+   */
+  const handleAnomaliaClick = useCallback((categoryName: string) => {
+    // Look up the color assigned to this category in the current pie data
+    const categoryColor = getExpensesByCategory(periodFilteredExpenses)
+      .find(d => d.name === categoryName)?.color ?? COLORS[0];
+
+    // Pre-select the category in the drill-down state machine
+    setDrillDown({
+      level: 'subcategory',
+      chartType: 'expenses',
+      selectedCategory: categoryName,
+      selectedCategoryColor: categoryColor,
+      selectedSubCategory: null,
+    });
+
+    // Scroll to distribution section after state update settles
+    setTimeout(() => {
+      distributionRef.current?.scrollIntoView({ behavior: 'instant', block: 'start' });
+    }, 50);
+  }, [periodFilteredExpenses, COLORS]);
 
   // ── Pie/drill-down helpers ─────────────────────────────────────────────
 
@@ -444,158 +558,7 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
     }
   };
 
-  // ── Trend chart helpers ────────────────────────────────────────────────
-
-  const clampPercentage = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
-
-  const getMonthlyTrend = (expenses: Expense[]) => {
-    const map = new Map<string, { income: number; expenses: number; sortKey: string }>();
-    expenses.forEach(e => {
-      const date = toDate(e.date);
-      const { month, year } = getItalyMonthYear(date);
-      const key = `${String(month).padStart(2, '0')}/${String(year).slice(-2)}`;
-      const sortKey = `${year}-${String(month).padStart(2, '0')}`;
-      const cur = map.get(key) || { income: 0, expenses: 0, sortKey };
-      if (e.type === 'income') cur.income += e.amount; else cur.expenses += Math.abs(e.amount);
-      map.set(key, cur);
-    });
-    return Array.from(map.entries()).map(([month, v]) => {
-      const total = v.income + v.expenses;
-      const rawSavingRate = v.income > 0 ? ((v.income - v.expenses) / v.income) * 100 : 0;
-      return {
-        month, sortKey: v.sortKey,
-        Entrate: v.income, Spese: v.expenses, Netto: v.income - v.expenses,
-        'Entrate %': clampPercentage(total > 0 ? (v.income / total) * 100 : 0, 0, 100),
-        'Spese %': clampPercentage(total > 0 ? (v.expenses / total) * 100 : 0, 0, 100),
-        'Saving Rate %': clampPercentage(rawSavingRate, -100, 100),
-      };
-    }).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-  };
-
-  const getYearlyTrend = (expenses: Expense[]) => {
-    const map = new Map<number, { income: number; expenses: number }>();
-    expenses.forEach(e => {
-      const year = getItalyYear(toDate(e.date));
-      const cur = map.get(year) || { income: 0, expenses: 0 };
-      if (e.type === 'income') cur.income += e.amount; else cur.expenses += Math.abs(e.amount);
-      map.set(year, cur);
-    });
-    return Array.from(map.entries()).map(([year, v]) => {
-      const total = v.income + v.expenses;
-      const rawSavingRate = v.income > 0 ? ((v.income - v.expenses) / v.income) * 100 : 0;
-      return {
-        year: year.toString(),
-        Entrate: v.income, Spese: v.expenses, Netto: v.income - v.expenses,
-        'Entrate %': clampPercentage(total > 0 ? (v.income / total) * 100 : 0, 0, 100),
-        'Spese %': clampPercentage(total > 0 ? (v.expenses / total) * 100 : 0, 0, 100),
-        'Saving Rate %': clampPercentage(rawSavingRate, -100, 100),
-      };
-    }).sort((a, b) => parseInt(a.year) - parseInt(b.year));
-  };
-
-  const getMonthlyExpensesByType = (expenses: Expense[]) => {
-    const map = new Map<string, Record<string, number | string>>();
-    expenses.filter(e => e.type !== 'income').forEach(e => {
-      const date = toDate(e.date);
-      const { month, year } = getItalyMonthYear(date);
-      const key = `${String(month).padStart(2, '0')}/${String(year).slice(-2)}`;
-      const sortKey = `${year}-${String(month).padStart(2, '0')}`;
-      if (!map.has(key)) map.set(key, { sortKey });
-      const cur = map.get(key)!;
-      const typeName = EXPENSE_TYPE_LABELS[e.type as ExpenseType];
-      cur[typeName] = ((cur[typeName] as number) || 0) + Math.abs(e.amount);
-    });
-    return Array.from(map.entries())
-      .map(([month, v]) => { const { sortKey, ...rest } = v; return { month, sortKey, ...rest }; })
-      .sort((a, b) => (a.sortKey as string).localeCompare(b.sortKey as string));
-  };
-
-  const getYearlyExpensesByType = (expenses: Expense[]) => {
-    const map = new Map<number, Record<string, number>>();
-    expenses.filter(e => e.type !== 'income').forEach(e => {
-      const year = getItalyYear(toDate(e.date));
-      if (!map.has(year)) map.set(year, {});
-      const cur = map.get(year)!;
-      const typeName = EXPENSE_TYPE_LABELS[e.type as ExpenseType];
-      cur[typeName] = (cur[typeName] || 0) + Math.abs(e.amount);
-    });
-    return Array.from(map.entries())
-      .map(([year, v]) => ({ year: year.toString(), ...v }))
-      .sort((a, b) => parseInt(a.year) - parseInt(b.year));
-  };
-
-  const getMonthlyByCategory = (expenses: Expense[], income: boolean) => {
-    const catTotals = new Map<string, number>();
-    expenses.filter(e => income ? e.type === 'income' : e.type !== 'income').forEach(e => {
-      catTotals.set(e.categoryName, (catTotals.get(e.categoryName) || 0) + Math.abs(e.amount));
-    });
-    const top5 = Array.from(catTotals.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([n]) => n);
-    const map = new Map<string, Record<string, number | string>>();
-    expenses.filter(e => income ? e.type === 'income' : e.type !== 'income').forEach(e => {
-      const date = toDate(e.date);
-      const { month, year } = getItalyMonthYear(date);
-      const key = `${String(month).padStart(2, '0')}/${String(year).slice(-2)}`;
-      const sortKey = `${year}-${String(month).padStart(2, '0')}`;
-      if (!map.has(key)) map.set(key, { sortKey, Altro: 0 });
-      const cur = map.get(key)!;
-      const cat = top5.includes(e.categoryName) ? e.categoryName : 'Altro';
-      cur[cat] = ((cur[cat] as number) || 0) + Math.abs(e.amount);
-    });
-    const data = Array.from(map.entries())
-      .map(([month, v]) => { const { sortKey, ...rest } = v; return { month, sortKey, ...rest }; })
-      .sort((a, b) => (a.sortKey as string).localeCompare(b.sortKey as string));
-    return { data, categories: [...top5, 'Altro'] };
-  };
-
-  const getYearlyByCategory = (expenses: Expense[], income: boolean) => {
-    const catTotals = new Map<string, number>();
-    expenses.filter(e => income ? e.type === 'income' : e.type !== 'income').forEach(e => {
-      catTotals.set(e.categoryName, (catTotals.get(e.categoryName) || 0) + Math.abs(e.amount));
-    });
-    const top5 = Array.from(catTotals.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([n]) => n);
-    const map = new Map<number, Record<string, number>>();
-    expenses.filter(e => income ? e.type === 'income' : e.type !== 'income').forEach(e => {
-      const year = getItalyYear(toDate(e.date));
-      if (!map.has(year)) map.set(year, { Altro: 0 });
-      const cur = map.get(year)!;
-      const cat = top5.includes(e.categoryName) ? e.categoryName : 'Altro';
-      cur[cat] = (cur[cat] || 0) + Math.abs(e.amount);
-    });
-    const data = Array.from(map.entries())
-      .map(([year, v]) => ({ year: year.toString(), ...v }))
-      .sort((a, b) => parseInt(a.year) - parseInt(b.year));
-    return { data, categories: [...top5, 'Altro'] };
-  };
-
-  const getYearlyIncomeExpenseRatio = () => {
-    const yearlyMap = new Map<number, Expense[]>();
-    allExpenses.forEach(e => {
-      const year = getItalyYear(toDate(e.date));
-      if (!yearlyMap.has(year)) yearlyMap.set(year, []);
-      yearlyMap.get(year)!.push(e);
-    });
-    return Array.from(yearlyMap.entries())
-      .map(([year, expenses]) => ({ year: year.toString(), ratio: calculateIncomeExpenseRatio(expenses) }))
-      .filter(item => item.ratio !== null)
-      .sort((a, b) => parseInt(a.year) - parseInt(b.year));
-  };
-
   // ── Computed chart data ────────────────────────────────────────────────
-
-  const expensesFrom2025 = useMemo(() =>
-    allExpenses.filter(e => getItalyYear(toDate(e.date)) >= historyStartYear),
-    [allExpenses, historyStartYear]
-  );
-
-  const monthlyTrendData = useMemo(() => getMonthlyTrend(baseExpenses), [baseExpenses]);
-  const yearlyTrendData = useMemo(() => getYearlyTrend(baseExpenses), [baseExpenses]);
-  const monthlyExpensesByType = useMemo(() => getMonthlyExpensesByType(expensesFrom2025), [expensesFrom2025]);
-  const yearlyExpensesByType = useMemo(() => getYearlyExpensesByType(expensesFrom2025), [expensesFrom2025]);
-  const monthlyExpensesByCategory = useMemo(() => getMonthlyByCategory(expensesFrom2025, false), [expensesFrom2025]);
-  const yearlyExpensesByCategory = useMemo(() => getYearlyByCategory(expensesFrom2025, false), [expensesFrom2025]);
-  const monthlyIncomeByCategory = useMemo(() => getMonthlyByCategory(expensesFrom2025, true), [expensesFrom2025]);
-  const yearlyIncomeByCategory = useMemo(() => getYearlyByCategory(expensesFrom2025, true), [expensesFrom2025]);
-  const yearlyIncomeExpenseRatioData = useMemo(() => getYearlyIncomeExpenseRatio(), [allExpenses]);
 
   const currentSubcategoriesData = drillDown.level === 'subcategory' && drillDown.selectedCategory && drillDown.chartType
     ? getSubcategoriesData(periodFilteredExpenses, drillDown.selectedCategory, drillDown.chartType)
@@ -605,38 +568,33 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
 
   const pieChartHeight = isMobile ? 320 : 500;
   const pieOuterRadius = isMobile ? 110 : 140;
-  const lineChartHeight = isMobile ? 260 : 350;
-  const xAxisProps = isMobile
-    ? { angle: -45, textAnchor: 'end' as const, height: 60, interval: 0 }
-    : { interval: 'preserveStartEnd' as const };
-  const axisTickProps = { fontSize: isMobile ? 10 : 12 };
-  const recentMonthsLimit = 24;
 
-  const filterRecentMonths = <T extends { sortKey?: string | number }>(data: T[], months: number) => {
-    if (data.length <= months) return data;
-    return data.slice(-months);
-  };
-
-  const monthlyTrendChartData = isMobile && !showFullMonthlyHistory
-    ? filterRecentMonths(monthlyTrendData, recentMonthsLimit) : monthlyTrendData;
-  const monthlyTrendPercentChartData = monthlyTrendChartData.map(item => ({
-    month: item.month,
-    'Entrate %': item['Entrate %'],
-    'Spese %': item['Spese %'],
-    'Saving Rate %': item['Saving Rate %'],
-  }));
-  const monthlyExpensesByTypeChartData = isMobile && !showFullMonthlyHistory
-    ? filterRecentMonths(monthlyExpensesByType, recentMonthsLimit) : monthlyExpensesByType;
-  const monthlyExpensesByCategoryChartData = isMobile && !showFullMonthlyHistory
-    ? filterRecentMonths(monthlyExpensesByCategory.data, recentMonthsLimit) : monthlyExpensesByCategory.data;
-  const monthlyIncomeByCategoryChartData = isMobile && !showFullMonthlyHistory
-    ? filterRecentMonths(monthlyIncomeByCategory.data, recentMonthsLimit) : monthlyIncomeByCategory.data;
-  const yearlyTrendPercentChartData = yearlyTrendData.map(item => ({
-    year: item.year,
-    'Entrate %': item['Entrate %'],
-    'Spese %': item['Spese %'],
-    'Saving Rate %': item['Saving Rate %'],
-  }));
+  // Show structural skeleton only on initial load (no data yet).
+  // Re-fetches while data is present show stale data, not a skeleton — avoids jarring blank flash.
+  if (loading && allExpenses.length === 0) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        {/* Period pill placeholder */}
+        <div className="h-9 w-64 rounded-full bg-muted" />
+        {/* Hero KPI trio */}
+        <div className="grid grid-cols-3 gap-px bg-border rounded-xl overflow-hidden">
+          {[0, 1, 2].map(i => (
+            <div key={i} className="bg-card px-4 py-4 desktop:px-6 desktop:py-5 space-y-2">
+              <div className="h-3 w-16 rounded bg-muted" />
+              <div className="h-8 w-28 rounded bg-muted" />
+            </div>
+          ))}
+        </div>
+        {/* Sankey placeholder */}
+        <div className="h-64 rounded-xl bg-muted" />
+        {/* Charts placeholder */}
+        <div className="grid gap-4 desktop:grid-cols-2">
+          <div className="h-48 rounded-xl bg-muted" />
+          <div className="h-48 rounded-xl bg-muted" />
+        </div>
+      </div>
+    );
+  }
 
   const renderLegendItems = (
     items: ChartData[],
@@ -657,21 +615,6 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
           >
             <div className="h-3.5 w-3.5 flex-shrink-0 rounded-sm" style={{ backgroundColor: item.color }} />
             <span className="text-muted-foreground">{item.name} ({item.percentage.toFixed(1)}%)</span>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  const renderLegendContent = (maxItems?: number) => (props: any) => {
-    const payload = props?.payload || [];
-    const items = maxItems ? payload.slice(0, maxItems) : payload;
-    return (
-      <div className={isMobile ? 'mt-3 flex flex-wrap gap-3' : ''}>
-        {items.map((entry: any) => (
-          <div key={entry.value} className="flex items-center gap-2 text-sm">
-            <span className="h-3.5 w-3.5 rounded-sm" style={{ backgroundColor: entry.color }} />
-            <span className="text-muted-foreground">{entry.value}</span>
           </div>
         ))}
       </div>
@@ -756,22 +699,66 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
           ] as [PeriodMode, string][]).map(([mode, label]) => (
             <button
               key={mode}
+              type="button"
               role="tab"
               aria-selected={periodMode === mode}
               onClick={() => handlePeriodModeChange(mode)}
               className={cn(
                 'relative px-3 py-1.5 text-sm font-medium rounded-full transition-colors',
                 periodMode === mode
-                  ? 'bg-background text-foreground shadow-sm'
+                  ? 'text-foreground'
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              {label}
+              {periodMode === mode && (
+                <motion.span
+                  layoutId="analisi-period-pill"
+                  className="absolute inset-0 rounded-full bg-background shadow-sm"
+                  transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+                />
+              )}
+              <span className="relative z-10">{label}</span>
             </button>
           ))}
         </div>
 
-        {/* Year + Month dropdowns — visible only in "Anno" mode */}
+        {/* Month picker — "Anno Corrente" gets a month filter too */}
+        {periodMode === 'current' && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            className="flex flex-col gap-2 sm:flex-row sm:items-center"
+          >
+            <Select
+              value={selectedMonth?.toString() || '__all__'}
+              onValueChange={handleMonthChange}
+            >
+              <SelectTrigger className={cn('w-full sm:w-[160px]', controlClassName)}>
+                <SelectValue placeholder="Tutto l'anno" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Tutto l&apos;anno</SelectItem>
+                {MONTH_NAMES.map((month, index) => (
+                  <SelectItem key={index + 1} value={(index + 1).toString()}>{month}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {isMonthFiltered && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleResetFilters}
+                className="text-muted-foreground hover:text-foreground whitespace-nowrap self-start sm:self-auto"
+              >
+                Ripristina
+              </Button>
+            )}
+          </motion.div>
+        )}
+
+        {/* Year + Month dropdowns — "Anno" mode (past years only) */}
         {periodMode === 'year' && (
           <motion.div
             initial={{ opacity: 0, y: -4 }}
@@ -780,14 +767,15 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
             className="flex flex-col gap-2 sm:flex-row sm:items-center"
           >
             <Select
-              value={selectedYear?.toString() || availableYears[0]?.toString()}
+              value={selectedYear?.toString() || pastYears[0]?.toString()}
               onValueChange={handleYearChange}
             >
               <SelectTrigger className={cn('w-full sm:w-[140px]', controlClassName)}>
                 <SelectValue placeholder="Anno" />
               </SelectTrigger>
               <SelectContent>
-                {availableYears.map(year => (
+                {/* currentYear excluded — Anno Corrente is the dedicated entry point */}
+                {pastYears.map(year => (
                   <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
                 ))}
               </SelectContent>
@@ -803,13 +791,13 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">Tutto l&apos;anno</SelectItem>
-                {ITALIAN_MONTHS.map((month, index) => (
+                {MONTH_NAMES.map((month, index) => (
                   <SelectItem key={index + 1} value={(index + 1).toString()}>{month}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            {isFiltered && (
+            {isMonthFiltered && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -823,61 +811,92 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
         )}
       </div>
 
-      {/* ── KPI block ─────────────────────────────────────────────────── */}
-      <div className="grid gap-4 grid-cols-2 desktop:grid-cols-4">
-        {/* Entrate */}
-        <div className="rounded-lg border p-4 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Entrate</p>
-          <p className="text-xl font-bold font-mono text-green-600 dark:text-green-500 tabular-nums">
-            {formatCurrency(totalIncome)}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {periodFilteredExpenses.filter(e => e.type === 'income').length} voci
-          </p>
+      {/* ── Hero KPI trio ─────────────────────────────────────────────── */}
+      {/* Three dominant metrics in flat layout (Trade Republic hierarchy).
+          Mobile: stacked rows (full width). Desktop: 3 columns side by side.
+          Savings rate sits below Risparmio as a secondary metric, not a 4th column. */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-border rounded-xl overflow-hidden">
+        {/* Entrate
+            Mobile: flex row — label+count left, value right.
+            Desktop (sm:block): vertical stack — label → value → count. */}
+        <div className="bg-card px-4 py-4 desktop:px-6 desktop:py-5 flex items-center justify-between sm:block">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Entrate</p>
+            <p className="text-xs text-muted-foreground sm:hidden">
+              {periodFilteredExpenses.filter(e => e.type === 'income').length} voci
+            </p>
+          </div>
+          <div className="text-right sm:text-left sm:mt-1">
+            <p className="text-2xl desktop:text-4xl font-bold font-mono text-emerald-600 dark:text-emerald-400 tabular-nums">
+              {formatCurrency(totalIncome)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">
+              {periodFilteredExpenses.filter(e => e.type === 'income').length} voci
+            </p>
+          </div>
         </div>
 
         {/* Spese */}
-        <div className="rounded-lg border p-4 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Spese</p>
-          <p className="text-xl font-bold font-mono text-red-600 dark:text-red-500 tabular-nums">
-            {formatCurrency(totalExpenses)}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {periodFilteredExpenses.filter(e => e.type !== 'income').length} voci
-          </p>
+        <div className="bg-card px-4 py-4 desktop:px-6 desktop:py-5 flex items-center justify-between sm:block">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Spese</p>
+            <p className="text-xs text-muted-foreground sm:hidden">
+              {periodFilteredExpenses.filter(e => e.type !== 'income').length} voci
+            </p>
+          </div>
+          <div className="text-right sm:text-left sm:mt-1">
+            <p className="text-2xl desktop:text-4xl font-bold font-mono text-destructive tabular-nums">
+              {formatCurrency(totalExpenses)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">
+              {periodFilteredExpenses.filter(e => e.type !== 'income').length} voci
+            </p>
+          </div>
         </div>
 
-        {/* Bilancio Netto */}
-        <div className="rounded-lg border p-4 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Bilancio</p>
-          <p className={cn(
-            'text-xl font-bold font-mono tabular-nums',
-            netBalance >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'
-          )}>
-            {formatCurrency(netBalance)}
-          </p>
-          <p className="text-xs text-muted-foreground">Netto periodo</p>
-        </div>
-
-        {/* Rapporto */}
-        <div className="rounded-lg border p-4 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Rapporto</p>
-          <p className={cn(
-            'text-xl font-bold font-mono tabular-nums',
-            ratio === null ? 'text-muted-foreground' :
-              ratio >= 1.2 ? 'text-green-600 dark:text-green-500' :
-              ratio >= 0.8 ? 'text-yellow-600 dark:text-yellow-500' :
-              'text-red-600 dark:text-red-500'
-          )}>
-            {ratio !== null ? ratio.toFixed(2) : 'N/A'}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {ratio === null ? 'Nessun dato' :
-              ratio >= 1.2 ? 'Ottima salute' :
-              ratio >= 0.8 ? 'In equilibrio' : 'Attenzione'}
-          </p>
+        {/* Risparmio — netBalance drives sign color, savingsRate drives the secondary label */}
+        <div className="bg-card px-4 py-4 desktop:px-6 desktop:py-5 flex items-center justify-between sm:block">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Risparmio</p>
+            {totalIncome > 0 && (
+              <p className={cn(
+                'text-xs font-medium font-mono sm:hidden',
+                savingsRate >= 20
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : savingsRate >= 10
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-destructive'
+              )}>
+                {savingsRate >= 0 ? `${savingsRate.toFixed(1)}% risparmiato` : `${savingsRate.toFixed(1)}% (deficit)`}
+              </p>
+            )}
+          </div>
+          <div className="text-right sm:text-left sm:mt-1">
+            <p className={cn(
+              'text-2xl desktop:text-4xl font-bold font-mono tabular-nums',
+              netBalance >= 0 ? 'text-foreground' : 'text-destructive'
+            )}>
+              {formatCurrency(netBalance)}
+            </p>
+            {totalIncome > 0 && (
+              <p className={cn(
+                'text-xs font-medium font-mono mt-0.5 hidden sm:block',
+                savingsRate >= 20
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : savingsRate >= 10
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-destructive'
+              )}>
+                {savingsRate >= 0 ? `${savingsRate.toFixed(1)}% risparmiato` : `${savingsRate.toFixed(1)}% (deficit)`}
+              </p>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* ── Anomalie (condizionale) ───────────────────────────────────── */}
+      {/* Rendered only when anomalies detected — no "all clear" empty state */}
+      <AnomalieBlock anomalie={anomalieData} onCategoryClick={handleAnomaliaClick} />
 
       {/* ── Spese Maggiori ────────────────────────────────────────────── */}
       {topExpenses.length > 0 && (
@@ -891,6 +910,7 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
         </div>
       ) : (
         <motion.div
+          ref={distributionRef}
           variants={chartShellSettle}
           initial={false}
           animate="settle"
@@ -1065,296 +1085,35 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
         </motion.div>
       )}
 
-      {/* ── Trend section (collapsible) ───────────────────────────────── */}
-      <Collapsible open={trendOpen} onOpenChange={setTrendOpen}>
-        <CollapsibleTrigger asChild>
-          <button className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full text-left py-2">
-            <ChevronDown className={cn('h-4 w-4 transition-transform', trendOpen && 'rotate-180')} />
-            Trend storici
-            <span className="text-xs text-muted-foreground/60 font-normal ml-1">
-              {yearlyTrendData.length} anni di dati
-            </span>
-          </button>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="grid gap-4 sm:gap-6 desktop:grid-cols-2 mt-2">
+      {/* ── Confronto Annuale ─────────────────────────────────────────── */}
+      {/* Always rendered — shows placeholder when comparison data unavailable */}
+      <ConfrontoAnnualeSection
+        allExpenses={allExpenses}
+        selectedYear={selectedYear}
+        selectedMonth={selectedMonth}
+        periodMode={periodMode}
+        historyStartYear={historyStartYear}
+      />
 
-            {/* Monthly Trend */}
-            {monthlyTrendData.length > 0 && (
-              <Card className="desktop:col-span-2">
-                <CardHeader>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <CardTitle>Trend Mensile</CardTitle>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {isMobile && (
-                        <Button variant="outline" size="sm" onClick={() => setShowFullMonthlyHistory(!showFullMonthlyHistory)}>
-                          {showFullMonthlyHistory ? 'Ultimi 24 mesi' : 'Mostra tutto'}
-                        </Button>
-                      )}
-                      <Button variant="outline" size="sm" onClick={() => setShowMonthlyTrendPercentage(!showMonthlyTrendPercentage)}>
-                        {showMonthlyTrendPercentage ? '€ Valori Assoluti' : '% Percentuali'}
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={lineChartHeight}>
-                    {showMonthlyTrendPercentage ? (
-                      <LineChart data={monthlyTrendPercentChartData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="month" tick={axisTickProps} {...xAxisProps} />
-                        <YAxis tickFormatter={(v) => `${v.toFixed(0)}%`} domain={[-100, 100]} allowDataOverflow />
-                        <Tooltip content={<ChartTooltip formatter={(v) => `${v.toFixed(2)}%`} />} />
-                        <Legend />
-                        <ReferenceLine y={0} stroke="#6b7280" strokeDasharray="4 4" />
-                        <Line type="monotone" dataKey="Entrate %" stroke={COLORS[1] || '#10b981'} strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
-                        <Line type="monotone" dataKey="Spese %" stroke={COLORS[0] || '#ef4444'} strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
-                        <Line type="monotone" dataKey="Saving Rate %" stroke={COLORS[2] || '#3b82f6'} strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
-                      </LineChart>
-                    ) : (
-                      <LineChart data={monthlyTrendChartData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="month" tick={axisTickProps} {...xAxisProps} />
-                        <YAxis tickFormatter={(v) => formatCurrencyCompact(v)} />
-                        <Tooltip content={<ChartTooltip />} />
-                        <Legend />
-                        <Line type="monotone" dataKey="Entrate" stroke={COLORS[1] || '#10b981'} strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
-                        <Line type="monotone" dataKey="Spese" stroke={COLORS[0] || '#ef4444'} strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
-                        <Line type="monotone" dataKey="Netto" stroke={COLORS[2] || '#3b82f6'} strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
-                      </LineChart>
-                    )}
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            )}
+      {/* ── Andamento Risparmio + Trend per Categoria ────────────────── */}
+      {/* Hidden in "Anno" mode — the rolling windows (24m / 12m from today)
+          are discordant with a specific past-year filter. "Anno" always shows
+          a past year now (currentYear is handled by "Anno Corrente"). */}
+      {periodMode !== 'year' && (
+        <>
+          <SavingsRateTrendSection
+            allExpenses={allExpenses}
+            historyStartYear={historyStartYear}
+            monthsToShow={24}
+          />
 
-            {/* Yearly Trend */}
-            {yearlyTrendData.length > 0 && (
-              <Card className="desktop:col-span-2">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>Trend Annuale</CardTitle>
-                    <Button variant="outline" size="sm" onClick={() => setShowYearlyTrendPercentage(!showYearlyTrendPercentage)}>
-                      {showYearlyTrendPercentage ? '€ Valori Assoluti' : '% Percentuali'}
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={lineChartHeight}>
-                    {showYearlyTrendPercentage ? (
-                      <LineChart data={yearlyTrendPercentChartData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="year" tick={axisTickProps} {...xAxisProps} />
-                        <YAxis tickFormatter={(v) => `${v.toFixed(0)}%`} domain={[-100, 100]} allowDataOverflow />
-                        <Tooltip content={<ChartTooltip formatter={(v) => `${v.toFixed(2)}%`} />} />
-                        <Legend />
-                        <ReferenceLine y={0} stroke="#6b7280" strokeDasharray="4 4" />
-                        <Line type="monotone" dataKey="Entrate %" stroke={COLORS[1] || '#10b981'} strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
-                        <Line type="monotone" dataKey="Spese %" stroke={COLORS[0] || '#ef4444'} strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
-                        <Line type="monotone" dataKey="Saving Rate %" stroke={COLORS[2] || '#3b82f6'} strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
-                      </LineChart>
-                    ) : (
-                      <LineChart data={yearlyTrendData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="year" tick={axisTickProps} {...xAxisProps} />
-                        <YAxis tickFormatter={(v) => formatCurrencyCompact(v)} />
-                        <Tooltip content={<ChartTooltip />} />
-                        <Legend />
-                        <Line type="monotone" dataKey="Entrate" stroke={COLORS[1] || '#10b981'} strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
-                        <Line type="monotone" dataKey="Spese" stroke={COLORS[0] || '#ef4444'} strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
-                        <Line type="monotone" dataKey="Netto" stroke={COLORS[2] || '#3b82f6'} strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
-                      </LineChart>
-                    )}
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Yearly ratio */}
-            {yearlyIncomeExpenseRatioData.length > 0 && (
-              <Card className="desktop:col-span-2">
-                <CardHeader><CardTitle>Rapporto Entrate/Spese Annuale</CardTitle></CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={lineChartHeight}>
-                    <LineChart data={yearlyIncomeExpenseRatioData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="year" tick={axisTickProps} {...xAxisProps} />
-                      <YAxis tickFormatter={(v) => v.toFixed(2)} domain={[0, 'auto']} />
-                      <Tooltip content={<ChartTooltip formatter={(v) => v.toFixed(2)} />} />
-                      <ReferenceArea y1={1.2} y2={5} fill="#10b981" fillOpacity={0.1} />
-                      <ReferenceArea y1={0.8} y2={1.2} fill="#eab308" fillOpacity={0.1} />
-                      <ReferenceArea y1={0} y2={0.8} fill="#ef4444" fillOpacity={0.1} />
-                      <ReferenceLine y={1.0} stroke="#6b7280" strokeDasharray="5 5"
-                        label={{ value: 'Break-even', position: 'right', fill: '#6b7280', fontSize: 11 }} />
-                      <Line type="monotone" dataKey="ratio" stroke={COLORS[3] || '#8b5cf6'} strokeWidth={3}
-                        name="Rapporto" dot={{ r: 5 }} animationDuration={800} animationEasing="ease-out" />
-                    </LineChart>
-                  </ResponsiveContainer>
-                  <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                    <span><span className="inline-block w-2.5 h-2.5 rounded-sm bg-green-600/30 mr-1" />≥ 1.2 Ottima salute</span>
-                    <span><span className="inline-block w-2.5 h-2.5 rounded-sm bg-yellow-600/30 mr-1" />0.8–1.2 Equilibrio</span>
-                    <span><span className="inline-block w-2.5 h-2.5 rounded-sm bg-red-600/30 mr-1" />&lt; 0.8 Attenzione</span>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Monthly expenses by type */}
-            {monthlyExpensesByType.length > 0 && (
-              <Card className="desktop:col-span-2">
-                <CardHeader>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <CardTitle>Trend Mensile Spese per Tipo</CardTitle>
-                    {isMobile && (
-                      <Button variant="outline" size="sm" onClick={() => setShowFullMonthlyHistory(!showFullMonthlyHistory)}>
-                        {showFullMonthlyHistory ? 'Ultimi 24 mesi' : 'Mostra tutto'}
-                      </Button>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={lineChartHeight}>
-                    <LineChart data={monthlyExpensesByTypeChartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" tick={axisTickProps} {...xAxisProps} />
-                      <YAxis tickFormatter={(v) => formatCurrencyCompact(v)} />
-                      <Tooltip content={<ChartTooltip />} />
-                      <Legend content={renderLegendContent(isMobile ? 3 : undefined)} />
-                      <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.fixed} stroke={COLORS[2] || '#3b82f6'} strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
-                      <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.variable} stroke={COLORS[3] || '#8b5cf6'} strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
-                      <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.debt} stroke={COLORS[4] || '#f59e0b'} strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Yearly expenses by type */}
-            {yearlyExpensesByType.length > 0 && (
-              <Card className="desktop:col-span-2">
-                <CardHeader><CardTitle>Trend Annuale Spese per Tipo</CardTitle></CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={lineChartHeight}>
-                    <LineChart data={yearlyExpensesByType}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="year" tick={axisTickProps} {...xAxisProps} />
-                      <YAxis tickFormatter={(v) => formatCurrencyCompact(v)} />
-                      <Tooltip content={<ChartTooltip />} />
-                      <Legend content={renderLegendContent(isMobile ? 3 : undefined)} />
-                      <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.fixed} stroke={COLORS[2] || '#3b82f6'} strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
-                      <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.variable} stroke={COLORS[3] || '#8b5cf6'} strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
-                      <Line type="monotone" dataKey={EXPENSE_TYPE_LABELS.debt} stroke={COLORS[4] || '#f59e0b'} strokeWidth={2} dot={!isMobile} animationDuration={800} animationEasing="ease-out" />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Monthly expenses by category */}
-            {monthlyExpensesByCategory.data.length > 0 && (
-              <Card className="desktop:col-span-2">
-                <CardHeader>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <CardTitle>Trend Mensile Spese per Categoria (Top 5)</CardTitle>
-                    {isMobile && (
-                      <Button variant="outline" size="sm" onClick={() => setShowFullMonthlyHistory(!showFullMonthlyHistory)}>
-                        {showFullMonthlyHistory ? 'Ultimi 24 mesi' : 'Mostra tutto'}
-                      </Button>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={lineChartHeight}>
-                    <LineChart data={monthlyExpensesByCategoryChartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" tick={axisTickProps} {...xAxisProps} />
-                      <YAxis tickFormatter={(v) => formatCurrencyCompact(v)} />
-                      <Tooltip content={<ChartTooltip />} />
-                      <Legend content={renderLegendContent(isMobile ? 3 : undefined)} />
-                      {monthlyExpensesByCategory.categories.filter(c => c !== 'Altro').map((cat, i) => (
-                        <Line key={cat} type="monotone" dataKey={cat} stroke={COLORS[i % COLORS.length]} strokeWidth={2} animationDuration={800} animationEasing="ease-out" />
-                      ))}
-                    </LineChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Yearly expenses by category */}
-            {yearlyExpensesByCategory.data.length > 0 && (
-              <Card className="desktop:col-span-2">
-                <CardHeader><CardTitle>Trend Annuale Spese per Categoria (Top 5)</CardTitle></CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={lineChartHeight}>
-                    <LineChart data={yearlyExpensesByCategory.data}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="year" tick={axisTickProps} {...xAxisProps} />
-                      <YAxis tickFormatter={(v) => formatCurrencyCompact(v)} />
-                      <Tooltip content={<ChartTooltip />} />
-                      <Legend />
-                      {yearlyExpensesByCategory.categories.filter(c => c !== 'Altro').map((cat, i) => (
-                        <Line key={cat} type="monotone" dataKey={cat} stroke={COLORS[i % COLORS.length]} strokeWidth={2} animationDuration={800} animationEasing="ease-out" />
-                      ))}
-                    </LineChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Monthly income by category */}
-            {monthlyIncomeByCategory.data.length > 0 && (
-              <Card className="desktop:col-span-2">
-                <CardHeader>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <CardTitle>Trend Mensile Entrate per Categoria (Top 5)</CardTitle>
-                    {isMobile && (
-                      <Button variant="outline" size="sm" onClick={() => setShowFullMonthlyHistory(!showFullMonthlyHistory)}>
-                        {showFullMonthlyHistory ? 'Ultimi 24 mesi' : 'Mostra tutto'}
-                      </Button>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={lineChartHeight}>
-                    <LineChart data={monthlyIncomeByCategoryChartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" tick={axisTickProps} {...xAxisProps} />
-                      <YAxis tickFormatter={(v) => formatCurrencyCompact(v)} />
-                      <Tooltip content={<ChartTooltip />} />
-                      <Legend />
-                      {monthlyIncomeByCategory.categories.filter(c => c !== 'Altro').map((cat, i) => (
-                        <Line key={cat} type="monotone" dataKey={cat} stroke={COLORS[i % COLORS.length]} strokeWidth={2} animationDuration={800} animationEasing="ease-out" />
-                      ))}
-                    </LineChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Yearly income by category */}
-            {yearlyIncomeByCategory.data.length > 0 && (
-              <Card className="desktop:col-span-2">
-                <CardHeader><CardTitle>Trend Annuale Entrate per Categoria (Top 5)</CardTitle></CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={lineChartHeight}>
-                    <LineChart data={yearlyIncomeByCategory.data}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="year" tick={axisTickProps} {...xAxisProps} />
-                      <YAxis tickFormatter={(v) => formatCurrencyCompact(v)} />
-                      <Tooltip content={<ChartTooltip />} />
-                      <Legend />
-                      {yearlyIncomeByCategory.categories.filter(c => c !== 'Altro').map((cat, i) => (
-                        <Line key={cat} type="monotone" dataKey={cat} stroke={COLORS[i % COLORS.length]} strokeWidth={2} animationDuration={800} animationEasing="ease-out" />
-                      ))}
-                    </LineChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            )}
-
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
+          <CategoryTrendsGrid
+            allExpenses={allExpenses}
+            historyStartYear={historyStartYear}
+            monthsToShow={12}
+          />
+        </>
+      )}
     </div>
   );
 }

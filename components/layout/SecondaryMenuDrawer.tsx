@@ -17,6 +17,7 @@ import {
 import { AssistenteBanner } from '@/components/layout/AssistenteBanner';
 import { LogoutDialog } from '@/components/layout/LogoutDialog';
 import {
+  BarChart3,
   PieChart,
   History,
   Trophy,
@@ -43,15 +44,19 @@ import { getDisplayInfo } from '@/lib/utils/userDisplayUtils';
 
 type NavEntry = { name: string; href: string; icon: React.ComponentType<{ className?: string }> };
 
+// Statistiche: read-only analysis views
 const analisiNav: NavEntry[] = [
-  { name: 'Allocazione', href: '/dashboard/allocation', icon: PieChart },
-  { name: 'Rendimenti', href: '/dashboard/performance', icon: TrendingUp },
-  { name: 'Storico', href: '/dashboard/history', icon: History },
-  { name: 'Hall of Fame', href: '/dashboard/hall-of-fame', icon: Trophy },
+  { name: 'Analisi',      href: '/dashboard/analisi',      icon: BarChart3  },
+  { name: 'Rendimenti',   href: '/dashboard/performance',  icon: TrendingUp },
+  { name: 'Storico',      href: '/dashboard/history',      icon: History    },
+  { name: 'Hall of Fame', href: '/dashboard/hall-of-fame', icon: Trophy     },
 ];
 
+// Pianificazione: decision/action tools.
+// Allocazione moved here — it's a rebalancing action tool, not a read-only stat.
 const pianificazioneNav: NavEntry[] = [
-  { name: 'FIRE e Simulazioni', href: '/dashboard/fire-simulations', icon: Flame },
+  { name: 'Allocazione',        href: '/dashboard/allocation',       icon: PieChart },
+  { name: 'FIRE e Simulazioni', href: '/dashboard/fire-simulations', icon: Flame   },
 ];
 
 interface SecondaryMenuDrawerProps {
@@ -138,9 +143,9 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
                 initial="hidden"
                 animate="visible"
               >
-                {/* Analisi */}
+                {/* Statistiche */}
                 <div className="mb-1">
-                  <motion.p variants={drawerItem} className={sectionLabel}>Analisi</motion.p>
+                  <motion.p variants={drawerItem} className={sectionLabel}>Statistiche</motion.p>
                   {analisiNav.map((nav) => (
                     <motion.button
                       key={nav.href}

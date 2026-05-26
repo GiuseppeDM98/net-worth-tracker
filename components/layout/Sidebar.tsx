@@ -35,6 +35,7 @@ import { useLogout } from '@/lib/hooks/useLogout';
 import { isNavItemActive } from '@/lib/utils/navUtils';
 import { getDisplayInfo } from '@/lib/utils/userDisplayUtils';
 import {
+  BarChart3,
   LayoutDashboard,
   Wallet,
   PieChart,
@@ -62,17 +63,19 @@ const primaryNav: NavItem[] = [
   { name: 'Cashflow', href: '/dashboard/cashflow', icon: Receipt },
 ];
 
-// Analysis routes — also in SecondaryMenuDrawer under "Analisi".
+// Statistiche routes — read-only analysis views, also in SecondaryMenuDrawer.
 const analysisNav: NavItem[] = [
-  { name: 'Allocazione', href: '/dashboard/allocation', icon: PieChart },
-  { name: 'Rendimenti', href: '/dashboard/performance', icon: TrendingUp },
-  { name: 'Storico', href: '/dashboard/history', icon: History },
-  { name: 'Hall of Fame', href: '/dashboard/hall-of-fame', icon: Trophy },
+  { name: 'Analisi',      href: '/dashboard/analisi',      icon: BarChart3  },
+  { name: 'Rendimenti',   href: '/dashboard/performance',  icon: TrendingUp },
+  { name: 'Storico',      href: '/dashboard/history',      icon: History    },
+  { name: 'Hall of Fame', href: '/dashboard/hall-of-fame', icon: Trophy     },
 ];
 
-// Planning routes — also in SecondaryMenuDrawer under "Pianificazione".
+// Pianificazione routes — decision/action tools, also in SecondaryMenuDrawer.
+// Allocazione belongs here: it's a rebalancing action tool, not a read-only stat.
 const planningNav: NavItem[] = [
-  { name: 'FIRE e Simulazioni', href: '/dashboard/fire-simulations', icon: Flame },
+  { name: 'Allocazione',        href: '/dashboard/allocation',      icon: PieChart },
+  { name: 'FIRE e Simulazioni', href: '/dashboard/fire-simulations', icon: Flame   },
 ];
 
 function NavItems({ items }: { items: NavItem[] }) {
@@ -158,7 +161,7 @@ export function AppSidebar() {
 
           {/* Analysis routes */}
           <SidebarGroup>
-            <SidebarGroupLabel>Analisi</SidebarGroupLabel>
+            <SidebarGroupLabel>Statistiche</SidebarGroupLabel>
             <SidebarGroupContent>
               <NavItems items={analysisNav} />
             </SidebarGroupContent>

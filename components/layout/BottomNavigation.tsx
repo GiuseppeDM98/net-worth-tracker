@@ -19,12 +19,16 @@ const primaryNavigation = [
 ];
 
 const secondaryHrefs = [
-  '/dashboard/allocation',
+  // Statistiche
+  '/dashboard/analisi',
   '/dashboard/performance',
   '/dashboard/history',
-  ...(process.env.NEXT_PUBLIC_ASSISTANT_AI_ENABLED !== 'false' ? ['/dashboard/assistant'] : []),
   '/dashboard/hall-of-fame',
+  // Pianificazione
+  '/dashboard/allocation',
   '/dashboard/fire-simulations',
+  // Other
+  ...(process.env.NEXT_PUBLIC_ASSISTANT_AI_ENABLED !== 'false' ? ['/dashboard/assistant'] : []),
   '/dashboard/settings',
 ];
 

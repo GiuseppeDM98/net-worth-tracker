@@ -327,8 +327,9 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - **Bottom nav uses `--sidebar-*` CSS vars** for theme-aware colors — background `var(--sidebar)`, border `var(--sidebar-border)`, active tab `var(--sidebar-primary)` + `var(--sidebar-accent)` bg, inactive `var(--sidebar-foreground)` at opacity 0.65. Use `style={{ ... }}` inline because sidebar vars are not mapped to Tailwind utility classes.
 - **Sidebar active state — Overview exact match**: `Sidebar.tsx` `isActive` for `/dashboard` must use `pathname === item.href` only, never `startsWith`. `startsWith('/dashboard/')` matches every sub-route (`/dashboard/assets`, `/dashboard/history`, etc.) and keeps Panoramica highlighted on all pages. All other routes can use prefix matching safely
 - `secondaryHrefs` array in `BottomNavigation.tsx` must stay in sync with `navigationGroups` hrefs in `SecondaryMenuDrawer.tsx`
-- Secondary drawer uses 3 semantic groups: Analisi (Allocazione, Rendimenti, Storico, Hall of Fame), Pianificazione (FIRE e Simulazioni), Preferenze (Impostazioni)
-- `Assistente AI` belongs in the `Analisi` group and must be included anywhere secondary analytical routes are enumerated
+- Secondary drawer uses 3 semantic groups: **Statistiche** (Analisi, Rendimenti, Storico, Hall of Fame, Assistente AI — read-only views), **Pianificazione** (Allocazione, FIRE e Simulazioni — action-bearing tools), **Preferenze** (Impostazioni)
+- `Assistente AI` belongs in the `Statistiche` group. `Allocazione` belongs in `Pianificazione` (has COMPRA/VENDI/OK action chips — not a read-only stat)
+- Nav item for the cashflow analysis page is "Analisi" (route `/dashboard/analisi`), NOT "Flussi"
 - Eyebrow label style for group headers: `text-xs font-semibold uppercase tracking-wider text-muted-foreground/60`
 
 ### Progressive Disclosure on Data-Dense Pages
@@ -430,6 +431,7 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - `Legend` reads `<Bar fill>`, not `<Cell>`
 - Always set `fill` on `<Bar>` even when per-bar colors are overridden by `<Cell>`
 - Do not set text `color` globally in tooltip style for line/area/bar charts
+- **Recharts `formatter` prop signature is `(value: ValueType | undefined, ...)`**: `ValueType = string | number | (string | number)[]`. Never type the first param as `number` — TypeScript compiles but runtime receives `undefined` for gap points in line charts with `connectNulls={false}`. Correct coercion patterns: `Number(value ?? 0)` for bar charts; `value != null ? Number(value).toFixed(1) : '—'` for nullable line charts.
 - **Recharts tooltip — always use CSS vars, never hardcoded hex**: the correct pattern is to pass `contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', color: 'var(--card-foreground)' }}` and `labelStyle={{ fontWeight: 600, color: 'var(--card-foreground)' }}`. Never use `color: '#111827'` — it is invisible in dark mode since the tooltip background becomes dark via `var(--card)`. This applies to every `<Tooltip>` across all pages and charts. Applied in `FireCalculatorTab.tsx`, `FIREProjectionChart.tsx`.
 - **BarChart hover cursor overlay**: the default cursor is an opaque light rectangle — too visible in dark mode. Set `cursor={{ fill: 'rgba(128, 128, 128, 0.1)' }}` on `<Tooltip>` for a subtle semi-transparent overlay that works in both modes.
 

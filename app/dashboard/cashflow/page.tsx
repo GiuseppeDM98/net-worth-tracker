@@ -24,11 +24,10 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
-import { Receipt, Coins, BarChart3, Target, Layers } from 'lucide-react';
+import { Receipt, Coins, Target, Layers } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ExpenseTrackingTab } from '@/components/cashflow/ExpenseTrackingTab';
-import { AnalisiTab } from '@/components/cashflow/AnalisiTab';
 import { DividendTrackingTab } from '@/components/dividends/DividendTrackingTab';
 import { BudgetTab } from '@/components/cashflow/BudgetTab';
 import { CostCentersTab } from '@/components/cashflow/CostCentersTab';
@@ -48,11 +47,11 @@ function getErrorMessage(error: unknown): string {
 }
 
 // Module-level constant: stable reference for React Compiler
+// Analisi tab removed — it now lives at /dashboard/analisi as a standalone page.
 const CASHFLOW_TABS_BASE: Array<{ value: string; label: string; mobileLabel: string; icon: React.ElementType }> = [
-  { value: 'tracking',     label: 'Tracciamento', mobileLabel: 'Spese',     icon: Receipt  },
-  { value: 'dividends',    label: 'Dividendi',    mobileLabel: 'Dividendi', icon: Coins    },
-  { value: 'analisi',      label: 'Analisi',      mobileLabel: 'Analisi',   icon: BarChart3 },
-  { value: 'budget',       label: 'Budget',       mobileLabel: 'Budget',    icon: Target   },
+  { value: 'tracking',     label: 'Tracciamento', mobileLabel: 'Spese',     icon: Receipt },
+  { value: 'dividends',    label: 'Dividendi',    mobileLabel: 'Dividendi', icon: Coins   },
+  { value: 'budget',       label: 'Budget',       mobileLabel: 'Budget',    icon: Target  },
 ];
 
 export default function CashflowPage() {
@@ -171,7 +170,7 @@ export default function CashflowPage() {
           Cashflow
         </h1>
         <p className="mt-2 text-muted-foreground">
-          Traccia e analizza le tue entrate e uscite nel tempo
+          Traccia entrate, uscite e gestisci il budget mensile
         </p>
       </div>
 
@@ -262,23 +261,6 @@ export default function CashflowPage() {
                 assets={assets}
                 loading={loading}
                 onRefresh={handleRefresh}
-              />
-            </motion.div>
-          </TabsContent>
-        )}
-
-        {mountedTabs.has('analisi') && (
-          <TabsContent value="analisi" forceMount>
-            <motion.div
-              initial={false}
-              animate={activeTab === 'analisi' ? 'visible' : 'hidden'}
-              variants={tabPanelSwitch}
-            >
-              <AnalisiTab
-                allExpenses={allExpenses}
-                loading={loading}
-                onRefresh={handleRefresh}
-                historyStartYear={cashflowHistoryStartYear}
               />
             </motion.div>
           </TabsContent>
