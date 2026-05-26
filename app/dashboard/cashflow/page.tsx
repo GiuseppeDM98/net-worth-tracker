@@ -25,7 +25,7 @@ import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
-import { Receipt, Coins, BarChart3, Target, Layers } from 'lucide-react';
+import { Receipt, Coins, BarChart3, Target, Layers, ChartCandlestick, TrendingUp, ArrowRightLeft, Scale } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
@@ -91,10 +91,14 @@ function getErrorMessage(error: unknown): string {
 
 // Module-level constant: stable reference for React Compiler
 const CASHFLOW_TABS_BASE: Array<{ value: string; label: string; mobileLabel: string; icon: React.ElementType }> = [
-  { value: 'tracking',     label: 'Tracciamento', mobileLabel: 'Spese',     icon: Receipt  },
-  { value: 'dividends',    label: 'Dividendi',    mobileLabel: 'Dividendi', icon: Coins    },
-  { value: 'analisi',      label: 'Analisi',      mobileLabel: 'Analisi',   icon: BarChart3 },
-  { value: 'budget',       label: 'Budget',       mobileLabel: 'Budget',    icon: Target   },
+  { value: 'tracking',      label: 'Tracciamento',       mobileLabel: 'Spese',      icon: Receipt          },
+  { value: 'dividends',     label: 'Dividendi',          mobileLabel: 'Divid.',     icon: Coins            },
+  { value: 'investments',   label: 'Investimenti',       mobileLabel: 'Invest.',    icon: ChartCandlestick },
+  { value: 'current-year',  label: 'Anno Corrente',      mobileLabel: 'Anno',       icon: TrendingUp       },
+  { value: 'total-history', label: 'Storico Totale',     mobileLabel: 'Storico',    icon: BarChart3        },
+  { value: 'analisi',       label: 'Analisi',            mobileLabel: 'Analisi',    icon: BarChart3        },
+  { value: 'budget',        label: 'Budget',             mobileLabel: 'Budget',     icon: Target           },
+  { value: 'transfers',     label: 'Trasferimenti',      mobileLabel: 'Trasf.',     icon: ArrowRightLeft   },
 ];
 
 export default function CashflowPage() {
@@ -235,9 +239,11 @@ export default function CashflowPage() {
         {costCentersEnabled === null ? (
           <div className="h-10 w-full rounded-md bg-muted animate-pulse mb-6" />
         ) : (() => {
-          const allTabs = costCentersEnabled
-            ? [...CASHFLOW_TABS_BASE, { value: 'cost-centers', label: 'Centri di Costo', mobileLabel: 'C.Costo', icon: Layers }]
-            : CASHFLOW_TABS_BASE;
+          const allTabs = [
+            ...CASHFLOW_TABS_BASE,
+            ...(householdEnabled ? [{ value: 'compensations', label: 'Compensazioni', mobileLabel: 'Comp.', icon: Scale }] : []),
+            ...(costCentersEnabled ? [{ value: 'cost-centers', label: 'Centri di Costo', mobileLabel: 'C.Costo', icon: Layers }] : []),
+          ];
           return (
             <>
               {/* Mobile (<desktop): Framer Motion sliding pill */}
@@ -317,6 +323,51 @@ export default function CashflowPage() {
                 assets={assets}
                 loading={loading}
                 onRefresh={handleRefresh}
+              />
+            </motion.div>
+          </TabsContent>
+        )}
+
+        {mountedTabs.has('investments') && (
+          <TabsContent value="investments" className="mt-6" forceMount>
+            <motion.div
+              initial={false}
+              animate={activeTab === 'investments' ? 'visible' : 'hidden'}
+              variants={tabPanelSwitch}
+            >
+              <InvestmentOperationsTab />
+            </motion.div>
+          </TabsContent>
+        )}
+
+        {mountedTabs.has('current-year') && (
+          <TabsContent value="current-year" className="mt-6" forceMount>
+            <motion.div
+              initial={false}
+              animate={activeTab === 'current-year' ? 'visible' : 'hidden'}
+              variants={tabPanelSwitch}
+            >
+              <CurrentYearTab
+                allExpenses={allExpenses}
+                loading={loading}
+                onRefresh={handleRefresh}
+              />
+            </motion.div>
+          </TabsContent>
+        )}
+
+        {mountedTabs.has('total-history') && (
+          <TabsContent value="total-history" className="mt-6" forceMount>
+            <motion.div
+              initial={false}
+              animate={activeTab === 'total-history' ? 'visible' : 'hidden'}
+              variants={tabPanelSwitch}
+            >
+              <TotalHistoryTab
+                allExpenses={allExpenses}
+                loading={loading}
+                onRefresh={handleRefresh}
+                historyStartYear={cashflowHistoryStartYear}
               />
             </motion.div>
           </TabsContent>

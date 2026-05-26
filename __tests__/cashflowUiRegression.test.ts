@@ -36,4 +36,21 @@ describe('cashflow UI regression guards', () => {
     expect(source).not.toContain('disabled={!!expense}');
     expect(source).not.toContain('Il tipo di voce non può essere modificato');
   });
+
+  it('keeps cashflow operation tabs reachable from the tab menu', () => {
+    const source = readRepoFile('app/dashboard/cashflow/page.tsx');
+
+    for (const value of ['investments', 'current-year', 'total-history', 'transfers', 'compensations']) {
+      expect(source).toContain(`value: '${value}'`);
+      expect(source).toContain(`TabsContent value="${value}"`);
+    }
+  });
+
+  it('keeps the household attribution settings tab reachable from settings navigation', () => {
+    const source = readRepoFile('app/dashboard/settings/page.tsx');
+
+    expect(source).toContain("{ value: 'household'");
+    expect(source).toContain("label: 'Attribuzioni'");
+    expect(source).toContain('TabsContent value="household"');
+  });
 });

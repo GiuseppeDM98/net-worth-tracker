@@ -140,11 +140,12 @@ const roundToTwoDecimals = (value: number): number => {
 // Module-level tab definitions drive both the mobile pill and the desktop TabsList.
 // shortLabel must be ≤8 chars for the iPhone SE pill width.
 const SETTINGS_TABS: { value: string; label: string; shortLabel: string; icon: React.ElementType }[] = [
-  { value: 'allocazione', label: 'Allocazione', shortLabel: 'Alloc.',  icon: PieChart },
-  { value: 'generale',    label: 'Preferenze',  shortLabel: 'Pref.',   icon: Settings },
-  { value: 'spese',       label: 'Spese',       shortLabel: 'Spese',   icon: Receipt  },
-  { value: 'dividendi',   label: 'Dividendi',   shortLabel: 'Divid.',  icon: Coins    },
-  { value: 'aspetto',     label: 'Aspetto',     shortLabel: 'Aspetto', icon: Palette  },
+  { value: 'allocazione', label: 'Allocazione',  shortLabel: 'Alloc.',  icon: PieChart },
+  { value: 'generale',    label: 'Preferenze',   shortLabel: 'Pref.',   icon: Settings },
+  { value: 'spese',       label: 'Spese',        shortLabel: 'Spese',   icon: Receipt  },
+  { value: 'household',   label: 'Attribuzioni', shortLabel: 'Attrib.', icon: Users    },
+  { value: 'dividendi',   label: 'Dividendi',    shortLabel: 'Divid.',  icon: Coins    },
+  { value: 'aspetto',     label: 'Aspetto',      shortLabel: 'Aspetto', icon: Palette  },
 ];
 
 export default function SettingsPage() {
@@ -2131,7 +2132,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Desktop: standard TabsList driven by the same SETTINGS_TABS constant */}
-        <TabsList className="hidden desktop:grid desktop:grid-cols-5 w-full">
+        <TabsList className="hidden desktop:grid desktop:grid-cols-6 w-full">
           {SETTINGS_TABS.map((tab) => {
             const Icon = tab.icon;
             return (
