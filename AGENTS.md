@@ -122,6 +122,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - `setSettings()` has two write branches; update both
 - Assistant preference fields mirrored into settings must stay aligned with the assistant memory document and `AssetAllocationSettings`
 - **Feature toggle placement**: all feature toggles (`costCentersEnabled`, `goalBasedInvestingEnabled`, `stampDutyEnabled`, etc.) live in `AssetAllocationSettings` (`types/assets.ts` + `assetAllocationService.ts`). Do NOT add them to `UserPreferences` / `userPreferencesService.ts`. The 3-place rule applies here too.
+- **Derived-boolean resets on reload — always store explicitly**: if a boolean toggle's initial state is derived from the presence of another field (e.g. `autoCalculate = userAge !== undefined && riskFreeRate !== undefined`), disabling the toggle has no effect on reload because the source fields remain unchanged in Firestore. Always add a dedicated `boolean?` field to `AssetAllocationSettings` and persist it explicitly. Use `?? derivedFallback` on load for backward compatibility with existing users. Applied to `autoCalculateEquityBonds` (was previously derived from `userAge`/`riskFreeRate` presence).
 - **Cashflow settings fallback semantics**: `cashflowHistoryStartYear` may bootstrap from a hardcoded default, but that value is only a non-fatal fallback; preserve the saved settings value whenever `getSettings()` succeeds and log fallback activation explicitly.
 
 ### Settings UX Layer (Overdrive)

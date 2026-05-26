@@ -4,6 +4,7 @@ import { Asset, AssetClass } from '@/types/assets';
 import {
   GoalBasedInvestingData,
   GoalAssetAssignment,
+  GoalPriority,
   GoalProgress,
   InvestmentGoal,
 } from '@/types/goals';
@@ -231,36 +232,52 @@ export function cleanOrphanedAssignments(
  * Returns null when no usable data is available (no goals with recommended
  * allocation, or total weight is zero).
  */
+/**
+ * Priority multipliers used when computing goal-based allocation targets.
+ *
+ * The weight of each goal in the blended target is:
+ *   weight = gap_to_fill × priority_multiplier
+ *
+ * This means a high-priority goal with a large outstanding gap dominates the target,
+ * which reflects where the user should direct new investment dollars most urgently.
+ * Goals that are already fully funded (gap ≤ 0) are excluded from the calculation.
+ */
+const GOAL_PRIORITY_WEIGHTS: Record<GoalPriority, number> = {
+  alta:  3,
+  media: 2,
+  bassa: 1,
+};
+
 export function deriveTargetAllocationFromGoals(
   goals: InvestmentGoal[],
   assignments: GoalAssetAssignment[],
   assets: Asset[]
 ): Partial<Record<AssetClass, number>> | null {
-  // Filter to goals that have a non-empty recommended allocation
-  const goalsWithAllocation = goals.filter(
+  // Only consider goals that have both a target amount and a recommended allocation.
+  // Open-ended goals (no targetAmount) are excluded because there is no gap to fill.
+  const eligibleGoals = goals.filter(
     (g) =>
+      g.targetAmount != null &&
+      g.targetAmount > 0 &&
       g.recommendedAllocation &&
       Object.keys(g.recommendedAllocation).length > 0
   );
 
-  if (goalsWithAllocation.length === 0) return null;
+  if (eligibleGoals.length === 0) return null;
 
-  // Determine weight for each goal
+  // Build weighted entries: weight = gap_to_fill × priority_multiplier
   const weighted: { allocation: Partial<Record<AssetClass, number>>; weight: number }[] = [];
   let totalWeight = 0;
 
-  for (const goal of goalsWithAllocation) {
-    let weight: number;
+  for (const goal of eligibleGoals) {
+    const progress = calculateGoalProgress(goal, assignments, assets);
+    const gap = Math.max(0, goal.targetAmount! - progress.currentValue);
 
-    if (goal.targetAmount != null && goal.targetAmount > 0) {
-      weight = goal.targetAmount;
-    } else {
-      // Open-ended goal: use current assigned value as weight
-      const progress = calculateGoalProgress(goal, assignments, assets);
-      weight = progress.currentValue;
-    }
+    // Skip goals that are already fully funded — no more dollars needed there
+    if (gap <= 0) continue;
 
-    if (weight <= 0) continue;
+    const priorityMultiplier = GOAL_PRIORITY_WEIGHTS[goal.priority] ?? 1;
+    const weight = gap * priorityMultiplier;
 
     weighted.push({ allocation: goal.recommendedAllocation!, weight });
     totalWeight += weight;
@@ -268,7 +285,7 @@ export function deriveTargetAllocationFromGoals(
 
   if (totalWeight === 0) return null;
 
-  // Compute weighted average per asset class
+  // Compute weighted average of recommendedAllocation across all eligible goals
   const result: Partial<Record<AssetClass, number>> = {};
 
   for (const { allocation, weight } of weighted) {
@@ -278,11 +295,11 @@ export function deriveTargetAllocationFromGoals(
     }
   }
 
-  // Round to 1 decimal, ensure sum = 100% using remainder strategy
+  // Round to 1 decimal and guarantee sum = 100% via remainder strategy.
+  // Sort descending so rounding error lands on the smallest asset class.
   const entries = Object.entries(result) as [AssetClass, number][];
   if (entries.length === 0) return null;
 
-  // Sort by value descending so the smallest class absorbs rounding error
   entries.sort((a, b) => b[1] - a[1]);
 
   const rounded: Partial<Record<AssetClass, number>> = {};
@@ -294,7 +311,7 @@ export function deriveTargetAllocationFromGoals(
     allocated += pct;
   }
 
-  // Last class gets the remainder to guarantee sum = 100%
+  // Last class absorbs remainder to guarantee exact 100% sum
   rounded[entries[entries.length - 1][0]] =
     Math.round((100 - allocated) * 10) / 10;
 

@@ -667,8 +667,11 @@ export default function AllocationPage() {
       {/* Goal-derived targets indicator */}
       {usingGoalTargets && (
         <div className="rounded-lg border border-green-200 bg-green-50/50 p-3 sm:p-4 dark:border-green-800 dark:bg-green-950/10">
-          <p className="text-sm text-green-800 dark:text-green-200">
-            <strong>Target dagli obiettivi</strong> — Media pesata delle allocazioni raccomandate dagli obiettivi finanziari attivi.
+          <p className="text-sm font-medium text-green-800 dark:text-green-200">
+            Target dagli obiettivi
+          </p>
+          <p className="text-xs text-green-700/80 dark:text-green-300/70 mt-0.5">
+            Calcolato dal gap ancora da colmare per ogni obiettivo, pesato per priorità — Alta 3× · Media 2× · Bassa 1×. Gli obiettivi già raggiunti non influenzano il calcolo.
           </p>
         </div>
       )}

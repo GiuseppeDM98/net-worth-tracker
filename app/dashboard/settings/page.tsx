@@ -349,9 +349,11 @@ export default function SettingsPage() {
       if (settingsData) {
         setUserAge(settingsData.userAge);
         setRiskFreeRate(settingsData.riskFreeRate);
+        // Use explicit persisted flag when available; fall back to presence of age+rate for
+        // backward-compat with existing users who never explicitly toggled the switch.
         setAutoCalculate(
-          settingsData.userAge !== undefined &&
-          settingsData.riskFreeRate !== undefined
+          settingsData.autoCalculateEquityBonds ??
+          (settingsData.userAge !== undefined && settingsData.riskFreeRate !== undefined)
         );
         // Load FIRE setting (Bug #1 fix)
         setIncludePrimaryResidenceInFIRE(settingsData.includePrimaryResidenceInFIRE ?? false);
@@ -442,8 +444,8 @@ export default function SettingsPage() {
           userAge: settingsData?.userAge ?? null,
           riskFreeRate: settingsData?.riskFreeRate ?? null,
           autoCalculate:
-            settingsData?.userAge !== undefined &&
-            settingsData?.riskFreeRate !== undefined,
+            settingsData?.autoCalculateEquityBonds ??
+            (settingsData?.userAge !== undefined && settingsData?.riskFreeRate !== undefined),
           cashUseFixedAmount: cashTargetData?.useFixedAmount || false,
           cashFixedAmount: roundToTwoDecimals(cashTargetData?.fixedAmount || 0),
           assetClassStates: assetClasses.map((assetClass) => ({
@@ -1024,6 +1026,10 @@ export default function SettingsPage() {
       await setSettings(user.uid, {
         userAge,
         riskFreeRate,
+        // Persist the toggle state explicitly so disabling it survives a page reload.
+        // Without this field, the toggle was re-derived from age+rate presence on load,
+        // making it impossible to disable without clearing age and rate.
+        autoCalculateEquityBonds: autoCalculate,
         // Preserve FIRE settings (Bug #1 fix)
         includePrimaryResidenceInFIRE,
         goalBasedInvestingEnabled,
@@ -1562,7 +1568,7 @@ export default function SettingsPage() {
                     Allocazione da Obiettivi
                   </Label>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Calcola i target di allocazione come media pesata delle allocazioni raccomandate degli obiettivi
+                    I target sono calcolati in base al gap ancora da colmare per ogni obiettivo, pesato per priorità (Alta 3×, Media 2×, Bassa 1×). Gli obiettivi già raggiunti non influenzano il calcolo.
                   </p>
                 </div>
                 <Switch

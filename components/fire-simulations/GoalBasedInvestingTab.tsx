@@ -342,6 +342,27 @@ export function GoalBasedInvestingTab() {
             </div>
           </Card>
 
+          {/* Allocation-priority explanation — shown only when goal-driven allocation is active */}
+          {settings?.goalDrivenAllocationEnabled && (
+            <div className="rounded-lg border bg-muted/30 px-5 py-4 space-y-2">
+              <p className="text-sm font-medium text-foreground">
+                Come funziona l&apos;allocazione da obiettivi
+              </p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Il target di ogni classe di asset nella pagina{' '}
+                <strong className="text-foreground">Allocazione</strong> viene calcolato pesando
+                ogni obiettivo in base al <strong className="text-foreground">gap ancora da colmare</strong>{' '}
+                (quanto manca al target) moltiplicato per la sua <strong className="text-foreground">priorità</strong>.
+                Gli obiettivi già raggiunti non influenzano il calcolo.
+              </p>
+              <div className="flex gap-4 pt-1">
+                <span className="text-xs font-mono text-foreground/80">Alta · 3×</span>
+                <span className="text-xs font-mono text-foreground/80">Media · 2×</span>
+                <span className="text-xs font-mono text-foreground/80">Bassa · 1×</span>
+              </div>
+            </div>
+          )}
+
         </>
       )}
 

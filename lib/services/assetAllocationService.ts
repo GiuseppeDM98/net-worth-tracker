@@ -67,6 +67,7 @@ export async function getSettings(
       monteCarloScenarios: data.monteCarloScenarios,
       goalBasedInvestingEnabled: data.goalBasedInvestingEnabled,
       goalDrivenAllocationEnabled: data.goalDrivenAllocationEnabled,
+      autoCalculateEquityBonds: data.autoCalculateEquityBonds,
       defaultDebitCashAssetId: data.defaultDebitCashAssetId,
       defaultCreditCashAssetId: data.defaultCreditCashAssetId,
       stampDutyEnabled: data.stampDutyEnabled,
@@ -181,6 +182,9 @@ export async function setSettings(
       if (settings.goalDrivenAllocationEnabled !== undefined) {
         docData.goalDrivenAllocationEnabled = settings.goalDrivenAllocationEnabled;
       }
+      if (settings.autoCalculateEquityBonds !== undefined) {
+        docData.autoCalculateEquityBonds = settings.autoCalculateEquityBonds;
+      }
       if (settings.defaultDebitCashAssetId !== undefined) {
         docData.defaultDebitCashAssetId = settings.defaultDebitCashAssetId;
       }
@@ -286,6 +290,9 @@ export async function setSettings(
       }
       if (settings.goalDrivenAllocationEnabled !== undefined) {
         docData.goalDrivenAllocationEnabled = settings.goalDrivenAllocationEnabled;
+      }
+      if (settings.autoCalculateEquityBonds !== undefined) {
+        docData.autoCalculateEquityBonds = settings.autoCalculateEquityBonds;
       }
       if (settings.defaultDebitCashAssetId !== undefined) {
         docData.defaultDebitCashAssetId = settings.defaultDebitCashAssetId;

@@ -184,6 +184,7 @@ export interface AssetAllocationSettings {
   monteCarloScenarios?: MonteCarloScenarios; // Custom scenario parameters for Monte Carlo simulations (Bear/Base/Bull)
   goalBasedInvestingEnabled?: boolean; // Toggle to enable goal-based investing feature (mental allocation of portfolio to financial goals)
   goalDrivenAllocationEnabled?: boolean; // When true AND goalBasedInvestingEnabled, derive allocation targets from goal recommended allocations instead of manual Settings targets
+  autoCalculateEquityBonds?: boolean; // When true, equity and bond targets are auto-computed via the "125 − age − (rate × 5)" formula; stored explicitly so disabling persists across reloads
   defaultDebitCashAssetId?: string; // Default cash asset pre-selected for expenses/debts in expense dialog
   defaultCreditCashAssetId?: string; // Default cash asset pre-selected for income entries in expense dialog
   stampDutyEnabled?: boolean; // Toggle to include stamp duty (imposta di bollo) in annual portfolio cost
