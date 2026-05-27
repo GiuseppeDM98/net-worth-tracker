@@ -37,13 +37,19 @@ describe('cashflow UI regression guards', () => {
     expect(source).not.toContain('Il tipo di voce non può essere modificato');
   });
 
-  it('keeps cashflow operation tabs reachable from the tab menu', () => {
-    const source = readRepoFile('app/dashboard/cashflow/page.tsx');
+  it('keeps cashflow analysis tabs reachable and special operations inside tracking', () => {
+    const pageSource = readRepoFile('app/dashboard/cashflow/page.tsx');
+    const trackingSource = readRepoFile('components/cashflow/ExpenseTrackingTab.tsx');
 
-    for (const value of ['investments', 'current-year', 'total-history', 'transfers', 'compensations']) {
-      expect(source).toContain(`value: '${value}'`);
-      expect(source).toContain(`TabsContent value="${value}"`);
+    for (const value of ['current-year', 'total-history', 'compensations']) {
+      expect(pageSource).toContain(`value: '${value}'`);
+      expect(pageSource).toContain(`TabsContent value="${value}"`);
     }
+
+    expect(pageSource).not.toContain("value: 'investments'");
+    expect(pageSource).not.toContain("value: 'transfers'");
+    expect(trackingSource).toContain("{ value: 'investment', label: 'Investimento' }");
+    expect(trackingSource).toContain("{ value: 'transfer', label: 'Trasferimento' }");
   });
 
   it('keeps the household attribution settings tab reachable from settings navigation', () => {

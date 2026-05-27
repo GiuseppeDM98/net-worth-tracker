@@ -25,7 +25,7 @@ import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
-import { Receipt, Coins, BarChart3, Target, Layers, ChartCandlestick, TrendingUp, ArrowRightLeft, Scale } from 'lucide-react';
+import { Receipt, Coins, BarChart3, Target, Layers, TrendingUp, Scale } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
@@ -72,14 +72,6 @@ const CostCentersTab = dynamic(
   () => import('@/components/cashflow/CostCentersTab').then((mod) => mod.CostCentersTab),
   { loading: CashflowTabLoading }
 );
-const InternalTransfersTab = dynamic(
-  () => import('@/components/cashflow/InternalTransfersTab').then((mod) => mod.InternalTransfersTab),
-  { loading: CashflowTabLoading }
-);
-const InvestmentOperationsTab = dynamic(
-  () => import('@/components/cashflow/InvestmentOperationsTab').then((mod) => mod.InvestmentOperationsTab),
-  { loading: CashflowTabLoading }
-);
 const CompensationsTab = dynamic(
   () => import('@/components/cashflow/CompensationsTab').then((mod) => mod.CompensationsTab),
   { loading: CashflowTabLoading }
@@ -91,14 +83,12 @@ function getErrorMessage(error: unknown): string {
 
 // Module-level constant: stable reference for React Compiler
 const CASHFLOW_TABS_BASE: Array<{ value: string; label: string; mobileLabel: string; icon: React.ElementType }> = [
-  { value: 'tracking',      label: 'Tracciamento',       mobileLabel: 'Spese',      icon: Receipt          },
+  { value: 'tracking',      label: 'Tracciamento',       mobileLabel: 'Movim.',     icon: Receipt          },
   { value: 'dividends',     label: 'Dividendi',          mobileLabel: 'Divid.',     icon: Coins            },
-  { value: 'investments',   label: 'Investimenti',       mobileLabel: 'Invest.',    icon: ChartCandlestick },
   { value: 'current-year',  label: 'Anno Corrente',      mobileLabel: 'Anno',       icon: TrendingUp       },
   { value: 'total-history', label: 'Storico Totale',     mobileLabel: 'Storico',    icon: BarChart3        },
   { value: 'analisi',       label: 'Analisi',            mobileLabel: 'Analisi',    icon: BarChart3        },
   { value: 'budget',        label: 'Budget',             mobileLabel: 'Budget',     icon: Target           },
-  { value: 'transfers',     label: 'Trasferimenti',      mobileLabel: 'Trasf.',     icon: ArrowRightLeft   },
 ];
 
 export default function CashflowPage() {
@@ -217,10 +207,6 @@ export default function CashflowPage() {
     setMountedTabs(prev => new Set(prev).add(value));
   };
 
-  const desktopTabCount = 7 + (householdEnabled ? 1 : 0) + (costCentersEnabled ? 1 : 0);
-  const desktopTabGridClass =
-    desktopTabCount === 9 ? 'grid-cols-9' : desktopTabCount === 8 ? 'grid-cols-8' : 'grid-cols-7';
-
   return (
     <div className="space-y-6 max-desktop:portrait:pb-20">
       {/* Header */}
@@ -328,17 +314,6 @@ export default function CashflowPage() {
           </TabsContent>
         )}
 
-        {mountedTabs.has('investments') && (
-          <TabsContent value="investments" className="mt-6" forceMount>
-            <motion.div
-              initial={false}
-              animate={activeTab === 'investments' ? 'visible' : 'hidden'}
-              variants={tabPanelSwitch}
-            >
-              <InvestmentOperationsTab />
-            </motion.div>
-          </TabsContent>
-        )}
 
         {mountedTabs.has('current-year') && (
           <TabsContent value="current-year" className="mt-6" forceMount>
@@ -404,17 +379,6 @@ export default function CashflowPage() {
                 historyStartYear={cashflowHistoryStartYear}
                 userId={user?.uid ?? ''}
               />
-            </motion.div>
-          </TabsContent>
-        )}
-        {mountedTabs.has('transfers') && (
-          <TabsContent value="transfers" className="mt-6" forceMount>
-            <motion.div
-              initial={false}
-              animate={activeTab === 'transfers' ? 'visible' : 'hidden'}
-              variants={tabPanelSwitch}
-            >
-              <InternalTransfersTab />
             </motion.div>
           </TabsContent>
         )}

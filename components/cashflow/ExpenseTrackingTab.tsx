@@ -24,8 +24,10 @@ import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useHouseholdScopeFilter } from '@/lib/hooks/useHouseholdScopeFilter';
 import { useInternalTransfers, useInvestmentOperations } from '@/lib/hooks/useInvestmentOperations';
-import { Expense, ExpenseCategory, EXPENSE_TYPE_LABELS, ExpenseType } from '@/types/expenses';
-import { InternalTransfer, InvestmentOperation } from '@/types/investments';
+import { Expense, ExpenseCategory, EXPENSE_TYPE_LABELS } from '@/types/expenses';
+import type { Asset } from '@/types/assets';
+import { INTERNAL_TRANSFER_PURPOSE_LABELS, type InternalTransferPurpose } from '@/types/household';
+import { InternalTransfer, InvestmentOperation, InvestmentOperationType } from '@/types/investments';
 import {
   calculateTotalIncome,
   calculateTotalExpenses,
@@ -35,10 +37,17 @@ import {
   getExpensesByInstallmentParentId,
 } from '@/lib/services/expenseService';
 import { updateCashAssetBalance, updateInvestmentAssetQuantity } from '@/lib/services/assetService';
-import { deleteInvestmentOperation } from '@/lib/services/investmentOperationService';
+import {
+  createInternalTransfer,
+  createInvestmentOperation,
+  deleteInternalTransfer,
+  deleteInvestmentOperation,
+  updateInternalTransfer,
+  updateInvestmentOperation,
+} from '@/lib/services/investmentOperationService';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
-import { toDate } from '@/lib/utils/dateHelpers';
+import { formatDateInputValue, toDate } from '@/lib/utils/dateHelpers';
 import {
   filterExpensesByAttributionScope,
   filterInternalTransfersByOwnershipScope,
@@ -61,12 +70,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Filter, ChevronDown, Check, X, Trash2, Pencil, TrendingUp, TrendingDown, ArrowRightLeft, ChartCandlestick } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Plus, Filter, ChevronDown, Check, X, Trash2, TrendingUp, TrendingDown, ArrowRightLeft, ChartCandlestick, ShoppingCart } from 'lucide-react';
 import { ExpenseDialog } from '@/components/expenses/ExpenseDialog';
-import { ExpenseTable } from '@/components/expenses/ExpenseTable';
-import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useChartColors } from '@/lib/hooks/useChartColors';
@@ -103,153 +116,6 @@ const getExpenseDate = (d: Expense['date']): Date => {
   return (d as { toDate(): Date }).toDate();
 };
 
-// Tailwind dot-color classes keyed by expense type for the mobile list rows.
-// Uses CSS variable references so they stay theme-aware across all 6 colour themes.
-const TYPE_DOT_CLASS: Record<ExpenseType, string> = {
-  income: 'bg-green-500 dark:bg-green-400',
-  fixed: 'bg-[var(--chart-2)]',
-  variable: 'bg-[var(--chart-4)]',
-  debt: 'bg-[var(--chart-3)]',
-};
-
-// ─── MobileExpenseRow ─────────────────────────────────────────────────────────
-
-interface MobileExpenseRowProps {
-  expense: Expense;
-  isExpanded: boolean;
-  onToggleExpand: (id: string) => void;
-  onEdit: (expense: Expense) => void;
-  onDelete: (expense: Expense) => void;
-  isPendingDelete: boolean;
-  isDemo: boolean;
-}
-
-/**
- * Flat list row for mobile expense display (Trade Republic divide-y style).
- *
- * Interaction pattern:
- * - Tapping the row body toggles an inline action area (Modifica + Elimina).
- * - Elimina reuses the parent's 2-click arm pattern — isPendingDelete drives
- *   the visual "confirm" state; actual logic lives in the parent handler.
- * - Complex expenses (installments/recurring) open an AlertDialog on first tap
- *   of Elimina, so no 2-click arm is needed; the parent handles the distinction.
- */
-function MobileExpenseRow({
-  expense,
-  isExpanded,
-  onToggleExpand,
-  onEdit,
-  onDelete,
-  isPendingDelete,
-  isDemo,
-}: MobileExpenseRowProps) {
-  const date = getExpenseDate(expense.date);
-  const isIncome = expense.type === 'income';
-
-  // "20/5" short date shown in the subtitle (no year, no zero-padding).
-  const shortDate = format(date, 'd/M');
-
-  // Subtitle: category · subcategory · date — omit subcategory when absent.
-  const subtitle = [expense.categoryName, expense.subCategoryName || null, shortDate]
-    .filter(Boolean)
-    .join(' · ');
-
-  // Title: user-entered notes take priority; fall back to category name.
-  const title = expense.notes?.trim() || expense.categoryName;
-
-  const amountLabel = `${isIncome ? '+' : ''}${cachedFormatCurrencyEUR(Math.abs(expense.amount))}`;
-
-  return (
-    <div className="py-3">
-      {/* Tappable row — shows dot, title, subtitle and amount */}
-      <button
-        type="button"
-        className="w-full flex items-center gap-3 text-left"
-        onClick={() => onToggleExpand(expense.id)}
-        aria-expanded={isExpanded}
-      >
-        {/* Type color dot */}
-        <span
-          className={cn(
-            'w-2 h-2 rounded-full flex-shrink-0',
-            TYPE_DOT_CLASS[expense.type] ?? 'bg-muted-foreground',
-          )}
-        />
-
-        {/* Title + badges + subtitle */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span className="text-[14px] font-medium text-foreground truncate">{title}</span>
-            {expense.isInstallment && expense.installmentNumber && expense.installmentTotal && (
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0">
-                {expense.installmentNumber}/{expense.installmentTotal}
-              </Badge>
-            )}
-            {expense.isRecurring && !expense.isInstallment && (
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0">
-                Ric.
-              </Badge>
-            )}
-          </div>
-          <p className="text-[12px] text-muted-foreground truncate mt-0.5">{subtitle}</p>
-        </div>
-
-        {/* Amount — green for income, red for expenses */}
-        <span
-          className={cn(
-            'text-[14px] font-bold font-mono tabular-nums flex-shrink-0',
-            isIncome
-              ? 'text-green-600 dark:text-green-400'
-              : 'text-red-600 dark:text-red-400',
-          )}
-        >
-          {amountLabel}
-        </span>
-      </button>
-
-      {/* Inline action area — animated height 0 → auto on expand */}
-      <AnimatePresence initial={false}>
-        {isExpanded && (
-          <motion.div
-            key="actions"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.18, ease: 'easeInOut' }}
-            className="overflow-hidden"
-          >
-            <div className="flex gap-2 mt-3 pl-5">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onEdit(expense)}
-                disabled={isDemo}
-                title={isDemo ? 'Non disponibile in modalità demo' : undefined}
-                className="flex-1 h-9"
-              >
-                <Pencil className="h-3.5 w-3.5 mr-1.5" />
-                Modifica
-              </Button>
-              {/* Delete: first tap arms (destructive style), second tap confirms */}
-              <Button
-                variant={isPendingDelete ? 'destructive' : 'outline'}
-                size="sm"
-                onClick={() => onDelete(expense)}
-                disabled={isDemo}
-                title={isDemo ? 'Non disponibile in modalità demo' : undefined}
-                className="flex-1 h-9"
-              >
-                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                {isPendingDelete ? 'Conferma' : 'Elimina'}
-              </Button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface ExpenseTrackingTabProps {
@@ -263,6 +129,447 @@ type UnifiedMovement =
   | { id: string; kind: 'expense'; date: Date; title: string; subtitle: string; amount: number; source: Expense }
   | { id: string; kind: 'investment'; date: Date; title: string; subtitle: string; amount: number; source: InvestmentOperation }
   | { id: string; kind: 'transfer'; date: Date; title: string; subtitle: string; amount: number; source: InternalTransfer };
+
+type MovementKind = UnifiedMovement['kind'];
+
+interface MovementTypeCard {
+  value: MovementKind;
+  icon: React.ElementType;
+  label: string;
+  description: string;
+}
+
+const MOVEMENT_TYPE_CARDS: MovementTypeCard[] = [
+  {
+    value: 'expense',
+    icon: ShoppingCart,
+    label: 'Cashflow',
+    description: 'Entrate, spese, debiti, rate e ricorrenze',
+  },
+  {
+    value: 'investment',
+    icon: ChartCandlestick,
+    label: 'Investimento',
+    description: 'Acquisto o vendita con asset, quote, prezzo, commissioni e tasse',
+  },
+  {
+    value: 'transfer',
+    icon: ArrowRightLeft,
+    label: 'Trasferimento',
+    description: 'Spostamento tra conti cash con sorgente, destinazione e tipo',
+  },
+];
+
+const INVESTMENT_OPERATION_LABELS: Record<InvestmentOperationType, string> = {
+  buy: 'Acquisto',
+  sell: 'Vendita',
+  contribution: 'Carico quote',
+  withdrawal: 'Scarico quote',
+  fee: 'Commissione',
+  tax: 'Tassa',
+};
+
+const FORM_INVESTMENT_OPERATION_TYPES: InvestmentOperationType[] = ['buy', 'sell'];
+
+interface UnifiedMovementDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  assets: Asset[];
+  editingMovement: UnifiedMovement | null;
+  householdEnabled: boolean;
+  onCreateCashflow: () => void;
+  onSaved: () => Promise<void>;
+}
+
+function UnifiedMovementDialog({
+  open,
+  onOpenChange,
+  assets,
+  editingMovement,
+  householdEnabled,
+  onCreateCashflow,
+  onSaved,
+}: UnifiedMovementDialogProps) {
+  const { user } = useAuth();
+  const investmentAssets = useMemo(
+    () => assets.filter(asset => asset.assetClass !== 'cash').sort((a, b) => a.name.localeCompare(b.name, 'it')),
+    [assets]
+  );
+  const cashAssets = useMemo(
+    () => assets.filter(asset => asset.assetClass === 'cash').sort((a, b) => a.name.localeCompare(b.name, 'it')),
+    [assets]
+  );
+
+  const [movementKind, setMovementKind] = useState<MovementKind | null>(null);
+  const [assetId, setAssetId] = useState('__none__');
+  const [investmentType, setInvestmentType] = useState<InvestmentOperationType>('buy');
+  const [cashAssetId, setCashAssetId] = useState('__none__');
+  const [quantity, setQuantity] = useState('');
+  const [pricePerUnit, setPricePerUnit] = useState('');
+  const [investmentFees, setInvestmentFees] = useState('');
+  const [taxes, setTaxes] = useState('');
+  const [fromCashAssetId, setFromCashAssetId] = useState('__none__');
+  const [toCashAssetId, setToCashAssetId] = useState('__none__');
+  const [transferAmount, setTransferAmount] = useState('');
+  const [transferFees, setTransferFees] = useState('');
+  const [purpose, setPurpose] = useState<InternalTransferPurpose>('neutral_transfer');
+  const [date, setDate] = useState(() => formatDateInputValue());
+  const [notes, setNotes] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const selectedInvestmentAsset = investmentAssets.find(asset => asset.id === assetId);
+  const editingId = editingMovement?.kind === movementKind ? editingMovement.source.id : undefined;
+  const grossAmount = Number(quantity) * Number(pricePerUnit);
+
+  const resetSpecialFields = useCallback(() => {
+    setMovementKind(null);
+    setAssetId('__none__');
+    setInvestmentType('buy');
+    setCashAssetId('__none__');
+    setQuantity('');
+    setPricePerUnit('');
+    setInvestmentFees('');
+    setTaxes('');
+    setFromCashAssetId('__none__');
+    setToCashAssetId('__none__');
+    setTransferAmount('');
+    setTransferFees('');
+    setPurpose('neutral_transfer');
+    setDate(formatDateInputValue());
+    setNotes('');
+  }, []);
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (!open) return;
+
+    if (!editingMovement) return;
+
+    setMovementKind(editingMovement.kind);
+    setDate(formatDateInputValue(toDate(editingMovement.date)));
+
+    if (editingMovement.kind === 'investment') {
+      const operation = editingMovement.source;
+      setAssetId(operation.assetId);
+      setInvestmentType(operation.type);
+      setCashAssetId(operation.cashAssetId || '__none__');
+      setQuantity(String(operation.quantity));
+      setPricePerUnit(String(operation.pricePerUnit));
+      setInvestmentFees(operation.fees ? String(operation.fees) : '');
+      setTaxes(operation.taxes ? String(operation.taxes) : '');
+      setNotes(operation.notes || '');
+      return;
+    }
+
+    if (editingMovement.kind === 'transfer') {
+      const transfer = editingMovement.source;
+      setFromCashAssetId(transfer.fromCashAssetId);
+      setToCashAssetId(transfer.toCashAssetId);
+      setTransferAmount(String(transfer.amount));
+      setTransferFees(transfer.fees ? String(transfer.fees) : '');
+      setPurpose(transfer.purpose ?? 'neutral_transfer');
+      setNotes(transfer.notes || '');
+    }
+  }, [editingMovement, open, resetSpecialFields]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const closeDialog = () => {
+    onOpenChange(false);
+    resetSpecialFields();
+  };
+
+  const handleSelectKind = (kind: MovementKind) => {
+    if (kind === 'expense') {
+      closeDialog();
+      onCreateCashflow();
+      return;
+    }
+
+    setMovementKind(kind);
+  };
+
+  const handleSaveInvestment = async (): Promise<boolean> => {
+    if (!user) return false;
+    const parsedQuantity = Number(quantity);
+    const parsedPrice = Number(pricePerUnit);
+    const parsedFees = investmentFees ? Number(investmentFees) : 0;
+    const parsedTaxes = taxes ? Number(taxes) : 0;
+
+    if (assetId === '__none__') {
+      toast.error('Seleziona un asset investimento');
+      return false;
+    }
+    if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
+      toast.error('Inserisci una quantità valida');
+      return false;
+    }
+    if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+      toast.error('Inserisci un prezzo unitario valido');
+      return false;
+    }
+    if (!Number.isFinite(parsedFees) || parsedFees < 0 || !Number.isFinite(parsedTaxes) || parsedTaxes < 0) {
+      toast.error('Commissioni e tasse devono essere positive o pari a zero');
+      return false;
+    }
+
+    const payload = {
+      assetId,
+      type: investmentType,
+      date: new Date(`${date}T00:00:00`),
+      quantity: parsedQuantity,
+      pricePerUnit: parsedPrice,
+      fees: parsedFees,
+      taxes: parsedTaxes,
+      currency: selectedInvestmentAsset?.currency || 'EUR',
+      cashAssetId: cashAssetId !== '__none__' ? cashAssetId : undefined,
+      notes: notes.trim() || undefined,
+    };
+
+    if (editingId) {
+      await updateInvestmentOperation(editingId, payload);
+    } else {
+      await createInvestmentOperation(user.uid, payload);
+    }
+    return true;
+  };
+
+  const handleSaveTransfer = async (): Promise<boolean> => {
+    if (!user) return false;
+    const parsedAmount = Number(transferAmount);
+    const parsedFees = transferFees ? Number(transferFees) : 0;
+
+    if (fromCashAssetId === '__none__' || toCashAssetId === '__none__') {
+      toast.error('Seleziona conto di partenza e conto di arrivo');
+      return false;
+    }
+    if (fromCashAssetId === toCashAssetId) {
+      toast.error('I due conti devono essere diversi');
+      return false;
+    }
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      toast.error('Inserisci un importo valido');
+      return false;
+    }
+    if (!Number.isFinite(parsedFees) || parsedFees < 0) {
+      toast.error('Inserisci commissioni valide');
+      return false;
+    }
+
+    const payload = {
+      fromCashAssetId,
+      toCashAssetId,
+      amount: parsedAmount,
+      fees: parsedFees,
+      purpose: householdEnabled ? purpose : 'neutral_transfer',
+      date: new Date(`${date}T00:00:00`),
+      notes: notes.trim() || undefined,
+    };
+
+    if (editingId) {
+      await updateInternalTransfer(editingId, payload);
+    } else {
+      await createInternalTransfer(user.uid, payload);
+    }
+    return true;
+  };
+
+  const handleSubmit = async () => {
+    if (!movementKind || movementKind === 'expense') return;
+
+    try {
+      setIsSaving(true);
+      const saved = movementKind === 'investment'
+        ? await handleSaveInvestment()
+        : await handleSaveTransfer();
+      if (!saved) return;
+      await onSaved();
+      toast.success(editingId ? 'Movimento aggiornato' : 'Movimento registrato');
+      closeDialog();
+    } catch (error) {
+      console.error('Error saving movement:', error);
+      toast.error(error instanceof Error ? error.message : 'Errore nel salvataggio del movimento');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(nextOpen) => (nextOpen ? onOpenChange(true) : closeDialog())}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{editingMovement ? 'Modifica movimento' : 'Nuovo movimento'}</DialogTitle>
+          <DialogDescription>
+            Scegli il tipo e compila solo i campi necessari per quel movimento.
+          </DialogDescription>
+        </DialogHeader>
+
+        {!movementKind ? (
+          <div className="grid gap-3 desktop:grid-cols-3">
+            {MOVEMENT_TYPE_CARDS.map(card => {
+              const Icon = card.icon;
+              return (
+                <button
+                  key={card.value}
+                  type="button"
+                  onClick={() => handleSelectKind(card.value)}
+                  className="rounded-xl border p-4 text-left transition-colors hover:bg-accent hover:text-accent-foreground"
+                >
+                  <Icon className="mb-3 h-5 w-5" />
+                  <p className="font-semibold">{card.label}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{card.description}</p>
+                </button>
+              );
+            })}
+          </div>
+        ) : movementKind === 'investment' ? (
+          <div className="grid gap-4 desktop:grid-cols-6 desktop:items-end">
+            <div className="space-y-2 desktop:col-span-2">
+              <Label>Asset</Label>
+              <Select value={assetId} onValueChange={setAssetId} disabled={!!editingId}>
+                <SelectTrigger><SelectValue placeholder="Seleziona asset" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Seleziona asset</SelectItem>
+                  {investmentAssets.map(asset => (
+                    <SelectItem key={asset.id} value={asset.id}>{asset.name} ({asset.ticker})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Tipo</Label>
+              <Select value={investmentType} onValueChange={(value) => setInvestmentType(value as InvestmentOperationType)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {FORM_INVESTMENT_OPERATION_TYPES.map(operationType => (
+                    <SelectItem key={operationType} value={operationType}>{INVESTMENT_OPERATION_LABELS[operationType]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Quote</Label>
+              <Input type="number" min="0" step="0.0001" value={quantity} onChange={(event) => setQuantity(event.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Prezzo unitario</Label>
+              <Input type="number" min="0" step="0.0001" value={pricePerUnit} onChange={(event) => setPricePerUnit(event.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Data</Label>
+              <Input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+            </div>
+            <div className="space-y-2 desktop:col-span-2">
+              <Label>Conto cash collegato</Label>
+              <Select value={cashAssetId} onValueChange={setCashAssetId}>
+                <SelectTrigger><SelectValue placeholder="Nessun conto" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Nessun conto</SelectItem>
+                  {cashAssets.map(asset => (
+                    <SelectItem key={asset.id} value={asset.id}>{asset.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Commissioni</Label>
+              <Input type="number" min="0" step="0.01" value={investmentFees} onChange={(event) => setInvestmentFees(event.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Tasse</Label>
+              <Input type="number" min="0" step="0.01" value={taxes} onChange={(event) => setTaxes(event.target.value)} />
+            </div>
+            <div className="space-y-2 desktop:col-span-2">
+              <Label>Note</Label>
+              <Input value={notes} onChange={(event) => setNotes(event.target.value)} />
+            </div>
+            {Number.isFinite(grossAmount) && grossAmount > 0 && (
+              <p className="text-sm text-muted-foreground desktop:col-span-6">
+                Controvalore lordo: {formatCurrency(grossAmount)}
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="grid gap-4 desktop:grid-cols-6 desktop:items-end">
+            <div className="space-y-2 desktop:col-span-2">
+              <Label>Da conto</Label>
+              <Select value={fromCashAssetId} onValueChange={setFromCashAssetId}>
+                <SelectTrigger><SelectValue placeholder="Seleziona conto" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Seleziona conto</SelectItem>
+                  {cashAssets.map(asset => (
+                    <SelectItem key={asset.id} value={asset.id}>{asset.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2 desktop:col-span-2">
+              <Label>A conto</Label>
+              <Select value={toCashAssetId} onValueChange={setToCashAssetId}>
+                <SelectTrigger><SelectValue placeholder="Seleziona conto" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Seleziona conto</SelectItem>
+                  {cashAssets.map(asset => (
+                    <SelectItem key={asset.id} value={asset.id}>{asset.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Importo</Label>
+              <Input type="number" min="0" step="0.01" value={transferAmount} onChange={(event) => setTransferAmount(event.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Data</Label>
+              <Input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Commissioni</Label>
+              <Input type="number" min="0" step="0.01" value={transferFees} onChange={(event) => setTransferFees(event.target.value)} />
+            </div>
+            {householdEnabled && (
+              <div className="space-y-2 desktop:col-span-2">
+                <Label>Tipo trasferimento</Label>
+                <Select value={purpose} onValueChange={(value) => setPurpose(value as InternalTransferPurpose)}>
+                  <SelectTrigger><SelectValue placeholder="Tipo trasferimento" /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(INTERNAL_TRANSFER_PURPOSE_LABELS).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="space-y-2 desktop:col-span-4">
+              <Label>Note</Label>
+              <Input value={notes} onChange={(event) => setNotes(event.target.value)} />
+            </div>
+          </div>
+        )}
+
+        <DialogFooter>
+          {movementKind && !editingMovement && (
+            <Button type="button" variant="ghost" onClick={() => setMovementKind(null)} disabled={isSaving}>
+              Cambia tipo
+            </Button>
+          )}
+          <Button type="button" variant="outline" onClick={closeDialog} disabled={isSaving}>
+            Annulla
+          </Button>
+          {movementKind && movementKind !== 'expense' && (
+            <Button
+              type="button"
+              onClick={handleSubmit}
+              disabled={isSaving || (movementKind === 'investment' && investmentAssets.length === 0) || (movementKind === 'transfer' && cashAssets.length < 2)}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              {editingId ? 'Aggiorna' : 'Registra'}
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 /**
  * CHECKLIST: When adding new ExpenseType values:
@@ -292,12 +599,11 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   const currentMonth = String(new Date().getMonth() + 1); // 1-based month (1-12)
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [movementDialogOpen, setMovementDialogOpen] = useState(false);
+  const [editingMovement, setEditingMovement] = useState<UnifiedMovement | null>(null);
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [filtersOpen, setFiltersOpen] = useState<boolean>(false);
-
-  // Tracks which mobile row is expanded (shows Modifica + Elimina actions).
-  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
 
   // 2-click inline delete state
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -309,9 +615,6 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
     expense: Expense | null;
     mode: 'installment' | 'recurring' | null;
   }>({ open: false, expense: null, mode: null });
-
-  // Mobile load-more state
-  const [mobileShowCount, setMobileShowCount] = useState<number>(20);
 
   // Separate state for each filter level enables independent reset logic.
   // Single state object would complicate cascading resets (Type → Category → Subcategory).
@@ -479,11 +782,6 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
     };
   }, []);
 
-  // Reset mobile show count when filters change
-  useEffect(() => {
-    setMobileShowCount(20);
-  }, [selectedYear, selectedMonth, selectedType, selectedCategoryId, selectedSubCategoryId]);
-
   /**
    * Click-outside handler for custom dropdowns
    *
@@ -511,13 +809,16 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   }, []);
 
   // Toggling another row collapses the previously expanded one (accordion pattern).
-  const handleToggleExpand = useCallback((id: string) => {
-    setExpandedRowId(prev => (prev === id ? null : id));
-  }, []);
+
 
   const handleAddExpense = () => {
     setEditingExpense(null);
     setDialogOpen(true);
+  };
+
+  const handleAddMovement = () => {
+    setEditingMovement(null);
+    setMovementDialogOpen(true);
   };
 
   const handleEditExpense = (expense: Expense) => {
@@ -535,12 +836,56 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
     await onRefresh();
   };
 
+  const refreshMovementData = async () => {
+    if (user) {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.assets.operations(user.uid) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.assets.realized(user.uid) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.assets.transfers(user.uid) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(user.uid) }),
+      ]);
+    }
+    await onRefresh();
+  };
+
+  const handleEditMovement = (movement: UnifiedMovement) => {
+    if (movement.kind === 'expense') {
+      handleEditExpense(movement.source);
+      return;
+    }
+
+    setEditingMovement(movement);
+    setMovementDialogOpen(true);
+  };
+
+  const handleDeleteMovement = async (movement: UnifiedMovement) => {
+    if (movement.kind === 'expense') {
+      handleDeleteExpense(movement.source);
+      return;
+    }
+
+    try {
+      if (movement.kind === 'investment') {
+        await deleteInvestmentOperation(movement.source.id);
+        toast.success('Operazione eliminata');
+      } else {
+        await deleteInternalTransfer(movement.source.id);
+        toast.success('Trasferimento eliminato');
+      }
+      await refreshMovementData();
+    } catch (error) {
+      console.error('Error deleting movement:', error);
+      toast.error(error instanceof Error ? error.message : 'Errore nell eliminazione del movimento');
+    }
+  };
+
   /**
    * 2-click inline delete: first click arms the button (3s disarm timer),
    * second click executes. For installments/recurring, opens AlertDialog
    * so the user can choose between single or bulk delete.
    */
-  const handleDeleteExpense = useCallback((expense: Expense) => {
+  const handleDeleteExpense = (expense: Expense) => {
     const isComplex = (expense.isInstallment && expense.installmentParentId) ||
       (expense.isRecurring && expense.recurringParentId);
 
@@ -565,9 +910,9 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
         setPendingDeleteId(null);
       }, 3000);
     }
-  }, [pendingDeleteId]);
+  };
 
-  const deleteSingleExpense = async (expense: Expense) => {
+  async function deleteSingleExpense(expense: Expense) {
     try {
       // Reverse the balance effect on the linked cash asset before deleting
       if (expense.linkedCashAssetId && !expense.investmentOperationId) {
@@ -593,7 +938,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
       console.error('Error deleting expense:', error);
       toast.error("Errore nell'eliminazione della voce");
     }
-  };
+  }
 
   const deleteAllRecurringExpenses = async (recurringParentId: string) => {
     try {
@@ -661,6 +1006,8 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
       { value: 'fixed', label: EXPENSE_TYPE_LABELS.fixed },
       { value: 'variable', label: EXPENSE_TYPE_LABELS.variable },
       { value: 'debt', label: EXPENSE_TYPE_LABELS.debt },
+      { value: 'investment', label: 'Investimento' },
+      { value: 'transfer', label: 'Trasferimento' },
     ];
 
     if (!searchQueryType.trim()) {
@@ -673,8 +1020,8 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
 
   // Filter options for Category based on selected type
   const categoryOptions = useMemo(() => {
-    // Only show categories if a specific type is selected
-    if (selectedType === 'all') {
+    // Only ordinary cashflow types have categories; special movement types keep their own fields.
+    if (selectedType === 'all' || selectedType === 'investment' || selectedType === 'transfer') {
       return [];
     }
 
@@ -730,9 +1077,13 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
    * This prevents filtering by Category when Type="all" (nonsensical combination).
    */
   const filteredExpenses = useMemo(() => {
+    if (selectedType === 'investment' || selectedType === 'transfer') {
+      return [];
+    }
+
     let filtered = [...expenses];
 
-    // Filter by type
+    // Filter by ordinary cashflow type
     if (selectedType !== 'all') {
       filtered = filtered.filter(expense => expense.type === selectedType);
     }
@@ -771,7 +1122,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
       source: expense,
     }));
 
-    const operationMovements: UnifiedMovement[] = scopedInvestmentOperations
+    const operationMovements: UnifiedMovement[] = (selectedType === 'all' || selectedType === 'investment' ? scopedInvestmentOperations : [])
       .filter(operation => matchesPeriod(operation.date))
       .map(operation => ({
         id: `investment-${operation.id}`,
@@ -788,7 +1139,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
         source: operation,
       }));
 
-    const transferMovements: UnifiedMovement[] = scopedInternalTransfers
+    const transferMovements: UnifiedMovement[] = (selectedType === 'all' || selectedType === 'transfer' ? scopedInternalTransfers : [])
       .filter(transfer => matchesPeriod(transfer.date))
       .map(transfer => ({
         id: `transfer-${transfer.id}`,
@@ -806,7 +1157,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
 
     return [...expenseMovements, ...operationMovements, ...transferMovements]
       .sort((a, b) => b.date.getTime() - a.date.getTime());
-  }, [filteredExpenses, scopedInternalTransfers, scopedInvestmentOperations, selectedMonth, selectedYear]);
+  }, [filteredExpenses, scopedInternalTransfers, scopedInvestmentOperations, selectedMonth, selectedType, selectedYear]);
 
   // Calculate totals from filtered expenses
   const totalIncome = calculateTotalIncome(filteredExpenses);
@@ -932,20 +1283,20 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
 
   return (
     <div className="space-y-6">
-      {/* Desktop "Nuova Spesa" button — mobile uses FAB below */}
+      {/* Desktop "Nuovo movimento" button — mobile uses FAB below */}
       <div className="hidden desktop:flex justify-end">
-        <Button onClick={handleAddExpense} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined}>
+        <Button onClick={handleAddMovement} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined}>
           <Plus className="mr-2 h-4 w-4" />
-          Nuova Spesa
+          Nuovo movimento
         </Button>
       </div>
 
       {/* Mobile FAB */}
       <Button
-        onClick={handleAddExpense}
+        onClick={handleAddMovement}
         disabled={isDemo}
         className="fixed bottom-24 right-4 z-40 h-14 w-14 rounded-full shadow-lg desktop:hidden"
-        aria-label="Nuova Spesa"
+        aria-label="Nuovo movimento"
       >
         <Plus className="h-6 w-6" />
       </Button>
@@ -1239,7 +1590,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                   <div className="relative">
                     <Input
                       id="category-combobox"
-                      placeholder={selectedType === 'all' ? 'Seleziona prima un tipo' : 'Cerca categoria...'}
+                      placeholder={selectedType === 'all' ? 'Seleziona prima un tipo' : selectedType === 'investment' || selectedType === 'transfer' ? 'Non disponibile per questo tipo' : 'Cerca categoria...'}
                       value={searchQueryCategory}
                       onChange={(e) => {
                         setSearchQueryCategory(e.target.value);
@@ -1450,17 +1801,39 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    {movement.kind === 'transfer' ? (
-                      <p className="font-semibold text-muted-foreground">Neutro</p>
-                    ) : (
-                      <p className={movement.amount >= 0 ? 'font-semibold text-green-600' : 'font-semibold text-red-600'}>
-                        {formatCurrency(movement.amount)}
+                  <div className="flex items-center justify-between gap-3 desktop:justify-end">
+                    <div className="text-right">
+                      {movement.kind === 'transfer' ? (
+                        <p className="font-semibold text-muted-foreground">Neutro</p>
+                      ) : (
+                        <p className={movement.amount >= 0 ? 'font-semibold text-green-600' : 'font-semibold text-red-600'}>
+                          {formatCurrency(movement.amount)}
+                        </p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {movement.kind === 'investment' ? 'Investimento' : movement.kind === 'transfer' ? 'Trasferimento' : 'Cashflow'}
                       </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                      {movement.kind === 'investment' ? 'Investimento' : movement.kind === 'transfer' ? 'Trasferimento' : 'Cashflow'}
-                    </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEditMovement(movement)}
+                      disabled={isDemo}
+                      title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+                    >
+                      Modifica
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteMovement(movement)}
+                      disabled={isDemo}
+                      title={isDemo ? 'Non disponibile in modalità demo' : 'Elimina movimento'}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -1474,70 +1847,18 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
         </CardContent>
       </Card>
 
-      {/* Expenses - Desktop Table / Mobile Cards */}
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            {selectedMonth !== 'all'
-              ? `Voci di ${MONTHS.find(m => m.value === selectedMonth)?.label} ${selectedYear}`
-              : `Voci del ${selectedYear}`}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {/* Desktop: Table */}
-          <div className="hidden desktop:block">
-            <ExpenseTable
-              expenses={filteredExpenses}
-              onEdit={handleEditExpense}
-              onRefresh={onRefresh}
-              isDemo={isDemo}
-            />
-          </div>
-
-          {/* Mobile: flat divide-y list with tap-to-expand actions */}
-          <div className="desktop:hidden">
-            {filteredExpenses.length === 0 ? (
-              <div className="rounded-md border border-dashed p-8 text-center">
-                <p className="text-muted-foreground">Nessuna voce trovata</p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Usa il pulsante + per aggiungere la prima voce
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className="divide-y divide-border">
-                  {filteredExpenses.slice(0, mobileShowCount).map(expense => (
-                    <MobileExpenseRow
-                      key={expense.id}
-                      expense={expense}
-                      isExpanded={expandedRowId === expense.id}
-                      onToggleExpand={handleToggleExpand}
-                      onEdit={handleEditExpense}
-                      onDelete={handleDeleteExpense}
-                      isPendingDelete={pendingDeleteId === expense.id}
-                      isDemo={isDemo}
-                    />
-                  ))}
-                </div>
-                {filteredExpenses.length > mobileShowCount && (
-                  <div className="pt-4 text-center">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setMobileShowCount(prev => prev + 20)}
-                    >
-                      Carica altri {Math.min(20, filteredExpenses.length - mobileShowCount)}
-                    </Button>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {mobileShowCount} di {filteredExpenses.length} voci
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <UnifiedMovementDialog
+        open={movementDialogOpen}
+        onOpenChange={(open) => {
+          setMovementDialogOpen(open);
+          if (!open) setEditingMovement(null);
+        }}
+        assets={assets}
+        editingMovement={editingMovement}
+        householdEnabled={householdEnabled}
+        onCreateCashflow={handleAddExpense}
+        onSaved={refreshMovementData}
+      />
 
       {/* Expense Dialog */}
       <ExpenseDialog
