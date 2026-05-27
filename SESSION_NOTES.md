@@ -36,3 +36,50 @@ Audit tecnico e fix del dashboard shell su 4 assi:
 - **`useReducedMotion` è un hook Framer Motion, non React**: si importa da `framer-motion`, non da `react`. Il valore è `true | false | null` — `null` durante SSR (no window). La condizione `!prefersReducedMotion` applica correttamente il `style` durante SSR (null è falsy → `style` presente → coerente col comportamento pre-fix).
 
 - **File toccati**: `app/dashboard/layout.tsx`, `app/dashboard/template.tsx`, `app/globals.css`.
+
+---
+
+## 2026-05-27 — Sidebar desktop audit & fix (Sidebar.tsx, sidebar.tsx, globals.css)
+
+### Cosa
+
+Audit tecnico (`/impeccable audit`) e fix della sidebar desktop su 5 assi:
+
+1. **`aria-current="page"` sull'link attivo** — `components/layout/Sidebar.tsx`. Il `<Link>` della voce attiva ora riceve `aria-current={isActive ? 'page' : undefined}`. L'animated pill e `data-[active=true]` erano puramente visuali; i screen reader non ricevevano alcuna informazione sulla pagina corrente.
+
+2. **Landmark `role="navigation"` sulla sidebar** — `<SidebarContent>` riceve `role="navigation" aria-label="Navigazione principale"`. Il primitivo shadcn è un `<div>` che accetta `...props` spread — nessun wrapper DOM aggiuntivo, nessun impatto sul layout flex.
+
+3. **Separatore visivo tra Primary e Statistiche** — `<div className="mx-3 border-t border-sidebar-border" />` tra il gruppo primary (Panoramica/Patrimonio/Cashflow) e il gruppo Statistiche. Usa `--sidebar-border` token, corretto su tutti e 6 i temi.
+
+4. **Token email footer: `text-muted-foreground` → `text-sidebar-foreground/50`** — l'email nel footer sidebar usava un token calibrato per `--background`, non per `--sidebar`. Su temi con sidebar divergente dal background (solar-dusk dark, retro-arcade dark) il contrasto era imprevedibile.
+
+5. **Active item `font-medium` → `font-semibold`** — `components/ui/sidebar.tsx` CVA. Il peso `medium` era quasi impercettibile a `text-sm`; `semibold` aggiunge segnale tipografico reale alla voce corrente.
+
+6. **Contrasto `--sidebar-accent` in 3 combinazioni tema/modalità** — `app/globals.css`:
+   - **retro-arcade light**: `--sidebar-accent-foreground` da bianco a `oklch(0.14 0.05 187.4)` (teal scuro) — bianco su L=0.64 teal raggiungeva ~3.3:1, sotto la soglia WCAG AA di 4.5:1.
+   - **retro-arcade dark**: `--sidebar-accent` da `oklch(0.6437 ...)` a `oklch(0.50 0.14 187.38)` — stesso problema, corretto scurendo l'accent mantenendo alta la saturazione per l'estetica "neon".
+   - **solar-dusk light**: `--sidebar-accent` da `oklch(0.5538 ...)` a `oklch(0.46 0.13 66.44)` — il valore originale era ~4.8:1, tecnicamente passante ma troppo vicino al limite per sicurezza; portato a ~7.1:1.
+
+### Perché
+
+- **ARIA lacune (P1)**: senza `aria-current` e senza landmark nav, un utente VoiceOver non può navigare per landmarks (rotor) né sapere quale pagina è corrente. Sono violazioni WCAG 1.3.1 e 2.4.4.
+
+- **`text-muted-foreground` in contesto sidebar**: il token è definito rispetto a `--background`. La sidebar in diversi temi usa una superficie completamente diversa (`--sidebar` può essere teal, ambra scuro, lavanda) — usare `muted-foreground` lì è un token di contesto sbagliato e produce contrasto non predicibile.
+
+- **Separatore tra gruppi**: l'assenza di separatore rendeva opaca la distinzione tra "core nav" (3 voci primarie) e le sezioni analitiche/decisionali. La gerarchia visiva era affidata solo allo spacing, insufficiente per comunicare la differenza semantica.
+
+- **Contrasto accent**: la palette "retro-arcade" usa teal medio-chiaro come accent (L≈0.64), che era presente in entrambe le modalità light e dark con foreground bianco — un valore che non raggiunge il 4.5:1 richiesto da WCAG AA per testo normale (14px). Stesso pattern in solar-dusk con amber.
+
+### Nota
+
+- **`SidebarContent` come punto di iniezione landmark**: il primitivo shadcn `SidebarContent` è un `<div>` con `...props` spread (riga 375 di `sidebar.tsx`). Passare `role` e `aria-label` direttamente a quel componente evita di modificare il primitivo e di aggiungere un wrapper `<nav>` che interferirebbe con il `flex-col` del layout. Questo pattern è preferibile ogni volta che un primitivo shadcn ha `...props` spread sul root element.
+
+- **`aria-current` e `asChild`**: con il pattern `SidebarMenuButton asChild` + `<Link>` figlio, Framer Motion non è coinvolto nel rendering dell'elemento — `aria-current` viene passato direttamente al `<Link>` di Next.js che lo renderizza sull'`<a>` finale. Non serve nessuna prop personalizzata sul primitivo.
+
+- **retro-arcade: cambio foreground in light, cambio accent in dark**: la strategia per i due modi è volutamente asimmetrica. In light mode, usare testo scuro su un accent teal medio è naturale (dark-on-color è il pattern classico per light mode). In dark mode, usare testo bianco su un accent più scuro preserva l'estetica "neon" del tema (light-on-dark) pur passando il contrasto.
+
+- **solar-dusk dark invariato**: il controllo ha confermato che `oklch(0.6847)` accent con foreground `oklch(0.2839)` raggiunge ~5.1:1 (WCAG AA ✓) — nessuna modifica necessaria.
+
+- **`font-semibold` nel primitivo shadcn — guard test**: la modifica è in `components/ui/sidebar.tsx` (non in `Sidebar.tsx`) perché il CVA vive nel primitivo. `npx shadcn@latest add sidebar` sovrascrive il file e ripristina `font-medium`. Per catturare questa regressione automaticamente è stato aggiunto `__tests__/sidebarShadcnOverrides.test.ts`: legge il file sorgente reale (non una local copy) e asserisce `data-[active=true]:font-semibold`. Lo stesso file protegge anche gli override `desktop:block` / `desktop:flex` (breakpoint 1440px). Approccio "goldenfile": il test legge il sorgente direttamente con `readFileSync` invece di importare il modulo — evita di dover mockare `next/navigation` e jsdom, ed è altrettanto affidabile per regressions testuali.
+
+- **File toccati**: `components/layout/Sidebar.tsx`, `components/ui/sidebar.tsx`, `app/globals.css`, `__tests__/sidebarShadcnOverrides.test.ts`.

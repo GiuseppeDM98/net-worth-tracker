@@ -105,7 +105,8 @@ function NavItems({ items }: { items: NavItem[] }) {
               tooltip={item.name}
               className="relative z-10 data-[active=true]:bg-transparent"
             >
-              <Link href={item.href} onClick={handleClick}>
+              {/* aria-current="page" is on the <a> so screen readers announce the active route */}
+              <Link href={item.href} onClick={handleClick} aria-current={isActive ? 'page' : undefined}>
                 <item.icon />
                 <span>{item.name}</span>
               </Link>
@@ -151,13 +152,22 @@ export function AppSidebar() {
           </SidebarMenu>
         </SidebarHeader>
 
-        <SidebarContent>
+        {/*
+          role="navigation" + aria-label turns this <div> into a nav landmark.
+          SidebarContent is a plain div in the shadcn primitive; spreading these
+          props is the cleanest way to add semantics without modifying the primitive
+          or introducing an extra DOM wrapper that would break the flex layout.
+        */}
+        <SidebarContent role="navigation" aria-label="Navigazione principale">
           {/* Primary routes — no label, acts as visual anchor */}
           <SidebarGroup>
             <SidebarGroupContent>
               <NavItems items={primaryNav} />
             </SidebarGroupContent>
           </SidebarGroup>
+
+          {/* Thin rule separates core navigation from analytical/planning sections */}
+          <div className="mx-3 border-t border-sidebar-border" />
 
           {/* Analysis routes */}
           <SidebarGroup>
@@ -188,7 +198,10 @@ export function AppSidebar() {
                 </Avatar>
                 <div className="grid flex-1 overflow-hidden text-left text-sm leading-tight">
                   <span className="truncate font-medium text-sidebar-foreground">{displayName}</span>
-                  <span className="truncate text-xs text-muted-foreground">{user?.email}</span>
+                  {/* text-sidebar-foreground/50 instead of text-muted-foreground: the
+                      footer sits on --sidebar background, not --background, so we need
+                      a token calibrated for the sidebar surface. */}
+                  <span className="truncate text-xs text-sidebar-foreground/50">{user?.email}</span>
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

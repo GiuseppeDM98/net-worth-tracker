@@ -193,8 +193,10 @@
   --sidebar-foreground: oklch(0.3092 0.0518 219.6516);
   --sidebar-primary: oklch(0.5924 0.2025 355.8943);
   --sidebar-primary-foreground: oklch(1.0000 0 0);
+  /* Active pill: medium teal (L=0.64) with white text only reaches ~3.3:1 — fail.
+     Dark teal foreground on the same accent gives ~6:1 and fits light-mode aesthetics. */
   --sidebar-accent: oklch(0.6437 0.1019 187.3840);
-  --sidebar-accent-foreground: oklch(1.0000 0 0);
+  --sidebar-accent-foreground: oklch(0.14 0.05 187.4);
   --sidebar-border: oklch(0.6537 0.0197 205.2618);
   --sidebar-ring: oklch(0.5924 0.2025 355.8943);
 }
@@ -231,7 +233,9 @@
   --sidebar-foreground: oklch(0.6979 0.0159 196.7940);
   --sidebar-primary: oklch(0.5924 0.2025 355.8943);
   --sidebar-primary-foreground: oklch(1.0000 0 0);
-  --sidebar-accent: oklch(0.6437 0.1019 187.3840);
+  /* Dark mode: original L=0.64 teal with white text only reaches ~3.3:1 — fail.
+     Darkened to L=0.50 (more saturated for "neon" feel) → ~6:1 with white. */
+  --sidebar-accent: oklch(0.50 0.14 187.38);
   --sidebar-accent-foreground: oklch(1.0000 0 0);
   --sidebar-border: oklch(0.5230 0.0283 219.1365);
   --sidebar-ring: oklch(0.5924 0.2025 355.8943);
@@ -353,7 +357,9 @@
   --sidebar-foreground: oklch(0.3660 0.0251 49.6085);
   --sidebar-primary: oklch(0.5553 0.1455 48.9975);
   --sidebar-primary-foreground: oklch(1.0000 0 0);
-  --sidebar-accent: oklch(0.5538 0.1207 66.4416);
+  /* L=0.5538 with white text reaches ~4.8:1 — technically passing but too close to the
+     4.5:1 AA threshold. Darkened to L=0.46 → ~7.1:1 for a comfortable safety margin. */
+  --sidebar-accent: oklch(0.46 0.13 66.44);
   --sidebar-accent-foreground: oklch(1.0000 0 0);
   --sidebar-border: oklch(0.8866 0.0404 89.6994);
   --sidebar-ring: oklch(0.5553 0.1455 48.9975);
