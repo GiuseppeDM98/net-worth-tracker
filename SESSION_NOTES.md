@@ -83,3 +83,45 @@ Audit tecnico (`/impeccable audit`) e fix della sidebar desktop su 5 assi:
 - **`font-semibold` nel primitivo shadcn — guard test**: la modifica è in `components/ui/sidebar.tsx` (non in `Sidebar.tsx`) perché il CVA vive nel primitivo. `npx shadcn@latest add sidebar` sovrascrive il file e ripristina `font-medium`. Per catturare questa regressione automaticamente è stato aggiunto `__tests__/sidebarShadcnOverrides.test.ts`: legge il file sorgente reale (non una local copy) e asserisce `data-[active=true]:font-semibold`. Lo stesso file protegge anche gli override `desktop:block` / `desktop:flex` (breakpoint 1440px). Approccio "goldenfile": il test legge il sorgente direttamente con `readFileSync` invece di importare il modulo — evita di dover mockare `next/navigation` e jsdom, ed è altrettanto affidabile per regressions testuali.
 
 - **File toccati**: `components/layout/Sidebar.tsx`, `components/ui/sidebar.tsx`, `app/globals.css`, `__tests__/sidebarShadcnOverrides.test.ts`.
+
+---
+
+## 2026-05-27 — Bottom navigation mobile audit & fix (BottomNavigation.tsx)
+
+### Cosa
+
+Audit tecnico (`/impeccable audit`, score 17/20) e fix della bottom navigation mobile su 4 assi:
+
+1. **`aria-label="Navigazione mobile"` sul `<nav>`** — il `<nav>` non aveva label. Quando la pagina ha sia la sidebar desktop che la bottom nav mobile entrambe visibili nel DOM, i screen reader elencano due landmark "navigation" anonimi e l'utente non può distinguerli. La label permette di navigare per landmarks (VoiceOver rotor, NVDA Elements list).
+
+2. **`aria-current="page"` sui link attivi** — i tre `<Link>` primari e il `<button>` "Altro" ora ricevono `aria-current={isActive ? 'page' : undefined}`. Porta la bottom nav in parità con `Sidebar.tsx` (già corretto nella sessione precedente, riga 109). L'attributo viene rimosso del tutto quando inattivo (`undefined` → no DOM attribute), non impostato a `"false"`.
+
+3. **`aria-haspopup="dialog"` + `aria-expanded={drawerOpen}` sul bottone "Altro"** — il bottone apre il `SecondaryMenuDrawer` ma non dichiarava né il tipo di widget né il suo stato. Ora AT annuncia "pulsante, ha popup, compresso/espanso" prima e dopo il tap.
+
+4. **`useReducedMotion()` sulla pill animation** — la `motion.div` con `layoutId="active-pill"` usava sempre `{ type: 'spring', stiffness: 400, damping: 35 }` ignorando `prefers-reduced-motion`. Introdotta la costante `pillTransition` che commuta su `{ duration: 0 }` quando `prefersReducedMotion === true`. Pattern identico agli 5 componenti dell'assistant che già usano `useReducedMotion` da framer-motion.
+
+5. **Shadow `rgba(0,0,0,0.28)` → `color-mix()`** — la box-shadow era hardcoded con un nero freddo. Sostituita con `color-mix(in oklch, var(--sidebar-foreground) 22%, transparent)` per mantenere la tinta della superficie in tutti e 6 i temi (warm themes come elegant-luxury e solar-dusk producono ombre calde, cold themes ombre fredde).
+
+### Perché
+
+- **ARIA lacune (P1)**: senza `aria-label` e `aria-current`, un utente screen reader non può localizzare la navigazione né sapere quale pagina è corrente — violazioni WCAG 4.1.2 (Name, Role, Value). Il problema era già risolto nella sidebar desktop ma mancava sulla bottom nav.
+
+- **`aria-expanded` assente sul bottone "Altro" (P2)**: un bottone che apre un overlay senza dichiarare il proprio stato aperto/chiuso non comunica nulla ad AT dopo il tap. L'utente potrebbe non capire che si è aperto qualcosa.
+
+- **`useReducedMotion` incoerente (P1)**: tutti i componenti dell'assistant lo usano; la nav non lo usava. Per utenti con epilessia fotosensibile o motion sickness, animazioni di layout ricorrenti (ogni cambio tab) sono fastidiose o dannose. Il fix costa una riga.
+
+- **Shadow hardcoded (P3)**: su temi con sidebar warmissima (elegant-luxury, retro-arcade) un'ombra netto-nera spezza la coerenza della superficie.
+
+### Nota
+
+- **`aria-current` su `<button>` "Altro" è corretto**: `aria-current="page"` non è riservato ai `<a>` — ARIA 1.1 lo permette su qualsiasi elemento interattivo quando rappresenta la posizione corrente in un insieme di navigazione. È la soluzione preferita qui perché il bottone non è un link ma porta il peso semantico di "sei su una rotta secondaria".
+
+- **`pillTransition` fuori dal JSX**: estrarre la transizione in una costante evita di inlineare la logica ternaria due volte (una per i link, una per "Altro") — pattern Single Responsibility.
+
+- **`type: 'spring' as const`**: TypeScript richiede il cast perché inferisce `string` per i literal string nelle object expressions; `as const` è il modo idiomatico in questo codebase.
+
+- **`color-mix(in oklch, ...)` nelle inline styles di React**: le inline styles React passano il valore direttamente all'attributo `style` del DOM — il browser parsifica la stringa come CSS. `color-mix()` è supportata in tutti i browser target (Chrome 111+, Safari 16.2+, Firefox 113+); nessun polyfill necessario.
+
+- **Score post-fix stimato: 20/20** — tutti i P0/P1/P2/P3 risolti in un'unica sessione.
+
+- **File toccati**: `components/layout/BottomNavigation.tsx`.
