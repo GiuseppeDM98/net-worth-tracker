@@ -30,6 +30,17 @@ interface OverviewChartsSectionProps {
 }
 
 // Liquidity chart removed — now shown as a donut in the Patrimonio Liquido hero card.
+
+// Module-level so React never sees a new component type between renders.
+// Defining this inside the component body would cause remounts on every re-render
+// of OverviewChartsSectionInner, resetting the spinner animation each time.
+const LoadingPlaceholder = () => (
+  <div className="flex h-[220px] items-center justify-center text-sm text-muted-foreground">
+    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+    Preparazione grafico...
+  </div>
+);
+
 const CHART_TABS = [
   { id: 'assetClass', label: 'Asset Class' },
   { id: 'asset',      label: 'Per Asset'   },
@@ -116,13 +127,6 @@ const OverviewChartsSectionInner = ({
       return next;
     });
   };
-
-  const LoadingPlaceholder = () => (
-    <div className="flex h-[220px] items-center justify-center text-sm text-muted-foreground">
-      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-      Preparazione grafico...
-    </div>
-  );
 
   /**
    * Legend row for a single chart slice.

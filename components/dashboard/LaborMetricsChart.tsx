@@ -3,6 +3,7 @@
 // Recharts line chart showing month-by-month evolution of labor income, savings from
 // work, and gross investment growth — the time-series counterpart to the 4 KPI cards.
 // Follows the same pattern as FireCalculatorTab "Evoluzione Storica" chart.
+// Colors come from useChartColors() so they respect the active theme (no hardcoded hex).
 
 import {
   LineChart,
@@ -17,6 +18,7 @@ import {
 import { prepareMonthlyLaborMetricsData, formatCurrencyCompact } from '@/lib/services/chartService';
 import { fmtCurrency } from '@/lib/utils/chartUtils';
 import { EmptyState, ChartEmptyIcon } from '@/components/ui/EmptyState';
+import { useChartColors } from '@/lib/hooks/useChartColors';
 
 interface LaborMetricsChartProps {
   data: ReturnType<typeof prepareMonthlyLaborMetricsData>;
@@ -24,6 +26,9 @@ interface LaborMetricsChartProps {
 }
 
 export default function LaborMetricsChart({ data, isMobile }: LaborMetricsChartProps) {
+  // Must be called unconditionally before any early return (rules of hooks)
+  const chartColors = useChartColors();
+
   if (data.length === 0) {
     return (
       <EmptyState
@@ -60,7 +65,7 @@ export default function LaborMetricsChart({ data, isMobile }: LaborMetricsChartP
         <Line
           type="monotone"
           dataKey="laborIncome"
-          stroke="#3B82F6"
+          stroke={chartColors[0]}
           strokeWidth={2}
           name="Guadagnato da Lavoro"
           dot={{ r: 3 }}
@@ -70,7 +75,7 @@ export default function LaborMetricsChart({ data, isMobile }: LaborMetricsChartP
         <Line
           type="monotone"
           dataKey="savedFromWork"
-          stroke="#10B981"
+          stroke={chartColors[1]}
           strokeWidth={2}
           name="Risparmiato da Lavoro"
           dot={{ r: 3 }}
@@ -80,7 +85,7 @@ export default function LaborMetricsChart({ data, isMobile }: LaborMetricsChartP
         <Line
           type="monotone"
           dataKey="investmentGrowth"
-          stroke="#F59E0B"
+          stroke={chartColors[4]}
           strokeWidth={2}
           name="Crescita Investimenti (Lordo)"
           dot={{ r: 3 }}

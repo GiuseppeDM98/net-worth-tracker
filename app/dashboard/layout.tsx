@@ -30,17 +30,20 @@ export default function DashboardLayout({
             </div>
 
             {isDemo && (
-              <div className="flex shrink-0 items-center gap-1.5 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300">
+              // Amber is intentionally hardcoded via --warning tokens: demo mode is a
+              // global concern that must read as "caution" on every theme. The token
+              // maps to oklch amber regardless of active palette.
+              <div className="flex shrink-0 items-center gap-1.5 border-b border-warning-border bg-warning px-4 py-2 text-xs text-warning-foreground">
                 <FlaskConical className="h-3.5 w-3.5 shrink-0" />
                 <span className="font-medium">Modalità Demo</span>
-                <span className="hidden text-amber-700 dark:text-amber-400 sm:inline">
+                <span className="hidden text-warning-foreground/75 sm:inline">
                   — sola lettura, i dati non possono essere modificati
                 </span>
               </div>
             )}
 
             {/* Page transitions handled by template.tsx which re-mounts on every navigation */}
-            <main className="flex-1 overflow-y-auto bg-gray-50 p-4 dark:bg-gray-950 md:p-6 desktop:pb-6 max-desktop:portrait:[padding-bottom:calc(env(safe-area-inset-bottom,0px)+88px)] max-desktop:landscape:pb-6">
+            <main className="flex-1 overflow-y-auto bg-background p-4 desktop:p-6 max-desktop:portrait:[padding-bottom:calc(env(safe-area-inset-bottom,0px)+88px)] max-desktop:landscape:pb-6">
               {children}
             </main>
           </SidebarInset>

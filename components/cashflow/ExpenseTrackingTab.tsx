@@ -821,6 +821,16 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
     setMovementDialogOpen(true);
   };
 
+  // Opens the unified movement dialog when the bottom-nav "+" button fires.
+  useEffect(() => {
+    const handler = () => {
+      setEditingMovement(null);
+      setMovementDialogOpen(true);
+    };
+    window.addEventListener('cashflow:add-expense', handler);
+    return () => window.removeEventListener('cashflow:add-expense', handler);
+  }, []);
+
   const handleEditExpense = (expense: Expense) => {
     setEditingExpense(expense);
     setDialogOpen(true);
@@ -1290,16 +1300,6 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
           Nuovo movimento
         </Button>
       </div>
-
-      {/* Mobile FAB */}
-      <Button
-        onClick={handleAddMovement}
-        disabled={isDemo}
-        className="fixed bottom-24 right-4 z-40 h-14 w-14 rounded-full shadow-lg desktop:hidden"
-        aria-label="Nuovo movimento"
-      >
-        <Plus className="h-6 w-6" />
-      </Button>
 
       {/* ── Hero Cashflow Card ─────────────────────────────────────────────── */}
       {/* Mirrors the cashflow card in the Overview/Panoramica page, but driven  */}

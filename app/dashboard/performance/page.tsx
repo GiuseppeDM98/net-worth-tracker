@@ -60,6 +60,8 @@ import { BenchmarkComparisonSection } from '@/components/performance/BenchmarkCo
 import { HouseholdScopeSelect } from '@/components/household/HouseholdScopeSelect';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { filterExpensesByAttributionScope, filterSnapshotsByOwnershipScope } from '@/lib/utils/householdUtils';
+import { PageContainer } from '@/components/layout/PageContainer';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 const PERIOD_TABS = [
   { value: 'YTD' as TimePeriod, label: 'YTD', mobileLabel: 'YTD' },
@@ -688,16 +690,12 @@ export default function PerformancePage() {
 
   if (metrics.hasInsufficientData) {
     return (
-      <div className="space-y-6 p-3 sm:p-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Portafoglio</p>
-            <h1 className="text-3xl font-bold tracking-tight">Rendimenti del Portafoglio</h1>
-            <p className="text-muted-foreground mt-1">
-              Analisi dei rendimenti e metriche di rischio-rendimento
-            </p>
-          </div>
-          {householdEnabled && (
+      <PageContainer>
+        <PageHeader
+          label="Portafoglio"
+          title="Rendimenti del Portafoglio"
+          description="Analisi dei rendimenti e metriche di rischio-rendimento"
+          actions={householdEnabled ? (
             <HouseholdScopeSelect
               value={selectedScopeKey}
               onValueChange={setSelectedScopeKey}
@@ -705,8 +703,8 @@ export default function PerformancePage() {
               label="Vista rendimenti"
               className="w-full sm:w-[240px]"
             />
-          )}
-        </div>
+          ) : undefined}
+        />
 
         <PerformancePeriodSelector
           selectedPeriod={selectedPeriod}
@@ -725,29 +723,25 @@ export default function PerformancePage() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="space-y-6 p-3 sm:p-6">
+    <PageContainer>
       {/* Header */}
       <motion.div
         key={`header-${refreshAnimationTick}`}
         variants={sectionRefreshPulse}
         initial="idle"
         animate={isRefreshing ? 'pulse' : 'idle'}
-        className="border-b border-border pb-4"
       >
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Portafoglio</p>
-            <h1 className="text-3xl font-bold tracking-tight">Rendimenti del Portafoglio</h1>
-            <p className="text-muted-foreground mt-1">
-              Analisi dei rendimenti e metriche di rischio-rendimento
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2 sm:justify-end">
+        <PageHeader
+          label="Portafoglio"
+          title="Rendimenti del Portafoglio"
+          description="Analisi dei rendimenti e metriche di rischio-rendimento"
+          actions={
+            <div className="flex flex-wrap gap-2 sm:justify-end">
             {householdEnabled && (
               <HouseholdScopeSelect
                 value={selectedScopeKey}
@@ -795,8 +789,9 @@ export default function PerformancePage() {
               <RefreshCw className={cn('mr-2 h-4 w-4', isRefreshing && 'animate-spin')} />
               Aggiorna
             </Button>
-          </div>
-        </div>
+            </div>
+          }
+        />
       </motion.div>
 
       {/* Guide strip — outside period selector, shown once per user until dismissed */}
@@ -901,7 +896,7 @@ export default function PerformancePage() {
             value={metrics.cagr}
             format="percentage"
             description="Tasso di crescita annuale composto"
-            tooltip="Rendimento medio annuo che il portafoglio avrebbe dovuto avere per passare dal valore iniziale (+ contributi) al valore finale. Utile per confrontare periodi di durata diversa. Considera i flussi di cassa ma non il loro timing."
+            tooltip="Rendimento medio annuo del portafoglio, trattando tutti i versamenti come capitale investito (aggiunti al valore iniziale nel denominatore). Isola la performance degli investimenti: è più basso rispetto alla crescita grezza del patrimonio (visibile in Storico) perché i contributi appaiono come costo, non come crescita."
           />
           <MetricCard
             title="Money-Weighted Return (IRR)"
@@ -1509,6 +1504,6 @@ export default function PerformancePage() {
           triggerOrigin={aiDialogOrigin}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }

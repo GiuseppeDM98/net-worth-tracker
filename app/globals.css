@@ -25,6 +25,9 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-border: var(--warning-border);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -63,6 +66,9 @@
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
+  --warning: oklch(0.986 0.022 90);
+  --warning-foreground: oklch(0.468 0.098 75);
+  --warning-border: oklch(0.855 0.062 85);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -97,6 +103,9 @@
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
+  --warning: oklch(0.260 0.038 78);
+  --warning-foreground: oklch(0.854 0.090 82);
+  --warning-border: oklch(0.460 0.085 75);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
@@ -169,6 +178,9 @@
   --accent-foreground: oklch(1.0000 0 0);
   --destructive: oklch(0.5863 0.2064 27.1172);
   --destructive-foreground: oklch(1.0000 0 0);
+  --warning: oklch(0.986 0.022 90);
+  --warning-foreground: oklch(0.468 0.098 75);
+  --warning-border: oklch(0.855 0.062 85);
   --border: oklch(0.6537 0.0197 205.2618);
   --input: oklch(0.6537 0.0197 205.2618);
   --ring: oklch(0.5924 0.2025 355.8943);
@@ -181,8 +193,10 @@
   --sidebar-foreground: oklch(0.3092 0.0518 219.6516);
   --sidebar-primary: oklch(0.5924 0.2025 355.8943);
   --sidebar-primary-foreground: oklch(1.0000 0 0);
+  /* Active pill: medium teal (L=0.64) with white text only reaches ~3.3:1 — fail.
+     Dark teal foreground on the same accent gives ~6:1 and fits light-mode aesthetics. */
   --sidebar-accent: oklch(0.6437 0.1019 187.3840);
-  --sidebar-accent-foreground: oklch(1.0000 0 0);
+  --sidebar-accent-foreground: oklch(0.14 0.05 187.4);
   --sidebar-border: oklch(0.6537 0.0197 205.2618);
   --sidebar-ring: oklch(0.5924 0.2025 355.8943);
 }
@@ -204,6 +218,9 @@
   --accent-foreground: oklch(1.0000 0 0);
   --destructive: oklch(0.5863 0.2064 27.1172);
   --destructive-foreground: oklch(1.0000 0 0);
+  --warning: oklch(0.260 0.038 78);
+  --warning-foreground: oklch(0.854 0.090 82);
+  --warning-border: oklch(0.460 0.085 75);
   --border: oklch(0.5230 0.0283 219.1365);
   --input: oklch(0.5230 0.0283 219.1365);
   --ring: oklch(0.5924 0.2025 355.8943);
@@ -216,7 +233,9 @@
   --sidebar-foreground: oklch(0.6979 0.0159 196.7940);
   --sidebar-primary: oklch(0.5924 0.2025 355.8943);
   --sidebar-primary-foreground: oklch(1.0000 0 0);
-  --sidebar-accent: oklch(0.6437 0.1019 187.3840);
+  /* Dark mode: original L=0.64 teal with white text only reaches ~3.3:1 — fail.
+     Darkened to L=0.50 (more saturated for "neon" feel) → ~6:1 with white. */
+  --sidebar-accent: oklch(0.50 0.14 187.38);
   --sidebar-accent-foreground: oklch(1.0000 0 0);
   --sidebar-border: oklch(0.5230 0.0283 219.1365);
   --sidebar-ring: oklch(0.5924 0.2025 355.8943);
@@ -241,6 +260,9 @@
   --accent-foreground: oklch(0.1649 0.0352 281.8285);
   --destructive: oklch(0.6535 0.2348 34.0370);
   --destructive-foreground: oklch(1.0000 0 0);
+  --warning: oklch(0.986 0.022 90);
+  --warning-foreground: oklch(0.468 0.098 75);
+  --warning-border: oklch(0.855 0.062 85);
   --border: oklch(0.9205 0.0086 225.0878);
   --input: oklch(0.9205 0.0086 225.0878);
   --ring: oklch(0.6726 0.2904 341.4084);
@@ -276,6 +298,9 @@
   --accent-foreground: oklch(0.1649 0.0352 281.8285);
   --destructive: oklch(0.6535 0.2348 34.0370);
   --destructive-foreground: oklch(1.0000 0 0);
+  --warning: oklch(0.260 0.038 78);
+  --warning-foreground: oklch(0.854 0.090 82);
+  --warning-border: oklch(0.460 0.085 75);
   --border: oklch(0.3279 0.0832 280.7890);
   --input: oklch(0.3279 0.0832 280.7890);
   --ring: oklch(0.6726 0.2904 341.4084);
@@ -317,6 +342,9 @@
   --accent: oklch(0.9000 0.0500 74.9889);
   --accent-foreground: oklch(0.4444 0.0096 73.6390);
   --destructive: oklch(0.4437 0.1613 26.8994);
+  --warning: oklch(0.986 0.022 90);
+  --warning-foreground: oklch(0.468 0.098 75);
+  --warning-border: oklch(0.855 0.062 85);
   --border: oklch(0.8866 0.0404 89.6994);
   --input: oklch(0.8866 0.0404 89.6994);
   --ring: oklch(0.5553 0.1455 48.9975);
@@ -329,7 +357,9 @@
   --sidebar-foreground: oklch(0.3660 0.0251 49.6085);
   --sidebar-primary: oklch(0.5553 0.1455 48.9975);
   --sidebar-primary-foreground: oklch(1.0000 0 0);
-  --sidebar-accent: oklch(0.5538 0.1207 66.4416);
+  /* L=0.5538 with white text reaches ~4.8:1 — technically passing but too close to the
+     4.5:1 AA threshold. Darkened to L=0.46 → ~7.1:1 for a comfortable safety margin. */
+  --sidebar-accent: oklch(0.46 0.13 66.44);
   --sidebar-accent-foreground: oklch(1.0000 0 0);
   --sidebar-border: oklch(0.8866 0.0404 89.6994);
   --sidebar-ring: oklch(0.5553 0.1455 48.9975);
@@ -351,6 +381,9 @@
   --accent: oklch(0.3598 0.0497 229.3202);
   --accent-foreground: oklch(0.9232 0.0026 48.7171);
   --destructive: oklch(0.5771 0.2152 27.3250);
+  --warning: oklch(0.260 0.038 78);
+  --warning-foreground: oklch(0.854 0.090 82);
+  --warning-border: oklch(0.460 0.085 75);
   --border: oklch(0.3741 0.030 60.0000);
   --input: oklch(0.3741 0.030 60.0000);
   --ring: oklch(0.7049 0.1867 47.6044);
@@ -387,6 +420,9 @@
   --accent: oklch(0.9619 0.0580 95.6174);
   --accent-foreground: oklch(0.3958 0.1331 25.7230);
   --destructive: oklch(0.4437 0.1613 26.8994);
+  --warning: oklch(0.986 0.022 90);
+  --warning-foreground: oklch(0.468 0.098 75);
+  --warning-border: oklch(0.855 0.062 85);
   --border: oklch(0.9355 0.0324 80.9937);
   --input: oklch(0.9355 0.0324 80.9937);
   --ring: oklch(0.4650 0.1470 24.9381);
@@ -421,6 +457,9 @@
   --accent: oklch(0.5553 0.1455 48.9975);
   --accent-foreground: oklch(0.9619 0.0580 95.6174);
   --destructive: oklch(0.6368 0.2078 25.3313);
+  --warning: oklch(0.260 0.038 78);
+  --warning-foreground: oklch(0.854 0.090 82);
+  --warning-border: oklch(0.460 0.085 75);
   --border: oklch(0.3741 0.025 20.0000);
   --input: oklch(0.3741 0.025 20.0000);
   --ring: oklch(0.5054 0.1905 27.5181);
@@ -458,6 +497,9 @@
   --accent-foreground: oklch(1.0000 0 0);
   --destructive: oklch(0.6368 0.2078 25.3313);
   --destructive-foreground: oklch(1.0000 0 0);
+  --warning: oklch(0.986 0.022 90);
+  --warning-foreground: oklch(0.468 0.098 75);
+  --warning-border: oklch(0.855 0.062 85);
   --border: oklch(0.8699 0 0);
   --input: oklch(0.8699 0 0);
   --ring: oklch(0.5676 0.2021 283.0838);
@@ -493,6 +535,9 @@
   --accent-foreground: oklch(0.9219 0 0);
   --destructive: oklch(0.6368 0.2078 25.3313);
   --destructive-foreground: oklch(1.0000 0 0);
+  --warning: oklch(0.260 0.038 78);
+  --warning-foreground: oklch(0.854 0.090 82);
+  --warning-border: oklch(0.460 0.085 75);
   --border: oklch(0.3867 0.025 270.0000);
   --input: oklch(0.3867 0.025 270.0000);
   --ring: oklch(0.5676 0.2021 283.0838);
@@ -509,4 +554,13 @@
   --sidebar-accent-foreground: oklch(0.9219 0 0);
   --sidebar-border: oklch(0.3867 0.025 270.0000);
   --sidebar-ring: oklch(0.5676 0.2021 283.0838);
+}
+
+/* Disable continuous rotation for users who prefer reduced motion.
+ * Tailwind's animate-spin has no built-in reduced-motion guard, so we
+ * neutralise it globally here rather than wrapping every spinner. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin {
+    animation: none;
+  }
 }

@@ -13,7 +13,7 @@
  * the previous variant context ("visible") and skip initial="hidden" on the new child.
  */
 
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { pageVariants } from '@/lib/utils/motionVariants';
 
 export default function DashboardTemplate({
@@ -21,6 +21,8 @@ export default function DashboardTemplate({
 }: {
   children: React.ReactNode;
 }) {
+  const prefersReducedMotion = useReducedMotion();
+
   return (
     <motion.div
       initial="hidden"
@@ -28,8 +30,11 @@ export default function DashboardTemplate({
       variants={pageVariants}
       // Belt-and-suspenders: CSS opacity:0 + translateY covers the single frame
       // before Framer Motion's useLayoutEffect runs on very slow JS threads.
-      // Must match pageVariants.hidden values exactly.
-      style={{ opacity: 0, transform: 'translateY(4px)' }}
+      // Omitted when reduced motion is preferred — MotionConfig in layout.tsx already
+      // skips durations, so this inline style would cause a one-frame invisible flash
+      // without any animation payoff for reduced-motion users.
+      // Values must match pageVariants.hidden exactly when applied.
+      style={!prefersReducedMotion ? { opacity: 0, transform: 'translateY(4px)' } : undefined}
     >
       {children}
     </motion.div>

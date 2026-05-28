@@ -369,10 +369,20 @@ export function AssetManagementTab({ assets, allAssets, loading, onRefresh, snap
         : entries.find((e) => e.year === italyYear);
       const firstEntry = entries[0];
 
+      // Δ Inizio base: prefer averageCost (actual purchase price) over the first snapshot
+      // price when cost basis is tracked and the asset uses unit prices (not useTotal).
+      // This gives the true return since purchase — the first snapshot may have been taken
+      // days/weeks after the buy, already reflecting some price movement.
+      // Falls back to first snapshot price for manual-price assets or when no cost basis exists.
+      const allTimeBase =
+        !useTotal && asset.averageCost && asset.averageCost > 0
+          ? asset.averageCost
+          : firstEntry.value;
+
       result[asset.id] = {
         lastSnapshotDelta: prevMonthEntry ? calcDelta(prevMonthEntry.value) : null,
         ytdDelta: ytdEntry ? calcDelta(ytdEntry.value) : null,
-        allTimeDelta: calcDelta(firstEntry.value),
+        allTimeDelta: calcDelta(allTimeBase),
       };
     }
     return result;

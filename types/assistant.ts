@@ -226,6 +226,16 @@ export interface AssistantMonthContextBundle {
       [subCategory: string]: number; // EUR value from snapshot
     };
   };
+  // Target allocation from user settings (Settings → Allocazione).
+  // null when the user has not configured any targets.
+  // subTargets percentages are relative to the asset class (not total portfolio):
+  //   e.g. equity 60% total, US Stocks 70% of equity → 42% of portfolio.
+  targetAllocation: {
+    [assetClass: string]: {
+      targetPercentage: number; // % of total portfolio
+      subTargets?: { [subCategory: string]: number }; // % relative to this asset class
+    };
+  } | null;
   dataQuality: {
     hasSnapshot: boolean;
     hasPreviousBaseline: boolean;

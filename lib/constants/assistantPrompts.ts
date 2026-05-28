@@ -56,6 +56,16 @@ export const assistantPromptChips: AssistantPromptChip[] = [
     webContextHint: 'none',
   },
   {
+    id: 'allocation-vs-target',
+    label: 'Allocazione vs target',
+    prompt: "Analizza la mia allocazione attuale rispetto al target configurato: dove sono fuori bilanciamento e a quali acquisti dare priorità per riallinearmi?",
+    // ytd_analysis fetches the latest portfolio snapshot automatically without
+    // requiring a manual month selection — ideal for a "state of now" allocation check.
+    mode: 'ytd_analysis',
+    requiresMonthContext: false,
+    webContextHint: 'none',
+  },
+  {
     id: 'macro-watch',
     label: 'Contesto geopolitico',
     // The apostrophe in "d'occhio" is a genuine Italian contraction, not a JS escape issue.

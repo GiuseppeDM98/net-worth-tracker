@@ -96,34 +96,6 @@ servirà come input per il prossimo step:
 
 ## Cashflow
 
-### Tab "Analisi"
-
-```
-/impeccable critique il tab "Analisi" della pagina Cashflow
-
-File: app/dashboard/cashflow/page.tsx
-Componenti: components/cashflow/AnalisiTab.tsx,
-            components/cashflow/CashflowSankeyChart.tsx
-
-Questo tab unifica anno corrente + storico in un'unica vista con 3-state period pill
-(Anno Corrente / Anno / Storico). Include Sankey chart con drill-down breadcrumb,
-TopExpensesBlock (top 5 spese espandibile) e 9 trend charts in collapsible.
-Confronta con: Rendimenti (period selector), Storico (narrative order + collapsible appendice).
-Design language atteso: Trade Republic hierarchy (text-4xl font-bold font-mono hero,
-divide-y flat rows, no card-in-card), useChartColors() per tutte le serie grafiche,
-token compliance su tutti e 6 i temi dell'app.
-
-Contesto:
-- Leggi AGENTS.md (pattern, convenzioni, gotcha)
-- Leggi CLAUDE.md (stato corrente, known issues)
-
-Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
-servirà come input per il prossimo step:
-- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
-- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
-- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
-```
-
 ### Tab "Dividendi"
 
 ```
@@ -230,6 +202,45 @@ Ogni centro ha KPI cards, grafico spesa mensile e tabella transazioni collegate.
 Delete e rename cascadano sulle spese via writeBatch.
 Confronta con: GoalBasedInvestingTab (assegnazione risorse a obiettivi — pattern analogo),
 ExpenseTrackingTab (transaction table style).
+Design language atteso: Trade Republic hierarchy (text-4xl font-bold font-mono hero,
+divide-y flat rows, no card-in-card), useChartColors() per tutte le serie grafiche,
+token compliance su tutti e 6 i temi dell'app.
+
+Contesto:
+- Leggi AGENTS.md (pattern, convenzioni, gotcha)
+- Leggi CLAUDE.md (stato corrente, known issues)
+
+Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
+servirà come input per il prossimo step:
+- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
+- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
+- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+```
+
+---
+
+## Analisi
+
+```
+/impeccable critique la pagina Analisi
+
+File: app/dashboard/analisi/page.tsx
+Componenti: components/cashflow/AnalisiTab.tsx,
+            components/cashflow/CashflowSankeyChart.tsx,
+            components/cashflow/AnomalieBlock.tsx,
+            components/cashflow/ConfrontoAnnualeSection.tsx,
+            components/cashflow/SavingsRateTrendSection.tsx,
+            components/cashflow/CategoryTrendsGrid.tsx
+
+Pagina standalone (estratta dal tab "Analisi" di Cashflow). Unifica anno corrente +
+storico in un'unica vista con 3-state period pill (Anno Corrente / Anno / Storico).
+Include: Sankey chart con drill-down breadcrumb, TopExpensesBlock (top 5 spese
+espandibile), AnomalieBlock (anomalie di spesa), ConfrontoAnnualeSection (confronto
+anno corrente vs anno precedente), SavingsRateTrendSection (trend savings rate),
+CategoryTrendsGrid (9 trend charts collassabili). Data fetching autonomo via
+useExpenses / useExpenseCategories — non condivide route lifecycle con Cashflow.
+Confronta con: Cashflow/Tracciamento (dati condivisi via RQ cache),
+Rendimenti (period selector), Storico (narrative order + collapsible appendice).
 Design language atteso: Trade Republic hierarchy (text-4xl font-bold font-mono hero,
 divide-y flat rows, no card-in-card), useChartColors() per tutte le serie grafiche,
 token compliance su tutti e 6 i temi dell'app.
@@ -569,10 +580,11 @@ Componenti: components/layout/Sidebar.tsx,
 
 Questi file definiscono la struttura permanente dell'app: layout wrapper (main padding,
 demo banner, landscape header bar con SidebarTrigger), page transitions (template.tsx),
-sidebar desktop con nav items e voce attiva, bottom navigation mobile portrait con
-theme sync via --sidebar-* CSS vars, secondary menu drawer per voci overflow su mobile.
-Nota: layout.tsx ha già due problemi noti — bg-gray-50/dark:bg-gray-950 hardcoded nel
-<main> e md:p-6 invece di desktop:p-6.
+sidebar desktop collassabile (icon mode, toggle desktop-only, AssistenteBanner → Bot icon
+in collapsed), bottom navigation mobile portrait con FAB cashflow animato via AnimatePresence
+e theme sync via --sidebar-* CSS vars, secondary menu drawer per voci overflow su mobile.
+Nuovi componenti condivisi: PageContainer, PageHeader (sticky mobile bar), PageTabs/PageTabBar
+(underline tab indicator), ThemePicker, lib/constants/navigation.ts (nav arrays centralizzati).
 Confronta con: nessuna pagina specifica — il benchmark è la coerenza interna tra
 sidebar desktop, bottom nav mobile e secondary drawer.
 Design language atteso: Trade Republic hierarchy (text-4xl font-bold font-mono hero,
@@ -693,17 +705,18 @@ servirà come input per il prossimo step:
 Dalla meno redesignata alla più redesignata, per trovare i delta maggiori prima:
 
 1. Cashflow / tab "Dividendi" ← mai redesignato, delta atteso alto
-2. App Shell e Navigazione ← fondamentale, problemi noti già in layout.tsx
-3. Cross-cutting: Sistema dei Dialog ← usati ovunque, coerenza mai verificata
-4. Impostazioni ← redesign parziale
-5. Landing Page ← primo contatto utente, mai critiquata
-6. Login e Register ← già migliorati ma mai critiquati formalmente
-7. Panoramica ← v2 con KPI chip grid + category bars (verifica delta)
-8. Patrimonio ← pagina unica (nessun tab), hero condiviso con Panoramica
-9. Cashflow / tab "Tracciamento" (mobileLabel: "Spese") e "Budget" ← da verificare dopo AnalisiTab
-10. Allocazione
-11. Rendimenti
-12. Storico
-13. Hall of Fame
-14. FIRE e Simulazioni (4 tab)
-15. Assistente AI ← rieseguire dopo redesign (baseline: 25/40)
+2. Analisi ← pagina nuova (estratta da Cashflow), mai critiquata formalmente
+3. App Shell e Navigazione ← fondamentale, problemi noti già in layout.tsx
+4. Cross-cutting: Sistema dei Dialog ← usati ovunque, coerenza mai verificata
+5. Impostazioni ← redesign parziale
+6. Landing Page ← primo contatto utente, mai critiquata
+7. Login e Register ← già migliorati ma mai critiquati formalmente
+8. Panoramica ← v2 con KPI chip grid + category bars (verifica delta)
+9. Patrimonio ← pagina unica (nessun tab), hero condiviso con Panoramica
+10. Cashflow / tab "Tracciamento" (mobileLabel: "Spese") e "Budget"
+11. Allocazione
+12. Rendimenti
+13. Storico
+14. Hall of Fame
+15. FIRE e Simulazioni (4 tab)
+16. Assistente AI ← rieseguire dopo redesign (baseline: 25/40)

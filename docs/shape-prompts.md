@@ -75,28 +75,6 @@ Contesto:
 
 ## Cashflow
 
-### Tab "Analisi"
-
-```
-/impeccable shape il tab "Analisi" della pagina Cashflow
-
-Priority issues (P0/P1) da: [SLUG]
-File: app/dashboard/cashflow/page.tsx
-Componenti: components/cashflow/AnalisiTab.tsx,
-            components/cashflow/CashflowSankeyChart.tsx
-
-Confronta con: Rendimenti (period selector), Storico (narrative order + collapsible).
-Design language atteso: Trade Republic hierarchy (text-4xl font-bold font-mono hero,
-divide-y flat rows, no card-in-card), useChartColors() per tutte le serie grafiche,
-token compliance su tutti e 6 i temi dell'app.
-
-Contesto:
-- Leggi AGENTS.md (pattern, convenzioni, gotcha)
-- Leggi CLAUDE.md (stato corrente, known issues)
-- Leggi COMMENTS.md e APPLICALA mentre scrivi codice
-- Leggi DEVELOPMENT_GUIDELINES.md e APPLICALA mentre scrivi codice
-```
-
 ### Tab "Dividendi"
 
 ```
@@ -178,6 +156,35 @@ Componenti: components/cashflow/CostCentersTab.tsx,
             components/cashflow/CostCenterDialog.tsx
 
 Confronta con: GoalBasedInvestingTab (assegnazione risorse), ExpenseTrackingTab (tabella).
+Design language atteso: Trade Republic hierarchy (text-4xl font-bold font-mono hero,
+divide-y flat rows, no card-in-card), useChartColors() per tutte le serie grafiche,
+token compliance su tutti e 6 i temi dell'app.
+
+Contesto:
+- Leggi AGENTS.md (pattern, convenzioni, gotcha)
+- Leggi CLAUDE.md (stato corrente, known issues)
+- Leggi COMMENTS.md e APPLICALA mentre scrivi codice
+- Leggi DEVELOPMENT_GUIDELINES.md e APPLICALA mentre scrivi codice
+```
+
+---
+
+## Analisi
+
+```
+/impeccable shape la pagina Analisi
+
+Priority issues (P0/P1) da: [SLUG]
+File: app/dashboard/analisi/page.tsx
+Componenti: components/cashflow/AnalisiTab.tsx,
+            components/cashflow/CashflowSankeyChart.tsx,
+            components/cashflow/AnomalieBlock.tsx,
+            components/cashflow/ConfrontoAnnualeSection.tsx,
+            components/cashflow/SavingsRateTrendSection.tsx,
+            components/cashflow/CategoryTrendsGrid.tsx
+
+Confronta con: Cashflow/Tracciamento (dati condivisi via RQ cache),
+Rendimenti (period selector), Storico (narrative order + collapsible).
 Design language atteso: Trade Republic hierarchy (text-4xl font-bold font-mono hero,
 divide-y flat rows, no card-in-card), useChartColors() per tutte le serie grafiche,
 token compliance su tutti e 6 i temi dell'app.

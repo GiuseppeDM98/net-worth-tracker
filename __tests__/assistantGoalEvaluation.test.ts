@@ -51,6 +51,7 @@ function makeBundle(overrides?: Partial<AssistantMonthContextBundle>): Assistant
         'Azioni USA': 42000,
       },
     },
+    targetAllocation: null,
     dataQuality: {
       hasSnapshot: true,
       hasPreviousBaseline: false,

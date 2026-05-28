@@ -55,3 +55,6 @@ next-env.d.ts
 .agents/
 .antigravitycli/
 skills-lock.json
+
+# Editor
+.vscode/

@@ -81,10 +81,13 @@ export function OverviewAnimatedCurrency({
 
   useEffect(() => {
     if (!animateOnMount || !onSettled || settledRef.current) return;
-    // Animation is complete when the hook has reached the non-zero target.
-    // value !== 0 guards against firing during the loading phase when all
-    // metrics are 0 (empty assets) and animated snaps to 0 immediately.
-    if (animated !== null && animated === value && value !== 0) {
+    // Fire once the count-up loop reaches the target value.
+    // No value !== 0 guard here: this component only renders after the page's
+    // loading skeleton is dismissed, so value=0 means a legitimately empty
+    // portfolio, not a loading placeholder. Guarding on !== 0 would prevent
+    // heroSettled from firing for new users, leaving charts in a permanent
+    // "Preparazione grafico..." state on desktop.
+    if (animated !== null && animated === value) {
       settledRef.current = true;
       onSettled();
     }

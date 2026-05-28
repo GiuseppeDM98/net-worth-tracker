@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -16,55 +16,41 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { AssistenteBanner } from '@/components/layout/AssistenteBanner';
 import { LogoutDialog } from '@/components/layout/LogoutDialog';
-import {
-  PieChart,
-  History,
-  Trophy,
-  Flame,
-  Settings,
-  TrendingUp,
-  LogOut,
-  MoreVertical,
-  Sun,
-  Moon,
-  Monitor,
-} from 'lucide-react';
+import { ThemePicker } from '@/components/layout/ThemePicker';
+import { Settings, LogOut, MoreVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { drawerContainer, drawerItem } from '@/lib/utils/motionVariants';
-import { applyThemeWithTransition } from '@/lib/utils/themeTransition';
 import { useLogout } from '@/lib/hooks/useLogout';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTheme } from 'next-themes';
 import { getDisplayInfo } from '@/lib/utils/userDisplayUtils';
-
-// WARNING: If you add/remove navigation items here, also update:
-// - Sidebar.tsx (analysisNav / planningNav arrays)
-// - BottomNavigation.tsx (secondaryHrefs array)
-
-type NavEntry = { name: string; href: string; icon: React.ComponentType<{ className?: string }> };
-
-const analisiNav: NavEntry[] = [
-  { name: 'Allocazione', href: '/dashboard/allocation', icon: PieChart },
-  { name: 'Rendimenti', href: '/dashboard/performance', icon: TrendingUp },
-  { name: 'Storico', href: '/dashboard/history', icon: History },
-  { name: 'Hall of Fame', href: '/dashboard/hall-of-fame', icon: Trophy },
-];
-
-const pianificazioneNav: NavEntry[] = [
-  { name: 'FIRE e Simulazioni', href: '/dashboard/fire-simulations', icon: Flame },
-];
+import { analysisNav, planningNav } from '@/lib/constants/navigation';
 
 interface SecondaryMenuDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
+/**
+ * Returns all keyboard-focusable elements within a container in DOM order.
+ * Used by the focus-trap and autofocus effects to cycle Tab within the dialog.
+ */
+function getFocusable(container: HTMLElement): HTMLElement[] {
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+  );
+}
+
 export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const { user } = useAuth();
-  const { theme, setTheme } = useTheme();
   const { confirmLogout, setConfirmLogout, handleSignOut } = useLogout(() => onOpenChange(false));
+
+  // Ref on the dialog panel — used for focus management and Tab trapping.
+  const panelRef = useRef<HTMLDivElement>(null);
+  // Capture the element that opened the drawer so focus returns to it on close.
+  const returnFocusRef = useRef<Element | null>(null);
 
   // Lock body scroll when open
   useEffect(() => {
@@ -80,19 +66,53 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onOpenChange]);
 
+  // Focus management: autofocus the first item on open, return focus to the
+  // trigger on close. requestAnimationFrame defers until after the panel is
+  // painted so the element is actually reachable when focus() is called.
+  useEffect(() => {
+    if (open) {
+      returnFocusRef.current = document.activeElement;
+      const raf = requestAnimationFrame(() => {
+        if (!panelRef.current) return;
+        getFocusable(panelRef.current)[0]?.focus();
+      });
+      return () => cancelAnimationFrame(raf);
+    } else {
+      // Return focus to whatever triggered the drawer (the "Altro" bottom-nav button).
+      (returnFocusRef.current as HTMLElement | null)?.focus();
+      returnFocusRef.current = null;
+    }
+  }, [open]);
+
+  // Tab trap: cycle Tab and Shift+Tab within the panel while it is open.
+  // Without this, Tab leaks to background elements behind the opaque backdrop.
+  useEffect(() => {
+    if (!open) return;
+    const trapTab = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab' || !panelRef.current) return;
+      const focusable = getFocusable(panelRef.current);
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    window.addEventListener('keydown', trapTab);
+    return () => window.removeEventListener('keydown', trapTab);
+  }, [open]);
+
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + '/');
 
-  const navigate = (href: string) => {
-    router.push(href);
-    onOpenChange(false);
-  };
-
   const { displayName, initials } = getDisplayInfo(user);
 
+  // py-3 (12px × 2) + text-sm line-height (~20px) = 44px — meets WCAG 2.5.5 touch target minimum.
   const navItemCn = (active: boolean) =>
     cn(
-      'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors',
+      'flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium transition-colors',
       active
         ? 'bg-sidebar-accent text-sidebar-accent-foreground'
         : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
@@ -105,71 +125,97 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
       <AnimatePresence>
         {open && (
           <>
-            {/* Backdrop */}
+            {/* Backdrop — color-mix tints the overlay toward the sidebar foreground
+                so it reads as neutral across all 6 color themes without hardcoding
+                black, which looks harsh on warm themes (solar-dusk, elegant-luxury).
+                aria-hidden keeps it out of the AT tree; pointer events still fire. */}
             <motion.div
               key="backdrop"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="fixed inset-0 z-40 bg-black/40"
+              aria-hidden="true"
+              className="fixed inset-0 z-40"
+              style={{ background: 'color-mix(in oklch, var(--sidebar-foreground) 45%, transparent)' }}
               onClick={() => onOpenChange(false)}
             />
 
-            {/* Panel */}
+            {/* Dialog panel.
+                role="dialog" + aria-modal="true" tells assistive technology that
+                this is a modal layer and background content is inert — without these,
+                screen readers don't announce the overlay or confine navigation to it.
+                aria-label provides the accessible name in place of a visible heading. */}
             <motion.div
               key="panel"
+              ref={panelRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Menu secondario"
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
-              transition={{ type: 'spring', stiffness: 350, damping: 38 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 35 }}
               className="fixed bottom-0 left-0 right-0 z-50 flex max-h-[82vh] flex-col rounded-t-2xl border-t border-sidebar-border bg-sidebar text-sidebar-foreground"
               style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
             >
-              {/* Drag handle */}
+              {/* Drag handle — visual affordance for swipe-to-dismiss */}
               <div className="flex shrink-0 justify-center pb-1 pt-3">
                 <div className="h-1 w-10 rounded-full bg-sidebar-foreground/20" />
               </div>
 
-              {/* Scrollable nav */}
-              <motion.div
+              {/* Scrollable navigation area.
+                  motion.nav doubles as the stagger container, eliminating a redundant
+                  wrapper div while adding the <nav> landmark for AT discovery. */}
+              <motion.nav
+                aria-label="Navigazione secondaria"
                 className="flex-1 overflow-y-auto px-2 pb-3 pt-1"
                 variants={drawerContainer}
                 initial="hidden"
                 animate="visible"
               >
-                {/* Analisi */}
+                {/* Statistiche group */}
                 <div className="mb-1">
-                  <motion.p variants={drawerItem} className={sectionLabel}>Analisi</motion.p>
-                  {analisiNav.map((nav) => (
-                    <motion.button
-                      key={nav.href}
-                      variants={drawerItem}
-                      onClick={() => navigate(nav.href)}
-                      className={navItemCn(isActive(nav.href))}
-                    >
-                      <nav.icon className="size-5 shrink-0" />
-                      {nav.name}
-                    </motion.button>
-                  ))}
+                  <motion.p variants={drawerItem} className={sectionLabel}>Statistiche</motion.p>
+                  {/* motion.li carries the stagger variant; the inner Link keeps
+                      aria-current, Next.js prefetching, and right-click semantics. */}
+                  <ul className="m-0 list-none p-0">
+                    {analysisNav.map((nav) => (
+                      <motion.li key={nav.href} variants={drawerItem}>
+                        <Link
+                          href={nav.href}
+                          aria-current={isActive(nav.href) ? 'page' : undefined}
+                          onClick={() => onOpenChange(false)}
+                          className={navItemCn(isActive(nav.href))}
+                        >
+                          <nav.icon className="size-5 shrink-0" />
+                          {nav.name}
+                        </Link>
+                      </motion.li>
+                    ))}
+                  </ul>
                 </div>
 
-                {/* Pianificazione */}
+                {/* Pianificazione group */}
                 <div className="mb-1">
                   <motion.p variants={drawerItem} className={cn(sectionLabel, 'pt-2')}>
                     Pianificazione
                   </motion.p>
-                  {pianificazioneNav.map((nav) => (
-                    <motion.button
-                      key={nav.href}
-                      variants={drawerItem}
-                      onClick={() => navigate(nav.href)}
-                      className={navItemCn(isActive(nav.href))}
-                    >
-                      <nav.icon className="size-5 shrink-0" />
-                      {nav.name}
-                    </motion.button>
-                  ))}
+                  <ul className="m-0 list-none p-0">
+                    {planningNav.map((nav) => (
+                      <motion.li key={nav.href} variants={drawerItem}>
+                        <Link
+                          href={nav.href}
+                          aria-current={isActive(nav.href) ? 'page' : undefined}
+                          onClick={() => onOpenChange(false)}
+                          className={navItemCn(isActive(nav.href))}
+                        >
+                          <nav.icon className="size-5 shrink-0" />
+                          {nav.name}
+                        </Link>
+                      </motion.li>
+                    ))}
+                  </ul>
                 </div>
 
                 {/* Assistente AI banner */}
@@ -178,10 +224,9 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
                     <AssistenteBanner onClick={() => onOpenChange(false)} />
                   </motion.div>
                 )}
+              </motion.nav>
 
-              </motion.div>
-
-              {/* Footer */}
+              {/* Footer: user identity + account options dropdown */}
               <div className="shrink-0 border-t border-sidebar-border">
                 <div className="flex items-center gap-3 px-4 py-3">
                   <Avatar className="size-8 shrink-0 rounded-lg">
@@ -215,29 +260,10 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
                       <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">
                         Preferenze
                       </DropdownMenuLabel>
+                      {/* Theme selector — plain div so clicking buttons doesn't close the menu */}
                       <div className="flex items-center justify-between px-2 py-1.5">
                         <span className="text-sm">Tema</span>
-                        <div className="flex items-center gap-0.5 rounded-md border bg-muted/50 p-0.5">
-                          {([
-                            { value: 'system', icon: Monitor, label: 'Sistema' },
-                            { value: 'light',  icon: Sun,     label: 'Chiaro'  },
-                            { value: 'dark',   icon: Moon,    label: 'Scuro'   },
-                          ] as const).map(({ value, icon: Icon, label }) => (
-                            <button
-                              key={value}
-                              onClick={(e) => applyThemeWithTransition(value, e, setTheme)}
-                              title={label}
-                              className={cn(
-                                'flex size-6 items-center justify-center rounded transition-colors',
-                                theme === value
-                                  ? 'bg-background text-foreground shadow-sm'
-                                  : 'text-muted-foreground hover:text-foreground'
-                              )}
-                            >
-                              <Icon className="size-3.5" />
-                            </button>
-                          ))}
-                        </div>
+                        <ThemePicker />
                       </div>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onSelect={() => setConfirmLogout(true)}>

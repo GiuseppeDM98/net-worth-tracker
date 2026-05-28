@@ -175,10 +175,12 @@ async function fetchSettings(userId: string): Promise<AssetAllocationSettings | 
   if (!data) {
     return null;
   }
-  // Only the fields needed for context building — not the full settings shape
+  // Only the fields needed for context building — not the full settings shape.
+  // targets is included so the prompt can show allocation target vs current gap.
   return {
     dividendIncomeCategoryId: data.dividendIncomeCategoryId,
     cashflowHistoryStartYear: data.cashflowHistoryStartYear,
+    targets: data.targets ?? null,
   } as AssetAllocationSettings;
 }
 
@@ -286,6 +288,42 @@ function buildSubCategoryAllocation(
   }
 
   return result;
+}
+
+/**
+ * Normalises the user's AssetAllocationTarget into the flat bundle shape.
+ *
+ * subTargets stored in Firestore use two legacy formats:
+ *   - number (old): percentage relative to the asset class
+ *   - SubCategoryTarget (new): object with targetPercentage relative to the asset class
+ * Both are normalised to a plain number here so prompt builders need no special-casing.
+ *
+ * Returns null when no targets are configured, so the prompt section is silently omitted.
+ */
+function buildTargetAllocation(
+  settings: AssetAllocationSettings | null
+): AssistantMonthContextBundle['targetAllocation'] {
+  if (!settings?.targets) return null;
+
+  const result: NonNullable<AssistantMonthContextBundle['targetAllocation']> = {};
+
+  for (const [assetClass, config] of Object.entries(settings.targets)) {
+    if (!config?.targetPercentage) continue;
+
+    const subTargets: Record<string, number> = {};
+    if (config.subTargets) {
+      for (const [sub, val] of Object.entries(config.subTargets)) {
+        subTargets[sub] = typeof val === 'number' ? val : (val as { targetPercentage: number }).targetPercentage;
+      }
+    }
+
+    result[assetClass] = {
+      targetPercentage: config.targetPercentage,
+      ...(Object.keys(subTargets).length > 0 ? { subTargets } : {}),
+    };
+  }
+
+  return Object.keys(result).length > 0 ? result : null;
 }
 
 /**
@@ -489,6 +527,7 @@ export async function buildAssistantMonthContext(
   const { topExpensesByCategory, topIndividualExpenses } = buildExpenseBreakdown(scopedExpenses);
   const allocationChanges = buildAllocationChanges(currentSnapshot, previousSnapshot);
   const bySubCategoryAllocation = buildSubCategoryAllocation(currentSnapshot, scopedAssets);
+  const targetAllocation = buildTargetAllocation(settings);
 
   return {
     selector,
@@ -511,6 +550,7 @@ export async function buildAssistantMonthContext(
     topExpensesByCategory,
     topIndividualExpenses,
     bySubCategoryAllocation,
+    targetAllocation,
     dataQuality: {
       hasSnapshot,
       hasPreviousBaseline,
@@ -604,6 +644,7 @@ export async function buildAssistantYearContext(
   const { topExpensesByCategory, topIndividualExpenses } = buildExpenseBreakdown(scopedExpenses);
   const allocationChanges = buildAllocationChanges(currentSnapshot, previousSnapshot);
   const bySubCategoryAllocation = buildSubCategoryAllocation(currentSnapshot, scopedAssets);
+  const targetAllocation = buildTargetAllocation(settings);
 
   // selector.month = 0 signals "year-level" period to prompt builders and the context card
   return {
@@ -622,6 +663,7 @@ export async function buildAssistantYearContext(
     topExpensesByCategory,
     topIndividualExpenses,
     bySubCategoryAllocation,
+    targetAllocation,
     dataQuality: {
       hasSnapshot,
       hasPreviousBaseline,
@@ -653,7 +695,8 @@ export async function buildAssistantQuarterContext(
   userId: string,
   year: number,
   quarter: number,
-  includeDummySnapshots = false
+  includeDummySnapshots = false,
+  options?: AssistantContextBuildOptions
 ): Promise<AssistantMonthContextBundle> {
   const lastMonthOfQuarter = quarter * 3;    // 3, 6, 9, 12
   const quarterStartMonth = lastMonthOfQuarter - 2; // 1, 4, 7, 10
@@ -672,15 +715,20 @@ export async function buildAssistantQuarterContext(
     fetchSettings(userId),
     fetchAssets(userId),
   ]);
+  const {
+    snapshots: scopedSnapshots,
+    expenses: scopedExpenses,
+    assets: scopedAssets,
+  } = await applyHouseholdScope(userId, allSnapshots, quarterExpenses, assets, options);
 
   // End snapshot = last day of quarter-end month
-  const currentSnapshot = findSnapshot(allSnapshots, year, lastMonthOfQuarter, includeDummySnapshots);
+  const currentSnapshot = findSnapshot(scopedSnapshots, year, lastMonthOfQuarter, includeDummySnapshots);
   // Baseline snapshot = last day of previous quarter
-  const previousSnapshot = findSnapshot(allSnapshots, prevQuarterYear, prevQuarterMonth, includeDummySnapshots);
+  const previousSnapshot = findSnapshot(scopedSnapshots, prevQuarterYear, prevQuarterMonth, includeDummySnapshots);
 
   const hasSnapshot = currentSnapshot !== null;
   const hasPreviousBaseline = previousSnapshot !== null;
-  const hasCashflowData = quarterExpenses.length > 0;
+  const hasCashflowData = scopedExpenses.length > 0;
 
   const notes: string[] = [];
   if (!hasSnapshot && hasCashflowData) {
@@ -703,13 +751,14 @@ export async function buildAssistantQuarterContext(
 
   const dividendCategoryId = settings?.dividendIncomeCategoryId;
   const { totalIncome, totalExpenses, totalDividends, netCashFlow } = aggregateCashflow(
-    quarterExpenses,
+    scopedExpenses,
     dividendCategoryId
   );
 
-  const { topExpensesByCategory, topIndividualExpenses } = buildExpenseBreakdown(quarterExpenses);
+  const { topExpensesByCategory, topIndividualExpenses } = buildExpenseBreakdown(scopedExpenses);
   const allocationChanges = buildAllocationChanges(currentSnapshot, previousSnapshot);
-  const bySubCategoryAllocation = buildSubCategoryAllocation(currentSnapshot, assets);
+  const bySubCategoryAllocation = buildSubCategoryAllocation(currentSnapshot, scopedAssets);
+  const targetAllocation = buildTargetAllocation(settings);
 
   // selector.quarter disambiguates from a monthly period with the same end-month value
   return {
@@ -721,13 +770,14 @@ export async function buildAssistantQuarterContext(
       totalExpenses,
       totalDividends,
       netCashFlow,
-      transactionCount: quarterExpenses.length,
+      transactionCount: scopedExpenses.length,
     },
     netWorth: { start: nwStart, end: nwEnd, delta: nwDelta, deltaPct: nwDeltaPct },
     allocationChanges,
     topExpensesByCategory,
     topIndividualExpenses,
     bySubCategoryAllocation,
+    targetAllocation,
     dataQuality: {
       hasSnapshot,
       hasPreviousBaseline,
@@ -810,6 +860,7 @@ export async function buildAssistantYtdContext(
   const { topExpensesByCategory, topIndividualExpenses } = buildExpenseBreakdown(scopedExpenses);
   const allocationChanges = buildAllocationChanges(currentSnapshot, previousSnapshot);
   const bySubCategoryAllocation = buildSubCategoryAllocation(currentSnapshot, scopedAssets);
+  const targetAllocation = buildTargetAllocation(settings);
 
   // selector.month = -1 signals "YTD" period
   return {
@@ -828,6 +879,7 @@ export async function buildAssistantYtdContext(
     topExpensesByCategory,
     topIndividualExpenses,
     bySubCategoryAllocation,
+    targetAllocation,
     dataQuality: {
       hasSnapshot,
       hasPreviousBaseline,
@@ -916,6 +968,7 @@ export async function buildAssistantHistoryContext(
   const { topExpensesByCategory, topIndividualExpenses } = buildExpenseBreakdown(scopedExpenses);
   const allocationChanges = buildAllocationChanges(currentSnapshot, previousSnapshot);
   const bySubCategoryAllocation = buildSubCategoryAllocation(currentSnapshot, scopedAssets);
+  const targetAllocation = buildTargetAllocation(settings);
 
   // selector.month = -2 signals "total history" period
   return {
@@ -934,6 +987,7 @@ export async function buildAssistantHistoryContext(
     topExpensesByCategory,
     topIndividualExpenses,
     bySubCategoryAllocation,
+    targetAllocation,
     dataQuality: {
       hasSnapshot,
       hasPreviousBaseline,

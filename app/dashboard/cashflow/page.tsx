@@ -26,8 +26,7 @@ import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
 import { Receipt, Coins, BarChart3, Target, Layers, TrendingUp, Scale } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TabsContent } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { Dividend } from '@/types/dividend';
 import { Asset } from '@/types/assets';
@@ -39,6 +38,10 @@ import { getSettings } from '@/lib/services/assetAllocationService';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { tabPanelSwitch } from '@/lib/utils/motionVariants';
 import { toast } from 'sonner';
+import { PageContainer } from '@/components/layout/PageContainer';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { PageTabs } from '@/components/layout/PageTabs';
+import type { TabDef } from '@/components/layout/PageTabs';
 
 function CashflowTabLoading() {
   return <div className="h-48 rounded-md border bg-muted/30 animate-pulse" />;
@@ -46,10 +49,6 @@ function CashflowTabLoading() {
 
 const ExpenseTrackingTab = dynamic(
   () => import('@/components/cashflow/ExpenseTrackingTab').then((mod) => mod.ExpenseTrackingTab),
-  { loading: CashflowTabLoading }
-);
-const AnalisiTab = dynamic(
-  () => import('@/components/cashflow/AnalisiTab').then((mod) => mod.AnalisiTab),
   { loading: CashflowTabLoading }
 );
 const CurrentYearTab = dynamic(
@@ -82,12 +81,12 @@ function getErrorMessage(error: unknown): string {
 }
 
 // Module-level constant: stable reference for React Compiler
+// Analisi tab removed — it now lives at /dashboard/analisi as a standalone page.
 const CASHFLOW_TABS_BASE: Array<{ value: string; label: string; mobileLabel: string; icon: React.ElementType }> = [
   { value: 'tracking',      label: 'Tracciamento',       mobileLabel: 'Movim.',     icon: Receipt          },
   { value: 'dividends',     label: 'Dividendi',          mobileLabel: 'Divid.',     icon: Coins            },
   { value: 'current-year',  label: 'Anno Corrente',      mobileLabel: 'Anno',       icon: TrendingUp       },
   { value: 'total-history', label: 'Storico Totale',     mobileLabel: 'Storico',    icon: BarChart3        },
-  { value: 'analisi',       label: 'Analisi',            mobileLabel: 'Analisi',    icon: BarChart3        },
   { value: 'budget',        label: 'Budget',             mobileLabel: 'Budget',     icon: Target           },
 ];
 
@@ -207,80 +206,28 @@ export default function CashflowPage() {
     setMountedTabs(prev => new Set(prev).add(value));
   };
 
+  const allTabs: TabDef[] = [
+    ...CASHFLOW_TABS_BASE,
+    ...(householdEnabled ? [{ value: 'compensations', label: 'Compensazioni', shortLabel: 'Comp.', icon: Scale }] : []),
+    ...(costCentersEnabled ? [{ value: 'cost-centers', label: 'Centri di Costo', shortLabel: 'C.Costo', icon: Layers }] : []),
+  ];
+
   return (
-    <div className="space-y-6 max-desktop:portrait:pb-20">
-      {/* Header */}
-      <div className="border-b border-border pb-4">
-        <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Operatività</p>
-        <h1 className="mt-1 text-2xl font-bold text-foreground sm:text-3xl">
-          Cashflow
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          Traccia e analizza le tue entrate e uscite nel tempo
-        </p>
-      </div>
+    <PageContainer>
+      <PageHeader
+        label="Operatività"
+        title="Cashflow"
+        description="Traccia e analizza le tue entrate e uscite nel tempo"
+        separator={false}
+      />
 
-      {/* Tabs */}
-      <Tabs defaultValue="tracking" value={activeTab} onValueChange={handleTabChange} className="w-full">
-        {costCentersEnabled === null ? (
-          <div className="h-10 w-full rounded-md bg-muted animate-pulse mb-6" />
-        ) : (() => {
-          const allTabs = [
-            ...CASHFLOW_TABS_BASE,
-            ...(householdEnabled ? [{ value: 'compensations', label: 'Compensazioni', mobileLabel: 'Comp.', icon: Scale }] : []),
-            ...(costCentersEnabled ? [{ value: 'cost-centers', label: 'Centri di Costo', mobileLabel: 'C.Costo', icon: Layers }] : []),
-          ];
-          return (
-            <>
-              {/* Mobile (<desktop): Framer Motion sliding pill */}
-              <div className="desktop:hidden mb-6">
-                <div role="tablist" aria-label="Sezioni cashflow" className="flex rounded-xl bg-muted p-1 gap-1">
-                  {allTabs.map(({ value, mobileLabel, icon: Icon }) => (
-                    <button
-                      key={value}
-                      type="button"
-                      role="tab"
-                      aria-selected={activeTab === value}
-                      onClick={() => handleTabChange(value)}
-                      className={cn(
-                        'relative flex-1 flex items-center justify-center gap-1 h-9 rounded-lg text-xs font-medium',
-                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
-                        activeTab !== value && 'text-muted-foreground hover:text-foreground transition-colors duration-150'
-                      )}
-                    >
-                      {activeTab === value && (
-                        <motion.span
-                          layoutId="cashflow-mobile-tab"
-                          className="absolute inset-0 rounded-lg bg-card shadow-sm"
-                          transition={{ type: 'spring', stiffness: 400, damping: 35 }}
-                        />
-                      )}
-                      <span className={cn(
-                        'relative z-10 flex items-center gap-1',
-                        activeTab === value ? 'text-foreground' : 'text-muted-foreground'
-                      )}>
-                        <Icon className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate">{mobileLabel}</span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Desktop (1440px+): standard tab list */}
-              <div className="hidden desktop:block mb-6">
-                <TabsList className="w-full justify-start">
-                  {allTabs.map(({ value, label, icon: Icon }) => (
-                    <TabsTrigger key={value} value={value} className="flex items-center gap-1.5">
-                      <Icon className="h-3.5 w-3.5" />
-                      {label}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </div>
-            </>
-          );
-        })()}
+      <PageTabs
+        tabs={allTabs}
+        value={activeTab}
+        onValueChange={handleTabChange}
+        layoutId="cashflow-tab"
+        loading={costCentersEnabled === null}
+      >
 
         <TabsContent value="tracking" forceMount>
           <motion.div
@@ -314,7 +261,6 @@ export default function CashflowPage() {
           </TabsContent>
         )}
 
-
         {mountedTabs.has('current-year') && (
           <TabsContent value="current-year" className="mt-6" forceMount>
             <motion.div
@@ -339,23 +285,6 @@ export default function CashflowPage() {
               variants={tabPanelSwitch}
             >
               <TotalHistoryTab
-                allExpenses={allExpenses}
-                loading={loading}
-                onRefresh={handleRefresh}
-                historyStartYear={cashflowHistoryStartYear}
-              />
-            </motion.div>
-          </TabsContent>
-        )}
-
-        {mountedTabs.has('analisi') && (
-          <TabsContent value="analisi" forceMount>
-            <motion.div
-              initial={false}
-              animate={activeTab === 'analisi' ? 'visible' : 'hidden'}
-              variants={tabPanelSwitch}
-            >
-              <AnalisiTab
                 allExpenses={allExpenses}
                 loading={loading}
                 onRefresh={handleRefresh}
@@ -408,7 +337,7 @@ export default function CashflowPage() {
             </motion.div>
           </TabsContent>
         )}
-      </Tabs>
-    </div>
+      </PageTabs>
+    </PageContainer>
   );
 }

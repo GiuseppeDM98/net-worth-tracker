@@ -170,6 +170,36 @@ function formatBundleForPrompt(bundle: AssistantMonthContextBundle): string {
     lines.push('');
   }
 
+  // Target vs current allocation: gives Claude the gap for each asset class and
+  // sub-category so it can reason about rebalancing without doing the maths itself.
+  // Only rendered when targets are configured and a snapshot is available — otherwise
+  // the section is silently omitted to keep the prompt clean.
+  const targetAlloc = bundle.targetAllocation;
+  if (targetAlloc && byAssetClass && Object.keys(byAssetClass).length > 0) {
+    const totalNetWorth = currentSnapshot?.totalNetWorth ?? 0;
+    lines.push('--- ALLOCAZIONE TARGET vs CORRENTE ---');
+    for (const [assetClass, target] of Object.entries(targetAlloc)) {
+      const currentValue = byAssetClass[assetClass] ?? 0;
+      const currentPct = totalNetWorth > 0 ? (currentValue / totalNetWorth) * 100 : 0;
+      const gap = currentPct - target.targetPercentage;
+      const gapStr = gap >= 0 ? `+${gap.toFixed(1)} p.p.` : `${gap.toFixed(1)} p.p.`;
+      lines.push(`${assetClass}: attuale ${currentPct.toFixed(1)}% | target ${target.targetPercentage}% | gap ${gapStr}`);
+
+      if (target.subTargets) {
+        for (const [sub, subTargetPct] of Object.entries(target.subTargets)) {
+          // subTargetPct is relative to the asset class; convert to portfolio-level for comparison
+          const subTargetOfPortfolio = (subTargetPct / 100) * target.targetPercentage;
+          const subCurrentValue = bundle.bySubCategoryAllocation?.[assetClass]?.[sub] ?? 0;
+          const subCurrentPct = totalNetWorth > 0 ? (subCurrentValue / totalNetWorth) * 100 : 0;
+          const subGap = subCurrentPct - subTargetOfPortfolio;
+          const subGapStr = subGap >= 0 ? `+${subGap.toFixed(1)} p.p.` : `${subGap.toFixed(1)} p.p.`;
+          lines.push(`  › ${sub}: attuale ${subCurrentPct.toFixed(1)}% | target ${subTargetOfPortfolio.toFixed(1)}% (${subTargetPct}% dell'${assetClass}) | gap ${subGapStr}`);
+        }
+      }
+    }
+    lines.push('');
+  }
+
   // Top-5 movers section: shows which classes changed most this period.
   // allocationChanges is already capped at 5 by the context builder.
   if (allocationChanges.length > 0) {

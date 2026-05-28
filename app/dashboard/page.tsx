@@ -63,6 +63,8 @@ import { HouseholdScopeSelect } from '@/components/household/HouseholdScopeSelec
 import type { DashboardOverviewExpenseStats, DashboardOverviewPayload } from '@/types/dashboardOverview';
 import type { Expense } from '@/types/expenses';
 import type { MonthlySnapshot } from '@/types/assets';
+import { PageContainer } from '@/components/layout/PageContainer';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 const MotionButtonShell = motion.div;
 
@@ -440,13 +442,13 @@ export default function DashboardPage() {
   // ─── Loading skeleton ─────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="space-y-4 max-desktop:portrait:pb-20">
+      <PageContainer className="space-y-4">
         <div className="pb-4 border-b border-border">
           <div className="h-3 w-20 bg-muted rounded animate-pulse mb-2" />
           <div className="h-8 w-56 bg-muted rounded animate-pulse mb-2" />
           <div className="h-4 w-44 bg-muted rounded animate-pulse" />
         </div>
-        {/* Hero + Liquid skeleton */}
+        {/* Hero + Liquid skeleton — mirrors the desktop:grid-cols-[2fr_1fr] live layout */}
         <div className="grid gap-4 desktop:grid-cols-[2fr_1fr]">
           <div className="rounded-2xl border border-border bg-card p-[22px]">
             <div className="h-3 w-40 bg-muted rounded animate-pulse mb-3" />
@@ -487,7 +489,16 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
-      </div>
+
+        {/* Charts skeleton — mirrors OverviewChartsSection structure */}
+        <div className="border-t border-border/40 pt-4">
+          <div className="h-3 w-24 bg-muted rounded animate-pulse mb-4" />
+          <div className="grid desktop:grid-cols-2 gap-4">
+            <div className="rounded-2xl bg-muted h-[220px] animate-pulse" />
+            <div className="rounded-2xl bg-muted h-[220px] animate-pulse" />
+          </div>
+        </div>
+      </PageContainer>
     );
   }
 
@@ -496,46 +507,46 @@ export default function DashboardPage() {
     <motion.div
       layout="position"
       transition={springLayoutTransition}
-      className="space-y-4 max-desktop:portrait:pb-20"
+      className="max-w-[1600px] mx-auto w-full space-y-4 max-desktop:portrait:pb-20"
     >
-      {/* ── PAGE HEADER ── */}
-      <div className="pb-4 border-b border-border">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Panoramica</p>
-            <h1 className="text-2xl font-bold text-foreground sm:text-3xl">{greeting.label}</h1>
-            <p className="mt-1 text-muted-foreground sm:mt-2">{greeting.subtitle}</p>
-          </div>
-          {householdEnabled && (
-            <HouseholdScopeSelect
-              value={selectedScopeKey}
-              onValueChange={setSelectedScopeKey}
-              options={householdScopeOptions}
-              label="Vista panoramica"
-              className="w-full sm:w-[240px]"
-            />
-          )}
-          <MotionButtonShell
-            whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
-            transition={springLayoutTransition}
-          >
-            <Button
-              ref={snapshotButtonRef}
-              onClick={handleCreateSnapshot}
-              disabled={isDemo || creatingSnapshot || (rawOverview?.flags.assetCount ?? 0) === 0}
-              title={isDemo ? 'Non disponibile in modalità demo' : undefined}
-              variant="default"
-              className="w-full sm:w-auto"
+      <PageHeader
+        label="Panoramica"
+        title={greeting.label}
+        description={greeting.subtitle}
+        actions={
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-end">
+            {householdEnabled && (
+              <HouseholdScopeSelect
+                value={selectedScopeKey}
+                onValueChange={setSelectedScopeKey}
+                options={householdScopeOptions}
+                label="Vista panoramica"
+                className="w-full sm:w-[240px]"
+              />
+            )}
+            <MotionButtonShell
+              whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
+              transition={springLayoutTransition}
             >
-              <Camera className="mr-2 h-4 w-4" />
-              {creatingSnapshot ? 'Creazione...' : 'Crea Snapshot'}
-            </Button>
-          </MotionButtonShell>
-        </div>
-      </div>
+              <Button
+                ref={snapshotButtonRef}
+                onClick={handleCreateSnapshot}
+                disabled={isDemo || creatingSnapshot || (rawOverview?.flags.assetCount ?? 0) === 0}
+                title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+                variant="default"
+                className="w-full sm:w-auto"
+              >
+                <Camera className="mr-2 h-4 w-4" />
+                {creatingSnapshot ? 'Creazione...' : 'Crea Snapshot'}
+              </Button>
+            </MotionButtonShell>
+          </div>
+        }
+      />
 
       {/* ── HERO + LIQUID — desktop: 2/3 + 1/3 grid ── */}
       <motion.section
+        aria-label="Patrimonio"
         layout="position"
         transition={springLayoutTransition}
         variants={staggerContainer}

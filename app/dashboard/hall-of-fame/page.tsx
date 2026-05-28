@@ -67,6 +67,7 @@ import { HallOfFameNoteViewDialog } from '@/components/hall-of-fame/HallOfFameNo
 import { HallOfFameSkeleton } from '@/components/hall-of-fame/HallOfFameSkeleton';
 import { getItalyMonthYear, getItalyYear } from '@/lib/utils/dateHelpers';
 import { toast } from 'sonner';
+import { PageContainer } from '@/components/layout/PageContainer';
 import {
   Trophy,
   TrendingUp,
@@ -526,7 +527,7 @@ export default function HallOfFamePage() {
   const showRankings = mobileView !== 'overview';
 
   return (
-    <div className="p-4 sm:p-6 desktop:p-8 space-y-6 max-desktop:portrait:pb-20">
+    <PageContainer>
 
       {/* ── HEADER ─────────────────────────────────────────────────────── */}
       <header className="space-y-4">
@@ -819,7 +820,7 @@ export default function HallOfFamePage() {
           style={noteEditDialogStyle}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }
 

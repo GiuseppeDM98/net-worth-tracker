@@ -786,10 +786,10 @@ export function FireCalculatorTab() {
 
                 {displayedRunwaySummary.targetYearsOfExpenses !== null && (
                   <div className="flex items-center justify-between px-4 py-3">
-                    {/* 100 ÷ SWR% = years of expenses the portfolio must cover to sustain the withdrawal indefinitely.
-                        This is the reference line shown in the chart below. */}
+                    {/* 1 / SWR = years of expenses the portfolio must cover to sustain the withdrawal indefinitely.
+                        Shown as the dashed reference line in the chart below. */}
                     <p className="text-xs text-muted-foreground">
-                      Obiettivo FIRE — linea tratteggiata nel grafico (100 &divide; SWR {previewWithdrawalRate}%)
+                      Obiettivo patrimonio (anni di spese, linea tratteggiata)
                     </p>
                     <p className="font-mono text-xs font-medium tabular-nums text-muted-foreground">
                       {displayedRunwaySummary.targetYearsOfExpenses.toFixed(1)} anni

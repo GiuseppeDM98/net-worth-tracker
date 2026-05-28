@@ -159,13 +159,13 @@ const TYPE_CARDS: TypeCard[] = [
     value: 'variable',
     icon: ShoppingCart,
     label: 'Spesa Variabile',
-    description: 'Acquisti quotidiani, ristoranti, svaghi',
+    description: 'Extra di cui potresti fare a meno',
   },
   {
     value: 'fixed',
     icon: CalendarClock,
     label: 'Spesa Fissa',
-    description: 'Affitto, bollette, abbonamenti',
+    description: 'Quelle di cui non puoi fare a meno',
   },
   {
     value: 'debt',
