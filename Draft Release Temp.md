@@ -72,3 +72,6 @@
 - Improved: Cost Centers color picker now announces color names to screen readers ("Blu", "Verde smeraldo", etc.) instead of raw hex values; the selected color is also announced
 - Improved: Cost Centers "Create / Edit" dialog now provides a contextual description to screen readers when it opens
 - Improved: Cost Centers detail view now shows a structural loading skeleton instead of a plain text message — the skeleton anticipates the KPI grid and chart layout
+- Improved: Allocation page asset class cards and sub-category rows are now fully keyboard-navigable — Tab focuses each drillable item, Enter or Space opens the detail view or sub-category drill-down (WCAG 2.1.1)
+- Improved: Allocation page buy/sell/hold chips (COMPRA, VENDI, OK) now follow the active color theme — COMPRA uses the warning palette and VENDI uses the destructive palette across all six themes instead of fixed orange and red
+- Improved: Allocation page loading skeleton now matches the page container dimensions precisely, eliminating a brief layout shift on the horizontal margins when portfolio data loads

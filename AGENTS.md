@@ -43,6 +43,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - Never hardcode structural layout colors in shell components
 - Use semantic tokens like `bg-background`, `text-foreground`, `border-border`
 - For income/positive values use `text-emerald-600 dark:text-emerald-400`; for losses/expenses use `text-destructive`. Never use raw `text-green-*` or `text-red-*` — these diverge from `--destructive` on non-default themes (e.g. Cyberpunk uses orange for destructive). Applied in `ExpenseTrackingTab.tsx` KPI blocks and `MobileExpenseRow`.
+- **`--warning` token for under-allocation / buy signals**: `bg-warning text-warning-foreground border-warning-border`. Registered in `globals.css` as `--color-warning/foreground/border` → available as Tailwind utilities. Semantic mapping in Allocation: COMPRA (under-allocated) → warning; VENDI (over-allocated) → destructive; OK (balanced) → `text-green-600 dark:text-green-400` (no `--success` token exists). ⚠️ In light mode `--warning` is near-white (`oklch(0.986 0.022 90)`) — always test COMPRA chip visibility visually in light mode across themes. Applied in `AllocationCard.tsx` and `app/dashboard/allocation/page.tsx`.
 - **Overview KPI value colors**: financial values in conditional sections (cost basis, TER, costs) on Panoramica must use design system tokens. Neutral values (Patrimonio Netto/Liquido Netto) → `text-foreground`. Cost/warning signals (Tasse Stimate, Costo Annuale Portfolio, TER) → `text-amber-600 dark:text-amber-400` (Amber Watch, `--chart-3`). `text-blue-600`, `text-purple-600`, `text-orange-600` are raw Tailwind defaults with no semantic meaning in this design system; `text-purple-600` is flagged by the `impeccable` detector as `ai-color-palette`.
 - **Sidebar accent token semantics**: `--sidebar-accent` is the background for active/hover items. `--sidebar-accent-foreground` is for text that sits ON that background (designed to contrast with it). `--sidebar-primary` is for accent-colored elements on the plain sidebar background — do NOT use it for text on an accent-colored background. In cyberpunk/solar-dusk dark, `--sidebar-accent` is bright (L≈0.89 cyan), so only `--sidebar-accent-foreground` (dark) has sufficient contrast.
 - **Inline `style` blocks Tailwind hover variants**: if a color or opacity is set via inline `style={{ color, opacity }}`, Tailwind hover/focus class variants (e.g. `hover:text-sidebar-accent-foreground`) cannot override it — inline styles always win. Migrate to Tailwind classes before adding any hover/focus variants. Applied in `BottomNavigation.tsx` (sessions sidebar-hover-theme-fix, bottom-nav-hover-theme-fix).
@@ -440,6 +441,7 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
   - Assistant: `assistantRoutes` + `assistantWebSearchPolicy` + `assistantMonthContextService`
   - Dividends/cron: `dividendUseCase` + `dividendProcessor` | Email: `monthlyEmailService`
   - Assets/bonds: `assetDialogHelpers` + `couponUtils` | Cashflow/Budget: `budgetUtils`
+  - Allocation: `allocationUtils`
 - For motion/perceived-performance changes, compare `npm run dev` vs `npm run build && npm run start` — dev can exaggerate cost
 
 ### Test Patterns
@@ -463,6 +465,11 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 
 ### Skeleton as Dead Code — Loading State Silent Failure
 - Skeleton exists but page shows blank flash: the skeleton was never imported — `if (loading) return null` is still in place. TypeScript does not catch unused components. After writing a skeleton, verify it's wired up in the page
+
+### Skeleton Must Wrap in the Same Container as the Real Layout
+- **Symptom**: content shifts on load — skeleton has different padding or max-width than the real layout.
+- **Root cause**: `if (loading) return <XSkeleton />` fires before the `<PageContainer>` wrapper in the main return, so the skeleton renders without `max-w-[1600px] mx-auto max-desktop:portrait:pb-20`.
+- **Fix**: import `PageContainer` inside the skeleton file and wrap its root div there, or wrap at the call site. Applied in `AllocationPageSkeleton.tsx`.
 
 ### Recharts Legend and Tooltip Mismatch
 - `Legend` reads `<Bar fill>`, not `<Cell>`

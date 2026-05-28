@@ -8,6 +8,7 @@
  */
 
 import { cn } from '@/lib/utils';
+import { PageContainer } from '@/components/layout/PageContainer';
 
 function SkeletonBar({ className, delayMs = 0 }: { className?: string; delayMs?: number }) {
   return (
@@ -70,7 +71,7 @@ function TableRowSkeleton({ delayMs = 0 }: { delayMs?: number }) {
 
 export function AllocationPageSkeleton() {
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <PageContainer className="space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="border-b border-border pb-4">
         <div className="mb-2">
@@ -106,6 +107,6 @@ export function AllocationPageSkeleton() {
           <TableRowSkeleton key={i} delayMs={120 + i * 40} />
         ))}
       </div>
-    </div>
+    </PageContainer>
   );
 }

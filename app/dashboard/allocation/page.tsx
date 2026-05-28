@@ -59,7 +59,7 @@ import {
 import { Settings, Info, ArrowLeft, LayoutGrid } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
-import { AllocationCard } from '@/components/allocation/AllocationCard';
+import { AllocationCard, ActionChip } from '@/components/allocation/AllocationCard';
 import { AllocationSheet } from '@/components/allocation/AllocationSheet';
 import { AnimatePresence, motion } from 'framer-motion';
 import { drillDownShell } from '@/lib/utils/motionVariants';
@@ -198,21 +198,12 @@ export default function AllocationPage() {
     }
   };
 
+  // Positive difference means current > target (over-allocated → VENDI signal).
+  // Negative difference means current < target (under-allocated → COMPRA signal).
   const getDifferenceColor = (difference: number) => {
     if (Math.abs(difference) <= 1) return 'text-green-600 dark:text-green-400';
-    if (difference > 1) return 'text-red-600 dark:text-red-400';
-    return 'text-orange-600 dark:text-orange-400';
-  };
-
-  const getActionChipClass = (action: 'COMPRA' | 'VENDI' | 'OK') => {
-    switch (action) {
-      case 'COMPRA':
-        return 'bg-orange-500/10 text-orange-600 border-orange-200 dark:text-orange-400 dark:border-orange-800';
-      case 'VENDI':
-        return 'bg-red-500/10 text-red-600 border-red-200 dark:text-red-400 dark:border-red-800';
-      case 'OK':
-        return 'bg-green-500/10 text-green-600 border-green-200 dark:text-green-400 dark:border-green-800';
-    }
+    if (difference > 1) return 'text-destructive';
+    return 'text-warning-foreground';
   };
 
   const assetClassLabels: Record<string, string> = {
@@ -605,9 +596,7 @@ export default function AllocationPage() {
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center justify-center">
-                              <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${getActionChipClass(data.action)}`}>
-                                {data.action}
-                              </span>
+                              <ActionChip action={data.action} />
                             </div>
                           </TableCell>
                         </TableRow>
@@ -786,9 +775,7 @@ export default function AllocationPage() {
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center justify-center">
-                                <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${getActionChipClass(data.action)}`}>
-                                  {data.action}
-                                </span>
+                                <ActionChip action={data.action} />
                               </div>
                             </TableCell>
                           </TableRow>
@@ -838,9 +825,19 @@ export default function AllocationPage() {
                             return (
                               <TableRow
                                 key={subCategory}
-                                className={cn(hasSpecificAssets && 'cursor-pointer hover:bg-muted/50')}
+                                className={cn(
+                                  hasSpecificAssets && 'cursor-pointer hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset'
+                                )}
+                                tabIndex={hasSpecificAssets ? 0 : undefined}
+                                aria-label={hasSpecificAssets ? `Apri asset specifici per ${subCategory}` : undefined}
                                 onClick={() => {
                                   if (hasSpecificAssets) {
+                                    handleDrillDownToSpecificAssets(assetClass, subCategory);
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  if (hasSpecificAssets && (e.key === 'Enter' || e.key === ' ')) {
+                                    e.preventDefault();
                                     handleDrillDownToSpecificAssets(assetClass, subCategory);
                                   }
                                 }}
@@ -879,9 +876,7 @@ export default function AllocationPage() {
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex items-center justify-center">
-                                    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${getActionChipClass(data.action)}`}>
-                                      {data.action}
-                                    </span>
+                                    <ActionChip action={data.action} />
                                   </div>
                                 </TableCell>
                               </TableRow>
