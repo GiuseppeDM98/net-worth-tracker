@@ -37,6 +37,17 @@ describe('cashflow UI regression guards', () => {
     expect(source).not.toContain('Il tipo di voce non può essere modificato');
   });
 
+  it('resets hidden recurrence and installment flags when editing a cashflow entry', () => {
+    const source = readRepoFile('components/expenses/ExpenseDialog.tsx');
+    const editResetMatch = source.match(/if \(expense\) \{\s*reset\(\{([\s\S]*?)\}\);/);
+
+    expect(editResetMatch?.[1]).toContain('isRecurring: expense.isRecurring || false');
+    expect(editResetMatch?.[1]).toContain('isInstallment: expense.isInstallment || false');
+    expect(editResetMatch?.[1]).toContain("installmentMode: 'auto'");
+    expect(editResetMatch?.[1]).toContain('installmentCount: expense.installmentTotal || 2');
+    expect(editResetMatch?.[1]).toContain('installmentTotalAmount: expense.installmentTotalAmount || Math.abs(expense.amount)');
+  });
+
   it('keeps cashflow analysis tabs reachable and special operations inside tracking', () => {
     const pageSource = readRepoFile('app/dashboard/cashflow/page.tsx');
     const trackingSource = readRepoFile('components/cashflow/ExpenseTrackingTab.tsx');
