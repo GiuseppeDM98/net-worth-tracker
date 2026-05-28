@@ -38,7 +38,8 @@ export interface CostCenterMonthlyData {
 }
 
 // Palette for the color picker in CostCenterDialog.
-// WARNING: If you add colors here, also update the color label map in CostCenterDialog.tsx.
+// WARNING: If you add or change a color here, also update COLOR_LABELS in CostCenterDialog.tsx
+// (those labels are what screen readers announce — hex values are unpronounceable).
 export const COST_CENTER_COLORS = [
   '#3b82f6', // blue
   '#10b981', // emerald

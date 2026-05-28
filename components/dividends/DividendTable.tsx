@@ -1,20 +1,17 @@
 /**
- * Paginated dividend table with sorting and currency conversion
+ * Paginated dividend table with sorting, currency conversion, and inline delete.
  *
  * Features:
  * - Three-way sort toggle: asc → desc → default (exDate desc)
- * - Smart currency display: Shows EUR conversion when available
+ * - Smart currency display: shows EUR conversion when available
  * - Pagination: 50 items per page
- *
- * AmountWithConversion Component:
- * Displays amount with optional EUR conversion in tooltip.
- * Shows Euro icon when conversion available.
+ * - 2-click inline delete (consistent with ExpenseTrackingTab and Patrimonio pages)
  */
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Dividend, DividendType } from '@/types/dividend';
+import { Dividend } from '@/types/dividend';
 import { Timestamp } from 'firebase/firestore';
 import {
   Table,
@@ -42,6 +39,7 @@ import { formatCurrency } from '@/lib/utils/formatters';
 import { toDate } from '@/lib/utils/dateHelpers';
 import { tableShellSettle } from '@/lib/utils/motionVariants';
 import { cn } from '@/lib/utils';
+import { dividendTypeLabels, dividendTypeBadgeColor } from '@/lib/constants/dividendTypes';
 
 const ITEMS_PER_PAGE = 50;
 
@@ -50,30 +48,60 @@ interface DividendTableProps {
   onEdit: (dividend: Dividend) => void;
   onOpenDetails: (dividend: Dividend, triggerElement: HTMLElement) => void;
   onRefresh: () => void;
-  showTotals?: boolean; // Show totals row at bottom when filtering
+  showTotals?: boolean;
   activeDividendId?: string | null;
   isDemo?: boolean;
 }
 
-// WARNING: If you add a DividendType, update both maps below.
-// Also update types/dividend.ts and DividendDialog.tsx.
-const dividendTypeLabels: Record<DividendType, string> = {
-  ordinary: 'Ordinario',
-  extraordinary: 'Straordinario',
-  interim: 'Interim',
-  final: 'Finale',
-  coupon: 'Cedola',
-  finalPremium: 'Premio Finale',
-};
+/**
+ * Displays an amount with an optional EUR-conversion tooltip.
+ * Extracted to module level to avoid re-creation on every parent render.
+ *
+ * When the original currency is EUR (or no conversion is available), the raw
+ * amount is shown. Otherwise the EUR equivalent is shown with an info icon
+ * and a tooltip that reveals the original value.
+ */
+function AmountWithConversion({
+  originalAmount,
+  eurAmount,
+  currency,
+  textColor = '',
+}: {
+  originalAmount: number;
+  eurAmount?: number;
+  currency: string;
+  textColor?: string;
+}) {
+  const isEur = currency.toUpperCase() === 'EUR';
+  const hasConversion = !isEur && eurAmount !== undefined;
 
-const dividendTypeBadgeColor: Record<DividendType, string> = {
-  ordinary: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800',
-  extraordinary: 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-800',
-  interim: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-950/40 dark:text-yellow-400 dark:border-yellow-800',
-  final: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-950/40 dark:text-green-400 dark:border-green-800',
-  coupon: 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800',
-  finalPremium: 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800',
-};
+  if (isEur || !hasConversion) {
+    return (
+      <span className={textColor}>
+        {formatCurrency(originalAmount, currency)}
+      </span>
+    );
+  }
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className={`flex items-center justify-end gap-1 ${textColor} cursor-help`}>
+            <span>{formatCurrency(eurAmount, 'EUR')}</span>
+            <Info className="h-3 w-3 text-muted-foreground" />
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="left">
+          <div className="text-xs space-y-1">
+            <div>Originale: {formatCurrency(originalAmount, currency)}</div>
+            <div className="text-muted-foreground">Convertito al tasso corrente</div>
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
 
 export function DividendTable({
   dividends,
@@ -85,24 +113,27 @@ export function DividendTable({
   isDemo = false,
 }: DividendTableProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const pendingDeleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [currentPage, setCurrentPage] = useState(1);
   const [sortColumn, setSortColumn] = useState<'exDate' | 'paymentDate' | 'totalNet' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
-  // Calculate totals across all dividends (not just current page)
+  // Clear pending-delete timer on unmount to prevent state updates on unmounted component
+  useEffect(() => {
+    return () => {
+      if (pendingDeleteTimerRef.current) clearTimeout(pendingDeleteTimerRef.current);
+    };
+  }, []);
+
   const totals = useMemo(() => {
     return dividends.reduce(
       (acc, div) => {
-        // Use EUR amounts if available, otherwise use original currency
         const grossAmount = div.grossAmountEur ?? div.grossAmount;
         const taxAmount = div.taxAmountEur ?? div.taxAmount;
         const netAmount = div.netAmountEur ?? div.netAmount;
-
-        return {
-          gross: acc.gross + grossAmount,
-          tax: acc.tax + taxAmount,
-          net: acc.net + netAmount,
-        };
+        return { gross: acc.gross + grossAmount, tax: acc.tax + taxAmount, net: acc.net + netAmount };
       },
       { gross: 0, tax: 0, net: 0 }
     );
@@ -113,62 +144,26 @@ export function DividendTable({
   };
 
   /**
-   * Helper component to display amount with EUR conversion if available
+   * 2-click inline delete — first click arms (3s auto-disarm), second click executes.
+   * Consistent with ExpenseTrackingTab and the assets page patterns.
    */
-  const AmountWithConversion = ({
-    originalAmount,
-    eurAmount,
-    currency,
-    textColor = '',
-  }: {
-    originalAmount: number;
-    eurAmount?: number;
-    currency: string;
-    textColor?: string;
-  }) => {
-    const isEur = currency.toUpperCase() === 'EUR';
-    const hasConversion = !isEur && eurAmount !== undefined;
+  const handleDeleteClick = (dividend: Dividend, e?: React.MouseEvent) => {
+    e?.stopPropagation();
 
-    if (isEur || !hasConversion) {
-      // Show original amount only
-      return (
-        <span className={textColor}>
-          {formatCurrency(originalAmount, currency)}
-        </span>
-      );
+    if (pendingDeleteId === dividend.id) {
+      // Second click: confirm and execute
+      if (pendingDeleteTimerRef.current) clearTimeout(pendingDeleteTimerRef.current);
+      setPendingDeleteId(null);
+      void executeDelete(dividend);
+    } else {
+      // First click: arm with 3-second auto-disarm
+      if (pendingDeleteTimerRef.current) clearTimeout(pendingDeleteTimerRef.current);
+      setPendingDeleteId(dividend.id);
+      pendingDeleteTimerRef.current = setTimeout(() => setPendingDeleteId(null), 3000);
     }
-
-    // Show EUR amount with tooltip showing original
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className={`flex items-center justify-end gap-1 ${textColor} cursor-help`}>
-              <span>{formatCurrency(eurAmount, 'EUR')}</span>
-              <Info className="h-3 w-3 text-muted-foreground" />
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side="left">
-            <div className="text-xs space-y-1">
-              <div>Originale: {formatCurrency(originalAmount, currency)}</div>
-              <div className="text-muted-foreground">Convertito al tasso corrente</div>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
   };
 
-  const handleDelete = async (dividend: Dividend) => {
-    const confirmDelete = window.confirm(
-      `Sei sicuro di voler eliminare questo dividendo?\n\n` +
-      `Asset: ${dividend.assetTicker} - ${dividend.assetName}\n` +
-      `Importo netto: ${formatCurrency(dividend.netAmount)}\n` +
-      `Data ex-dividendo: ${formatDate(dividend.exDate)}`
-    );
-
-    if (!confirmDelete) return;
-
+  const executeDelete = async (dividend: Dividend) => {
     try {
       setDeletingId(dividend.id);
 
@@ -178,14 +173,14 @@ export function DividendTable({
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Errore nell\'eliminazione del dividendo');
+        throw new Error(error.message || "Errore nell'eliminazione del dividendo");
       }
 
       toast.success('Dividendo eliminato con successo');
       onRefresh();
     } catch (error) {
       console.error('Error deleting dividend:', error);
-      toast.error(error instanceof Error ? error.message : 'Errore nell\'eliminazione del dividendo');
+      toast.error(error instanceof Error ? error.message : "Errore nell'eliminazione del dividendo");
     } finally {
       setDeletingId(null);
     }
@@ -193,7 +188,6 @@ export function DividendTable({
 
   const handleSort = (column: 'exDate' | 'paymentDate' | 'totalNet') => {
     if (sortColumn === column) {
-      // Toggle direction or reset
       if (sortDirection === 'desc') {
         setSortDirection('asc');
       } else {
@@ -206,10 +200,8 @@ export function DividendTable({
     }
   };
 
-  // Sort dividends based on sortColumn and sortDirection
   const sortedDividends = useMemo(() => {
     if (sortColumn === null) {
-      // Default sort: by exDate desc
       return [...dividends].sort((a, b) => {
         const dateA = toDate(a.exDate);
         const dateB = toDate(b.exDate);
@@ -220,7 +212,6 @@ export function DividendTable({
     const sorted = [...dividends];
     sorted.sort((a, b) => {
       let comparison = 0;
-
       if (sortColumn === 'exDate' || sortColumn === 'paymentDate') {
         const dateA = toDate(a[sortColumn]);
         const dateB = toDate(b[sortColumn]);
@@ -228,35 +219,28 @@ export function DividendTable({
       } else if (sortColumn === 'totalNet') {
         comparison = a.netAmount - b.netAmount;
       }
-
       return sortDirection === 'desc' ? -comparison : comparison;
     });
 
     return sorted;
   }, [dividends, sortColumn, sortDirection]);
 
-  // Calculate pagination
   const totalPages = Math.ceil(sortedDividends.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
 
-  // Paginate sorted dividends
-  const paginatedDividends = useMemo(() => {
-    return sortedDividends.slice(startIndex, endIndex);
-  }, [sortedDividends, startIndex, endIndex]);
+  const paginatedDividends = useMemo(
+    () => sortedDividends.slice(startIndex, endIndex),
+    [sortedDividends, startIndex, endIndex]
+  );
 
-  // Reset to page 1 when dividends array length changes
+  // Reset to page 1 when the filtered set changes
   useEffect(() => {
     setCurrentPage(1);
   }, [dividends.length]);
 
-  const handlePreviousPage = () => {
-    setCurrentPage((prev) => Math.max(1, prev - 1));
-  };
-
-  const handleNextPage = () => {
-    setCurrentPage((prev) => Math.min(totalPages, prev + 1));
-  };
+  const handlePreviousPage = () => setCurrentPage((prev) => Math.max(1, prev - 1));
+  const handleNextPage = () => setCurrentPage((prev) => Math.min(totalPages, prev + 1));
 
   const SortButton = ({ column, label }: { column: 'exDate' | 'paymentDate' | 'totalNet'; label: string }) => (
     <button
@@ -289,7 +273,7 @@ export function DividendTable({
       initial="inactive"
       animate="visible"
     >
-      {/* Mobile card view — table has 13 columns, not suitable for small screens */}
+      {/* Mobile card view — the desktop table has 13 columns, unusable on small screens */}
       <div className="desktop:hidden space-y-3">
         {paginatedDividends.map((dividend) => (
           <div
@@ -320,34 +304,50 @@ export function DividendTable({
                 <Badge variant="outline" className={`text-xs ${dividendTypeBadgeColor[dividend.dividendType]}`}>
                   {dividendTypeLabels[dividend.dividendType]}
                 </Badge>
-                <Button variant="ghost" size="sm" onClick={(event) => {
-                  event.stopPropagation();
-                  onEdit(dividend);
-                }} disabled={isDemo || deletingId === dividend.id} title={isDemo ? 'Non disponibile in modalità demo' : 'Modifica'}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => { e.stopPropagation(); onEdit(dividend); }}
+                  disabled={isDemo || deletingId === dividend.id}
+                  title={isDemo ? 'Non disponibile in modalità demo' : 'Modifica'}
+                >
                   <Edit className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="sm" onClick={(event) => {
-                  event.stopPropagation();
-                  handleDelete(dividend);
-                }} disabled={isDemo || deletingId === dividend.id} title={isDemo ? 'Non disponibile in modalità demo' : 'Elimina'}>
-                  <Trash2 className="h-4 w-4 text-red-500" />
+                <Button
+                  variant={pendingDeleteId === dividend.id ? 'destructive' : 'ghost'}
+                  size="sm"
+                  onClick={(e) => handleDeleteClick(dividend, e)}
+                  disabled={isDemo || deletingId === dividend.id}
+                  title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+                >
+                  {pendingDeleteId === dividend.id
+                    ? 'Conferma'
+                    : <Trash2 className="h-4 w-4 text-destructive" />
+                  }
                 </Button>
               </div>
             </div>
+
             {/* Dates */}
             <div className="flex gap-4 text-xs text-muted-foreground">
               <span>Ex-Date: <span className="text-foreground">{formatDate(dividend.exDate)}</span></span>
               <span>Pagamento: <span className="text-foreground">{formatDate(dividend.paymentDate)}</span></span>
             </div>
+
             {/* Amounts */}
             <div className="flex items-baseline justify-between gap-2">
               <div className="text-xs text-muted-foreground space-y-0.5">
                 <div>Lordo: <AmountWithConversion originalAmount={dividend.grossAmount} eurAmount={dividend.grossAmountEur} currency={dividend.currency} /></div>
-                <div>Tasse: <AmountWithConversion originalAmount={dividend.taxAmount} eurAmount={dividend.taxAmountEur} currency={dividend.currency} textColor="text-red-600" /></div>
+                <div>Tasse: <AmountWithConversion originalAmount={dividend.taxAmount} eurAmount={dividend.taxAmountEur} currency={dividend.currency} textColor="text-destructive" /></div>
               </div>
               <div className="text-right">
                 <div className="text-xs text-muted-foreground mb-0.5">Totale Netto</div>
-                <AmountWithConversion originalAmount={dividend.netAmount} eurAmount={dividend.netAmountEur} currency={dividend.currency} textColor="text-green-600 font-semibold text-base" />
+                <AmountWithConversion
+                  originalAmount={dividend.netAmount}
+                  eurAmount={dividend.netAmountEur}
+                  currency={dividend.currency}
+                  textColor="text-emerald-600 dark:text-emerald-400 font-semibold text-base"
+                />
               </div>
             </div>
           </div>
@@ -408,14 +408,14 @@ export function DividendTable({
                     minimumFractionDigits: 4,
                   }).format(dividend.dividendPerShare)}
                 </TableCell>
-                <TableCell className="text-right text-sm text-red-600">
+                <TableCell className="text-right text-sm text-destructive">
                   {new Intl.NumberFormat('it-IT', {
                     style: 'currency',
                     currency: dividend.currency,
                     minimumFractionDigits: 4,
                   }).format(dividend.taxAmount / dividend.quantity)}
                 </TableCell>
-                <TableCell className="text-right text-sm text-green-600">
+                <TableCell className="text-right text-sm text-emerald-600 dark:text-emerald-400">
                   {new Intl.NumberFormat('it-IT', {
                     style: 'currency',
                     currency: dividend.currency,
@@ -444,7 +444,7 @@ export function DividendTable({
                     originalAmount={dividend.taxAmount}
                     eurAmount={dividend.taxAmountEur}
                     currency={dividend.currency}
-                    textColor="text-red-600"
+                    textColor="text-destructive"
                   />
                 </TableCell>
                 <TableCell className="text-right font-medium">
@@ -452,14 +452,11 @@ export function DividendTable({
                     originalAmount={dividend.netAmount}
                     eurAmount={dividend.netAmountEur}
                     currency={dividend.currency}
-                    textColor="text-green-600"
+                    textColor="text-emerald-600 dark:text-emerald-400"
                   />
                 </TableCell>
                 <TableCell>
-                  <Badge
-                    variant="outline"
-                    className={dividendTypeBadgeColor[dividend.dividendType]}
-                  >
+                  <Badge variant="outline" className={dividendTypeBadgeColor[dividend.dividendType]}>
                     {dividendTypeLabels[dividend.dividendType]}
                   </Badge>
                 </TableCell>
@@ -468,26 +465,23 @@ export function DividendTable({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onEdit(dividend);
-                      }}
+                      onClick={(e) => { e.stopPropagation(); onEdit(dividend); }}
                       disabled={isDemo || deletingId === dividend.id}
                       title={isDemo ? 'Non disponibile in modalità demo' : 'Modifica'}
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
                     <Button
-                      variant="ghost"
+                      variant={pendingDeleteId === dividend.id ? 'destructive' : 'ghost'}
                       size="sm"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleDelete(dividend);
-                      }}
+                      onClick={(e) => handleDeleteClick(dividend, e)}
                       disabled={isDemo || deletingId === dividend.id}
-                      title={isDemo ? 'Non disponibile in modalità demo' : 'Elimina'}
+                      title={isDemo ? 'Non disponibile in modalità demo' : undefined}
                     >
-                      <Trash2 className="h-4 w-4 text-red-500" />
+                      {pendingDeleteId === dividend.id
+                        ? 'Conferma'
+                        : <Trash2 className="h-4 w-4 text-destructive" />
+                      }
                     </Button>
                   </div>
                 </TableCell>
@@ -495,20 +489,20 @@ export function DividendTable({
             ))}
           </TableBody>
 
-          {/* Totals Footer Row */}
           {showTotals && dividends.length > 0 && (
             <TableFooter>
               <TableRow>
                 <TableCell colSpan={8} className="text-right font-semibold">
-                  Totale ({dividends.length} {dividends.length === 1 ? 'dividendo' : 'dividendi'}):
+                  Totale ({dividends.length}{' '}
+                  {dividends.length === 1 ? 'dividendo' : 'dividendi'}):
                 </TableCell>
                 <TableCell className="text-right font-bold">
                   {formatCurrency(totals.gross)}
                 </TableCell>
-                <TableCell className="text-right font-bold text-red-600 dark:text-red-400">
+                <TableCell className="text-right font-bold text-destructive">
                   {formatCurrency(totals.tax)}
                 </TableCell>
-                <TableCell className="text-right font-bold text-green-600 dark:text-green-400">
+                <TableCell className="text-right font-bold text-emerald-600 dark:text-emerald-400">
                   {formatCurrency(totals.net)}
                 </TableCell>
                 <TableCell colSpan={2} />
@@ -517,33 +511,22 @@ export function DividendTable({
           )}
         </Table>
       </div>
-      {/* end desktop table */}
 
-      {/* Pagination Controls */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between px-2">
           <div className="text-sm text-muted-foreground">
-            Visualizzati {startIndex + 1}-{Math.min(endIndex, sortedDividends.length)} di {sortedDividends.length} dividendi
+            Visualizzati {startIndex + 1}-{Math.min(endIndex, sortedDividends.length)} di{' '}
+            {sortedDividends.length} dividendi
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handlePreviousPage}
-              disabled={currentPage === 1}
-            >
+            <Button variant="outline" size="sm" onClick={handlePreviousPage} disabled={currentPage === 1}>
               <ChevronLeft className="h-4 w-4 mr-1" />
               Precedente
             </Button>
             <div className="text-sm font-medium">
               Pagina {currentPage} di {totalPages}
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleNextPage}
-              disabled={currentPage === totalPages}
-            >
+            <Button variant="outline" size="sm" onClick={handleNextPage} disabled={currentPage === totalPages}>
               Successiva
               <ChevronRight className="h-4 w-4 ml-1" />
             </Button>

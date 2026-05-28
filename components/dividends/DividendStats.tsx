@@ -192,12 +192,19 @@ function MetricInfoTooltip({ content }: { content: string }) {
       }
     };
 
+    // Close on Escape so keyboard users can dismiss without moving focus
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowTooltip(false);
+    };
+
     if (showTooltip) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [showTooltip]);
 
@@ -208,6 +215,8 @@ function MetricInfoTooltip({ content }: { content: string }) {
         className="cursor-help rounded-full text-muted-foreground transition-colors hover:text-foreground"
         onClick={() => setShowTooltip((current) => !current)}
         aria-label="Come leggere questa card"
+        aria-expanded={showTooltip}
+        aria-haspopup="true"
       >
         <HelpCircle className="h-4 w-4" />
       </button>
@@ -310,7 +319,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
     if (loading) return <DividendStatsSkeleton />;
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="text-gray-500">Nessuna statistica disponibile</div>
+        <div className="text-muted-foreground">Nessuna statistica disponibile</div>
       </div>
     );
   }
@@ -322,10 +331,10 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Dividendi Ricevuti (Netto)</CardTitle>
-            <DollarSign className="h-4 w-4 text-green-500" />
+            <DollarSign className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
               {formatCurrency(stats.period.totalNet)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -346,10 +355,10 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Tasse Pagate</CardTitle>
-            <TrendingDown className="h-4 w-4 text-red-500" />
+            <TrendingDown className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">
+            <div className="text-2xl font-bold text-destructive">
               {formatCurrency(stats.period.totalTax)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -364,10 +373,10 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Dividendi in Arrivo</CardTitle>
-            <Calendar className="h-4 w-4 text-purple-500" />
+            <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-600">
+            <div className="text-2xl font-bold text-foreground">
               {formatCurrency(stats.upcomingTotal)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -402,14 +411,14 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                       <p>{yocSummary.coverage} {yocSummary.coverage === 1 ? 'asset coperto' : 'asset coperti'}</p>
                     </div>
                   </div>
-                  <div className="grid gap-3 border-t border-border/50 pt-4 grid-cols-1 sm:grid-cols-3">
+                  <div className="grid gap-3 border-t border-border/50 pt-4 grid-cols-1 desktop:grid-cols-3">
                     <div>
                       <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
                         Spread vs Rendimento Corrente
                       </p>
                       <SettledPercentValue
                         value={yocSummary.spread}
-                        className={`mt-1 text-lg font-semibold tabular-nums ${yocSummary.spread >= 0 ? 'text-emerald-600' : 'text-red-600'}`}
+                        className={`mt-1 text-lg font-semibold tabular-nums ${yocSummary.spread >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}
                       />
                     </div>
                     <div>
@@ -448,7 +457,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                     <SettledPercentValue
                       value={growthSummary.median}
                       className={`text-3xl font-semibold desktop:text-4xl tabular-nums ${
-                        (growthSummary.median ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600'
+                        (growthSummary.median ?? 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'
                       }`}
                     />
                     <div className="text-right text-xs text-muted-foreground">
@@ -456,7 +465,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                       <p>{growthSummary.coverage} {growthSummary.coverage === 1 ? 'asset con storico' : 'asset con storico'}</p>
                     </div>
                   </div>
-                  <div className="grid gap-3 border-t border-border/50 pt-4 sm:grid-cols-2">
+                  <div className="grid gap-3 border-t border-border/50 pt-4 desktop:grid-cols-2">
                     <div>
                       <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
                         Media portafoglio
@@ -464,7 +473,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                       <SettledPercentValue
                         value={growthSummary.average}
                         className={`mt-1 text-lg font-semibold tabular-nums ${
-                          (growthSummary.average ?? 0) >= 0 ? 'text-blue-600' : 'text-red-600'
+                          (growthSummary.average ?? 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'
                         }`}
                       />
                     </div>
@@ -559,9 +568,10 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                   <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} />
                   <RechartsTooltip content={<ChartTooltip />} cursor={{ fill: 'var(--muted)' }} />
                   <Legend />
-                  <Bar dataKey="totalGross" fill="#10B981" name="Lordo" animationDuration={600} animationEasing="ease-out" />
-                  <Bar dataKey="totalTax" fill="#EF4444" name="Tasse" animationDuration={600} animationEasing="ease-out" />
-                  <Bar dataKey="totalNet" fill="#3B82F6" name="Netto" animationDuration={600} animationEasing="ease-out" />
+                  {/* Colors resolved from the active theme via useChartColors() — no hardcoded hex */}
+                  <Bar dataKey="totalGross" fill={COLORS[0]} name="Lordo" animationDuration={600} animationEasing="ease-out" />
+                  <Bar dataKey="totalTax" fill={COLORS[4]} name="Tasse" animationDuration={600} animationEasing="ease-out" />
+                  <Bar dataKey="totalNet" fill={COLORS[2]} name="Netto" animationDuration={600} animationEasing="ease-out" />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -592,7 +602,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                 <Line
                   type="monotone"
                   dataKey="totalNet"
-                  stroke="#10B981"
+                  stroke={COLORS[0]}
                   strokeWidth={2}
                   name="Dividendi Netti"
                   dot={{ r: 4 }}
@@ -628,7 +638,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-green-600">{formatCurrency(asset.totalNet)}</p>
+                    <p className="font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(asset.totalNet)}</p>
                     <p className="text-xs text-muted-foreground">{asset.count} dividendi</p>
                   </div>
                 </div>
@@ -661,7 +671,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
               {!assetId && portfolioMedianGrowth !== undefined && (
                   <div className="text-right">
                     <p className="text-xs text-muted-foreground">Mediana portafoglio</p>
-                    <p className={`text-xl font-bold ${portfolioMedianGrowth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    <p className={`text-xl font-bold ${portfolioMedianGrowth >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
                     {portfolioMedianGrowth >= 0 ? '+' : ''}{portfolioMedianGrowth.toFixed(2)}%
                     </p>
                   </div>
@@ -686,13 +696,13 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <span>
                         YoY:{' '}
-                          <span className={`font-medium ${asset.latestYoyGrowth === undefined ? '' : asset.latestYoyGrowth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          <span className={`font-medium ${asset.latestYoyGrowth === undefined ? '' : asset.latestYoyGrowth >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
                           {asset.latestYoyGrowth === undefined ? '—' : `${asset.latestYoyGrowth >= 0 ? '+' : ''}${asset.latestYoyGrowth.toFixed(2)}%`}
                         </span>
                       </span>
                       <span>
                         CAGR:{' '}
-                        <span className={`font-medium ${asset.cagr === undefined ? '' : asset.cagr >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                        <span className={`font-medium ${asset.cagr === undefined ? '' : asset.cagr >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
                           {asset.cagr === undefined ? '—' : `${asset.cagr >= 0 ? '+' : ''}${asset.cagr.toFixed(2)}%`}
                         </span>
                       </span>
@@ -736,13 +746,13 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                         <div className="flex gap-6 text-sm pt-1 border-t">
                           <div>
                             <p className="text-xs text-muted-foreground">YoY</p>
-                            <p className={`font-semibold ${selectedDpsAsset.latestYoyGrowth === undefined ? 'text-muted-foreground' : selectedDpsAsset.latestYoyGrowth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            <p className={`font-semibold ${selectedDpsAsset.latestYoyGrowth === undefined ? 'text-muted-foreground' : selectedDpsAsset.latestYoyGrowth >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
                               {selectedDpsAsset.latestYoyGrowth === undefined ? '—' : `${selectedDpsAsset.latestYoyGrowth >= 0 ? '+' : ''}${selectedDpsAsset.latestYoyGrowth.toFixed(2)}%`}
                             </p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">CAGR</p>
-                            <p className={`font-semibold ${selectedDpsAsset.cagr === undefined ? 'text-muted-foreground' : selectedDpsAsset.cagr >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                            <p className={`font-semibold ${selectedDpsAsset.cagr === undefined ? 'text-muted-foreground' : selectedDpsAsset.cagr >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
                               {selectedDpsAsset.cagr === undefined ? '—' : `${selectedDpsAsset.cagr >= 0 ? '+' : ''}${selectedDpsAsset.cagr.toFixed(2)}%`}
                             </p>
                           </div>
@@ -761,8 +771,8 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                       {allYears.map(year => (
                         <th key={year} className="text-right py-3 px-2">{year}</th>
                       ))}
-                      <th className="text-right py-3 px-2 text-amber-600">YoY %</th>
-                      <th className="text-right py-3 pl-2 text-blue-600">CAGR %</th>
+                      <th className="text-right py-3 px-2">YoY %</th>
+                      <th className="text-right py-3 pl-2">CAGR %</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -781,7 +791,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                           ))}
                           <td className={`text-right py-3 px-2 font-medium tabular-nums ${
                             asset.latestYoyGrowth === undefined ? 'text-muted-foreground' :
-                            asset.latestYoyGrowth >= 0 ? 'text-emerald-600' : 'text-red-600'
+                            asset.latestYoyGrowth >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'
                           }`}>
                             {asset.latestYoyGrowth === undefined
                               ? '—'
@@ -789,7 +799,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                           </td>
                           <td className={`text-right py-3 pl-2 font-medium tabular-nums ${
                             asset.cagr === undefined ? 'text-muted-foreground' :
-                            asset.cagr >= 0 ? 'text-blue-600' : 'text-red-600'
+                            asset.cagr >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'
                           }`}>
                             {asset.cagr === undefined
                               ? '—'
@@ -834,18 +844,18 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                     <div className="space-y-1">
                       <div>
                         <span className="text-muted-foreground">Plusval.: </span>
-                        <span className={`font-medium ${asset.capitalGainPercentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <span className={`font-medium ${asset.capitalGainPercentage >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
                           {asset.capitalGainPercentage >= 0 ? '+' : ''}{asset.capitalGainPercentage.toFixed(2)}%
                         </span>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Dividendi: </span>
-                        <span className="font-medium text-green-600">+{asset.dividendReturnPercentage.toFixed(2)}%</span>
+                        <span className="font-medium text-emerald-600 dark:text-emerald-400">+{asset.dividendReturnPercentage.toFixed(2)}%</span>
                       </div>
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-muted-foreground">Rend. Totale</p>
-                      <p className={`text-base font-semibold ${asset.totalReturnPercentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      <p className={`text-base font-semibold ${asset.totalReturnPercentage >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
                         {asset.totalReturnPercentage >= 0 ? '+' : ''}{asset.totalReturnPercentage.toFixed(2)}%
                       </p>
                     </div>
@@ -871,17 +881,17 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                         <p className="font-medium">{asset.assetTicker}</p>
                         <p className="text-xs text-muted-foreground">{asset.assetName}</p>
                       </td>
-                      <td className={`text-right py-3 px-3 ${asset.capitalGainPercentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      <td className={`text-right py-3 px-3 ${asset.capitalGainPercentage >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
                         <span title={formatCurrency(asset.capitalGainAbsolute)}>
                           {asset.capitalGainPercentage >= 0 ? '+' : ''}{asset.capitalGainPercentage.toFixed(2)}%
                         </span>
                       </td>
-                      <td className="text-right py-3 px-3 text-green-600">
+                      <td className="text-right py-3 px-3 text-emerald-600 dark:text-emerald-400">
                         <span title={formatCurrency(asset.allTimeNetDividends)}>
                           +{asset.dividendReturnPercentage.toFixed(2)}%
                         </span>
                       </td>
-                      <td className={`text-right py-3 pl-3 font-semibold ${asset.totalReturnPercentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      <td className={`text-right py-3 pl-3 font-semibold ${asset.totalReturnPercentage >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
                         {asset.totalReturnPercentage >= 0 ? '+' : ''}{asset.totalReturnPercentage.toFixed(2)}%
                       </td>
                     </tr>

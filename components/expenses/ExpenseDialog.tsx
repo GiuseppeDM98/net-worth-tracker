@@ -53,6 +53,7 @@ import { CategoryManagementDialog } from '@/components/expenses/CategoryManageme
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -650,10 +651,20 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-hidden" aria-describedby={undefined}>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
 
         {/* Header */}
         <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
+          {/* sr-only description satisfies WCAG 4.1.2 (dialog must have an
+              accessible description). The text is kept concise and contextual
+              so screen readers announce it immediately after the dialog title. */}
+          <DialogDescription className="sr-only">
+            {isEdit
+              ? 'Modifica i dettagli della voce selezionata'
+              : step === 'picker'
+              ? 'Seleziona il tipo di voce da registrare'
+              : 'Inserisci i dettagli della nuova voce'}
+          </DialogDescription>
           <div className="flex items-center gap-3">
             {/* Back button: visible only in step 2 during create mode */}
             {!isEdit && step === 'form' && (
@@ -699,13 +710,20 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
                 <p className="text-sm text-muted-foreground mb-5">
                   Che tipo di voce vuoi registrare?
                 </p>
-                <div className="grid grid-cols-2 gap-3">
+                {/* role="radiogroup" communicates to assistive technology that
+                    exactly one option must be chosen before proceeding. Each card
+                    carries role="radio" + aria-checked so screen readers announce
+                    the selection state. Clicking immediately advances to step 2,
+                    so aria-checked is always false here — the picker is ephemeral. */}
+                <div className="grid grid-cols-2 gap-3" role="radiogroup" aria-label="Tipo di voce da registrare">
                   {TYPE_CARDS.map((card) => {
                     const Icon = card.icon;
                     return (
                       <button
                         key={card.value}
                         type="button"
+                        role="radio"
+                        aria-checked={false}
                         onClick={() => {
                           setValue('type', card.value);
                           setValue('categoryId', '');
@@ -762,7 +780,9 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: ExpenseDial
                                 options={availableCategories.map((cat) => ({
                                   value: cat.id,
                                   label: cat.name,
-                                  color: cat.color || '#3b82f6',
+                                  // Fallback to --primary so the dot stays on-theme
+                                  // when a category has no explicit colour assigned.
+                                  color: cat.color || 'var(--primary)',
                                 }))}
                                 value={selectedCategoryId || ''}
                                 onValueChange={(value) => {

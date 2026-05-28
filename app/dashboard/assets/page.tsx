@@ -88,9 +88,11 @@ function CashAccountsSection({
             key={asset.id}
             type="button"
             onClick={() => onSelect(asset)}
+            // bg-muted/40 (no border) keeps these as lighter KPI chips, not full cards.
+            // bg-card + border would give them equal visual weight to the hero cards above.
             className={cn(
-              'cursor-pointer rounded-xl border border-border bg-card p-5 text-left',
-              'hover:bg-muted/50 active:bg-muted/70 transition-colors duration-150',
+              'cursor-pointer rounded-xl bg-muted/40 p-5 text-left',
+              'hover:bg-muted/60 active:bg-muted/70 transition-colors duration-150',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1'
             )}
           >

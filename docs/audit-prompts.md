@@ -259,31 +259,6 @@ Contesto:
 
 ## Cashflow
 
-### Tab "Analisi"
-
-```
-/impeccable audit il tab "Analisi" della pagina Cashflow
-
-File: app/dashboard/cashflow/page.tsx
-Componenti: components/cashflow/AnalisiTab.tsx,
-            components/cashflow/CashflowSankeyChart.tsx
-
-Assi da verificare (minimum — segnala anche eventuali altri problemi):
-- Token: nessun hardcoded nel Sankey (nodi, link, tooltip), nei KPI hero blocks,
-  nel TopExpensesBlock (importi rossi — usa `text-destructive`?)
-- Chart colors: Sankey node colors via `useChartColors()` o CSS vars; 9 trend charts via
-  `useChartColors()` — nessun hex diretto
-- Breakpoint: pill 3-state (Anno Corrente/Anno/Storico) corretto su 375px; TopExpensesBlock
-  non overflow su mobile
-- Motion: `key={periodLabel}` su TopExpensesBlock per reset `showAll`; pill animation (400/35)
-- ARIA: pill selector `role="tablist"`, Sankey drill-down breadcrumb accessibile
-- Altro: pattern anomali o violazioni non elencate sopra
-
-Contesto:
-- Leggi AGENTS.md (pattern, convenzioni, gotcha)
-- Leggi CLAUDE.md (stato corrente, known issues)
-```
-
 ### Tab "Dividendi"
 
 ```
@@ -384,6 +359,37 @@ Contesto:
 
 ---
 
+## Analisi
+
+```
+/impeccable audit la pagina Analisi
+
+File: app/dashboard/analisi/page.tsx
+Componenti: components/cashflow/AnalisiTab.tsx,
+            components/cashflow/CashflowSankeyChart.tsx,
+            components/cashflow/AnomalieBlock.tsx,
+            components/cashflow/ConfrontoAnnualeSection.tsx,
+            components/cashflow/SavingsRateTrendSection.tsx,
+            components/cashflow/CategoryTrendsGrid.tsx
+
+Assi da verificare (minimum — segnala anche eventuali altri problemi):
+- Token: nessun hardcoded nel Sankey (nodi, link, tooltip), nei KPI hero blocks,
+  nel TopExpensesBlock (importi rossi — usa `text-destructive`?)
+- Chart colors: Sankey node colors via `useChartColors()` o CSS vars; 9 trend charts via
+  `useChartColors()` — nessun hex diretto
+- Breakpoint: pill 3-state (Anno Corrente/Anno/Storico) corretto su 375px; TopExpensesBlock
+  non overflow su mobile
+- Motion: `key={periodLabel}` su TopExpensesBlock per reset `showAll`; pill animation (400/35)
+- ARIA: pill selector `role="tablist"`, Sankey drill-down breadcrumb accessibile
+- Altro: pattern anomali o violazioni non elencate sopra
+
+Contesto:
+- Leggi AGENTS.md (pattern, convenzioni, gotcha)
+- Leggi CLAUDE.md (stato corrente, known issues)
+```
+
+---
+
 ## Allocazione
 
 ```
@@ -447,11 +453,11 @@ Componenti: components/history/*,
             components/dashboard/LaborMetricsChart.tsx
 
 Assi da verificare (minimum — segnala anche eventuali altri problemi):
-- Token: sezione Lavoro & Investimenti flat rows — nessun hardcoded; Appendice collapsible
-  wrapper — nessun `bg-gray-*`
-- Chart colors: tutti i chart (Evoluzione, Composizione, Raddoppi, Labor) via
+- Token: sezione Lavoro & Investimenti flat rows — nessun hardcoded;
+  sezione Driver (3 card: Savings vs Investment, Lavoro & Investimenti, YoY) — nessun `bg-gray-*`
+- Chart colors: tutti i chart (Evoluzione, Composizione, Raddoppi, Labor, YoY bar) via
   `useChartColors()`; tooltip via CSS vars; mobile inline legend usa stessi colori
-- ARIA: Appendice `<Collapsible>` con `aria-expanded`; segmented pill `role="tablist"`
+- ARIA: segmented pill `role="tablist"` su view toggles (Evoluzione, Composizione, Raddoppi)
 - Breakpoint: mobile inline legend non overflow; chart height adattivo
 - Altro: pattern anomali o violazioni non elencate sopra
 

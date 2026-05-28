@@ -329,7 +329,8 @@ Componenti: components/history/*,
 
 Questa pagina mostra l'evoluzione storica del patrimonio con narrative order:
 Hero (patrimonio + CAGR + crescita totale) → Evoluzione → Raddoppi → Composizione
-→ Driver (Lavoro & Investimenti) → Appendice collapsible. Include segmented pills
+→ Driver (3 sezioni: Savings vs Investment, Lavoro & Investimenti, Variazione Anno su Anno
+sempre visibile). Nessuna Appendice collapsible (eliminata). Include segmented pills
 per view toggles e mobile inline legend sui grafici multi-serie.
 Confronta con: Rendimenti (period selector), Hall of Fame (tabelle flat + hero).
 Design language atteso: Trade Republic hierarchy (text-4xl font-bold font-mono hero,

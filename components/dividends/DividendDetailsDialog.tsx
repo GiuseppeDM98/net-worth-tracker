@@ -1,20 +1,6 @@
-/**
- * Dialog showing detailed dividend list for a specific date
- *
- * Displays when user clicks a date with dividends in the calendar view.
- * Shows all dividends scheduled for payment on that date with:
- * - Asset ticker and name
- * - Dividend type (with color-coded badge)
- * - Net amount (with EUR conversion if applicable)
- *
- * Design decisions:
- * - Uses Dialog (not Popover) for consistent behavior across all screen sizes
- * - Scrollable content area for handling many dividends on same date
- * - Reuses dividend type badge colors from DividendTable for consistency
- */
 'use client';
 
-import { Dividend, DividendType } from '@/types/dividend';
+import { Dividend } from '@/types/dividend';
 import {
   Dialog,
   DialogContent,
@@ -25,26 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
-
-// Italian labels for dividend types
-const dividendTypeLabels: Record<DividendType, string> = {
-  ordinary: 'Ordinario',
-  extraordinary: 'Straordinario',
-  interim: 'Interim',
-  final: 'Finale',
-  coupon: 'Cedola',
-  finalPremium: 'Premio Finale',
-};
-
-// Badge colors for dividend types (consistent with DividendTable)
-const dividendTypeBadgeColor: Record<DividendType, string> = {
-  ordinary: 'bg-blue-100 text-blue-800 border-blue-200',
-  extraordinary: 'bg-purple-100 text-purple-800 border-purple-200',
-  interim: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  final: 'bg-green-100 text-green-800 border-green-200',
-  coupon: 'bg-amber-100 text-amber-800 border-amber-200',
-  finalPremium: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-};
+import { dividendTypeLabels, dividendTypeBadgeColor } from '@/lib/constants/dividendTypes';
 
 interface DividendDetailsDialogProps {
   open: boolean;
@@ -59,7 +26,6 @@ export function DividendDetailsDialog({
   date,
   dividends,
 }: DividendDetailsDialogProps) {
-  // Format date in Italian locale (DD/MM/YYYY)
   const formattedDate = format(date, 'dd/MM/yyyy', { locale: it });
 
   return (
@@ -72,7 +38,6 @@ export function DividendDetailsDialog({
         {/* Scrollable dividend list */}
         <div className="flex-1 overflow-y-auto space-y-3">
           {dividends.map((dividend) => {
-            // Use EUR amount if available (for converted dividends)
             const displayAmount = dividend.netAmountEur ?? dividend.netAmount;
             const isEur = dividend.currency.toUpperCase() === 'EUR';
             const hasConversion = !isEur && dividend.netAmountEur !== undefined;
@@ -82,17 +47,11 @@ export function DividendDetailsDialog({
                 key={dividend.id}
                 className="border border-border rounded-lg p-3 space-y-2"
               >
-                {/* Asset ticker and name */}
                 <div className="space-y-1">
-                  <div className="font-semibold text-sm">
-                    {dividend.assetTicker}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {dividend.assetName}
-                  </div>
+                  <div className="font-semibold text-sm">{dividend.assetTicker}</div>
+                  <div className="text-xs text-muted-foreground">{dividend.assetName}</div>
                 </div>
 
-                {/* Dividend type and amount */}
                 <div className="flex items-center justify-between gap-2">
                   <Badge
                     variant="outline"
@@ -102,7 +61,7 @@ export function DividendDetailsDialog({
                   </Badge>
 
                   <div className="text-right">
-                    <div className="font-medium text-green-600 dark:text-green-400">
+                    <div className="font-medium text-emerald-600 dark:text-emerald-400">
                       {formatCurrency(displayAmount)}
                     </div>
                     {hasConversion && (
@@ -113,7 +72,6 @@ export function DividendDetailsDialog({
                   </div>
                 </div>
 
-                {/* Notes (if any) */}
                 {dividend.notes && (
                   <div className="text-xs text-muted-foreground border-t border-border pt-2">
                     {dividend.notes}
@@ -124,16 +82,13 @@ export function DividendDetailsDialog({
           })}
         </div>
 
-        {/* Summary footer */}
+        {/* Totals footer — only shown when more than one dividend on the same date */}
         {dividends.length > 1 && (
           <div className="border-t border-border pt-3 flex items-center justify-between">
             <span className="text-sm font-medium">Totale</span>
-            <span className="text-lg font-semibold text-green-600 dark:text-green-400">
+            <span className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
               {formatCurrency(
-                dividends.reduce((sum, div) => {
-                  const amount = div.netAmountEur ?? div.netAmount;
-                  return sum + amount;
-                }, 0)
+                dividends.reduce((sum, div) => sum + (div.netAmountEur ?? div.netAmount), 0)
               )}
             </span>
           </div>

@@ -42,7 +42,8 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 ### Layout Tokens
 - Never hardcode structural layout colors in shell components
 - Use semantic tokens like `bg-background`, `text-foreground`, `border-border`
-- Hardcoded green/red for gains and losses is allowed
+- For income/positive values use `text-emerald-600 dark:text-emerald-400`; for losses/expenses use `text-destructive`. Never use raw `text-green-*` or `text-red-*` — these diverge from `--destructive` on non-default themes (e.g. Cyberpunk uses orange for destructive). Applied in `ExpenseTrackingTab.tsx` KPI blocks and `MobileExpenseRow`.
+- **`--warning` token for under-allocation / buy signals**: `bg-warning text-warning-foreground border-warning-border`. Registered in `globals.css` as `--color-warning/foreground/border` → available as Tailwind utilities. Semantic mapping in Allocation: COMPRA (under-allocated) → warning; VENDI (over-allocated) → destructive; OK (balanced) → `text-green-600 dark:text-green-400` (no `--success` token exists). ⚠️ In light mode `--warning` is near-white (`oklch(0.986 0.022 90)`) — always test COMPRA chip visibility visually in light mode across themes. Applied in `AllocationCard.tsx` and `app/dashboard/allocation/page.tsx`.
 - **Overview KPI value colors**: financial values in conditional sections (cost basis, TER, costs) on Panoramica must use design system tokens. Neutral values (Patrimonio Netto/Liquido Netto) → `text-foreground`. Cost/warning signals (Tasse Stimate, Costo Annuale Portfolio, TER) → `text-amber-600 dark:text-amber-400` (Amber Watch, `--chart-3`). `text-blue-600`, `text-purple-600`, `text-orange-600` are raw Tailwind defaults with no semantic meaning in this design system; `text-purple-600` is flagged by the `impeccable` detector as `ai-color-palette`.
 - **Sidebar accent token semantics**: `--sidebar-accent` is the background for active/hover items. `--sidebar-accent-foreground` is for text that sits ON that background (designed to contrast with it). `--sidebar-primary` is for accent-colored elements on the plain sidebar background — do NOT use it for text on an accent-colored background. In cyberpunk/solar-dusk dark, `--sidebar-accent` is bright (L≈0.89 cyan), so only `--sidebar-accent-foreground` (dark) has sufficient contrast.
 - **Inline `style` blocks Tailwind hover variants**: if a color or opacity is set via inline `style={{ color, opacity }}`, Tailwind hover/focus class variants (e.g. `hover:text-sidebar-accent-foreground`) cannot override it — inline styles always win. Migrate to Tailwind classes before adding any hover/focus variants. Applied in `BottomNavigation.tsx` (sessions sidebar-hover-theme-fix, bottom-nav-hover-theme-fix).
@@ -234,6 +235,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 ### Shared Constants
 - Italian month names: `MONTH_NAMES` from `lib/constants/months.ts` — do not redeclare inline
 - Hall of Fame section labels and key arrays: `SECTION_LABELS`, `MONTHLY_SECTION_KEYS`, `YEARLY_SECTION_KEYS` from `lib/constants/hallOfFame.ts`
+- Dividend type labels and badge Tailwind classes: `dividendTypeLabels`, `dividendTypeBadgeColor` from `lib/constants/dividendTypes.ts`. Both maps include full dark: variants. Previously duplicated in `DividendTable`, `DividendDetailsDialog`, `DividendTrackingTab` with the detail dialog missing dark: variants (silent dark-mode regression). **Rule of Three applied**: any map used in 3+ files must live in a shared constant.
 
 ### Firestore Pre-Computed Cache Pattern
 For pages that aggregate large collections (many snapshots + all expenses) on every load, store pre-computed results in a dedicated Firestore collection rather than re-reading and re-calculating each visit.
@@ -401,15 +403,32 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 
 ### Progress Bar ARIA
 - A visual progress bar (`<div>` animated with Framer Motion) has no semantic meaning to screen readers. Always add `role="progressbar"`, `aria-valuenow={Math.round(value)}`, `aria-valuemin={0}`, `aria-valuemax={100}`, and `aria-label` describing what is being measured.
+- Place `role="progressbar"` and all `aria-value*` attrs on the **track container** (outer div), not the fill element. The outer element carries the semantic value; the inner fill is purely decorative.
+
+### `title` Attribute Is Not a Reliable Accessible Name for Buttons
+- `title="Sposta su"` on a `<button>` looks like it provides an accessible label, but `title` is not reliably announced by screen readers (VoiceOver on iOS ignores it entirely; NVDA behaviour varies). Always use `aria-label` as the primary accessible name for icon-only action buttons. Keep `title` only if you also want a hover tooltip for pointer users — but `aria-label` must always be present too.
+- **Demo-mode disabled buttons**: use `aria-label={isDemo ? 'Azione — non disponibile in modalità demo' : 'Azione'}` instead of `title`. Screen readers announce the disabled state automatically; the `aria-label` explains *why*.
+
+### Color Picker Buttons — `aria-label` Must Use Human-Readable Names
+- Color swatch buttons with `aria-label={`Colore ${hexValue}`}` cause screen readers to spell out the hex string (e.g. "Colore hashtag 3 b 8 2 f 6") — meaningless to AT users. Always maintain a `COLOR_LABELS: Record<string, string>` map alongside the palette constant and use it for labels.
+- Pattern: `aria-label={`${COLOR_LABELS[c] ?? c}${color === c ? ' (selezionato)' : ''}`}` + `aria-pressed={color === c}`. The `(selezionato)` suffix tells AT users the current selection without requiring a separate announcement.
+- Keep `COLOR_LABELS` in the component file (UI-specific) and add a checklist comment on the palette constant in the type file: "If you add a color here, also update COLOR_LABELS in <Dialog>.tsx". Applied in `CostCenterDialog.tsx`.
 
 ### Accessibility Patterns
+- **Calendar grid ARIA structure**: a 7-column calendar grid requires explicit ARIA roles — not just visual CSS grid. Pattern: outer container `role="grid" aria-label="Calendario pagamenti dividendi"`; header row `role="row"` with each day cell `role="columnheader" aria-label={fullDayName}`; each of the 6 week rows as `role="row"` (flat 42-cell array must be sliced: `Array.from({ length: 6 }, (_, i) => cells.slice(i*7, i*7+7))`); each date cell `role="gridcell"`. Using CSS `grid-cols-7` alone creates no navigable structure — the DOM rows must exist as elements. Applied in `DividendCalendar.tsx`.
+- **`role="gridcell"` on `<button>`**: acceptable for calendar cells. Overrides the implicit `button` role. Modern screen readers (NVDA, VoiceOver, JAWS) treat it as an activatable gridcell. Wrapping in `<div role="gridcell"><button>` is the strictly correct approach but adds DOM complexity with no practical AT benefit. Use the `<button role="gridcell">` pattern only when the button IS the full cell content.
+- **`aria-label` for calendar cells must be built in the parent**: the parent calendar component has `getDividendsForDate(date)` already computed for each cell. Pass the result as `ariaLabel: string` prop to the cell — do not re-derive it inside the cell. Format: `"${day} ${monthName} ${year}${dividends.length > 0 ? ' — N pagamenti' : ''}"`. The prop is non-optional (string, not string | undefined) to force the call-site to always supply it.
+- **Custom tooltip with `aria-expanded`**: any toggle-button that shows/hides a panel must have `aria-expanded={isOpen}` and `aria-haspopup="true"`. Add a `keydown` handler for Escape on the document (not just the button) — Escape is a global dismiss shortcut for tooltips/popups and screen reader users expect it. Pattern: add/remove the listener inside `useEffect([isOpen])`, remove on cleanup. Applied in `MetricInfoTooltip` in `DividendStats.tsx`.
 - **`aria-live` on streaming content**: any region that receives dynamically injected text (SSE streams, polling) must have `aria-live="polite"` and `aria-atomic="false"` on its container so screen readers announce content as it arrives. Use `aria-label` to give the region a name (e.g. `aria-label="Conversazione con l'assistente"`).
 - **Action buttons hidden with `opacity-0` are inaccessible on both keyboard and touch**: `opacity-0 group-hover:opacity-100` makes controls unreachable from keyboard (focus lands on invisible buttons) and invisible on touch (no hover state). Fix: use `[@media(pointer:fine)]:opacity-0 [@media(pointer:fine)]:group-hover:opacity-100 [@media(pointer:fine)]:group-focus-within:opacity-100` — actions remain always visible on touch devices and become visible on keyboard focus. Tailwind v4 JIT supports arbitrary `@media` variants.
 - **Tab pattern without ARIA**: `<button>` elements styled as tabs must have `role="tab"`, `aria-selected`, and a `role="tablist"` wrapper to be announced correctly by screen readers.
+- **`<Card>` (or any non-interactive element) with `onClick` requires explicit keyboard support**: shadcn `<Card>` is a `<div>` — it receives no keyboard events by default. When used as a clickable navigation element, always add `role="button"`, `tabIndex={0}`, `aria-label`, and an `onKeyDown` handler: `(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler(); } }`. Also add `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2` for the visible focus ring. Omitting these violates WCAG 2.1.1. Applied in `CostCentersTab.tsx` center cards.
 - **Touch targets**: minimum 44×44px per Apple HIG and Material Design. `h-6 w-6` (24px) icon-only buttons are below threshold — use at least `h-8 w-8` for action buttons in dense lists; `h-10 w-10` for primary CTAs and destructive icon buttons (trash, remove). Tab filters need at least `min-h-[36px]`. shadcn `size="icon"` defaults to 36px — always override with `className="h-10 w-10"` on touch-critical controls.
 - **`type="button"` on `<button>` elements**: always set explicit `type="button"` on buttons that are not form submits to prevent accidental form submission in nested contexts.
 - **`aria-label` on icon-only selects**: `SelectTrigger` without visible label text must have `aria-label` — screen readers will otherwise only announce the current value with no context about what is being selected.
-- **`DialogDescription` is required in every `DialogContent`**: Radix logs "Missing `Description` or `aria-describedby={undefined}`" at runtime when `DialogContent` has no `DialogDescription`. Always import and add `DialogDescription` inside `DialogHeader`, below `DialogTitle`, with a one-line contextual description. In create/edit dialogs use a ternary to match the mode. Never suppress with `aria-describedby={undefined}` — that removes accessibility without silencing the root cause.
+- **`DialogDescription` is required in every `DialogContent`**: Radix logs "Missing `Description` or `aria-describedby={undefined}`" at runtime when `DialogContent` has no `DialogDescription`. Always import and add `DialogDescription` inside `DialogHeader`, below `DialogTitle`, with a one-line contextual description. In create/edit dialogs use a ternary to match the mode. Use `className="sr-only"` when the description should not be visible. Never suppress with `aria-describedby={undefined}` — that removes accessibility without silencing the root cause. Applied in `ExpenseDialog.tsx`.
+- **`role="radiogroup"` for ephemeral type pickers**: when N cards act as a single-choice selector that immediately advances to the next step (no persistent selected state), apply `role="radiogroup"` on the container + `role="radio"` + `aria-checked={false}` on each card. `aria-checked` is always `false` because clicking immediately navigates away — setting it to the form's default value would be misleading. Applied in `ExpenseDialog.tsx` Step 1 type picker.
+- **`role="group"` + `aria-labelledby` for button groups**: a `<Label>` or `<label>` without `htmlFor` is not associated with anything in the accessibility tree. When a label describes a group of buttons (e.g. year-pill selectors), use `role="group"` on the container + `aria-labelledby` pointing to a labelling element with an `id`. This is the correct ARIA pattern for labelled groups that share no single focusable input. Applied in `ExpenseTrackingTab.tsx` Anno filter.
 
 ---
 
@@ -422,6 +441,7 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
   - Assistant: `assistantRoutes` + `assistantWebSearchPolicy` + `assistantMonthContextService`
   - Dividends/cron: `dividendUseCase` + `dividendProcessor` | Email: `monthlyEmailService`
   - Assets/bonds: `assetDialogHelpers` + `couponUtils` | Cashflow/Budget: `budgetUtils`
+  - Allocation: `allocationUtils`
 - For motion/perceived-performance changes, compare `npm run dev` vs `npm run build && npm run start` — dev can exaggerate cost
 
 ### Test Patterns
@@ -438,22 +458,51 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - **Radix Select runtime error**: never use empty string as value — use sentinels `__all__`, `__none__`, `__create_new__`
 - **Radix Tabs forceMount gap** (blank space on hidden panel): add `data-[state=inactive]:hidden` to `TabsContent` in `components/ui/tabs.tsx`
 
+### Duplicate Badge/Label Maps — Silent Dark Mode Regression
+- When a `Record<Type, string>` map (labels, badge Tailwind classes) is copied across 3+ files, the copies drift. The canonical symptom: one copy is missing dark: variant classes that the others have — badges in that one component show near-white backgrounds in dark mode, making text illegible, but TypeScript compiles without error because the type signature matches.
+- **Fix**: move the map to `lib/constants/<domain>.ts` on first duplication (Rule of Three). If a copy already exists without dark: variants, audit ALL copies and reconcile before centralising.
+- Applied: `dividendTypeBadgeColor` (3 files → `lib/constants/dividendTypes.ts`). `DividendDetailsDialog` had no dark: variants; `DividendTable` had them; silently diverged.
+
 ### Skeleton as Dead Code — Loading State Silent Failure
 - Skeleton exists but page shows blank flash: the skeleton was never imported — `if (loading) return null` is still in place. TypeScript does not catch unused components. After writing a skeleton, verify it's wired up in the page
+
+### Skeleton Must Wrap in the Same Container as the Real Layout
+- **Symptom**: content shifts on load — skeleton has different padding or max-width than the real layout.
+- **Root cause**: `if (loading) return <XSkeleton />` fires before the `<PageContainer>` wrapper in the main return, so the skeleton renders without `max-w-[1600px] mx-auto max-desktop:portrait:pb-20`.
+- **Fix**: import `PageContainer` inside the skeleton file and wrap its root div there, or wrap at the call site. Applied in `AllocationPageSkeleton.tsx`.
 
 ### Recharts Legend and Tooltip Mismatch
 - `Legend` reads `<Bar fill>`, not `<Cell>`
 - Always set `fill` on `<Bar>` even when per-bar colors are overridden by `<Cell>`
 - Do not set text `color` globally in tooltip style for line/area/bar charts
 - **Recharts `formatter` prop signature is `(value: ValueType | undefined, ...)`**: `ValueType = string | number | (string | number)[]`. Never type the first param as `number` — TypeScript compiles but runtime receives `undefined` for gap points in line charts with `connectNulls={false}`. Correct coercion patterns: `Number(value ?? 0)` for bar charts; `value != null ? Number(value).toFixed(1) : '—'` for nullable line charts.
-- **Recharts tooltip — always use CSS vars, never hardcoded hex**: the correct pattern is to pass `contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', color: 'var(--card-foreground)' }}` and `labelStyle={{ fontWeight: 600, color: 'var(--card-foreground)' }}`. Never use `color: '#111827'` — it is invisible in dark mode since the tooltip background becomes dark via `var(--card)`. This applies to every `<Tooltip>` across all pages and charts. Applied in `FireCalculatorTab.tsx`, `FIREProjectionChart.tsx`.
-- **BarChart hover cursor overlay**: the default cursor is an opaque light rectangle — too visible in dark mode. Set `cursor={{ fill: 'rgba(128, 128, 128, 0.1)' }}` on `<Tooltip>` for a subtle semi-transparent overlay that works in both modes.
+- **Recharts tooltip has THREE separate style props — all must be set**: `contentStyle` (the box wrapper), `labelStyle` (the title row, e.g. "apr 26"), and `itemStyle` (each value row, e.g. "Spesa : 208,71 €"). They do NOT inherit from each other. Omitting `itemStyle` leaves value-row text at Recharts' hardcoded default color — invisible on dark backgrounds. Full pattern:
+  ```tsx
+  const TOOLTIP_CONTENT_STYLE = { backgroundColor: 'var(--card)', border: '1px solid var(--border)', color: 'var(--card-foreground)', fontSize: 12, borderRadius: 8 } as const;
+  const TOOLTIP_LABEL_STYLE  = { fontWeight: 600, color: 'var(--card-foreground)' } as const;
+  const TOOLTIP_ITEM_STYLE   = { color: 'var(--card-foreground)' } as const;
+  <Tooltip contentStyle={TOOLTIP_CONTENT_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} cursor={{ fill: 'var(--muted)', opacity: 0.4 }} />
+  ```
+  Define the three objects as module-level `as const` constants — avoids re-creating objects on every render and keeps usage sites clean. Applied in `ConfrontoAnnualeSection.tsx` (TOOLTIP_CONTENT_STYLE / TOOLTIP_LABEL_STYLE), `CostCenterDetail.tsx` (all three). Never use `color: '#111827'` in any of them — invisible in dark mode.
 
 ### `sticky` on `tfoot` inside a div-scroll wrapper
 - **Symptom**: the total/summary footer row overlaps the last visible data rows when a table is inside a scrollable `<div>` — the tfoot appears to float on top of content.
 - **Root cause**: `sticky bottom-0` on `<tfoot>` positions relative to the nearest scroll ancestor. If the scroll container is a `<div>` wrapper (not the `<table>` itself), the tfoot sticks to the bottom of the visible viewport area, overlapping content. CSS `sticky` on table parts only works correctly when the table's own scroll context is the scroll container.
 - **Fix**: remove `sticky bottom-0` from `<tfoot>`. The total appears naturally at the end of the table after scrolling — correct UX for a long scrollable list.
 - Applied in `CashflowSankeyChart.tsx` and `AnalisiTab.tsx` (ExpenseList).
+
+### Sticky `thead` transparent background causes header/row overlap on scroll
+- **Symptom**: column headers visually merge with table rows when scrolling inside a `max-h-[...] overflow-y-auto` container — header text and cell content overlap.
+- **Root cause**: `bg-muted/50` (50% opacity) on `<thead className="sticky top-0">` is semi-transparent. Inside an overflow scroll wrapper, rows scroll under the sticky header and are visible through the transparent background.
+- **Fix**: use a fully opaque token — `bg-card` for tables inside `<Card>`, `bg-background` for tables on plain page backgrounds. Never use alpha-transparent backgrounds on sticky headers.
+- Applied in `CashflowSankeyChart.tsx` (Sankey transaction table) and `AnalisiTab.tsx` (ExpenseList drill-down).
+
+### Recharts `<Legend content=>` must receive a module-level component for stable reference
+- **Symptom**: Recharts Legend re-renders on every state change unrelated to chart data (drill-down navigation, filter changes) — noticeable flicker or unnecessary reconciliation.
+- **Root cause**: `content={() => renderLegendItems(...)}` creates a new function reference every render. Recharts treats a changed `content` reference as a reason to re-render the Legend subtree.
+- **Fix**: extract the legend renderer to a module-level component (e.g. `LegendItems`) and use `content={() => <LegendItems items={...} />}`. The component reference itself is stable; only the props change when data changes.
+- **Bonus**: module-level component enables proper semantic HTML — clickable legend items can be `<button type="button">` instead of `<div onClick>` (WCAG 2.1.1 compliance).
+- Applied in `AnalisiTab.tsx`: `LegendItems` replaces `renderLegendItems`.
 
 ### `@nivo/sankey` + `useChartColors()` → react-spring arity crash
 - **Symptom**: `createStringInterpolator2: The arity of each output value must be equal` on page load after making Sankey node colors theme-aware.
@@ -464,6 +513,10 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 
 ### Cashflow Null State vs Genuine Zero
 - `expenseStats === null` (no data) ≠ `expenseStats = 0` (real zero). Render empty state for null; `€0,00` is reserved for confirmed zero
+
+### Deriving Text-Color Classes from BG-Color Classes via String Replace
+- **Anti-pattern**: `progressColor(ratio).replace('bg-green-500', 'text-green-600 dark:text-green-500')` to get a matching text color. Fragile: breaks silently if the source class name changes; Tailwind's JIT scanner treats the derived string as a new class name, which is never statically visible in source — it may or may not appear in the purged output depending on safelist config.
+- **Fix**: extract a dedicated `progressTextColor(ratio, inverted)` that returns text-class strings directly, using the same threshold logic as `progressColor`. The two functions stay in sync and both are statically scannable. Applied in `BudgetTab.tsx`.
 
 ### Recharts Sparkline — flat line on large absolute numbers
 - Symptom: 260k → 284k sparkline is a flat horizontal line. Fix: `<YAxis hide domain={['auto', 'auto']} />` — scales Y to data range instead of starting from 0
@@ -478,8 +531,9 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 ### Radix CollapsibleTrigger Nested Button
 - Symptom: `<button> cannot be a descendant of <button>` hydration error in console
 - Cause: `CollapsibleTrigger asChild={false}` (the Radix default) renders its own `<button>` element. If the trigger's children contain any `Button` component (another `<button>`), this creates an invalid nested-button DOM tree.
-- Fix: always use `asChild` on `CollapsibleTrigger` so it clones the first child element (typically a `div` or `CardHeader`) as the interactive trigger instead of generating its own `<button>`. The child must be a single non-button React element. `disabled` and other props still work correctly via prop merging.
-- Applied in `AssistantMemoryPanel` — the `CardHeader` (div) becomes the trigger, keeping the inner `Button` (trash icon) at a safe nesting level.
+- Fix: always use `asChild` on `CollapsibleTrigger` so it clones the first child element as the interactive trigger. **The child must be `<button type="button">`** — never a `<div>` or `<span>`. Non-button elements are excluded from the tab order and do not respond to Enter/Space, breaking keyboard access entirely (WCAG 2.1.1). `disabled` and other props still work correctly via prop merging.
+- **`asChild + <div>` is a P1 keyboard accessibility bug**: a `<div>` child looks correct visually but removes the trigger from keyboard navigation. Applied fix in `ExpenseTrackingTab.tsx` Filtri card.
+- Applied in `AssistantMemoryPanel` — use `<button type="button">` (or a non-button element only if the trigger itself contains no interactive controls and you add `tabIndex={0}` + `onKeyDown` manually).
 
 ### CSS Grid Mobile Overflow: `auto` Tracks vs `minmax(0, 1fr)`
 - **Symptom**: on mobile, a page scrolls horizontally — long text in message cards or tables causes the page to expand beyond the viewport.

@@ -19,6 +19,7 @@ import { createCostCenter, updateCostCenter } from '@/lib/services/costCenterSer
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -27,6 +28,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+
+// Human-readable labels for screen readers — hex values are unpronounceable.
+// Keep in sync with COST_CENTER_COLORS in types/costCenters.ts.
+const COLOR_LABELS: Record<string, string> = {
+  '#3b82f6': 'Blu',
+  '#10b981': 'Verde smeraldo',
+  '#f59e0b': 'Ambra',
+  '#ef4444': 'Rosso',
+  '#8b5cf6': 'Viola',
+  '#ec4899': 'Rosa',
+  '#06b6d4': 'Ciano',
+  '#84cc16': 'Verde lime',
+};
 
 interface CostCenterDialogProps {
   open: boolean;
@@ -97,6 +111,11 @@ export function CostCenterDialog({
           <DialogTitle>
             {costCenter ? 'Modifica centro di costo' : 'Nuovo centro di costo'}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            {costCenter
+              ? 'Modifica nome, descrizione e colore del centro di costo.'
+              : 'Crea un nuovo centro di costo per raggruppare le spese per oggetto o progetto.'}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
@@ -145,7 +164,7 @@ export function CostCenterDialog({
                   )}
                   style={{ backgroundColor: c }}
                   onClick={() => setColor(c)}
-                  aria-label={`Colore ${c}`}
+                  aria-label={`${COLOR_LABELS[c] ?? c}${color === c ? ' (selezionato)' : ''}`}
                   aria-pressed={color === c}
                 />
               ))}

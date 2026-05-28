@@ -43,6 +43,26 @@ import { useChartColors } from '@/lib/hooks/useChartColors';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 
+// Shared with other cashflow charts (ConfrontoAnnualeSection, LaborMetricsChart).
+// Recharts defaults to a white/hardcoded background that breaks dark mode.
+const TOOLTIP_CONTENT_STYLE = {
+  backgroundColor: 'var(--card)',
+  border: '1px solid var(--border)',
+  color: 'var(--card-foreground)',
+  fontSize: 12,
+  borderRadius: 8,
+} as const;
+
+const TOOLTIP_LABEL_STYLE = {
+  fontWeight: 600,
+  color: 'var(--card-foreground)',
+} as const;
+
+// itemStyle controls the value rows (e.g. "Spesa : 208,71 €") — separate from labelStyle.
+const TOOLTIP_ITEM_STYLE = {
+  color: 'var(--card-foreground)',
+} as const;
+
 interface CostCenterDetailProps {
   costCenter: CostCenter;
   onBack: () => void;
@@ -151,7 +171,8 @@ export function CostCenterDetail({
     return showFullHistory ? all : all.slice(-12);
   }, [expenses, showFullHistory]);
 
-  const accentColor = costCenter.color ?? (chartColors[0] || '#3b82f6');
+  // chartColors[0] should never be empty in practice; 'var(--chart-1)' is the CSS fallback.
+  const accentColor = costCenter.color ?? (chartColors[0] || 'var(--chart-1)');
 
   // Disarm delete after 3 seconds if the user doesn't confirm
   useEffect(() => {
@@ -185,7 +206,14 @@ export function CostCenterDetail({
           )}
         </div>
         <div className="flex gap-2 sm:shrink-0">
-          <Button variant="outline" size="sm" className="flex-1 sm:flex-none" onClick={() => onEdit(costCenter)} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 sm:flex-none"
+            onClick={() => onEdit(costCenter)}
+            disabled={isDemo}
+            aria-label={isDemo ? 'Modifica — non disponibile in modalità demo' : 'Modifica centro di costo'}
+          >
             <Pencil className="h-4 w-4 mr-1" />
             Modifica
           </Button>
@@ -194,7 +222,13 @@ export function CostCenterDetail({
             size="sm"
             className="flex-1 sm:flex-none"
             disabled={isDemo}
-            title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+            aria-label={
+              isDemo
+                ? 'Elimina — non disponibile in modalità demo'
+                : deleteArmed
+                  ? 'Conferma eliminazione del centro di costo'
+                  : 'Elimina centro di costo'
+            }
             onClick={() => {
               if (deleteArmed) {
                 onDelete(costCenter);
@@ -210,7 +244,24 @@ export function CostCenterDetail({
       </div>
 
       {loading ? (
-        <div className="text-center text-muted-foreground py-8">Caricamento...</div>
+        // Structural skeleton matches the KPI-grid + chart + table layout below.
+        <div className="space-y-6 animate-pulse" aria-hidden="true">
+          <div className="grid grid-cols-2 desktop:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map(i => (
+              <Card key={i}>
+                <CardContent className="p-4 space-y-2">
+                  <div className="h-3 bg-muted rounded w-2/3" />
+                  <div className="h-6 bg-muted rounded w-1/2" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <Card>
+            <CardContent className="p-6">
+              <div className="h-48 desktop:h-64 bg-muted rounded" />
+            </CardContent>
+          </Card>
+        </div>
       ) : expenses.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
@@ -268,6 +319,8 @@ export function CostCenterDetail({
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowFullHistory(prev => !prev)}
+                aria-pressed={showFullHistory}
+                aria-label={showFullHistory ? 'Mostra ultimi 12 mesi' : 'Mostra tutto lo storico'}
                 className="text-xs"
               >
                 {showFullHistory ? 'Ultimi 12 mesi' : 'Tutto lo storico'}
@@ -292,8 +345,10 @@ export function CostCenterDetail({
                     />
                     <Tooltip
                       formatter={(value) => [formatCurrency(value as number), 'Spesa']}
-                      labelStyle={{ fontWeight: 600, color: '#111827' }}
-                      cursor={{ fill: 'rgba(128, 128, 128, 0.1)' }}
+                      contentStyle={TOOLTIP_CONTENT_STYLE}
+                      labelStyle={TOOLTIP_LABEL_STYLE}
+                      itemStyle={TOOLTIP_ITEM_STYLE}
+                      cursor={{ fill: 'var(--muted)', opacity: 0.4 }}
                     />
                     <Bar dataKey="total" radius={[3, 3, 0, 0]}>
                       {monthlyData.map((_, i) => (

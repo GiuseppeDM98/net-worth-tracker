@@ -30,10 +30,8 @@ import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { calculateTotalExpenses, calculateTotalIncome } from '@/lib/services/expenseService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronLeft, ExternalLink } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import {
@@ -128,7 +126,7 @@ function TopExpenseRow({ expense }: { expense: Expense }) {
           <p className="text-xs text-muted-foreground/70 truncate mt-0.5">{expense.notes}</p>
         )}
       </div>
-      <span className="text-sm font-semibold font-mono tabular-nums text-red-600 dark:text-red-500 shrink-0">
+      <span className="text-sm font-semibold font-mono tabular-nums text-destructive shrink-0">
         {formatCurrency(Math.abs(expense.amount))}
       </span>
     </div>
@@ -174,6 +172,7 @@ function TopExpensesBlock({
             size="sm"
             type="button"
             className="w-full text-muted-foreground"
+            aria-expanded={showAll}
             onClick={() => setShowAll(v => !v)}
           >
             {showAll ? 'Mostra meno' : `Mostra tutte (${expenses.length})`}
@@ -182,6 +181,101 @@ function TopExpensesBlock({
         </div>
       )}
     </Card>
+  );
+}
+
+// ── Pure chart-data helpers (module-level for stable references) ─────────────
+// Each takes `colors` explicitly so useMemo deps are correct when the theme
+// switches — avoids re-renders on unrelated state changes.
+
+function getExpensesByCategory(expenses: Expense[], colors: string[]): ChartData[] {
+  const categoryMap = new Map<string, number>();
+  expenses.filter(e => e.type !== 'income').forEach(e => {
+    categoryMap.set(e.categoryName, (categoryMap.get(e.categoryName) || 0) + Math.abs(e.amount));
+  });
+  const total = Array.from(categoryMap.values()).reduce((s, v) => s + v, 0);
+  return Array.from(categoryMap.entries())
+    .map(([name, value], index) => ({
+      name, value,
+      percentage: total > 0 ? (value / total) * 100 : 0,
+      color: colors[index % colors.length],
+    }))
+    .sort((a, b) => b.value - a.value);
+}
+
+function getIncomeByCategory(expenses: Expense[], colors: string[]): ChartData[] {
+  const categoryMap = new Map<string, number>();
+  expenses.filter(e => e.type === 'income').forEach(e => {
+    categoryMap.set(e.categoryName, (categoryMap.get(e.categoryName) || 0) + e.amount);
+  });
+  const total = Array.from(categoryMap.values()).reduce((s, v) => s + v, 0);
+  return Array.from(categoryMap.entries())
+    .map(([name, value], index) => ({
+      name, value,
+      percentage: total > 0 ? (value / total) * 100 : 0,
+      color: colors[index % colors.length],
+    }))
+    .sort((a, b) => b.value - a.value);
+}
+
+function getExpensesByType(expenses: Expense[], colors: string[]): ChartData[] {
+  const typeMap = new Map<string, number>();
+  expenses.filter(e => e.type !== 'income').forEach(e => {
+    const label = EXPENSE_TYPE_LABELS[e.type as ExpenseType] || e.type;
+    typeMap.set(label, (typeMap.get(label) || 0) + Math.abs(e.amount));
+  });
+  const total = Array.from(typeMap.values()).reduce((s, v) => s + v, 0);
+  return Array.from(typeMap.entries())
+    .map(([name, value], index) => ({
+      name, value,
+      percentage: total > 0 ? (value / total) * 100 : 0,
+      color: colors[index % colors.length],
+    }))
+    .sort((a, b) => b.value - a.value);
+}
+
+// ── LegendItems ──────────────────────────────────────────────────────────────
+// Module-level component so the Legend content= prop gets a stable reference.
+// Clickable items render as <button> for keyboard accessibility (WCAG 2.1.1).
+
+function LegendItems({
+  items,
+  onItemClick,
+  className,
+  maxItems,
+  isMobile,
+}: {
+  items: ChartData[];
+  onItemClick?: (item: ChartData) => void;
+  className?: string;
+  maxItems?: number;
+  isMobile: boolean;
+}) {
+  const filtered = items.filter(item => item.percentage >= 5).sort((a, b) => b.value - a.value);
+  const visible = maxItems ? filtered.slice(0, maxItems) : filtered;
+  const baseClass = isMobile ? 'mt-4 flex flex-wrap gap-3' : 'pl-5';
+  return (
+    <div className={cn(baseClass, className)}>
+      {visible.map((item, index) =>
+        onItemClick ? (
+          <button
+            key={`legend-${index}`}
+            type="button"
+            className="flex items-center gap-2 text-sm text-left"
+            onClick={() => onItemClick(item)}
+            aria-label={`Filtra per ${item.name} (${item.percentage.toFixed(1)}%)`}
+          >
+            <div className="h-3.5 w-3.5 flex-shrink-0 rounded-sm" style={{ backgroundColor: item.color }} />
+            <span className="text-muted-foreground">{item.name} ({item.percentage.toFixed(1)}%)</span>
+          </button>
+        ) : (
+          <div key={`legend-${index}`} className="flex items-center gap-2 text-sm">
+            <div className="h-3.5 w-3.5 flex-shrink-0 rounded-sm" style={{ backgroundColor: item.color }} />
+            <span className="text-muted-foreground">{item.name} ({item.percentage.toFixed(1)}%)</span>
+          </div>
+        )
+      )}
+    </div>
   );
 }
 
@@ -326,6 +420,21 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
       .sort((a, b) => a.amount - b.amount);
   }, [periodFilteredExpenses]);
 
+  // Memoized pie chart datasets — computed here (before early returns) so hooks
+  // are never called conditionally and renders inside drill-down don't recompute.
+  const expensesByCategoryData = useMemo(
+    () => getExpensesByCategory(periodFilteredExpenses, COLORS),
+    [periodFilteredExpenses, COLORS]
+  );
+  const incomeByCategoryData = useMemo(
+    () => getIncomeByCategory(periodFilteredExpenses, COLORS),
+    [periodFilteredExpenses, COLORS]
+  );
+  const expensesByTypeData = useMemo(
+    () => getExpensesByType(periodFilteredExpenses, COLORS),
+    [periodFilteredExpenses, COLORS]
+  );
+
   /**
    * Compute spending anomalies for the current month context.
    *
@@ -429,8 +538,9 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
    * Uses 'instant' (not 'smooth') per AGENTS.md scrollIntoView convention.
    */
   const handleAnomaliaClick = useCallback((categoryName: string) => {
-    // Look up the color assigned to this category in the current pie data
-    const categoryColor = getExpensesByCategory(periodFilteredExpenses)
+    // Use the already-memoized pie data to look up the category color — avoids
+    // re-running the full aggregation inside a callback.
+    const categoryColor = expensesByCategoryData
       .find(d => d.name === categoryName)?.color ?? COLORS[0];
 
     // Pre-select the category in the drill-down state machine
@@ -446,7 +556,7 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
     setTimeout(() => {
       distributionRef.current?.scrollIntoView({ behavior: 'instant', block: 'start' });
     }, 50);
-  }, [periodFilteredExpenses, COLORS]);
+  }, [expensesByCategoryData, COLORS]);
 
   // ── Pie/drill-down helpers ─────────────────────────────────────────────
 
@@ -460,52 +570,6 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
       const b = parseInt(hex.slice(5, 7), 16);
       return `rgba(${r},${g},${b},${opacity.toFixed(2)})`;
     });
-  };
-
-  const getExpensesByCategory = (expenses: Expense[]): ChartData[] => {
-    const categoryMap = new Map<string, number>();
-    expenses.filter(e => e.type !== 'income').forEach(e => {
-      categoryMap.set(e.categoryName, (categoryMap.get(e.categoryName) || 0) + Math.abs(e.amount));
-    });
-    const total = Array.from(categoryMap.values()).reduce((s, v) => s + v, 0);
-    return Array.from(categoryMap.entries())
-      .map(([name, value], index) => ({
-        name, value,
-        percentage: total > 0 ? (value / total) * 100 : 0,
-        color: COLORS[index % COLORS.length],
-      }))
-      .sort((a, b) => b.value - a.value);
-  };
-
-  const getIncomeByCategory = (expenses: Expense[]): ChartData[] => {
-    const categoryMap = new Map<string, number>();
-    expenses.filter(e => e.type === 'income').forEach(e => {
-      categoryMap.set(e.categoryName, (categoryMap.get(e.categoryName) || 0) + e.amount);
-    });
-    const total = Array.from(categoryMap.values()).reduce((s, v) => s + v, 0);
-    return Array.from(categoryMap.entries())
-      .map(([name, value], index) => ({
-        name, value,
-        percentage: total > 0 ? (value / total) * 100 : 0,
-        color: COLORS[index % COLORS.length],
-      }))
-      .sort((a, b) => b.value - a.value);
-  };
-
-  const getExpensesByType = (expenses: Expense[]): ChartData[] => {
-    const typeMap = new Map<string, number>();
-    expenses.filter(e => e.type !== 'income').forEach(e => {
-      const label = EXPENSE_TYPE_LABELS[e.type as ExpenseType] || e.type;
-      typeMap.set(label, (typeMap.get(label) || 0) + Math.abs(e.amount));
-    });
-    const total = Array.from(typeMap.values()).reduce((s, v) => s + v, 0);
-    return Array.from(typeMap.entries())
-      .map(([name, value], index) => ({
-        name, value,
-        percentage: total > 0 ? (value / total) * 100 : 0,
-        color: COLORS[index % COLORS.length],
-      }))
-      .sort((a, b) => b.value - a.value);
   };
 
   const getSubcategoriesData = (expenses: Expense[], categoryName: string, chartType: ChartType): ChartData[] => {
@@ -596,50 +660,6 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
     );
   }
 
-  const renderLegendItems = (
-    items: ChartData[],
-    onItemClick?: (item: ChartData) => void,
-    className?: string,
-    maxItems?: number
-  ) => {
-    const filtered = items.filter(item => item.percentage >= 5).sort((a, b) => b.value - a.value);
-    const visible = maxItems ? filtered.slice(0, maxItems) : filtered;
-    const baseClass = isMobile ? 'mt-4 flex flex-wrap gap-3' : 'pl-5';
-    return (
-      <div className={cn(baseClass, className)}>
-        {visible.map((item, index) => (
-          <div
-            key={`legend-${index}`}
-            className={cn('flex items-center gap-2 text-sm', onItemClick && 'cursor-pointer')}
-            onClick={onItemClick ? () => onItemClick(item) : undefined}
-          >
-            <div className="h-3.5 w-3.5 flex-shrink-0 rounded-sm" style={{ backgroundColor: item.color }} />
-            <span className="text-muted-foreground">{item.name} ({item.percentage.toFixed(1)}%)</span>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="h-10 w-72 rounded-full bg-muted animate-pulse" />
-        <div className="grid gap-4 grid-cols-2 desktop:grid-cols-4">
-          {[0, 1, 2, 3].map(i => (
-            <div key={i} className="rounded-lg border p-4 space-y-2">
-              <div className="h-3 w-20 bg-muted animate-pulse rounded" />
-              <div className="h-7 w-28 bg-muted animate-pulse rounded" />
-            </div>
-          ))}
-        </div>
-        <div className="rounded-lg border p-6">
-          <div className="h-64 bg-muted animate-pulse rounded" />
-        </div>
-      </div>
-    );
-  }
-
   if (allExpenses.length === 0) {
     return (
       <div className="rounded-md border border-dashed p-12 text-center">
@@ -650,37 +670,37 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
   }
 
   // ── Drill-down breadcrumb path ─────────────────────────────────────────
+  // Wrapped in <nav> so screen readers announce it as a navigation landmark.
+  // Separator spans are aria-hidden — they're purely visual dividers.
   const drillBreadcrumb = drillDown.level !== 'category' && drillDown.chartType ? (
-    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-      <button
-        className="hover:text-foreground transition-colors"
-        onClick={resetDrillDown}
-      >
-        {drillDown.chartType === 'expenses' ? 'Spese' : 'Entrate'}
-      </button>
-      {drillDown.selectedCategory && (
-        <>
-          <span className="text-border">/</span>
-          <button
-            className="hover:text-foreground transition-colors"
-            onClick={() => setDrillDown(prev => ({ ...prev, level: 'subcategory', selectedSubCategory: null }))}
-          >
-            {drillDown.selectedCategory}
-          </button>
-        </>
-      )}
-      {drillDown.level === 'expenseList' && drillDown.selectedSubCategory && (
-        <>
-          <span className="text-border">/</span>
-          <span className="text-foreground font-medium">{drillDown.selectedSubCategory}</span>
-        </>
-      )}
-    </div>
+    <nav aria-label="Posizione nel drill-down">
+      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+        <button
+          className="hover:text-foreground transition-colors"
+          onClick={resetDrillDown}
+        >
+          {drillDown.chartType === 'expenses' ? 'Spese' : 'Entrate'}
+        </button>
+        {drillDown.selectedCategory && (
+          <>
+            <span className="text-border" aria-hidden="true">/</span>
+            <button
+              className="hover:text-foreground transition-colors"
+              onClick={() => setDrillDown(prev => ({ ...prev, level: 'subcategory', selectedSubCategory: null }))}
+            >
+              {drillDown.selectedCategory}
+            </button>
+          </>
+        )}
+        {drillDown.level === 'expenseList' && drillDown.selectedSubCategory && (
+          <>
+            <span className="text-border" aria-hidden="true">/</span>
+            <span className="text-foreground font-medium">{drillDown.selectedSubCategory}</span>
+          </>
+        )}
+      </div>
+    </nav>
   ) : null;
-
-  const expensesByCategoryData = getExpensesByCategory(periodFilteredExpenses);
-  const incomeByCategoryData = getIncomeByCategory(periodFilteredExpenses);
-  const expensesByTypeData = getExpensesByType(periodFilteredExpenses);
 
   return (
     <div className="space-y-6">
@@ -722,9 +742,12 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
           ))}
         </div>
 
-        {/* Month picker — "Anno Corrente" gets a month filter too */}
+        {/* Month picker — wrapped in AnimatePresence so the exit animation plays
+            when switching between period modes (not just on mount). */}
+        <AnimatePresence mode="wait">
         {periodMode === 'current' && (
           <motion.div
+            key="picker-current"
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
@@ -761,6 +784,7 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
         {/* Year + Month dropdowns — "Anno" mode (past years only) */}
         {periodMode === 'year' && (
           <motion.div
+            key="picker-year"
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
@@ -809,6 +833,7 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
             )}
           </motion.div>
         )}
+        </AnimatePresence>
       </div>
 
       {/* ── Hero KPI trio ─────────────────────────────────────────────── */}
@@ -963,7 +988,7 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
                       </Pie>
                       <Tooltip content={<ChartTooltip />} />
                       <Legend layout={isMobile ? 'horizontal' : 'vertical'} align={isMobile ? 'center' : 'right'} verticalAlign={isMobile ? 'bottom' : 'middle'}
-                        content={() => renderLegendItems(expensesByCategoryData, e => handleCategoryClick(e, 'expenses'), undefined, isMobile ? 3 : undefined)} />
+                        content={() => <LegendItems items={expensesByCategoryData} onItemClick={e => handleCategoryClick(e, 'expenses')} isMobile={isMobile} maxItems={isMobile ? 3 : undefined} />} />
                     </RechartsPC>
                   </ResponsiveContainer>
                 )}
@@ -982,7 +1007,7 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
                       </Pie>
                       <Tooltip content={<ChartTooltip />} />
                       <Legend layout={isMobile ? 'horizontal' : 'vertical'} align={isMobile ? 'center' : 'right'} verticalAlign={isMobile ? 'bottom' : 'middle'}
-                        content={() => renderLegendItems(currentSubcategoriesData, e => handleSubcategoryClick(e))} />
+                        content={() => <LegendItems items={currentSubcategoriesData} onItemClick={e => handleSubcategoryClick(e)} isMobile={isMobile} />} />
                     </RechartsPC>
                   </ResponsiveContainer>
                 )}
@@ -1010,7 +1035,7 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
                     </Pie>
                     <Tooltip content={<ChartTooltip />} />
                     <Legend layout={isMobile ? 'horizontal' : 'vertical'} align={isMobile ? 'center' : 'right'} verticalAlign={isMobile ? 'bottom' : 'middle'}
-                      content={() => renderLegendItems(expensesByTypeData)} />
+                      content={() => <LegendItems items={expensesByTypeData} isMobile={isMobile} />} />
                   </RechartsPC>
                 </ResponsiveContainer>
               </CardContent>
@@ -1054,7 +1079,7 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
                       </Pie>
                       <Tooltip content={<ChartTooltip />} />
                       <Legend layout={isMobile ? 'horizontal' : 'vertical'} align={isMobile ? 'center' : 'right'} verticalAlign={isMobile ? 'bottom' : 'middle'}
-                        content={() => renderLegendItems(incomeByCategoryData, e => handleCategoryClick(e, 'income'))} />
+                        content={() => <LegendItems items={incomeByCategoryData} onItemClick={e => handleCategoryClick(e, 'income')} isMobile={isMobile} />} />
                     </RechartsPC>
                   </ResponsiveContainer>
                 )}
@@ -1072,7 +1097,7 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
                       </Pie>
                       <Tooltip content={<ChartTooltip />} />
                       <Legend layout={isMobile ? 'horizontal' : 'vertical'} align={isMobile ? 'center' : 'right'} verticalAlign={isMobile ? 'bottom' : 'middle'}
-                        content={() => renderLegendItems(currentSubcategoriesData, e => handleSubcategoryClick(e))} />
+                        content={() => <LegendItems items={currentSubcategoriesData} onItemClick={e => handleSubcategoryClick(e)} isMobile={isMobile} />} />
                     </RechartsPC>
                   </ResponsiveContainer>
                 )}
@@ -1130,7 +1155,7 @@ function ExpenseList({ expenses, isIncome }: { expenses: Expense[]; isIncome: bo
 
   // Sum all amounts — income entries are positive, expense entries are negative.
   const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
-  const amountClass = isIncome ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500';
+  const amountClass = isIncome ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive';
 
   return (
     <div className="space-y-4">
@@ -1170,7 +1195,7 @@ function ExpenseList({ expenses, isIncome }: { expenses: Expense[]; isIncome: bo
       <div className="hidden desktop:block rounded-md border">
         <div className="max-h-[500px] overflow-y-auto">
           <table className="w-full">
-            <thead className="sticky top-0 bg-muted/50 border-b">
+            <thead className="sticky top-0 bg-card border-b">
               <tr>
                 <th className="px-4 py-3 text-left text-sm font-medium">Data</th>
                 <th className="px-4 py-3 text-right text-sm font-medium">Importo</th>

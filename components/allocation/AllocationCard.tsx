@@ -11,7 +11,7 @@
  */
 'use client';
 
-import { MouseEvent, forwardRef } from 'react';
+import { KeyboardEvent, MouseEvent, forwardRef } from 'react';
 import { AllocationData } from '@/types/assets';
 import { formatCurrency, formatPercentage } from '@/lib/services/chartService';
 import { TrendingUp, TrendingDown, Minus, ChevronRight } from 'lucide-react';
@@ -30,26 +30,31 @@ interface AllocationCardProps {
   isOrigin?: boolean;
 }
 
-function ActionChip({ action }: { action: 'COMPRA' | 'VENDI' | 'OK' }) {
+/**
+ * Renders a compact status badge for an allocation action.
+ * Used in both mobile cards (AllocationCard) and the desktop table (page.tsx).
+ * Colors map to design tokens so all 6 themes stay consistent.
+ */
+export function ActionChip({ action }: { action: 'COMPRA' | 'VENDI' | 'OK' }) {
   switch (action) {
     case 'COMPRA':
       return (
-        <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-orange-200 bg-orange-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-orange-600 dark:border-orange-800 dark:text-orange-400">
-          <TrendingUp className="h-2.5 w-2.5" />
+        <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-warning-border bg-warning px-1.5 py-0.5 text-[10px] font-semibold text-warning-foreground">
+          <TrendingUp className="h-2.5 w-2.5" aria-hidden="true" />
           COMPRA
         </span>
       );
     case 'VENDI':
       return (
-        <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-red-200 bg-red-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-red-600 dark:border-red-800 dark:text-red-400">
-          <TrendingDown className="h-2.5 w-2.5" />
+        <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-destructive/30 bg-destructive/10 px-1.5 py-0.5 text-[10px] font-semibold text-destructive">
+          <TrendingDown className="h-2.5 w-2.5" aria-hidden="true" />
           VENDI
         </span>
       );
     case 'OK':
       return (
         <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-green-200 bg-green-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-green-600 dark:border-green-800 dark:text-green-400">
-          <Minus className="h-2.5 w-2.5" />
+          <Minus className="h-2.5 w-2.5" aria-hidden="true" />
           OK
         </span>
       );
@@ -69,16 +74,38 @@ export const AllocationCard = forwardRef<HTMLDivElement, AllocationCardProps>(
       });
     };
 
+    const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+      if (!hasChildren || !onDrillDown) return;
+      if (event.key === 'Enter' || event.key === ' ') {
+        // Prevent Space from scrolling the page while activating the drill-down.
+        event.preventDefault();
+        onDrillDown({
+          sourceId: continuityId,
+          rect: event.currentTarget.getBoundingClientRect(),
+        });
+      }
+    };
+
+    const isDrillable = hasChildren && !!onDrillDown;
+
     return (
       <motion.div
         ref={ref}
         variants={listItem}
-        className={cn('px-4 py-4', className)}
+        className={cn(
+          'px-4 py-4',
+          isDrillable && 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+          className
+        )}
         layout={false}
         data-continuity-id={continuityId}
+        role={isDrillable ? 'button' : undefined}
+        tabIndex={isDrillable ? 0 : undefined}
+        aria-label={isDrillable ? `Apri ${name}` : undefined}
         onClick={handleClick}
+        onKeyDown={handleKeyDown}
       >
-        <div className={cn('flex items-start gap-3', hasChildren && onDrillDown && 'cursor-pointer')}>
+        <div className={cn('flex items-start gap-3', isDrillable && 'cursor-pointer')}>
           <div className="min-w-0 flex-1">
             {/* Row 1: name + action chip */}
             <div className="mb-2 flex items-center gap-2">
@@ -111,8 +138,8 @@ export const AllocationCard = forwardRef<HTMLDivElement, AllocationCardProps>(
                     className={cn(
                       'font-medium',
                       data.action === 'COMPRA'
-                        ? 'text-orange-600 dark:text-orange-400'
-                        : 'text-red-600 dark:text-red-400'
+                        ? 'text-warning-foreground'
+                        : 'text-destructive'
                     )}
                   >
                     {data.differenceValue > 0 ? '+' : ''}

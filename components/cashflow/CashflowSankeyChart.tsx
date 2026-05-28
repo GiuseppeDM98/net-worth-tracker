@@ -1048,7 +1048,7 @@ export function CashflowSankeyChart({
   if ((sankeyData.nodes.length === 0 || sankeyData.links.length === 0) &&
       selectedCategory?.mode !== 'transactions') {
     return (
-      <Card className="md:col-span-2">
+      <Card className="desktop:col-span-2">
         <CardHeader>
           <CardTitle>{getBreadcrumbTitle()}</CardTitle>
         </CardHeader>
@@ -1076,7 +1076,7 @@ export function CashflowSankeyChart({
       : 'Vista compatta';
 
   return (
-    <Card className="md:col-span-2">
+    <Card className="desktop:col-span-2">
       <CardHeader>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
@@ -1211,10 +1211,10 @@ export function CashflowSankeyChart({
               {/* Desktop table view (sm and above) */}
               {filteredExpenses.length > 0 && (
                 <>
-                  <div className="hidden rounded-md border sm:block">
+                  <div className="hidden rounded-md border desktop:block">
                     <div className="max-h-[500px] overflow-y-auto">
                       <table className="w-full">
-                        <thead className="sticky top-0 bg-muted/50 border-b">
+                        <thead className="sticky top-0 bg-card border-b">
                           <tr>
                             <th className="px-4 py-3 text-left text-sm font-medium">Data</th>
                             <th className="px-4 py-3 text-right text-sm font-medium">Importo</th>
@@ -1226,8 +1226,8 @@ export function CashflowSankeyChart({
                           {filteredExpenses.map((expense) => {
                             // Use semantic Tailwind tokens instead of hardcoded hex colors.
                             const rowAmountClass = expense.type === 'income'
-                              ? 'text-green-600 dark:text-green-500'
-                              : 'text-red-600 dark:text-red-500';
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : 'text-destructive';
                             return (
                               <tr key={expense.id} className="border-b hover:bg-muted/30 transition-colors">
                                 <td className="px-4 py-3 text-sm">
@@ -1263,7 +1263,7 @@ export function CashflowSankeyChart({
                             </td>
                             <td className={cn(
                               'px-4 py-3 text-sm text-right font-semibold font-mono',
-                              listTotal >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'
+                              listTotal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'
                             )}>
                               {formatCurrency(listTotal)}
                             </td>
@@ -1275,11 +1275,11 @@ export function CashflowSankeyChart({
                   </div>
 
                   {/* Mobile card view (below sm) */}
-                  <div className="space-y-3 sm:hidden">
+                  <div className="space-y-3 desktop:hidden">
                     {filteredExpenses.map((expense) => {
                       const rowAmountClass = expense.type === 'income'
-                        ? 'text-green-600 dark:text-green-500'
-                        : 'text-red-600 dark:text-red-500';
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-destructive';
                       return (
                         <div key={expense.id} className="rounded-md border p-3 bg-card">
                           <div className="flex items-center justify-between">
@@ -1314,7 +1314,7 @@ export function CashflowSankeyChart({
                       </span>
                       <span className={cn(
                         'text-sm font-semibold font-mono',
-                        listTotal >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'
+                        listTotal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'
                       )}>
                         {formatCurrency(listTotal)}
                       </span>

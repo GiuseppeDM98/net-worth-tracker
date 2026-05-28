@@ -98,10 +98,23 @@ interface SortHeadProps {
 
 function SortHead({ column, children, className, sortState, onSort }: SortHeadProps) {
   const isActive = sortState?.column === column;
+  // aria-sort communicates sort state to screen readers per WCAG 1.3.1.
+  // tabIndex + onKeyDown let keyboard-only users activate sort via Enter/Space.
+  const ariaSort = isActive
+    ? (sortState.dir === 'asc' ? 'ascending' : 'descending')
+    : 'none';
   return (
     <TableHead
       className={`cursor-pointer select-none hover:text-foreground ${className ?? ''}`}
+      aria-sort={ariaSort as 'ascending' | 'descending' | 'none'}
+      tabIndex={0}
       onClick={() => onSort(column)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSort(column);
+        }
+      }}
     >
       <span className="inline-flex items-center gap-1">
         {children}
@@ -700,7 +713,7 @@ export function AssetManagementTab({ assets, allAssets, loading, onRefresh, snap
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => handleCalculateTaxes(asset)}
-                                    title="Calcola Plusvalenze"
+                                    aria-label="Calcola plusvalenze"
                                   >
                                     <Calculator className="h-4 w-4" />
                                   </Button>
@@ -711,6 +724,7 @@ export function AssetManagementTab({ assets, allAssets, loading, onRefresh, snap
                                   size="sm"
                                   onClick={() => handleEdit(asset)}
                                   disabled={isDemo}
+                                  aria-label="Modifica asset"
                                   title={isDemo ? 'Non disponibile in modalità demo' : undefined}
                                 >
                                   <Pencil className="h-4 w-4" />
@@ -721,12 +735,13 @@ export function AssetManagementTab({ assets, allAssets, loading, onRefresh, snap
                                   size="sm"
                                   onClick={() => handleDeleteClick(asset.id)}
                                   disabled={isDemo}
+                                  aria-label={isPending ? 'Conferma eliminazione' : 'Elimina asset'}
                                   title={isDemo ? 'Non disponibile in modalità demo' : undefined}
                                 >
                                   {isPending ? (
                                     <span className="text-xs px-1">Conferma?</span>
                                   ) : (
-                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                    <Trash2 className="h-4 w-4 text-destructive" />
                                   )}
                                 </Button>
                               </div>

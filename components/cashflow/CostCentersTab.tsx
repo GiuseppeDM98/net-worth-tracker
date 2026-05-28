@@ -186,7 +186,13 @@ export function CostCentersTab() {
             Raggruppa le spese per oggetto o progetto e monitora il costo totale nel tempo
           </p>
         </div>
-        <Button onClick={handleOpenCreate} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined} className="w-full sm:w-auto sm:shrink-0" size="sm">
+        <Button
+            onClick={handleOpenCreate}
+            disabled={isDemo}
+            aria-label={isDemo ? 'Nuovo centro — non disponibile in modalità demo' : undefined}
+            className="w-full sm:w-auto sm:shrink-0"
+            size="sm"
+          >
           <Plus className="h-4 w-4 mr-1" />
           Nuovo centro
         </Button>
@@ -234,8 +240,17 @@ export function CostCentersTab() {
                   transition={{ delay: i * 0.04, duration: 0.2 }}
                 >
                   <Card
-                    className="cursor-pointer hover:border-primary/50 transition-colors duration-150"
+                    role="button"
+                    tabIndex={0}
+                    className="cursor-pointer hover:border-primary/50 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    aria-label={`Apri ${center.name}`}
                     onClick={() => setSelectedCenter(center)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setSelectedCenter(center);
+                      }
+                    }}
                   >
                     <CardContent className="p-5 space-y-3">
                       {/* Card header: color dot + name */}

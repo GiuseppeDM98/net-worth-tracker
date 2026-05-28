@@ -11,6 +11,7 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed: column headers in the Analisi page transaction details (Sankey drill-down and pie chart drill-down) no longer overlap with row content when scrolling — the header background was semi-transparent, causing rows scrolling underneath to bleed through
 - Fixed the "Auto-calculate Equity/Bonds" toggle in Settings not persisting after a page refresh — disabling it would revert to enabled on reload because the setting was never saved explicitly
 - Fixed a color regression in the Cashflow Sankey chart: after drilling into a spending category (e.g. "Rifiuti") and pressing "Indietro", the panel header reverted to the subcategory's derived gray color instead of the parent type's original color (e.g. blue for "Spese Fisse"). Navigation now correctly restores the original type color at every level
 - Fixed: Overview composition charts were stuck on "Preparazione grafico..." for empty portfolios
@@ -19,6 +20,13 @@
 - Fixed: password mismatch error on Register now stays visible inline under the confirmation field (not just a disappearing toast)
 
 ## 🔧 Improvements
+
+- **Dividends — delete confirmation is now inline**: deleting a dividend record no longer opens a browser confirmation dialog. Click "Delete" once to arm (the button turns red and shows "Conferma"), then click again within 3 seconds to confirm. Click anywhere else or wait 3 seconds to cancel. Consistent with the delete pattern used in Cashflow and Portfolio
+- **Dividends — "Download All" confirmation is now an in-app dialog**: the "Scarica Tutti (Manuale)" button now opens a styled confirmation dialog instead of a native browser alert, showing the number of assets that will be scraped before proceeding
+- **Dividends — calendar cells announce date and payment count to screen readers**: the dividend calendar grid now has full ARIA structure (`role="grid"`, `role="row"`, `role="gridcell"`) so screen readers can navigate it as a table. Each day cell announces its full date (e.g. "15 Maggio 2026 — 2 pagamenti") instead of just the day number
+- **Dividends — today's date marker respects the active color theme**: the ring around today's date in the dividend calendar now uses the app's primary color instead of a fixed blue, so it stays consistent across all six themes
+- **Dividends — bar and line charts follow the active theme**: the "Dividendi per Anno" bar chart and "Reddito Mensile" line chart now use theme-aware colors instead of hardcoded greens, reds, and blues that clashed with non-default themes (especially Cyberpunk and Solar Dusk)
+- **Dividends — type badges display correctly in dark mode**: dividend type badges (Ordinario, Cedola, Straordinario, etc.) in the calendar date popup now show correctly in dark mode — the background and text were previously near-white in dark themes due to missing dark-mode Tailwind variants
 
 - **Expense type descriptions reworded** — the creation dialog now frames Fixed and Variable expenses as a complementary pair: Fixed expenses are described as "things you can't do without"; Variable expenses as "extras you could do without". The contrast makes it immediately clear how to categorize a new transaction
 - **Allocation columns now stay aligned across cards** — the Corrente / Target / Differenza / Azione columns previously shifted horizontally depending on the longest subcategory name in each card (e.g. "ETF Obbligazionari a Breve Termine" widened the first column, pushing the others). All tables now lock to the same column proportions regardless of content length
@@ -47,3 +55,23 @@
 - **Accessibility — touch targets**: password toggle buttons on login/register enlarged from 28px to 44px
 - **Accessibility — form autofill**: login and register fields now have correct `autoComplete` hints so browsers and password managers fill them correctly
 - **Sidebar accent contrast**: fixed in Retro Arcade (light and dark) and Solar Dusk (light) — active sidebar items now meet WCAG AA contrast in all six themes
+- Improved: Cashflow Tracking tab — income and expense KPI amounts (Entrate, Spese, Risparmio) now use theme-aware color tokens instead of fixed green/red, so they adapt correctly to all six color themes including Cyberpunk and Solar Dusk
+- Improved: Filter panel in the Cashflow Tracking tab is now fully keyboard-accessible — Tab navigates to it and Enter/Space opens or closes it (previously only reachable by mouse)
+- Improved: Expense creation dialog now announces its type picker as a radio group to screen readers, so users relying on assistive technology hear "Tipo di voce da registrare, radiogroup" and can navigate the four options correctly
+- Improved: Expense creation and edit dialog now provides a contextual description to screen readers when it opens ("Seleziona il tipo di voce da registrare", "Inserisci i dettagli della nuova voce", or "Modifica i dettagli della voce selezionata" depending on the current step)
+- Improved: Budget tab progress bars now announce their value to screen readers — assistive technology reads "Avanzamento budget, X%" for each category row instead of skipping the bar entirely (WCAG 4.1.2)
+- Improved: Budget tab section headers, category rows, and subtotal rows are now keyboard-accessible — Tab navigates to them and Enter or Space expands/collapses or opens the historical drill-down (WCAG 2.1.1)
+- Improved: Budget tab percentage values now render in a monospaced font, keeping numbers visually aligned across rows
+- Improved: Budget tab loading state now shows a structural skeleton matching the page layout instead of a plain text message
+- Improved: Budget tab item detail dialog (mobile) now announces the category name and context to screen readers when it opens
+- Improved: Budget tab reorder and delete buttons in edit mode now announce their target category to screen readers
+- Improved: Budget tab over-budget progress bars now follow the active color theme's destructive color instead of a fixed red — adapts correctly across all six themes including Cyberpunk and Solar Dusk
+- Improved: Budget tab delta percentages and table text adapt correctly to all six color themes — no more fixed gray or green values that clashed with non-default themes
+- Fixed: Cost Centers monthly chart tooltip now displays correctly in all dark themes (Cyberpunk, Midnight Bloom, Elegant Luxury, Solar Dusk) — value text was invisible against the dark background
+- Improved: Cost Centers list cards are now fully keyboard-navigable — Tab focuses each center, Enter or Space opens the detail view
+- Improved: Cost Centers color picker now announces color names to screen readers ("Blu", "Verde smeraldo", etc.) instead of raw hex values; the selected color is also announced
+- Improved: Cost Centers "Create / Edit" dialog now provides a contextual description to screen readers when it opens
+- Improved: Cost Centers detail view now shows a structural loading skeleton instead of a plain text message — the skeleton anticipates the KPI grid and chart layout
+- Improved: Allocation page asset class cards and sub-category rows are now fully keyboard-navigable — Tab focuses each drillable item, Enter or Space opens the detail view or sub-category drill-down (WCAG 2.1.1)
+- Improved: Allocation page buy/sell/hold chips (COMPRA, VENDI, OK) now follow the active color theme — COMPRA uses the warning palette and VENDI uses the destructive palette across all six themes instead of fixed orange and red
+- Improved: Allocation page loading skeleton now matches the page container dimensions precisely, eliminating a brief layout shift on the horizontal margins when portfolio data loads

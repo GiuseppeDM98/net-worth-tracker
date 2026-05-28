@@ -18,7 +18,7 @@ import { cardItem, pageVariants, tableShellSettle } from '@/lib/utils/motionVari
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
-import { Dividend, DividendType } from '@/types/dividend';
+import { Dividend } from '@/types/dividend';
 import { Asset } from '@/types/assets';
 import { DividendDialog } from './DividendDialog';
 import { DividendTable } from './DividendTable';
@@ -35,22 +35,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
-import { CalendarDays, Download, Filter, ListFilter, Loader2, Plus } from 'lucide-react';
+import { CalendarDays, Download, Filter, Info, ListFilter, Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { toDate } from '@/lib/utils/dateHelpers';
 import { cn } from '@/lib/utils';
-
-const dividendTypeLabels: Record<DividendType, string> = {
-  ordinary: 'Ordinario',
-  extraordinary: 'Straordinario',
-  interim: 'Interim',
-  final: 'Finale',
-  coupon: 'Cedola',
-  finalPremium: 'Premio Finale',
-};
+import { dividendTypeLabels } from '@/lib/constants/dividendTypes';
 
 interface DividendTrackingTabProps {
   dividends: Dividend[];
@@ -63,7 +65,14 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
   const { user } = useAuth();
   const isDemo = useDemoMode();
   const [scraping, setScraping] = useState(false);
+  const [scrapeDialogOpen, setScrapeDialogOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Pre-computed so the AlertDialog description can show the count without re-filtering
+  const assetsWithIsinCount = useMemo(
+    () => assets.filter((a) => a.isin && a.isin.trim() !== '').length,
+    [assets]
+  );
   const [selectedDividend, setSelectedDividend] = useState<Dividend | null>(null);
   const [detailDividend, setDetailDividend] = useState<Dividend | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
@@ -194,22 +203,23 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
     return () => cancelAnimationFrame(frameId);
   }, [detailDialogOpen]);
 
-  const handleScrapeAll = async () => {
+  /**
+   * Opens the AlertDialog confirmation before executing scraping.
+   * Scraping is sequential (not parallel) to avoid rate-limiting from Borsa Italiana.
+   */
+  const handleScrapeAll = () => {
     if (!user) return;
-
-    const assetsWithIsin = assets.filter((a) => a.isin && a.isin.trim() !== '');
-
-    if (assetsWithIsin.length === 0) {
+    if (assetsWithIsinCount === 0) {
       toast.error('Nessun asset con ISIN trovato per lo scraping');
       return;
     }
+    setScrapeDialogOpen(true);
+  };
 
-    const confirmScrape = window.confirm(
-      `Vuoi scaricare i dividendi per ${assetsWithIsin.length} asset con ISIN?\n\n` +
-      `Questa operazione potrebbe richiedere alcuni minuti.`
-    );
+  const executeScrapeAll = async () => {
+    if (!user) return;
 
-    if (!confirmScrape) return;
+    const assetsWithIsin = assets.filter((a) => a.isin && a.isin.trim() !== '');
 
     try {
       setScraping(true);
@@ -220,20 +230,13 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
         try {
           const response = await authenticatedFetch('/api/dividends/scrape', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              userId: user.uid,
-              assetId: asset.id,
-            }),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.uid, assetId: asset.id }),
           });
 
           if (response.ok) {
             const result = await response.json();
-            if (result.scraped > 0) {
-              successCount++;
-            }
+            if (result.scraped > 0) successCount++;
           } else {
             failedCount++;
           }
@@ -369,7 +372,7 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
       {/* Action Buttons Row */}
       <motion.div variants={cardItem} initial="hidden" animate="visible" transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1], delay: 0 }} className="space-y-2">
         <div className="flex flex-col desktop:flex-row desktop:flex-wrap desktop:items-center gap-2">
-          <Button onClick={handleCreate} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined} className="dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
+          <Button onClick={handleCreate} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined}>
             <Plus className="h-4 w-4 mr-2" />
             Aggiungi Dividendo
           </Button>
@@ -396,8 +399,9 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
             Esporta CSV
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">
-          💡 I dividendi recenti vengono scaricati automaticamente ogni giorno.
+        <p className="text-xs text-muted-foreground flex items-start gap-1.5">
+          <Info className="h-3 w-3 mt-0.5 shrink-0" aria-hidden="true" />
+          I dividendi recenti vengono scaricati automaticamente ogni giorno.
           Usa "Scarica Tutti" solo per importare dividendi storici o forzare un refresh.
         </p>
       </motion.div>
@@ -531,7 +535,7 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
               <Button
                 variant={viewMode === 'table' ? 'default' : 'ghost'}
                 onClick={() => setViewMode('table')}
-                className={cn('rounded-b-none', viewMode === 'table' && 'dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600')}
+                className="rounded-b-none"
               >
                 <ListFilter className="mr-2 h-4 w-4" />
                 Tabella
@@ -539,7 +543,7 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
               <Button
                 variant={viewMode === 'calendar' ? 'default' : 'ghost'}
                 onClick={() => setViewMode('calendar')}
-                className={cn('rounded-b-none', viewMode === 'calendar' && 'dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600')}
+                className="rounded-b-none"
               >
                 <CalendarDays className="mr-2 h-4 w-4" />
                 Calendario
@@ -603,6 +607,24 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
       </div>
 
       </motion.div>
+
+      {/* Scrape confirmation — replaces window.confirm() with an accessible AlertDialog */}
+      <AlertDialog open={scrapeDialogOpen} onOpenChange={setScrapeDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Scarica dividendi storici</AlertDialogTitle>
+            <AlertDialogDescription>
+              Verranno scaricati i dividendi per {assetsWithIsinCount}{' '}
+              {assetsWithIsinCount === 1 ? 'asset con ISIN' : 'asset con ISIN'}.
+              {' '}Questa operazione potrebbe richiedere alcuni minuti.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogAction onClick={executeScrapeAll}>Scarica</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Dividend Dialog */}
       <DividendDialog

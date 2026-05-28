@@ -89,8 +89,8 @@ export function AssetMobileSummary({
                   : formatCurrency(cell.price);
               const changeColor = cn(
                 'text-xs tabular-nums text-right',
-                cell.change !== undefined && cell.change > 0 && 'text-green-600',
-                cell.change !== undefined && cell.change < 0 && 'text-red-600',
+                cell.change !== undefined && cell.change > 0 && 'text-green-600 dark:text-green-400',
+                cell.change !== undefined && cell.change < 0 && 'text-red-600 dark:text-red-400',
                 (cell.change === undefined || cell.change === 0) && 'text-muted-foreground'
               );
               return (

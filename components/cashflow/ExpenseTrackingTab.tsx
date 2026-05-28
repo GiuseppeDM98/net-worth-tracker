@@ -90,9 +90,11 @@ const getExpenseDate = (d: Expense['date']): Date => {
 };
 
 // Tailwind dot-color classes keyed by expense type for the mobile list rows.
-// Uses CSS variable references so they stay theme-aware across all 6 colour themes.
+// All four entries use CSS variable / semantic token references so they remain
+// theme-aware across all 6 colour themes. `income` uses emerald-* (semantic
+// positive) instead of green-* for parity with the project token convention.
 const TYPE_DOT_CLASS: Record<ExpenseType, string> = {
-  income: 'bg-green-500 dark:bg-green-400',
+  income: 'bg-emerald-500 dark:bg-emerald-400',
   fixed: 'bg-[var(--chart-2)]',
   variable: 'bg-[var(--chart-4)]',
   debt: 'bg-[var(--chart-3)]',
@@ -180,13 +182,14 @@ function MobileExpenseRow({
           <p className="text-[12px] text-muted-foreground truncate mt-0.5">{subtitle}</p>
         </div>
 
-        {/* Amount — green for income, red for expenses */}
+        {/* Amount — positive income uses emerald semantic token; expenses use
+            text-destructive so both adapt to the active colour theme */}
         <span
           className={cn(
             'text-[14px] font-bold font-mono tabular-nums flex-shrink-0',
             isIncome
-              ? 'text-green-600 dark:text-green-400'
-              : 'text-red-600 dark:text-red-400',
+              ? 'text-emerald-600 dark:text-emerald-400'
+              : 'text-destructive',
           )}
         >
           {amountLabel}
@@ -830,13 +833,13 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
               <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-1.5">
                 Entrate
               </p>
-              <p className="text-[22px] font-bold font-mono tabular-nums text-green-500 dark:text-green-400 leading-none">
+              <p className="text-[22px] font-bold font-mono tabular-nums text-emerald-500 dark:text-emerald-400 leading-none">
                 {cachedFormatCurrencyEUR(totalIncome, true)}
               </p>
               {heroDelta !== null && (() => {
                 const pos = heroDelta.income >= 0;
                 return (
-                  <p className={cn('text-[12px] font-mono mt-1.5', pos ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400')}>
+                  <p className={cn('text-[12px] font-mono mt-1.5', pos ? 'text-emerald-500 dark:text-emerald-400' : 'text-destructive')}>
                     {pos ? '+' : ''}{heroDelta.income.toFixed(1)}% vs mese scorso
                   </p>
                 );
@@ -848,14 +851,14 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
               <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground mb-1.5">
                 Spese
               </p>
-              <p className="text-[22px] font-bold font-mono tabular-nums text-red-500 dark:text-red-400 leading-none">
+              <p className="text-[22px] font-bold font-mono tabular-nums text-destructive leading-none">
                 {cachedFormatCurrencyEUR(totalExpenses, true)}
               </p>
               {heroDelta !== null && (() => {
-                // For expenses: +% means spent more → red (inverted logic vs income).
+                // For expenses: +% means spent more → destructive (inverted logic vs income).
                 const pos = heroDelta.expenses >= 0;
                 return (
-                  <p className={cn('text-[12px] font-mono mt-1.5', pos ? 'text-red-500 dark:text-red-400' : 'text-green-500 dark:text-green-400')}>
+                  <p className={cn('text-[12px] font-mono mt-1.5', pos ? 'text-destructive' : 'text-emerald-500 dark:text-emerald-400')}>
                     {pos ? '+' : ''}{heroDelta.expenses.toFixed(1)}% vs mese scorso
                   </p>
                 );
@@ -869,7 +872,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
               </p>
               <p className={cn(
                 'text-[22px] font-bold font-mono tabular-nums leading-none',
-                netBalance >= 0 ? 'text-foreground' : 'text-red-500 dark:text-red-400',
+                netBalance >= 0 ? 'text-foreground' : 'text-destructive',
               )}>
                 {cachedFormatCurrencyEUR(netBalance, true)}
               </p>
@@ -976,8 +979,11 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
       <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
         <Card>
           <CardHeader>
+            {/* asChild with a <button> (not <div>) — CollapsibleTrigger must
+                render as a focusable element so keyboard users can reach it.
+                A <div> is not in the tab order and ignores Enter/Space. */}
             <CollapsibleTrigger asChild>
-              <div className="flex items-center justify-between cursor-pointer w-full">
+              <button type="button" className="flex items-center justify-between w-full text-left">
                 <div className="flex items-center gap-2">
                   <Filter className="h-4 w-4 text-muted-foreground" />
                   <CardTitle className="text-base">Filtri</CardTitle>
@@ -986,7 +992,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
                   )}
                 </div>
                 <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', filtersOpen && 'rotate-180')} />
-              </div>
+              </button>
             </CollapsibleTrigger>
           </CardHeader>
           <CollapsibleContent>
@@ -994,8 +1000,11 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
               <div className="grid grid-cols-1 gap-3 desktop:flex desktop:flex-wrap desktop:items-end desktop:gap-4">
                 {/* Anno filter (integrated — replaces the separate Year card) */}
                 {availableYears.length > 0 && (
-                  <div className="flex flex-col gap-2 desktop:min-w-[110px]">
-                    <label className="text-sm font-medium">Anno</label>
+                  // role="group" + aria-labelledby associates the heading with the
+                  // button set. A plain <label> without htmlFor is not linked to
+                  // anything and is invisible to assistive technology.
+                  <div role="group" aria-labelledby="anno-filter-label" className="flex flex-col gap-2 desktop:min-w-[110px]">
+                    <Label id="anno-filter-label">Anno</Label>
                     <div className="flex flex-wrap gap-1.5">
                       {availableYears.map(year => (
                         <Button

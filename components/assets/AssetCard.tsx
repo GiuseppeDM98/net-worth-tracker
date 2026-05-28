@@ -97,10 +97,12 @@ export function AssetCard({
 
   const isPositive = gainLoss > 0;
   const isNegative = gainLoss < 0;
+  // Dark variants are required: green-600/red-600 are nearly unreadable on dark card backgrounds.
+  // The desktop table (deltaColorClass) already uses these — keep both in sync.
   const gainLossColor = isPositive
-    ? 'text-green-600'
+    ? 'text-green-600 dark:text-green-400'
     : isNegative
-    ? 'text-red-600'
+    ? 'text-red-600 dark:text-red-400'
     : 'text-muted-foreground';
 
   const handleDeleteClick = () => {
@@ -116,7 +118,9 @@ export function AssetCard({
   };
 
   return (
-    <Card className={isManualPrice ? 'bg-amber-50 dark:bg-amber-950/20' : ''}>
+    // color-mix() tracks the active theme's --chart-3, matching the desktop table row treatment.
+    // Avoids hardcoded amber-50/amber-950 which break on non-default themes.
+    <Card className={isManualPrice ? 'bg-[color-mix(in_oklch,var(--chart-3)_6%,transparent)]' : ''}>
       {/* Header: plain div avoids CardHeader's flex-col which breaks inner flex-1 truncation */}
       <div className="p-4 pb-0 flex items-start gap-2">
         <div className="flex-1 overflow-hidden min-w-0">

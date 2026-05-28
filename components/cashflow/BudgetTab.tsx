@@ -43,7 +43,7 @@ import {
 import { getItalyYear, getItalyMonth } from '@/lib/utils/dateHelpers';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -156,16 +156,40 @@ function getItemLabel(item: BudgetItem, categories: ExpenseCategory[]): string {
   return catName;
 }
 
-/** Progress bar fill color. Inverted = income (higher is better). */
+/**
+ * Returns the Tailwind bg-class for the progress bar fill.
+ * Inverted = income semantics (reaching 100% is good, not bad).
+ * Uses `bg-destructive` for the over-limit state so the color follows the
+ * theme's --destructive token rather than a hardcoded red palette value.
+ * bg-emerald-500 is used for the "on-track" state — no --success token exists
+ * in the current theme system, so a palette value is the pragmatic choice.
+ */
 function progressColor(ratio: number, inverted = false): string {
   if (inverted) {
-    if (ratio >= 1) return 'bg-green-500';
+    if (ratio >= 1) return 'bg-emerald-500';
     if (ratio >= 0.8) return 'bg-amber-500';
-    return 'bg-red-500';
+    return 'bg-destructive';
   }
-  if (ratio > 1) return 'bg-red-500';
+  if (ratio > 1) return 'bg-destructive';
   if (ratio >= 0.8) return 'bg-amber-500';
-  return 'bg-green-500';
+  return 'bg-emerald-500';
+}
+
+/**
+ * Returns the Tailwind text-class for inline percentage text derived from the
+ * same thresholds as progressColor. Having a dedicated function avoids the
+ * fragile `.replace('bg-X', 'text-X')` string manipulation used previously,
+ * which silently broke if the bg-class names ever changed.
+ */
+function progressTextColor(ratio: number, inverted = false): string {
+  if (inverted) {
+    if (ratio >= 1) return 'text-emerald-600 dark:text-emerald-500';
+    if (ratio >= 0.8) return 'text-amber-600 dark:text-amber-500';
+    return 'text-destructive';
+  }
+  if (ratio > 1) return 'text-destructive';
+  if (ratio >= 0.8) return 'text-amber-600 dark:text-amber-500';
+  return 'text-emerald-600 dark:text-emerald-500';
 }
 
 function progressBadgeVariant(ratio: number, inverted = false): 'destructive' | 'secondary' | 'outline' {
@@ -181,17 +205,26 @@ function progressBadgeVariant(ratio: number, inverted = false): 'destructive' | 
 
 // ==================== Sub-components ====================
 
-function ProgressCell({ ratio, inverted = false }: { ratio: number; inverted?: boolean }) {
+function ProgressCell({ ratio, inverted = false, label }: { ratio: number; inverted?: boolean; label?: string }) {
   const pct = Math.round(ratio * 100);
+  // role="progressbar" on the track container (not the fill) so AT reads the
+  // value from the outer element, which also carries the accessible label.
   return (
     <div className="flex items-center gap-2 min-w-[120px]">
-      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+      <div
+        role="progressbar"
+        aria-valuenow={Math.min(100, pct)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={label ?? (inverted ? 'Avanzamento entrate' : 'Avanzamento budget')}
+        className="flex-1 h-2 bg-muted rounded-full overflow-hidden"
+      >
         <div
           className={`h-full rounded-full transition-all ${progressColor(ratio, inverted)}`}
           style={{ width: `${Math.min(100, pct)}%` }}
         />
       </div>
-      <Badge variant={progressBadgeVariant(ratio, inverted)} className="text-xs tabular-nums w-14 justify-center">
+      <Badge variant={progressBadgeVariant(ratio, inverted)} className="text-xs font-mono tabular-nums w-14 justify-center">
         {pct}%
       </Badge>
     </div>
@@ -523,12 +556,12 @@ export function BudgetTab({
    * Inverted (income):  green = up (more income = good), red = down.
    */
   function DeltaBadge({ value, reference, inverted = false }: { value: number; reference: number; inverted?: boolean }) {
-    if (reference === 0 || value === 0) return <span className="text-gray-400 text-xs">—</span>;
+    if (reference === 0 || value === 0) return <span className="text-muted-foreground text-xs">—</span>;
     const pct = ((value - reference) / reference) * 100;
     const isUp = pct > 0;
     // For expenses: up = bad. For income: up = good.
     const isBad = inverted ? !isUp : isUp;
-    const color = isBad ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-500';
+    const color = isBad ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-500';
     const sign = isUp ? '+' : '';
     return (
       <span className={`text-xs font-medium tabular-nums ${color}`}>
@@ -593,9 +626,10 @@ export function BudgetTab({
                       <button
                         className="flex items-center gap-1 cursor-pointer select-none"
                         onClick={() => setProgressTooltipOpen((v) => !v)}
+                        aria-label="Informazioni sull'avanzamento budget"
                       >
                         Avanzamento
-                        <HelpCircle className="h-3.5 w-3.5 text-gray-400" />
+                        <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed p-3">
@@ -630,20 +664,23 @@ export function BudgetTab({
 
               return (
                 <React.Fragment key={sectionType}>
-                  {/* Section header row — click to collapse/expand */}
+                  {/* Section header row — click or Enter/Space to collapse/expand */}
                   <TableRow
                     key={`section-${sectionType}`}
-                    className="bg-gray-50 dark:bg-gray-800/60 cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-800"
+                    className="bg-muted/50 cursor-pointer select-none hover:bg-muted/70"
                     onClick={() => toggleSection(sectionType)}
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSection(sectionType); } }}
+                    aria-expanded={!isCollapsed}
                   >
                     <TableCell
                       colSpan={totalCols}
-                      className="py-2 font-semibold text-sm text-gray-700 dark:text-gray-300"
+                      className="py-2 font-semibold text-sm text-foreground"
                     >
                       <span className="flex items-center gap-2">
-                        <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${!isCollapsed ? 'rotate-180' : ''}`} />
+                        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${!isCollapsed ? 'rotate-180' : ''}`} />
                         {sectionLabel}
-                        <span className="text-xs font-normal text-gray-400">
+                        <span className="text-xs font-normal text-muted-foreground">
                           ({items.length} {items.length === 1 ? 'voce' : 'voci'})
                         </span>
                       </span>
@@ -672,7 +709,9 @@ export function BudgetTab({
                                 return (
                                   <div
                                     key={item.id}
-                                    className={`flex items-center border-b border-gray-100 dark:border-gray-800 cursor-pointer transition-colors ${
+                                    role="button"
+                                    tabIndex={0}
+                                    className={`flex items-center border-b border-border/60 cursor-pointer transition-colors ${
                                       isSelected
                                         ? 'bg-muted/40 hover:bg-muted/60'
                                         : 'hover:bg-muted/40'
@@ -680,12 +719,15 @@ export function BudgetTab({
                                     onClick={() =>
                                       setSelectedItemKey((prev) => (prev === itemKey ? null : itemKey))
                                     }
+                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedItemKey((prev) => (prev === itemKey ? null : itemKey)); } }}
+                                    aria-expanded={isSelected}
+                                    aria-label={`${getItemLabel(item, categories)} — analisi storica`}
                                   >
                                     <div className="flex-1 min-w-0 pl-6 pr-2 py-4 text-sm">
                                       <span className="flex items-center gap-1">
                                         {isSelected
                                           ? <ChevronDown className="h-3 w-3 text-primary shrink-0" />
-                                          : <ChevronRight className="h-3 w-3 text-gray-300 dark:text-gray-600 shrink-0" />}
+                                          : <ChevronRight className="h-3 w-3 text-muted-foreground/40 shrink-0" />}
                                         {getItemLabel(item, categories)}
                                       </span>
                                     </div>
@@ -695,14 +737,14 @@ export function BudgetTab({
                                     <div className="w-[110px] shrink-0 text-right tabular-nums font-semibold text-sm px-4 py-4">
                                       {formatCurrency(c.currentYearTotal)}
                                     </div>
-                                    <div className="w-[110px] shrink-0 text-right tabular-nums text-gray-500 dark:text-gray-400 text-sm px-4 py-4">
+                                    <div className="w-[110px] shrink-0 text-right tabular-nums text-muted-foreground text-sm px-4 py-4">
                                       {c.previousYearTotal > 0 ? formatCurrency(c.previousYearTotal) : '—'}
                                     </div>
                                     <div className="w-[85px] shrink-0 text-right px-4 py-4">
                                       <DeltaBadge value={c.currentYearTotal} reference={c.previousYearTotal} inverted={isIncome} />
                                     </div>
                                     {hasHistory && (
-                                      <div className="w-[110px] shrink-0 text-right tabular-nums text-gray-500 dark:text-gray-400 text-sm px-4 py-4">
+                                      <div className="w-[110px] shrink-0 text-right tabular-nums text-muted-foreground text-sm px-4 py-4">
                                         {c.historicalAverage > 0 ? formatCurrency(c.historicalAverage) : '—'}
                                       </div>
                                     )}
@@ -719,18 +761,23 @@ export function BudgetTab({
                               })}
                               {/* Section subtotal */}
                               <div
-                                className={`flex items-center border-t border-gray-200 dark:border-gray-700 cursor-pointer select-none transition-colors ${
+                                role="button"
+                                tabIndex={0}
+                                className={`flex items-center border-t border-border cursor-pointer select-none transition-colors ${
                                   selectedItemKey === SUBTOTAL_KEY(sectionType)
                                     ? 'bg-muted/40 hover:bg-muted/60'
-                                    : 'bg-gray-50/60 dark:bg-gray-800/30 hover:bg-muted/40'
+                                    : 'bg-muted/20 hover:bg-muted/40'
                                 }`}
                                 onClick={() => setSelectedItemKey(prev => prev === SUBTOTAL_KEY(sectionType) ? null : SUBTOTAL_KEY(sectionType))}
+                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedItemKey(prev => prev === SUBTOTAL_KEY(sectionType) ? null : SUBTOTAL_KEY(sectionType)); } }}
+                                aria-expanded={selectedItemKey === SUBTOTAL_KEY(sectionType)}
+                                aria-label={`Subtotale ${sectionLabel} — analisi storica`}
                               >
-                                <div className="flex-1 min-w-0 pl-6 pr-2 py-4 text-xs font-medium text-gray-500 dark:text-gray-400">
+                                <div className="flex-1 min-w-0 pl-6 pr-2 py-4 text-xs font-medium text-muted-foreground">
                                   <span className="flex items-center gap-1">
                                     {selectedItemKey === SUBTOTAL_KEY(sectionType)
                                       ? <ChevronDown className="h-3 w-3 text-primary shrink-0" />
-                                      : <ChevronRight className="h-3 w-3 text-gray-300 dark:text-gray-600 shrink-0" />}
+                                      : <ChevronRight className="h-3 w-3 text-muted-foreground/40 shrink-0" />}
                                     Subtotale {sectionLabel}
                                   </span>
                                 </div>
@@ -740,7 +787,7 @@ export function BudgetTab({
                                 <div className="w-[110px] shrink-0 text-right tabular-nums text-xs font-medium px-4 py-4">
                                   {formatCurrency(secCurrentYear)}
                                 </div>
-                                <div className="w-[110px] shrink-0 text-right tabular-nums text-xs text-gray-500 dark:text-gray-400 px-4 py-4">
+                                <div className="w-[110px] shrink-0 text-right tabular-nums text-xs text-muted-foreground px-4 py-4">
                                   {secPrevYear > 0 ? formatCurrency(secPrevYear) : '—'}
                                 </div>
                                 <div className="w-[85px] shrink-0 text-right px-4 py-4">
@@ -749,7 +796,7 @@ export function BudgetTab({
                                   )}
                                 </div>
                                 {hasHistory && (
-                                  <div className="w-[110px] shrink-0 text-right tabular-nums text-xs text-gray-500 dark:text-gray-400 px-4 py-4">
+                                  <div className="w-[110px] shrink-0 text-right tabular-nums text-xs text-muted-foreground px-4 py-4">
                                     {secHistAvg > 0 ? formatCurrency(secHistAvg) : '—'}
                                   </div>
                                 )}
@@ -788,7 +835,7 @@ export function BudgetTab({
                   <span className="flex items-center gap-1">
                     {selectedItemKey === TOTAL_EXPENSES_KEY
                       ? <ChevronDown className="h-3 w-3 text-primary shrink-0" />
-                      : <ChevronRight className="h-3 w-3 text-gray-300 dark:text-gray-600 shrink-0" />}
+                      : <ChevronRight className="h-3 w-3 text-muted-foreground/40 shrink-0" />}
                     Totale Spese
                   </span>
                 </TableCell>
@@ -836,7 +883,7 @@ export function BudgetTab({
                   <span className="flex items-center gap-1">
                     {selectedItemKey === TOTAL_INCOME_KEY
                       ? <ChevronDown className="h-3 w-3 text-primary shrink-0" />
-                      : <ChevronRight className="h-3 w-3 text-gray-300 dark:text-gray-600 shrink-0" />}
+                      : <ChevronRight className="h-3 w-3 text-muted-foreground/40 shrink-0" />}
                     Totale Entrate
                   </span>
                 </TableCell>
@@ -932,13 +979,9 @@ export function BudgetTab({
               {rows.map(({ year, total, monthly, budgetAnnual }) => {
                 const isCurrentYear = year === currentYear;
                 const ratio = budgetAnnual > 0 ? total / budgetAnnual : 0;
-                // Derive a text color from the same thresholds used elsewhere for consistency
                 const vsColorClass = total > 0 && budgetAnnual > 0
-                  ? progressColor(ratio, isIncome)
-                      .replace('bg-green-500', 'text-green-600 dark:text-green-500')
-                      .replace('bg-amber-500', 'text-amber-600 dark:text-amber-500')
-                      .replace('bg-red-500', 'text-red-600 dark:text-red-400')
-                  : 'text-gray-300 dark:text-gray-600';
+                  ? progressTextColor(ratio, isIncome)
+                  : 'text-muted-foreground/40';
 
                 // Identify the highest and lowest spending months for this year.
                 // Exclude future months and zero months — they don't carry real data.
@@ -964,7 +1007,7 @@ export function BudgetTab({
                       {/* Small marker so the current year stands out in a long list */}
                       {isCurrentYear && <span className="ml-1 text-primary">◂</span>}
                     </td>
-                    <td className="pr-3 py-1.5 text-right tabular-nums text-gray-500 dark:text-gray-400 whitespace-nowrap hidden sm:table-cell">
+                    <td className="pr-3 py-1.5 text-right tabular-nums text-muted-foreground whitespace-nowrap hidden sm:table-cell">
                       {budgetAnnual > 0 ? formatCurrency(budgetAnnual) : '—'}
                     </td>
                     {monthly.map((v, i) => {
@@ -974,16 +1017,18 @@ export function BudgetTab({
                       // Max/min highlight: expenses use red=max, green=min; income inverts
                       const isMax = !isEmpty && highlightEnabled && v === maxVal;
                       const isMin = !isEmpty && highlightEnabled && v === minVal;
+                      // color-mix against semantic tokens keeps highlights theme-aware
+                      // rather than using hardcoded bg-red-100/bg-green-100 palette values
                       const highlightClass = isMax
-                        ? (isIncome ? 'bg-green-100 dark:bg-green-900/30 font-semibold rounded' : 'bg-red-100 dark:bg-red-900/30 font-semibold rounded')
+                        ? (isIncome ? 'bg-emerald-500/10 font-semibold rounded' : 'bg-destructive/10 font-semibold rounded')
                         : isMin
-                        ? (isIncome ? 'bg-red-100 dark:bg-red-900/30 font-semibold rounded' : 'bg-green-100 dark:bg-green-900/30 font-semibold rounded')
+                        ? (isIncome ? 'bg-destructive/10 font-semibold rounded' : 'bg-emerald-500/10 font-semibold rounded')
                         : '';
                       return (
                         <td
                           key={i}
                           className={`px-0.5 sm:px-1.5 py-1.5 text-right tabular-nums whitespace-nowrap ${
-                            isEmpty ? 'text-gray-300 dark:text-gray-600' : highlightClass
+                            isEmpty ? 'text-muted-foreground/40' : highlightClass
                           }`}
                         >
                           {isEmpty ? '—' : formatCurrency(v)}
@@ -1046,11 +1091,8 @@ export function BudgetTab({
                     {secRows.map(({ year, isCurrentYear, monthly, total }) => {
                       const ratio = secBudgetAnnual > 0 ? total / secBudgetAnnual : 0;
                       const vsColorClass = total > 0 && secBudgetAnnual > 0
-                        ? progressColor(ratio, false)
-                            .replace('bg-green-500', 'text-green-600 dark:text-green-500')
-                            .replace('bg-amber-500', 'text-amber-600 dark:text-amber-500')
-                            .replace('bg-red-500', 'text-red-600 dark:text-red-400')
-                        : 'text-gray-300 dark:text-gray-600';
+                        ? progressTextColor(ratio, false)
+                        : 'text-muted-foreground/40';
 
                       // Same min/max highlight logic as the aggregate table
                       const realMonths = monthly
@@ -1072,7 +1114,7 @@ export function BudgetTab({
                           <td className="pr-2 py-1.5 tabular-nums whitespace-nowrap sticky left-0 z-10 bg-inherit">
                             {year}{isCurrentYear && <span className="ml-1 text-primary">◂</span>}
                           </td>
-                          <td className="pr-3 py-1.5 text-right tabular-nums text-gray-500 dark:text-gray-400 whitespace-nowrap hidden sm:table-cell">
+                          <td className="pr-3 py-1.5 text-right tabular-nums text-muted-foreground whitespace-nowrap hidden sm:table-cell">
                             {secBudgetAnnual > 0 ? formatCurrency(secBudgetAnnual) : '—'}
                           </td>
                           {monthly.map((v, i) => {
@@ -1081,15 +1123,15 @@ export function BudgetTab({
                             const isMax = !isEmpty && highlightEnabled && v === maxVal;
                             const isMin = !isEmpty && highlightEnabled && v === minVal;
                             const highlightClass = isMax
-                              ? 'bg-red-100 dark:bg-red-900/30 font-semibold rounded'
+                              ? 'bg-destructive/10 font-semibold rounded'
                               : isMin
-                              ? 'bg-green-100 dark:bg-green-900/30 font-semibold rounded'
+                              ? 'bg-emerald-500/10 font-semibold rounded'
                               : '';
                             return (
                               <td
                                 key={i}
                                 className={`px-0.5 sm:px-1.5 py-1.5 text-right tabular-nums whitespace-nowrap ${
-                                  isEmpty ? 'text-gray-300 dark:text-gray-600' : highlightClass
+                                  isEmpty ? 'text-muted-foreground/40' : highlightClass
                                 }`}
                               >
                                 {isEmpty ? '—' : formatCurrency(v)}
@@ -1142,9 +1184,9 @@ export function BudgetTab({
           const isSubFormOpen = subForm?.sectionType === sectionType;
 
           return (
-            <Card key={sectionType} className="border-gray-200 dark:border-gray-700">
+            <Card key={sectionType} className="border-border">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-gray-700 dark:text-gray-300">
+                <CardTitle className="text-sm text-foreground">
                   {sectionLabel}
                 </CardTitle>
               </CardHeader>
@@ -1155,25 +1197,25 @@ export function BudgetTab({
                     {/* Reorder arrows */}
                     <div className="flex flex-col">
                       <button
-                        className="text-gray-400 hover:text-gray-600 disabled:opacity-20"
+                        className="text-muted-foreground hover:text-foreground disabled:opacity-20"
                         onClick={() => handleReorder(item.id, 'up')}
                         disabled={idx === 0}
-                        title="Sposta su"
+                        aria-label={`Sposta su ${getItemLabel(item, categories)}`}
                       >
                         <ChevronUp className="h-3.5 w-3.5" />
                       </button>
                       <button
-                        className="text-gray-400 hover:text-gray-600 disabled:opacity-20"
+                        className="text-muted-foreground hover:text-foreground disabled:opacity-20"
                         onClick={() => handleReorder(item.id, 'down')}
                         disabled={idx === catItems.length - 1 && subItems.length === 0}
-                        title="Sposta giù"
+                        aria-label={`Sposta giù ${getItemLabel(item, categories)}`}
                       >
                         <ChevronDown className="h-3.5 w-3.5" />
                       </button>
                     </div>
                     <span className="flex-1 text-sm">{getItemLabel(item, categories)}</span>
                     <div className="flex items-center gap-1">
-                      <span className="text-xs text-gray-400">€</span>
+                      <span className="text-xs text-muted-foreground">€</span>
                       <Input
                         type="number"
                         min="0"
@@ -1183,7 +1225,7 @@ export function BudgetTab({
                         onChange={(e) => handleAmountChange(item.id, e.target.value)}
                         placeholder="0"
                       />
-                      <span className="text-xs text-gray-400">/mese</span>
+                      <span className="text-xs text-muted-foreground">/mese</span>
                     </div>
                   </div>
                 ))}
@@ -1193,27 +1235,27 @@ export function BudgetTab({
                   <div key={item.id} className="flex items-center gap-2 py-1 pl-4 border-t border-border/40">
                     <div className="flex flex-col">
                       <button
-                        className="text-gray-400 hover:text-gray-600 disabled:opacity-20"
+                        className="text-muted-foreground hover:text-foreground disabled:opacity-20"
                         onClick={() => handleReorder(item.id, 'up')}
                         disabled={idx === 0 && catItems.length === 0}
-                        title="Sposta su"
+                        aria-label={`Sposta su ${getItemLabel(item, categories)}`}
                       >
                         <ChevronUp className="h-3.5 w-3.5" />
                       </button>
                       <button
-                        className="text-gray-400 hover:text-gray-600 disabled:opacity-20"
+                        className="text-muted-foreground hover:text-foreground disabled:opacity-20"
                         onClick={() => handleReorder(item.id, 'down')}
                         disabled={idx === subItems.length - 1}
-                        title="Sposta giù"
+                        aria-label={`Sposta giù ${getItemLabel(item, categories)}`}
                       >
                         <ChevronDown className="h-3.5 w-3.5" />
                       </button>
                     </div>
-                    <span className="flex-1 text-sm text-gray-600 dark:text-gray-400">
+                    <span className="flex-1 text-sm text-muted-foreground">
                       {getItemLabel(item, categories)}
                     </span>
                     <div className="flex items-center gap-1">
-                      <span className="text-xs text-gray-400">€</span>
+                      <span className="text-xs text-muted-foreground">€</span>
                       <Input
                         type="number"
                         min="0"
@@ -1223,12 +1265,12 @@ export function BudgetTab({
                         onChange={(e) => handleAmountChange(item.id, e.target.value)}
                         placeholder="0"
                       />
-                      <span className="text-xs text-gray-400">/mese</span>
+                      <span className="text-xs text-muted-foreground">/mese</span>
                     </div>
                     <button
-                      className="text-red-400 hover:text-red-600 ml-1"
+                      className="text-destructive/70 hover:text-destructive ml-1"
                       onClick={() => handleDeleteSubItem(item.id)}
-                      title="Rimuovi"
+                      aria-label={`Rimuovi ${getItemLabel(item, categories)}`}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -1332,7 +1374,7 @@ export function BudgetTab({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="mt-1 h-7 text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                    className="mt-1 h-7 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
                     onClick={() => handleOpenSubForm(sectionType)}
                   >
                     <Plus className="h-3 w-3" />
@@ -1402,9 +1444,10 @@ export function BudgetTab({
                 <button
                   className="w-full flex items-center justify-between px-3 py-2 rounded-md bg-muted/60 hover:bg-muted/80 transition-colors"
                   onClick={() => toggleSection(sectionType)}
+                  aria-expanded={!isCollapsed}
                 >
-                  <span className="font-semibold text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                    <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${!isCollapsed ? 'rotate-180' : ''}`} />
+                  <span className="font-semibold text-sm text-foreground flex items-center gap-2">
+                    <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${!isCollapsed ? 'rotate-180' : ''}`} />
                     {sectionLabel}
                   </span>
                   <span className="text-xs text-muted-foreground">{items.length} {items.length === 1 ? 'voce' : 'voci'}</span>
@@ -1432,7 +1475,7 @@ export function BudgetTab({
                             >
                               <div className="flex items-center gap-1">
                                 <span className="flex-1 text-sm font-medium truncate">{getItemLabel(item, categories)}</span>
-                                <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
+                                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60" />
                               </div>
                               <ProgressCell ratio={c.budgetUsedRatio} inverted={isIncome} />
                               <div className="flex items-baseline justify-between text-xs">
@@ -1531,11 +1574,14 @@ export function BudgetTab({
 
         {/* Item comparison dialog */}
         <Dialog open={mobileDetailItemId !== null} onOpenChange={(open) => { if (!open) setMobileDetailItemId(null); }}>
-          <DialogContent className="max-w-xs" aria-describedby={undefined}>
+          <DialogContent className="max-w-xs">
             {detailItem && detailComp && (
               <>
                 <DialogHeader>
                   <DialogTitle className="text-base leading-snug">{getItemLabel(detailItem, categories)}</DialogTitle>
+                  <DialogDescription className="sr-only">
+                    Dettaglio budget e confronto storico per {getItemLabel(detailItem, categories)}
+                  </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 pt-1">
                   <table className="w-full text-sm">
@@ -1591,8 +1637,24 @@ export function BudgetTab({
 
   if (budgetLoading || loading) {
     return (
-      <div className="flex items-center justify-center py-16 text-gray-500">
-        <span className="text-sm">Caricamento budget…</span>
+      <div className="space-y-6 animate-pulse" aria-busy="true" aria-label="Caricamento budget">
+        {/* Header skeleton */}
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="space-y-2">
+            <div className="h-7 w-32 bg-muted rounded" />
+            <div className="h-4 w-64 bg-muted/60 rounded" />
+          </div>
+          <div className="h-8 w-24 bg-muted rounded" />
+        </div>
+        {/* Section skeletons — one per expected expense type */}
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="space-y-2">
+            <div className="h-9 bg-muted/50 rounded" />
+            {[0, 1].map((j) => (
+              <div key={j} className="h-12 bg-muted/30 rounded" />
+            ))}
+          </div>
+        ))}
       </div>
     );
   }
@@ -1606,14 +1668,14 @@ export function BudgetTab({
             <Target className="h-5 w-5 text-primary" />
             Budget
           </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+          <p className="text-sm text-muted-foreground mt-0.5">
             Confronta la spesa effettiva con il budget, l&apos;anno precedente e la media storica
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           {!isEditing && (
-            <Button variant="outline" size="sm" onClick={handleStartEditing} className="flex items-center gap-1.5 dark:border-gray-600 dark:text-gray-200">
+            <Button variant="outline" size="sm" onClick={handleStartEditing} className="flex items-center gap-1.5">
               <Pencil className="h-3.5 w-3.5" />
               Modifica
             </Button>
@@ -1642,7 +1704,7 @@ export function BudgetTab({
           {/* Guide toggle */}
           <button
             onClick={() => setShowGuide((v) => !v)}
-            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             <HelpCircle className="h-3.5 w-3.5" />
             {showGuide ? 'Nascondi guida' : 'Come leggere questa pagina'}
@@ -1658,8 +1720,8 @@ export function BudgetTab({
                 exit="exit"
                 className="rounded-lg border border-border bg-muted/30 p-4 text-sm space-y-3"
               >
-                <p className="font-medium text-gray-700 dark:text-gray-300">Come leggere la tabella</p>
-                <ul className="space-y-1.5 text-gray-600 dark:text-gray-400 text-xs list-disc list-inside">
+                <p className="font-medium text-foreground">Come leggere la tabella</p>
+                <ul className="space-y-1.5 text-muted-foreground text-xs list-disc list-inside">
                   <li><span className="font-medium">Budget/anno</span> — il tetto annuale impostato (budget/mese × 12). Di default corrisponde al totale speso l&apos;anno precedente.</li>
                   <li><span className="font-medium text-primary">{currentYear}</span> — quanto hai speso finora nell&apos;anno corrente.</li>
                   <li><span className="font-medium text-amber-600 dark:text-amber-400">{currentYear - 1}</span> — totale speso nell&apos;anno precedente.</li>
@@ -1669,7 +1731,7 @@ export function BudgetTab({
                   <li>Clicca sull&apos;intestazione di una sezione per espanderla o collassarla.</li>
                   <li>Clicca una voce per aprire l&apos;analisi storica anno per anno con dettaglio mensile.</li>
                 </ul>
-                <p className="text-xs text-gray-400">Per le <span className="font-medium">Entrate</span> i colori sono invertiti: verde = entrate in crescita.</p>
+                <p className="text-xs text-muted-foreground">Per le <span className="font-medium">Entrate</span> i colori sono invertiti: verde = entrate in crescita.</p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -1702,7 +1764,7 @@ export function BudgetTab({
             )}
           </AnimatePresence>
 
-          <p className="text-xs text-gray-400 flex items-center gap-1">
+          <p className="text-xs text-muted-foreground flex items-center gap-1">
             <Info className="h-3 w-3" />
             Avanzamento calcolato sul budget annuale (budget/mese × 12). · Clicca una voce per l&apos;analisi storica mensile.
           </p>

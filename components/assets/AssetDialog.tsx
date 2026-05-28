@@ -930,11 +930,15 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
             <p className="text-sm text-muted-foreground mb-5">
               Scegli il tipo di asset da aggiungere al portafoglio
             </p>
-            <div className="grid grid-cols-2 gap-3">
+            {/* role="radiogroup" + role="radio" exposes mutually exclusive selection to screen readers.
+                aria-checked reflects the form default (etf) until the user makes a choice. */}
+            <div role="radiogroup" aria-label="Tipo di asset" className="grid grid-cols-2 gap-3">
               {TYPE_CARDS.map(({ type: t, label, Icon, description }, idx) => (
                 <button
                   key={t}
                   type="button"
+                  role="radio"
+                  aria-checked={selectedType === t}
                   onClick={() => handleTypeSelect(t)}
                   className={`flex items-start gap-3 rounded-lg border border-border bg-card p-4 text-left transition-colors duration-150 ease-out hover:bg-muted/50 hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring${idx === TYPE_CARDS.length - 1 && TYPE_CARDS.length % 2 !== 0 ? ' col-span-2' : ''}`}
                 >
@@ -1135,7 +1139,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                       </SelectItem>
                     ))}
                     {availableSubCategories().length > 0 && <SelectSeparator />}
-                    <SelectItem value="__create_new__" className="text-blue-600 dark:text-blue-400">
+                    <SelectItem value="__create_new__" className="text-primary">
                       <Plus className="h-3.5 w-3.5" />
                       Crea nuova sottocategoria
                     </SelectItem>
@@ -1190,7 +1194,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label htmlFor="isLiquid">Asset Liquido</Label>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-muted-foreground">
                   Indica se questo asset può essere convertito rapidamente in contanti
                 </p>
               </div>
@@ -1208,7 +1212,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label htmlFor="autoUpdatePrice">Aggiornamento Automatico Prezzo</Label>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-muted-foreground">
                   Indica se il prezzo deve essere aggiornato automaticamente da {priceSource}
                 </p>
               </div>
@@ -1227,7 +1231,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label htmlFor="isComposite">Asset Composto</Label>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-muted-foreground">
                   Es. fondo pensione con mix di azioni e obbligazioni
                 </p>
               </div>
@@ -1331,7 +1335,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                 })}
 
                 {composition.length > 0 && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs text-muted-foreground">
                     Totale: {composition.reduce((sum, c) => sum + c.percentage, 0).toFixed(2)}% (deve essere 100%)
                   </p>
                 )}
@@ -1346,7 +1350,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="hasOutstandingDebt">Debito Residuo</Label>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs text-muted-foreground">
                     Es. mutuo residuo sull&apos;immobile. Il valore netto sarà: valore - debito
                   </p>
                 </div>
@@ -1376,7 +1380,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                   {errors.outstandingDebt && (
                     <p className="text-sm text-red-500">{errors.outstandingDebt.message}</p>
                   )}
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs text-muted-foreground">
                     Il valore netto dell&apos;immobile sarà calcolato come: valore lordo - debito residuo
                   </p>
                 </div>
@@ -1390,7 +1394,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="isPrimaryResidence">Casa di Abitazione</Label>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs text-muted-foreground">
                     Marca questo immobile come casa di abitazione. Il calcolo FIRE può escludere questi immobili
                     (configurabile nelle impostazioni FIRE).
                   </p>
@@ -1410,7 +1414,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="showBondDetails">Dettagli Cedole</Label>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs text-muted-foreground">
                     Configura il piano cedolare per generare automaticamente la prossima cedola
                   </p>
                 </div>
@@ -1481,7 +1485,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                       {errors.bondIssueDate && (
                         <p className="text-sm text-red-500">{errors.bondIssueDate.message}</p>
                       )}
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Ancora del calendario cedolare</p>
+                      <p className="text-xs text-muted-foreground">Ancora del calendario cedolare</p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="bondMaturityDate">Data di Rimborso</Label>
@@ -1493,14 +1497,14 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                       {errors.bondMaturityDate && (
                         <p className="text-sm text-red-500">{errors.bondMaturityDate.message}</p>
                       )}
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Nessuna cedola oltre questa data</p>
+                      <p className="text-xs text-muted-foreground">Nessuna cedola oltre questa data</p>
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="bondNominalValue">
                       Valore Nominale per Unità ({watchCurrency}){' '}
-                      <span className="text-gray-400 dark:text-gray-500 font-normal">(opzionale)</span>
+                      <span className="text-muted-foreground/70 font-normal">(opzionale)</span>
                     </Label>
                     <Input
                       id="bondNominalValue"
@@ -1525,13 +1529,13 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                         const perShare = (rate / 100 / periods) * nominal;
                         const total = perShare * qty;
                         return (
-                          <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                          <p className="text-xs text-primary font-medium">
                             → Cedola stimata: {perShare.toFixed(2)} {watchCurrency}/unità × {qty} = {total.toFixed(2)} {watchCurrency} per pagamento
                           </p>
                         );
                       }
                       return (
-                        <div className="text-xs text-gray-500 space-y-1">
+                        <div className="text-xs text-muted-foreground space-y-1">
                           <p>Valore faccia per singola unità nella tua valuta.</p>
                           <p>• Hai 5 lotti da €1000 (qty=5) → inserisci <strong>1000</strong></p>
                           <p>• Hai qty=5000 e ogni unità vale €1 → inserisci <strong>1</strong></p>
@@ -1561,7 +1565,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                     </div>
                     {showStepUp && (
                       <div className="space-y-2">
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                        <p className="text-xs text-muted-foreground">
                           Il tasso base sopra è usato come fallback se nessuna fascia corrisponde.
                         </p>
                         {tierFields.map((field, index) => (
@@ -1629,7 +1633,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                   <div className="space-y-2">
                     <Label htmlFor="bondFinalPremiumRate">
                       Premio Finale a Scadenza (%){' '}
-                      <span className="text-gray-400 dark:text-gray-500 font-normal">(opzionale)</span>
+                      <span className="text-muted-foreground/70 font-normal">(opzionale)</span>
                     </Label>
                     <Input
                       id="bondFinalPremiumRate"
@@ -1651,13 +1655,13 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                         const perShare = (premRate / 100) * nominal;
                         const total = perShare * qty;
                         return (
-                          <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                          <p className="text-xs text-primary font-medium">
                             → Premio stimato: {perShare.toFixed(2)} {watchCurrency}/unità × {qty} = {total.toFixed(2)} {watchCurrency} alla scadenza
                           </p>
                         );
                       }
                       return (
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                        <p className="text-xs text-muted-foreground">
                           Bonus una-tantum pagato alla scadenza (es. 0.8% per BTP Valore)
                         </p>
                       );
@@ -1674,7 +1678,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label htmlFor="showCostBasis">Tracciamento Cost Basis</Label>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-muted-foreground">
                   Abilita il calcolo di plusvalenze non realizzate e tasse stimate
                 </p>
               </div>
@@ -1709,7 +1713,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                             setBrokerEntries([{ qty: '', price: '' }]);
                           }
                         }}
-                        className="flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                        className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
                       >
                         <Calculator className="h-3.5 w-3.5" />
                         Calcola PMC
@@ -1726,7 +1730,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                     {errors.averageCost && (
                       <p className="text-sm text-red-500">{errors.averageCost.message}</p>
                     )}
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <p className="text-xs text-muted-foreground">
                       {isBondPctMode
                         ? 'Inserire il prezzo di acquisto come riportato su Borsa Italiana (per 100€ di nominale).'
                         : 'Il costo medio di acquisto per singola azione/unità'}
@@ -1737,7 +1741,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                       if (!biPrice || isNaN(biPrice) || !nominal) return null;
                       const eurVal = biPrice * (nominal / 100);
                       return (
-                        <p className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                        <p className="text-xs font-medium text-primary">
                           ≈ {eurVal.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€ per unità
                         </p>
                       );
@@ -1758,14 +1762,14 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                     {errors.taxRate && (
                       <p className="text-sm text-red-500">{errors.taxRate.message}</p>
                     )}
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <p className="text-xs text-muted-foreground">
                       Percentuale di tassazione sulle plusvalenze (es. 26 per 26%)
                     </p>
                     {(selectedType === 'bond' || selectedAssetClass === 'bonds') && (
                       <button
                         type="button"
                         onClick={() => setValue('taxRate', 12.5)}
-                        className="text-xs text-blue-600 dark:text-blue-400 underline hover:no-underline"
+                        className="text-xs text-primary underline hover:no-underline"
                       >
                         Titoli di Stato italiani (BTP, CCT, BOT): imposta 12,5%
                       </button>
@@ -1868,7 +1872,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label htmlFor="showTER">TER (Total Expense Ratio)</Label>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-muted-foreground">
                   Costi annuali di gestione del fondo (es. ETF, fondi comuni)
                 </p>
               </div>
@@ -1899,7 +1903,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                 {errors.totalExpenseRatio && (
                   <p className="text-sm text-red-500">{errors.totalExpenseRatio.message}</p>
                 )}
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-muted-foreground">
                   Percentuale annuale dei costi di gestione (es. 0.20 per 0.20%)
                 </p>
               </div>
@@ -1911,7 +1915,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
           <div className="flex items-center justify-between rounded-lg border p-4">
             <div className="space-y-0.5">
               <Label htmlFor="stampDutyExempt">Esente da imposta di bollo</Label>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-muted-foreground">
                 Se attivo, questo asset non viene incluso nel calcolo dell&apos;imposta di bollo (es. fondi pensione, immobili)
               </p>
             </div>
@@ -1939,7 +1943,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
               {errors.manualPrice && (
                 <p className="text-sm text-red-500">{errors.manualPrice.message}</p>
               )}
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-muted-foreground">
                 {isBondPctMode
                   ? `Inserire come % del nominale (es. 104.20 per un BTP quotato a 104.20% di 1000€ → prezzo salvato come 1042€/unità). Lascia vuoto per recupero automatico da ${priceSource}.`
                   : `Se inserisci un prezzo manuale, questo verrà utilizzato al posto del recupero automatico da ${priceSource}.`}
@@ -1947,8 +1951,9 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
             </div>
           )}
 
-          <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-3 border border-blue-200 dark:border-blue-800">
-            <p className="text-sm text-blue-800 dark:text-blue-200">
+          {/* color-mix() on --primary so the info box tracks the active theme colour. */}
+          <div className="rounded-lg bg-[color-mix(in_oklch,var(--primary)_8%,transparent)] border border-[color-mix(in_oklch,var(--primary)_20%,transparent)] p-3">
+            <p className="text-sm text-foreground">
               <strong>Nota:</strong>
               {selectedType === 'cash' && ' Per asset di tipo liquidità, il prezzo sarà impostato a 1.'}
               {selectedType === 'realestate' && ' Per immobili, il prezzo deve essere aggiornato manualmente.'}
