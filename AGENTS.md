@@ -335,12 +335,15 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 
 ### Mobile Navigation Structure
 - Bottom navigation (portrait mobile): 3 primary routes + "Altro" button (MoreHorizontal icon)
+- **Single source of truth for nav arrays**: `lib/constants/navigation.ts` exports `primaryNav`, `analysisNav`, `planningNav`, `secondaryHrefs`. Sidebar, BottomNavigation, and SecondaryMenuDrawer all import from there — never redeclare nav arrays inline. Adding/removing a route means one file edit.
 - **Bottom nav uses `--sidebar-*` CSS vars** for theme-aware colors — background `var(--sidebar)`, border `var(--sidebar-border)`, active tab `var(--sidebar-primary)` + `var(--sidebar-accent)` bg, inactive `var(--sidebar-foreground)` at opacity 0.65. Use `style={{ ... }}` inline because sidebar vars are not mapped to Tailwind utility classes.
 - **Sidebar active state — Overview exact match**: `Sidebar.tsx` `isActive` for `/dashboard` must use `pathname === item.href` only, never `startsWith`. `startsWith('/dashboard/')` matches every sub-route (`/dashboard/assets`, `/dashboard/history`, etc.) and keeps Panoramica highlighted on all pages. All other routes can use prefix matching safely
-- `secondaryHrefs` array in `BottomNavigation.tsx` must stay in sync with `navigationGroups` hrefs in `SecondaryMenuDrawer.tsx`
+- **Sidebar icon-collapsed mode**: `collapsible="icon"` on `<Sidebar>`. Content hidden via `group-data-[state=collapsed]:hidden`; icon-only alternatives shown via `group-data-[state=collapsed]:flex`. `SidebarMenuButton size="lg"` in the footer auto-collapses to avatar-only. Toggle button uses `hidden desktop:flex` (desktop only). State persists in localStorage via shadcn `useSidebar()` — no custom persistence needed.
+- `secondaryHrefs` is exported from `navigation.ts` — derived from `analysisNav` + `planningNav` + `['/dashboard/assistant', '/dashboard/settings']`. Do not hardcode in BottomNavigation.
 - Secondary drawer uses 3 semantic groups: **Statistiche** (Analisi, Rendimenti, Storico, Hall of Fame, Assistente AI — read-only views), **Pianificazione** (Allocazione, FIRE e Simulazioni — action-bearing tools), **Preferenze** (Impostazioni)
 - `Assistente AI` belongs in the `Statistiche` group. `Allocazione` belongs in `Pianificazione` (has COMPRA/VENDI/OK action chips — not a read-only stat)
 - Nav item for the cashflow analysis page is "Analisi" (route `/dashboard/analisi`), NOT "Flussi"
+- **Cashflow FAB → ExpenseTrackingTab communication**: the `+` FAB in BottomNavigation has no access to the tab component. Communication uses `window.dispatchEvent(new CustomEvent('cashflow:add-expense'))` in the FAB and `window.addEventListener('cashflow:add-expense', handler)` in `ExpenseTrackingTab`. Pattern: cross-hierarchy components with no shared ancestor → custom DOM events are correct; prop drilling or lifting state to layout would require threading callbacks through multiple unrelated layers.
 - Eyebrow label style for group headers: `text-xs font-semibold uppercase tracking-wider text-muted-foreground/60`
 
 ### Progressive Disclosure on Data-Dense Pages

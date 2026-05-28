@@ -96,7 +96,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - **Public demo mode** — "Try the Demo" button on the login page and landing page auto-logs visitors into a shared read-only account. All mutation actions are disabled; the AI Assistant is fully blocked. Set `NEXT_PUBLIC_DEMO_*` env vars to enable; leave them empty to hide the CTA on self-hosted deploys
 - **Color Themes** — Six selectable color themes (Default, Solar Dusk, Elegant Luxury, Midnight Bloom, Cyberpunk, Retro Arcade) with per-user persistence in Firestore and localStorage. Theme selector in Settings → Aspetto with light/dark preview swatches. Switching dark/light mode plays a circle-reveal animation from the toggle. Charts update their palette to match the active theme
 - **Dark mode** — Full dark/light/system theme support. The header toggle cycles through three states: Light, Dark, and System (follows OS preference), using Sun, Moon, and Monitor icons. Every page, chart tooltip, and UI component is properly themed
-- **Authentication flow** — Login and registration screens follow the same visual language as the dashboard, with accessible focus states, keyboard-friendly password toggles, and clearer in-place submit feedback
+- **Authentication flow** — Login and registration screens follow the same visual language as the dashboard, with accessible focus states, 44px keyboard-reachable password toggles, `autoComplete` hints for browsers and password managers, and clearer in-place submit feedback including an inline password mismatch error on Register
 - **Hall of Fame** — Personal records dashboard with an all-time best hero block, monthly and annual ranking tables, current-period spotlight, and contextual notes. Mobile navigation shows one section at a time; desktop tables are full-height with no internal scroll
 - **PDF Export** — 8 configurable sections with custom year/month period selection; sections auto-disabled for past periods when historical data is unavailable
 - **Settings** — Trade Republic-inspired layout: the Allocation tab opens with a hero block showing the total allocation percentage, followed by a single unified flat list for all six asset classes (Equity, Bonds, Real Estate, Crypto, Commodities, Cash) — sub-categories expand inline without nested cards. Mobile tab navigation uses a segmented pill control (all five tabs visible at a glance). Unsaved-change feedback, smooth nested allocation editing, and inline two-tap confirmations for sensitive category actions
@@ -183,6 +183,7 @@ See [`.env.local.example`](.env.local.example) for detailed comments on each var
 - **Service layer** (`lib/services/`) for all business logic
 - **React Query** for client-side data caching and mutations
 - **Feature-based component organization** (by domain, not by layer)
+- **Shared layout system** (`PageContainer`, `PageHeader`, `PageTabBar`) for consistent page structure
 - **Timezone-aware** date handling (Europe/Rome)
 
 ## Tech Stack

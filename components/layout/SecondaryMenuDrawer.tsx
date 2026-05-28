@@ -174,9 +174,9 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
                 initial="hidden"
                 animate="visible"
               >
-                {/* Analisi group */}
+                {/* Statistiche group */}
                 <div className="mb-1">
-                  <motion.p variants={drawerItem} className={sectionLabel}>Analisi</motion.p>
+                  <motion.p variants={drawerItem} className={sectionLabel}>Statistiche</motion.p>
                   {/* motion.li carries the stagger variant; the inner Link keeps
                       aria-current, Next.js prefetching, and right-click semantics. */}
                   <ul className="m-0 list-none p-0">

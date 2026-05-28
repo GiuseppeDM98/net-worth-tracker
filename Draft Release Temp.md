@@ -6,11 +6,17 @@
 - **Savings rate trend** — a new 24-month line chart shows how your savings rate has evolved over time, with a 20% reference line and a red shaded area below the target so you can see at a glance when you fell short
 - **Per-category spending sparklines** — a new grid shows a mini area chart for every expense category with at least 3 months of data, ordered by total spend. Tap any card to expand it into a full bar chart for that category's month-by-month history
 - Added a **total summary row** to all expense drill-down views in the Cashflow Analisi tab. When drilling into any Sankey node or pie chart category, a "Totale (N voci)" row now appears at the bottom of the transaction list showing the aggregated sum — so you can see the full amount at a glance without scrolling through every entry. Available on both desktop (table footer row) and mobile (summary block below the card list)
+- **Collapsible sidebar**: the desktop sidebar can now be collapsed to icon-only mode with a toggle button in the sidebar header; state persists across sessions
+- **Cashflow FAB**: a `+` button appears in the bottom navigation bar when you're on the Cashflow page — tap it to open the new expense dialog without scrolling to the top
 
 ## 🐛 Bug Fixes
 
 - Fixed the "Auto-calculate Equity/Bonds" toggle in Settings not persisting after a page refresh — disabling it would revert to enabled on reload because the setting was never saved explicitly
 - Fixed a color regression in the Cashflow Sankey chart: after drilling into a spending category (e.g. "Rifiuti") and pressing "Indietro", the panel header reverted to the subcategory's derived gray color instead of the parent type's original color (e.g. blue for "Spese Fisse"). Navigation now correctly restores the original type color at every level
+- Fixed: Overview composition charts were stuck on "Preparazione grafico..." for empty portfolios
+- Fixed: the overview loading spinner was remounting on every parent re-render, causing a flicker during the count-up animation
+- Fixed: loading skeleton on the Overview page now includes the charts section, preventing a layout shift when data loads
+- Fixed: password mismatch error on Register now stays visible inline under the confirmation field (not just a disappearing toast)
 
 ## 🔧 Improvements
 
@@ -23,7 +29,7 @@
 - **Year-over-year variation chart is now always visible** in the History page — it was previously hidden inside a collapsed "Appendix" section that required an extra click to open. It now appears directly in the Growth Drivers section alongside the savings and work/investment charts
 - **Monthly snapshot log removed from History** — the grid showing the last 6 raw snapshots was redundant; the same data (with notes) is accessible through the snapshot search dialog already present in the page header
 - **History "Work & Investments" chart now respects your color theme** — the three trend lines (income earned, saved from work, investment growth) previously used fixed colors that didn't change when switching themes. They now follow the active theme palette like all other charts in the app
-- **Navigation reorganized** — the sidebar group is now called "Statistiche" and contains the read-only analytical pages (Analisi, Rendimenti, Storico, Hall of Fame, Assistente AI). The Allocation page has moved to the "Pianificazione" group alongside FIRE & Simulations, since it drives buy/sell/hold decisions rather than being a passive view
+- **Navigation reorganized** — the sidebar group for analytical pages is called "Statistiche" and contains the read-only views (Analisi, Rendimenti, Storico, Hall of Fame, Assistente AI). The Allocation page has moved to the "Pianificazione" group alongside FIRE & Simulations, since it drives buy/sell/hold decisions rather than being a passive view
 - **Goal-based allocation targets** (Settings → Preferences → "Allocazione da Obiettivi") now correctly reflect investment priorities: each goal is weighted by its outstanding gap multiplied by its priority level (Alta 3×, Media 2×, Bassa 1×). Goals that are already fully funded are excluded from the calculation. Previously, only the target amount was used as weight, which made the priority setting have no meaningful effect
 - The Allocation page banner and the Goals tab now explain how the priority weighting affects allocation targets, so the logic is transparent and actionable
 - The **Overview "Sintesi Patrimoniale" card** no longer shows a redundant large number at the top. The card now reads as a clean financial statement — asset breakdown flows naturally into the fiscal impact section, with "Pat. Netto Totale" as the clear bottom-line conclusion
@@ -32,3 +38,12 @@
 - **"Since start" performance column** (Δ Inizio) in the Assets table now uses your actual purchase price as the baseline instead of the first monthly snapshot price. The first snapshot is often taken days or weeks after you bought an asset, meaning part of the return was invisible. The column now shows the true return from day one — consistent with the G/P% displayed in the same row
 - **Total unrealized G/P** in the Assets hero now correctly excludes cash accounts from its calculation. Including cash in the cost-basis denominator would artificially lower the percentage — cash doesn't generate investment returns
 - **CAGR tooltips clarified**: the History page chip now explains that its figure includes both investment gains and new contributions (raw wealth growth rate). The Rendimenti page tooltip now explains that contributions are counted as invested capital in the denominator, which is why that figure is typically lower — the two metrics measure different things intentionally
+- **Tab bar style**: Cashflow, FIRE & Simulations, and Settings tabs use an underline sliding indicator instead of a rounded pill
+- **Theme-aware background**: the dashboard main content area now correctly uses theme colors (was fixed gray regardless of selected theme)
+- **Landing page feature grid**: six feature cards now use a unified connected grid with shared hairline separators instead of identical individual card borders
+- **Accessibility — navigation**: skip-to-content link added to the landing page; sidebar, bottom nav, and secondary drawer are now named landmarks for screen reader navigation; active route announced via `aria-current` on all nav items
+- **Accessibility — loading states**: loading spinner on the landing page and the demo button now announce state to screen readers
+- **Accessibility — motion**: bottom nav pill, landing hero, login/register animations now respect the system Reduce Motion preference; all loading spinners stop spinning when Reduce Motion is active
+- **Accessibility — touch targets**: password toggle buttons on login/register enlarged from 28px to 44px
+- **Accessibility — form autofill**: login and register fields now have correct `autoComplete` hints so browsers and password managers fill them correctly
+- **Sidebar accent contrast**: fixed in Retro Arcade (light and dark) and Solar Dusk (light) — active sidebar items now meet WCAG AA contrast in all six themes
