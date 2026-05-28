@@ -555,3 +555,12 @@
   --sidebar-border: oklch(0.3867 0.025 270.0000);
   --sidebar-ring: oklch(0.5676 0.2021 283.0838);
 }
+
+/* Disable continuous rotation for users who prefer reduced motion.
+ * Tailwind's animate-spin has no built-in reduced-motion guard, so we
+ * neutralise it globally here rather than wrapping every spinner. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin {
+    animation: none;
+  }
+}

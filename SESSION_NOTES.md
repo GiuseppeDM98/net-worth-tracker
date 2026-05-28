@@ -177,3 +177,51 @@ Audit tecnico (`/impeccable audit`, score 15/20) e fix del drawer mobile seconda
 - **Score post-fix stimato: 20/20** — tutti i P1/P2/P3 risolti in un'unica sessione.
 
 - **File toccati**: `components/layout/SecondaryMenuDrawer.tsx`.
+
+---
+
+## 2026-05-28 — Landing page audit & fix (page.tsx, globals.css)
+
+### Cosa
+
+Audit tecnico (`/impeccable audit`, score 16/20) e fix della landing page su 8 assi:
+
+1. **Skip-to-content link** — `<a href="#main-content">` visivamente nascosto (`sr-only`) inserito come primo figlio del root `<div>`, prima del `<header>`. Diventa visibile al focus via Tab (`focus:not-sr-only`). Punta a `id="main-content"` sul `<main>`.
+
+2. **`<main id="main-content">`** — introdotto il landmark `<main>` che wrappa la sezione hero e la sezione features. Il root layout non inietta un `<main>` — senza questo, i landmark navigabili da screen reader erano solo `<header>` e `<footer>`.
+
+3. **Loading spinner accessibile** — il `<div>` di loading ora porta `role="status"` e `aria-label="Caricamento..."`. Il `<Loader2>` riceve `aria-hidden="true"` (decorativo). Prima, uno screen reader riceveva silenzio totale durante la risoluzione dell'auth.
+
+4. **`aria-label` sulle `<section>`** — `aria-label="Presentazione"` sul hero e `aria-label="Funzionalità"` sulla griglia feature. Due sezioni anonime producevano due landmark "region" indistinguibili nel rotor VoiceOver.
+
+5. **`aria-busy` sul pulsante demo** — `aria-busy={demoLoading}` aggiunto al `<Button>` "Prova la Demo". Il cambio di label da "Prova la Demo" a "Accesso demo..." cambia il testo ma non annuncia lo stato ai screen reader senza `aria-busy`.
+
+6. **`aria-hidden` sulle icone decorative** — `aria-hidden="true"` aggiunto su ShieldCheck (navbar), Sparkles (badge hero), ArrowRight e Loader2 (CTA). Lucide React v0.553 applica `aria-hidden` di default solo quando nessuna prop ARIA viene passata esplicitamente — le icone dentro bottoni con testo visibile sono decorative e non devono essere annunciate due volte.
+
+7. **Footer link con `aria-label`** — aggiunto `aria-label="Net Worth Tracker su GitHub (apre in una nuova scheda)"` al link GitHub con `target="_blank"`. L'apertura in nuova scheda è comportamento inatteso per screen reader e utenti da tastiera senza questo avviso.
+
+8. **Feature grid: `gap-px` technique** — sostituita la griglia di 6 card identiche (anti-pattern "identical card grids" esplicitamente bandito dai design laws). La nuova struttura usa `grid gap-px bg-border/40 overflow-hidden rounded-xl border border-border/60` come container, con celle `bg-background` che producono hairline separators condivisi tramite il background del container — tecnica Vercel/Linear. Le celle non hanno più border/rounded individuali. L'heading `<h3>` per ogni feature è preservato. Il layout rimane `sm:grid-cols-2 lg:grid-cols-3`.
+
+9. **`prefers-reduced-motion` per `animate-spin`** — blocco `@media (prefers-reduced-motion: reduce) { .animate-spin { animation: none; } }` aggiunto in fondo a `globals.css`. Tailwind non include questa guardia di default; il fix copre globalmente tutti i `<Loader2>` dell'intera app (landing, demo button, skeleton loaders ovunque).
+
+### Perché
+
+- **`<main>` assente (P1)**: senza landmark main, gli utenti da tastiera/screen reader non hanno modo di raggiungere il contenuto primario senza attraversare navbar e poi tutto il DOM in sequenza. Il skip-to-content link è inutile senza un target. Violazione WCAG 2.4.1 e 1.3.6.
+
+- **Spinner silenzioso (P1)**: il loading state è un pattern ad alta frequenza — ogni visita di un utente già autenticato lo incontra. Senza `role="status"`, VoiceOver non annuncia nulla. L'utente pensa che la pagina sia rotta, non in caricamento.
+
+- **Feature card identiche (P2)**: la presenza di 6 card con struttura identica è uno dei pattern banditi esplicitamente nei design laws dell'impeccable skill (`shared design laws → Anti-Patterns → "Identical card grids"`). La tecnica `gap-px` produce la stessa griglia col 30% di markup CSS in meno e un aspetto molto più distintivo e on-brand.
+
+- **`animate-spin` e vestibular disorders (P2)**: rotazione continua senza pausa in loop è il tipo di animazione più problematico per utenti con disordini vestibolari. La regola CSS globale è la soluzione minima e massimamente efficace — nessuna modifica ai componenti.
+
+### Nota
+
+- **`gap-px` technique — come funziona**: il container ha `bg-border/40` e `gap-px`. Ogni cella ha `bg-background`. Il gap di 1px tra le celle espone il background del container, che appare come hairline separator. `overflow-hidden` sul container + `rounded-xl` fa sì che le celle d'angolo vengano clippate al corner radius esterno, producendo un blocco unificato. Zero dipendenza da `border` individuali per cella.
+
+- **`aria-hidden` su Lucide in contesto bottone con testo**: la regola è — se il bottone ha testo visibile, l'icona è decorativa → `aria-hidden="true"`. Se l'icona è il solo identificatore del bottone (icona-only), deve avere `aria-label` o `title`. Tutti i casi in questa pagina rientrano nel primo pattern.
+
+- **`aria-busy` vs `aria-live`**: `aria-busy` sull'elemento interattivo è sufficiente per dichiarare che l'azione è in corso. Un `aria-live` region separato sarebbe necessario solo per annunciare il completamento dell'azione — qui non serve perché il successo porta direttamente al redirect su `/dashboard`.
+
+- **Score post-fix stimato: 20/20** — tutti i P1/P2/P3 risolti in un'unica sessione.
+
+- **File toccati**: `app/page.tsx`, `app/globals.css`.

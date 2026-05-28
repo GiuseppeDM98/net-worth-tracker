@@ -73,7 +73,7 @@ export default function HomePage() {
   const router = useRouter();
   const [demoLoading, setDemoLoading] = useState(false);
 
-  // Redirect authenticated users straight to the dashboard
+  // Redirect authenticated users straight to the dashboard.
   useEffect(() => {
     if (!loading && user) {
       router.push('/dashboard');
@@ -85,7 +85,7 @@ export default function HomePage() {
     setDemoLoading(true);
     try {
       await signIn(DEMO_EMAIL, DEMO_PASSWORD);
-      // AuthContext will update `user` → the useEffect above will push to /dashboard
+      // AuthContext will update `user` → the useEffect above will push to /dashboard.
     } catch {
       toast.error('Impossibile accedere alla demo. Riprova più tardi.');
       setDemoLoading(false);
@@ -96,8 +96,12 @@ export default function HomePage() {
   // landing page for users who are already signed in.
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div
+        role="status"
+        aria-label="Caricamento..."
+        className="flex min-h-screen items-center justify-center bg-background"
+      >
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" aria-hidden="true" />
       </div>
     );
   }
@@ -107,11 +111,19 @@ export default function HomePage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
+      {/* Skip-to-content for keyboard users — visually hidden until focused. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:left-4 focus:top-4 focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:ring-2 focus:ring-ring"
+      >
+        Vai al contenuto principale
+      </a>
+
       {/* ── Navbar ────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-primary" />
+            <ShieldCheck className="h-5 w-5 text-primary" aria-hidden="true" />
             <span className="text-sm font-semibold tracking-tight">Net Worth Tracker</span>
           </div>
           <Button variant="ghost" size="sm" asChild>
@@ -120,87 +132,102 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* ── Hero ──────────────────────────────────────────────────────── */}
-      <section className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center px-4 py-24 text-center sm:px-6">
-        <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-muted/50 px-3 py-1 text-xs text-muted-foreground">
-          <Sparkles className="h-3 w-3" />
-          Progetto open source per investitori italiani
-        </div>
+      <main id="main-content">
+        {/* ── Hero ──────────────────────────────────────────────────────── */}
+        <section
+          aria-label="Presentazione"
+          className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center px-4 py-24 text-center sm:px-6"
+        >
+          <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-muted/50 px-3 py-1 text-xs text-muted-foreground">
+            <Sparkles className="h-3 w-3" aria-hidden="true" />
+            Progetto open source per investitori italiani
+          </div>
 
-        <h1 className="mb-4 text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
-          Il tuo patrimonio,{' '}
-          <span className="text-primary">sotto controllo</span>
-        </h1>
+          <h1 className="mb-4 text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
+            Il tuo patrimonio,{' '}
+            <span className="text-primary">sotto controllo</span>
+          </h1>
 
-        <p className="mb-10 max-w-xl text-base text-muted-foreground sm:text-lg">
-          Traccia asset, cashflow, dividendi e performance in un&apos;unica app.
-          Pianifica il FIRE, analizza i rendimenti e lascia che l&apos;AI ti aiuti a capire la tua situazione finanziaria.
-        </p>
+          <p className="mb-10 max-w-xl text-base text-muted-foreground sm:text-lg">
+            Traccia asset, cashflow, dividendi e performance in un&apos;unica app.
+            Pianifica il FIRE, analizza i rendimenti e lascia che l&apos;AI ti aiuti a capire la tua situazione finanziaria.
+          </p>
 
-        <div className="flex flex-col items-center gap-3 sm:flex-row">
-          {DEMO_ENABLED && (
+          <div className="flex flex-col items-center gap-3 sm:flex-row">
+            {DEMO_ENABLED && (
+              <Button
+                size="lg"
+                onClick={handleDemoLogin}
+                disabled={demoLoading}
+                aria-busy={demoLoading}
+                className="w-full sm:w-auto"
+              >
+                {demoLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                    Accesso demo...
+                  </>
+                ) : (
+                  <>
+                    Prova la Demo
+                    <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+                  </>
+                )}
+              </Button>
+            )}
             <Button
+              variant={DEMO_ENABLED ? 'outline' : 'default'}
               size="lg"
-              onClick={handleDemoLogin}
-              disabled={demoLoading}
+              asChild
               className="w-full sm:w-auto"
             >
-              {demoLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Accesso demo...
-                </>
-              ) : (
-                <>
-                  Prova la Demo
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </>
-              )}
+              <Link href="/login">Accedi</Link>
             </Button>
-          )}
-          <Button
-            variant={DEMO_ENABLED ? 'outline' : 'default'}
-            size="lg"
-            asChild
-            className="w-full sm:w-auto"
-          >
-            <Link href="/login">Accedi</Link>
-          </Button>
-        </div>
-
-        {DEMO_ENABLED && (
-          <p className="mt-4 text-xs text-muted-foreground">
-            La demo è in sola lettura — nessun dato viene modificato.
-          </p>
-        )}
-      </section>
-
-      {/* ── Features grid ─────────────────────────────────────────────── */}
-      <section className="border-t border-border/60 bg-muted/30 px-4 py-16 sm:px-6">
-        <div className="mx-auto max-w-6xl">
-          <h2 className="mb-2 text-center text-2xl font-bold tracking-tight">
-            Tutto quello che ti serve
-          </h2>
-          <p className="mb-10 text-center text-sm text-muted-foreground">
-            Costruito da un investitore italiano per investitori italiani.
-          </p>
-
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map(({ icon: Icon, title, description }) => (
-              <div
-                key={title}
-                className="rounded-xl border border-border/60 bg-background p-5 transition-colors hover:border-border"
-              >
-                <div className="mb-3 inline-flex rounded-lg bg-primary/10 p-2">
-                  <Icon className="h-5 w-5 text-primary" />
-                </div>
-                <h3 className="mb-1 text-sm font-semibold">{title}</h3>
-                <p className="text-xs leading-relaxed text-muted-foreground">{description}</p>
-              </div>
-            ))}
           </div>
-        </div>
-      </section>
+
+          {DEMO_ENABLED && (
+            <p className="mt-4 text-xs text-muted-foreground">
+              La demo è in sola lettura — nessun dato viene modificato.
+            </p>
+          )}
+        </section>
+
+        {/* ── Features ──────────────────────────────────────────────────── */}
+        <section
+          aria-label="Funzionalità"
+          className="border-t border-border/60 bg-muted/30 px-4 py-16 sm:px-6"
+        >
+          <div className="mx-auto max-w-6xl">
+            <h2 className="mb-2 text-center text-2xl font-bold tracking-tight">
+              Tutto quello che ti serve
+            </h2>
+            <p className="mb-10 text-center text-sm text-muted-foreground">
+              Costruito da un investitore italiano per investitori italiani.
+            </p>
+
+            {/*
+             * Gap-px grid: the container bg color becomes the grid line.
+             * Each cell carries its own bg-background, so the thin gaps
+             * between cells produce hairline separators without per-cell
+             * borders. overflow-hidden + rounded-xl clips cells to the
+             * outer corner radius.
+             */}
+            <div className="grid gap-px overflow-hidden rounded-xl border border-border/60 bg-border/40 sm:grid-cols-2 lg:grid-cols-3">
+              {FEATURES.map(({ icon: Icon, title, description }) => (
+                <div key={title} className="flex gap-4 bg-background p-5 sm:p-6">
+                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                    <Icon className="h-4 w-4 text-primary" aria-hidden="true" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-semibold">{title}</h3>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      </main>
 
       {/* ── Footer ────────────────────────────────────────────────────── */}
       <footer className="border-t border-border/60 py-6 text-center text-xs text-muted-foreground">
@@ -209,6 +236,7 @@ export default function HomePage() {
           href="https://github.com/GiuseppeDM98/net-worth-tracker"
           target="_blank"
           rel="noopener noreferrer"
+          aria-label="Net Worth Tracker su GitHub (apre in una nuova scheda)"
           className="underline underline-offset-2 hover:text-foreground"
         >
           GitHub
