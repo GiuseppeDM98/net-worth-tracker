@@ -18,6 +18,7 @@
 - Fixed: the overview loading spinner was remounting on every parent re-render, causing a flicker during the count-up animation
 - Fixed: loading skeleton on the Overview page now includes the charts section, preventing a layout shift when data loads
 - Fixed: password mismatch error on Register now stays visible inline under the confirmation field (not just a disappearing toast)
+- Fixed: benchmark chart tooltip label was invisible in all dark themes — the date label used a hardcoded near-black color that disappeared on dark backgrounds. Now correctly uses the theme's foreground color token across all six themes
 
 ## 🔧 Improvements
 
@@ -75,3 +76,9 @@
 - Improved: Allocation page asset class cards and sub-category rows are now fully keyboard-navigable — Tab focuses each drillable item, Enter or Space opens the detail view or sub-category drill-down (WCAG 2.1.1)
 - Improved: Allocation page buy/sell/hold chips (COMPRA, VENDI, OK) now follow the active color theme — COMPRA uses the warning palette and VENDI uses the destructive palette across all six themes instead of fixed orange and red
 - Improved: Allocation page loading skeleton now matches the page container dimensions precisely, eliminating a brief layout shift on the horizontal margins when portfolio data loads
+- Improved: Performance page metric values (TWR, Sharpe, ROI, etc.) now adapt their green/red colors to all six color themes instead of using fixed Tailwind green and red values that clashed with non-default themes
+- Improved: Portfolio line in the benchmark growth-of-100 chart now follows the active color theme, matching the rolling CAGR and Sharpe charts on the same page
+- Improved: Heatmap zero-return months now use the theme's neutral background color instead of a fixed gray, staying consistent across all six themes
+- Improved: AI Analysis button hover glow now derives from the theme's accent color instead of a hardcoded purple, adapting correctly to all six color themes
+- Improved: Benchmark comparison table and monthly returns heatmap now have proper semantic column and row headers, enabling screen reader users to navigate them as structured data tables (WCAG 1.3.1)
+- Improved: Screen readers now announce the active custom date range period in the Rendimenti period selector — previously, selecting a custom range left all tab buttons unselected with no announcement of the active state

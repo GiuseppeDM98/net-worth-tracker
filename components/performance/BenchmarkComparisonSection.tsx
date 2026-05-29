@@ -230,7 +230,7 @@ export function BenchmarkComparisonSection({
                 Converti benchmark in EUR
               </Label>
               {convertToEur && fxError && (
-                <span className="text-xs text-red-500 dark:text-red-400">
+                <span className="text-xs text-destructive">
                   ⚠ Tassi di cambio non disponibili
                 </span>
               )}

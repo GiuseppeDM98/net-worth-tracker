@@ -28,6 +28,12 @@
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
   --color-warning-border: var(--warning-border);
+  /* Semantic positive (green) — mirrors --destructive for the positive half of metric values.
+     Custom themes that do not override --positive inherit the default light/dark value. */
+  --color-positive: var(--positive);
+  --color-positive-foreground: var(--positive-foreground);
+  /* AI feature accent — isolates the purple glow from hardcoded rgba values. */
+  --color-ai-accent: var(--ai-accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -69,6 +75,9 @@
   --warning: oklch(0.986 0.022 90);
   --warning-foreground: oklch(0.468 0.098 75);
   --warning-border: oklch(0.855 0.062 85);
+  --positive: oklch(0.627 0.194 149.214);
+  --positive-foreground: oklch(1 0 0);
+  --ai-accent: oklch(0.65 0.2 305);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -106,6 +115,11 @@
   --warning: oklch(0.260 0.038 78);
   --warning-foreground: oklch(0.854 0.090 82);
   --warning-border: oklch(0.460 0.085 75);
+  /* Lighter green for dark mode — matches the luminance contrast patterns of other
+     dark-mode semantic tokens (e.g. --destructive shifts from 0.577 to 0.704). */
+  --positive: oklch(0.740 0.156 148.655);
+  --positive-foreground: oklch(0.145 0 0);
+  --ai-accent: oklch(0.65 0.2 305);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
