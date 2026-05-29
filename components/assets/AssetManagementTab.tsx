@@ -219,6 +219,7 @@ export function AssetManagementTab({ assets, allAssets, loading, onRefresh, snap
     setEditingAsset(null);
     if (user?.uid) {
       queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(user.uid) });
     }
   };
 

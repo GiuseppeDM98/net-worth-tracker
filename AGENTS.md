@@ -57,6 +57,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 
 ### React Query and Derived State
 - Invalidate all related caches after mutations
+- **Asset mutations require dual cache invalidation**: `onClose` handlers after `AssetDialog` must invalidate BOTH `queryKeys.assets.all` AND `queryKeys.dashboard.overview`. The hero block on the Patrimonio page reads from `useDashboardOverview` — a separate RQ key from `useAssets`. Invalidating only `assets.all` updates the asset cards and table but leaves the hero total stale until the TTL expires or a manual refresh. Rule: any close handler after an asset mutation must call `invalidateQueries` for both keys. Applied in `handleCashDialogClose` (`assets/page.tsx`) and `handleDialogClose` (`AssetManagementTab.tsx`).
 - Never remove tabs from `mountedTabs`
 - For state-preserving tab UIs, keep per-scope active tab state explicitly (e.g. separate sub-tab state for `Anno Corrente` and `Storico`) instead of sharing one global sub-tab value
 - Use `useMemo` for derived state; do not use `useEffect + setState` for computed values

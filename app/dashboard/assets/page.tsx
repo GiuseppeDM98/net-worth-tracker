@@ -281,9 +281,10 @@ export default function AssetsPage() {
   const handleCashDialogClose = () => {
     setCashEditOpen(false);
     setSelectedCashAsset(null);
-    // Invalidate assets so the card grid and the table reflect any changes.
+    // Invalidate assets + overview so the card grid, table, and hero block reflect any changes.
     if (user?.uid) {
       queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(user.uid) });
     }
   };
 

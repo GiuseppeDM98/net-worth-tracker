@@ -11,6 +11,7 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed: editing an asset (cash balance, ETF quantity, manual price, or any other field) on the Portfolio page now immediately updates the portfolio total, monthly/annual variations, and sparkline in the hero block — no manual page refresh required
 - Fixed: column headers in the Analisi page transaction details (Sankey drill-down and pie chart drill-down) no longer overlap with row content when scrolling — the header background was semi-transparent, causing rows scrolling underneath to bleed through
 - Fixed the "Auto-calculate Equity/Bonds" toggle in Settings not persisting after a page refresh — disabling it would revert to enabled on reload because the setting was never saved explicitly
 - Fixed a color regression in the Cashflow Sankey chart: after drilling into a spending category (e.g. "Rifiuti") and pressing "Indietro", the panel header reverted to the subcategory's derived gray color instead of the parent type's original color (e.g. blue for "Spese Fisse"). Navigation now correctly restores the original type color at every level
