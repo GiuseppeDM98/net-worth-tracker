@@ -78,6 +78,13 @@ function PerformancePeriodSelector({
 
   return (
     <>
+      {/* Announce the active period to screen readers.
+          Standard tabs use aria-selected; the CUSTOM period has no tab button so it
+          needs an explicit live region so SR users know which period is selected. */}
+      <div role="status" aria-live="polite" className="sr-only">
+        {effective === null ? 'Periodo personalizzato attivo' : `Periodo ${effective} selezionato`}
+      </div>
+
       {/* Mobile (<1440px): scrollable pill */}
       <div className="desktop:hidden">
         <div role="tablist" aria-label="Periodo di analisi" className="flex rounded-xl bg-muted p-1 gap-1">
@@ -699,7 +706,7 @@ export default function PerformancePage() {
               }}
               disabled={isDemo || !metrics || metrics.hasInsufficientData}
               title={isDemo ? 'Non disponibile in modalità demo' : undefined}
-              className="group gap-2 transition-[border-color,color,box-shadow] duration-200 hover:border-purple-400 hover:text-purple-600 hover:shadow-[0_0_14px_rgba(139,92,246,0.35)] dark:hover:text-purple-400 dark:hover:border-purple-500"
+              className="group gap-2 transition-[border-color,color,box-shadow] duration-200 hover:border-[var(--ai-accent)] hover:text-[var(--ai-accent)] hover:shadow-[0_0_14px_color-mix(in_oklch,var(--ai-accent)_40%,transparent)]"
             >
               <Sparkles className="h-4 w-4 transition-transform duration-200 group-hover:rotate-12 group-hover:scale-110" />
               Analizza con AI

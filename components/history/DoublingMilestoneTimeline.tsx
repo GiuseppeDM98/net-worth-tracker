@@ -7,27 +7,41 @@ import { fastStaggerContainer, listItem, progressSettleTransition } from '@/lib/
 import { hasCelebrated, markCelebrated, shouldReduceMotion } from '@/lib/utils/celebrationUtils';
 import { EmptyState, SeedlingIcon } from '@/components/ui/EmptyState';
 
+// Module-level helpers — stable references, not recreated on every render.
+
+/**
+ * Format a duration in months to a compact "Ya Xm" string.
+ * Example: 27 months → "2a 3m"
+ */
+function formatMonthDuration(months: number): string {
+  const years = Math.floor(months / 12);
+  const remainingMonths = months % 12;
+  if (years > 0) return `${years}a ${remainingMonths}m`;
+  return `${remainingMonths}m`;
+}
+
+/**
+ * Return the display label for a milestone.
+ * Threshold mode shows the target value (e.g. "€100.000"); geometric shows "N° Raddoppio".
+ */
+function getMilestoneLabel(milestone: DoublingMilestone): string {
+  if (milestone.milestoneType === 'threshold' && milestone.thresholdValue) {
+    return formatCurrency(milestone.thresholdValue);
+  }
+  return `${milestone.milestoneNumber}° Raddoppio`;
+}
+
 interface DoublingMilestoneTimelineProps {
   milestones: DoublingMilestone[];
   currentInProgress: DoublingMilestone | null;
 }
 
 /**
- * Display timeline of doubling milestones with visual cards.
+ * Timeline of completed and in-progress doubling milestones.
  *
- * Shows each milestone as a card with:
- * - Badge indicating milestone number and completion status
- * - Start and end values with arrow
- * - Duration in years and months
- * - Period label (MM/YY - MM/YY)
- * - Progress bar for incomplete milestones
- *
- * Visual distinction:
- * - Complete milestones: green badge, standard border
- * - In-progress milestones: blue badge, blue border, progress bar
- *
- * @param milestones - Array of completed milestones
- * @param currentInProgress - Current milestone in progress (if any)
+ * Complete milestones use the positive token (green); the in-progress card uses
+ * the primary token so it stays theme-aware across all 6 color themes.
+ * Progress bar uses var(--chart-1) for the same reason — no hardcoded blue.
  */
 export function DoublingMilestoneTimeline({
   milestones,
@@ -35,7 +49,6 @@ export function DoublingMilestoneTimeline({
 }: DoublingMilestoneTimelineProps) {
   const prefersReducedMotion = useReducedMotion();
 
-  // Combine completed milestones with current in-progress
   const allMilestones = [...milestones];
   if (currentInProgress) {
     allMilestones.push(currentInProgress);
@@ -62,15 +75,14 @@ export function DoublingMilestoneTimeline({
   }, [allMilestones.length, prefersReducedMotion]);
 
   // Celebrate each newly-seen completed milestone once.
-  // Delay by 800ms so the stagger list animation finishes before confetti fires.
-  // Canvas-confetti is loaded lazily to keep it out of the main bundle.
+  // Delay 800ms so the stagger animation finishes before confetti fires.
+  // canvas-confetti is lazily imported to stay out of the main bundle.
   useEffect(() => {
     if (shouldReduceMotion()) return;
 
     const completedMilestones = milestones.filter((m) => m.isComplete);
     if (completedMilestones.length === 0) return;
 
-    // Build the list of milestones that still need a celebration this session
     const uncelebrated = completedMilestones.filter((m) => {
       const key = `milestone_${m.milestoneType}_${m.milestoneNumber}`;
       return !hasCelebrated(key);
@@ -79,7 +91,6 @@ export function DoublingMilestoneTimeline({
     if (uncelebrated.length === 0) return;
 
     const timer = setTimeout(async () => {
-      // Dynamic import keeps canvas-confetti out of the initial page bundle
       const confetti = (await import('canvas-confetti')).default;
 
       for (const milestone of uncelebrated) {
@@ -92,20 +103,16 @@ export function DoublingMilestoneTimeline({
           gravity: 1.2,
           scalar: 0.8,
         });
-        // Mark before the animation resolves — we don't want to retry if the
-        // tab is closed mid-animation
+        // Mark before animation resolves — prevents retry if the tab closes mid-animation
         markCelebrated(key);
       }
     }, 800);
 
     return () => clearTimeout(timer);
+    // Re-runs when milestones changes (initial load delivers [] then real data).
+    // hasCelebrated + markCelebrated guarantee each milestone fires exactly once.
   }, [milestones]);
-  // Re-runs when milestones changes (initial load delivers [] then real data).
-  // hasCelebrated + markCelebrated ensure each milestone fires exactly once,
-  // even if milestones reference changes on subsequent re-renders.
 
-  // Guide comment: Empty state handling
-  // Show encouraging message when no milestones exist yet
   if (allMilestones.length === 0) {
     return (
       <EmptyState
@@ -116,41 +123,6 @@ export function DoublingMilestoneTimeline({
     );
   }
 
-  /**
-   * Format duration in months to readable "Ya Xm" format.
-   *
-   * Converts total months to years + months for better readability.
-   * Example: 27 months → "2a 3m"
-   *
-   * @param months - Total duration in months
-   * @returns Formatted duration string
-   */
-  function formatMonthDuration(months: number): string {
-    const years = Math.floor(months / 12);
-    const remainingMonths = months % 12;
-
-    if (years > 0) {
-      return `${years}a ${remainingMonths}m`;
-    }
-    return `${remainingMonths}m`;
-  }
-
-  /**
-   * Get milestone label based on type.
-   *
-   * For geometric: "1° Raddoppio", "2° Raddoppio", etc.
-   * For threshold: "€100k", "€200k", etc.
-   *
-   * @param milestone - Milestone object
-   * @returns Label string for display
-   */
-  function getMilestoneLabel(milestone: DoublingMilestone): string {
-    if (milestone.milestoneType === 'threshold' && milestone.thresholdValue) {
-      return formatCurrency(milestone.thresholdValue);
-    }
-    return `${milestone.milestoneNumber}° Raddoppio`;
-  }
-
   return (
     <motion.div
       variants={fastStaggerContainer}
@@ -158,10 +130,6 @@ export function DoublingMilestoneTimeline({
       animate="visible"
       className="space-y-3"
     >
-      {/* Guide comment: Render milestone cards with visual distinction
-          Complete milestones: green badge with checkmark
-          In-progress milestones: blue badge with progress bar
-          This creates clear visual hierarchy for user engagement */}
       {allMilestones.slice(0, visibleMilestones).map((milestone) => (
         <motion.div
           key={`${milestone.milestoneType}-${milestone.milestoneNumber}`}
@@ -170,55 +138,63 @@ export function DoublingMilestoneTimeline({
           animate="visible"
           className={cn(
             'rounded-lg border p-4 transition-colors',
-            !milestone.isComplete && 'border-blue-300 bg-blue-50/50 dark:bg-blue-950/20'
+            // In-progress card uses primary token so accent color tracks the active theme
+            !milestone.isComplete && 'border-primary/30 bg-primary/5'
           )}
         >
-          {/* Header: Badge + Duration */}
+          {/* Badge + duration */}
           <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <span
-                className={cn(
-                  'px-2 py-1 rounded-md text-xs font-semibold',
-                  milestone.isComplete
-                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
-                    : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100'
-                )}
-              >
-                {getMilestoneLabel(milestone)}
-                {!milestone.isComplete && ' - In Corso'}
-              </span>
-            </div>
-            <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <span
+              className={cn(
+                'px-2 py-1 rounded-md text-xs font-semibold',
+                milestone.isComplete
+                  ? 'bg-positive/10 text-positive'
+                  : 'bg-primary/10 text-primary'
+              )}
+            >
+              {getMilestoneLabel(milestone)}
+              {!milestone.isComplete && ' - In Corso'}
+            </span>
+            <span className="text-sm font-medium text-foreground">
               {formatMonthDuration(milestone.durationMonths)}
-            </div>
+            </span>
           </div>
 
-          {/* Values Row */}
+          {/* Values row */}
           <div className="flex items-center gap-2 text-sm mb-2">
-            <span className="font-medium text-gray-900 dark:text-gray-100">
+            <span className="font-medium text-foreground">
               {formatCurrency(milestone.startValue)}
             </span>
-            <span className="text-gray-400">→</span>
-            <span className="font-medium text-gray-900 dark:text-gray-100">
+            <span className="text-muted-foreground">→</span>
+            <span className="font-medium text-foreground">
               {formatCurrency(milestone.endValue)}
             </span>
           </div>
 
-          {/* Period Label */}
-          <div className="text-xs text-gray-500 dark:text-gray-400">
+          {/* Period label */}
+          <div className="text-xs text-muted-foreground">
             {milestone.periodLabel}
           </div>
 
-          {/* Progress Bar (for incomplete milestones) */}
+          {/* Progress bar for incomplete milestones */}
           {!milestone.isComplete && milestone.progressPercentage !== undefined && (
             <div className="mt-3">
-              <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
+              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                 <span>Progresso</span>
                 <span>{milestone.progressPercentage.toFixed(0)}%</span>
               </div>
-              <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              {/* role="progressbar" on the track container, not the fill — WCAG 4.1.2 */}
+              <div
+                className="h-2 bg-muted rounded-full overflow-hidden"
+                role="progressbar"
+                aria-valuenow={Math.round(milestone.progressPercentage)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="Progresso verso il prossimo traguardo"
+              >
                 <motion.div
-                  className="h-full bg-blue-500 rounded-full"
+                  className="h-full rounded-full"
+                  style={{ background: 'var(--chart-1)' }}
                   initial={false}
                   animate={{ width: `${milestone.progressPercentage}%` }}
                   transition={progressSettleTransition}

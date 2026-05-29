@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import { BenchmarkMonthlyReturn, BenchmarkDefinition, FxMonthlyRate, EcbMonthlyRate } from '@/types/benchmarks';
 import { MonthlyReturnHeatmapData } from '@/types/performance';
+import { useChartColors } from '@/lib/hooks/useChartColors';
 
 interface BenchmarkComparisonChartProps {
   // User portfolio monthly returns (from prepareMonthlyReturnsHeatmap)
@@ -332,6 +333,8 @@ export function BenchmarkComparisonChart({
   ecbRates,
   ecbError,
 }: BenchmarkComparisonChartProps) {
+  // chartColors[0] makes the portfolio line theme-aware (matches rolling charts on the same page).
+  const chartColors = useChartColors();
   // Period-accurate risk-free rate: arithmetic mean of ECB deposit facility rates
   // over the evaluation window. Falls back to user setting if ECB data unavailable.
   const effectiveRiskFreeRate = useMemo(
@@ -480,15 +483,13 @@ export function BenchmarkComparisonChart({
 
   const fmtInt = (value: number) => value.toString();
 
+  // Use design tokens instead of hardcoded tailwind color classes so that all 6
+  // themes render consistent semantic colors without manual dark: overrides.
   const colorClass = (value: number | null) =>
-    value != null && value >= 0
-      ? 'text-green-600 dark:text-green-400'
-      : 'text-red-600 dark:text-red-400';
+    value != null && value >= 0 ? 'text-positive' : 'text-destructive';
 
   const negColorClass = (value: number | null) =>
-    value != null && value < 0
-      ? 'text-red-600 dark:text-red-400'
-      : 'text-muted-foreground';
+    value != null && value < 0 ? 'text-destructive' : 'text-muted-foreground';
 
   return (
     <div className="space-y-4">
@@ -508,7 +509,7 @@ export function BenchmarkComparisonChart({
           />
           <Tooltip
             contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--card-foreground)' }}
-            labelStyle={{ fontWeight: 600, color: '#111827' }}
+            labelStyle={{ fontWeight: 600, color: 'var(--card-foreground)' }}
             formatter={(value, name) => {
               const num = value as number;
               const label = name === 'portfolio'
@@ -525,7 +526,7 @@ export function BenchmarkComparisonChart({
           <Line
             type="monotone"
             dataKey="portfolio"
-            stroke="var(--chart-1, #3b82f6)"
+            stroke={chartColors[0]}
             strokeWidth={2.5}
             dot={false}
             animationDuration={800}
@@ -555,18 +556,18 @@ export function BenchmarkComparisonChart({
           <table className="w-full text-sm border-collapse" style={{ minWidth: '700px' }}>
             <thead>
               <tr className="border-b border-border">
-                <th className="text-left py-2 pr-3 font-medium text-muted-foreground whitespace-nowrap">Portafoglio</th>
-                <th className="text-right py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">TWR ann.</th>
-                <th className="text-right py-2 px-2 font-medium text-muted-foreground whitespace-nowrap hidden sm:table-cell">Crescita tot.</th>
-                <th className="text-right py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Volatilità</th>
-                <th className="text-right py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Sharpe</th>
-                <th className="text-right py-2 px-2 font-medium text-muted-foreground whitespace-nowrap hidden md:table-cell">Sortino</th>
-                <th className="text-right py-2 px-2 font-medium text-muted-foreground whitespace-nowrap hidden md:table-cell">Calmar</th>
-                <th className="text-right py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Max DD</th>
-                <th className="text-right py-2 px-2 font-medium text-muted-foreground whitespace-nowrap hidden sm:table-cell">Miglior mese</th>
-                <th className="text-right py-2 px-2 font-medium text-muted-foreground whitespace-nowrap hidden sm:table-cell">Peggior mese</th>
-                <th className="text-right py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Mesi +</th>
-                <th className="text-right py-2 pl-2 font-medium text-muted-foreground whitespace-nowrap hidden sm:table-cell">Mesi -</th>
+                <th scope="col" className="text-left py-2 pr-3 font-medium text-muted-foreground whitespace-nowrap">Portafoglio</th>
+                <th scope="col" className="text-right py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">TWR ann.</th>
+                <th scope="col" className="text-right py-2 px-2 font-medium text-muted-foreground whitespace-nowrap hidden sm:table-cell">Crescita tot.</th>
+                <th scope="col" className="text-right py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Volatilità</th>
+                <th scope="col" className="text-right py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Sharpe</th>
+                <th scope="col" className="text-right py-2 px-2 font-medium text-muted-foreground whitespace-nowrap hidden md:table-cell">Sortino</th>
+                <th scope="col" className="text-right py-2 px-2 font-medium text-muted-foreground whitespace-nowrap hidden md:table-cell">Calmar</th>
+                <th scope="col" className="text-right py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Max DD</th>
+                <th scope="col" className="text-right py-2 px-2 font-medium text-muted-foreground whitespace-nowrap hidden sm:table-cell">Miglior mese</th>
+                <th scope="col" className="text-right py-2 px-2 font-medium text-muted-foreground whitespace-nowrap hidden sm:table-cell">Peggior mese</th>
+                <th scope="col" className="text-right py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Mesi +</th>
+                <th scope="col" className="text-right py-2 pl-2 font-medium text-muted-foreground whitespace-nowrap hidden sm:table-cell">Mesi -</th>
               </tr>
             </thead>
             <tbody>
@@ -574,7 +575,7 @@ export function BenchmarkComparisonChart({
               <tr className="border-b border-border/50">
                 <td className="py-2 pr-3">
                   <div className="flex items-center gap-2">
-                    <div className="h-2 w-5 rounded-full bg-[var(--chart-1,#3b82f6)]" />
+                    <div className="h-2 w-5 rounded-full" style={{ backgroundColor: chartColors[0] }} />
                     <span className="font-medium whitespace-nowrap">Il Tuo Portafoglio</span>
                   </div>
                 </td>
@@ -608,7 +609,7 @@ export function BenchmarkComparisonChart({
                   </span>
                 </td>
                 <td className="text-right py-2 px-2 tabular-nums hidden sm:table-cell">
-                  <span className="text-green-600 dark:text-green-400">
+                  <span className="text-positive">
                     {fmtPct(metricsSummary.portfolioMetrics.bestMonth)}
                   </span>
                 </td>
@@ -617,11 +618,11 @@ export function BenchmarkComparisonChart({
                     {fmtPct(metricsSummary.portfolioMetrics.worstMonth)}
                   </span>
                 </td>
-                <td className="text-right py-2 px-2 tabular-nums text-green-600 dark:text-green-400">
+                <td className="text-right py-2 px-2 tabular-nums text-positive">
                   {fmtInt(metricsSummary.portfolioMetrics.positiveMonths)}
                   <span className="text-muted-foreground font-normal">/{fmtInt(metricsSummary.portfolioMetrics.totalMonths)}</span>
                 </td>
-                <td className="text-right py-2 pl-2 tabular-nums text-red-600 dark:text-red-400 hidden sm:table-cell">
+                <td className="text-right py-2 pl-2 tabular-nums text-destructive hidden sm:table-cell">
                   {fmtInt(metricsSummary.portfolioMetrics.negativeMonths)}
                   <span className="text-muted-foreground font-normal">/{fmtInt(metricsSummary.portfolioMetrics.totalMonths)}</span>
                 </td>
@@ -663,15 +664,15 @@ export function BenchmarkComparisonChart({
                       {m ? <span className={negColorClass(m.maxDrawdown)}>{fmtPct(m.maxDrawdown)}</span> : '–'}
                     </td>
                     <td className="text-right py-2 px-2 tabular-nums hidden sm:table-cell">
-                      {m ? <span className="text-green-600 dark:text-green-400">{fmtPct(m.bestMonth)}</span> : '–'}
+                      {m ? <span className="text-positive">{fmtPct(m.bestMonth)}</span> : '–'}
                     </td>
                     <td className="text-right py-2 px-2 tabular-nums hidden sm:table-cell">
                       {m ? <span className={negColorClass(m.worstMonth)}>{fmtPct(m.worstMonth)}</span> : '–'}
                     </td>
-                    <td className="text-right py-2 px-2 tabular-nums text-green-600 dark:text-green-400">
+                    <td className="text-right py-2 px-2 tabular-nums text-positive">
                       {m ? <>{fmtInt(m.positiveMonths)}<span className="text-muted-foreground font-normal">/{fmtInt(m.totalMonths)}</span></> : '–'}
                     </td>
-                    <td className="text-right py-2 pl-2 tabular-nums text-red-600 dark:text-red-400 hidden sm:table-cell">
+                    <td className="text-right py-2 pl-2 tabular-nums text-destructive hidden sm:table-cell">
                       {m ? <>{fmtInt(m.negativeMonths)}<span className="text-muted-foreground font-normal">/{fmtInt(m.totalMonths)}</span></> : '–'}
                     </td>
                   </tr>

@@ -9,6 +9,7 @@ import { formatCurrency, formatPercentage } from '@/lib/services/chartService';
 import { cn } from '@/lib/utils';
 import { useCountUp } from '@/lib/utils/useCountUp';
 import { metricSettleTransition } from '@/lib/utils/motionVariants';
+import { getMetricValueColor } from '@/lib/utils/metricColors';
 
 export interface HeroMetricBlockProps {
   label: string;
@@ -37,14 +38,6 @@ function formatValue(val: number | null, format: HeroMetricBlockProps['format'])
   }
 }
 
-function getValueColor(val: number | null, format: HeroMetricBlockProps['format']): string {
-  if (val === null) return 'text-muted-foreground';
-  if (format === 'percentage' || format === 'number') {
-    if (val > 0) return 'text-green-600 dark:text-green-400';
-    if (val < 0) return 'text-red-600 dark:text-red-400';
-  }
-  return 'text-foreground';
-}
 
 export function HeroMetricBlock({
   label,
@@ -84,7 +77,7 @@ export function HeroMetricBlock({
             transition={metricSettleTransition}
             className={cn(
               'font-mono text-4xl font-bold tabular-nums leading-none tracking-tight',
-              getValueColor(value, format)
+              getMetricValueColor(value, format)
             )}
           >
             {formatValue(animatedValue, format)}

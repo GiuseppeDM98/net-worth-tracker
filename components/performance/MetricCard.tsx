@@ -8,6 +8,7 @@ import { formatCurrency, formatPercentage } from '@/lib/services/chartService';
 import { cn } from '@/lib/utils';
 import { useCountUp } from '@/lib/utils/useCountUp';
 import { metricSettleTransition } from '@/lib/utils/motionVariants';
+import { getMetricValueColor } from '@/lib/utils/metricColors';
 
 export interface MetricCardProps {
   title: string;
@@ -38,14 +39,6 @@ function formatValue(val: number | null, format: MetricCardProps['format']): str
   }
 }
 
-function getValueColor(val: number | null, format: MetricCardProps['format']): string {
-  if (val === null) return 'text-muted-foreground';
-  if (format === 'percentage' || format === 'number') {
-    if (val > 0) return 'text-green-600 dark:text-green-400';
-    if (val < 0) return 'text-red-600 dark:text-red-400';
-  }
-  return 'text-foreground';
-}
 
 /**
  * MetricCard — flat list row for secondary performance metrics.
@@ -91,7 +84,7 @@ export function MetricCard({
       {/* Right: value + subtitle + tooltip */}
       <div className="flex shrink-0 items-center gap-2">
         <div className="text-right">
-          <p className={cn('font-mono text-sm font-semibold tabular-nums', getValueColor(value, format))}>
+          <p className={cn('font-mono text-sm font-semibold tabular-nums', getMetricValueColor(value, format))}>
             {formatValue(animatedValue, format)}
           </p>
           {subtitle && (

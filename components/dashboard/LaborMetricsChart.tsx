@@ -40,59 +40,79 @@ export default function LaborMetricsChart({ data, isMobile }: LaborMetricsChartP
   }
 
   return (
-    <ResponsiveContainer width="100%" height={isMobile ? 280 : 400}>
-      <LineChart data={data} margin={{ left: isMobile ? 10 : 50, bottom: 20 }}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis
-          dataKey="period"
-          tick={{ fontSize: isMobile ? 10 : 12 }}
-        />
-        <YAxis
-          width={isMobile ? 70 : 100}
-          tickFormatter={(value) => formatCurrencyCompact(value)}
-          tick={{ fontSize: isMobile ? 10 : 12 }}
-        />
-        <Tooltip
-          formatter={fmtCurrency}
-          contentStyle={{
-            backgroundColor: 'var(--card)',
-            border: '1px solid var(--border)',
-            color: 'var(--card-foreground)',
-          }}
-          labelStyle={{ color: 'var(--foreground)' }}
-        />
-        <Legend />
-        <Line
-          type="monotone"
-          dataKey="laborIncome"
-          stroke={chartColors[0]}
-          strokeWidth={2}
-          name="Guadagnato da Lavoro"
-          dot={{ r: 3 }}
-          animationDuration={800}
-          animationEasing="ease-out"
-        />
-        <Line
-          type="monotone"
-          dataKey="savedFromWork"
-          stroke={chartColors[1]}
-          strokeWidth={2}
-          name="Risparmiato da Lavoro"
-          dot={{ r: 3 }}
-          animationDuration={800}
-          animationEasing="ease-out"
-        />
-        <Line
-          type="monotone"
-          dataKey="investmentGrowth"
-          stroke={chartColors[4]}
-          strokeWidth={2}
-          name="Crescita Investimenti (Lordo)"
-          dot={{ r: 3 }}
-          animationDuration={800}
-          animationEasing="ease-out"
-        />
-      </LineChart>
-    </ResponsiveContainer>
+    <>
+      <ResponsiveContainer width="100%" height={isMobile ? 280 : 400}>
+        <LineChart data={data} margin={{ left: isMobile ? 10 : 50, bottom: 20 }}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis
+            dataKey="period"
+            tick={{ fontSize: isMobile ? 10 : 12 }}
+          />
+          <YAxis
+            width={isMobile ? 70 : 100}
+            tickFormatter={(value) => formatCurrencyCompact(value)}
+            tick={{ fontSize: isMobile ? 10 : 12 }}
+          />
+          <Tooltip
+            formatter={fmtCurrency}
+            contentStyle={{
+              backgroundColor: 'var(--card)',
+              border: '1px solid var(--border)',
+              color: 'var(--card-foreground)',
+            }}
+            labelStyle={{ color: 'var(--foreground)' }}
+          />
+          {/* Legend labels are long — hidden on mobile and replaced by the inline legend below */}
+          <Legend wrapperStyle={{ display: isMobile ? 'none' : 'block', paddingTop: '20px' }} />
+          <Line
+            type="monotone"
+            dataKey="laborIncome"
+            stroke={chartColors[0]}
+            strokeWidth={2}
+            name="Guadagnato da Lavoro"
+            dot={{ r: 3 }}
+            animationDuration={800}
+            animationEasing="ease-out"
+          />
+          <Line
+            type="monotone"
+            dataKey="savedFromWork"
+            stroke={chartColors[1]}
+            strokeWidth={2}
+            name="Risparmiato da Lavoro"
+            dot={{ r: 3 }}
+            animationDuration={800}
+            animationEasing="ease-out"
+          />
+          <Line
+            type="monotone"
+            dataKey="investmentGrowth"
+            stroke={chartColors[4]}
+            strokeWidth={2}
+            name="Crescita Investimenti (Lordo)"
+            dot={{ r: 3 }}
+            animationDuration={800}
+            animationEasing="ease-out"
+          />
+        </LineChart>
+      </ResponsiveContainer>
+
+      {isMobile && (
+        <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-3 px-1">
+          <div className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: chartColors[0] }} />
+            <span className="text-xs text-muted-foreground">Guadagnato</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: chartColors[1] }} />
+            <span className="text-xs text-muted-foreground">Risparmiato</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: chartColors[4] }} />
+            <span className="text-xs text-muted-foreground">Investimenti</span>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

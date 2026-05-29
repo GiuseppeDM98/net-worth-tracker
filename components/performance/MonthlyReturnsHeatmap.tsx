@@ -28,7 +28,8 @@ function getReturnColor(returnValue: number | null): string {
   if (returnValue <= -5) return 'bg-red-600 dark:bg-red-700';
   if (returnValue < -2) return 'bg-red-400 dark:bg-red-500';
   if (returnValue < 0) return 'bg-red-200 dark:bg-red-400';
-  if (returnValue === 0) return 'bg-gray-200 dark:bg-gray-700';
+  // bg-muted instead of a hardcoded gray so zero-return cells follow the theme token.
+  if (returnValue === 0) return 'bg-muted';
   if (returnValue < 2) return 'bg-green-200 dark:bg-green-400';
   if (returnValue < 5) return 'bg-green-400 dark:bg-green-500';
   return 'bg-green-600 dark:bg-green-700';
@@ -86,9 +87,9 @@ export function MonthlyReturnsHeatmap({ data, revealKey }: MonthlyReturnsHeatmap
       <table className="w-full border-collapse text-xs desktop:text-sm">
         <thead>
           <tr>
-            <th className="border border-border p-1 desktop:p-2 bg-muted font-semibold text-left sticky left-0 z-10">Anno</th>
+            <th scope="col" className="border border-border p-1 desktop:p-2 bg-muted font-semibold text-left sticky left-0 z-10">Anno</th>
             {columnHeaders.map(({ month, letter }) => (
-              <th key={month} className="border border-border p-1 desktop:p-2 bg-muted font-semibold text-center">
+              <th key={month} scope="col" className="border border-border p-1 desktop:p-2 bg-muted font-semibold text-center">
                 <span className="desktop:hidden">{letter}</span>
                 <span className="hidden desktop:inline">{month}</span>
               </th>
@@ -109,7 +110,7 @@ export function MonthlyReturnsHeatmap({ data, revealKey }: MonthlyReturnsHeatmap
                     }
               }
             >
-              <td className="border border-border p-1 desktop:p-2 bg-muted font-semibold sticky left-0 z-10">{yearData.year}</td>
+              <th scope="row" className="border border-border p-1 desktop:p-2 bg-muted font-semibold sticky left-0 z-10">{yearData.year}</th>
               {yearData.months.map((monthData, monthIndex) => {
                 const bgColor = getReturnColor(monthData.return);
                 const textColor = getTextColor(monthData.return);
