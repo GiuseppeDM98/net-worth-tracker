@@ -45,6 +45,8 @@ interface PeriodPickerProps {
 
 export function PeriodPicker({ value, onChange, availableYears = [], className }: PeriodPickerProps) {
   const isMobile = useMediaQuery('(max-width: 639px)');
+  // Stable reference: preset labels are relative to «today» and don't change mid-session.
+  const now = React.useMemo(() => new Date(), []);
 
   const {
     open, setOpen,
@@ -56,8 +58,6 @@ export function PeriodPicker({ value, onChange, availableYears = [], className }
     handlePreset, handleRangeSelect, handleApply,
     handleFromTextChange, handleToTextChange,
   } = usePeriodPicker({ value, onChange, availableYears });
-
-  const now = new Date();
 
   // ── Shared: trigger button ─────────────────────────────────────────────────
 

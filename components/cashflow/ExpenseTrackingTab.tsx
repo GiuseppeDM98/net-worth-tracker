@@ -56,7 +56,8 @@ import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useChartColors } from '@/lib/hooks/useChartColors';
-import { PeriodPicker, type Period, periodToRange, periodLabel, currentMonthPeriod } from '@/components/ui/period-picker';
+import { PeriodPicker } from '@/components/ui/period-picker';
+import { type Period, periodToRange, periodLabel, currentMonthPeriod, isCurrentMonth } from '@/lib/utils/period';
 
 // Coverage ratio → Italian health label (mirrors the same function in the dashboard overview page).
 function coverageHealthLabel(ratio: number): string {
@@ -309,14 +310,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   };
 
   // A filter is "active" (non-default) if period ≠ current month or any taxonomy filter is set.
-  const nowForDefaults = new Date();
-  const defaultYear = nowForDefaults.getFullYear();
-  const defaultMonth = nowForDefaults.getMonth() + 1;
-  const isPeriodDefault =
-    period.kind === 'month' &&
-    period.year === defaultYear &&
-    period.month === defaultMonth;
-  const hasActiveFilters = !isPeriodDefault || selectedType !== 'all' || selectedCategoryId !== 'all' || selectedSubCategoryId !== 'all';
+  const hasActiveFilters = !isCurrentMonth(period) || selectedType !== 'all' || selectedCategoryId !== 'all' || selectedSubCategoryId !== 'all';
 
   // Derive period slice from allExpenses synchronously.
   const expenses = useMemo(() => {

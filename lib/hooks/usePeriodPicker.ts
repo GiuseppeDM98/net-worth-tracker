@@ -3,8 +3,7 @@
 import * as React from 'react';
 import { type DateRange } from 'react-day-picker';
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, isSameDay, isSameMonth } from 'date-fns';
-import { type Locale } from 'date-fns/locale';
-import { it } from 'date-fns/locale';
+import { type Locale, it } from 'date-fns/locale';
 import {
   type Period,
   periodToRange,
@@ -78,14 +77,16 @@ export function usePeriodPicker({
   const [fromText, setFromText] = React.useState('');
   const [toText, setToText] = React.useState('');
 
-  // Re-sync calendar state whenever the picker opens
+  // Re-sync calendar state whenever the picker opens — intentionally excludes `value`
+  // so an in-progress calendar selection is not reset when the parent re-renders.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   React.useEffect(() => {
     if (open) {
       const r = periodToRange(value);
       setCalendarRange({ from: r.from, to: r.to });
       setCalendarMonth(r.from);
     }
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // Keep text inputs in sync with calendar range
   React.useEffect(() => {
@@ -134,12 +135,18 @@ export function usePeriodPicker({
     if (parsed) setCalendarRange(prev => ({ from: prev?.from ?? parsed, to: parsed }));
   };
 
-  const now = new Date();
-  const last3Years = [...availableYears].sort((a, b) => b - a).slice(0, 3);
-  const last5Months = Array.from({ length: 5 }, (_, i) => {
-    const d = subMonths(now, i);
-    return { year: d.getFullYear(), month: d.getMonth() + 1 };
-  });
+  const last3Years = React.useMemo(
+    () => [...availableYears].sort((a, b) => b - a).slice(0, 3),
+    [availableYears],
+  );
+
+  const last5Months = React.useMemo(
+    () => Array.from({ length: 5 }, (_, i) => {
+      const d = subMonths(new Date(), i);
+      return { year: d.getFullYear(), month: d.getMonth() + 1 };
+    }),
+    [],
+  );
 
   const label = periodLabel(value);
 

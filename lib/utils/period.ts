@@ -5,6 +5,7 @@
 
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, startOfDay, endOfDay } from 'date-fns';
 import { it } from 'date-fns/locale';
+import { MONTH_NAMES } from '@/lib/constants/months';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -20,16 +21,14 @@ export const MONTH_NAMES_SHORT = [
   'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic',
 ] as const;
 
-export const MONTH_NAMES_FULL = [
-  'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
-  'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
-] as const;
+// Re-export canonical month names (single source of truth in lib/constants/months.ts).
+export { MONTH_NAMES };
 
 // ─── Public helpers ───────────────────────────────────────────────────────────
 
 /** Human-readable label for a Period. */
 export function periodLabel(period: Period): string {
-  if (period.kind === 'month') return `${MONTH_NAMES_FULL[period.month - 1]} ${period.year}`;
+  if (period.kind === 'month') return `${MONTH_NAMES[period.month - 1]} ${period.year}`;
   if (period.kind === 'year') return String(period.year);
   const from = format(period.from, 'd MMM yyyy', { locale: it });
   const to = format(period.to, 'd MMM yyyy', { locale: it });
