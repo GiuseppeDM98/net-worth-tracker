@@ -10,7 +10,7 @@ export type ExpenseType = 'fixed' | 'variable' | 'debt' | 'income';
 
 export const EXPENSE_TYPE_LABELS: Record<ExpenseType, string> = {
   fixed: 'Spese Fisse',
-  variable: 'Variabili',
+  variable: 'Spese Variabili',
   debt: 'Debiti',
   income: 'Entrate',
 };

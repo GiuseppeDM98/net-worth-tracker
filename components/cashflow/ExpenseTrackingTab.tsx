@@ -58,6 +58,7 @@ import { cn } from '@/lib/utils';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { PeriodPicker } from '@/components/ui/period-picker';
 import { type Period, periodToRange, periodLabel, currentMonthPeriod, isCurrentMonth } from '@/lib/utils/period';
+import { MultiSelect, type MultiSelectGroup, type MultiSelectOption } from '@/components/ui/multi-select';
 
 // Coverage ratio → Italian health label (mirrors the same function in the dashboard overview page).
 function coverageHealthLabel(ratio: number): string {
@@ -275,10 +276,9 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   // Mobile load-more state
   const [mobileShowCount, setMobileShowCount] = useState<number>(20);
 
-  // Separate state for each filter level enables independent reset logic.
-  // Single state object would complicate cascading resets (Type → Category → Subcategory).
-  const [selectedType, setSelectedType] = useState<string>('all');
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
+  // Multi-select category filter: values are either a real categoryId or
+  // a synthetic "__type__<type>" sentinel that matches all categories of that type.
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   const [selectedSubCategoryId, setSelectedSubCategoryId] = useState<string>('all');
 
 
@@ -289,28 +289,56 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
     return Array.from(new Set(years)).sort((a, b) => b - a);
   }, [allExpenses]);
 
-  const handleSelectType = (type: string) => {
-    setSelectedType(type);
-    // Reset downstream filters when type changes
-    setSelectedCategoryId('all');
-    setSelectedSubCategoryId('all');
-  };
-
-  const handleSelectCategory = (categoryId: string) => {
-    setSelectedCategoryId(categoryId);
-    // Reset subcategory when category changes
+  const handleSelectCategories = (values: string[]) => {
+    const ORDER: ExpenseType[] = ['income', 'fixed', 'variable', 'debt'];
+    const result: string[] = [];
+    for (const type of ORDER) {
+      const typeCats = categories.filter(c => c.type === type);
+      if (typeCats.length === 0) continue;
+      const sentinel = `${TYPE_PREFIX}${type}`;
+      const sentinelSelected = values.includes(sentinel);
+      const presentCatIds = typeCats.filter(c => values.includes(c.id)).map(c => c.id);
+      const prevSentinelSelected = selectedCategoryIds.includes(sentinel);
+      if (sentinelSelected) {
+        if (!prevSentinelSelected) {
+          // Sentinel just added → store sentinel only (covers all of this type)
+          result.push(sentinel);
+        } else {
+          // Sentinel was already active — check if all individuals are still present
+          const allPresent = typeCats.every(c => values.includes(c.id));
+          if (allPresent) {
+            result.push(sentinel);
+          } else {
+            // User deselected an individual → demote to remaining individual IDs
+            result.push(...presentCatIds);
+          }
+        }
+      } else {
+        if (prevSentinelSelected) {
+          // Sentinel was just removed → deselect ALL of this type
+        } else {
+          // Normal individual toggle — auto-promote when all are individually selected
+          const allPresent = typeCats.length > 0 && typeCats.every(c => values.includes(c.id));
+          if (allPresent) {
+            result.push(sentinel);
+          } else {
+            result.push(...presentCatIds);
+          }
+        }
+      }
+    }
+    setSelectedCategoryIds(result);
     setSelectedSubCategoryId('all');
   };
 
   const handleResetFilters = () => {
     setPeriod(currentMonthPeriod());
-    setSelectedType('all');
-    setSelectedCategoryId('all');
+    setSelectedCategoryIds([]);
     setSelectedSubCategoryId('all');
   };
 
   // A filter is "active" (non-default) if period ≠ current month or any taxonomy filter is set.
-  const hasActiveFilters = !isCurrentMonth(period) || selectedType !== 'all' || selectedCategoryId !== 'all' || selectedSubCategoryId !== 'all';
+  const hasActiveFilters = !isCurrentMonth(period) || selectedCategoryIds.length > 0 || selectedSubCategoryId !== 'all';
 
   // Derive period slice from allExpenses synchronously.
   const expenses = useMemo(() => {
@@ -331,7 +359,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   // Reset mobile show count when filters change
   useEffect(() => {
     setMobileShowCount(20);
-  }, [period, selectedType, selectedCategoryId, selectedSubCategoryId]);
+  }, [period, selectedCategoryIds, selectedSubCategoryId]);
 
   // Toggling another row collapses the previously expanded one (accordion pattern).
   const handleToggleExpand = useCallback((id: string) => {
@@ -452,31 +480,70 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   };
 
   // Filter options for Type
-  const typeOptions = useMemo(() => [
-    { value: 'all', label: 'Tutte' },
-    { value: 'income', label: EXPENSE_TYPE_LABELS.income },
-    { value: 'fixed', label: EXPENSE_TYPE_LABELS.fixed },
-    { value: 'variable', label: EXPENSE_TYPE_LABELS.variable },
-    { value: 'debt', label: EXPENSE_TYPE_LABELS.debt },
-  ], []);
+  // Prefix used to distinguish type-level sentinels from real category IDs.
+  const TYPE_PREFIX = '__type__';
 
-  // Filter options for Category based on selected type
-  const categoryOptions = useMemo(() => {
-    if (selectedType === 'all') return [];
-    return categories.filter(cat => cat.type === selectedType);
-  }, [categories, selectedType]);
+  // Build grouped MultiSelect options: one group per ExpenseType, each with a
+  // "Tutte le <tipo>" sentinel at the top followed by the real categories.
+  // sentinel options use badgeLabel for short badge text and separator: true for visual divider.
+  // Individual options use groupKey to suppress their badge when their sentinel is selected.
+  const categoryMultiSelectOptions = useMemo((): MultiSelectGroup[] => {
+    const ORDER: ExpenseType[] = ['income', 'fixed', 'variable', 'debt'];
+    return ORDER
+      .map(type => {
+        const cats = categories.filter(c => c.type === type);
+        if (cats.length === 0) return null;
+        return {
+          heading: EXPENSE_TYPE_LABELS[type],
+          options: [
+            {
+              value: `${TYPE_PREFIX}${type}`,
+              label: `Tutte le ${EXPENSE_TYPE_LABELS[type]}`,
+              badgeLabel: EXPENSE_TYPE_LABELS[type],
+              separator: true,
+            } as MultiSelectOption,
+            ...cats.map(cat => ({
+              value: cat.id,
+              label: cat.name,
+              groupKey: `${TYPE_PREFIX}${type}`,
+            } as MultiSelectOption)),
+          ],
+        };
+      })
+      .filter((g): g is MultiSelectGroup => g !== null);
+  }, [categories]);
 
-  // Filter options for Subcategory based on selected category
+  // Expand sentinels to individual IDs so checkboxes appear checked in the dropdown.
+  // State stores sentinels; the MultiSelect component receives the expanded set.
+  const multiSelectValue = useMemo(() => {
+    const result: string[] = [];
+    for (const v of selectedCategoryIds) {
+      if (v.startsWith(TYPE_PREFIX)) {
+        const type = v.slice(TYPE_PREFIX.length) as ExpenseType;
+        result.push(v); // include sentinel itself
+        categories.filter(c => c.type === type).forEach(c => result.push(c.id));
+      } else {
+        result.push(v);
+      }
+    }
+    return result;
+  }, [selectedCategoryIds, categories]);
+
+  // Subcategory options: only when exactly ONE plain category (not a type sentinel) is selected.
+  const soloSelectedCategory = useMemo(() => {
+    const plainSelected = selectedCategoryIds.filter(v => !v.startsWith(TYPE_PREFIX));
+    if (plainSelected.length !== 1) return null;
+    return categories.find(c => c.id === plainSelected[0]) ?? null;
+  }, [categories, selectedCategoryIds]);
+
   const subCategoryOptions = useMemo(() => {
-    if (selectedCategoryId === 'all') return [];
-    const selectedCategory = categories.find(cat => cat.id === selectedCategoryId);
-    if (!selectedCategory) return [];
-    return selectedCategory.subCategories.map(sub => ({
+    if (!soloSelectedCategory) return [];
+    return soloSelectedCategory.subCategories.map(sub => ({
       ...sub,
-      categoryName: selectedCategory.name,
-      categoryId: selectedCategory.id,
+      categoryName: soloSelectedCategory.name,
+      categoryId: soloSelectedCategory.id,
     }));
-  }, [categories, selectedCategoryId]);
+  }, [soloSelectedCategory]);
 
   /**
    * Cumulative AND filtering (progressive narrowing)
@@ -496,23 +563,28 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   const filteredExpenses = useMemo(() => {
     let filtered = [...expenses];
 
-    // Filter by type
-    if (selectedType !== 'all') {
-      filtered = filtered.filter(expense => expense.type === selectedType);
+    if (selectedCategoryIds.length > 0) {
+      // Collect which type sentinels and which plain category IDs are active.
+      const activeTypes = new Set(
+        selectedCategoryIds
+          .filter(v => v.startsWith(TYPE_PREFIX))
+          .map(v => v.slice(TYPE_PREFIX.length) as ExpenseType)
+      );
+      const activeCatIds = new Set(
+        selectedCategoryIds.filter(v => !v.startsWith(TYPE_PREFIX))
+      );
+      filtered = filtered.filter(
+        e => activeTypes.has(e.type) || activeCatIds.has(e.categoryId)
+      );
     }
 
-    // Filter by category (only if a type is selected)
-    if (selectedType !== 'all' && selectedCategoryId !== 'all') {
-      filtered = filtered.filter(expense => expense.categoryId === selectedCategoryId);
-    }
-
-    // Filter by subcategory (only if a type and category are selected)
-    if (selectedType !== 'all' && selectedCategoryId !== 'all' && selectedSubCategoryId !== 'all') {
-      filtered = filtered.filter(expense => expense.subCategoryId === selectedSubCategoryId);
+    // Subcategory filter only applies when a single category is selected
+    if (soloSelectedCategory && selectedSubCategoryId !== 'all') {
+      filtered = filtered.filter(e => e.subCategoryId === selectedSubCategoryId);
     }
 
     return filtered;
-  }, [expenses, selectedType, selectedCategoryId, selectedSubCategoryId]);
+  }, [expenses, selectedCategoryIds, soloSelectedCategory, selectedSubCategoryId]);
 
   // Calculate totals from filtered expenses
   const totalIncome = calculateTotalIncome(filteredExpenses);
@@ -650,47 +722,22 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
               className="w-full desktop:w-auto desktop:flex-shrink-0"
             />
 
-            {/* Tipo + Categoria — 2-col grid on mobile, inline on desktop */}
-            <div className="grid grid-cols-2 gap-2 desktop:flex desktop:gap-2">
-              <Select value={selectedType} onValueChange={handleSelectType}>
-                <SelectTrigger id="filter-type" aria-label="Filtra per tipo" className="desktop:min-w-[130px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {typeOptions.map(opt => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select
-                value={selectedCategoryId}
-                onValueChange={handleSelectCategory}
-                disabled={selectedType === 'all' || categoryOptions.length === 0}
-              >
-                <SelectTrigger id="filter-category" aria-label="Filtra per categoria" className="desktop:min-w-[140px]">
-                  <SelectValue placeholder="Tutte" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tutte</SelectItem>
-                  {categoryOptions.map(cat => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      <span className="flex items-center gap-2">
-                        {cat.color && (
-                          <span
-                            className="inline-block w-2 h-2 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: cat.color }}
-                          />
-                        )}
-                        {cat.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Categorie — MultiSelect grouped by type */}
+            <MultiSelect
+              options={categoryMultiSelectOptions}
+              defaultValue={multiSelectValue}
+              onValueChange={handleSelectCategories}
+              placeholder="Tutte le categorie"
+              searchable
+              hideSelectAll
+              maxCount={2}
+              className="desktop:min-w-[220px]"
+              popoverClassName="w-[280px]"
+              resetOnDefaultValueChange={true}
+            />
 
             {/* Sottocategoria — full row on mobile, inline on desktop */}
-            {selectedCategoryId !== 'all' && subCategoryOptions.length > 0 && (
+            {soloSelectedCategory && subCategoryOptions.length > 0 && (
               <Select value={selectedSubCategoryId} onValueChange={setSelectedSubCategoryId}>
                 <SelectTrigger id="filter-subcategory" aria-label="Filtra per sottocategoria" className="w-full desktop:min-w-[150px]">
                   <SelectValue placeholder="Tutte" />
