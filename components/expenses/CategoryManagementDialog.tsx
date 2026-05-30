@@ -1,38 +1,6 @@
 'use client';
 
-/**
- * CategoryManagementDialog Component
- *
- * Dialog for creating and editing expense categories with subcategory management.
- *
- * Features:
- * - Create/Edit Category: Form with name, type, and color picker
- * - Subcategory CRUD: Add, remove subcategories inline
- * - Smart Deletion: Checks for expenses using subcategory before deletion
- * - Reassignment Flow: Triggers CategoryDeleteConfirmDialog if subcategory has expenses
- * - Validation: Zod schema with custom refinement for type immutability on edit
- * - Color Picker: Predefined palette with visual color swatches
- *
- * Design Considerations:
- * - Category type can be changed; all associated expenses are batch-updated via updateExpensesType()
- * - Crossing income ↔ expense boundary flips all amount signs automatically
- * - Deleting subcategories with expenses requires reassignment to prevent data loss
- * - Form resets on dialog close to clear stale state
- *
- * WARNING (Checklist Comment):
- * If you modify subcategory deletion logic, also update:
- * - CategoryDeleteConfirmDialog.tsx (handles reassignment flow)
- * - lib/services/expenseService.ts (reassignment implementation)
- *
- * @param open - Controls dialog visibility
- * @param onClose - Callback when dialog closes
- * @param category - Optional category to edit (undefined for create mode)
- * @param onSuccess - Callback after successful create/update
- * @param initialType - Pre-select type for create mode (used by parent dialogs)
- * @param initialName - Pre-fill name for create mode (used by inline creation)
- */
-
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -42,7 +10,7 @@ import {
   ExpenseCategoryFormData,
   ExpenseType,
   EXPENSE_TYPE_LABELS,
-  ExpenseSubCategory
+  ExpenseSubCategory,
 } from '@/types/expenses';
 import {
   createCategory,
@@ -54,12 +22,7 @@ import {
   reassignExpensesSubCategory,
 } from '@/lib/services/expenseService';
 import { CategoryDeleteConfirmDialog } from './CategoryDeleteConfirmDialog';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -68,50 +31,29 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Plus, X, ArrowRightLeft } from 'lucide-react';
+import { Plus, X, ArrowRightLeft, Check, Tag } from 'lucide-react';
 import { CategoryMoveDialog } from './CategoryMoveDialog';
 import { moveExpensesFromSubCategory } from '@/lib/services/expenseService';
+import { cn } from '@/lib/utils';
 
-/**
- * Teacher Comment: Zod Schema with Custom Refinement
- *
- * Base schema validates name, type, and optional color.
- * Custom refinement (if added) would enforce business rules like:
- * - Type immutability on edit (type can't change after category created)
- * - Name uniqueness validation (no duplicate category names)
- *
- * Current implementation uses simple schema. Type changes are allowed and
- * cascade to all associated expenses via updateExpensesType() in expenseCategoryService.
- */
+
+// ---------------------------------------------------------------------------
+// Schema
+// ---------------------------------------------------------------------------
 const categorySchema = z.object({
-  name: z.string().min(1, 'Category name is required'),
+  name: z.string().min(1, 'Il nome è obbligatorio'),
   type: z.enum(['fixed', 'variable', 'debt', 'income']),
   color: z.string().optional(),
 });
 
 type CategoryFormValues = z.infer<typeof categorySchema>;
 
-interface CategoryManagementDialogProps {
-  open: boolean;
-  onClose: () => void;
-  category?: ExpenseCategory | null;
-  onSuccess?: () => void;
-  initialType?: ExpenseType;
-  initialName?: string;
-}
-
-const expenseTypes: { value: ExpenseType; label: string }[] = [
-  { value: 'fixed', label: EXPENSE_TYPE_LABELS.fixed },
-  { value: 'variable', label: EXPENSE_TYPE_LABELS.variable },
-  { value: 'debt', label: EXPENSE_TYPE_LABELS.debt },
-  { value: 'income', label: EXPENSE_TYPE_LABELS.income },
-];
-
-// Colori predefiniti per le categorie
-const categoryColors = [
+// ---------------------------------------------------------------------------
+// Static data
+// ---------------------------------------------------------------------------
+const CATEGORY_COLORS: { value: string; label: string }[] = [
   { value: '#ef4444', label: 'Rosso' },
   { value: '#f97316', label: 'Arancione' },
   { value: '#f59e0b', label: 'Giallo' },
@@ -123,6 +65,237 @@ const categoryColors = [
   { value: '#64748b', label: 'Grigio' },
 ];
 
+// For screen-reader labels (AGENTS.md: Color Picker Buttons)
+const COLOR_LABELS: Record<string, string> = Object.fromEntries(
+  CATEGORY_COLORS.map((c) => [c.value, c.label])
+);
+
+const TYPE_OPTIONS: { value: ExpenseType; label: string; description: string }[] = [
+  { value: 'variable', label: EXPENSE_TYPE_LABELS.variable, description: 'Ristorante, shopping, svago, imprevisti' },
+  { value: 'fixed',    label: EXPENSE_TYPE_LABELS.fixed,    description: 'Affitto, abbonamenti, bollette, utenze' },
+  { value: 'debt',     label: EXPENSE_TYPE_LABELS.debt,     description: 'Mutuo, prestito, finanziamento ricorrente' },
+  { value: 'income',   label: EXPENSE_TYPE_LABELS.income,   description: 'Stipendio, bonus, dividendi, rimborsi' },
+];
+
+// ---------------------------------------------------------------------------
+// Props
+// ---------------------------------------------------------------------------
+export interface CategoryManagementDialogProps {
+  open: boolean;
+  onClose: () => void;
+  category?: ExpenseCategory | null;
+  onSuccess?: () => void;
+  initialType?: ExpenseType;
+  initialName?: string;
+  /** Pre-fill the new-subcategory input when opening in edit mode */
+  initialSubCategoryName?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Form body — shared between Dialog and Drawer shells
+// ---------------------------------------------------------------------------
+interface FormBodyProps {
+  category?: ExpenseCategory | null;
+  subCategories: ExpenseSubCategory[];
+  setSubCategories: (subs: ExpenseSubCategory[]) => void;
+  newSubCategoryName: string;
+  setNewSubCategoryName: (v: string) => void;
+  handleAddSubCategory: () => void;
+  handleRemoveSubCategory: (id: string) => void;
+  handleMoveSubCategory: ((id: string) => void) | null;
+  form: ReturnType<typeof useForm<CategoryFormValues>>;
+}
+
+function CategoryFormBody({
+  category,
+  subCategories,
+  setSubCategories,
+  newSubCategoryName,
+  setNewSubCategoryName,
+  handleAddSubCategory,
+  handleRemoveSubCategory,
+  handleMoveSubCategory,
+  form,
+}: FormBodyProps) {
+  const { register, setValue, control, formState: { errors } } = form;
+  const selectedColor = useWatch({ control, name: 'color' });
+  const selectedType  = useWatch({ control, name: 'type' });
+  const subInputRef   = useRef<HTMLInputElement>(null);
+
+  return (
+    <div className="space-y-6">
+      {/* ---- Nome ---- */}
+      <div className="space-y-2">
+        <Label htmlFor="cat-name">Nome categoria *</Label>
+        <Input
+          id="cat-name"
+          {...register('name')}
+          placeholder="es. Alimentari, Trasporti, Stipendio"
+          className={errors.name ? 'border-destructive' : ''}
+          autoFocus
+        />
+        {errors.name && (
+          <p className="text-xs text-destructive">{errors.name.message}</p>
+        )}
+      </div>
+
+      {/* ---- Tipo ---- */}
+      <div className="space-y-2">
+        <Label htmlFor="cat-type">Tipo di voce *</Label>
+        <Select
+          value={selectedType}
+          onValueChange={(v) => setValue('type', v as ExpenseType)}
+        >
+          <SelectTrigger id="cat-type" aria-label="Tipo di voce">
+            <span className={cn(!selectedType && 'text-muted-foreground')}>
+              {selectedType ? EXPENSE_TYPE_LABELS[selectedType as ExpenseType] : 'Seleziona tipo'}
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            {TYPE_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                <div className="flex flex-col gap-0.5 py-0.5">
+                  <span className="font-medium">{opt.label}</span>
+                  <span className="text-xs text-muted-foreground font-normal">{opt.description}</span>
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {errors.type && (
+          <p className="text-xs text-destructive">{errors.type.message}</p>
+        )}
+        {category && selectedType !== category.type && (() => {
+          const crossesBoundary = (category.type === 'income') !== (selectedType === 'income');
+          return crossesBoundary ? (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              Attenzione: tutti gli importi cambieranno segno (da {EXPENSE_TYPE_LABELS[category.type]} a {EXPENSE_TYPE_LABELS[selectedType as ExpenseType]}).
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Il tipo verrà aggiornato su tutte le transazioni associate.
+            </p>
+          );
+        })()}
+      </div>
+
+      {/* ---- Colore ---- */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Label>Colore</Label>
+          {selectedColor && (
+            <span className="text-xs text-muted-foreground">{COLOR_LABELS[selectedColor] ?? selectedColor}</span>
+          )}
+        </div>
+        <div
+          className="flex flex-wrap gap-2.5"
+          role="radiogroup"
+          aria-label="Colore categoria"
+        >
+          {CATEGORY_COLORS.map((c) => {
+            const isSelected = selectedColor === c.value;
+            return (
+              <button
+                key={c.value}
+                type="button"
+                role="radio"
+                aria-checked={isSelected}
+                aria-label={`${c.label}${isSelected ? ' (selezionato)' : ''}`}
+                onClick={() => setValue('color', c.value)}
+                className={cn(
+                  'w-8 h-8 rounded-full border-2 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                  isSelected
+                    ? 'border-foreground scale-110 shadow-md'
+                    : 'border-transparent hover:scale-105'
+                )}
+                style={{ backgroundColor: c.value }}
+              >
+                {isSelected && (
+                  <Check className="w-3.5 h-3.5 text-white mx-auto drop-shadow" aria-hidden="true" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ---- Sottocategorie ---- */}
+      <div className="space-y-3">
+        <Label>Sottocategorie <span className="text-muted-foreground font-normal">(opzionali)</span></Label>
+
+        {/* Existing list */}
+        {subCategories.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {subCategories.map((sub) => (
+              <div
+                key={sub.id}
+                className="group flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full text-xs font-medium bg-muted border border-border/60 hover:border-border transition-colors"
+              >
+                <Tag className="w-3 h-3 text-muted-foreground shrink-0" aria-hidden="true" />
+                <span className="max-w-[120px] truncate">{sub.name}</span>
+                {handleMoveSubCategory && (
+                  <button
+                    type="button"
+                    onClick={() => handleMoveSubCategory(sub.id)}
+                    className="ml-0.5 p-0.5 rounded-full opacity-0 group-hover:opacity-100 hover:bg-blue-100 dark:hover:bg-blue-950 transition-all focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    aria-label={`Sposta transazioni di ${sub.name}`}
+                    title="Sposta transazioni"
+                  >
+                    <ArrowRightLeft className="w-3 h-3 text-blue-500" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleRemoveSubCategory(sub.id)}
+                  className="p-0.5 rounded-full hover:bg-destructive/15 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  aria-label={`Rimuovi sottocategoria ${sub.name}`}
+                >
+                  <X className="w-3 h-3 text-muted-foreground hover:text-destructive" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Add new */}
+        <div className="flex items-center gap-2">
+          <Input
+            ref={subInputRef}
+            placeholder="Nuova sottocategoria…"
+            value={newSubCategoryName}
+            onChange={(e) => setNewSubCategoryName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleAddSubCategory();
+              }
+            }}
+            className="text-sm"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => {
+              handleAddSubCategory();
+              subInputRef.current?.focus();
+            }}
+            aria-label="Aggiungi sottocategoria"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Premi Invio o + per aggiungere. Clicca &times; su un chip per rimuovere.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 export function CategoryManagementDialog({
   open,
   onClose,
@@ -130,12 +303,14 @@ export function CategoryManagementDialog({
   onSuccess,
   initialType,
   initialName,
+  initialSubCategoryName,
 }: CategoryManagementDialogProps) {
   const { user } = useAuth();
+
   const [subCategories, setSubCategories] = useState<ExpenseSubCategory[]>([]);
   const [newSubCategoryName, setNewSubCategoryName] = useState('');
 
-  // Subcategory deletion confirmation state
+  // Subcategory deletion state
   const [deleteSubCategoryDialogOpen, setDeleteSubCategoryDialogOpen] = useState(false);
   const [subCategoryToDelete, setSubCategoryToDelete] = useState<ExpenseSubCategory | null>(null);
   const [subCategoryExpenseCount, setSubCategoryExpenseCount] = useState(0);
@@ -146,74 +321,45 @@ export function CategoryManagementDialog({
   const [subCategoryMoveExpenseCount, setSubCategoryMoveExpenseCount] = useState(0);
   const [allCategoriesForMove, setAllCategoriesForMove] = useState<ExpenseCategory[]>([]);
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    control,
-    formState: { errors, isSubmitting },
-  } = useForm<CategoryFormValues>({
+  const form = useForm<CategoryFormValues>({
     resolver: zodResolver(categorySchema),
-    defaultValues: {
-      type: 'variable',
-      color: '#3b82f6',
-    },
+    defaultValues: { type: 'variable', color: '#3b82f6' },
   });
+  const { handleSubmit, reset, formState: { isSubmitting } } = form;
 
-  const selectedColor = useWatch({ control, name: 'color' });
-  const selectedType = useWatch({ control, name: 'type' });
-
+  // Reset form whenever open/category changes
   useEffect(() => {
+    if (!open) return;
     if (category) {
-      reset({
-        name: category.name,
-        type: category.type,
-        color: category.color || '#3b82f6',
-      });
+      reset({ name: category.name, type: category.type, color: category.color || '#3b82f6' });
       setSubCategories(category.subCategories || []);
     } else {
-      reset({
-        name: initialName || '',
-        type: initialType || 'variable',
-        color: '#3b82f6',
-      });
+      reset({ name: initialName || '', type: initialType || 'variable', color: '#3b82f6' });
       setSubCategories([]);
     }
-    setNewSubCategoryName('');
-  }, [category, reset, open, initialType, initialName]);
+    setNewSubCategoryName(initialSubCategoryName || '');
+  }, [open, category, reset, initialType, initialName, initialSubCategoryName]);
 
+  // ---- Subcategory handlers ----
   const handleAddSubCategory = () => {
-    if (!newSubCategoryName.trim()) {
-      toast.error('Inserisci un nome per la sottocategoria');
-      return;
+    const trimmed = newSubCategoryName.trim();
+    if (!trimmed) { toast.error('Inserisci un nome per la sottocategoria'); return; }
+    if (subCategories.some((s) => s.name.toLowerCase() === trimmed.toLowerCase())) {
+      toast.error('Questa sottocategoria esiste già'); return;
     }
-
-    // Check if subcategory already exists
-    if (subCategories.some(sub => sub.name.toLowerCase() === newSubCategoryName.trim().toLowerCase())) {
-      toast.error('Questa sottocategoria esiste già');
-      return;
-    }
-
-    const newSubCategory: ExpenseSubCategory = {
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      name: newSubCategoryName.trim(),
-    };
-
-    setSubCategories([...subCategories, newSubCategory]);
+    setSubCategories([
+      ...subCategories,
+      { id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, name: trimmed },
+    ]);
     setNewSubCategoryName('');
-    toast.success('Sottocategoria aggiunta');
   };
 
   const handleRemoveSubCategory = async (subCategoryId: string) => {
-    // If editing an existing category, check for associated expenses
     if (category && user) {
       try {
         const expenseCount = await getExpenseCountBySubCategoryId(category.id, subCategoryId, user.uid);
-
         if (expenseCount > 0) {
-          // Show reassignment dialog
-          const subCat = subCategories.find(sub => sub.id === subCategoryId);
+          const subCat = subCategories.find((s) => s.id === subCategoryId);
           if (subCat) {
             setSubCategoryToDelete(subCat);
             setSubCategoryExpenseCount(expenseCount);
@@ -227,57 +373,26 @@ export function CategoryManagementDialog({
         return;
       }
     }
-
-    // No expenses or new category, proceed with removal
-    setSubCategories(subCategories.filter(sub => sub.id !== subCategoryId));
+    setSubCategories(subCategories.filter((s) => s.id !== subCategoryId));
     toast.success('Sottocategoria rimossa');
   };
 
-  const handleConfirmSubCategoryDelete = async (
-    newCategoryId?: string,
-    newSubCategoryId?: string
-  ) => {
+  const handleConfirmSubCategoryDelete = async (newCategoryId?: string, newSubCategoryId?: string) => {
     if (!category || !subCategoryToDelete || !user) return;
-
     try {
-      // If no category ID provided, delete without reassignment
-      // (for subcategories, this means keeping the category but removing subcategory)
       if (!newCategoryId) {
-        await reassignExpensesSubCategory(
-          category.id,
-          subCategoryToDelete.id,
-          user.uid,
-          undefined,
-          undefined
-        );
-
-        // Remove the subcategory from the local state
-        setSubCategories(subCategories.filter(sub => sub.id !== subCategoryToDelete.id));
-
+        await reassignExpensesSubCategory(category.id, subCategoryToDelete.id, user.uid, undefined, undefined);
+        setSubCategories(subCategories.filter((s) => s.id !== subCategoryToDelete.id));
         toast.success(`Sottocategoria "${subCategoryToDelete.name}" eliminata. Le spese rimarranno nella categoria senza sottocategoria.`);
-
-        // Close the dialog
-        setDeleteSubCategoryDialogOpen(false);
-        setSubCategoryToDelete(null);
-        setSubCategoryExpenseCount(0);
-        return;
+      } else {
+        await reassignExpensesSubCategory(
+          category.id, subCategoryToDelete.id, user.uid,
+          newSubCategoryId,
+          newSubCategoryId ? subCategories.find((s) => s.id === newSubCategoryId)?.name : undefined
+        );
+        setSubCategories(subCategories.filter((s) => s.id !== subCategoryToDelete.id));
+        toast.success('Spese riassegnate e sottocategoria rimossa');
       }
-
-      // Reassign expenses to new category/subcategory
-      await reassignExpensesSubCategory(
-        category.id,
-        subCategoryToDelete.id,
-        user.uid,
-        newSubCategoryId,
-        newSubCategoryId ? subCategories.find(sub => sub.id === newSubCategoryId)?.name : undefined
-      );
-
-      // Remove the subcategory from the local state
-      setSubCategories(subCategories.filter(sub => sub.id !== subCategoryToDelete.id));
-
-      toast.success('Spese riassegnate e sottocategoria rimossa con successo');
-
-      // Close the dialog
       setDeleteSubCategoryDialogOpen(false);
       setSubCategoryToDelete(null);
       setSubCategoryExpenseCount(0);
@@ -287,24 +402,17 @@ export function CategoryManagementDialog({
     }
   };
 
-  // ========== Subcategory Move Handlers ==========
-
   const handleMoveSubCategory = async (subCategoryId: string) => {
     if (!category || !user) return;
-
     try {
       const expenseCount = await getExpenseCountBySubCategoryId(category.id, subCategoryId, user.uid);
-
       if (expenseCount === 0) {
-        const subCat = subCategories.find(sub => sub.id === subCategoryId);
+        const subCat = subCategories.find((s) => s.id === subCategoryId);
         toast.warning(`La sottocategoria "${subCat?.name}" non ha transazioni da spostare`);
         return;
       }
-
-      // Fetch all categories for the move dialog destination options
       const categories = await getAllCategories(user.uid);
-
-      const subCat = subCategories.find(sub => sub.id === subCategoryId);
+      const subCat = subCategories.find((s) => s.id === subCategoryId);
       if (subCat) {
         setSubCategoryToMove(subCat);
         setSubCategoryMoveExpenseCount(expenseCount);
@@ -317,49 +425,24 @@ export function CategoryManagementDialog({
     }
   };
 
-  const handleConfirmMoveSubCategory = async (
-    newCategoryId: string,
-    newSubCategoryId?: string
-  ) => {
+  const handleConfirmMoveSubCategory = async (newCategoryId: string, newSubCategoryId?: string) => {
     if (!category || !subCategoryToMove || !user) return;
-
     try {
-      const newCategory = allCategoriesForMove.find(cat => cat.id === newCategoryId);
-      if (!newCategory) {
-        toast.error('Categoria di destinazione non trovata');
-        return;
-      }
-
-      // Resolve subcategory name
-      let newSubCategoryName: string | undefined;
+      const newCategory = allCategoriesForMove.find((cat) => cat.id === newCategoryId);
+      if (!newCategory) { toast.error('Categoria di destinazione non trovata'); return; }
+      let resolvedSubName: string | undefined;
       if (newSubCategoryId && newSubCategoryId !== '__none__') {
-        const newSubCat = newCategory.subCategories.find(sub => sub.id === newSubCategoryId);
-        newSubCategoryName = newSubCat?.name;
+        resolvedSubName = newCategory.subCategories.find((s) => s.id === newSubCategoryId)?.name;
       } else {
         newSubCategoryId = undefined;
       }
-
       const movedCount = await moveExpensesFromSubCategory(
-        category.id,
-        subCategoryToMove.id,
-        category.type,
-        newCategoryId,
-        newCategory.name,
-        newCategory.type,
-        user.uid,
-        newSubCategoryId,
-        newSubCategoryName
+        category.id, subCategoryToMove.id, category.type,
+        newCategoryId, newCategory.name, newCategory.type,
+        user.uid, newSubCategoryId, resolvedSubName
       );
-
-      const destLabel = newSubCategoryName
-        ? `${newCategory.name} → ${newSubCategoryName}`
-        : newCategory.name;
-
-      toast.success(
-        `${movedCount} ${movedCount === 1 ? 'transazione spostata' : 'transazioni spostate'} da "${category.name} → ${subCategoryToMove.name}" a "${destLabel}"`
-      );
-
-      // Reset state — source subcategory is NOT deleted
+      const destLabel = resolvedSubName ? `${newCategory.name} \u2192 ${resolvedSubName}` : newCategory.name;
+      toast.success(`${movedCount} ${movedCount === 1 ? 'transazione spostata' : 'transazioni spostate'} da "${category.name} \u2192 ${subCategoryToMove.name}" a "${destLabel}"`);
       setMoveSubCategoryDialogOpen(false);
       setSubCategoryToMove(null);
       setSubCategoryMoveExpenseCount(0);
@@ -370,29 +453,21 @@ export function CategoryManagementDialog({
   };
 
   const onSubmit = async (data: CategoryFormValues) => {
-    if (!user) {
-      toast.error('Devi essere autenticato');
-      return;
-    }
-
+    if (!user) { toast.error('Devi essere autenticato'); return; }
     try {
       const categoryData: ExpenseCategoryFormData = {
         name: data.name.trim(),
         type: data.type,
         color: data.color,
-        subCategories: subCategories,
+        subCategories,
       };
-
       if (category) {
-        // Update existing category
         await updateCategory(category.id, categoryData, user.uid);
-        toast.success('Categoria aggiornata con successo');
+        toast.success('Categoria aggiornata');
       } else {
-        // Create new category
         await createCategory(user.uid, categoryData);
-        toast.success('Categoria creata con successo');
+        toast.success('Categoria creata');
       }
-
       onSuccess?.();
       onClose();
     } catch (error) {
@@ -401,192 +476,28 @@ export function CategoryManagementDialog({
     }
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {category ? 'Modifica Categoria' : 'Nuova Categoria'}
-          </DialogTitle>
-        </DialogHeader>
+  const title = category ? 'Modifica Categoria' : 'Nuova Categoria';
+  const submitLabel = isSubmitting
+    ? 'Salvataggio\u2026'
+    : category
+    ? 'Salva Modifiche'
+    : 'Crea Categoria';
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Nome Categoria */}
-          <div className="space-y-2">
-            <Label htmlFor="name">Nome Categoria *</Label>
-            <Input
-              id="name"
-              {...register('name')}
-              placeholder="es. Alimentari, Trasporti, Stipendio..."
-              className={errors.name ? 'border-red-500' : ''}
-            />
-            {errors.name && (
-              <p className="text-sm text-red-500">{errors.name.message}</p>
-            )}
-          </div>
+  const formBodyProps: FormBodyProps = {
+    category,
+    subCategories,
+    setSubCategories,
+    newSubCategoryName,
+    setNewSubCategoryName,
+    handleAddSubCategory,
+    handleRemoveSubCategory,
+    handleMoveSubCategory: category ? handleMoveSubCategory : null,
+    form,
+  };
 
-          {/* Tipo di Voce */}
-          <div className="space-y-2">
-            <Label htmlFor="type">Tipo di Voce *</Label>
-            <Select
-              value={selectedType}
-              onValueChange={(value) => setValue('type', value as ExpenseType)}
-            >
-              <SelectTrigger id="type">
-                <SelectValue placeholder="Seleziona tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                {expenseTypes.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.type && (
-              <p className="text-sm text-red-500">{errors.type.message}</p>
-            )}
-            {/* Warn when type changes on edit — sign flip for income ↔ expense crossing */}
-            {category && selectedType !== category.type && (() => {
-              const oldIsIncome = category.type === 'income';
-              const newIsIncome = selectedType === 'income';
-              const crossesBoundary = oldIsIncome !== newIsIncome;
-              return crossesBoundary ? (
-                <p className="text-sm text-amber-600 dark:text-amber-400">
-                  Attenzione: tutte le transazioni cambieranno segno degli importi (da {EXPENSE_TYPE_LABELS[category.type]} a {EXPENSE_TYPE_LABELS[selectedType as ExpenseType]}).
-                </p>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Il tipo verrà aggiornato per tutte le transazioni associate.
-                </p>
-              );
-            })()}
-          </div>
-
-          {/* Colore */}
-          <div className="space-y-2">
-            <Label htmlFor="color">Colore (opzionale)</Label>
-            <div className="flex items-center gap-2">
-              <Select
-                value={selectedColor}
-                onValueChange={(value) => setValue('color', value)}
-              >
-                <SelectTrigger id="color" className="w-[200px]">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-4 h-4 rounded-full border border-gray-300"
-                      style={{ backgroundColor: selectedColor }}
-                    />
-                    <SelectValue placeholder="Seleziona colore" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent>
-                  {categoryColors.map((color) => (
-                    <SelectItem key={color.value} value={color.value}>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-4 h-4 rounded-full border border-gray-300"
-                          style={{ backgroundColor: color.value }}
-                        />
-                        <span>{color.label}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Sotto-categorie */}
-          <div className="space-y-2">
-            <Label>Sotto-categorie (opzionali)</Label>
-            <div className="space-y-2">
-              {/* Lista sotto-categorie esistenti */}
-              {subCategories.length > 0 && (
-                <div className="space-y-1">
-                  {subCategories.map((subCategory) => (
-                    <div
-                      key={subCategory.id}
-                      className="flex items-center justify-between p-2 bg-muted rounded-md"
-                    >
-                      <span className="text-sm">{subCategory.name}</span>
-                      <div className="flex items-center gap-1">
-                        {/* Only show move button when editing an existing category */}
-                        {category && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleMoveSubCategory(subCategory.id)}
-                            title="Sposta transazioni"
-                          >
-                            <ArrowRightLeft className="h-3.5 w-3.5 text-blue-500" />
-                          </Button>
-                        )}
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveSubCategory(subCategory.id)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Input per aggiungere nuova sottocategoria */}
-              <div className="flex items-center gap-2">
-                <Input
-                  placeholder="Nome sottocategoria"
-                  value={newSubCategoryName}
-                  onChange={(e) => setNewSubCategoryName(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddSubCategory();
-                    }
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={handleAddSubCategory}
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Premi Invio o clicca + per aggiungere una sottocategoria
-              </p>
-            </div>
-          </div>
-
-          {/* Buttons */}
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isSubmitting}
-            >
-              Annulla
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting
-                ? 'Salvataggio...'
-                : category
-                ? 'Salva Modifiche'
-                : 'Crea Categoria'}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-
-      {/* Subcategory Delete Confirmation Dialog */}
+  // ---- Sub-dialogs (shared between mobile/desktop) ----
+  const subDialogs = (
+    <>
       {category && subCategoryToDelete && (
         <CategoryDeleteConfirmDialog
           open={deleteSubCategoryDialogOpen}
@@ -598,12 +509,10 @@ export function CategoryManagementDialog({
           onConfirm={handleConfirmSubCategoryDelete}
           categoryToDelete={category}
           expenseCount={subCategoryExpenseCount}
-          allCategories={[category]} // Only allow reassignment within same category for subcategories
+          allCategories={[category]}
           subCategoryToDelete={subCategoryToDelete}
         />
       )}
-
-      {/* Subcategory Move Dialog */}
       {category && subCategoryToMove && (
         <CategoryMoveDialog
           open={moveSubCategoryDialogOpen}
@@ -619,6 +528,44 @@ export function CategoryManagementDialog({
           allCategories={allCategoriesForMove}
         />
       )}
-    </Dialog>
+    </>
+  );
+
+  // ---- Mobile: Drawer / Desktop: Dialog (via ResponsiveModal) ----
+  return (
+    <>
+      <ResponsiveModal
+        open={open}
+        onClose={onClose}
+        title={title}
+        dialogClassName="max-w-3xl"
+        footer={(isMobile) =>
+          isMobile ? (
+            <>
+              <Button type="submit" form="category-form" disabled={isSubmitting} className="w-full">
+                {submitLabel}
+              </Button>
+              <Button type="button" variant="outline" className="w-full" disabled={isSubmitting} onClick={onClose}>
+                Annulla
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+                Annulla
+              </Button>
+              <Button type="submit" form="category-form" disabled={isSubmitting}>
+                {submitLabel}
+              </Button>
+            </>
+          )
+        }
+      >
+        <form id="category-form" onSubmit={handleSubmit(onSubmit)}>
+          <CategoryFormBody {...formBodyProps} />
+        </form>
+      </ResponsiveModal>
+      {subDialogs}
+    </>
   );
 }
