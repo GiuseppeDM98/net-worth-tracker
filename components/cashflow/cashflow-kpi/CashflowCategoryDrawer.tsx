@@ -4,7 +4,7 @@
  * CashflowCategoryDrawer — used for CashflowKpiCarousel
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   Drawer,
   DrawerContent,

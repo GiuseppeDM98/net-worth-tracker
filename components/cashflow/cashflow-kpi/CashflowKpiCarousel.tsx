@@ -15,7 +15,7 @@ import { Carousel, CarouselContent, CarouselItem } from '@/components/ui/carouse
 import { cn } from '@/lib/utils';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { type CategoryBreakdownItem } from '../CategoryBreakdownList';
-import { coverageHealthLabel } from '../CashflowHeroCard';
+import { coverageHealthLabel } from './CashflowHeroCard';
 import type { ExpenseCategory } from '@/types/expenses';
 import { CashflowCategoryDrawer } from './CashflowCategoryDrawer';
 

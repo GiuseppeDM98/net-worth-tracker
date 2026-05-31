@@ -37,7 +37,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,14 +60,20 @@ import { ExpenseDialog } from '@/components/expenses/ExpenseDialog';
 import { ExpenseTable } from '@/components/expenses/ExpenseTable';
 
 import { CategoryBreakdownList } from '@/components/cashflow/CategoryBreakdownList';
-import { CashflowHeroCard } from '@/components/cashflow/CashflowHeroCard';
+import { CashflowHeroCard } from '@/components/cashflow/cashflow-kpi/CashflowHeroCard';
 import { Badge } from '@/components/ui/badge';
 
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { PeriodPicker } from '@/components/ui/period-picker';
-import { type Period, periodToRange, periodLabel, currentMonthPeriod, isCurrentMonth } from '@/lib/utils/period';
+import {
+  type Period,
+  periodToRange,
+  periodLabel,
+  currentMonthPeriod,
+  isCurrentMonth,
+} from '@/lib/utils/period';
 import { MultiSelect, type MultiSelectGroup } from '@/components/ui/multi-select';
 import { getExpenseDate } from '@/lib/utils/expenseHelpers';
 import { CashflowTrackingMobile } from '@/components/cashflow/CashflowTrackingMobile';
@@ -85,7 +97,13 @@ interface ExpenseTrackingTabProps {
  * 4. Update typeOptions array in this file
  * 5. Add type validation in ExpenseDialog schema
  */
-export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh, assetNameMap }: ExpenseTrackingTabProps) {
+export function ExpenseTrackingTab({
+  allExpenses,
+  categories,
+  loading,
+  onRefresh,
+  assetNameMap,
+}: ExpenseTrackingTabProps) {
   const { user } = useAuth();
   const isDemo = useDemoMode();
   const queryClient = useQueryClient();
@@ -95,7 +113,10 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
 
   // Opens the add-expense dialog when the bottom-nav "+" button fires the custom event.
   useEffect(() => {
-    const handler = () => { setEditingExpense(null); setDialogOpen(true); };
+    const handler = () => {
+      setEditingExpense(null);
+      setDialogOpen(true);
+    };
     window.addEventListener('cashflow:add-expense', handler);
     return () => window.removeEventListener('cashflow:add-expense', handler);
   }, []);
@@ -123,7 +144,9 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   const [searchQuery, setSearchQuery] = useState('');
 
   // Sort key for the mobile/tablet flat list.
-  const [mobileSortKey, setMobileSortKey] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc' | 'category-asc'>('date-desc');
+  const [mobileSortKey, setMobileSortKey] = useState<
+    'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc' | 'category-asc'
+  >('date-desc');
 
   // Multi-select category filter: selectedTypes covers all categories of a type;
   // selectedCatIds covers individually picked categories.
@@ -137,7 +160,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   // Generate available years from ALL expenses (not filtered)
   const availableYears = useMemo(() => {
     if (allExpenses.length === 0) return [];
-    const years = allExpenses.map(e => getExpenseDate(e.date).getFullYear());
+    const years = allExpenses.map((e) => getExpenseDate(e.date).getFullYear());
     return Array.from(new Set(years)).sort((a, b) => b - a);
   }, [allExpenses]);
 
@@ -148,12 +171,12 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
     const newTypes: ExpenseType[] = [];
     const newCatIds: string[] = [];
     for (const type of ORDER) {
-      const typeCats = categories.filter(c => c.type === type);
+      const typeCats = categories.filter((c) => c.type === type);
       if (typeCats.length === 0) continue;
-      if (typeCats.every(c => values.includes(c.id))) {
+      if (typeCats.every((c) => values.includes(c.id))) {
         newTypes.push(type);
       } else {
-        typeCats.filter(c => values.includes(c.id)).forEach(c => newCatIds.push(c.id));
+        typeCats.filter((c) => values.includes(c.id)).forEach((c) => newCatIds.push(c.id));
       }
     }
     setSelectedTypes(newTypes);
@@ -172,7 +195,13 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   };
 
   // A filter is "active" (non-default) if period ≠ current month or any taxonomy filter is set.
-  const hasActiveFilters = !isCurrentMonth(period) || selectedTypes.length > 0 || selectedCatIds.length > 0 || selectedSubCategoryId !== 'all' || searchQuery !== '' || selectedAccountId !== 'all';
+  const hasActiveFilters =
+    !isCurrentMonth(period) ||
+    selectedTypes.length > 0 ||
+    selectedCatIds.length > 0 ||
+    selectedSubCategoryId !== 'all' ||
+    searchQuery !== '' ||
+    selectedAccountId !== 'all';
 
   // Count of active drawer-internal filters shown on the mobile "Filtri" badge.
   // Period and search are excluded — they are always visible inline on mobile.
@@ -188,7 +217,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   // Derive period slice from allExpenses synchronously.
   const expenses = useMemo(() => {
     const { from, to } = periodToRange(period);
-    return allExpenses.filter(expense => {
+    return allExpenses.filter((expense) => {
       const date = getExpenseDate(expense.date);
       return date >= from && date <= to;
     });
@@ -204,11 +233,18 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   // Reset mobile show count when filters change
   useEffect(() => {
     setMobileShowCount(20);
-  }, [period, selectedTypes, selectedCatIds, selectedSubCategoryId, searchQuery, selectedAccountId]);
+  }, [
+    period,
+    selectedTypes,
+    selectedCatIds,
+    selectedSubCategoryId,
+    searchQuery,
+    selectedAccountId,
+  ]);
 
   // Toggling another row collapses the previously expanded one (accordion pattern).
   const handleToggleExpand = useCallback((id: string) => {
-    setExpandedRowId(prev => (prev === id ? null : id));
+    setExpandedRowId((prev) => (prev === id ? null : id));
   }, []);
 
   const handleAddExpense = () => {
@@ -223,12 +259,20 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   // Sanitize a cell value against CSV formula injection (OWASP A03).
   // Strings starting with =, +, -, @, TAB, or CR are prefixed with a single quote,
   // which Excel/LibreOffice treat as a text literal, not a formula.
-  const sanitizeCSVCell = (s: string): string =>
-    /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+  const sanitizeCSVCell = (s: string): string => (/^[=+\-@\t\r]/.test(s) ? `'${s}` : s);
 
   const handleExportCSV = () => {
-    const headers = ['Data', 'Tipo', 'Categoria', 'Sottocategoria', 'Importo (\u20ac)', 'Note', 'Conto', 'Link'];
-    const rows = filteredExpenses.map(e => [
+    const headers = [
+      'Data',
+      'Tipo',
+      'Categoria',
+      'Sottocategoria',
+      'Importo (\u20ac)',
+      'Note',
+      'Conto',
+      'Link',
+    ];
+    const rows = filteredExpenses.map((e) => [
       format(getExpenseDate(e.date), 'dd/MM/yyyy'),
       EXPENSE_TYPE_LABELS[e.type] || e.type,
       sanitizeCSVCell(e.categoryName),
@@ -239,7 +283,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
       sanitizeCSVCell(e.link || ''),
     ]);
     const csvContent = [headers, ...rows]
-      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
       .join('\n');
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -268,54 +312,61 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
     await onRefresh();
   };
 
-  const deleteSingleExpense = useCallback(async (expense: Expense) => {
-    try {
-      // Reverse the balance effect on the linked cash asset before deleting
-      if (expense.linkedCashAssetId) {
-        await updateCashAssetBalance(expense.linkedCashAssetId, -expense.amount);
-        if (user) queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
+  const deleteSingleExpense = useCallback(
+    async (expense: Expense) => {
+      try {
+        // Reverse the balance effect on the linked cash asset before deleting
+        if (expense.linkedCashAssetId) {
+          await updateCashAssetBalance(expense.linkedCashAssetId, -expense.amount);
+          if (user) queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
+        }
+        const { deleteExpense } = await import('@/lib/services/expenseService');
+        await deleteExpense(expense.id);
+        toast.success('Voce eliminata con successo');
+        await onRefresh();
+      } catch (error) {
+        console.error('Error deleting expense:', error);
+        toast.error("Errore nell'eliminazione della voce");
       }
-      const { deleteExpense } = await import('@/lib/services/expenseService');
-      await deleteExpense(expense.id);
-      toast.success('Voce eliminata con successo');
-      await onRefresh();
-    } catch (error) {
-      console.error('Error deleting expense:', error);
-      toast.error("Errore nell'eliminazione della voce");
-    }
-  }, [user, queryClient, onRefresh]);
+    },
+    [user, queryClient, onRefresh],
+  );
 
   /**
    * 2-click inline delete: first click arms the button (3s disarm timer),
    * second click executes. For installments/recurring, opens AlertDialog
    * so the user can choose between single or bulk delete.
    */
-  const handleDeleteExpense = useCallback((expense: Expense) => {
-    const isComplex = (expense.isInstallment && expense.installmentParentId) ||
-      (expense.isRecurring && expense.recurringParentId);
+  const handleDeleteExpense = useCallback(
+    (expense: Expense) => {
+      const isComplex =
+        (expense.isInstallment && expense.installmentParentId) ||
+        (expense.isRecurring && expense.recurringParentId);
 
-    if (isComplex) {
-      // Open AlertDialog for bulk delete choice
-      const mode = expense.isInstallment ? 'installment' : 'recurring';
-      setBulkDeleteDialog({ open: true, expense, mode });
-      return;
-    }
+      if (isComplex) {
+        // Open AlertDialog for bulk delete choice
+        const mode = expense.isInstallment ? 'installment' : 'recurring';
+        setBulkDeleteDialog({ open: true, expense, mode });
+        return;
+      }
 
-    // 2-click inline for regular expenses
-    if (pendingDeleteId === expense.id) {
-      // Second click: confirm
-      if (pendingDeleteTimerRef.current) clearTimeout(pendingDeleteTimerRef.current);
-      setPendingDeleteId(null);
-      void deleteSingleExpense(expense);
-    } else {
-      // First click: arm
-      if (pendingDeleteTimerRef.current) clearTimeout(pendingDeleteTimerRef.current);
-      setPendingDeleteId(expense.id);
-      pendingDeleteTimerRef.current = setTimeout(() => {
+      // 2-click inline for regular expenses
+      if (pendingDeleteId === expense.id) {
+        // Second click: confirm
+        if (pendingDeleteTimerRef.current) clearTimeout(pendingDeleteTimerRef.current);
         setPendingDeleteId(null);
-      }, 3000);
-    }
-  }, [pendingDeleteId, deleteSingleExpense]);
+        void deleteSingleExpense(expense);
+      } else {
+        // First click: arm
+        if (pendingDeleteTimerRef.current) clearTimeout(pendingDeleteTimerRef.current);
+        setPendingDeleteId(expense.id);
+        pendingDeleteTimerRef.current = setTimeout(() => {
+          setPendingDeleteId(null);
+        }, 3000);
+      }
+    },
+    [pendingDeleteId, deleteSingleExpense],
+  );
 
   const deleteAllRecurringExpenses = async (recurringParentId: string) => {
     try {
@@ -326,7 +377,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
           await updateCashAssetBalance(exp.linkedCashAssetId, -exp.amount);
         }
       }
-      if (user && seriesExpenses.some(e => e.linkedCashAssetId)) {
+      if (user && seriesExpenses.some((e) => e.linkedCashAssetId)) {
         queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
       }
       const { deleteRecurringExpenses } = await import('@/lib/services/expenseService');
@@ -348,7 +399,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
           await updateCashAssetBalance(exp.linkedCashAssetId, -exp.amount);
         }
       }
-      if (user && seriesExpenses.some(e => e.linkedCashAssetId)) {
+      if (user && seriesExpenses.some((e) => e.linkedCashAssetId)) {
         queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
       }
       const { deleteInstallmentExpenses } = await import('@/lib/services/expenseService');
@@ -365,24 +416,22 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   // The MultiSelect component handles group-level select-all natively via its toggleGroup.
   const categoryMultiSelectOptions = useMemo((): MultiSelectGroup[] => {
     const ORDER: ExpenseType[] = ['income', 'fixed', 'variable', 'debt', 'transfer'];
-    return ORDER
-      .map(type => {
-        const cats = categories.filter(c => c.type === type);
-        if (cats.length === 0) return null;
-        return {
-          heading: EXPENSE_TYPE_LABELS[type],
-          options: cats.map(cat => ({ value: cat.id, label: cat.name })),
-          collapseGroupBadge: true,
-        };
-      })
-      .filter((g): g is NonNullable<typeof g> => g !== null);
+    return ORDER.map((type) => {
+      const cats = categories.filter((c) => c.type === type);
+      if (cats.length === 0) return null;
+      return {
+        heading: EXPENSE_TYPE_LABELS[type],
+        options: cats.map((cat) => ({ value: cat.id, label: cat.name })),
+        collapseGroupBadge: true,
+      };
+    }).filter((g): g is NonNullable<typeof g> => g !== null);
   }, [categories]);
 
   // Expand type-level selections to individual IDs so MultiSelect checkboxes stay in sync.
   const multiSelectValue = useMemo(() => {
     const result: string[] = [];
     for (const type of selectedTypes) {
-      categories.filter(c => c.type === type).forEach(c => result.push(c.id));
+      categories.filter((c) => c.type === type).forEach((c) => result.push(c.id));
     }
     result.push(...selectedCatIds);
     return result;
@@ -391,12 +440,12 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   // Subcategory options: only when exactly ONE plain category is selected.
   const soloSelectedCategory = useMemo(() => {
     if (selectedCatIds.length !== 1) return null;
-    return categories.find(c => c.id === selectedCatIds[0]) ?? null;
+    return categories.find((c) => c.id === selectedCatIds[0]) ?? null;
   }, [categories, selectedCatIds]);
 
   const subCategoryOptions = useMemo(() => {
     if (!soloSelectedCategory) return [];
-    return soloSelectedCategory.subCategories.map(sub => ({
+    return soloSelectedCategory.subCategories.map((sub) => ({
       ...sub,
       categoryName: soloSelectedCategory.name,
       categoryId: soloSelectedCategory.id,
@@ -410,7 +459,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
     for (const e of expenses) {
       if (e.linkedCashAssetId) ids.add(e.linkedCashAssetId);
     }
-    return Array.from(ids).map(id => ({
+    return Array.from(ids).map((id) => ({
       id,
       name: assetNameMap.get(id) ?? id,
     }));
@@ -419,7 +468,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   // Auto-reset account filter when the selected account is no longer present in the
   // current period (e.g. user changed period to a month with no transactions for that account).
   useEffect(() => {
-    if (selectedAccountId !== 'all' && !accountOptions.some(a => a.id === selectedAccountId)) {
+    if (selectedAccountId !== 'all' && !accountOptions.some((a) => a.id === selectedAccountId)) {
       setSelectedAccountId('all');
     }
   }, [accountOptions, selectedAccountId]);
@@ -445,38 +494,45 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
     if (selectedTypes.length > 0 || selectedCatIds.length > 0) {
       const typeSet = new Set(selectedTypes);
       const catIdSet = new Set(selectedCatIds);
-      filtered = filtered.filter(
-        e => typeSet.has(e.type) || catIdSet.has(e.categoryId)
-      );
+      filtered = filtered.filter((e) => typeSet.has(e.type) || catIdSet.has(e.categoryId));
     }
 
     // Subcategory filter only applies when a single category is selected
     if (soloSelectedCategory && selectedSubCategoryId !== 'all') {
-      filtered = filtered.filter(e => e.subCategoryId === selectedSubCategoryId);
+      filtered = filtered.filter((e) => e.subCategoryId === selectedSubCategoryId);
     }
 
     // Free-text search across notes, category name, and subcategory name
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
-      filtered = filtered.filter(e =>
-        (e.notes?.toLowerCase().includes(q)) ||
-        e.categoryName.toLowerCase().includes(q) ||
-        (e.subCategoryName?.toLowerCase().includes(q))
+      filtered = filtered.filter(
+        (e) =>
+          e.notes?.toLowerCase().includes(q) ||
+          e.categoryName.toLowerCase().includes(q) ||
+          e.subCategoryName?.toLowerCase().includes(q),
       );
     }
 
     // Account (conto corrente) filter
     if (selectedAccountId !== 'all') {
-      filtered = filtered.filter(e => e.linkedCashAssetId === selectedAccountId);
+      filtered = filtered.filter((e) => e.linkedCashAssetId === selectedAccountId);
     }
 
     return filtered;
-  }, [expenses, selectedTypes, selectedCatIds, soloSelectedCategory, selectedSubCategoryId, searchQuery, selectedAccountId]);
+  }, [
+    expenses,
+    selectedTypes,
+    selectedCatIds,
+    soloSelectedCategory,
+    selectedSubCategoryId,
+    searchQuery,
+    selectedAccountId,
+  ]);
 
   // categoryId → { icon, color } lookup for mobile row icon badges.
-  const categoryMetaMap = useMemo(() =>
-    new Map(categories.map(c => [c.id, { icon: c.icon, color: c.color }])),
-    [categories]
+  const categoryMetaMap = useMemo(
+    () => new Map(categories.map((c) => [c.id, { icon: c.icon, color: c.color }])),
+    [categories],
   );
 
   // Sort the filtered list for the mobile/tablet flat list.
@@ -507,11 +563,12 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   const incomeExpenseRatio = calculateIncomeExpenseRatio(filteredExpenses);
 
   // Transfer total — shown separately, not included in income/expenses/savings
-  const totalTransfers = useMemo(() =>
-    filteredExpenses
-      .filter(e => e.type === 'transfer')
-      .reduce((sum, e) => sum + Math.abs(e.amount), 0),
-    [filteredExpenses]
+  const totalTransfers = useMemo(
+    () =>
+      filteredExpenses
+        .filter((e) => e.type === 'transfer')
+        .reduce((sum, e) => sum + Math.abs(e.amount), 0),
+    [filteredExpenses],
   );
 
   // ─── Hero card derived data ──────────────────────────────────────────────────
@@ -526,7 +583,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
     const prevMonthNum = period.month - 1;
     const prevYear = prevMonthNum === 0 ? period.year - 1 : period.year;
     const prevMonth = prevMonthNum === 0 ? 12 : prevMonthNum;
-    return allExpenses.filter(e => {
+    return allExpenses.filter((e) => {
       const date = getExpenseDate(e.date);
       return date.getFullYear() === prevYear && date.getMonth() + 1 === prevMonth;
     });
@@ -537,8 +594,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
     if (!previousPeriodExpenses) return null;
     const prevIncome = calculateTotalIncome(previousPeriodExpenses);
     const prevExpenses = calculateTotalExpenses(previousPeriodExpenses);
-    const calcDelta = (curr: number, prev: number) =>
-      prev > 0 ? ((curr - prev) / prev) * 100 : 0;
+    const calcDelta = (curr: number, prev: number) => (prev > 0 ? ((curr - prev) / prev) * 100 : 0);
     return {
       income: calcDelta(totalIncome, prevIncome),
       expenses: calcDelta(totalExpenses, prevExpenses),
@@ -553,7 +609,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
 
   // Top-5 expense categories aggregated from filteredExpenses for the hero bar chart.
   const heroExpenseCategories = useMemo(() => {
-    const items = filteredExpenses.filter(e => e.type !== 'income' && e.type !== 'transfer');
+    const items = filteredExpenses.filter((e) => e.type !== 'income' && e.type !== 'transfer');
     const total = items.reduce((s, e) => s + Math.abs(e.amount), 0);
     const byCategory = new Map<string, number>();
     for (const e of items)
@@ -570,7 +626,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
 
   // Top-5 income categories aggregated from filteredExpenses for the hero bar chart.
   const heroIncomeCategories = useMemo(() => {
-    const items = filteredExpenses.filter(e => e.type === 'income');
+    const items = filteredExpenses.filter((e) => e.type === 'income');
     const total = items.reduce((s, e) => s + Math.abs(e.amount), 0);
     const byCategory = new Map<string, number>();
     for (const e of items)
@@ -590,36 +646,36 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
       <div className="space-y-6">
         {/* Filters skeleton */}
         <div className="flex flex-wrap justify-end gap-2">
-          <div className="h-9 w-full sm:w-[190px] bg-muted animate-pulse rounded-md" />
-          <div className="h-9 w-full sm:w-[260px] bg-muted animate-pulse rounded-md" />
+          <div className="bg-muted h-9 w-full animate-pulse rounded-md sm:w-[190px]" />
+          <div className="bg-muted h-9 w-full animate-pulse rounded-md sm:w-[260px]" />
         </div>
         {/* Hero card skeleton */}
-        <div className="rounded-xl border p-[22px] space-y-4">
-          <div className="h-3 w-36 bg-muted animate-pulse rounded" />
+        <div className="space-y-4 rounded-xl border p-[22px]">
+          <div className="bg-muted h-3 w-36 animate-pulse rounded" />
           <div className="grid grid-cols-2 gap-3">
-            {[0, 1, 2, 3].map(i => (
-              <div key={i} className="bg-muted/40 rounded-xl p-3.5 space-y-2">
-                <div className="h-2.5 w-14 bg-muted animate-pulse rounded" />
-                <div className="h-6 w-24 bg-muted animate-pulse rounded" />
-                <div className="h-2.5 w-20 bg-muted animate-pulse rounded" />
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="bg-muted/40 space-y-2 rounded-xl p-3.5">
+                <div className="bg-muted h-2.5 w-14 animate-pulse rounded" />
+                <div className="bg-muted h-6 w-24 animate-pulse rounded" />
+                <div className="bg-muted h-2.5 w-20 animate-pulse rounded" />
               </div>
             ))}
           </div>
         </div>
         {/* List skeleton — flat rows */}
-        <div className="rounded-xl border divide-y divide-border">
-          <div className="px-6 py-4 flex items-center gap-2">
-            <div className="h-4 w-12 bg-muted animate-pulse rounded" />
-            <div className="h-5 w-6 bg-muted animate-pulse rounded-full" />
+        <div className="divide-border divide-y rounded-xl border">
+          <div className="flex items-center gap-2 px-6 py-4">
+            <div className="bg-muted h-4 w-12 animate-pulse rounded" />
+            <div className="bg-muted h-5 w-6 animate-pulse rounded-full" />
           </div>
-          {[0, 1, 2, 3, 4].map(i => (
+          {[0, 1, 2, 3, 4].map((i) => (
             <div key={i} className="flex items-center gap-3 px-6 py-3">
-              <div className="h-2 w-2 rounded-full bg-muted animate-pulse flex-shrink-0" />
+              <div className="bg-muted h-2 w-2 flex-shrink-0 animate-pulse rounded-full" />
               <div className="flex-1 space-y-1.5">
-                <div className="h-3 w-36 bg-muted animate-pulse rounded" />
-                <div className="h-2.5 w-24 bg-muted animate-pulse rounded" />
+                <div className="bg-muted h-3 w-36 animate-pulse rounded" />
+                <div className="bg-muted h-2.5 w-24 animate-pulse rounded" />
               </div>
-              <div className="h-3 w-16 bg-muted animate-pulse rounded" />
+              <div className="bg-muted h-3 w-16 animate-pulse rounded" />
             </div>
           ))}
         </div>
@@ -663,7 +719,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
         transactions={mobileSortedExpenses}
         totalCount={filteredExpenses.length}
         showCount={mobileShowCount}
-        onLoadMore={() => setMobileShowCount(prev => prev + 20)}
+        onLoadMore={() => setMobileShowCount((prev) => prev + 20)}
         mobileSortKey={mobileSortKey}
         onSortChange={setMobileSortKey}
         onEdit={handleEditExpense}
@@ -676,161 +732,180 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
       />
 
       {/* ── DESKTOP: filter bar ─────────────────────────────────────────────── */}
-      <div className="hidden desktop:flex flex-col gap-2">
+      <div className="desktop:flex hidden flex-col gap-2">
         {/* Row 1: Search + Period */}
         <div className="flex flex-wrap items-center gap-2">
-        {/* Ricerca testo */}
-        <div className="relative flex-1 min-w-[160px]">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Cerca note, categorie..."
-            className="h-9 pl-8 pr-8 text-sm"
-            aria-label="Cerca nelle note, categoria o sottocategoria"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-              aria-label="Cancella ricerca"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
+          {/* Ricerca testo */}
+          <div className="relative min-w-[160px] flex-1">
+            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cerca note, categorie..."
+              className="h-9 pr-8 pl-8 text-sm"
+              aria-label="Cerca nelle note, categoria o sottocategoria"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2.5 -translate-y-1/2 transition-colors"
+                aria-label="Cancella ricerca"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
 
-        {/* Periodo */}
-        <PeriodPicker
-          value={period}
-          onChange={setPeriod}
-          availableYears={availableYears}
-          className="shrink-0"
-        />
+          {/* Periodo */}
+          <PeriodPicker
+            value={period}
+            onChange={setPeriod}
+            availableYears={availableYears}
+            className="shrink-0"
+          />
         </div>
 
         {/* Row 2: Category chips + optional account filter + reset */}
         <div className="flex flex-wrap items-center gap-2">
-        {/* Categorie */}
-        <div className="flex-1 min-w-[200px]">
-          <MultiSelect
-            options={categoryMultiSelectOptions}
-            defaultValue={multiSelectValue}
-            onValueChange={handleSelectCategories}
-            placeholder="Tutte le categorie"
-            searchable
-            hideSelectAll
-            singleLine
-            maxCount={2}
-            className="w-full"
-            popoverClassName="w-[280px] desktop:w-[320px]"
-            resetOnDefaultValueChange={false}
-          />
-        </div>
-
-        {/* Sottocategoria */}
-        {soloSelectedCategory && subCategoryOptions.length > 0 && (
-          <div className="w-full sm:w-[180px] shrink-0">
-            <Select value={selectedSubCategoryId} onValueChange={setSelectedSubCategoryId}>
-              <SelectTrigger id="filter-subcategory" aria-label="Filtra per sottocategoria" className="w-full">
-                <SelectValue placeholder="Tutte" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tutte</SelectItem>
-                {subCategoryOptions.map(sub => (
-                  <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* Categorie */}
+          <div className="min-w-[200px] flex-1">
+            <MultiSelect
+              options={categoryMultiSelectOptions}
+              defaultValue={multiSelectValue}
+              onValueChange={handleSelectCategories}
+              placeholder="Tutte le categorie"
+              searchable
+              hideSelectAll
+              singleLine
+              maxCount={2}
+              className="w-full"
+              popoverClassName="w-[280px] desktop:w-[320px]"
+              resetOnDefaultValueChange={false}
+            />
           </div>
-        )}
 
-        {/* Conto corrente — only shown when 2+ accounts appear in the period */}
-        {accountOptions.length >= 2 && (
-          <div className="w-full sm:w-[180px] shrink-0">
-            <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
-              <SelectTrigger id="filter-account" aria-label="Filtra per conto corrente" className="w-full">
-                <SelectValue placeholder="Tutti i conti" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tutti i conti</SelectItem>
-                {accountOptions.map(acc => (
-                  <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+          {/* Sottocategoria */}
+          {soloSelectedCategory && subCategoryOptions.length > 0 && (
+            <div className="w-full shrink-0 sm:w-[180px]">
+              <Select value={selectedSubCategoryId} onValueChange={setSelectedSubCategoryId}>
+                <SelectTrigger
+                  id="filter-subcategory"
+                  aria-label="Filtra per sottocategoria"
+                  className="w-full"
+                >
+                  <SelectValue placeholder="Tutte" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tutte</SelectItem>
+                  {subCategoryOptions.map((sub) => (
+                    <SelectItem key={sub.id} value={sub.id}>
+                      {sub.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
-        {/* Ripristina — only when filters are active */}
-        {hasActiveFilters && (
-          <Button variant="ghost" size="sm" onClick={handleResetFilters} className="h-9 gap-1.5 px-2.5 shrink-0 text-muted-foreground hover:text-foreground">
-            <X className="h-3.5 w-3.5" />
-            Ripristina
-          </Button>
-        )}
+          {/* Conto corrente — only shown when 2+ accounts appear in the period */}
+          {accountOptions.length >= 2 && (
+            <div className="w-full shrink-0 sm:w-[180px]">
+              <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+                <SelectTrigger
+                  id="filter-account"
+                  aria-label="Filtra per conto corrente"
+                  className="w-full"
+                >
+                  <SelectValue placeholder="Tutti i conti" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tutti i conti</SelectItem>
+                  {accountOptions.map((acc) => (
+                    <SelectItem key={acc.id} value={acc.id}>
+                      {acc.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Ripristina — only when filters are active */}
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleResetFilters}
+              className="text-muted-foreground hover:text-foreground h-9 shrink-0 gap-1.5 px-2.5"
+            >
+              <X className="h-3.5 w-3.5" />
+              Ripristina
+            </Button>
+          )}
         </div>
       </div>
       {/* end desktop filter bar */}
 
       {/* ── DESKTOP: sticky KPI left + transaction list right ────────────────── */}
-      <div className="hidden desktop:grid desktop:grid-cols-[360px_1fr] desktop:gap-6 desktop:items-start">
-      <div className="desktop:sticky desktop:top-4">
-      {/* ── Hero Cashflow Card ─────────────────────────────────────────────── */}
-      <CashflowHeroCard
-        monthLabel={heroLabel}
-        income={totalIncome}
-        expenses={totalExpenses}
-        net={netBalance}
-        ratio={incomeExpenseRatio}
-        incomeDelta={heroDelta?.income}
-        expensesDelta={heroDelta?.expenses}
-        savingsRate={heroSavingsRate}
-        expenseCategories={heroExpenseCategories}
-        incomeCategories={heroIncomeCategories}
-        categories={categories}
-        transfers={totalTransfers}
-      />
-      </div>{/* end desktop sticky left panel */}
-
-      {/* RIGHT: transaction list */}
-      <Card className="gap-0 py-0">
-        <CardHeader className="px-5 pt-5 pb-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <CardTitle className="text-base">Elenco delle spese</CardTitle>
-              <Badge variant="secondary" className="tabular-nums text-xs">
-                {filteredExpenses.length}
-              </Badge>
-              <span className="text-sm text-muted-foreground">{periodLabel(period)}</span>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportCSV}
-                disabled={filteredExpenses.length === 0}
-                aria-label="Esporta voci come CSV"
-                className="gap-1.5 h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground"
-              >
-                <Download className="h-3.5 w-3.5" />
-                Esporta CSV
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="px-5 pb-5">
-          <ExpenseTable
-            expenses={filteredExpenses}
-            onEdit={handleEditExpense}
-            onRefresh={onRefresh}
-            isDemo={isDemo}
-            hasActiveFilters={hasActiveFilters}
+      <div className="desktop:grid desktop:grid-cols-[360px_1fr] desktop:gap-6 desktop:items-start hidden">
+        <div className="desktop:sticky desktop:top-4">
+          {/* ── Hero Cashflow Card ─────────────────────────────────────────────── */}
+          <CashflowHeroCard
+            monthLabel={heroLabel}
+            income={totalIncome}
+            expenses={totalExpenses}
+            net={netBalance}
+            ratio={incomeExpenseRatio}
+            incomeDelta={heroDelta?.income}
+            expensesDelta={heroDelta?.expenses}
+            savingsRate={heroSavingsRate}
+            expenseCategories={heroExpenseCategories}
+            incomeCategories={heroIncomeCategories}
             categories={categories}
+            transfers={totalTransfers}
           />
-        </CardContent>
-      </Card>
-      </div>{/* end desktop two-column grid */}
+        </div>
+        {/* end desktop sticky left panel */}
+
+        {/* RIGHT: transaction list */}
+        <Card className="gap-0 py-0">
+          <CardHeader className="px-5 pt-5 pb-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <CardTitle className="text-base">Elenco delle spese</CardTitle>
+                <Badge variant="secondary" className="text-xs tabular-nums">
+                  {filteredExpenses.length}
+                </Badge>
+                <span className="text-muted-foreground text-sm">{periodLabel(period)}</span>
+              </div>
+              <div className="flex flex-shrink-0 items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportCSV}
+                  disabled={filteredExpenses.length === 0}
+                  aria-label="Esporta voci come CSV"
+                  className="text-muted-foreground hover:text-foreground h-8 gap-1.5 px-2.5 text-xs"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Esporta CSV
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="px-5 pb-5">
+            <ExpenseTable
+              expenses={filteredExpenses}
+              onEdit={handleEditExpense}
+              onRefresh={onRefresh}
+              isDemo={isDemo}
+              hasActiveFilters={hasActiveFilters}
+              categories={categories}
+            />
+          </CardContent>
+        </Card>
+      </div>
+      {/* end desktop two-column grid */}
 
       {/* Expense Dialog */}
       <ExpenseDialog
@@ -855,8 +930,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
             <AlertDialogDescription>
               {bulkDeleteDialog.mode === 'installment' && bulkDeleteDialog.expense
                 ? `Questa è la rata ${bulkDeleteDialog.expense.installmentNumber}/${bulkDeleteDialog.expense.installmentTotal}. Vuoi eliminare solo questa rata o tutte le ${bulkDeleteDialog.expense.installmentTotal} rate?`
-                : 'Questa è una voce ricorrente. Vuoi eliminare solo questa voce o tutte le occorrenze correlate?'
-              }
+                : 'Questa è una voce ricorrente. Vuoi eliminare solo questa voce o tutte le occorrenze correlate?'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
