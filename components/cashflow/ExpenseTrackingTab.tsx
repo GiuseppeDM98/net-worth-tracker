@@ -60,7 +60,7 @@ import { useChartColors } from '@/lib/hooks/useChartColors';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { PeriodPicker } from '@/components/ui/period-picker';
 import { type Period, periodToRange, periodLabel, currentMonthPeriod, isCurrentMonth } from '@/lib/utils/period';
-import { MultiSelect, type MultiSelectGroup, type MultiSelectOption } from '@/components/ui/multi-select';
+import { MultiSelect, type MultiSelectGroup } from '@/components/ui/multi-select';
 import { getExpenseDate } from '@/lib/utils/expenseHelpers';
 
 // Coverage ratio → Italian health label (mirrors the same function in the dashboard overview page).
@@ -256,7 +256,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
     return () => window.removeEventListener('cashflow:add-expense', handler);
   }, []);
   // Unified period filter (replaces separate selectedYear + selectedMonth)
-  const [period, setPeriod] = useState<Period>(currentMonthPeriod);
+  const [period, setPeriod] = useState<Period>(() => currentMonthPeriod());
 
   // Tracks which mobile row is expanded (shows Modifica + Elimina actions).
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
@@ -281,9 +281,10 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   // Sort key for the mobile/tablet flat list.
   const [mobileSortKey, setMobileSortKey] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc' | 'category-asc'>('date-desc');
 
-  // Multi-select category filter: values are either a real categoryId or
-  // a synthetic "__type__<type>" sentinel that matches all categories of that type.
-  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  // Multi-select category filter: selectedTypes covers all categories of a type;
+  // selectedCatIds covers individually picked categories.
+  const [selectedTypes, setSelectedTypes] = useState<ExpenseType[]>([]);
+  const [selectedCatIds, setSelectedCatIds] = useState<string[]>([]);
   const [selectedSubCategoryId, setSelectedSubCategoryId] = useState<string>('all');
 
   // Conto corrente filter — 'all' means no account filter applied.
@@ -297,51 +298,30 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
     return Array.from(new Set(years)).sort((a, b) => b - a);
   }, [allExpenses]);
 
+  // Receives individual category IDs from MultiSelect; promotes to type-level when
+  // ALL categories of a type are selected (covers deleted-category edge case).
   const handleSelectCategories = (values: string[]) => {
     const ORDER: ExpenseType[] = ['income', 'fixed', 'variable', 'debt'];
-    const result: string[] = [];
+    const newTypes: ExpenseType[] = [];
+    const newCatIds: string[] = [];
     for (const type of ORDER) {
       const typeCats = categories.filter(c => c.type === type);
       if (typeCats.length === 0) continue;
-      const sentinel = `${TYPE_PREFIX}${type}`;
-      const sentinelSelected = values.includes(sentinel);
-      const presentCatIds = typeCats.filter(c => values.includes(c.id)).map(c => c.id);
-      const prevSentinelSelected = selectedCategoryIds.includes(sentinel);
-      if (sentinelSelected) {
-        if (!prevSentinelSelected) {
-          // Sentinel just added → store sentinel only (covers all of this type)
-          result.push(sentinel);
-        } else {
-          // Sentinel was already active — check if all individuals are still present
-          const allPresent = typeCats.every(c => values.includes(c.id));
-          if (allPresent) {
-            result.push(sentinel);
-          } else {
-            // User deselected an individual → demote to remaining individual IDs
-            result.push(...presentCatIds);
-          }
-        }
+      if (typeCats.every(c => values.includes(c.id))) {
+        newTypes.push(type);
       } else {
-        if (prevSentinelSelected) {
-          // Sentinel was just removed → deselect ALL of this type
-        } else {
-          // Normal individual toggle — auto-promote when all are individually selected
-          const allPresent = typeCats.length > 0 && typeCats.every(c => values.includes(c.id));
-          if (allPresent) {
-            result.push(sentinel);
-          } else {
-            result.push(...presentCatIds);
-          }
-        }
+        typeCats.filter(c => values.includes(c.id)).forEach(c => newCatIds.push(c.id));
       }
     }
-    setSelectedCategoryIds(result);
+    setSelectedTypes(newTypes);
+    setSelectedCatIds(newCatIds);
     setSelectedSubCategoryId('all');
   };
 
   const handleResetFilters = () => {
     setPeriod(currentMonthPeriod());
-    setSelectedCategoryIds([]);
+    setSelectedTypes([]);
+    setSelectedCatIds([]);
     setSelectedSubCategoryId('all');
     setSearchQuery('');
     setSelectedAccountId('all');
@@ -349,7 +329,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   };
 
   // A filter is "active" (non-default) if period ≠ current month or any taxonomy filter is set.
-  const hasActiveFilters = !isCurrentMonth(period) || selectedCategoryIds.length > 0 || selectedSubCategoryId !== 'all' || searchQuery !== '' || selectedAccountId !== 'all';
+  const hasActiveFilters = !isCurrentMonth(period) || selectedTypes.length > 0 || selectedCatIds.length > 0 || selectedSubCategoryId !== 'all' || searchQuery !== '' || selectedAccountId !== 'all';
 
   // Derive period slice from allExpenses synchronously.
   const expenses = useMemo(() => {
@@ -370,7 +350,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   // Reset mobile show count when filters change
   useEffect(() => {
     setMobileShowCount(20);
-  }, [period, selectedCategoryIds, selectedSubCategoryId, searchQuery, selectedAccountId]);
+  }, [period, selectedTypes, selectedCatIds, selectedSubCategoryId, searchQuery, selectedAccountId]);
 
   // Toggling another row collapses the previously expanded one (accordion pattern).
   const handleToggleExpand = useCallback((id: string) => {
@@ -521,14 +501,8 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
     }
   };
 
-  // Filter options for Type
-  // Prefix used to distinguish type-level sentinels from real category IDs.
-  const TYPE_PREFIX = '__type__';
-
-  // Build grouped MultiSelect options: one group per ExpenseType, each with a
-  // "Tutte le <tipo>" sentinel at the top followed by the real categories.
-  // sentinel options use badgeLabel for short badge text and separator: true for visual divider.
-  // Individual options use groupKey to suppress their badge when their sentinel is selected.
+  // Build grouped MultiSelect options: one group per ExpenseType with real categories.
+  // The MultiSelect component handles group-level select-all natively via its toggleGroup.
   const categoryMultiSelectOptions = useMemo((): MultiSelectGroup[] => {
     const ORDER: ExpenseType[] = ['income', 'fixed', 'variable', 'debt'];
     return ORDER
@@ -537,46 +511,28 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
         if (cats.length === 0) return null;
         return {
           heading: EXPENSE_TYPE_LABELS[type],
-          options: [
-            {
-              value: `${TYPE_PREFIX}${type}`,
-              label: `Tutte le ${EXPENSE_TYPE_LABELS[type]}`,
-              badgeLabel: EXPENSE_TYPE_LABELS[type],
-              separator: true,
-            } as MultiSelectOption,
-            ...cats.map(cat => ({
-              value: cat.id,
-              label: cat.name,
-              groupKey: `${TYPE_PREFIX}${type}`,
-            } as MultiSelectOption)),
-          ],
+          options: cats.map(cat => ({ value: cat.id, label: cat.name })),
+          collapseGroupBadge: true,
         };
       })
-      .filter((g): g is MultiSelectGroup => g !== null);
+      .filter((g): g is NonNullable<typeof g> => g !== null);
   }, [categories]);
 
-  // Expand sentinels to individual IDs so checkboxes appear checked in the dropdown.
-  // State stores sentinels; the MultiSelect component receives the expanded set.
+  // Expand type-level selections to individual IDs so MultiSelect checkboxes stay in sync.
   const multiSelectValue = useMemo(() => {
     const result: string[] = [];
-    for (const v of selectedCategoryIds) {
-      if (v.startsWith(TYPE_PREFIX)) {
-        const type = v.slice(TYPE_PREFIX.length) as ExpenseType;
-        result.push(v); // include sentinel itself
-        categories.filter(c => c.type === type).forEach(c => result.push(c.id));
-      } else {
-        result.push(v);
-      }
+    for (const type of selectedTypes) {
+      categories.filter(c => c.type === type).forEach(c => result.push(c.id));
     }
+    result.push(...selectedCatIds);
     return result;
-  }, [selectedCategoryIds, categories]);
+  }, [selectedTypes, selectedCatIds, categories]);
 
-  // Subcategory options: only when exactly ONE plain category (not a type sentinel) is selected.
+  // Subcategory options: only when exactly ONE plain category is selected.
   const soloSelectedCategory = useMemo(() => {
-    const plainSelected = selectedCategoryIds.filter(v => !v.startsWith(TYPE_PREFIX));
-    if (plainSelected.length !== 1) return null;
-    return categories.find(c => c.id === plainSelected[0]) ?? null;
-  }, [categories, selectedCategoryIds]);
+    if (selectedCatIds.length !== 1) return null;
+    return categories.find(c => c.id === selectedCatIds[0]) ?? null;
+  }, [categories, selectedCatIds]);
 
   const subCategoryOptions = useMemo(() => {
     if (!soloSelectedCategory) return [];
@@ -633,18 +589,11 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
   const filteredExpenses = useMemo(() => {
     let filtered = [...expenses];
 
-    if (selectedCategoryIds.length > 0) {
-      // Collect which type sentinels and which plain category IDs are active.
-      const activeTypes = new Set(
-        selectedCategoryIds
-          .filter(v => v.startsWith(TYPE_PREFIX))
-          .map(v => v.slice(TYPE_PREFIX.length) as ExpenseType)
-      );
-      const activeCatIds = new Set(
-        selectedCategoryIds.filter(v => !v.startsWith(TYPE_PREFIX))
-      );
+    if (selectedTypes.length > 0 || selectedCatIds.length > 0) {
+      const typeSet = new Set(selectedTypes);
+      const catIdSet = new Set(selectedCatIds);
       filtered = filtered.filter(
-        e => activeTypes.has(e.type) || activeCatIds.has(e.categoryId)
+        e => typeSet.has(e.type) || catIdSet.has(e.categoryId)
       );
     }
 
@@ -669,7 +618,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
     }
 
     return filtered;
-  }, [expenses, selectedCategoryIds, soloSelectedCategory, selectedSubCategoryId, searchQuery, selectedAccountId]);
+  }, [expenses, selectedTypes, selectedCatIds, soloSelectedCategory, selectedSubCategoryId, searchQuery, selectedAccountId]);
 
   // Sort the filtered list for the mobile/tablet flat list.
   // date-desc also gets an explicit sort — never rely on Firestore document order.
@@ -816,7 +765,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
       {/* ── Filters bar — always visible, commands the whole page ─────────── */}
       <div className="flex flex-wrap items-center justify-end gap-2">
         {/* Ricerca testo */}
-        <div className="relative w-full sm:w-[220px] sm:mr-auto">
+        <div className="relative w-full sm:flex-1 sm:min-w-[220px] sm:max-w-[400px] sm:mr-auto">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
             value={searchQuery}
@@ -845,7 +794,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
         />
 
         {/* Categorie */}
-        <div className="w-full sm:w-[260px] sm:shrink-0">
+        <div className="w-full sm:w-[260px] desktop:w-[320px] sm:shrink-0">
           <MultiSelect
             options={categoryMultiSelectOptions}
             defaultValue={multiSelectValue}
@@ -855,7 +804,7 @@ export function ExpenseTrackingTab({ allExpenses, categories, loading, onRefresh
             hideSelectAll
             maxCount={2}
             className="w-full"
-            popoverClassName="w-[280px]"
+            popoverClassName="w-[280px] desktop:w-[320px]"
             resetOnDefaultValueChange={true}
           />
         </div>

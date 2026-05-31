@@ -77,15 +77,18 @@ export function usePeriodPicker({
   const [fromText, setFromText] = React.useState('');
   const [toText, setToText] = React.useState('');
 
-  // Re-sync calendar state whenever the picker opens — intentionally excludes `value`
-  // so an in-progress calendar selection is not reset when the parent re-renders.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Capture the `value` at the moment the picker opens so the calendar syncs
+  // to the current period without tracking every intermediate change the parent
+  // makes while the picker is closed.
+  const valueOnOpenRef = React.useRef(value);
   React.useEffect(() => {
     if (open) {
+      valueOnOpenRef.current = value;
       const r = periodToRange(value);
       setCalendarRange({ from: r.from, to: r.to });
       setCalendarMonth(r.from);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: sync only on open, not every value change
   }, [open]);
 
   // Keep text inputs in sync with calendar range
@@ -132,7 +135,10 @@ export function usePeriodPicker({
     const val = e.target.value;
     setToText(val);
     const parsed = parseDateInput(val);
-    if (parsed) setCalendarRange(prev => ({ from: prev?.from ?? parsed, to: parsed }));
+    // Do NOT fall back to `parsed` for `from` — if the user is typing the end
+    // date before the start date, silently setting from=to produces a
+    // confusing single-day range. Leave `from` undefined until the user sets it.
+    if (parsed) setCalendarRange(prev => ({ from: prev?.from, to: parsed }));
   };
 
   const last3Years = React.useMemo(
@@ -140,12 +146,13 @@ export function usePeriodPicker({
     [availableYears],
   );
 
-  const last5Months = React.useMemo(
-    () => Array.from({ length: 5 }, (_, i) => {
+  // Computed once at hook initialisation — `new Date()` is stable enough for
+  // the lifetime of the picker session (opened/closed within the same page view).
+  const [last5Months] = React.useState(() =>
+    Array.from({ length: 5 }, (_, i) => {
       const d = subMonths(new Date(), i);
       return { year: d.getFullYear(), month: d.getMonth() + 1 };
-    }),
-    [],
+    })
   );
 
   const label = periodLabel(value);

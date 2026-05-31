@@ -117,7 +117,24 @@ interface MultiSelectGroup {
 	heading: string;
 	/** Options in this group */
 	options: MultiSelectOption[];
+	/**
+	 * When true and ALL non-disabled options in the group are selected,
+	 * collapse individual badges in the trigger into a single badge
+	 * showing the group heading.
+	 */
+	collapseGroupBadge?: boolean;
 }
+
+/**
+ * A typed badge entry for the trigger button.
+ * – `option`: a single selected option (normal case)
+ * – `group`:  a whole group collapsed into one badge
+ *             (when collapseGroupBadge: true and every non-disabled
+ *             item in the group is selected)
+ */
+type TriggerBadge =
+	| { kind: "option"; value: string; option: MultiSelectOption }
+	| { kind: "group"; heading: string; group: MultiSelectGroup };
 
 /**
  * Props for MultiSelect component
@@ -155,6 +172,13 @@ interface MultiSelectProps
 	minWidth?: string;
 	maxWidth?: string;
 	deduplicateOptions?: boolean;
+	/**
+	 * When `defaultValue` changes, update internal state to match.
+	 * This is **uncontrolled** behaviour — the component still owns its state.
+	 * For a fully controlled component, manage `defaultValue` externally and
+	 * use the `ref.setSelectedValues()` imperative API instead.
+	 * @default true
+	 */
 	resetOnDefaultValueChange?: boolean;
 	closeOnSelect?: boolean;
 }
@@ -518,6 +542,24 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
 			}
 		};
 
+		const toggleGroup = React.useCallback(
+			(groupOptions: MultiSelectOption[]) => {
+				if (disabled) return;
+				const nonDisabledValues = groupOptions
+					.filter((o) => !o.disabled)
+					.map((o) => o.value);
+				const allSelected = nonDisabledValues.every((v) =>
+					selectedValues.includes(v)
+				);
+				const newSelected = allSelected
+					? selectedValues.filter((v) => !nonDisabledValues.includes(v))
+					: [...new Set([...selectedValues, ...nonDisabledValues])];
+				setSelectedValues(newSelected);
+				onValueChange(newSelected);
+			},
+			[disabled, selectedValues, onValueChange]
+		);
+
 		React.useEffect(() => {
 			if (!resetOnDefaultValueChange) return;
 			const prevDefaultValue = prevDefaultValueRef.current;
@@ -604,14 +646,37 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
 			}
 		}, [selectedValues, isPopoverOpen, searchValue, announce, getAllOptions]);
 
-		// Values that should produce a visible trigger badge:
-		// Skip individual options whose sentinel groupKey is also in the selection.
-		const visibleSelectedValues = selectedValues.filter((v) => {
-			const opt = getOptionByValue(v);
-			if (!opt) return false;
-			if (opt.groupKey && selectedValues.includes(opt.groupKey)) return false;
-			return true;
-		});
+		// Badges to render in the trigger. Groups with collapseGroupBadge collapse
+		// all their selected items into a single group badge.
+		const visibleBadges = React.useMemo((): TriggerBadge[] => {
+			if (!isGroupedOptions(options)) {
+				const optMap = new Map(
+					(options as MultiSelectOption[]).map((o) => [o.value, o])
+				);
+				return selectedValues.flatMap((v) => {
+					const option = optMap.get(v);
+					return option ? [{ kind: "option" as const, value: v, option }] : [];
+				});
+			}
+			const result: TriggerBadge[] = [];
+			for (const group of options) {
+				const nonDisabled = group.options.filter((o) => !o.disabled);
+				const selectedInGroup = nonDisabled.filter((o) =>
+					selectedValues.includes(o.value)
+				);
+				if (
+					group.collapseGroupBadge &&
+					nonDisabled.length > 0 &&
+					selectedInGroup.length === nonDisabled.length
+				) {
+					result.push({ kind: "group", heading: group.heading, group });
+				} else {
+					for (const o of selectedInGroup)
+						result.push({ kind: "option", value: o.value, option: o });
+				}
+			}
+			return result;
+		}, [selectedValues, options, isGroupedOptions]);
 
 		// Shared: the trigger button rendered in both Popover (desktop) and Drawer (mobile)
 		const triggerButton = (
@@ -651,13 +716,56 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
 								responsiveSettings.compactMode && "gap-0.5"
 							)}
 							style={singleLine ? { paddingBottom: "4px" } : {}}>
-							{visibleSelectedValues
+							{visibleBadges
 								.slice(0, responsiveSettings.maxCount)
-								.map((value) => {
-									const option = getOptionByValue(value);
-									const IconComponent = option?.icon;
-									const customStyle = option?.style;
-									if (!option) return null;
+								.map((badge) => {
+									// ── Group-summary badge ────────────────────────────
+									if (badge.kind === "group") {
+										const { heading, group } = badge;
+										return (
+											<Badge
+												key={`grp:${heading}`}
+												className={cn(
+													getBadgeAnimationClass(),
+													multiSelectVariants({ variant }),
+													responsiveSettings.compactMode && "text-xs px-1.5 py-0.5",
+													screenSize === "mobile" && "max-w-[120px] truncate",
+													singleLine && "flex-shrink-0 whitespace-nowrap",
+													"[&>svg]:pointer-events-auto"
+												)}>
+												<span className={cn(screenSize === "mobile" && "truncate")}>
+													{heading}
+												</span>
+												<div
+													role="button"
+													tabIndex={0}
+													onClick={(event) => {
+														event.stopPropagation();
+														toggleGroup(group.options);
+													}}
+													onKeyDown={(event) => {
+														if (event.key === "Enter" || event.key === " ") {
+															event.preventDefault();
+															event.stopPropagation();
+															toggleGroup(group.options);
+														}
+													}}
+													aria-label={`Rimuovi ${heading} dalla selezione`}
+													className="ml-2 h-4 w-4 cursor-pointer hover:bg-white/20 rounded-sm p-0.5 -m-0.5 focus:outline-none focus:ring-1 focus:ring-white/50">
+													<XCircle
+														className={cn(
+															"h-3 w-3",
+															responsiveSettings.compactMode && "h-2.5 w-2.5"
+														)}
+													/>
+												</div>
+											</Badge>
+										);
+									}
+									// ── Individual option badge ─────────────────────────
+									const { value, option } = badge;
+									const IconComponent = option.icon;
+									const customStyle = option.style;
 									const badgeStyle: React.CSSProperties = {
 										animationDuration: `${animation}s`,
 										...(customStyle?.badgeColor && {
@@ -714,7 +822,7 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
 														toggleOption(value);
 													}
 												}}
-												aria-label={`Remove ${option.label} from selection`}
+												aria-label={`Rimuovi ${option.badgeLabel ?? option.label} dalla selezione`}
 												className="ml-2 h-4 w-4 cursor-pointer hover:bg-white/20 rounded-sm p-0.5 -m-0.5 focus:outline-none focus:ring-1 focus:ring-white/50">
 												<XCircle
 													className={cn(
@@ -725,9 +833,8 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
 											</div>
 										</Badge>
 									);
-								})
-								.filter(Boolean)}
-							{visibleSelectedValues.length > responsiveSettings.maxCount && (
+								})}
+							{visibleBadges.length > responsiveSettings.maxCount && (
 								<Badge
 									className={cn(
 										"bg-transparent text-foreground border-foreground/1 hover:bg-transparent",
@@ -742,7 +849,7 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
 										animationDelay: `${animationConfig?.delay || 0}s`,
 									}}>
 									{`+ ${
-										visibleSelectedValues.length - responsiveSettings.maxCount
+										visibleBadges.length - responsiveSettings.maxCount
 									} more`}
 									<XCircle
 										className={cn(
@@ -855,50 +962,88 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
 						</CommandGroup>
 					)}
 					{isGroupedOptions(filteredOptions) ? (
-						filteredOptions.map((group) => (
-							<CommandGroup key={group.heading} heading={group.heading}>
-								{group.options.map((option) => {
-									const isSelected = selectedValues.includes(option.value);
-									return (
-										<React.Fragment key={option.value}>
-											<CommandItem
-												onSelect={() => toggleOption(option.value)}
-												role="option"
-												aria-selected={isSelected}
-												aria-disabled={option.disabled}
-												aria-label={`${option.label}${
-													isSelected ? ", selected" : ", not selected"
-												}${option.disabled ? ", disabled" : ""}`}
-												className={cn(
-													"cursor-pointer",
-													option.disabled && "opacity-50 cursor-not-allowed",
-													!option.groupKey && "font-medium"
-												)}
-												disabled={option.disabled}>
-												<div
+						filteredOptions.map((group) => {
+							const groupNonDisabled = group.options
+								.filter((o) => !o.disabled)
+								.map((o) => o.value);
+							const selectedInGroup = groupNonDisabled.filter((v) =>
+								selectedValues.includes(v)
+							);
+							const isGroupAllSelected =
+								groupNonDisabled.length > 0 &&
+								selectedInGroup.length === groupNonDisabled.length;
+							const isGroupPartiallySelected =
+								selectedInGroup.length > 0 && !isGroupAllSelected;
+							return (
+								<CommandGroup key={group.heading} heading={group.heading}>
+									<CommandItem
+										key={`group-all-${group.heading}`}
+										onSelect={() => toggleGroup(group.options)}
+										role="option"
+										aria-selected={isGroupAllSelected}
+										aria-label={`${
+											isGroupAllSelected ? "Deseleziona" : "Seleziona"
+										} tutte: ${group.heading}`}
+										className="cursor-pointer font-medium">
+										<div
+											className={cn(
+												"mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+												isGroupAllSelected
+													? "bg-primary text-primary-foreground"
+													: isGroupPartiallySelected
+													? "bg-primary/30 [&_svg]:visible"
+													: "opacity-50 [&_svg]:invisible"
+											)}
+											aria-hidden="true">
+											<CheckIcon className="h-4 w-4" />
+										</div>
+										<span>Tutte: {group.heading}</span>
+									</CommandItem>
+									<CommandSeparator className="my-1" />
+									{group.options.map((option) => {
+										const isSelected = selectedValues.includes(option.value);
+										return (
+											<React.Fragment key={option.value}>
+												<CommandItem
+													onSelect={() => toggleOption(option.value)}
+													role="option"
+													aria-selected={isSelected}
+													aria-disabled={option.disabled}
+													aria-label={`${option.label}${
+														isSelected ? ", selected" : ", not selected"
+													}${option.disabled ? ", disabled" : ""}`}
 													className={cn(
-														"mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
-														isSelected
-															? "bg-primary text-primary-foreground"
-															: "opacity-50 [&_svg]:invisible"
+														"cursor-pointer",
+														option.disabled && "opacity-50 cursor-not-allowed"
 													)}
-													aria-hidden="true">
-													<CheckIcon className="h-4 w-4" />
-												</div>
-												{option.icon && (
-													<option.icon
-														className="mr-2 h-4 w-4 text-muted-foreground"
-														aria-hidden="true"
-													/>
+													disabled={option.disabled}>
+													<div
+														className={cn(
+															"mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+															isSelected
+																? "bg-primary text-primary-foreground"
+																: "opacity-50 [&_svg]:invisible"
+														)}
+														aria-hidden="true">
+														<CheckIcon className="h-4 w-4" />
+													</div>
+													{option.icon && (
+														<option.icon
+															className="mr-2 h-4 w-4 text-muted-foreground"
+															aria-hidden="true"
+														/>
+													)}
+													<span>{option.label}</span>
+												</CommandItem>
+												{option.separator && (
+													<CommandSeparator className="my-1" />
 												)}
-												<span>{option.label}</span>
-											</CommandItem>
-											{option.separator && <CommandSeparator className="my-1" />}
-										</React.Fragment>
-									);
-								})}
-							</CommandGroup>
-						))
+											</React.Fragment>
+										);
+									})}
+								</CommandGroup>
+							);
+						})
 					) : (
 						<CommandGroup>
 							{filteredOptions.map((option) => {
