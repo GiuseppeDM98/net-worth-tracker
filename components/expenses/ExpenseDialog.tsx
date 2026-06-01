@@ -339,8 +339,8 @@ function ExpenseFormBody({
       </div>
 
       {/* ---- Importo + Data ---- */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2 min-w-0">
           <Label htmlFor="amount">Importo (euro) *</Label>
           <Input
             id="amount"
@@ -359,7 +359,7 @@ function ExpenseFormBody({
           )}
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 min-w-0">
           <Label htmlFor="date">Data *</Label>
           <Controller
             control={control}
@@ -384,7 +384,7 @@ function ExpenseFormBody({
       </div>
 
       {/* ---- Categoria + Sottocategoria ---- */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-3 space-y-4 sm:space-y-0">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="categoryId">Categoria *</Label>
           {loadingCategories ? (

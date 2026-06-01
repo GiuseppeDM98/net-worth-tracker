@@ -71,16 +71,18 @@ export function ResponsiveModal({
 
   if (isMobile) {
     return (
-      <Drawer open={open} onOpenChange={(v) => !v && onClose()}>
+      // noBodyStyles: prevents vaul from setting overflow:hidden on body,
+      // which on iOS interferes with layout restoration after keyboard dismiss.
+      <Drawer open={open} onOpenChange={(v) => !v && onClose()} noBodyStyles>
         <DrawerContent>
-          <DrawerHeader className="border-b px-6 pb-4 pt-2">
+          <DrawerHeader className="border-b px-4 pb-3 pt-2">
             <DrawerTitle>{title}</DrawerTitle>
             <DrawerDescription className="sr-only">
               {resolvedDescription || 'Finestra modale'}
             </DrawerDescription>
           </DrawerHeader>
 
-          <div className="flex-1 overflow-y-auto px-6 py-5 min-h-0">
+          <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0">
             {children}
           </div>
 
