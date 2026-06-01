@@ -346,7 +346,7 @@ const TYPE_CARDS: { type: AssetType; label: string; title: string; Icon: React.E
 // Zod validation schema for asset form
 // Note: .or(z.nan()) allows undefined values for optional numeric fields
 const assetSchema = z.object({
-  ticker: z.string().min(1, 'Ticker is required'),
+  ticker: z.string(),
   name: z.string().min(1, 'Name is required'),
   isin: z.string().regex(/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/, 'Invalid ISIN format (example: IT0003128367)').optional().or(z.literal('')),
   type: z.enum(['stock', 'etf', 'bond', 'crypto', 'commodity', 'cash', 'realestate']),
@@ -378,6 +378,11 @@ const assetSchema = z.object({
   })).optional(),
   // Final premium at maturity (optional, e.g. BTP Valore 0.8%)
   bondFinalPremiumRate: z.number().min(0).max(100).optional().or(z.nan()),
+}).superRefine((data, ctx) => {
+  const tickerRequired = data.type !== 'cash' && data.type !== 'realestate';
+  if (tickerRequired && (!data.ticker || data.ticker.trim().length === 0)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Ticker is required', path: ['ticker'] });
+  }
 });
 
 type AssetFormValues = z.infer<typeof assetSchema>;
@@ -1952,15 +1957,16 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
           )}
 
           {/* color-mix() on --primary so the info box tracks the active theme colour. */}
+          {(selectedType === 'realestate' || selectedSubCategory === 'Private Equity' || shouldUpdatePrice(selectedType, selectedSubCategory)) && (
           <div className="rounded-lg bg-[color-mix(in_oklch,var(--primary)_8%,transparent)] border border-[color-mix(in_oklch,var(--primary)_20%,transparent)] p-3">
             <p className="text-sm text-foreground">
               <strong>Nota:</strong>
-              {selectedType === 'cash' && ' Per asset di tipo liquidità, il prezzo sarà impostato a 1.'}
               {selectedType === 'realestate' && ' Per immobili, il prezzo deve essere aggiornato manualmente.'}
               {selectedSubCategory === 'Private Equity' && ' Per Private Equity, il prezzo deve essere aggiornato manualmente.'}
               {shouldUpdatePrice(selectedType, selectedSubCategory) && ` Puoi inserire un prezzo manuale nel campo apposito, oppure il prezzo verrà recuperato automaticamente da ${priceSource}. In caso di errore nel recupero automatico, potrai sempre impostare il prezzo manualmente.`}
             </p>
           </div>
+          )}
 
           </div>
           <div className="px-6 pb-6 pt-4 border-t shrink-0 flex justify-end gap-2">
