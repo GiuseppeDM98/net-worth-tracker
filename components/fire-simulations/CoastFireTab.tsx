@@ -10,7 +10,7 @@
  * they affect the retirement-phase portfolio need, not the classic FIRE tab.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
@@ -329,7 +329,7 @@ export function CoastFireTab() {
   const [tempCustomExpenses, setTempCustomExpenses] = useState('');
   const [tempPensions, setTempPensions] = useState<CoastFirePensionDraft[]>([]);
   const [tempTaxBrackets, setTempTaxBrackets] = useState<CoastFireTaxBracketDraft[]>([]);
-  const [isConfigOpen, setIsConfigOpen] = useState(true);
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
 
   const { data: settings, isLoading: isLoadingSettings } = useQuery<Settings | null>({
     queryKey: ['settings', user?.uid],
@@ -700,18 +700,23 @@ export function CoastFireTab() {
   const targetAgeLabel = currentAge !== null ? formatAgeYears(currentAge) : 'Da impostare';
   const retirementAgeLabel = retirementAge !== null ? formatAgeYears(retirementAge) : 'Da impostare';
 
-  const shouldAutoOpenConfig =
-    hasUnsavedChanges ||
-    pensionConfigurationState === 'empty' ||
-    pensionConfigurationState === 'incomplete' ||
-    currentAge === null ||
-    retirementAge === null;
-
-  // Only auto-open when the user needs to act (missing data, unsaved changes, incomplete pensions).
-  // Never auto-close: collapsing after save is disorienting if the user wants to keep editing.
+  // Decide the initial collapsed/expanded state ONCE, after the form has settled to match saved
+  // settings (hasUnsavedChanges === false ⇒ temp state seeded). Collapsed when the user has already
+  // configured their age (config-first for new users). Waiting for the settled state avoids the
+  // transient first-render mismatch (empty temp vs saved age) popping the panel open.
+  const hasSeededConfigRef = useRef(false);
   useEffect(() => {
-    if (shouldAutoOpenConfig) setIsConfigOpen(true);
-  }, [shouldAutoOpenConfig]);
+    if (hasSeededConfigRef.current || isLoadingSettings || hasUnsavedChanges) return;
+    hasSeededConfigRef.current = true;
+    if (settings?.userAge == null) setIsConfigOpen(true);
+  }, [isLoadingSettings, hasUnsavedChanges, settings?.userAge]);
+
+  // After seeding, reopen on a genuine unsaved edit or an incomplete pension to fix.
+  // Never auto-close: collapsing after save is disorienting if the user keeps editing.
+  useEffect(() => {
+    if (!hasSeededConfigRef.current) return;
+    if (hasUnsavedChanges || pensionConfigurationState === 'incomplete') setIsConfigOpen(true);
+  }, [hasUnsavedChanges, pensionConfigurationState]);
 
   if (isLoadingSettings || isLoadingAssets || isLoadingAnnualExpenses) {
     return <FireCalculatorSkeleton />;
@@ -719,78 +724,6 @@ export function CoastFireTab() {
 
   return (
     <div className="space-y-6 max-desktop:portrait:pb-20">
-
-      {/* 1. HERO — always visible, even without projection */}
-      <Card className="overflow-hidden">
-        <HeroMetricBlock
-          label="Coast FIRE Number · Scenario Base"
-          value={baseScenario?.coastFireNumberToday ?? null}
-          format="currency"
-        />
-        <div className="divide-y divide-border border-t border-border">
-          {/* Progresso totale with animated fill bar */}
-          <div className="px-6 py-3.5">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm text-muted-foreground">Progresso totale</span>
-              <div className="flex items-center gap-2">
-                {baseScenario?.isCoastReached && (
-                  <Badge variant="secondary" className="gap-1">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    Coast FIRE
-                  </Badge>
-                )}
-                <span className="font-mono text-sm font-semibold text-foreground">
-                  {baseScenario ? formatPercentage(baseScenario.progressToCoastFI) : '–'}
-                </span>
-              </div>
-            </div>
-            {baseScenario && (
-              <div
-                role="progressbar"
-                aria-valuenow={Math.min(Math.round(baseScenario.progressToCoastFI), 100)}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-label="Progresso verso il Coast FIRE"
-                className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted"
-              >
-                <motion.div
-                  className="h-full bg-primary"
-                  initial={false}
-                  animate={{ width: `${Math.min(baseScenario.progressToCoastFI, 100)}%` }}
-                  transition={{ duration: 0.35, ease: 'easeOut' }}
-                />
-              </div>
-            )}
-          </div>
-          {/* Liquid-only progress */}
-          <div className="flex items-center justify-between px-6 py-3.5">
-            <span className="text-sm text-muted-foreground">Progresso (solo liquidi)</span>
-            <span className="font-mono text-sm font-semibold text-foreground">
-              {baseScenario ? formatPercentage(liquidProgressBase) : '–'}
-            </span>
-          </div>
-          {/* Patrimonio FIRE attuale */}
-          <div className="flex items-center justify-between px-6 py-3.5">
-            <span className="text-sm text-muted-foreground">Patrimonio FIRE attuale</span>
-            <span className="font-mono text-sm font-semibold text-foreground">
-              {formatCurrency(currentNetWorth)}
-            </span>
-          </div>
-          {/* Patrimonio FIRE attuale (solo liquidi) */}
-          <div className="flex items-center justify-between px-6 py-3.5">
-            <span className="text-sm text-muted-foreground">Patrimonio FIRE attuale (liquido)</span>
-            <span className="font-mono text-sm font-semibold text-foreground">
-              {formatCurrency(liquidNetWorth)}
-            </span>
-          </div>
-          {/* Reason why projection is unavailable */}
-          {!baseScenario && incompleteReason && (
-            <div className="px-6 py-3.5">
-              <p className="text-sm text-muted-foreground">{incompleteReason}</p>
-            </div>
-          )}
-        </div>
-      </Card>
 
       {/* 2. CONFIG COLLAPSIBLE */}
       <Collapsible open={isConfigOpen} onOpenChange={setIsConfigOpen}>
@@ -1293,10 +1226,159 @@ export function CoastFireTab() {
         </Card>
       </Collapsible>
 
+      {/* 1. HERO — always visible, even without projection */}
+      <Card className="overflow-hidden">
+        <HeroMetricBlock
+          label="Coast FIRE Number · Scenario Base"
+          value={baseScenario?.coastFireNumberToday ?? null}
+          format="currency"
+        />
+        <div className="divide-y divide-border border-t border-border">
+          {/* Progresso totale with animated fill bar */}
+          <div className="px-6 py-3.5">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm text-muted-foreground">Progresso totale</span>
+              <div className="flex items-center gap-2">
+                {baseScenario?.isCoastReached && (
+                  <Badge variant="secondary" className="gap-1">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Coast FIRE
+                  </Badge>
+                )}
+                <span className="font-mono text-sm font-semibold text-foreground">
+                  {baseScenario ? formatPercentage(baseScenario.progressToCoastFI) : '–'}
+                </span>
+              </div>
+            </div>
+            {baseScenario && (
+              <div
+                role="progressbar"
+                aria-valuenow={Math.min(Math.round(baseScenario.progressToCoastFI), 100)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="Progresso verso il Coast FIRE"
+                className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted"
+              >
+                <motion.div
+                  className="h-full bg-primary"
+                  initial={false}
+                  animate={{ width: `${Math.min(baseScenario.progressToCoastFI, 100)}%` }}
+                  transition={{ duration: 0.35, ease: 'easeOut' }}
+                />
+              </div>
+            )}
+          </div>
+          {/* Liquid-only progress */}
+          <div className="flex items-center justify-between px-6 py-3.5">
+            <span className="text-sm text-muted-foreground">Progresso (solo liquidi)</span>
+            <span className="font-mono text-sm font-semibold text-foreground">
+              {baseScenario ? formatPercentage(liquidProgressBase) : '–'}
+            </span>
+          </div>
+          {/* Patrimonio FIRE attuale */}
+          <div className="flex items-center justify-between px-6 py-3.5">
+            <span className="text-sm text-muted-foreground">Patrimonio FIRE attuale</span>
+            <span className="font-mono text-sm font-semibold text-foreground">
+              {formatCurrency(currentNetWorth)}
+            </span>
+          </div>
+          {/* Patrimonio FIRE attuale (solo liquidi) */}
+          <div className="flex items-center justify-between px-6 py-3.5">
+            <span className="text-sm text-muted-foreground">Patrimonio FIRE attuale (liquido)</span>
+            <span className="font-mono text-sm font-semibold text-foreground">
+              {formatCurrency(liquidNetWorth)}
+            </span>
+          </div>
+          {/* Reason why projection is unavailable */}
+          {!baseScenario && incompleteReason && (
+            <div className="px-6 py-3.5">
+              <p className="text-sm text-muted-foreground">{incompleteReason}</p>
+            </div>
+          )}
+        </div>
+      </Card>
+
       {/* 3–8: projection sections — only when calculation is available */}
       {coastProjection && baseScenario && (
         <>
-          {/* 3. CHART */}
+          {/* 3. SCENARIO COMPARISON — 3 cards with flat divide-y rows inside each.
+              An @container query (px-consistent) keeps all three on one row from 960px; Tailwind v4 mis-orders arbitrary min-[px] vs rem-based sm:, so plain media queries fail here. */}
+          <div className="@container">
+            <div className="grid grid-cols-1 gap-4 @[640px]:grid-cols-2 @[960px]:grid-cols-3">
+              {(['bear', 'base', 'bull'] as const).map((key) => {
+                const scenario = coastProjection.scenarios[key];
+                const liquidProgress =
+                  scenario.coastFireNumberToday > 0
+                    ? (liquidNetWorth / scenario.coastFireNumberToday) * 100
+                    : 0;
+                const isBase = key === 'base';
+
+                return (
+                  <Card key={key} className="overflow-hidden">
+                    <div className="flex items-start justify-between gap-3 px-6 py-4">
+                      <div>
+                        <p className="text-xs uppercase tracking-widest text-muted-foreground/70">
+                          {scenario.label}
+                        </p>
+                        <p className="mt-1 font-mono text-xs text-muted-foreground">
+                          Reale {formatPercentage(scenario.realReturnRate)}
+                        </p>
+                      </div>
+                      {scenario.isCoastReached ? (
+                        <Badge variant="secondary" className="shrink-0 gap-1">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Raggiunto
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="shrink-0 font-mono">
+                          {formatCurrency(scenario.gapToCoastFI)}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="divide-y divide-border border-t border-border">
+                      <div className="flex items-center justify-between px-6 py-3">
+                        <span className="text-sm text-muted-foreground">Progresso</span>
+                        <span
+                          className={cn(
+                            'font-mono text-sm text-foreground',
+                            isBase ? 'font-bold' : 'font-semibold'
+                          )}
+                        >
+                          {formatPercentage(scenario.progressToCoastFI)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between px-6 py-3">
+                        <span className="text-sm text-muted-foreground">Progresso liquido</span>
+                        <span className="font-mono text-sm font-semibold text-foreground">
+                          {formatPercentage(liquidProgress)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between px-6 py-3">
+                        <span className="text-sm text-muted-foreground">{"Pensione netta al target"}</span>
+                        <span className="font-mono text-sm font-semibold text-foreground">
+                          {formatCurrency(scenario.totalNetAnnualPensionAtRetirement)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between px-6 py-3">
+                        <span className="text-sm text-muted-foreground">{"Capitale a pensione"}</span>
+                        <span className="font-mono text-sm font-semibold text-foreground">
+                          {formatCurrency(scenario.retirementCapitalRequired)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between px-6 py-3">
+                        <span className="text-sm text-muted-foreground">{"Capitale a regime"}</span>
+                        <span className="font-mono text-sm font-semibold text-foreground">
+                          {formatCurrency(scenario.steadyStatePortfolioNeed)}
+                        </span>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 4. CHART */}
           <Card className="border-border/70">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1316,81 +1398,6 @@ export function CoastFireTab() {
               />
             </CardContent>
           </Card>
-
-          {/* 4. SCENARIO COMPARISON — 3 cards with flat divide-y rows inside each.
-              sm:grid-cols-2 gives Bear+Base pairing before desktop 3-col. */}
-          <div className="grid gap-4 sm:grid-cols-2 desktop:grid-cols-3">
-            {(['bear', 'base', 'bull'] as const).map((key) => {
-              const scenario = coastProjection.scenarios[key];
-              const liquidProgress =
-                scenario.coastFireNumberToday > 0
-                  ? (liquidNetWorth / scenario.coastFireNumberToday) * 100
-                  : 0;
-              const isBase = key === 'base';
-
-              return (
-                <Card key={key} className="overflow-hidden">
-                  <div className="flex items-start justify-between gap-3 px-6 py-4">
-                    <div>
-                      <p className="text-xs uppercase tracking-widest text-muted-foreground/70">
-                        {scenario.label}
-                      </p>
-                      <p className="mt-1 font-mono text-xs text-muted-foreground">
-                        Reale {formatPercentage(scenario.realReturnRate)}
-                      </p>
-                    </div>
-                    {scenario.isCoastReached ? (
-                      <Badge variant="secondary" className="shrink-0 gap-1">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        Raggiunto
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="shrink-0 font-mono">
-                        {formatCurrency(scenario.gapToCoastFI)}
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="divide-y divide-border border-t border-border">
-                    <div className="flex items-center justify-between px-6 py-3">
-                      <span className="text-sm text-muted-foreground">Progresso</span>
-                      <span
-                        className={cn(
-                          'font-mono text-sm text-foreground',
-                          isBase ? 'font-bold' : 'font-semibold'
-                        )}
-                      >
-                        {formatPercentage(scenario.progressToCoastFI)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between px-6 py-3">
-                      <span className="text-sm text-muted-foreground">Progresso liquido</span>
-                      <span className="font-mono text-sm font-semibold text-foreground">
-                        {formatPercentage(liquidProgress)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between px-6 py-3">
-                      <span className="text-sm text-muted-foreground">{"Pensione netta al target"}</span>
-                      <span className="font-mono text-sm font-semibold text-foreground">
-                        {formatCurrency(scenario.totalNetAnnualPensionAtRetirement)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between px-6 py-3">
-                      <span className="text-sm text-muted-foreground">{"Capitale a pensione"}</span>
-                      <span className="font-mono text-sm font-semibold text-foreground">
-                        {formatCurrency(scenario.retirementCapitalRequired)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between px-6 py-3">
-                      <span className="text-sm text-muted-foreground">{"Capitale a regime"}</span>
-                      <span className="font-mono text-sm font-semibold text-foreground">
-                        {formatCurrency(scenario.steadyStatePortfolioNeed)}
-                      </span>
-                    </div>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
 
           {/* 5. COVERAGE PHASES — flat divide-y steps */}
           {timelineSteps.length > 0 && (

@@ -9,6 +9,7 @@
 - **Collapsible sidebar**: the desktop sidebar can now be collapsed to icon-only mode with a toggle button in the sidebar header; state persists across sessions
 - **Cashflow FAB**: a `+` button appears in the bottom navigation bar when you're on the Cashflow page — tap it to open the new expense dialog without scrolling to the top
 - **Account transfers** — a new "Trasferimento" transaction type lets you record moving money between your own cash accounts (e.g. checking → savings). Transfers are net-zero: they're automatically excluded from income, expenses, savings rate, budgets, and all performance metrics, so shuffling money around never distorts your stats. The origin account is debited and the destination credited automatically when you create, edit, or delete the transfer
+- **What If Analysis** — a new tab in FIRE & Simulazioni stress-tests your plan against real-life events: a job loss, a big purchase (house/car), a permanent change in your savings or spending, or a windfall (inheritance/bonus). Each scenario shows the before → after impact on **both** your traditional FIRE plan and your Coast FIRE plan — FIRE number, progress, years to FIRE, sustainable income, Coast FIRE number, and whether Coast FIRE is still reached. The "Years to FIRE sensitivity" matrix (how your timeline shifts as expenses and savings vary) now lives here too, and the job-loss and savings/spending scenarios spell out the baseline figures each number is built from
 
 ## 🐛 Bug Fixes
 
@@ -26,6 +27,9 @@
 - Fixed: the category filter inside the Cashflow filters panel could not be scrolled on tablets — the full category list is now reachable
 - Fixed: clearing a default cash account in Settings (selecting "Nessun default" for the withdrawal or deposit account) now actually saves — previously the old account was silently kept on reload, so the default could never be removed once set
 - Fixed: the Cost Centers tab now updates immediately when you add, edit, or delete an expense linked to a cost center — the per-center totals and transaction counts refresh on the spot instead of requiring a full page reload
+- Fixed: the settings panel in the FIRE Calculator and the configuration panel in Coast FIRE now stay **collapsed when you've already set them up** — they were incorrectly opening expanded on every visit because of a load-time timing issue
+- Fixed: the Bear/Base/Bull scenario cards in Coast FIRE now sit on a single row on laptops and tablets — they were wrapping to a 2 + 1 layout even when there was room for all three
+- Fixed: the page numbers no longer slide with a choppy animation when you collapse the settings panel in the FIRE Calculator and Coast FIRE tabs — they now settle smoothly in place
 
 ## 🔧 Improvements
 
@@ -100,3 +104,6 @@
 - Improved: the category filter inside the Cashflow filters panel now opens as a full-width bottom sheet on tablet (previously a small, unscrollable popup) and hides its scrollbar for a cleaner look on both mobile and tablet
 - Improved: on phones and tablets in portrait orientation, the in-page "Aggiungi" button on the Cashflow list is now hidden when the bottom navigation bar's `+` button is available, removing the duplicate control; in landscape (where the bottom bar is hidden) the "Aggiungi" button remains
 - Improved: tab navigation on mobile — Cashflow, Settings, and FIRE & Simulations now use a centered segmented pill on phones and tablets. The active section shows its icon alongside the full section name; inactive sections show only their icon, keeping all options visible without horizontal scrolling
+- **FIRE Calculator & Coast FIRE — settings moved to the top**: the settings/configuration panel now sits at the top of each tab and stays collapsed once configured, keeping the results front and center; it opens automatically only when something still needs setting up or you have unsaved changes
+- **Coast FIRE — scenario cards moved above the chart**: the Bear/Base/Bull comparison cards now appear directly above the "Proiezione senza nuovi contributi" chart, since they describe exactly the scenarios the chart plots
+- **What If — every number shows its baseline**: the job-loss scenario breaks down its portfolio impact (missed savings + living costs drawn from the portfolio, based on your last full year), and the savings/spending scenario shows your current annual savings and expenses and what they become after the change

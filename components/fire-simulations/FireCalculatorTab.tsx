@@ -3,14 +3,14 @@
 /**
  * FireCalculatorTab Component
  *
- * Trade Republic hierarchy: FIRE Number dominates in apertura, settings collapse
- * below results, all metrics in flat divide-y rows (no card-in-card).
+ * Trade Republic hierarchy: settings collapse at the top (config-first — collapsed once a
+ * withdrawal rate is saved), FIRE Number hero below, all metrics in flat divide-y rows.
  *
  * Data flow:
  * 1. settings + assets queries (independent, staleTime 5min)
  * 2. fireData query (depends on assets + settings — gated by `enabled`)
- * 3. displayedFireMetrics / plannedFireMetrics derived client-side via useMemo
- *    so preview changes (WR, plannedExpenses) are instant without re-fetching
+ * 3. displayedFireMetrics derived client-side via useMemo so preview changes (WR)
+ *    are instant without re-fetching
  *
  * Preview pattern: user edits form → temp state updates → displayed metrics
  * re-compute instantly → banner "Anteprima locale attiva" appears → explicit Save
@@ -18,8 +18,7 @@
  * the last saved values.
  */
 
-import { useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { useAuth } from '@/contexts/AuthContext';
@@ -35,7 +34,6 @@ import { getItalyYear } from '@/lib/utils/dateHelpers';
 import { getSettings, setSettings, getDefaultTargets } from '@/lib/services/assetAllocationService';
 import {
   getFIREData,
-  calculatePlannedFIREMetrics,
   calculateFIREMetrics,
   prepareRunwaySummaryLabel,
 } from '@/lib/services/fireService';
@@ -54,8 +52,6 @@ import {
   HelpCircle,
   Info,
   Loader2,
-  TrendingDown,
-  TrendingUp,
 } from 'lucide-react';
 import { FireCalculatorSkeleton } from '@/components/fire-simulations/FireCalculatorSkeleton';
 import { toast } from 'sonner';
@@ -75,7 +71,6 @@ import { FIREProjectionSection } from './FIREProjectionSection';
 import { FireReachedBanner } from './FireReachedBanner';
 import { cn } from '@/lib/utils';
 import { useCountUp } from '@/lib/utils/useCountUp';
-import { metricSettleTransition } from '@/lib/utils/motionVariants';
 
 const FIRE_CONTROL_CLASSNAME =
   'mt-1 transition-[border-color,background-color,box-shadow] duration-200 focus-visible:ring-2 focus-visible:ring-primary/25 motion-reduce:transition-none';
@@ -125,7 +120,6 @@ export function FireCalculatorTab() {
   const chartColors = useChartColors();
 
   const [tempWithdrawalRate, setTempWithdrawalRate] = useState<string>('4.0');
-  const [tempPlannedAnnualExpenses, setTempPlannedAnnualExpenses] = useState<string>('');
   const [includePrimaryResidence, setIncludePrimaryResidence] = useState<boolean>(false);
   const [settingsOpen, setSettingsOpen] = useState<boolean>(false);
   const [howItWorksOpen, setHowItWorksOpen] = useState<boolean>(false);
@@ -145,7 +139,6 @@ export function FireCalculatorTab() {
   });
 
   const withdrawalRate = settings?.withdrawalRate ?? 4.0;
-  const plannedAnnualExpenses = settings?.plannedAnnualExpenses ?? null;
   const currentNetWorth = assets ? calculateFIRENetWorth(assets, includePrimaryResidence) : 0;
   const liquidNetWorth = assets ? calculateLiquidFIRENetWorth(assets, includePrimaryResidence) : 0;
   const illiquidNetWorth = assets ? calculateIlliquidFIRENetWorth(assets, includePrimaryResidence) : 0;
@@ -176,25 +169,25 @@ export function FireCalculatorTab() {
     Number.isFinite(parsedPreviewWithdrawalRate) && parsedPreviewWithdrawalRate > 0
       ? parsedPreviewWithdrawalRate
       : withdrawalRate;
-  const trimmedPreviewExpenses = tempPlannedAnnualExpenses.trim();
-  const parsedPreviewExpenses =
-    trimmedPreviewExpenses !== '' ? Number.parseFloat(trimmedPreviewExpenses) : null;
-  const previewPlannedAnnualExpenses =
-    parsedPreviewExpenses !== null &&
-    Number.isFinite(parsedPreviewExpenses) &&
-    parsedPreviewExpenses >= 0
-      ? parsedPreviewExpenses
-      : plannedAnnualExpenses;
-
   const hasUnsavedChanges =
     tempWithdrawalRate !== (settings?.withdrawalRate ?? 4.0).toString() ||
-    tempPlannedAnnualExpenses !==
-      (settings?.plannedAnnualExpenses ? settings.plannedAnnualExpenses.toString() : '') ||
     includePrimaryResidence !== (settings?.includePrimaryResidenceInFIRE ?? false);
 
-  // Auto-open settings panel when user has unsaved changes so the banner is visible
+  // Decide the panel's initial state ONCE, after the form has settled to match saved settings
+  // (hasUnsavedChanges === false ⇒ temp state has been seeded). Collapsed when a withdrawal rate
+  // is already saved, open for config-first users. Waiting for the settled state avoids the
+  // transient first-render mismatch (temp '4.0' vs saved '4') popping the panel open. The settings
+  // inputs live inside the collapsible, so genuine edits only happen while it is already open.
+  const hasSeededSettingsRef = useRef(false);
   useEffect(() => {
-    if (hasUnsavedChanges) setSettingsOpen(true);
+    if (hasSeededSettingsRef.current || isLoadingSettings || hasUnsavedChanges) return;
+    hasSeededSettingsRef.current = true;
+    if (settings?.withdrawalRate == null) setSettingsOpen(true);
+  }, [isLoadingSettings, hasUnsavedChanges, settings?.withdrawalRate]);
+
+  // After seeding, reopen if a genuine unsaved edit appears (keeps the preview banner visible).
+  useEffect(() => {
+    if (hasSeededSettingsRef.current && hasUnsavedChanges) setSettingsOpen(true);
   }, [hasUnsavedChanges]);
 
   const displayedFireMetrics = useMemo(() => {
@@ -207,16 +200,6 @@ export function FireCalculatorTab() {
       illiquidNetWorth
     );
   }, [currentNetWorth, fireData?.metrics, liquidNetWorth, previewWithdrawalRate, illiquidNetWorth]);
-
-  const plannedFireMetrics = useMemo(() => {
-    if (!previewPlannedAnnualExpenses || previewPlannedAnnualExpenses <= 0 || currentNetWorth <= 0)
-      return null;
-    return calculatePlannedFIREMetrics(
-      currentNetWorth,
-      previewPlannedAnnualExpenses,
-      previewWithdrawalRate
-    );
-  }, [currentNetWorth, previewPlannedAnnualExpenses, previewWithdrawalRate]);
 
   const displayedRunwayData = useMemo(() => {
     const targetYearsOfExpenses = previewWithdrawalRate > 0 ? 100 / previewWithdrawalRate : null;
@@ -258,27 +241,22 @@ export function FireCalculatorTab() {
     };
   }, [displayedRunwayData, previewWithdrawalRate]);
 
-  // Sync form state when settings load or change
+  // Sync form state when settings load or change (runs once data has loaded — even when the user
+  // has no settings doc yet — so temp state always settles to the saved-or-default values).
   useEffect(() => {
-    if (settings) {
-      setTempWithdrawalRate((settings.withdrawalRate ?? 4.0).toString());
-      setTempPlannedAnnualExpenses(
-        settings.plannedAnnualExpenses ? settings.plannedAnnualExpenses.toString() : ''
-      );
-      setIncludePrimaryResidence(settings.includePrimaryResidenceInFIRE ?? false);
-    }
-  }, [settings]);
+    if (isLoadingSettings) return;
+    setTempWithdrawalRate((settings?.withdrawalRate ?? 4.0).toString());
+    setIncludePrimaryResidence(settings?.includePrimaryResidenceInFIRE ?? false);
+  }, [isLoadingSettings, settings]);
 
   const handleResetToSaved = () => {
     setTempWithdrawalRate((settings?.withdrawalRate ?? 4.0).toString());
-    setTempPlannedAnnualExpenses(settings?.plannedAnnualExpenses?.toString() ?? '');
     setIncludePrimaryResidence(settings?.includePrimaryResidenceInFIRE ?? false);
   };
 
   const mutation = useMutation({
     mutationFn: (newSettings: {
       withdrawalRate: number;
-      plannedAnnualExpenses?: number;
       includePrimaryResidenceInFIRE?: boolean;
     }) =>
       setSettings(user!.uid, {
@@ -298,23 +276,14 @@ export function FireCalculatorTab() {
 
   const handleSaveSettings = () => {
     const newWR = parseFloat(tempWithdrawalRate);
-    const newPAE =
-      tempPlannedAnnualExpenses.trim() !== ''
-        ? parseFloat(tempPlannedAnnualExpenses)
-        : undefined;
 
     if (isNaN(newWR) || newWR <= 0 || newWR > 100) {
       toast.error('Inserisci un Withdrawal Rate valido tra 0 e 100');
       return;
     }
-    if (newPAE !== undefined && (isNaN(newPAE) || newPAE < 0)) {
-      toast.error('Inserisci spese annuali previste valide (numero positivo)');
-      return;
-    }
 
     mutation.mutate({
       withdrawalRate: newWR,
-      plannedAnnualExpenses: newPAE,
       includePrimaryResidenceInFIRE: includePrimaryResidence,
     });
   };
@@ -324,10 +293,7 @@ export function FireCalculatorTab() {
   }
 
   // Compact trigger label summarises active settings at a glance
-  const settingsTriggerLabel =
-    tempPlannedAnnualExpenses.trim()
-      ? `SWR ${previewWithdrawalRate}% · Spese previste ${formatCurrency(Number(tempPlannedAnnualExpenses))}/anno`
-      : `Safe Withdrawal Rate ${previewWithdrawalRate}%`;
+  const settingsTriggerLabel = `Safe Withdrawal Rate ${previewWithdrawalRate}%`;
 
   return (
     <div className="space-y-6">
@@ -342,6 +308,138 @@ export function FireCalculatorTab() {
         />
       )}
 
+      {/* Settings — collapsed by default, auto-opens when unsaved changes are present */}
+      <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <Card className="overflow-hidden">
+          <CollapsibleTrigger asChild>
+            <div className="flex cursor-pointer items-center justify-between px-6 py-4 transition-colors hover:bg-muted/30">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-foreground">Impostazioni FIRE</p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  {settingsTriggerLabel}
+                </p>
+              </div>
+              <div className="ml-3 flex shrink-0 items-center gap-2">
+                {hasUnsavedChanges && (
+                  <span
+                    className="h-1.5 w-1.5 rounded-full bg-amber-500"
+                    aria-label="Modifiche non salvate"
+                  />
+                )}
+                <ChevronDown
+                  className={cn(
+                    'h-4 w-4 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none',
+                    settingsOpen && 'rotate-180'
+                  )}
+                />
+              </div>
+            </div>
+          </CollapsibleTrigger>
+
+          <CollapsibleContent>
+            <div className="space-y-4 border-t border-border px-6 py-4">
+              {/* Unsaved changes banner — Info at rest, Loader2 only during mutation */}
+              {hasUnsavedChanges && (
+                <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
+                  <div className="flex items-start gap-2">
+                    {mutation.isPending ? (
+                      <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
+                    ) : (
+                      <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                    )}
+                    <div className="space-y-0.5">
+                      <p className="font-medium text-foreground">Anteprima locale attiva</p>
+                      <p className="text-xs text-muted-foreground">
+                        Le metriche riflettono i valori inseriti ma non ancora salvati.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid gap-4">
+                <div>
+                  <div className="mb-1 flex items-center gap-1.5">
+                    <Label htmlFor="withdrawalRate">Safe Withdrawal Rate (%)</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          className="text-muted-foreground/60 transition-colors hover:text-muted-foreground focus-visible:outline-none"
+                          aria-label="Informazioni sul Safe Withdrawal Rate"
+                        >
+                          <HelpCircle className="h-3.5 w-3.5" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent side="top" className="max-w-[280px] text-sm leading-relaxed">
+                        La percentuale del patrimonio che puoi prelevare ogni anno in modo
+                        sostenibile. Il 4% (regola del 4%, Trinity Study) garantisce la
+                        sopravvivenza del portafoglio su 30 anni nel 95% degli scenari storici.
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <Input
+                    id="withdrawalRate"
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    value={tempWithdrawalRate}
+                    onChange={(e) => setTempWithdrawalRate(e.target.value)}
+                    className={FIRE_CONTROL_CLASSNAME}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Tipicamente 4% secondo la regola del 4% (Trinity Study)
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-muted/30 p-4">
+                <div className="min-w-0 space-y-0.5">
+                  <Label htmlFor="includePrimaryResidence" className="leading-normal">
+                    Includi casa di abitazione nel FIRE
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Se disattivo, gli immobili di abitazione sono esclusi (metodologia FIRE
+                    standard).
+                  </p>
+                </div>
+                <Switch
+                  id="includePrimaryResidence"
+                  checked={includePrimaryResidence}
+                  onCheckedChange={setIncludePrimaryResidence}
+                  className="mt-0.5 shrink-0"
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={handleSaveSettings}
+                  disabled={isDemo || mutation.isPending}
+                  title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+                >
+                  {mutation.isPending
+                    ? 'Salvataggio...'
+                    : hasUnsavedChanges
+                      ? 'Salva Anteprima'
+                      : 'Salva Impostazioni'}
+                </Button>
+                {hasUnsavedChanges && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleResetToSaved}
+                    disabled={mutation.isPending}
+                  >
+                    Annulla
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
+
       {/* Hero: FIRE Number — dominant value, progress chip inline, WR corrente as secondary row */}
       {displayedFireMetrics && (
         <Card className="overflow-hidden">
@@ -349,13 +447,9 @@ export function FireCalculatorTab() {
             <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/70">
               FIRE NUMBER
             </p>
-            <motion.p
-              layout="position"
-              transition={metricSettleTransition}
-              className="font-mono text-4xl font-bold tabular-nums text-foreground mt-1 leading-none tracking-tight"
-            >
+            <p className="font-mono text-4xl font-bold tabular-nums text-foreground mt-1 leading-none tracking-tight">
               <SettledCurrencyValue value={displayedFireMetrics.fireNumber} />
-            </motion.p>
+            </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center rounded-md bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
                 <SettledPercentageValue value={displayedFireMetrics.progressToFI} />
@@ -414,13 +508,9 @@ export function FireCalculatorTab() {
             <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/70">
               REDDITO PASSIVO SOSTENIBILE
             </p>
-            <motion.p
-              layout="position"
-              transition={metricSettleTransition}
-              className="font-mono text-4xl font-bold tabular-nums text-foreground mt-1 leading-none tracking-tight"
-            >
+            <p className="font-mono text-4xl font-bold tabular-nums text-foreground mt-1 leading-none tracking-tight">
               <SettledCurrencyValue value={displayedFireMetrics.annualAllowance} />
-            </motion.p>
+            </p>
             <p className="mt-1 text-xs text-muted-foreground">
               Patrimonio FIRE {formatCurrency(currentNetWorth)} &times;{' '}
               {previewWithdrawalRate}% annuo
@@ -470,229 +560,6 @@ export function FireCalculatorTab() {
                 </span>
               </div>
             )}
-          </div>
-        </Card>
-      )}
-
-      {/* Settings — collapsed by default, auto-opens when unsaved changes are present */}
-      <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
-        <Card className="overflow-hidden">
-          <CollapsibleTrigger asChild>
-            <div className="flex cursor-pointer items-center justify-between px-6 py-4 transition-colors hover:bg-muted/30">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-foreground">Impostazioni FIRE</p>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                  {settingsTriggerLabel}
-                </p>
-              </div>
-              <div className="ml-3 flex shrink-0 items-center gap-2">
-                {hasUnsavedChanges && (
-                  <span
-                    className="h-1.5 w-1.5 rounded-full bg-amber-500"
-                    aria-label="Modifiche non salvate"
-                  />
-                )}
-                <ChevronDown
-                  className={cn(
-                    'h-4 w-4 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none',
-                    settingsOpen && 'rotate-180'
-                  )}
-                />
-              </div>
-            </div>
-          </CollapsibleTrigger>
-
-          <CollapsibleContent>
-            <div className="space-y-4 border-t border-border px-6 py-4">
-              {/* Unsaved changes banner — Info at rest, Loader2 only during mutation */}
-              {hasUnsavedChanges && (
-                <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
-                  <div className="flex items-start gap-2">
-                    {mutation.isPending ? (
-                      <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
-                    ) : (
-                      <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                    )}
-                    <div className="space-y-0.5">
-                      <p className="font-medium text-foreground">Anteprima locale attiva</p>
-                      <p className="text-xs text-muted-foreground">
-                        Le metriche riflettono i valori inseriti ma non ancora salvati.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="grid gap-4 desktop:grid-cols-2">
-                <div>
-                  <div className="mb-1 flex items-center gap-1.5">
-                    <Label htmlFor="withdrawalRate">Safe Withdrawal Rate (%)</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button
-                          type="button"
-                          className="text-muted-foreground/60 transition-colors hover:text-muted-foreground focus-visible:outline-none"
-                          aria-label="Informazioni sul Safe Withdrawal Rate"
-                        >
-                          <HelpCircle className="h-3.5 w-3.5" />
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent side="top" className="max-w-[280px] text-sm leading-relaxed">
-                        La percentuale del patrimonio che puoi prelevare ogni anno in modo
-                        sostenibile. Il 4% (regola del 4%, Trinity Study) garantisce la
-                        sopravvivenza del portafoglio su 30 anni nel 95% degli scenari storici.
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  <Input
-                    id="withdrawalRate"
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    max="100"
-                    value={tempWithdrawalRate}
-                    onChange={(e) => setTempWithdrawalRate(e.target.value)}
-                    className={FIRE_CONTROL_CLASSNAME}
-                  />
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Tipicamente 4% secondo la regola del 4% (Trinity Study)
-                  </p>
-                </div>
-
-                <div>
-                  <Label htmlFor="plannedExpenses" className="mb-1 block">
-                    Spese Annuali Previste (€)
-                  </Label>
-                  <Input
-                    id="plannedExpenses"
-                    type="number"
-                    step="100"
-                    min="0"
-                    value={tempPlannedAnnualExpenses}
-                    onChange={(e) => setTempPlannedAnnualExpenses(e.target.value)}
-                    className={FIRE_CONTROL_CLASSNAME}
-                    placeholder="Es. 25000"
-                  />
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Spese annuali che prevedi di avere in FIRE (opzionale)
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-muted/30 p-4">
-                <div className="min-w-0 space-y-0.5">
-                  <Label htmlFor="includePrimaryResidence" className="leading-normal">
-                    Includi casa di abitazione nel FIRE
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Se disattivo, gli immobili di abitazione sono esclusi (metodologia FIRE
-                    standard).
-                  </p>
-                </div>
-                <Switch
-                  id="includePrimaryResidence"
-                  checked={includePrimaryResidence}
-                  onCheckedChange={setIncludePrimaryResidence}
-                  className="mt-0.5 shrink-0"
-                />
-              </div>
-
-              <div className="flex items-center gap-3">
-                <Button
-                  onClick={handleSaveSettings}
-                  disabled={isDemo || mutation.isPending}
-                  title={isDemo ? 'Non disponibile in modalità demo' : undefined}
-                >
-                  {mutation.isPending
-                    ? 'Salvataggio...'
-                    : hasUnsavedChanges
-                      ? 'Salva Anteprima'
-                      : 'Salva Impostazioni'}
-                </Button>
-                {hasUnsavedChanges && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleResetToSaved}
-                    disabled={mutation.isPending}
-                  >
-                    Annulla
-                  </Button>
-                )}
-              </div>
-            </div>
-          </CollapsibleContent>
-        </Card>
-      </Collapsible>
-
-      {/* Scenario Pianificato — shown only when user has configured planned expenses */}
-      {plannedFireMetrics && displayedFireMetrics && (
-        <Card className="overflow-hidden">
-          <div className="px-6 py-5">
-            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/70">
-              SCENARIO PIANIFICATO
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Proiezione con spese annuali previste:{' '}
-              {formatCurrency(plannedFireMetrics.plannedAnnualExpenses)}
-            </p>
-            <motion.p
-              layout="position"
-              transition={metricSettleTransition}
-              className="font-mono text-4xl font-bold tabular-nums text-foreground mt-3 leading-none tracking-tight"
-            >
-              <SettledCurrencyValue value={plannedFireMetrics.plannedFireNumber} />
-            </motion.p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {formatCurrency(plannedFireMetrics.plannedAnnualExpenses)} &divide;{' '}
-              {previewWithdrawalRate}% &mdash; FIRE Number previsto
-            </p>
-            {displayedFireMetrics.fireNumber !== plannedFireMetrics.plannedFireNumber && (
-              <p
-                className={cn(
-                  'mt-2 flex items-center gap-1 text-xs font-medium',
-                  plannedFireMetrics.plannedFireNumber < displayedFireMetrics.fireNumber
-                    ? 'text-green-600 dark:text-green-400'
-                    : 'text-muted-foreground'
-                )}
-              >
-                {plannedFireMetrics.plannedFireNumber < displayedFireMetrics.fireNumber ? (
-                  <>
-                    <TrendingDown className="h-3.5 w-3.5 shrink-0" />
-                    {formatCurrency(
-                      displayedFireMetrics.fireNumber - plannedFireMetrics.plannedFireNumber
-                    )}{' '}
-                    in meno rispetto all&apos;attuale
-                  </>
-                ) : (
-                  <>
-                    <TrendingUp className="h-3.5 w-3.5 shrink-0" />
-                    {formatCurrency(
-                      plannedFireMetrics.plannedFireNumber - displayedFireMetrics.fireNumber
-                    )}{' '}
-                    in più rispetto all&apos;attuale
-                  </>
-                )}
-              </p>
-            )}
-          </div>
-          <div className="divide-y divide-border border-t border-border">
-            <div className="flex items-center justify-between px-6 py-3.5">
-              <span className="text-sm text-muted-foreground">Progresso verso FI previsto</span>
-              <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
-                <SettledPercentageValue value={plannedFireMetrics.plannedProgressToFI} />
-              </span>
-            </div>
-            <div className="flex items-center justify-between px-6 py-3.5">
-              <span className="text-sm text-muted-foreground">Ancora da accumulare</span>
-              <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
-                {plannedFireMetrics.plannedProgressToFI >= 100
-                  ? '—'
-                  : formatCurrency(
-                      plannedFireMetrics.plannedFireNumber - currentNetWorth
-                    )}
-              </span>
-            </div>
           </div>
         </Card>
       )}
@@ -983,7 +850,6 @@ export function FireCalculatorTab() {
           currentNetWorth={currentNetWorth}
           withdrawalRate={previewWithdrawalRate}
           settings={settings}
-          plannedAnnualExpensesPreview={previewPlannedAnnualExpenses}
         />
       )}
 

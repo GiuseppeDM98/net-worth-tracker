@@ -69,12 +69,13 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Year-over-Year variation and raw monthly snapshot data available in a collapsible section (collapsed by default)
 
 ### FIRE Planning
-- FIRE calculator with primary residence exclusion
-- **Coast FIRE tab** — Trade Republic-inspired layout: Coast FIRE number as a dominant hero metric (always visible without scrolling), settings panel collapsed by default with auto-open on changes, narrative order (hero → config → projection chart → Bear/Base/Bull scenarios → coverage phases → detail → pension impact → interpretation). Hero rows show overall progress, liquid-only progress, total net worth, and liquid net worth. "Annulla" button resets unsaved changes in one tap. All chart colors theme-aware
+- FIRE calculator with primary residence exclusion; the settings panel sits at the top and stays collapsed once you've set your withdrawal rate
+- **Coast FIRE tab** — Trade Republic-inspired layout: configuration panel at the top (collapsed once you've set your age, opens automatically when setup is incomplete), Coast FIRE number as a dominant hero metric, then the Bear/Base/Bull scenario cards (one row on wider screens) above the projection chart, followed by coverage phases, detail, pension impact, and interpretation. Hero rows show overall progress, liquid-only progress, total net worth, and liquid net worth. "Annulla" button resets unsaved changes in one tap. All chart colors theme-aware
 - Coast FIRE supports one or more state pensions with editable IRPEF brackets, exact pension start dates, scenario-specific real net conversion, a guided summary that separates target-age need, bridge years, and post-pension steady state
 - Multi-scenario projections (Bear / Base / Bull) with inflation adjustment
 - Per-scenario FIRE numbers with automatic savings stop at FIRE reached
-- Historical FIRE runway view with rolling 12-month expenses, separate total/liquid deltas, and a sensitivity matrix for annual spending vs annual savings
+- Historical FIRE runway view with rolling 12-month expenses and separate total/liquid deltas
+- **What If Analysis tab** — stress-test your plan against life events (job loss, major purchase, savings/spending change, windfall) and see the before → after impact on both traditional FIRE and Coast FIRE; hosts the years-to-FIRE sensitivity matrix (how your timeline shifts as annual spending and savings vary)
 - **Goal-Based Investing**: allocate portfolio portions to financial goals (house, retirement, emergency fund, etc.) with progress tracking and recommended asset class comparison. The tab opens with a hero block showing total allocated value; goals are displayed as a single flat list — tap any row to expand it inline and see the progress bar, assigned assets, allocation comparison bars, and edit/delete actions. Two-tap inline delete confirmation prevents accidental removal
 - **Goal-Driven Allocation**: optionally derive portfolio allocation targets as a weighted average of goal recommended allocations, with automatic fallback to manual targets
 - Fully responsive on mobile and tablet — tab navigation uses a dropdown on small screens, year-by-year projection table switches to a card layout

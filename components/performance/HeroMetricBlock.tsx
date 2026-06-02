@@ -1,14 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { HelpCircle } from 'lucide-react';
 import { formatCurrency, formatPercentage } from '@/lib/services/chartService';
 import { cn } from '@/lib/utils';
 import { useCountUp } from '@/lib/utils/useCountUp';
-import { metricSettleTransition } from '@/lib/utils/motionVariants';
 import { getMetricValueColor } from '@/lib/utils/metricColors';
 
 export interface HeroMetricBlockProps {
@@ -51,11 +49,7 @@ export function HeroMetricBlock({
   const animatedValue = useCountUp(value, { duration: 620, once: true });
 
   return (
-    <motion.div
-      layout="position"
-      transition={metricSettleTransition}
-      className={cn('px-6 py-5', className)}
-    >
+    <div className={cn('px-6 py-5', className)}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -72,16 +66,14 @@ export function HeroMetricBlock({
             )}
           </div>
 
-          <motion.p
-            layout="position"
-            transition={metricSettleTransition}
+          <p
             className={cn(
               'font-mono text-4xl font-bold tabular-nums leading-none tracking-tight',
               getMetricValueColor(value, format)
             )}
           >
             {formatValue(animatedValue, format)}
-          </motion.p>
+          </p>
 
           {subtitle && (
             <p className="text-xs text-muted-foreground">{subtitle}</p>
@@ -109,6 +101,6 @@ export function HeroMetricBlock({
           </Popover>
         )}
       </div>
-    </motion.div>
+    </div>
   );
 }
