@@ -12,7 +12,8 @@ import {
   limit,
   Timestamp,
   orderBy,
-  deleteField
+  deleteField,
+  runTransaction,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
@@ -366,6 +367,41 @@ export async function updateCashAssetBalance(assetId: string, signedDelta: numbe
       error: getErrorMessage(error),
     });
     throw new Error(`Failed to update cash asset balance for ${assetId}`, { cause: error });
+  }
+}
+
+/**
+ * Atomically update cash asset balances for multiple assets in a single Firestore transaction.
+ * Use this instead of multiple sequential updateCashAssetBalance calls to prevent
+ * partial-update corruption on network failure.
+ */
+export async function updateCashAssetBalancesAtomic(
+  updates: { assetId: string; signedDelta: number }[]
+): Promise<void> {
+  const validUpdates = updates.filter(u => u.signedDelta !== 0);
+  if (validUpdates.length === 0) return;
+
+  let userId: string | undefined;
+
+  await runTransaction(db, async (tx) => {
+    for (const { assetId, signedDelta } of validUpdates) {
+      const ref = doc(db, ASSETS_COLLECTION, assetId);
+      const snap = await tx.get(ref);
+      if (!snap.exists()) {
+        console.warn('Skipping balance update: asset not found', { assetId });
+        continue;
+      }
+      const data = snap.data();
+      if (!userId) userId = data.userId as string;
+      tx.update(ref, {
+        quantity: (data.quantity as number) + signedDelta,
+        updatedAt: new Date(),
+      });
+    }
+  });
+
+  if (userId) {
+    await invalidateDashboardOverviewSummary(userId, 'cash_asset_balance_updated');
   }
 }
 

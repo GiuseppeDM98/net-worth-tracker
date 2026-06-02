@@ -38,6 +38,7 @@ import {
   getExpensesByInstallmentParentId,
 } from '@/lib/services/expenseService';
 import { updateCashAssetBalance } from '@/lib/services/assetService';
+import { reconcileTransferDelete } from '@/lib/services/cashBalanceReconciliation';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { Timestamp } from 'firebase/firestore';
 import {
@@ -143,15 +144,17 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasA
   const deleteSingleExpense = async (expense: Expense) => {
     try {
       setDeletingId(expense.id);
-      // Reverse the balance effect on the linked cash asset before deleting
-      if (expense.linkedCashAssetId) {
+      if (expense.type === 'transfer') {
+        await reconcileTransferDelete({
+          originId: expense.linkedCashAssetId,
+          destId: expense.transferCashAssetId,
+          amount: Math.abs(expense.amount),
+        });
+      } else if (expense.linkedCashAssetId) {
         await updateCashAssetBalance(expense.linkedCashAssetId, -expense.amount);
-        if (user) queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
       }
-      // Reverse the transfer destination balance
-      if (expense.transferCashAssetId) {
-        await updateCashAssetBalance(expense.transferCashAssetId, -Math.abs(expense.amount));
-        if (user) queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
+      if (user && (expense.linkedCashAssetId || expense.transferCashAssetId)) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
       }
       await deleteExpense(expense.id);
       toast.success('Voce eliminata con successo');

@@ -17,7 +17,7 @@
  */
 
 import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { useForm, Controller, useWatch } from 'react-hook-form';
+import { useForm, Controller, useWatch, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useQueryClient } from '@tanstack/react-query';
@@ -193,12 +193,7 @@ interface ExpenseDialogProps {
 // ---------------------------------------------------------------------------
 
 interface FormBodyProps {
-  register: ReturnType<typeof useForm<ExpenseFormValues>>['register'];
-  control: ReturnType<typeof useForm<ExpenseFormValues>>['control'];
-  errors: ReturnType<typeof useForm<ExpenseFormValues>>['formState']['errors'];
-  setValue: ReturnType<typeof useForm<ExpenseFormValues>>['setValue'];
-  getValues: ReturnType<typeof useForm<ExpenseFormValues>>['getValues'];
-  handleSubmit: ReturnType<typeof useForm<ExpenseFormValues>>['handleSubmit'];
+  form: UseFormReturn<ExpenseFormValues>;
   onSubmit: (data: ExpenseFormValues) => Promise<void>;
   isEdit: boolean;
   selectedType: ExpenseType;
@@ -232,12 +227,7 @@ interface FormBodyProps {
 // ---------------------------------------------------------------------------
 
 function ExpenseFormBody({
-  register,
-  control,
-  errors,
-  setValue,
-  getValues,
-  handleSubmit,
+  form,
   onSubmit,
   isEdit,
   selectedType,
@@ -265,6 +255,7 @@ function ExpenseFormBody({
   advancedOpen,
   setAdvancedOpen,
 }: Readonly<FormBodyProps>) {
+  const { register, control, handleSubmit, setValue, getValues, formState: { errors } } = form;
   return (
     <form id="expense-form" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
 
@@ -904,15 +895,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
   const [subCategoryInitialName, setSubCategoryInitialName] = useState('');
   const [advancedOpen, setAdvancedOpen] = useState(() => isAdvancedPrePopulated(expense));
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    getValues,
-    control,
-    formState: { errors, isSubmitting },
-  } = useForm<ExpenseFormValues>({
+  const form = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseSchema),
     defaultValues: {
       type: 'variable',
@@ -928,6 +911,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
       transferCashAssetId: '__none__',
     },
   });
+  const { reset, setValue, getValues, control, formState: { isSubmitting } } = form;
 
   const selectedType = useWatch({ control, name: 'type' }) as ExpenseType;
   const selectedCategoryId = useWatch({ control, name: 'categoryId' });
@@ -974,13 +958,18 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
         setValue('categoryId', transferCategoryIdRef.current);
         return;
       }
+      // Use the already-loaded category list first to avoid an unnecessary Firestore
+      // write (ensureTransferCategory creates the stub even on dialog cancel).
+      const existingTransferCat = categories.find(c => c.type === 'transfer');
+      if (existingTransferCat) {
+        transferCategoryIdRef.current = existingTransferCat.id;
+        setValue('categoryId', existingTransferCat.id);
+        return;
+      }
       ensureTransferCategory(user.uid).then((catId) => {
         transferCategoryIdRef.current = catId;
         setValue('categoryId', catId);
-        // Only refresh if the category list doesn't already contain the transfer category
-        if (!categories.some(c => c.id === catId)) {
-          loadCategories();
-        }
+        loadCategories();
       }).catch(console.error);
     }
   }, [selectedType, user, open, isEdit, setValue, categories]);
@@ -1332,12 +1321,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
   const submitLabel = isSubmitting ? 'Salvataggio...' : baseLabel;
 
   const formBodyProps: FormBodyProps = {
-    register,
-    control,
-    errors,
-    setValue,
-    getValues,
-    handleSubmit,
+    form,
     onSubmit,
     isEdit,
     selectedType,

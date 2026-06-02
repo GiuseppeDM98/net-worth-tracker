@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ArrowLeftRight } from 'lucide-react';
+import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import {
@@ -53,6 +54,7 @@ export function CashflowWidget({
   expenseCategories,
   incomeCategories,
   categories,
+  transfers,
   className,
 }: Readonly<CashflowWidgetProps>) {
   const [catsExpanded, setCatsExpanded] = useState(false);
@@ -85,6 +87,19 @@ export function CashflowWidget({
           {
             <div className="tablet:block hidden">
               <div className="border-border mt-4 border-t" />
+
+              {/* Transfers summary row */}
+              {transfers !== undefined && transfers > 0 && (
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-muted-foreground flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.06em] uppercase">
+                    <ArrowLeftRight className="h-3 w-3" />
+                    Trasferimenti
+                  </span>
+                  <span className="text-muted-foreground text-[13px] font-medium tabular-nums">
+                    {cachedFormatCurrencyEUR(transfers)}
+                  </span>
+                </div>
+              )}
 
               {/* Toggle button */}
               <button

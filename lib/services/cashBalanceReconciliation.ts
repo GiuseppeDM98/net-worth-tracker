@@ -2,14 +2,11 @@
  * Cash Balance Reconciliation Service
  *
  * Handles cash asset balance updates when expenses are created, edited, or deleted.
- * Extracted from UI components to keep business logic testable and maintainable.
- *
- * Transfer reconciliation involves 4 sequential balance updates (reverse old pair,
- * apply new pair). If any step fails, a detailed error is logged with which step
- * failed and the partial state, so the user can manually correct the balances.
+ * Transfer operations are executed atomically via a single Firestore transaction
+ * to prevent partial-update corruption on network failure.
  */
 
-import { updateCashAssetBalance } from '@/lib/services/assetService';
+import { updateCashAssetBalance, updateCashAssetBalancesAtomic } from '@/lib/services/assetService';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -55,58 +52,29 @@ export interface SingleDeleteParams {
 
 /**
  * Reconcile cash balances when editing a transfer.
- * 4-step process: reverse old origin, reverse old destination, apply new origin, apply new destination.
- * Returns true if any asset was updated.
- *
- * Throws with a descriptive message if any step fails, logging which step
- * succeeded and which failed so the user can manually correct balances.
+ * All 4 balance updates (reverse old pair + apply new pair) execute atomically
+ * in a single Firestore transaction.
  */
 export async function reconcileTransferEdit(params: TransferReconcileParams): Promise<boolean> {
   const { oldOriginId, oldDestId, newOriginId, newDestId, oldAmount, newAmount } = params;
-  let assetUpdated = false;
-  const completedSteps: string[] = [];
 
-  try {
-    // Step 1: Reverse old origin debit
-    if (oldOriginId) {
-      await updateCashAssetBalance(oldOriginId, oldAmount);
-      completedSteps.push(`reversed origin debit (${oldOriginId}: +${oldAmount})`);
-      assetUpdated = true;
-    }
+  // Aggregate net deltas per asset (handles the case where old and new IDs overlap)
+  const deltas = new Map<string, number>();
+  const apply = (id: string | undefined, delta: number) => {
+    if (!id) return;
+    deltas.set(id, (deltas.get(id) ?? 0) + delta);
+  };
 
-    // Step 2: Reverse old destination credit
-    if (oldDestId) {
-      await updateCashAssetBalance(oldDestId, -oldAmount);
-      completedSteps.push(`reversed dest credit (${oldDestId}: -${oldAmount})`);
-      assetUpdated = true;
-    }
+  apply(oldOriginId, +oldAmount);   // reverse old origin debit
+  apply(oldDestId, -oldAmount);     // reverse old destination credit
+  apply(newOriginId, -newAmount);   // apply new origin debit
+  apply(newDestId, +newAmount);     // apply new destination credit
 
-    // Step 3: Apply new origin debit
-    if (newOriginId) {
-      await updateCashAssetBalance(newOriginId, -newAmount);
-      completedSteps.push(`applied origin debit (${newOriginId}: -${newAmount})`);
-      assetUpdated = true;
-    }
+  const updates = Array.from(deltas.entries()).map(([assetId, signedDelta]) => ({ assetId, signedDelta }));
+  if (updates.length === 0) return false;
 
-    // Step 4: Apply new destination credit
-    if (newDestId) {
-      await updateCashAssetBalance(newDestId, newAmount);
-      completedSteps.push(`applied dest credit (${newDestId}: +${newAmount})`);
-      assetUpdated = true;
-    }
-  } catch (error) {
-    console.error('Transfer reconciliation failed mid-way', {
-      completedSteps,
-      params,
-      error,
-    });
-    throw new Error(
-      `Riconciliazione trasferimento fallita dopo ${completedSteps.length}/4 passaggi. ` +
-      'Verifica i saldi dei conti manualmente.'
-    );
-  }
-
-  return assetUpdated;
+  await updateCashAssetBalancesAtomic(updates);
+  return true;
 }
 
 /**
@@ -140,34 +108,19 @@ export async function reconcileSingleEdit(params: SingleReconcileEditParams): Pr
 
 /**
  * Apply cash balance changes when creating a transfer.
- * Returns true if any asset was updated.
+ * Origin debit and destination credit execute atomically.
  */
 export async function reconcileTransferCreate(params: TransferCreateParams): Promise<boolean> {
   const { originId, destId, amount } = params;
-  let updated = false;
 
-  try {
-    if (originId) {
-      await updateCashAssetBalance(originId, -amount);
-      updated = true;
-    }
-    if (destId) {
-      await updateCashAssetBalance(destId, amount);
-      updated = true;
-    }
-  } catch (error) {
-    console.error('Transfer create reconciliation failed', {
-      originId,
-      destId,
-      amount,
-      error,
-    });
-    throw new Error(
-      'Riconciliazione saldi trasferimento fallita. Verifica i saldi dei conti manualmente.'
-    );
-  }
+  const updates: { assetId: string; signedDelta: number }[] = [];
+  if (originId) updates.push({ assetId: originId, signedDelta: -amount });
+  if (destId) updates.push({ assetId: destId, signedDelta: amount });
 
-  return updated;
+  if (updates.length === 0) return false;
+
+  await updateCashAssetBalancesAtomic(updates);
+  return true;
 }
 
 /**
@@ -179,34 +132,17 @@ export async function reconcileSingleCreate(params: SingleCreateParams): Promise
 
 /**
  * Reverse cash balance changes when deleting a transfer.
- * Returns true if any asset was updated.
+ * Origin credit and destination debit execute atomically.
  */
 export async function reconcileTransferDelete(params: TransferDeleteParams): Promise<boolean> {
   const { originId, destId, amount } = params;
-  let updated = false;
 
-  try {
-    // Reverse the debit on origin (add back)
-    if (originId) {
-      await updateCashAssetBalance(originId, amount);
-      updated = true;
-    }
-    // Reverse the credit on destination (remove)
-    if (destId) {
-      await updateCashAssetBalance(destId, -amount);
-      updated = true;
-    }
-  } catch (error) {
-    console.error('Transfer delete reconciliation failed', {
-      originId,
-      destId,
-      amount,
-      error,
-    });
-    throw new Error(
-      'Riconciliazione saldi trasferimento fallita. Verifica i saldi dei conti manualmente.'
-    );
-  }
+  const updates: { assetId: string; signedDelta: number }[] = [];
+  if (originId) updates.push({ assetId: originId, signedDelta: +amount });
+  if (destId) updates.push({ assetId: destId, signedDelta: -amount });
 
-  return updated;
+  if (updates.length === 0) return false;
+
+  await updateCashAssetBalancesAtomic(updates);
+  return true;
 }

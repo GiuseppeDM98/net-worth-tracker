@@ -190,9 +190,12 @@ export default function CashflowPage() {
     router.replace(`${pathname}?tab=${value}`, { scroll: false });
   };
 
-  // Sync URL on mount so the initial tab is always reflected
+  // Canonicalize the URL on mount only when the tab param is absent or invalid
   useEffect(() => {
-    router.replace(`${pathname}?tab=${initialTab}`, { scroll: false });
+    const currentTab = searchParams.get('tab');
+    if (currentTab !== initialTab) {
+      router.replace(`${pathname}?tab=${initialTab}`, { scroll: false });
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

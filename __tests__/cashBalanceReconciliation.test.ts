@@ -1,9 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock assetService before importing the module under test
+// Mock assetService before importing the module under test.
+// Transfer operations now use updateCashAssetBalancesAtomic (atomic transaction);
+// single-asset operations still use updateCashAssetBalance.
 const mockUpdateCashAssetBalance = vi.fn();
+const mockUpdateCashAssetBalancesAtomic = vi.fn();
 vi.mock('@/lib/services/assetService', () => ({
   updateCashAssetBalance: (...args: unknown[]) => mockUpdateCashAssetBalance(...args),
+  updateCashAssetBalancesAtomic: (...args: unknown[]) => mockUpdateCashAssetBalancesAtomic(...args),
 }));
 
 import {
@@ -18,12 +22,14 @@ describe('cashBalanceReconciliation', () => {
   beforeEach(() => {
     mockUpdateCashAssetBalance.mockReset();
     mockUpdateCashAssetBalance.mockResolvedValue(undefined);
+    mockUpdateCashAssetBalancesAtomic.mockReset();
+    mockUpdateCashAssetBalancesAtomic.mockResolvedValue(undefined);
   });
 
   // ─── reconcileTransferEdit ─────────────────────────────────────────────────
 
   describe('reconcileTransferEdit', () => {
-    it('should reverse old balances and apply new balances in correct order', async () => {
+    it('should call updateCashAssetBalancesAtomic with correct deltas', async () => {
       const result = await reconcileTransferEdit({
         oldOriginId: 'oldOrigin',
         oldDestId: 'oldDest',
@@ -34,18 +40,38 @@ describe('cashBalanceReconciliation', () => {
       });
 
       expect(result).toBe(true);
-      expect(mockUpdateCashAssetBalance).toHaveBeenCalledTimes(4);
-      // Step 1: Reverse old origin debit (add back 100)
-      expect(mockUpdateCashAssetBalance).toHaveBeenNthCalledWith(1, 'oldOrigin', 100);
-      // Step 2: Reverse old destination credit (remove 100)
-      expect(mockUpdateCashAssetBalance).toHaveBeenNthCalledWith(2, 'oldDest', -100);
-      // Step 3: Apply new origin debit (subtract 200)
-      expect(mockUpdateCashAssetBalance).toHaveBeenNthCalledWith(3, 'newOrigin', -200);
-      // Step 4: Apply new destination credit (add 200)
-      expect(mockUpdateCashAssetBalance).toHaveBeenNthCalledWith(4, 'newDest', 200);
+      expect(mockUpdateCashAssetBalancesAtomic).toHaveBeenCalledTimes(1);
+      const updates = mockUpdateCashAssetBalancesAtomic.mock.calls[0][0] as { assetId: string; signedDelta: number }[];
+      // Net delta per asset: oldOrigin +100, oldDest -100, newOrigin -200, newDest +200
+      expect(updates).toEqual(expect.arrayContaining([
+        { assetId: 'oldOrigin', signedDelta: 100 },
+        { assetId: 'oldDest',   signedDelta: -100 },
+        { assetId: 'newOrigin', signedDelta: -200 },
+        { assetId: 'newDest',   signedDelta: 200 },
+      ]));
     });
 
-    it('should skip steps for missing asset IDs', async () => {
+    it('should aggregate net deltas when old and new IDs overlap', async () => {
+      // oldOrigin === newOrigin: net delta = +100 - 200 = -100
+      const result = await reconcileTransferEdit({
+        oldOriginId: 'sharedOrigin',
+        oldDestId: 'oldDest',
+        newOriginId: 'sharedOrigin',
+        newDestId: 'newDest',
+        oldAmount: 100,
+        newAmount: 200,
+      });
+
+      expect(result).toBe(true);
+      const updates = mockUpdateCashAssetBalancesAtomic.mock.calls[0][0] as { assetId: string; signedDelta: number }[];
+      expect(updates).toEqual(expect.arrayContaining([
+        { assetId: 'sharedOrigin', signedDelta: -100 }, // +100 - 200 = -100
+        { assetId: 'oldDest',      signedDelta: -100 },
+        { assetId: 'newDest',      signedDelta: 200 },
+      ]));
+    });
+
+    it('should skip missing asset IDs', async () => {
       const result = await reconcileTransferEdit({
         oldOriginId: undefined,
         oldDestId: 'oldDest',
@@ -56,9 +82,12 @@ describe('cashBalanceReconciliation', () => {
       });
 
       expect(result).toBe(true);
-      expect(mockUpdateCashAssetBalance).toHaveBeenCalledTimes(2);
-      expect(mockUpdateCashAssetBalance).toHaveBeenNthCalledWith(1, 'oldDest', -50);
-      expect(mockUpdateCashAssetBalance).toHaveBeenNthCalledWith(2, 'newOrigin', -75);
+      const updates = mockUpdateCashAssetBalancesAtomic.mock.calls[0][0] as { assetId: string; signedDelta: number }[];
+      expect(updates).toEqual(expect.arrayContaining([
+        { assetId: 'oldDest',   signedDelta: -50 },
+        { assetId: 'newOrigin', signedDelta: -75 },
+      ]));
+      expect(updates).toHaveLength(2);
     });
 
     it('should return false when no asset IDs are provided', async () => {
@@ -72,14 +101,11 @@ describe('cashBalanceReconciliation', () => {
       });
 
       expect(result).toBe(false);
-      expect(mockUpdateCashAssetBalance).not.toHaveBeenCalled();
+      expect(mockUpdateCashAssetBalancesAtomic).not.toHaveBeenCalled();
     });
 
-    it('should throw with descriptive error if step fails mid-way', async () => {
-      mockUpdateCashAssetBalance
-        .mockResolvedValueOnce(undefined) // Step 1 succeeds
-        .mockResolvedValueOnce(undefined) // Step 2 succeeds
-        .mockRejectedValueOnce(new Error('Firestore write failed')); // Step 3 fails
+    it('should propagate errors from the atomic transaction', async () => {
+      mockUpdateCashAssetBalancesAtomic.mockRejectedValueOnce(new Error('Firestore write failed'));
 
       await expect(
         reconcileTransferEdit({
@@ -90,7 +116,7 @@ describe('cashBalanceReconciliation', () => {
           oldAmount: 100,
           newAmount: 200,
         })
-      ).rejects.toThrow('Riconciliazione trasferimento fallita dopo 2/4 passaggi');
+      ).rejects.toThrow('Firestore write failed');
     });
   });
 
@@ -132,9 +158,7 @@ describe('cashBalanceReconciliation', () => {
 
       expect(result).toBe(true);
       expect(mockUpdateCashAssetBalance).toHaveBeenCalledTimes(2);
-      // Reverse old: remove the -100 effect → +100
       expect(mockUpdateCashAssetBalance).toHaveBeenNthCalledWith(1, 'assetA', 100);
-      // Apply new: -200
       expect(mockUpdateCashAssetBalance).toHaveBeenNthCalledWith(2, 'assetB', -200);
     });
 
@@ -168,7 +192,7 @@ describe('cashBalanceReconciliation', () => {
   // ─── reconcileTransferCreate ───────────────────────────────────────────────
 
   describe('reconcileTransferCreate', () => {
-    it('should debit origin and credit destination', async () => {
+    it('should debit origin and credit destination atomically', async () => {
       const result = await reconcileTransferCreate({
         originId: 'origin',
         destId: 'dest',
@@ -176,9 +200,11 @@ describe('cashBalanceReconciliation', () => {
       });
 
       expect(result).toBe(true);
-      expect(mockUpdateCashAssetBalance).toHaveBeenCalledTimes(2);
-      expect(mockUpdateCashAssetBalance).toHaveBeenNthCalledWith(1, 'origin', -500);
-      expect(mockUpdateCashAssetBalance).toHaveBeenNthCalledWith(2, 'dest', 500);
+      expect(mockUpdateCashAssetBalancesAtomic).toHaveBeenCalledTimes(1);
+      expect(mockUpdateCashAssetBalancesAtomic).toHaveBeenCalledWith([
+        { assetId: 'origin', signedDelta: -500 },
+        { assetId: 'dest',   signedDelta: 500 },
+      ]);
     });
 
     it('should handle missing destination', async () => {
@@ -189,16 +215,17 @@ describe('cashBalanceReconciliation', () => {
       });
 
       expect(result).toBe(true);
-      expect(mockUpdateCashAssetBalance).toHaveBeenCalledTimes(1);
-      expect(mockUpdateCashAssetBalance).toHaveBeenCalledWith('origin', -300);
+      expect(mockUpdateCashAssetBalancesAtomic).toHaveBeenCalledWith([
+        { assetId: 'origin', signedDelta: -300 },
+      ]);
     });
 
-    it('should throw on failure', async () => {
-      mockUpdateCashAssetBalance.mockRejectedValueOnce(new Error('write failed'));
+    it('should propagate errors from the atomic transaction', async () => {
+      mockUpdateCashAssetBalancesAtomic.mockRejectedValueOnce(new Error('write failed'));
 
       await expect(
         reconcileTransferCreate({ originId: 'origin', destId: 'dest', amount: 100 })
-      ).rejects.toThrow('Riconciliazione saldi trasferimento fallita');
+      ).rejects.toThrow('write failed');
     });
   });
 
@@ -224,7 +251,7 @@ describe('cashBalanceReconciliation', () => {
   // ─── reconcileTransferDelete ───────────────────────────────────────────────
 
   describe('reconcileTransferDelete', () => {
-    it('should reverse origin debit and destination credit', async () => {
+    it('should reverse origin debit and destination credit atomically', async () => {
       const result = await reconcileTransferDelete({
         originId: 'origin',
         destId: 'dest',
@@ -232,11 +259,11 @@ describe('cashBalanceReconciliation', () => {
       });
 
       expect(result).toBe(true);
-      expect(mockUpdateCashAssetBalance).toHaveBeenCalledTimes(2);
-      // Reverse debit (add back)
-      expect(mockUpdateCashAssetBalance).toHaveBeenNthCalledWith(1, 'origin', 400);
-      // Reverse credit (remove)
-      expect(mockUpdateCashAssetBalance).toHaveBeenNthCalledWith(2, 'dest', -400);
+      expect(mockUpdateCashAssetBalancesAtomic).toHaveBeenCalledTimes(1);
+      expect(mockUpdateCashAssetBalancesAtomic).toHaveBeenCalledWith([
+        { assetId: 'origin', signedDelta: 400 },
+        { assetId: 'dest',   signedDelta: -400 },
+      ]);
     });
 
     it('should return false when no asset IDs present', async () => {
@@ -247,15 +274,15 @@ describe('cashBalanceReconciliation', () => {
       });
 
       expect(result).toBe(false);
-      expect(mockUpdateCashAssetBalance).not.toHaveBeenCalled();
+      expect(mockUpdateCashAssetBalancesAtomic).not.toHaveBeenCalled();
     });
 
-    it('should throw on failure', async () => {
-      mockUpdateCashAssetBalance.mockRejectedValueOnce(new Error('write failed'));
+    it('should propagate errors from the atomic transaction', async () => {
+      mockUpdateCashAssetBalancesAtomic.mockRejectedValueOnce(new Error('write failed'));
 
       await expect(
         reconcileTransferDelete({ originId: 'origin', destId: 'dest', amount: 100 })
-      ).rejects.toThrow('Riconciliazione saldi trasferimento fallita');
+      ).rejects.toThrow('write failed');
     });
   });
 });
