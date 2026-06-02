@@ -357,18 +357,34 @@ A compact, text-only chip for contextual financial actions (buy / sell / hold si
 
 ### Segmented Pill Control
 
-A tab switcher for 2–4 mutually exclusive views within a section. Replaces `<Select>` dropdowns where options are few, short, and always visible. The active pill animates via Framer Motion `layoutId` spring.
+A tab switcher for mutually exclusive views within a section. Replaces `<Select>` dropdowns where options are few and always visible. The active pill animates via Framer Motion `layoutId` spring.
 
-**Structure:** `role="tablist"` container with `bg-muted rounded-lg p-1`, each option is a `role="tab"` button. Active pill is a `motion.div` with `layoutId` that slides between options.
+**Structure:** `role="tablist"` container with `bg-muted rounded-lg p-1 w-fit mx-auto`, each option is a `role="tab"` `motion.button` with `layout="size"`. Active pill is a `motion.div` with `layoutId` and `bg-background shadow-sm` that slides between options.
 
-**Spring:** `stiffness: 400, damping: 35` — snappy without overshooting.
+**Spring:** `stiffness: 400, damping: 35` — snappy without overshooting. Same constant on both `motion.button` `transition` and `motion.div` `transition`.
 
-**Rules:**
-- 2–4 options maximum. Beyond 4, use a Select or vertical nav.
-- Labels are abbreviated for mobile (≤10 chars preferred). Full labels on `desktop:`.
+#### Variant A — Icon tabs (section navigation)
+
+Used in `PageTabBar` for pages with multiple named sections (Cashflow, Settings, FIRE). Each tab has a meaningful icon.
+
+- **Active tab:** icon + full label. `motion.button layout="size"` expands smoothly.
+- **Inactive tabs:** icon only — label hidden. Tabs shrink to icon width.
+- **Fallback:** if a tab has no icon, always show the label regardless of active state.
+- **Centering:** `w-fit mx-auto` on the container — the pill sizes to content and centers in the page.
+- **Implementation:** `components/layout/PageTabBar.tsx`
+
+#### Variant B — Text tabs (period / filter selection)
+
+Used for compact period selectors (e.g. YTD / 1A / 3A / 5A / MAX on Rendimenti) where labels ARE the identifier and no icons exist.
+
+- All options always show their label (already ≤3–4 chars — no overflow risk).
+- Uses underline `motion.div` indicator instead of background pill — appropriate for horizontal period strips.
+- Do not force icons onto period selectors. "1 year" has no meaningful icon.
+
+**Shared rules:**
 - Full ARIA: `role="tablist"` on container, `role="tab"` + `aria-selected` per button.
 - Only use for view-switching within a page section. Global navigation uses the bottom pill or sidebar.
-- Desktop may use shadcn `TabsList` when the design calls for a more open tab style. The segmented pill is the mobile-first default.
+- Desktop (`≥ 1440px`): `PageTabBar` renders the animated underline tab bar instead. The segmented pill is mobile-only (`desktop:hidden`).
 
 ### Bento Asymmetric Hero Layout
 

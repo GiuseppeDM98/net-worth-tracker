@@ -75,6 +75,7 @@ import { CreateDummySnapshotModal } from '@/components/CreateDummySnapshotModal'
 import { DeleteDummyDataDialog } from '@/components/DeleteDummyDataDialog';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageTabs } from '@/components/layout/PageTabs';
+import type { TabDef } from '@/components/layout/PageTabBar';
 
 interface SubTarget {
   name: string;
@@ -122,13 +123,12 @@ const roundToTwoDecimals = (value: number): number => {
 };
 
 // Module-level tab definitions drive both the mobile pill and the desktop underline tabs.
-// shortLabel must be ≤8 chars for the iPhone SE pill width.
-const SETTINGS_TABS: { value: string; label: string; shortLabel: string; icon: React.ElementType }[] = [
-  { value: 'allocazione', label: 'Allocazione', shortLabel: 'Alloc.',  icon: PieChart },
-  { value: 'generale',    label: 'Preferenze',  shortLabel: 'Pref.',   icon: Settings },
-  { value: 'spese',       label: 'Spese',       shortLabel: 'Spese',   icon: Receipt  },
-  { value: 'dividendi',   label: 'Dividendi',   shortLabel: 'Divid.',  icon: Coins    },
-  { value: 'aspetto',     label: 'Aspetto',     shortLabel: 'Aspetto', icon: Palette  },
+const SETTINGS_TABS: TabDef[] = [
+  { value: 'allocazione', label: 'Allocazione', icon: PieChart },
+  { value: 'generale',    label: 'Preferenze',  icon: Settings },
+  { value: 'spese',       label: 'Spese',       icon: Receipt  },
+  { value: 'dividendi',   label: 'Dividendi',   icon: Coins    },
+  { value: 'aspetto',     label: 'Aspetto',     icon: Palette  },
 ];
 
 export default function SettingsPage() {

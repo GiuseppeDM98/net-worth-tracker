@@ -99,3 +99,4 @@
 - Improved: the Cashflow filter controls (period picker, Filters, sort) are now centered on mobile instead of being pushed to one side
 - Improved: the category filter inside the Cashflow filters panel now opens as a full-width bottom sheet on tablet (previously a small, unscrollable popup) and hides its scrollbar for a cleaner look on both mobile and tablet
 - Improved: on phones and tablets in portrait orientation, the in-page "Aggiungi" button on the Cashflow list is now hidden when the bottom navigation bar's `+` button is available, removing the duplicate control; in landscape (where the bottom bar is hidden) the "Aggiungi" button remains
+- Improved: tab navigation on mobile — Cashflow, Settings, and FIRE & Simulations now use a centered segmented pill on phones and tablets. The active section shows its icon alongside the full section name; inactive sections show only their icon, keeping all options visible without horizontal scrolling

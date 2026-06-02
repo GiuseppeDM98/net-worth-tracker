@@ -57,10 +57,10 @@ function getErrorMessage(error: unknown): string {
 
 // Module-level constant: stable reference for React Compiler
 // Analisi tab removed — it now lives at /dashboard/analisi as a standalone page.
-const CASHFLOW_TABS_BASE: Array<{ value: string; label: string; mobileLabel: string; icon: React.ElementType }> = [
-  { value: 'tracking',     label: 'Tracciamento', mobileLabel: 'Spese',     icon: ArrowRightLeft },
-  { value: 'dividends',    label: 'Dividendi',    mobileLabel: 'Dividendi', icon: Coins   },
-  { value: 'budget',       label: 'Budget',       mobileLabel: 'Budget',    icon: Target  },
+const CASHFLOW_TABS_BASE: TabDef[] = [
+  { value: 'tracking',  label: 'Tracciamento', icon: ArrowRightLeft },
+  { value: 'dividends', label: 'Dividendi',    icon: Coins          },
+  { value: 'budget',    label: 'Budget',       icon: Target         },
 ];
 
 const VALID_CASHFLOW_TABS = ['tracking', 'dividends', 'budget', 'cost-centers'] as const;
@@ -200,7 +200,7 @@ export default function CashflowPage() {
   }, []);
 
   const allTabs: TabDef[] = costCentersEnabled
-    ? [...CASHFLOW_TABS_BASE, { value: 'cost-centers', label: 'Centri di Costo', shortLabel: 'C.Costo', icon: Layers }]
+    ? [...CASHFLOW_TABS_BASE, { value: 'cost-centers', label: 'Centri di Costo', icon: Layers }]
     : CASHFLOW_TABS_BASE;
 
   return (
