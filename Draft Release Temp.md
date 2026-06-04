@@ -15,6 +15,11 @@
 - **Rebalancing plan on the Allocation page** — a new "Piano di Ribilanciamento" turns the per-class buy/sell signals into one prioritized to-do list: each off-target asset class shows exactly how much to add or trim, largest amount first, with a calm "Tutto in linea" state when everything is within tolerance
 - **"Plan a contribution" tool** — on the Allocation page, enter how much new money you want to invest and it shows where to put it to move toward your targets **without selling anything**, broken down per asset class and, drilling in, per sub-category
 - **Adjustable rebalancing threshold** — choose how far a holding must drift from its target before it's flagged for action: ±2%, ±5%, the classic 5/25 rule, or a custom value. The balance verdict, the plan, and the COMPRA/VENDI/OK chips all update instantly
+- **AI Assistant — live period card** — picking a period (month, year, year-to-date, or full history) now fills a context card with that period's net-worth change, cashflow, and allocation shifts *before* you ask anything, so you choose what to analyse with the numbers already in front of you. In free-chat mode you can optionally attach a period as context from the same control
+- **AI Assistant — follow-up suggestions** — after each answer the assistant proposes two or three natural next questions (e.g. "Confronta col mese precedente", "Dove posso risparmiare?"); tap one to send it instantly
+- **AI Assistant — proactive goal-reached prompts** — when the assistant detects from your portfolio data that a tracked goal has been reached, it surfaces a "goal reached" banner at the top of the conversation with one-tap "mark as completed", instead of leaving it hidden in the Memory panel
+- **AI Assistant — "what it knows about you"** — your active memory items (goals, risk profile, preferences) are shown as a compact inline row, so you can always see what context is shaping the answers
+- **AI Assistant — "searching the web" indicator** — when a macro or geopolitical question triggers a web search, the assistant now shows a dedicated "Sto cercando sul web…" status instead of a generic delay
 
 ## 🐛 Bug Fixes
 
@@ -35,6 +40,8 @@
 - Fixed: the settings panel in the FIRE Calculator and the configuration panel in Coast FIRE now stay **collapsed when you've already set them up** — they were incorrectly opening expanded on every visit because of a load-time timing issue
 - Fixed: the Bear/Base/Bull scenario cards in Coast FIRE now sit on a single row on laptops and tablets — they were wrapping to a 2 + 1 layout even when there was room for all three
 - Fixed: the page numbers no longer slide with a choppy animation when you collapse the settings panel in the FIRE Calculator and Coast FIRE tabs — they now settle smoothly in place
+- Fixed: the Conversations and Memory lists in the AI Assistant could not be scrolled on desktop — their content is now fully reachable (both now open as side panels from the header on every screen size)
+- Fixed: positive and negative figures in the AI Assistant's context card used fixed green/red that didn't match non-default themes (e.g. orange for negatives in Cyberpunk) — they now use each theme's own positive/negative colors
 
 ## 🔧 Improvements
 
@@ -116,3 +123,7 @@
 - **What If sensitivity matrix — easier to read on phones**: on mobile the "Sensibilità Anni al FIRE" matrix now labels each card with "SPESE ANNUE" (annual expenses) and tags the inner values as "Risparmio annuo" (annual savings), with a reading note written for the card layout instead of the desktop table's rows-and-columns wording
 - **Richer AI commentary in summary emails** — the AI comment in every summary email now follows a clear 5-part structure: an overview of the period, a comparison with the previous period, a comparison with the same period last year, a breakdown of how much your income and expenses changed and the likely reasons, and a couple of practical takeaways. The cause analysis now draws on your subcategories and transaction notes (not just top-level categories) for more specific explanations, and can reference recent market events to explain net-worth moves
 - **Clearer net-savings figure in emails** — the "Risparmio netto" line in summary emails now spells out that it is Income − Expenses and shows the amount saved as a percentage of income
+- **AI Assistant redesigned around a single period axis** — Mese / Anno / YTD / Storico / Libera now live in one selector with the period picker right beside it, instead of being split between the top of the page and the message box. The message box is now just type-and-send
+- **AI Assistant — Conversations and Memory open as side panels on desktop too** — matching mobile; the right column now shows only the period context card
+- **AI Assistant — unified preferences** — response style, web/macro context, and automatic memory on/off now sit together in one Preferences popover instead of being scattered across the page
+- **AI Assistant — ready to use on arrival** — it now defaults to your last completed month (which always has data) and shows clearer keyboard focus outlines across its controls

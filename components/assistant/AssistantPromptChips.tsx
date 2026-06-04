@@ -45,6 +45,7 @@ export function AssistantPromptChips({ chips, onSelect, disabled }: AssistantPro
           className={cn(
             'inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-2 text-left text-sm text-foreground transition-colors',
             'hover:bg-muted hover:border-border/80',
+            'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
             'disabled:pointer-events-none disabled:opacity-50',
             // Slightly highlight chips that also pull in web context
             chip.webContextHint === 'macro' && 'border-dashed',

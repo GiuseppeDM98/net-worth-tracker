@@ -1,9 +1,9 @@
 /**
  * Skeleton loading state for the Assistente AI page.
  *
- * Matches the post-load layout exactly so the perceived layout shift on first load
- * is minimal. Order: left col (mode strip → hero block → conversation → composer),
- * right col (tab card → context block). This mirrors AssistantPageClient's render order.
+ * Matches the post-load layout so the perceived layout shift on first load is
+ * minimal. Order: left col (period selector → conversation → composer),
+ * right col (period scheda → tab card). Mirrors AssistantPageClient's render order.
  */
 export function AssistantPageSkeleton() {
   return (
@@ -18,20 +18,16 @@ export function AssistantPageSkeleton() {
       <div className="grid gap-6 desktop:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.85fr)]">
         {/* Left column skeleton */}
         <div className="flex flex-col gap-0">
-          {/* Mode pill strip */}
-          <div className="mb-4 flex gap-2">
-            <div className="h-8 w-16 rounded-full bg-muted" />
-            <div className="h-8 w-16 rounded-full bg-muted" />
-            <div className="h-8 w-14 rounded-full bg-muted" />
-            <div className="h-8 w-20 rounded-full bg-muted" />
-            <div className="h-8 w-14 rounded-full bg-muted" />
-          </div>
-
-          {/* Hero block */}
-          <div className="mb-6 rounded-2xl border border-border bg-card px-6 py-5">
-            <div className="h-3 w-28 rounded bg-muted mb-2" />
-            <div className="h-9 w-44 rounded bg-muted" />
-            <div className="h-4 w-32 rounded bg-muted mt-3" />
+          {/* Period selector: pill strip + sub-picker */}
+          <div className="mb-5 flex flex-col gap-3 desktop:flex-row desktop:items-center desktop:justify-between">
+            <div className="flex gap-2">
+              <div className="h-8 w-16 rounded-full bg-muted" />
+              <div className="h-8 w-16 rounded-full bg-muted" />
+              <div className="h-8 w-14 rounded-full bg-muted" />
+              <div className="h-8 w-20 rounded-full bg-muted" />
+              <div className="h-8 w-16 rounded-full bg-muted" />
+            </div>
+            <div className="h-9 w-40 rounded-md bg-muted" />
           </div>
 
           {/* Conversation area */}
@@ -52,28 +48,9 @@ export function AssistantPageSkeleton() {
           </div>
         </div>
 
-        {/* Right column skeleton — matches new layout: tab card → context block */}
+        {/* Right column skeleton — period scheda → tab card */}
         <div className="hidden desktop:flex desktop:flex-col desktop:gap-4">
-          {/* Tab card: Conversazioni | Memoria */}
-          <div className="overflow-hidden rounded-xl border border-border">
-            {/* Tab headers */}
-            <div className="flex border-b border-border">
-              <div className="flex-1 px-4 py-3">
-                <div className="h-4 w-28 rounded bg-muted" />
-              </div>
-              <div className="flex-1 px-4 py-3">
-                <div className="h-4 w-16 rounded bg-muted" />
-              </div>
-            </div>
-            {/* Thread list rows */}
-            <div className="p-4 space-y-3">
-              <div className="h-14 w-full rounded-xl bg-muted" />
-              <div className="h-14 w-full rounded-xl bg-muted" />
-              <div className="h-14 w-full rounded-xl bg-muted" />
-            </div>
-          </div>
-
-          {/* Context block */}
+          {/* Period scheda */}
           <div className="overflow-hidden rounded-xl border border-border">
             <div className="px-4 py-3 border-b border-border">
               <div className="h-3 w-32 rounded bg-muted" />
@@ -88,6 +65,23 @@ export function AssistantPageSkeleton() {
                 <div className="h-3 w-20 rounded bg-muted" />
               </div>
             ))}
+          </div>
+
+          {/* Tab card: Conversazioni | Memoria */}
+          <div className="overflow-hidden rounded-xl border border-border">
+            <div className="flex border-b border-border">
+              <div className="flex-1 px-4 py-3">
+                <div className="h-4 w-28 rounded bg-muted" />
+              </div>
+              <div className="flex-1 px-4 py-3">
+                <div className="h-4 w-16 rounded bg-muted" />
+              </div>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="h-14 w-full rounded-xl bg-muted" />
+              <div className="h-14 w-full rounded-xl bg-muted" />
+              <div className="h-14 w-full rounded-xl bg-muted" />
+            </div>
           </div>
         </div>
       </div>
