@@ -1,14 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Brain, CheckCircle2, ChevronDown, Loader2, RotateCcw, Trash2, X } from 'lucide-react';
+import { Brain, ChevronDown, Loader2, RotateCcw, Trash2 } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { toast } from 'sonner';
 import { AssistantMemoryItemRow } from '@/components/assistant/AssistantMemoryItemRow';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { useChartColors } from '@/lib/hooks/useChartColors';
 import {
   Dialog,
   DialogContent,
@@ -17,7 +16,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Switch } from '@/components/ui/switch';
 import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/utils';
 import { useDeleteAssistantMemory, useUpdateAssistantMemory } from '@/lib/hooks/useAssistantMemory';
@@ -74,11 +72,8 @@ export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onTogg
   const deleteMutation = useDeleteAssistantMemory(userId);
 
   const isMutating = updateMutation.isPending || deleteMutation.isPending;
+  // Read for empty-state copy only — the on/off control itself lives in Preferences.
   const memoryEnabled = memory?.preferences.memoryEnabled ?? true;
-  const chartColors = useChartColors();
-  // goal → [0] gives a theme-aware accent for the suggestions block header icon/border
-  const suggestionColor = chartColors[0] ?? 'var(--chart-1)';
-  const pendingSuggestions = (memory?.suggestions ?? []).filter((suggestion) => suggestion.status === 'pending');
 
   // Group items by category preserving the canonical display order
   const filteredItems = (memory?.items ?? []).filter((item) => item.status === filterTab);
@@ -86,14 +81,6 @@ export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onTogg
     category,
     items: filteredItems.filter((item) => item.category === category),
   })).filter((group) => group.items.length > 0);
-
-  const handleToggleMemory = async (enabled: boolean) => {
-    try {
-      await updateMutation.mutateAsync({ preferences: { memoryEnabled: enabled } });
-    } catch (err) {
-      toast.error((err as Error).message);
-    }
-  };
 
   const handleEdit = async (id: string, text: string) => {
     const item = memory?.items.find((i) => i.id === id);
@@ -142,23 +129,6 @@ export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onTogg
 
   const totalItems = memory?.items.length ?? 0;
   const activeCount = (memory?.items ?? []).filter((i) => i.status === 'active').length;
-
-  const handleAcceptSuggestion = async (suggestionId: string, itemId: string) => {
-    try {
-      await updateMutation.mutateAsync({ action: 'acceptSuggestion', suggestionId, itemId });
-      toast.success('Obiettivo segnato come completato');
-    } catch (err) {
-      toast.error((err as Error).message);
-    }
-  };
-
-  const handleIgnoreSuggestion = async (suggestionId: string) => {
-    try {
-      await updateMutation.mutateAsync({ action: 'ignoreSuggestion', suggestionId });
-    } catch (err) {
-      toast.error((err as Error).message);
-    }
-  };
 
   const handleReactivateGoal = async (itemId: string) => {
     try {
@@ -230,66 +200,10 @@ export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onTogg
 
           <CollapsibleContent>
             <CardContent className="space-y-5">
-          {!isLoading && pendingSuggestions.length > 0 && (
-            // Theme-aware suggestion block: border and bg use color-mix() from chart color [0]
-            <div
-              className="space-y-2 rounded-xl p-3"
-              style={{
-                border: `1px solid color-mix(in srgb, ${suggestionColor} 25%, transparent)`,
-                backgroundColor: `color-mix(in srgb, ${suggestionColor} 6%, transparent)`,
-              }}
-            >
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4" style={{ color: suggestionColor }} />
-                <p className="text-sm font-medium text-foreground">Suggerimenti</p>
-              </div>
-              {pendingSuggestions.map((suggestion) => {
-                const linkedItem = memory?.items.find((item) => item.id === suggestion.itemId);
-                if (!linkedItem) return null;
-                return (
-                  <div key={suggestion.id} className="rounded-lg border border-border bg-background px-3 py-2.5">
-                    <p className="text-sm font-medium text-foreground">{linkedItem.text}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{suggestion.evidenceSummary}</p>
-                    <div className="mt-3 flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => handleAcceptSuggestion(suggestion.id, linkedItem.id)}
-                        disabled={isMutating}
-                      >
-                        Segna come completato
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleIgnoreSuggestion(suggestion.id)}
-                        disabled={isMutating}
-                      >
-                        <X className="mr-1 h-3.5 w-3.5" />
-                        Ignora
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Memory enabled toggle */}
-          <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-2">
-            <div>
-              <p className="text-sm font-medium text-foreground">Apprendimento automatico</p>
-              <p className="text-xs text-muted-foreground">
-                {memoryEnabled
-                  ? 'Estrae fatti stabili dalle conversazioni'
-                  : "L'assistente non salverà nuovi ricordi"}
-              </p>
-            </div>
-            <Switch
-              checked={memoryEnabled}
-              onCheckedChange={handleToggleMemory}
-              disabled={isLoading || isMutating}
-            />
-          </div>
+          {/* Note: automatic learning (memory on/off) now lives in the unified
+              Preferences popover, and goal-completion suggestions surface as a
+              proactive banner in the main column — both removed from this panel so
+              each control has a single home. This panel manages stored items only. */}
 
           {/* Loading state */}
           {isLoading && (

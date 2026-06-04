@@ -54,8 +54,8 @@ function KpiRow({ label, value, positive }: KpiRowProps) {
       <span
         className={cn(
           'text-sm font-semibold tabular-nums font-mono',
-          positive === true && 'text-green-600 dark:text-green-400',
-          positive === false && 'text-red-600 dark:text-red-400',
+          positive === true && 'text-positive',
+          positive === false && 'text-destructive',
           positive === null && 'text-foreground'
         )}
       >
@@ -153,16 +153,16 @@ export function AssistantContextCard({ bundle, className, isLoading }: Assistant
             <DeltaIcon
               className={cn(
                 'h-4 w-4 shrink-0 self-center',
-                deltaPositive === true && 'text-green-600 dark:text-green-400',
-                deltaPositive === false && 'text-red-600 dark:text-red-400',
+                deltaPositive === true && 'text-positive',
+                deltaPositive === false && 'text-destructive',
                 deltaPositive === null && 'text-muted-foreground'
               )}
             />
             <span
               className={cn(
                 'text-2xl font-bold tabular-nums font-mono',
-                deltaPositive === true && 'text-green-600 dark:text-green-400',
-                deltaPositive === false && 'text-red-600 dark:text-red-400',
+                deltaPositive === true && 'text-positive',
+                deltaPositive === false && 'text-destructive',
                 deltaPositive === null && 'text-muted-foreground'
               )}
             >
@@ -231,8 +231,8 @@ export function AssistantContextCard({ bundle, className, isLoading }: Assistant
                     className={cn(
                       'text-sm font-semibold tabular-nums font-mono',
                       change.absoluteChange >= 0
-                        ? 'text-green-600 dark:text-green-400'
-                        : 'text-red-600 dark:text-red-400'
+                        ? 'text-positive'
+                        : 'text-destructive'
                     )}
                   >
                     {change.absoluteChange >= 0 ? '+' : ''}
@@ -287,8 +287,8 @@ export function AssistantContextPill({ bundle }: { bundle: AssistantMonthContext
           <span
             className={cn(
               'font-medium',
-              deltaPositive === true && 'text-green-600 dark:text-green-400',
-              deltaPositive === false && 'text-red-600 dark:text-red-400',
+              deltaPositive === true && 'text-positive',
+              deltaPositive === false && 'text-destructive',
             )}
           >
             {netWorth.delta >= 0 ? '+' : ''}{eur(netWorth.delta)}
