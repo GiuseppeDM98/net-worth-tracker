@@ -10,6 +10,13 @@ import { BudgetConfig, BudgetItem } from '@/types/budget';
 
 const BUDGETS_COLLECTION = 'budgets';
 
+// Settings persisted alongside the budget items in the same document.
+export interface BudgetConfigSettings {
+  overallMonthlyAmount?: number;
+  alertsEnabled?: boolean;
+  alertThresholds?: number[];
+}
+
 /** Fetch the user's budget config. Returns null if no document exists yet. */
 export async function getBudgetConfig(userId: string): Promise<BudgetConfig | null> {
   try {
@@ -23,7 +30,12 @@ export async function getBudgetConfig(userId: string): Promise<BudgetConfig | nu
     const data = docSnap.data();
     return {
       userId: data.userId,
-      items: (data.items || []) as BudgetItem[],
+      // Migrate items saved before income/expense kind, period, or the
+      // monthlyAmount→amount rename existed.
+      items: ((data.items || []) as BudgetItem[]).map(normalizeItem),
+      overallMonthlyAmount: data.overallMonthlyAmount,
+      alertsEnabled: data.alertsEnabled,
+      alertThresholds: data.alertThresholds,
       updatedAt: data.updatedAt,
     };
   } catch (error) {
@@ -33,33 +45,69 @@ export async function getBudgetConfig(userId: string): Promise<BudgetConfig | nu
 }
 
 /** Save the user's budget config (complete replacement). */
-export async function saveBudgetConfig(userId: string, items: BudgetItem[]): Promise<void> {
+export async function saveBudgetConfig(
+  userId: string,
+  items: BudgetItem[],
+  settings: BudgetConfigSettings = {}
+): Promise<void> {
   try {
     const docRef = doc(db, BUDGETS_COLLECTION, userId);
 
     // Strip undefined fields — Firestore rejects them
     const cleanItems = items.map((item) => {
+      const normalized = normalizeItem(item);
       const clean: Record<string, unknown> = {
-        id: item.id,
-        scope: item.scope,
-        monthlyAmount: item.monthlyAmount,
-        order: item.order,
+        id: normalized.id,
+        kind: normalized.kind,
+        scope: normalized.scope,
+        period: normalized.period,
+        amount: normalized.amount,
+        order: normalized.order,
       };
-      if (item.expenseType != null) clean.expenseType = item.expenseType;
-      if (item.categoryId != null) clean.categoryId = item.categoryId;
-      if (item.categoryName != null) clean.categoryName = item.categoryName;
-      if (item.subCategoryId != null) clean.subCategoryId = item.subCategoryId;
-      if (item.subCategoryName != null) clean.subCategoryName = item.subCategoryName;
+      if (normalized.expenseType != null) clean.expenseType = normalized.expenseType;
+      if (normalized.categoryId != null) clean.categoryId = normalized.categoryId;
+      if (normalized.categoryName != null) clean.categoryName = normalized.categoryName;
+      if (normalized.subCategoryId != null) clean.subCategoryId = normalized.subCategoryId;
+      if (normalized.subCategoryName != null) clean.subCategoryName = normalized.subCategoryName;
       return clean;
     });
 
-    await setDoc(docRef, {
+    const payload: Record<string, unknown> = {
       userId,
       items: cleanItems,
       updatedAt: new Date(),
-    });
+    };
+    if (settings.overallMonthlyAmount != null) payload.overallMonthlyAmount = settings.overallMonthlyAmount;
+    if (settings.alertsEnabled != null) payload.alertsEnabled = settings.alertsEnabled;
+    if (settings.alertThresholds != null) payload.alertThresholds = settings.alertThresholds;
+
+    await setDoc(docRef, payload);
   } catch (error) {
     console.error('Error saving budget config:', error);
     throw error;
   }
+}
+
+/**
+ * Back-fills fields added after the first budget release so older documents keep
+ * working:
+ *   - `kind`: a 'type'-scope item is income only when expenseType==='income';
+ *     category/subcategory items default to 'expense' (reconciled later).
+ *   - `period`: defaults to 'monthly'.
+ *   - `amount`: falls back to the legacy `monthlyAmount` field.
+ */
+function normalizeItem(item: BudgetItem): BudgetItem {
+  const legacy = item as BudgetItem & { monthlyAmount?: number };
+  const kind =
+    item.kind === 'expense' || item.kind === 'income'
+      ? item.kind
+      : item.scope === 'type' && item.expenseType === 'income'
+        ? 'income'
+        : 'expense';
+  return {
+    ...item,
+    kind,
+    period: item.period ?? 'monthly',
+    amount: item.amount ?? legacy.monthlyAmount ?? 0,
+  };
 }

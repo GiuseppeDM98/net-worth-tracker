@@ -65,7 +65,7 @@ condivide useDashboardOverview RQ cache) → CashAccountsSection (grid cards
 conti correnti) → AssetManagementTab (tabella ordinabile, group-by-class,
 sparkline per asset, 2-click delete, AssetDialog 2-step).
 Confronta con: Panoramica (stesso hero layout — usa come riferimento primario),
-AllocationCard (flat divide-y), GoalDetailCard (expand/collapse inline).
+AllocationBreakdown (flat divide-y rows), GoalDetailCard (expand/collapse inline).
 Design language atteso (vedi DESIGN.md): North Star "Effortless Precision" — Linear/Vercel +
 Trade Republic + Apple, sotto la legge Form Follows Function (onestà, deferenza, inevitabilità:
 ogni proprietà visiva è conseguenza di una funzione, mai decorazione). Scala hero: page hero
@@ -156,7 +156,7 @@ Priority issues (P0/P1) da: [SLUG]
 File: app/dashboard/cashflow/page.tsx
 Componenti: components/cashflow/BudgetTab.tsx
 
-Confronta con: AllocationCard (progress bar + target%), GoalDetailCard (% display).
+Confronta con: Allocazione/RebalancePlan (mosse + target% via TargetTick), GoalDetailCard (% display).
 Design language atteso (vedi DESIGN.md): North Star "Effortless Precision" — Linear/Vercel +
 Trade Republic + Apple, sotto la legge Form Follows Function (onestà, deferenza, inevitabilità:
 ogni proprietà visiva è conseguenza di una funzione, mai decorazione). Scala hero: page hero
@@ -521,7 +521,7 @@ Contesto:
 ```
 /impeccable shape la pagina Assistente AI
 
-Priority issues (P0/P1) da: .impeccable/critique/2026-05-24T05-46-56Z__app-dashboard-assistant-page-tsx.md
+Priority issues (P0/P1) da: [SLUG]
 File: app/dashboard/assistant/page.tsx
 Componenti: components/assistant/*
 

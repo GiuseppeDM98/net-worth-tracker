@@ -349,7 +349,7 @@ Contesto:
 ```
 /impeccable polish la pagina Assistente AI
 
-Priority issues (P2/P3) da: .impeccable/critique/2026-05-24T05-46-56Z__app-dashboard-assistant-page-tsx.md
+Priority issues (P2/P3) da: [SLUG]
 File: app/dashboard/assistant/page.tsx
 Componenti: components/assistant/*
 

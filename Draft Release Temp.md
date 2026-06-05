@@ -20,6 +20,14 @@
 - **AI Assistant — proactive goal-reached prompts** — when the assistant detects from your portfolio data that a tracked goal has been reached, it surfaces a "goal reached" banner at the top of the conversation with one-tap "mark as completed", instead of leaving it hidden in the Memory panel
 - **AI Assistant — "what it knows about you"** — your active memory items (goals, risk profile, preferences) are shown as a compact inline row, so you can always see what context is shaping the answers
 - **AI Assistant — "searching the web" indicator** — when a macro or geopolitical question triggers a web search, the assistant now shows a dedicated "Sto cercando sul web…" status instead of a generic delay
+- **Budget tab rebuilt** — budgets are now something you create yourself, one at a time, instead of a row being auto-generated for every category. Add, edit, and delete a budget from a single dialog, and changes save automatically as you go (no more Save button)
+- **Overall monthly budget** — set one spending ceiling across everything. The page shows how much of it is still unallocated, and warns you (and pauses saving) if your individual category budgets add up to more than the overall limit
+- **Income budgets** — set targets for your income categories (salary, freelance) tracked separately from spending, with progress shown toward the goal rather than as an overspend
+- **Monthly or yearly budgets** — each budget can run on a monthly or an annual horizon. Spiky categories like holidays or gifts can have a single yearly limit (tracked year-to-date) instead of a meaningless monthly cap; budgets are grouped into "Budget mensili" and "Budget annuali"
+- **End-of-month spending forecast** — a card projects where your spending is heading by month-end at your current pace: projected total, budget left, estimated overspend, and a suggested daily allowance for the rest of the month
+- **Budget insights** — at a glance: your top spending category this month, how many categories are at risk of going over, your spend versus what you'd usually have spent by this point in the month, and your average daily spend
+- **Budget alerts** — get warned when a category reaches 50%, 75%, 90%, or 100% of its budget, or is forecast to overrun — both in-app and as a section in your monthly summary email. Choose which thresholds you care about
+- **Weekly budget email** — a new opt-in report sent every Sunday with the status and progress of all your monthly and annual budgets, plus a one-line AI summary highlighting what needs attention. Enable it in Settings and send a test copy anytime
 
 ## 🐛 Bug Fixes
 
@@ -42,6 +50,7 @@
 - Fixed: the page numbers no longer slide with a choppy animation when you collapse the settings panel in the FIRE Calculator and Coast FIRE tabs — they now settle smoothly in place
 - Fixed: the Conversations and Memory lists in the AI Assistant could not be scrolled on desktop — their content is now fully reachable (both now open as side panels from the header on every screen size)
 - Fixed: positive and negative figures in the AI Assistant's context card used fixed green/red that didn't match non-default themes (e.g. orange for negatives in Cyberpunk) — they now use each theme's own positive/negative colors
+- Fixed: budgets could appear to vanish after a page refresh — the budget list now loads reliably even before your categories have finished loading, so your saved budgets always show up
 
 ## 🔧 Improvements
 
@@ -127,3 +136,4 @@
 - **AI Assistant — Conversations and Memory open as side panels on desktop too** — matching mobile; the right column now shows only the period context card
 - **AI Assistant — unified preferences** — response style, web/macro context, and automatic memory on/off now sit together in one Preferences popover instead of being scattered across the page
 - **AI Assistant — ready to use on arrival** — it now defaults to your last completed month (which always has data) and shows clearer keyboard focus outlines across its controls
+- **Budget forecasts are smarter early in the month** — instead of blindly extrapolating a big purchase made on day 3 into a huge month-end projection, the forecast now blends your current pace with your usual spending and waits a few days before flagging anything as "at risk". The insights comparison also measures your spend against what you'd typically have reached by today, not against a whole month

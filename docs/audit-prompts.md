@@ -418,14 +418,17 @@ File: app/dashboard/allocation/page.tsx
 Componenti: components/allocation/*
 
 Assi da verificare (minimum — segnala anche eventuali altri problemi):
-- Token: `ActionChip` (COMPRA/VENDI/OK) — colori via token, non hardcoded;
-  `AllocationProgressBar` — fill via token o `color-mix()`; tabella desktop 5-col — nessun
-  hardcoded su header e celle
-- Chart colors: eventuali grafici in ExposureSection via `useChartColors()`
-- ARIA: `AllocationProgressBar` con `role="progressbar"`, `aria-valuenow/min/max`;
-  ActionChip con `aria-label` descrittivo
-- Breakpoint: ExposureSection drill-down (azienda/settore/ETF) non overflow su mobile
-- Skeleton: `AllocationPageSkeleton` isomorfo al layout reale
+- Token: `ActionChip` (COMPRA/VENDI/OK) e `TargetTick` — colori azione via `useActionColors`
+  (legge `--chart-*` con clamp lightness oklch), non hardcoded; `AllocationHero` verdetto e
+  `RebalancePlan` mosse — nessun `bg-gray-*`/hex su badge e righe; `ContributionAllocator`
+  ripartizione — token; `RebalanceBandControl` segmented (±2/±5/5·25/custom) — token
+- Chart colors: eventuali grafici in ExposureSection via `useChartColors()`; i colori azione
+  passano da `useActionColors` (ACTION_CHART_NUMBER COMPRA 3 / VENDI 5 / OK 2)
+- ARIA: `AllocationBreakdown` accordion con `aria-expanded` + contenuto `inert` da chiuso;
+  `RebalanceBandControl` `role="radiogroup"`/segmented; `ActionChip` con `aria-label` descrittivo
+- Breakpoint: AllocationBreakdown accordion (grid-template-rows) e ExposureSection drill-down
+  (azienda/settore/ETF) non overflow su mobile
+- Skeleton: `AllocationPageSkeleton` isomorfo al layout reale (hero → plan → breakdown → exposure)
 - Altro: pattern anomali o violazioni non elencate sopra
 
 Contesto:
@@ -675,17 +678,22 @@ File: app/dashboard/assistant/page.tsx
 Componenti: components/assistant/*
 
 Assi da verificare (minimum — segnala anche eventuali altri problemi):
-- Token: hero patrimonio wrapper — nessun hardcoded; user bubble `bg-muted/40` (token ✓);
-  memory badges — `useChartColors()` + `color-mix()` (non emerald/blue/violet hardcoded);
-  suggestion card border/bg via `chartColors[0]` + `color-mix()` (non hardcoded)
+- Token: scheda period-reactive (`renderPeriodScheda` / `PatrimonioTodayCard`) wrapper —
+  nessun hardcoded; valori Δ → `text-positive`/`text-destructive` (token, non emerald/red);
+  user bubble `bg-muted/40` (token ✓); memory badges (`AssistantMemoryFacts`) —
+  `useChartColors()` + `color-mix()` (non emerald/blue/violet hardcoded); suggestion card
+  (`AssistantSuggestionsBanner`) border/bg via `chartColors[0]` + `color-mix()` (non hardcoded)
 - Chart colors: non applicabile (no Recharts in questa pagina)
-- ARIA: mode strip `role="tablist"`; Conversazioni/Memoria tab strip `role="tablist"`;
-  memory badge `aria-label`; delete 2-click 3s auto-disarm con `aria-label`
-- Breakpoint: `grid-cols-1` + `min-w-0` su left column (fix overflow mobile);
-  composer context chip strip senza `-mx-4` (fix horizontal overflow su mobile)
-- Motion: `layoutId="assistant-mode-pill"` e `layoutId="assistant-sidebar-tab-pill"`
-  unici nella pagina; spring (400/35)
-- Skeleton: `AssistantPageSkeleton` isomorfo al layout reale (mode strip → hero →
+- ARIA: `AssistantPeriodSelector` period axis `role="tablist"` + sub-picker; sheet
+  Conversazioni/Memoria `role="dialog"`/`aria-modal` + focus trap (non più tab strip);
+  `AssistantPreferencesPopover` controlli con label; memory badge `aria-label`;
+  delete 2-click 3s auto-disarm con `aria-label`; SSE `status:'searching'` badge con `aria-live`
+- Breakpoint: `grid-cols-1` + `min-w-0` su left column (fix overflow mobile); scheda come
+  colonna destra solo desktop, mobile nell'empty-state + `AssistantContextPill` nell'header;
+  composer slim (input+send) senza strip orizzontale che debordi
+- Motion: `layoutId="assistant-mode-pill"` (in `AssistantPeriodSelector`) unico nella pagina;
+  sheet open/close + `AnimatePresence` rispettano `useReducedMotion()`; spring (400/35)
+- Skeleton: `AssistantPageSkeleton` isomorfo al layout reale (period axis → scheda →
   conversation → composer → right col)
 - Altro: pattern anomali o violazioni non elencate sopra
 

@@ -23,6 +23,10 @@ import { formatMemoryForPrompt, buildResponseStyleInstruction } from '@/lib/serv
 import type { AssistantMemoryItem, AssistantPreferences } from '@/types/assistant';
 import { buildPeriodComparison } from '@/lib/server/emailPeriodComparison';
 import type { PeriodComparison, MetricDelta, ComparisonSet } from '@/lib/server/emailPeriodComparison';
+import { evaluateBudgetAlerts } from '@/lib/utils/budgetUtils';
+import { DEFAULT_ALERT_THRESHOLDS } from '@/types/budget';
+import type { BudgetAlert, BudgetItem } from '@/types/budget';
+import type { Expense } from '@/types/expenses';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,6 +68,9 @@ export interface MonthlyEmailData {
   dividendCount: number;
   // AI-generated markdown comment; undefined when generation failed or AI key is absent
   aiComment?: string;
+  // Threshold alerts for the period's expense budgets — monthly emails only,
+  // empty/undefined when the user has no budgets or alerts are disabled.
+  budgetAlerts?: BudgetAlert[];
 }
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -594,6 +601,7 @@ export async function getSettingsAdmin(
     quarterlyEmailEnabled: data.quarterlyEmailEnabled,
     semiAnnualEmailEnabled: data.semiAnnualEmailEnabled,
     yearlyEmailEnabled: data.yearlyEmailEnabled,
+    weeklyBudgetEmailEnabled: data.weeklyBudgetEmailEnabled,
     monthlyEmailRecipients: data.monthlyEmailRecipients,
     targets: data.targets,
   } as AssetAllocationSettings;
@@ -735,6 +743,53 @@ function aggregateDividends(
   return { dividendTotal, dividendCount };
 }
 
+/**
+ * Evaluates the user's expense budget alerts for a completed month.
+ *
+ * Reads the budget config via the Admin SDK and reuses the same pure evaluator
+ * as the in-app banner (evaluateBudgetAlerts), so the email and the UI never
+ * disagree. Returns an empty array when alerts are disabled or no budgets exist.
+ *
+ * `now` is pinned to the period-end day so the forecast collapses to actuals for
+ * the completed month (daysElapsed === daysInMonth → no extrapolation).
+ */
+async function buildBudgetAlertsForMonth(
+  userId: string,
+  year: number,
+  month: number,
+  expenseDocs: FirebaseFirestore.QueryDocumentSnapshot[]
+): Promise<BudgetAlert[]> {
+  const budgetSnap = await adminDb.collection('budgets').doc(userId).get();
+  if (!budgetSnap.exists) return [];
+  const data = budgetSnap.data() ?? {};
+
+  if (data.alertsEnabled === false) return [];
+
+  // Monthly email evaluates only monthly budgets: annual budgets are year-to-date
+  // and the query window here is a single month.
+  const items = ((data.items ?? []) as Array<BudgetItem & { monthlyAmount?: number }>)
+    .map((item) => ({
+      ...item,
+      kind: item.kind ?? (item.scope === 'type' && item.expenseType === 'income' ? 'income' : 'expense'),
+      period: item.period ?? 'monthly',
+      amount: item.amount ?? item.monthlyAmount ?? 0,
+    }))
+    .filter((item) => item.kind === 'expense' && item.period === 'monthly');
+  if (items.length === 0 && !data.overallMonthlyAmount) return [];
+
+  const expenses: Expense[] = expenseDocs.map((doc) => {
+    const e = doc.data();
+    return {
+      ...(e as Expense),
+      date: e.date?.toDate ? e.date.toDate() : e.date,
+    };
+  });
+
+  const thresholds = (data.alertThresholds as number[] | undefined) ?? DEFAULT_ALERT_THRESHOLDS;
+  const periodNow = new Date(year, month - 1, new Date(year, month, 0).getDate(), 12);
+  return evaluateBudgetAlerts(items, data.overallMonthlyAmount, expenses, thresholds, periodNow);
+}
+
 // ─── Core data builder ────────────────────────────────────────────────────────
 
 /**
@@ -837,6 +892,12 @@ export async function buildPeriodEmailData(
     aggregateExpenses(expensesSnap.docs);
   const { dividendTotal, dividendCount } = aggregateDividends(dividendsSnap.docs);
 
+  // Budget alerts are month-centric — only attach them to monthly emails.
+  const budgetAlerts =
+    periodType === 'monthly'
+      ? await buildBudgetAlertsForMonth(userId, year, month, expensesSnap.docs)
+      : undefined;
+
   return {
     periodType,
     year,
@@ -858,6 +919,7 @@ export async function buildPeriodEmailData(
     topIndividualExpenses,
     dividendTotal,
     dividendCount,
+    budgetAlerts,
   };
 }
 
@@ -938,6 +1000,47 @@ function buildComparisonSectionHtml(comparison: PeriodComparison): string {
 }
 
 /** Exported for unit testing only — callers should use sendMonthlyEmail. */
+/**
+ * Renders the budget alerts section. Each alert is one row: label, spent/budget,
+ * a percentage, and a sign-aware colour (red = exceeded, amber = warning).
+ * Inline hex colours are intentional — email clients don't support CSS tokens.
+ * Returns '' when there are no alerts so the section disappears cleanly.
+ */
+function buildBudgetAlertsSectionHtml(alerts: BudgetAlert[] | undefined): string {
+  if (!alerts || alerts.length === 0) return '';
+
+  const rows = alerts
+    .map((alert) => {
+      const color = alert.level === 'exceeded' ? '#dc2626' : '#d97706';
+      const pct = Math.round(alert.usedRatio * 100);
+      const badge = alert.level === 'exceeded' ? 'Superato' : `${alert.threshold}%`;
+      const forecastNote = alert.forecastedOverrun && alert.level !== 'exceeded'
+        ? ' · sforamento previsto a fine mese'
+        : '';
+      return `
+        <tr>
+          <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;">
+            <span style="display:inline-block;font-size:11px;font-weight:700;color:#ffffff;background:${color};border-radius:4px;padding:2px 6px;margin-right:8px;">${badge}</span>
+            <span style="font-size:13px;color:#0f172a;">${alert.label}</span>
+            <div style="font-size:12px;color:#64748b;margin-top:2px;font-family:'Geist Mono', ui-monospace, monospace;">
+              ${formatEur(alert.spent)} / ${formatEur(alert.budgetAmount)} &nbsp;·&nbsp; <span style="color:${color};font-weight:600;">${pct}%</span>${forecastNote}
+            </div>
+          </td>
+        </tr>`;
+    })
+    .join('');
+
+  return `
+        <tr>
+          <td style="padding:20px 32px;border-bottom:1px solid #f1f5f9;">
+            <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#0f172a;">Avvisi Budget</p>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+              ${rows}
+            </table>
+          </td>
+        </tr>`;
+}
+
 export function generateEmailHtml(data: MonthlyEmailData, comparisonData?: PeriodComparison): string {
   const title = periodTitle(data);
   const comparison = comparisonLabel(data);
@@ -1228,6 +1331,9 @@ export function generateEmailHtml(data: MonthlyEmailData, comparisonData?: Perio
 
         <!-- Comparisons (vs previous period + YoY) -->
         ${comparisonData ? buildComparisonSectionHtml(comparisonData) : ''}
+
+        <!-- Budget alerts (monthly only) -->
+        ${buildBudgetAlertsSectionHtml(data.budgetAlerts)}
 
         <!-- AI Comment -->
         ${

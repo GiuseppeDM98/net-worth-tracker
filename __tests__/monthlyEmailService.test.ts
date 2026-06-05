@@ -18,6 +18,10 @@ vi.mock('resend', () => {
 // Per-collection query chains — filled per-test
 const collectionMocks: Record<string, any> = {};
 
+// Snapshot returned by adminDb.collection('budgets').doc(uid).get() — mock-prefixed
+// so it can be referenced inside the hoisted vi.mock factory. Default: no budget doc.
+let mockBudgetDoc: { exists: boolean; data?: () => any } = { exists: false };
+
 // Build a reusable chainable query builder for the adminDb mock.
 // The real service uses: .where().where().where().limit().get() (3 conditions)
 // and:                   .where().where().get() (2 conditions for expenses/dividends).
@@ -42,7 +46,7 @@ function buildQueryMock(name: string) {
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
     collection: (name: string) => ({
-      doc: () => ({ get: vi.fn() }),
+      doc: () => ({ get: () => Promise.resolve(mockBudgetDoc) }),
       where: () => buildQueryMock(name),
     }),
   },
@@ -621,6 +625,30 @@ describe('generateEmailHtml', () => {
 describe('buildMonthlyEmailData', () => {
   beforeEach(() => {
     Object.keys(collectionMocks).forEach((k) => delete collectionMocks[k]);
+    mockBudgetDoc = { exists: false };
+  });
+
+  it('attaches budget alerts for an exceeded expense budget', async () => {
+    collectionMocks['monthly-snapshots'] = {
+      empty: false,
+      docs: [{ data: () => ({ totalNetWorth: 100, liquidNetWorth: 50, byAssetClass: {} }) }],
+    };
+    // March 2025 has 31 days; the period-end forecast collapses to actuals.
+    collectionMocks['expenses'] = {
+      docs: [{ data: () => ({ amount: -600, categoryId: 'c1', categoryName: 'Spesa', date: new Date(2025, 2, 10) }) }],
+    };
+    collectionMocks['dividends'] = { docs: [] };
+    mockBudgetDoc = {
+      exists: true,
+      data: () => ({
+        items: [{ id: 'g', kind: 'expense', scope: 'category', categoryId: 'c1', categoryName: 'Spesa', monthlyAmount: 400, order: 0 }],
+        alertsEnabled: true,
+      }),
+    };
+
+    const result = await buildMonthlyEmailData('user-1', 2025, 3);
+    expect(result!.budgetAlerts).toBeDefined();
+    expect(result!.budgetAlerts!.some((a) => a.label === 'Spesa' && a.level === 'exceeded')).toBe(true);
   });
 
   it('returns null when no current snapshot exists', async () => {

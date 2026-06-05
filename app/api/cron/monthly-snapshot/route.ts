@@ -16,6 +16,7 @@ import {
 } from '@/lib/server/monthlyEmailService';
 import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
 import { refreshEcbRatesIfStale } from '@/lib/server/ecbRatesService';
+import { isWeeklyBudgetDayItaly, buildAndSendWeeklyBudget } from '@/lib/server/weeklyBudgetEmailService';
 
 /**
  * GET /api/cron/monthly-snapshot
@@ -290,6 +291,40 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Phase 6: Send weekly budget status emails (every Sunday)
+    const weeklyBudgetEmailResults = { sent: 0, skipped: 0, errors: 0 };
+    if (isWeeklyBudgetDayItaly(now)) {
+      console.log('Sunday detected — sending weekly budget emails');
+
+      for (const userDoc of usersSnapshot.docs) {
+        const userId = userDoc.id;
+
+        if (userId === process.env.NEXT_PUBLIC_DEMO_USER_ID) {
+          weeklyBudgetEmailResults.skipped++;
+          continue;
+        }
+
+        try {
+          const settings = await getSettingsAdmin(userId);
+          if (!settings?.weeklyBudgetEmailEnabled || !settings.monthlyEmailRecipients?.length) {
+            weeklyBudgetEmailResults.skipped++;
+            continue;
+          }
+
+          const sent = await buildAndSendWeeklyBudget(userId, settings.monthlyEmailRecipients, now);
+          if (!sent) {
+            weeklyBudgetEmailResults.skipped++;
+          } else {
+            weeklyBudgetEmailResults.sent++;
+            console.log(`Weekly budget email sent for user ${userId}`);
+          }
+        } catch (emailError) {
+          console.error(`Weekly budget email failed for user ${userId}:`, emailError);
+          weeklyBudgetEmailResults.errors++;
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: `Monthly snapshots job completed`,
@@ -302,6 +337,7 @@ export async function GET(request: NextRequest) {
       quarterlyEmailSummary: quarterlyEmailResults,
       semiAnnualEmailSummary: semiAnnualEmailResults,
       yearlyEmailSummary: yearlyEmailResults,
+      weeklyBudgetEmailSummary: weeklyBudgetEmailResults,
     });
   } catch (error) {
     console.error('Error in monthly snapshot cron job:', error);

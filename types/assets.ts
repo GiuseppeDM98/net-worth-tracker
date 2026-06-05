@@ -198,7 +198,8 @@ export interface AssetAllocationSettings {
   quarterlyEmailEnabled?: boolean; // When true, a summary email is sent on the last day of each quarter (Mar/Jun/Sep/Dec)
   semiAnnualEmailEnabled?: boolean; // When true, a summary email is sent on the last day of each half-year (Jun 30 / Dec 31)
   yearlyEmailEnabled?: boolean; // When true, a summary email is sent on December 31
-  monthlyEmailRecipients?: string[]; // Recipient list shared by all periodic summary emails (monthly/quarterly/semiannual/yearly)
+  weeklyBudgetEmailEnabled?: boolean; // When true, a budget status email is sent every Sunday
+  monthlyEmailRecipients?: string[]; // Recipient list shared by all periodic summary emails (monthly/quarterly/semiannual/yearly/weekly-budget)
   targets: AssetAllocationTarget;
 }
 

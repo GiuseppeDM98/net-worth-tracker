@@ -146,9 +146,11 @@ describe('budget matching excludes transfers', () => {
   it('transfer expense never matches a type-scope budget item', () => {
     const item: BudgetItem = {
       id: 'b1',
+      kind: 'expense',
       scope: 'type',
+      period: 'monthly',
       expenseType: 'fixed',
-      monthlyAmount: 1000,
+      amount: 1000,
       order: 0,
     }
     const transferExpense = makeExpense('transfer', 500, {
@@ -161,10 +163,12 @@ describe('budget matching excludes transfers', () => {
   it('transfer expense never matches a category-scope budget item', () => {
     const item: BudgetItem = {
       id: 'b2',
+      kind: 'expense',
       scope: 'category',
+      period: 'monthly',
       categoryId: 'cat1',
       categoryName: 'Test',
-      monthlyAmount: 500,
+      amount: 500,
       order: 0,
     }
     const transferExpense = makeExpense('transfer', 500, {

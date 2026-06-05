@@ -154,9 +154,10 @@ export default function SettingsPage() {
   const [quarterlyEmailEnabled, setQuarterlyEmailEnabled] = useState<boolean>(false);
   const [semiAnnualEmailEnabled, setSemiAnnualEmailEnabled] = useState<boolean>(false);
   const [yearlyEmailEnabled, setYearlyEmailEnabled] = useState<boolean>(false);
+  const [weeklyBudgetEmailEnabled, setWeeklyBudgetEmailEnabled] = useState<boolean>(false);
   const [monthlyEmailRecipients, setMonthlyEmailRecipients] = useState<string[]>([]);
   const [newEmailInput, setNewEmailInput] = useState<string>('');
-  const [sendingTestEmailType, setSendingTestEmailType] = useState<'monthly' | 'quarterly' | 'semiannual' | 'yearly' | null>(null);
+  const [sendingTestEmailType, setSendingTestEmailType] = useState<'monthly' | 'quarterly' | 'semiannual' | 'yearly' | 'weekly-budget' | null>(null);
   const [assetClassStates, setAssetClassStates] = useState<
     Record<AssetClass, AssetClassState>
   >({} as Record<AssetClass, AssetClassState>);
@@ -392,6 +393,7 @@ export default function SettingsPage() {
         setQuarterlyEmailEnabled(settingsData.quarterlyEmailEnabled ?? false);
         setSemiAnnualEmailEnabled(settingsData.semiAnnualEmailEnabled ?? false);
         setYearlyEmailEnabled(settingsData.yearlyEmailEnabled ?? false);
+        setWeeklyBudgetEmailEnabled(settingsData.weeklyBudgetEmailEnabled ?? false);
         setMonthlyEmailRecipients(settingsData.monthlyEmailRecipients ?? []);
         // Load dividend settings
         setDividendIncomeCategoryId(settingsData.dividendIncomeCategoryId || '');
@@ -510,6 +512,7 @@ export default function SettingsPage() {
           quarterlyEmailEnabled: settingsData?.quarterlyEmailEnabled ?? false,
           semiAnnualEmailEnabled: settingsData?.semiAnnualEmailEnabled ?? false,
           yearlyEmailEnabled: settingsData?.yearlyEmailEnabled ?? false,
+          weeklyBudgetEmailEnabled: settingsData?.weeklyBudgetEmailEnabled ?? false,
           monthlyEmailRecipients: [...(settingsData?.monthlyEmailRecipients ?? [])].sort(),
         })
       );
@@ -1072,6 +1075,7 @@ export default function SettingsPage() {
         quarterlyEmailEnabled,
         semiAnnualEmailEnabled,
         yearlyEmailEnabled,
+        weeklyBudgetEmailEnabled,
         monthlyEmailRecipients,
       });
       toast.success('Impostazioni salvate con successo');
@@ -1387,6 +1391,7 @@ export default function SettingsPage() {
         quarterlyEmailEnabled,
         semiAnnualEmailEnabled,
         yearlyEmailEnabled,
+        weeklyBudgetEmailEnabled,
         monthlyEmailRecipients: [...monthlyEmailRecipients].sort(),
       }),
     [
@@ -1405,6 +1410,7 @@ export default function SettingsPage() {
       quarterlyEmailEnabled,
       semiAnnualEmailEnabled,
       yearlyEmailEnabled,
+      weeklyBudgetEmailEnabled,
       monthlyEmailRecipients,
     ]
   );
@@ -1883,7 +1889,26 @@ export default function SettingsPage() {
             />
           </div>
 
-          {(monthlyEmailEnabled || quarterlyEmailEnabled || semiAnnualEmailEnabled || yearlyEmailEnabled) && (
+          {/* Weekly budget email toggle */}
+          <div className="flex items-center justify-between border-t pt-4">
+            <div>
+              <Label htmlFor="weeklyBudgetEmailEnabled" className="text-sm font-medium">
+                Attiva report budget settimanale
+              </Label>
+              <p className="text-sm text-muted-foreground mt-1">
+                Inviato ogni domenica con lo stato dei budget mensili e annuali
+              </p>
+            </div>
+            <Switch
+              id="weeklyBudgetEmailEnabled"
+              checked={weeklyBudgetEmailEnabled}
+              onCheckedChange={setWeeklyBudgetEmailEnabled}
+              disabled={isDemo}
+              className={interactiveControlClass}
+            />
+          </div>
+
+          {(monthlyEmailEnabled || quarterlyEmailEnabled || semiAnnualEmailEnabled || yearlyEmailEnabled || weeklyBudgetEmailEnabled) && (
             <div className="space-y-3 border-t pt-4">
               <Label className="text-sm font-medium">Destinatari</Label>
 
@@ -1964,6 +1989,7 @@ export default function SettingsPage() {
                   { type: 'quarterly' as const, label: 'Invia trimestrale ora', enabled: quarterlyEmailEnabled },
                   { type: 'semiannual' as const, label: 'Invia semestrale ora', enabled: semiAnnualEmailEnabled },
                   { type: 'yearly' as const, label: 'Invia annuale ora', enabled: yearlyEmailEnabled },
+                  { type: 'weekly-budget' as const, label: 'Invia report budget ora', enabled: weeklyBudgetEmailEnabled },
                 ] as const).filter(({ enabled }) => enabled).map(({ type, label }) => (
                   <Button
                     key={type}

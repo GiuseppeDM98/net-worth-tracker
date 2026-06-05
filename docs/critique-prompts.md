@@ -87,7 +87,7 @@ La pagina è una singola scroll (nessun tab). Layout:
 - AssetManagementTab: tabella ordinabile (Valore, G/P%, Peso%, Nome, Classe),
   group-by-class toggle, sparkline per asset, 2-click delete, AssetDialog 2-step.
   Mobile: AssetMobileSummary (ultimi 3 mesi).
-Confronta con: Panoramica (stesso hero layout), AllocationCard (flat divide-y),
+Confronta con: Panoramica (stesso hero layout), AllocationBreakdown (flat divide-y rows),
 GoalDetailCard (expand/collapse inline).
 Design language atteso (vedi DESIGN.md): North Star "Effortless Precision" — Linear/Vercel +
 Trade Republic + Apple, sotto la legge Form Follows Function (onestà, deferenza, inevitabilità:
@@ -201,7 +201,7 @@ Componenti: components/cashflow/BudgetTab.tsx
 Questo tab permette di impostare budget per categoria e visualizzare
 l'avanzamento mensile con progress bars. Side-stripe borders rimossi,
 colori blue hardcoded migrati a design tokens.
-Confronta con: AllocationCard (progress bar + target%), GoalDetailCard (% display).
+Confronta con: Allocazione/RebalancePlan (mosse + target% via TargetTick), GoalDetailCard (% display).
 Design language atteso (vedi DESIGN.md): North Star "Effortless Precision" — Linear/Vercel +
 Trade Republic + Apple, sotto la legge Form Follows Function (onestà, deferenza, inevitabilità:
 ogni proprietà visiva è conseguenza di una funzione, mai decorazione). Scala hero: page hero
@@ -314,10 +314,16 @@ servirà come input per il prossimo step:
 File: app/dashboard/allocation/page.tsx
 Componenti: components/allocation/*
 
-Questa pagina mostra l'allocazione attuale vs target per classe di asset,
-con AllocationCard flat (divide-y + ActionChip COMPRA/VENDI/OK) e tabelle desktop
-5 colonne. Include la sezione "Esposizione Portfolio" lazy-loaded con drill-down
-per azienda / settore / emittente ETF.
+Questa pagina (redesign "ripensamento" 2026-06-04) risponde a una sola domanda — "sono
+in linea col target e cosa muovo?" — con: AllocationHero (patrimonio allocato + verdetto
+equilibrio: N classi fuori target + scostamento maggiore), RebalancePlan (lista firmata e
+ordinata delle mosse per classe, empty-state "Tutto in linea"), RebalanceBandControl (soglia
+±2/±5/regola 5·25/custom, di sessione, ri-classifica COMPRA/VENDI/OK in tutta la pagina),
+ContributionAllocator (versamento no-sell ripartito per classe e sottocategoria),
+AllocationBreakdown (una card, accordion inline grid-template-rows su tutti i breakpoint,
+AllocationRow + TargetTick per riga). Colori azione dal tema via useActionColors; pure layer
+in allocationUtils.ts. Bottom: sezione "Esposizione Portfolio" (ExposureSection) lazy-loaded
+con drill-down per azienda / settore / emittente ETF.
 Confronta con: Rendimenti (MetricSection flat rows), Patrimonio (sortable table).
 Design language atteso (vedi DESIGN.md): North Star "Effortless Precision" — Linear/Vercel +
 Trade Republic + Apple, sotto la legge Form Follows Function (onestà, deferenza, inevitabilità:
@@ -649,14 +655,22 @@ servirà come input per il prossimo step:
 File: app/dashboard/assistant/page.tsx
 Componenti: components/assistant/*
 
-Questa pagina offre un assistente AI per analisi del portafoglio in 5 modalità
-(Mese, Anno, YTD, Storico, Chat), con streaming SSE, thread persistenti period-pinned,
-pannello memoria con lifecycle attivo/completato/archiviato e context bundle numerico
-(patrimonio delta, cashflow, allocation) mostrato in sidebar.
+Questa pagina (redesign "single period axis" 2026-06-04) offre un assistente AI per analisi
+del portafoglio su un unico asse period (AssistantPeriodSelector: Mese / Anno / YTD / Storico /
+Libera = ex-Chat) con sub-picker co-locato; in Libera un Contesto opzionale (chatContextType).
+Scheda period-reactive (renderPeriodScheda + useAssistantPeriodContext sulla selezione live,
+PatrimonioTodayCard per Libera) che mostra net-worth Δ + cashflow + allocation prima della
+domanda — desktop colonna destra, mobile nell'empty-state + AssistantContextPill nell'header.
+Conversazioni/Memoria aperte da header come sheets su ogni breakpoint. Proactive memory:
+AssistantSuggestionsBanner (goal-completion) + AssistantMemoryFacts ("sa di te"). Prefs unificate
+in AssistantPreferencesPopover (stile + macro/web + memoria on/off). Follow-up chips
+(AssistantFollowUps). Composer slim (AssistantComposer: input+send). Streaming SSE
+(meta|context|status|text|done|error; status:'searching' → "Sto cercando sul web…"),
+thread persistenti period-pinned, memoria con lifecycle attivo/completato/archiviato.
 Confronta con: Rendimenti (hero number + data-first hierarchy), Storico (narrative order),
 Goals (flat divide-y list).
-Nota: critique già eseguita il 2026-05-24 — score 25/40. Findings in SESSION_NOTES.md.
-Rieseguire dopo il redesign per misurare il delta.
+Nota: critique baseline 2026-05-24 = 25/40 (pre-redesign). Il redesign è stato implementato
+il 2026-06-04 — rieseguire la critique per misurare il delta.
 Design language atteso (vedi DESIGN.md): North Star "Effortless Precision" — Linear/Vercel +
 Trade Republic + Apple, sotto la legge Form Follows Function (onestà, deferenza, inevitabilità:
 ogni proprietà visiva è conseguenza di una funzione, mai decorazione). Scala hero: page hero

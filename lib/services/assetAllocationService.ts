@@ -83,6 +83,7 @@ export async function getSettings(
       quarterlyEmailEnabled: data.quarterlyEmailEnabled,
       semiAnnualEmailEnabled: data.semiAnnualEmailEnabled,
       yearlyEmailEnabled: data.yearlyEmailEnabled,
+      weeklyBudgetEmailEnabled: data.weeklyBudgetEmailEnabled,
       monthlyEmailRecipients: data.monthlyEmailRecipients,
       targets: data.targets as AssetAllocationTarget,
     };
@@ -243,6 +244,9 @@ export async function setSettings(
       if (settings.yearlyEmailEnabled !== undefined) {
         docData.yearlyEmailEnabled = settings.yearlyEmailEnabled;
       }
+      if (settings.weeklyBudgetEmailEnabled !== undefined) {
+        docData.weeklyBudgetEmailEnabled = settings.weeklyBudgetEmailEnabled;
+      }
       if (settings.monthlyEmailRecipients !== undefined) {
         docData.monthlyEmailRecipients = settings.monthlyEmailRecipients;
       }
@@ -363,6 +367,9 @@ export async function setSettings(
       }
       if (settings.yearlyEmailEnabled !== undefined) {
         docData.yearlyEmailEnabled = settings.yearlyEmailEnabled;
+      }
+      if (settings.weeklyBudgetEmailEnabled !== undefined) {
+        docData.weeklyBudgetEmailEnabled = settings.weeklyBudgetEmailEnabled;
       }
       if (settings.monthlyEmailRecipients !== undefined) {
         docData.monthlyEmailRecipients = settings.monthlyEmailRecipients;
