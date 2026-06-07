@@ -31,7 +31,7 @@ import { CashflowCategoryDrawer } from './CashflowCategoryDrawer';
 function getDeltaColorClass(delta: number, invert = false): string {
   if (delta === 0) return 'text-muted-foreground';
   const positive = invert ? delta < 0 : delta > 0;
-  return positive ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive';
+  return positive ? 'text-positive' : 'text-destructive';
 }
 
 function getDeltaArrow(delta: number): string {
@@ -42,15 +42,15 @@ function getDeltaArrow(delta: number): string {
 
 function getRatioColorClass(ratio: number | null): string {
   if (ratio === null) return 'text-muted-foreground';
-  if (ratio >= 1.3) return 'text-emerald-600 dark:text-emerald-400';
+  if (ratio >= 1.3) return 'text-positive';
   if (ratio >= 1.0) return 'text-amber-500 dark:text-amber-400';
   return 'text-destructive';
 }
 
-/** Grey for 0, emerald for positive, destructive for negative. */
+/** Grey for 0, positive token for positive, destructive for negative. */
 function getEuroColor(value: number): string {
   if (value === 0) return 'text-muted-foreground';
-  return value > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive';
+  return value > 0 ? 'text-positive' : 'text-destructive';
 }
 
 // ─── DeltaRow ─────────────────────────────────────────────────────────────────
@@ -250,7 +250,7 @@ export function CashflowKpiCarousel({
       id: 'entrate',
       label: 'Entrate',
       displayValue: cachedFormatCurrencyEUR(income),
-      valueClassName: income === 0 ? 'text-muted-foreground' : 'text-emerald-600 dark:text-emerald-400',
+      valueClassName: income === 0 ? 'text-muted-foreground' : 'text-positive',
       subtext: <DeltaRow delta={incomeDelta} />,
     },
     {

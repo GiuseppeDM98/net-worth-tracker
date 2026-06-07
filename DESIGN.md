@@ -189,6 +189,8 @@ Five chart colors cover the semantic range of portfolio data. These are the syst
 
 **The Data Owns Color Rule.** Chart palettes, performance indicators, and the five named themes are the only sanctioned sources of chromatic energy. Interface chrome in the default theme is always achromatic.
 
+**The Sign-Color Token Rule.** Positive/negative *value* coloring (gain vs loss, income vs expense, up vs down deltas, variation chips, fiscal gains) always uses the theme-aware semantic tokens: `text-positive` for positive, `text-destructive` for negative, with `bg-positive/10` / `bg-destructive/10` for chip tints. Raw Tailwind `text-green-*` / `text-red-*` is forbidden here — those classes stay literal regardless of the active theme and diverge from `--destructive` on non-default themes (e.g. Cyberpunk renders destructive as orange), which would put two different "negative" colors on the same screen. `getMetricValueColor()` in `lib/utils/metricColors.ts` is the single source of truth for resolving the sign color. (Buy/sell *signal* chips — COMPRA/VENDI/OK — are a separate case, theme-mapped to the chart palette via `useActionColors`; see the ActionChip component.)
+
 ## 3. Typography
 
 **UI Font:** Geist Sans (with `system-ui, sans-serif` fallback)
@@ -206,7 +208,7 @@ Five chart colors cover the semantic range of portfolio data. These are the syst
 - **Body** (400 weight, 0.875rem, lh 1.6): All prose, descriptions, note content. Max line length 65ch.
 - **Label** (500 weight, 0.75rem, lh 1.4, ls +0.01em): Input labels, tags, stat captions, tab text. Slightly tracked for legibility at small sizes.
 - **Eyebrow Label** (600 weight, `10px`, uppercase, ls `0.1em`, muted): Section eyebrow — the small all-caps label placed above a dominant number. In Tailwind: `text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground`. Never competes with the number it names. Use 9px / `tracking-[0.08em]` for sub-eyebrows inside compact cells. Context can be appended with a centered-dot separator: `Cashflow · MAGGIO 2026` — the `·` joins without adding another label.
-- **Delta Annotation** (Geist Mono, 400 weight, `12px`, ls 0): The small trend line that appears directly below a sub-hero value inside a KPI chip — e.g. `+5.2% vs mese scorso`. Always `font-mono`. Color follows sign semantics: `text-green-500 dark:text-green-400` for positive, `text-red-500 dark:text-red-400` for negative. **Inverted semantics for expense metrics**: a positive delta on Spese is bad; parameter the color via `positiveGood: boolean`. In Tailwind: `text-[12px] font-mono mt-1.5 text-green-500 dark:text-green-400`. A neutral subline (non-trend) uses `text-[12px] text-muted-foreground mt-1.5`.
+- **Delta Annotation** (Geist Mono, 400 weight, `12px`, ls 0): The small trend line that appears directly below a sub-hero value inside a KPI chip — e.g. `+5.2% vs mese scorso`. Always `font-mono`. Color follows sign semantics via the theme tokens (see **The Sign-Color Token Rule**): `text-positive` for positive, `text-destructive` for negative — never raw `text-green-*`/`text-red-*`. **Inverted semantics for expense metrics**: a positive delta on Spese is bad; parameter the color via `positiveGood: boolean`. In Tailwind: `text-[12px] font-mono mt-1.5 text-positive` (or `text-destructive`); prefer `getMetricValueColor()`. A neutral subline (non-trend) uses `text-[12px] text-muted-foreground mt-1.5`.
 - **Numeric** (Geist Mono, 400 weight, 0.875rem, lh 1.4, `font-feature-settings: "tnum" 1`): All monetary values, percentages, dates, quantities in financial contexts. Tabular figures always enabled.
 
 ### Named Rules
@@ -300,15 +302,17 @@ Periodic changes (monthly, YTD) are displayed as compact inline chips directly b
 
 **Structure:** `inline-flex items-center gap-2 rounded-[9px] px-[13px] py-[6px] text-[15px] font-semibold font-mono tracking-[-0.01em]`
 
-**Colors:**
-- Positive: `bg-green-500/10 text-green-500 dark:text-green-400`
-- Negative: `bg-red-500/10 text-red-500 dark:text-red-400`
+**Colors:** (theme-aware tokens — see **The Sign-Color Token Rule**)
+- Positive: `bg-positive/10 text-positive`
+- Negative: `bg-destructive/10 text-destructive`
+
+Never use raw `bg-green-500/10 text-green-500` / `bg-red-500/10 text-red-500` here: those stay literal red/green regardless of theme and clash with `--destructive` on non-default themes (e.g. Cyberpunk = orange). Resolve the text color via `getMetricValueColor()` (`lib/utils/metricColors.ts`) where practical.
 
 **Content:** `{icon} {+/-}{formattedValue} ({+/-}{pct}%) {period label}` — e.g. `↗ +€1.240,00 (+2.34%) questo mese`
 
 **Rules:** Only render when snapshot data exists (at least one prior period). Never show a placeholder chip — absence communicates "no prior data" cleanly. Icon is `TrendingUp` or `TrendingDown` at `h-[13px] w-[13px]`. Multiple chips wrap naturally via `flex-wrap gap-2`. Use `font-mono` for the value — the chip contains a financial number and must satisfy the Mono Mandate.
 
-**Note (delta semantics):** For expense metrics, the sign convention is inverted: a positive delta on Spese is bad (spending went up), a negative delta is good. The color logic must be parameterized, not hard-coded: `positiveGood: boolean` governs green/red assignment.
+**Note (delta semantics):** For expense metrics, the sign convention is inverted: a positive delta on Spese is bad (spending went up), a negative delta is good. The color logic must be parameterized, not hard-coded: `positiveGood: boolean` governs the `text-positive` / `text-destructive` assignment.
 
 ### Dominant Value Block (Trade Republic Pattern)
 
@@ -698,7 +702,7 @@ useEffect(() => {
 - **Do** use `mt-auto` inside `flex flex-col h-full` CardContent to pin optional secondary content to the card bottom. The pattern requires `h-full` on both Card and CardContent; without both, `mt-auto` has no space to push against.
 - **Do** use `rounded-[2px]` for chart legend color swatches (color keys). Use `rounded-full` for inline dot indicators (row bullets, status dots). The distinction is semantic: square = color key, circle = inline marker.
 - **Do** duplicate responsive blocks with `desktop:hidden` / `hidden desktop:grid` when the same data must be positioned differently across breakpoints (e.g. TER + cost metrics in the hero card footer on desktop, as standalone cards below the hero on mobile). Redundant DOM is preferable to a convoluted single implementation that degrades at both sizes.
-- **Do** use inverted sign semantics (parameterized `positiveGood: boolean`) for expense delta annotations. A positive Spese delta means spending increased — the color should be red, opposite to the income logic. Never hardcode green-for-positive in components that handle both income and expense metrics.
+- **Do** use inverted sign semantics (parameterized `positiveGood: boolean`) for expense delta annotations. A positive Spese delta means spending increased — the color should be `text-destructive`, opposite to the income logic. Never hardcode positive-as-green (raw `text-green-*`) in components that handle both income and expense metrics; use the `text-positive` / `text-destructive` tokens so the sign colors follow the theme.
 
 ### Don't:
 

@@ -73,6 +73,22 @@ const MONTH_NAMES_IT = [
   'Dicembre',
 ];
 
+/**
+ * Sign-aware theme-token classes for financial values (gain vs loss).
+ *
+ * Returns the semantic tokens `text-positive` / `text-destructive` (plus the
+ * matching `/10` tint for chips) so the sign color follows the active theme on
+ * all six themes. Raw `text-green-*` / `text-red-*` is forbidden here: those stay
+ * literal and diverge from `--destructive` on non-default themes (e.g. Cyberpunk
+ * renders destructive as orange). See DESIGN.md "The Sign-Color Token Rule".
+ * Zero is treated as positive, matching the previous chip/fiscal behaviour.
+ */
+const signTextClass = (value: number): string =>
+  value >= 0 ? 'text-positive' : 'text-destructive';
+
+const signChipClass = (value: number): string =>
+  value >= 0 ? 'bg-positive/10 text-positive' : 'bg-destructive/10 text-destructive';
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const isDemo = useDemoMode();
@@ -357,9 +373,7 @@ export default function DashboardPage() {
                       className={cn(
                         'inline-flex items-center gap-2 rounded-[9px] px-[13px] py-[6px]',
                         'font-mono text-[15px] font-semibold tracking-[-0.01em]',
-                        overview.variations.monthly.value >= 0
-                          ? 'bg-green-500/10 text-green-500 dark:text-green-400'
-                          : 'bg-red-500/10 text-red-500 dark:text-red-400',
+                        signChipClass(overview.variations.monthly.value),
                       )}
                     >
                       {overview.variations.monthly.value >= 0 ? (
@@ -378,9 +392,7 @@ export default function DashboardPage() {
                       className={cn(
                         'inline-flex items-center gap-2 rounded-[9px] px-[13px] py-[6px]',
                         'font-mono text-[15px] font-semibold tracking-[-0.01em]',
-                        overview.variations.yearly.value >= 0
-                          ? 'bg-green-500/10 text-green-500 dark:text-green-400'
-                          : 'bg-red-500/10 text-red-500 dark:text-red-400',
+                        signChipClass(overview.variations.yearly.value),
                       )}
                     >
                       {overview.variations.yearly.value >= 0 ? (
@@ -437,19 +449,19 @@ export default function DashboardPage() {
                       <div className="desktop:grid border-border mt-auto hidden grid-cols-2 gap-4 border-t pt-4">
                         {overview.flags.hasTERTracking && (
                           <div>
-                            <p className="text-muted-foreground mb-2 text-[9px] font-semibold tracking-[0.1em] uppercase">
+                            <p className="text-muted-foreground mb-2 text-[10px] font-semibold tracking-[0.1em] uppercase">
                               TER Medio Ponderato
                             </p>
-                            <p className="text-foreground font-mono text-[28px] leading-none font-bold tracking-[-0.03em] tabular-nums">
+                            <p className="text-foreground font-mono text-[22px] leading-none font-bold tracking-[-0.025em] tabular-nums">
                               {overview.metrics.portfolioTER.toFixed(2)}%
                             </p>
                           </div>
                         )}
                         <div className={cn(!overview.flags.hasTERTracking && 'col-span-2')}>
-                          <p className="text-muted-foreground mb-2 text-[9px] font-semibold tracking-[0.1em] uppercase">
+                          <p className="text-muted-foreground mb-2 text-[10px] font-semibold tracking-[0.1em] uppercase">
                             Costo Annuale Stimato
                           </p>
-                          <p className="font-mono text-[28px] leading-none font-bold tracking-[-0.03em] text-amber-500 tabular-nums dark:text-amber-400">
+                          <p className="font-mono text-[22px] leading-none font-bold tracking-[-0.025em] text-amber-600 tabular-nums dark:text-amber-400">
                             {formatCurrency(annualTotal)}
                           </p>
                           {bothPresent && (
@@ -482,11 +494,12 @@ export default function DashboardPage() {
           <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
             <Card className="h-full rounded-2xl">
               <CardContent className="p-[22px]">
-                <p className="text-muted-foreground mb-2 text-[12px] font-semibold tracking-[0.1em] uppercase">
+                <p className="text-muted-foreground mb-2 text-[10px] font-semibold tracking-[0.1em] uppercase">
                   Sintesi Patrimoniale
                 </p>
 
-                {/* 3-row breakdown + Patrimonio Totale Lordo footer */}
+                {/* Breakdown by class + total footer. Only meaningful once there is value to split. */}
+                {totalValue > 0 ? (
                 <div className="border-border divide-border divide-y border-t pt-3">
                   {[
                     {
@@ -527,11 +540,9 @@ export default function DashboardPage() {
                     </div>
                   ))}
 
-                  {/* Bottom row: Patrimonio Totale Lordo (bold) */}
+                  {/* Bottom row: total (bold). The breakdown above sums to this. */}
                   <div className="flex items-center justify-between py-[7px]">
-                    <span className="text-foreground text-[14px] font-semibold">
-                      Patrimonio Totale Lordo
-                    </span>
+                    <span className="text-foreground text-[14px] font-semibold">Totale</span>
                     <div className="flex items-center gap-2">
                       <span className="text-foreground font-mono text-[14px] font-bold tabular-nums">
                         {cachedFormatCurrencyEUR(totalValue)}
@@ -542,6 +553,13 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 </div>
+                ) : (
+                  <div className="border-border border-t pt-3">
+                    <p className="text-muted-foreground text-[13px]">
+                      Il riepilogo per classe apparirà dopo il primo asset.
+                    </p>
+                  </div>
+                )}
 
                 {/* ── Fiscal rows — shown only when cost basis tracking is enabled ── */}
                 {overview?.flags.hasCostBasisTracking && overview.metrics && (
@@ -553,16 +571,13 @@ export default function DashboardPage() {
                       {
                         label: 'Plusvalenze Non Realizzate',
                         value: overview.metrics.unrealizedGains,
-                        className:
-                          overview.metrics.unrealizedGains >= 0
-                            ? 'text-green-500 dark:text-green-400'
-                            : 'text-red-500 dark:text-red-400',
+                        className: signTextClass(overview.metrics.unrealizedGains),
                         prefix: overview.metrics.unrealizedGains >= 0 ? '+' : '',
                       },
                       {
                         label: 'Tasse Stimate',
                         value: overview.metrics.estimatedTaxes,
-                        className: 'text-amber-500 dark:text-amber-400',
+                        className: 'text-amber-600 dark:text-amber-400',
                         prefix: '',
                       },
                       {
@@ -627,11 +642,11 @@ export default function DashboardPage() {
               {/* TER medio */}
               {overview.flags.hasTERTracking && (
                 <div className="bg-card border-border flex flex-col justify-between rounded-2xl border p-5">
-                  <span className="text-muted-foreground text-[9px] font-semibold tracking-[0.1em] uppercase">
+                  <span className="text-muted-foreground text-[10px] font-semibold tracking-[0.1em] uppercase">
                     TER Medio Ponderato
                   </span>
                   <div>
-                    <p className="text-foreground mt-3 font-mono text-[32px] leading-none font-bold tracking-[-0.03em] tabular-nums">
+                    <p className="text-foreground mt-3 font-mono text-[22px] leading-none font-bold tracking-[-0.025em] tabular-nums">
                       {overview.metrics.portfolioTER.toFixed(2)}%
                     </p>
                     <p className="text-muted-foreground mt-2 text-[10px]">
@@ -648,11 +663,11 @@ export default function DashboardPage() {
                   !overview.flags.hasTERTracking && 'col-span-2',
                 )}
               >
-                <span className="text-muted-foreground text-[9px] font-semibold tracking-[0.1em] uppercase">
+                <span className="text-muted-foreground text-[10px] font-semibold tracking-[0.1em] uppercase">
                   Costo Annuale Stimato
                 </span>
                 <div>
-                  <p className="mt-3 font-mono text-[32px] leading-none font-bold tracking-[-0.03em] text-amber-500 tabular-nums dark:text-amber-400">
+                  <p className="mt-3 font-mono text-[22px] leading-none font-bold tracking-[-0.025em] text-amber-600 tabular-nums dark:text-amber-400">
                     {formatCurrency(annualTotal)}
                   </p>
                   {bothPresent && (
