@@ -31,4 +31,28 @@ netto del debito, quantity×prezzo) sono già applicate. Feature di sola lettura
 - ESLint sui file nuovi → pulito (gli errori su `page.tsx`, es. `loadData` hoisting + import inutilizzati, sono preesistenti e non toccati).
 
 ## Stato
-Completato. Pronto per commit/push sul branch `claude/add-monthly-history-section-Jxq4y`.
+Completato. Pushato sul branch `claude/add-monthly-history-section-Jxq4y`.
+
+## Riepilogo
+- **Cosa:** Nuova sezione "Valore per Strumento" nella pagina Storico. L'utente sceglie un mese e
+  vede il valore di ogni singolo strumento di quel mese (dalla `byAsset` dello snapshot), seleziona
+  un sottoinsieme via checkbox per vederne somma + % sul totale del mese, e ne segue l'andamento
+  combinato nel tempo con un grafico cross-mese. Layer puro tipizzato + testato
+  (`snapshotAssetBreakdown.ts`), componente self-contained, wiring come nuovo capitolo `breakdown`
+  della pagina.
+- **Perché:** Il dato esiste già congelato negli snapshot (`MonthlySnapshot.byAsset.totalValue`,
+  calcolato a snapshot-time da `calculateAssetValue`), quindi tutte le regole di valore
+  (EUR/GBp/immobili netto debito/quantità×prezzo) sono già applicate: la feature è di sola lettura,
+  niente ricalcoli lato client. Default selezione = nessun asset e grafico andamento inclusi su
+  scelta dell'utente.
+- **Nota / gotcha:**
+  - Il selettore mese mostra **solo** gli snapshot con `byAsset` non vuoto: gli snapshot vecchi
+    (creati prima dell'introduzione del campo) non hanno il dettaglio per-strumento e sono esclusi
+    di proposito — da qui i "salti" tra mesi nel dropdown (es. da Novembre 2025 a Gennaio 2024).
+    Comportamento corretto, non un bug.
+  - La selezione è per `assetId` e persiste tra i mesi: uno strumento assente in un certo mese
+    contribuisce 0 al grafico (comprato dopo / venduto), così la linea riflette l'esposizione reale.
+  - `MonthlyAssetBreakdownSection` è self-contained (solo `snapshots` in input); sub-componenti a
+    livello di modulo per il React Compiler; colori solo da `useChartColors()`.
+  - Gli errori ESLint residui in `app/dashboard/history/page.tsx` (`loadData` hoisting, import
+    inutilizzati) sono preesistenti e su righe non toccate.
