@@ -415,7 +415,10 @@ Questa pagina mostra l'evoluzione storica del patrimonio con narrative order:
 Hero (patrimonio + CAGR + crescita totale) → Evoluzione → Raddoppi → Composizione
 → Driver (3 sezioni: Savings vs Investment, Lavoro & Investimenti, Variazione Anno su Anno
 sempre visibile). Nessuna Appendice collapsible (eliminata). Include segmented pills
-per view toggles e mobile inline legend sui grafici multi-serie.
+per view toggles e mobile inline legend sui grafici multi-serie. Include inoltre la sezione
+"Valore per Strumento" (`MonthlyAssetBreakdownSection`): tabella per-strumento del mese scelto +
+somma del sottoinsieme selezionato + trend cross-mese con `TrendTooltip` custom che scompone la
+variazione in effetto prezzo vs effetto quantità.
 Confronta con: Rendimenti (period selector), Hall of Fame (tabelle flat + hero).
 Design language atteso (vedi DESIGN.md): North Star "Effortless Precision" — Linear/Vercel +
 Trade Republic + Apple, sotto la legge Form Follows Function (onestà, deferenza, inevitabilità:
@@ -564,7 +567,11 @@ Questo tab simula eventi di vita (perdita lavoro, acquisto importante, variazion
 risparmio/spesa, windfall) e mostra l'impatto before→after su FIRE tradizionale e
 Coast FIRE. Gli eventi v1 si applicano "da adesso" (anno 0) come perturbazione di
 patrimonio/risparmio/spesa; l'impatto è calcolato ri-eseguendo le pure functions di
-fireService su baseline vs adjusted e diffando. Hero con blocco before→after custom
+fireService su baseline vs adjusted e diffando. L'evento "perdita di lavoro" lascia selezionare
+le voci di entrata che vengono a mancare (`IncomeSourceSelector` inline: albero
+categoria→sottocategoria, checkbox tri-state, default = `laborIncomeCategoryIds`) e mostra un box
+esplicativo con i dati usati + le formule `min/max` della scomposizione (mancati risparmi vs spese
+dal portafoglio), layout 2 colonne da `desktop:`. Hero con blocco before→after custom
 (non HeroMetricBlock — il sign-coloring confligge con "meno anni = meglio"). Ospita la
 matrice "Sensibilità Anni al FIRE" rilocata con baseline locale ri-centrabile. L'impatto
 Coast richiede settings.userAge, altrimenti empty-state. Input scenario ephemeral (non persistiti).

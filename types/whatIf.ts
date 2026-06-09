@@ -30,6 +30,10 @@ export interface WhatIfScenario {
 
   // jobLoss
   monthsWithoutIncome?: number;
+  // Annual income (EUR) that disappears during the job-loss window — the sum of the income
+  // sources the user selected. When absent, the whole household income is assumed lost
+  // (annualExpenses + annualSavings), which preserves the original behaviour.
+  lostAnnualIncome?: number;
 
   // majorPurchase / windfall — positive magnitude of the one-off cash movement
   lumpSumAmount?: number;

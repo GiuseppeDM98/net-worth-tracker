@@ -317,6 +317,10 @@ File: app/dashboard/history/page.tsx
 Componenti: components/history/*,
             components/dashboard/LaborMetricsChart.tsx
 
+Include la sezione "Valore per Strumento" (`MonthlyAssetBreakdownSection`): tabella per-strumento
+del mese scelto + somma del sottoinsieme selezionato + trend cross-mese con `TrendTooltip` custom
+che scompone la variazione in effetto prezzo vs effetto quantità (pure layer
+`lib/utils/snapshotAssetBreakdown.ts`).
 Confronta con: Rendimenti (period selector), Hall of Fame (tabelle flat + hero).
 Design language atteso (vedi DESIGN.md): North Star "Effortless Precision" — Linear/Vercel +
 Trade Republic + Apple, sotto la legge Form Follows Function (onestà, deferenza, inevitabilità:
@@ -441,7 +445,11 @@ Componenti: components/fire-simulations/WhatIfAnalysisTab.tsx,
 Tab che simula eventi di vita (perdita lavoro, acquisto importante, variazione
 risparmio/spesa, windfall) e mostra l'impatto before→after su FIRE tradizionale e
 Coast FIRE, ri-eseguendo le pure functions di fireService su baseline vs adjusted.
-Hero con blocco before→after custom (non HeroMetricBlock — il sign-coloring confligge
+L'evento "perdita di lavoro" lascia selezionare le voci di entrata che vengono a mancare
+(`IncomeSourceSelector` inline: albero categoria→sottocategoria, checkbox tri-state,
+default = `laborIncomeCategoryIds`) e mostra un box esplicativo con i dati usati + le formule
+`min/max` della scomposizione (mancati risparmi vs spese dal portafoglio), layout 2 colonne da
+`desktop:`. Hero con blocco before→after custom (non HeroMetricBlock — il sign-coloring confligge
 con "meno anni = meglio"). Ospita la matrice "Sensibilità Anni al FIRE" rilocata
 (baseline locale ri-centrabile). Impatto Coast richiede settings.userAge, altrimenti empty-state.
 Confronta con: FIRE Calculator + Coast FIRE (riusa le stesse fireService functions +

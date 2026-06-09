@@ -39,8 +39,11 @@ function buildMetricImpact(before: number | null, after: number | null): WhatIfM
  * Apply a What If scenario to the baseline, producing the adjusted inputs.
  *
  * Modelling (all immediate / year 0):
- * - jobLoss: the lost-income window both stops contributions and forces living-cost
- *   withdrawals, so net worth drops by (expenses + savings) × months/12.
+ * - jobLoss: net worth drops by the lost income over the window, (lostAnnualIncome × months/12).
+ *   This is exact even when only part of the household income stops: the retained income still
+ *   covers part of the expenses, so the gap versus the baseline trajectory is exactly the lost
+ *   income. When no specific sources are selected, the whole income (expenses + savings) is lost,
+ *   which reproduces the original "all income stops" behaviour.
  * - majorPurchase / windfall: a one-off cash movement out of / into net worth.
  * - cashflowChange: ongoing changes to annual savings and expenses from now onward; the
  *   expense delta also flows into Coast retirement expenses.
@@ -56,7 +59,11 @@ export function applyScenarioToBaseline(
   switch (scenario.eventType) {
     case 'jobLoss': {
       const months = clampNonNegative(scenario.monthsWithoutIncome ?? 0);
-      netWorthDelta = -((baseline.annualExpenses + baseline.annualSavings) * months) / 12;
+      // Default to the whole household income when no specific sources are selected.
+      const lostAnnualIncome = clampNonNegative(
+        scenario.lostAnnualIncome ?? baseline.annualExpenses + baseline.annualSavings
+      );
+      netWorthDelta = -(lostAnnualIncome * months) / 12;
       break;
     }
     case 'majorPurchase': {
