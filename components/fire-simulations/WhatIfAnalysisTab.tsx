@@ -16,7 +16,7 @@
  * Scenario inputs are ephemeral local state — exploration, not persisted settings.
  */
 
-import { useMemo, useState, type ElementType } from 'react';
+import { useEffect, useMemo, useRef, useState, type ElementType } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -32,6 +32,7 @@ import {
   normalizeCoastFirePensions,
   normalizeCoastFireTaxBrackets,
 } from '@/lib/services/fireService';
+import type { IncomeSourceCategory } from '@/lib/services/fireService';
 import { calculateWhatIfImpact } from '@/lib/services/whatIfService';
 import { formatCurrency, formatPercentage } from '@/lib/services/chartService';
 import type {
@@ -42,6 +43,7 @@ import type {
 } from '@/types/whatIf';
 import { Settings } from '@/types/settings';
 import { Card } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -59,7 +61,7 @@ const EVENTS: { type: WhatIfEventType; label: string; icon: ElementType; descrip
     label: 'Perdita di lavoro',
     icon: Briefcase,
     description:
-      'Un periodo senza reddito: niente risparmi e prelievi dal portafoglio per coprire le spese.',
+      'Un periodo in cui vengono a mancare alcune entrate. Scegli quali (utile se il portafoglio è condiviso e si perde un solo reddito).',
   },
   {
     type: 'majorPurchase',
@@ -84,6 +86,30 @@ const EVENTS: { type: WhatIfEventType; label: string; icon: ElementType; descrip
 function parseAmount(value: string): number {
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+// Income-source selection is keyed per subcategory leaf so a category can be partially selected
+// (e.g. one partner's salary lost, the other retained).
+function leafKey(categoryId: string, subCategoryId: string): string {
+  return `${categoryId}::${subCategoryId}`;
+}
+
+function categoryLeafKeys(category: IncomeSourceCategory): string[] {
+  return category.subCategories.map((sub) => leafKey(category.categoryId, sub.subCategoryId));
+}
+
+function collectLeafKeys(sources: IncomeSourceCategory[]): string[] {
+  return sources.flatMap(categoryLeafKeys);
+}
+
+function sumSelectedIncome(sources: IncomeSourceCategory[], selected: Set<string>): number {
+  let total = 0;
+  for (const category of sources) {
+    for (const sub of category.subCategories) {
+      if (selected.has(leafKey(category.categoryId, sub.subCategoryId))) total += sub.annualAmount;
+    }
+  }
+  return total;
 }
 
 function formatMetric(value: number | null, format: MetricFormat): string {
@@ -149,6 +175,106 @@ function ImpactRow({ label, impact, format, direction }: ImpactRowProps) {
   );
 }
 
+interface IncomeSourceSelectorProps {
+  sources: IncomeSourceCategory[];
+  selected: Set<string>;
+  onToggleLeaf: (key: string) => void;
+  onToggleCategory: (category: IncomeSourceCategory) => void;
+  onSelectAll: () => void;
+  onSelectNone: () => void;
+}
+
+// Category → subcategory checkbox tree. A category with a single (unnamed) subcategory collapses
+// to one row, so users with simple income tagging don't see a redundant "Generale" sub-line.
+function IncomeSourceSelector({
+  sources,
+  selected,
+  onToggleLeaf,
+  onToggleCategory,
+  onSelectAll,
+  onSelectNone,
+}: IncomeSourceSelectorProps) {
+  return (
+    <div className="rounded-lg border border-border">
+      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5">
+        <span className="text-sm font-medium text-foreground">Entrate che vengono a mancare</span>
+        <div className="flex items-center gap-3 text-xs">
+          <button type="button" onClick={onSelectAll} className="text-primary hover:underline">
+            Tutte
+          </button>
+          <button
+            type="button"
+            onClick={onSelectNone}
+            className="text-muted-foreground hover:underline"
+          >
+            Nessuna
+          </button>
+        </div>
+      </div>
+      <div className="divide-y divide-border">
+        {sources.map((category) => {
+          const leafKeys = categoryLeafKeys(category);
+          const selectedCount = leafKeys.filter((key) => selected.has(key)).length;
+          const categoryState =
+            selectedCount === 0
+              ? false
+              : selectedCount === leafKeys.length
+                ? true
+                : 'indeterminate';
+          // Collapse single-subcategory categories: the category row IS the only leaf.
+          const isSingleLeaf =
+            category.subCategories.length === 1 &&
+            category.subCategories[0].subCategoryId === '__none__';
+
+          return (
+            <div key={category.categoryId} className="px-4 py-2.5">
+              <label className="flex cursor-pointer items-center justify-between gap-3">
+                <span className="flex items-center gap-2.5">
+                  <Checkbox
+                    checked={categoryState}
+                    onCheckedChange={() => onToggleCategory(category)}
+                  />
+                  <span className="text-sm text-foreground">{category.categoryName}</span>
+                </span>
+                <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                  {formatCurrency(category.annualAmount)}/anno
+                </span>
+              </label>
+
+              {!isSingleLeaf && (
+                <div className="mt-2 space-y-2 pl-7">
+                  {category.subCategories.map((sub) => {
+                    const key = leafKey(category.categoryId, sub.subCategoryId);
+                    return (
+                      <label
+                        key={key}
+                        className="flex cursor-pointer items-center justify-between gap-3"
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <Checkbox
+                            checked={selected.has(key)}
+                            onCheckedChange={() => onToggleLeaf(key)}
+                          />
+                          <span className="text-sm text-muted-foreground">
+                            {sub.subCategoryName}
+                          </span>
+                        </span>
+                        <span className="font-mono text-xs tabular-nums text-muted-foreground/70">
+                          {formatCurrency(sub.annualAmount)}/anno
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function WhatIfAnalysisTab() {
   const { user } = useAuth();
 
@@ -176,6 +302,9 @@ export function WhatIfAnalysisTab() {
   // --- Scenario state (ephemeral) ---
   const [eventType, setEventType] = useState<WhatIfEventType>('jobLoss');
   const [monthsWithoutIncome, setMonthsWithoutIncome] = useState('6');
+  // Selected income-source leaves (`categoryId::subCategoryId`) that disappear on job loss.
+  const [selectedIncomeLeaves, setSelectedIncomeLeaves] = useState<Set<string>>(new Set());
+  const didInitIncomeSelection = useRef(false);
   const [purchaseAmount, setPurchaseAmount] = useState('');
   const [isPrimaryResidence, setIsPrimaryResidence] = useState(false);
   const [savingsDelta, setSavingsDelta] = useState('');
@@ -195,11 +324,47 @@ export function WhatIfAnalysisTab() {
   const baselineYearLabel = cashflowData
     ? `ultimo anno ${cashflowData.referenceYear}${cashflowData.isAnnualized ? ' (annualizzato)' : ''}`
     : 'ultimo anno';
-  // Job-loss breakdown — surfaced so the user sees where the portfolio hit comes from.
+  // --- Income sources for the job-loss selector ---
+  const incomeSources = useMemo(() => cashflowData?.incomeSources ?? [], [cashflowData]);
+  const hasIncomeSources = incomeSources.length > 0;
+  const laborIncomeCategoryIds = settings?.laborIncomeCategoryIds;
+
+  // Default selection: the categories flagged as labor income in Settings; if none match the
+  // available sources, fall back to every source (the original "all household income" behaviour).
+  const defaultIncomeLeaves = useMemo(() => {
+    const laborSet = new Set(laborIncomeCategoryIds ?? []);
+    const laborLeaves = incomeSources
+      .filter((category) => laborSet.has(category.categoryId))
+      .flatMap(categoryLeafKeys);
+    return new Set(laborLeaves.length > 0 ? laborLeaves : collectLeafKeys(incomeSources));
+  }, [incomeSources, laborIncomeCategoryIds]);
+
+  // Seed the selection once, after the data has loaded, without clobbering later user edits.
+  useEffect(() => {
+    if (didInitIncomeSelection.current) return;
+    if (isLoadingSettings || isLoadingCashflow) return;
+    setSelectedIncomeLeaves(defaultIncomeLeaves);
+    didInitIncomeSelection.current = true;
+  }, [isLoadingSettings, isLoadingCashflow, defaultIncomeLeaves]);
+
+  const selectedAnnualIncome = useMemo(
+    () => sumSelectedIncome(incomeSources, selectedIncomeLeaves),
+    [incomeSources, selectedIncomeLeaves]
+  );
+
+  // Job-loss hit — the lost income pro-rated over the window. With no categorised income, fall
+  // back to the whole household income (expenses + savings) so behaviour is unchanged.
   const jobLossMonths = Math.max(parseAmount(monthsWithoutIncome), 0);
-  const jobLossLostSavings = (annualSavings * jobLossMonths) / 12;
-  const jobLossDrawnExpenses = (annualExpenses * jobLossMonths) / 12;
-  const jobLossTotalHit = jobLossLostSavings + jobLossDrawnExpenses;
+  const jobLossAnnualIncome = hasIncomeSources ? selectedAnnualIncome : annualSavings + annualExpenses;
+  const jobLossTotalHit = (jobLossAnnualIncome * jobLossMonths) / 12;
+  // Decompose the hit, generalising the full-income case to partial loss: the retained income
+  // (e.g. a partner's salary) first covers expenses, so only the shortfall is drawn from the
+  // portfolio; the rest of the hit is the savings the user no longer makes. Sums to the total.
+  const jobLossTotalIncome = annualSavings + annualExpenses;
+  const jobLossRetainedIncome = Math.max(jobLossTotalIncome - jobLossAnnualIncome, 0);
+  const jobLossForgoneSavings = (Math.min(annualSavings, jobLossAnnualIncome) * jobLossMonths) / 12;
+  const jobLossDrawnExpenses =
+    (Math.max(jobLossAnnualIncome - annualSavings, 0) * jobLossMonths) / 12;
   // Cashflow-change preview — shows what the deltas are applied to.
   const newAnnualSavings = Math.max(annualSavings + parseAmount(savingsDelta), 0);
   const newAnnualExpenses = Math.max(annualExpenses + parseAmount(expensesDelta), 0);
@@ -249,10 +414,39 @@ export function WhatIfAnalysisTab() {
     settings?.coastFireTaxBrackets,
   ]);
 
+  // --- Income-source selection handlers ---
+  const toggleIncomeLeaf = (key: string) => {
+    setSelectedIncomeLeaves((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleIncomeCategory = (category: IncomeSourceCategory) => {
+    const keys = categoryLeafKeys(category);
+    setSelectedIncomeLeaves((prev) => {
+      const next = new Set(prev);
+      const allSelected = keys.every((key) => next.has(key));
+      // All selected → clear the category; otherwise select it fully.
+      keys.forEach((key) => (allSelected ? next.delete(key) : next.add(key)));
+      return next;
+    });
+  };
+
+  const selectAllIncome = () => setSelectedIncomeLeaves(new Set(collectLeafKeys(incomeSources)));
+  const selectNoIncome = () => setSelectedIncomeLeaves(new Set());
+
   const scenario = useMemo<WhatIfScenario>(() => {
     switch (eventType) {
       case 'jobLoss':
-        return { eventType, monthsWithoutIncome: parseAmount(monthsWithoutIncome) };
+        return {
+          eventType,
+          monthsWithoutIncome: parseAmount(monthsWithoutIncome),
+          // Only constrain the lost income when we actually have categorised sources to select.
+          lostAnnualIncome: hasIncomeSources ? selectedAnnualIncome : undefined,
+        };
       case 'majorPurchase':
         return { eventType, lumpSumAmount: parseAmount(purchaseAmount), isPrimaryResidence };
       case 'cashflowChange':
@@ -267,6 +461,8 @@ export function WhatIfAnalysisTab() {
   }, [
     eventType,
     monthsWithoutIncome,
+    hasIncomeSources,
+    selectedAnnualIncome,
     purchaseAmount,
     isPrimaryResidence,
     savingsDelta,
@@ -394,37 +590,96 @@ export function WhatIfAnalysisTab() {
                   placeholder="Es. 6"
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Stima del periodo senza stipendio prima di ripartire.
+                  Stima del periodo senza reddito prima di ripartire.
                 </p>
               </div>
-              {/* Make the portfolio hit explicit: it is the period's missed savings + drawn expenses */}
+
+              {/* Income-source picker — lets the user keep a partner's income that doesn't stop. */}
+              {hasIncomeSources && (
+                <IncomeSourceSelector
+                  sources={incomeSources}
+                  selected={selectedIncomeLeaves}
+                  onToggleLeaf={toggleIncomeLeaf}
+                  onToggleCategory={toggleIncomeCategory}
+                  onSelectAll={selectAllIncome}
+                  onSelectNone={selectNoIncome}
+                />
+              )}
+
+              {/* Make the portfolio hit explicit: state the method (retained income covers expenses
+                  first), the figures it uses, then the two effects that sum to the lost income.
+                  Single column on mobile/tablet; two columns (inputs | result) from desktop. */}
               {jobLossMonths > 0 && jobLossTotalHit > 0 && (
-                <div className="max-w-md space-y-1.5 rounded-lg border border-border bg-muted/30 p-3 text-xs">
-                  <p className="text-muted-foreground">
-                    Calcolo su {jobLossMonths} {jobLossMonths === 1 ? 'mese' : 'mesi'}, dati{' '}
-                    {baselineYearLabel}:
+                <div className="space-y-3.5 rounded-lg border border-border bg-muted/30 p-3.5 text-xs">
+                  {/* Method / priority — what the numbers below mean */}
+                  <p className="max-w-[65ch] text-muted-foreground">
+                    Su {jobLossMonths} {jobLossMonths === 1 ? 'mese' : 'mesi'} (dati{' '}
+                    {baselineYearLabel}), il{' '}
+                    <span className="font-medium text-foreground">
+                      reddito che resta copre prima le spese
+                    </span>
+                    ; si preleva dal portafoglio solo per la parte scoperta.
                   </p>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">
-                      Mancati risparmi ({formatCurrency(annualSavings)}/anno)
-                    </span>
-                    <span className="font-mono tabular-nums text-destructive">
-                      -{formatCurrency(jobLossLostSavings)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">
-                      Spese dal portafoglio ({formatCurrency(annualExpenses)}/anno)
-                    </span>
-                    <span className="font-mono tabular-nums text-destructive">
-                      -{formatCurrency(jobLossDrawnExpenses)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3 border-t border-border pt-1.5">
-                    <span className="font-medium text-foreground">Impatto sul patrimonio</span>
-                    <span className="font-mono font-medium tabular-nums text-foreground">
-                      -{formatCurrency(jobLossTotalHit)}
-                    </span>
+
+                  <div className="grid gap-x-6 gap-y-3.5 border-t border-border pt-3.5 desktop:grid-cols-2">
+                    {/* Dati usati — the explicit inputs to the calculation */}
+                    <div>
+                      <p className="mb-1.5 font-medium text-foreground">Dati usati</p>
+                      <dl className="space-y-1">
+                        {[
+                          { label: 'Reddito perso', value: jobLossAnnualIncome },
+                          { label: 'Reddito che resta', value: jobLossRetainedIncome },
+                          { label: 'Spese annue', value: annualExpenses },
+                          { label: 'Risparmio annuo', value: annualSavings },
+                        ].map((row) => (
+                          <div key={row.label} className="flex items-baseline justify-between gap-3">
+                            <dt className="text-muted-foreground">{row.label}</dt>
+                            <dd className="font-mono tabular-nums text-foreground">
+                              {formatCurrency(row.value)}/anno
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </div>
+
+                    {/* Effetto sul patrimonio — each effect shows its formula filled with the
+                        simulation's own figures (full-width below the row), so the result is
+                        traceable without the formula competing with the value column. */}
+                    <div className="border-t border-border pt-3.5 desktop:border-l desktop:border-t-0 desktop:pl-6 desktop:pt-0">
+                      <p className="mb-1.5 font-medium text-foreground">Effetto sul patrimonio</p>
+                      <div className="space-y-2.5">
+                        <div>
+                          <div className="flex items-baseline justify-between gap-3">
+                            <span className="text-muted-foreground">Mancati risparmi</span>
+                            <span className="shrink-0 font-mono tabular-nums text-destructive">
+                              -{formatCurrency(jobLossForgoneSavings)}
+                            </span>
+                          </div>
+                          <p className="mt-0.5 font-mono text-[11px] leading-snug text-muted-foreground/70">
+                            min({formatCurrency(annualSavings)}; {formatCurrency(jobLossAnnualIncome)}){' '}
+                            &times; {jobLossMonths}/12
+                          </p>
+                        </div>
+                        <div>
+                          <div className="flex items-baseline justify-between gap-3">
+                            <span className="text-muted-foreground">Spese dal portafoglio</span>
+                            <span className="shrink-0 font-mono tabular-nums text-destructive">
+                              -{formatCurrency(jobLossDrawnExpenses)}
+                            </span>
+                          </div>
+                          <p className="mt-0.5 font-mono text-[11px] leading-snug text-muted-foreground/70">
+                            max({formatCurrency(jobLossAnnualIncome)} &minus;{' '}
+                            {formatCurrency(annualSavings)}; 0) &times; {jobLossMonths}/12
+                          </p>
+                        </div>
+                        <div className="flex items-baseline justify-between gap-3 border-t border-border pt-2">
+                          <span className="font-medium text-foreground">Impatto sul patrimonio</span>
+                          <span className="shrink-0 font-mono font-semibold tabular-nums text-foreground">
+                            -{formatCurrency(jobLossTotalHit)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}

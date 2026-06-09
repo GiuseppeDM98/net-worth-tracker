@@ -54,6 +54,7 @@ import {
   sortAssetsByValue,
   sumSelectedValues,
   buildSelectedAssetTrend,
+  type SelectedAssetTrendPoint,
 } from '@/lib/utils/snapshotAssetBreakdown';
 
 // Shared tooltip style (mirrors AndamentoStoricoSection) — theme-aware via CSS vars.
@@ -66,6 +67,64 @@ const TOOLTIP_CONTENT_STYLE = {
 } as const;
 
 const TOOLTIP_LABEL_STYLE = { fontWeight: 600, color: 'var(--card-foreground)' } as const;
+
+// Signed EUR, with an explicit "+" for gains so the direction reads at a glance ("-" is built in).
+function formatSignedCurrency(value: number): string {
+  const formatted = formatCurrency(value);
+  return value > 0 ? `+${formatted}` : formatted;
+}
+
+// ── TrendTooltip ────────────────────────────────────────────────────────────────
+// Custom tooltip: the selected subset's value in the hovered month plus, from the second month on,
+// the change vs the previous month split into price vs quantity (see attributeSelectedChange).
+// Module-level for the React Compiler. Colours use the positive/negative semantic tokens.
+
+// Recharts passes the hovered data point under payload[0].payload (local props type — the library's
+// TooltipProps no longer exposes payload directly, matching the codebase's other custom tooltips).
+interface TrendTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: SelectedAssetTrendPoint }>;
+}
+
+function TrendTooltip({ active, payload }: TrendTooltipProps) {
+  if (!active || !payload || payload.length === 0) {
+    return null;
+  }
+  const point = payload[0].payload;
+
+  return (
+    <div style={TOOLTIP_CONTENT_STYLE} className="px-3 py-2">
+      <p style={TOOLTIP_LABEL_STYLE}>{point.label}</p>
+      <p className="text-[var(--chart-1)]">
+        Valore selezionato: {formatCurrency(point.total)}
+      </p>
+      {point.delta !== null && (
+        <div className="mt-1.5 space-y-0.5 border-t border-border pt-1.5">
+          <p className="text-muted-foreground">
+            Δ vs {point.previousLabel}:{' '}
+            <span className={point.delta >= 0 ? 'text-positive' : 'text-destructive'}>
+              {formatSignedCurrency(point.delta)}
+            </span>
+          </p>
+          <p className="text-muted-foreground">
+            • da prezzo:{' '}
+            <span className={(point.priceEffect ?? 0) >= 0 ? 'text-positive' : 'text-destructive'}>
+              {formatSignedCurrency(point.priceEffect ?? 0)}
+            </span>
+          </p>
+          <p className="text-muted-foreground">
+            • da quantità:{' '}
+            <span
+              className={(point.quantityEffect ?? 0) >= 0 ? 'text-positive' : 'text-destructive'}
+            >
+              {formatSignedCurrency(point.quantityEffect ?? 0)}
+            </span>
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── SelectedAssetTrendChart ─────────────────────────────────────────────────────
 // Combined value of the selected instruments across every month. Module-level (React Compiler).
@@ -98,9 +157,7 @@ function SelectedAssetTrendChart({
           domain={[(dataMin: number) => Math.min(0, dataMin), 'auto']}
         />
         <Tooltip
-          formatter={(value) => [formatCurrency(Number(value ?? 0)), 'Valore selezionato']}
-          contentStyle={TOOLTIP_CONTENT_STYLE}
-          labelStyle={TOOLTIP_LABEL_STYLE}
+          content={<TrendTooltip />}
           cursor={{ stroke: 'var(--border)', strokeWidth: 1, strokeDasharray: '5 5' }}
         />
         <Line

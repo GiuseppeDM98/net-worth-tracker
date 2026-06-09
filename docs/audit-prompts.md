@@ -507,6 +507,10 @@ Assi da verificare (minimum — segnala anche eventuali altri problemi):
   sezione Driver (3 card: Savings vs Investment, Lavoro & Investimenti, YoY) — nessun `bg-gray-*`
 - Chart colors: tutti i chart (Evoluzione, Composizione, Raddoppi, Labor, YoY bar) via
   `useChartColors()`; tooltip via CSS vars; mobile inline legend usa stessi colori
+- Valore per Strumento (`MonthlyAssetBreakdownSection`, sotto `components/history/*`): tabella
+  per-strumento del mese + sum del sottoinsieme selezionato + trend cross-mese; il `TrendTooltip`
+  custom (effetto prezzo vs quantità) usa CSS vars per bg/label e `useChartColors()` per la serie —
+  nessun hex; Mono Mandate sui valori; checkbox subset senza overflow a 375px
 - ARIA: segmented pill `role="tablist"` su view toggles (Evoluzione, Composizione, Raddoppi)
 - Breakpoint: mobile inline legend non overflow; chart height adattivo
 - Altro: pattern anomali o violazioni non elencate sopra
@@ -627,6 +631,14 @@ Assi da verificare (minimum — segnala anche eventuali altri problemi):
   header/righe; empty-state Coast con messaggio descrittivo quando manca `userAge`
 - Breakpoint: scenario inputs + sensitivity matrix non overflow su 375px;
   `max-desktop:portrait:pb-20`
+- Selettore voci di entrata (evento "perdita di lavoro", `IncomeSourceSelector` inline in
+  WhatIfAnalysisTab): albero categoria→sottocategoria con checkbox tri-state — ARIA `aria-checked`
+  che riflette lo stato `indeterminate` sulla riga categoria; ogni riga-label tappabile con touch
+  target ≥ 44px; "Tutte/Nessuna" raggiungibili da tastiera; nessun overflow a 375px
+- Box esplicativo della scomposizione (dati usati + formule `min/max` → mancati risparmi vs spese
+  dal portafoglio): Mono Mandate sui valori e sulle formule (`font-mono tabular-nums`); layout 2
+  colonne da `desktop:` (1440px) con divisore 1px, colonna singola sotto; le formule non debordano
+  a 320–375px; sub-tile `bg-muted/30` (no card-in-card)
 - Skeleton: `WhatIfAnalysisSkeleton` isomorfo al layout reale
 - Altro: pattern anomali o violazioni non elencate sopra
 

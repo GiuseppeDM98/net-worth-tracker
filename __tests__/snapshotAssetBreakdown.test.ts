@@ -12,6 +12,7 @@ import {
   sortAssetsByValue,
   sumSelectedValues,
   buildSelectedAssetTrend,
+  attributeSelectedChange,
   type SnapshotAsset,
 } from '@/lib/utils/snapshotAssetBreakdown';
 import type { MonthlySnapshot } from '@/types/assets';
@@ -121,5 +122,93 @@ describe('buildSelectedAssetTrend', () => {
       makeSnapshot(2026, 1, [makeAsset({ assetId: 'a', totalValue: 100 })]),
     ];
     expect(buildSelectedAssetTrend(snapshots, new Set())).toEqual([]);
+  });
+
+  it('leaves the first point without attribution and attributes later points', () => {
+    // Arrange — asset "a" only changes price (qty constant), so the whole Δ is the market.
+    const snapshots: MonthlySnapshot[] = [
+      makeSnapshot(2026, 1, [makeAsset({ assetId: 'a', quantity: 10, totalValue: 1000 })]),
+      makeSnapshot(2026, 2, [makeAsset({ assetId: 'a', quantity: 10, totalValue: 1200 })]),
+    ];
+
+    // Act
+    const trend = buildSelectedAssetTrend(snapshots, new Set(['a']));
+
+    // Assert — first point has no prior month
+    expect(trend[0].delta).toBeNull();
+    expect(trend[0].priceEffect).toBeNull();
+    expect(trend[0].previousLabel).toBeNull();
+    // Second point: +200 entirely from price
+    expect(trend[1].delta).toBe(200);
+    expect(trend[1].priceEffect).toBe(200);
+    expect(trend[1].quantityEffect).toBe(0);
+    expect(trend[1].previousLabel).toBe('Gennaio 2026');
+  });
+});
+
+describe('attributeSelectedChange', () => {
+  it('attributes a pure price move to the price effect (quantity unchanged)', () => {
+    const prev = [makeAsset({ assetId: 'a', quantity: 10, totalValue: 1000 })];
+    const curr = [makeAsset({ assetId: 'a', quantity: 10, totalValue: 1200 })];
+
+    expect(attributeSelectedChange(prev, curr, new Set(['a']))).toEqual({
+      priceEffect: 200,
+      quantityEffect: 0,
+    });
+  });
+
+  it('attributes a sale at unchanged price to the quantity effect (the XEON case)', () => {
+    // Unit value stays 100 €; quantity drops 10 → 6, so the drop is all "quantity".
+    const prev = [makeAsset({ assetId: 'xeon', quantity: 10, totalValue: 1000 })];
+    const curr = [makeAsset({ assetId: 'xeon', quantity: 6, totalValue: 600 })];
+
+    expect(attributeSelectedChange(prev, curr, new Set(['xeon']))).toEqual({
+      priceEffect: 0,
+      quantityEffect: -400,
+    });
+  });
+
+  it('splits a mixed change so the effects sum to the total change', () => {
+    // q 10→12 and unit value 100→110 €: price 10*(110-100)=100, qty (12-10)*110=220.
+    const prev = [makeAsset({ assetId: 'a', quantity: 10, totalValue: 1000 })];
+    const curr = [makeAsset({ assetId: 'a', quantity: 12, totalValue: 1320 })];
+
+    const result = attributeSelectedChange(prev, curr, new Set(['a']));
+    expect(result).toEqual({ priceEffect: 100, quantityEffect: 220 });
+    expect(result.priceEffect + result.quantityEffect).toBe(320); // = 1320 - 1000
+  });
+
+  it('treats a freshly bought asset (absent before) as a pure quantity effect', () => {
+    const curr = [makeAsset({ assetId: 'new', quantity: 5, totalValue: 500 })];
+
+    expect(attributeSelectedChange([], curr, new Set(['new']))).toEqual({
+      priceEffect: 0,
+      quantityEffect: 500,
+    });
+  });
+
+  it('treats a fully sold asset (absent after) as a pure negative quantity effect', () => {
+    const prev = [makeAsset({ assetId: 'gone', quantity: 5, totalValue: 500 })];
+
+    expect(attributeSelectedChange(prev, [], new Set(['gone']))).toEqual({
+      priceEffect: 0,
+      quantityEffect: -500,
+    });
+  });
+
+  it('ignores assets that are not selected', () => {
+    const prev = [
+      makeAsset({ assetId: 'a', quantity: 10, totalValue: 1000 }),
+      makeAsset({ assetId: 'b', quantity: 1, totalValue: 9999 }),
+    ];
+    const curr = [
+      makeAsset({ assetId: 'a', quantity: 10, totalValue: 1200 }),
+      makeAsset({ assetId: 'b', quantity: 1, totalValue: 1 }),
+    ];
+
+    expect(attributeSelectedChange(prev, curr, new Set(['a']))).toEqual({
+      priceEffect: 200,
+      quantityEffect: 0,
+    });
   });
 });

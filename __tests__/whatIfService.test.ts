@@ -45,6 +45,38 @@ describe('applyScenarioToBaseline', () => {
     expect(adjusted.annualExpenses).toBe(24_000)
   })
 
+  it('should only deduct the selected lost income when sources are chosen on job loss', () => {
+    // Arrange: of the 36000 total income, only 20000 (one partner's salary) disappears.
+    const baseline = makeBaseline()
+    const scenario: WhatIfScenario = {
+      eventType: 'jobLoss',
+      monthsWithoutIncome: 6,
+      lostAnnualIncome: 20_000,
+    }
+
+    // Act
+    const adjusted = applyScenarioToBaseline(baseline, scenario)
+
+    // Assert: 20000 × 6/12 = 10000 lost, not the full 18000
+    expect(adjusted.netWorth).toBe(190_000)
+  })
+
+  it('should not touch net worth when no income is lost on job loss', () => {
+    // Arrange
+    const baseline = makeBaseline()
+    const scenario: WhatIfScenario = {
+      eventType: 'jobLoss',
+      monthsWithoutIncome: 6,
+      lostAnnualIncome: 0,
+    }
+
+    // Act
+    const adjusted = applyScenarioToBaseline(baseline, scenario)
+
+    // Assert
+    expect(adjusted.netWorth).toBe(200_000)
+  })
+
   it('should subtract the lump sum from net worth on a major purchase', () => {
     // Arrange
     const baseline = makeBaseline()

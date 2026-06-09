@@ -798,11 +798,80 @@ export async function getFIREData(
  * Why both from the same source: savings and expenses must come from the same
  * period to avoid inconsistencies (e.g., current year expenses with last year savings).
  */
+/** A single income subcategory within a category, with its annualised amount for the period. */
+export interface IncomeSourceSubCategory {
+  subCategoryId: string; // '__none__' for income recorded without a subcategory
+  subCategoryName: string;
+  annualAmount: number;
+}
+
+/** An income category and its subcategory breakdown for the reference year. */
+export interface IncomeSourceCategory {
+  categoryId: string;
+  categoryName: string;
+  annualAmount: number; // Sum of its subcategories
+  subCategories: IncomeSourceSubCategory[];
+}
+
 export interface AnnualCashflowData {
   annualSavings: number; // Net savings (income - expenses), clamped to 0 minimum
   annualExpensesFromCashflow: number; // Total expenses from the reference year
   referenceYear: number; // Which year the data comes from
   isAnnualized: boolean; // True if current year data was scaled to full year
+  // Per-source income breakdown for the same reference period. Lets the What If "job loss"
+  // scenario attribute the hit to specific income lines (e.g. one partner's salary) instead
+  // of assuming the whole household income stops. Empty when there is no categorised income.
+  incomeSources: IncomeSourceCategory[];
+}
+
+/** Sentinel subcategory id for income recorded without a subcategory. */
+const NO_SUBCATEGORY_ID = '__none__';
+const NO_SUBCATEGORY_NAME = 'Generale';
+
+/**
+ * Group income expenses into a category → subcategory tree with annualised amounts.
+ *
+ * Pure: takes the already-fetched expenses so it shares the period and the single Firestore
+ * read with getAnnualCashflowData. `annualizationFactor` scales each amount the same way the
+ * totals are scaled (1 for a full calendar year, 12/monthsElapsed for an annualised partial
+ * year) so the breakdown sums back to the period's total income.
+ *
+ * Only `type === 'income'` entries are considered; income amounts are positive by convention.
+ */
+export function buildIncomeSourceBreakdown(
+  expenses: Expense[],
+  annualizationFactor: number
+): IncomeSourceCategory[] {
+  const categories = new Map<string, IncomeSourceCategory>();
+
+  for (const expense of expenses) {
+    if (expense.type !== 'income') continue;
+
+    let category = categories.get(expense.categoryId);
+    if (!category) {
+      category = {
+        categoryId: expense.categoryId,
+        categoryName: expense.categoryName || 'Entrate',
+        annualAmount: 0,
+        subCategories: [],
+      };
+      categories.set(expense.categoryId, category);
+    }
+
+    const subCategoryId = expense.subCategoryId ?? NO_SUBCATEGORY_ID;
+    const subCategoryName = expense.subCategoryName ?? NO_SUBCATEGORY_NAME;
+    let subCategory = category.subCategories.find((sub) => sub.subCategoryId === subCategoryId);
+    if (!subCategory) {
+      subCategory = { subCategoryId, subCategoryName, annualAmount: 0 };
+      category.subCategories.push(subCategory);
+    }
+
+    const annualized = expense.amount * annualizationFactor;
+    subCategory.annualAmount += annualized;
+    category.annualAmount += annualized;
+  }
+
+  return Array.from(categories.values());
 }
 
 export async function getAnnualCashflowData(userId: string): Promise<AnnualCashflowData> {
@@ -823,6 +892,7 @@ export async function getAnnualCashflowData(userId: string): Promise<AnnualCashf
         annualExpensesFromCashflow: expenses,
         referenceYear: lastYear,
         isAnnualized: false,
+        incomeSources: buildIncomeSourceBreakdown(lastYearExpenses, 1),
       };
     }
 
@@ -830,23 +900,37 @@ export async function getAnnualCashflowData(userId: string): Promise<AnnualCashf
     const currentYearExpenses = await getExpensesByDateRange(userId, currentYearStart, now);
 
     if (currentYearExpenses.length === 0) {
-      return { annualSavings: 0, annualExpensesFromCashflow: 0, referenceYear: currentYear, isAnnualized: true };
+      return {
+        annualSavings: 0,
+        annualExpensesFromCashflow: 0,
+        referenceYear: currentYear,
+        isAnnualized: true,
+        incomeSources: [],
+      };
     }
 
     const income = calculateTotalIncome(currentYearExpenses);
     const expenses = calculateTotalExpenses(currentYearExpenses);
     const savings = income - expenses;
     const monthsElapsed = Math.max(getItalyMonth(now), 1);
+    const annualizationFactor = 12 / monthsElapsed;
 
     return {
       annualSavings: Math.max((savings / monthsElapsed) * 12, 0),
       annualExpensesFromCashflow: (expenses / monthsElapsed) * 12,
       referenceYear: currentYear,
       isAnnualized: true,
+      incomeSources: buildIncomeSourceBreakdown(currentYearExpenses, annualizationFactor),
     };
   } catch (error) {
     console.error('Error calculating annual cashflow data:', error);
-    return { annualSavings: 0, annualExpensesFromCashflow: 0, referenceYear: getItalyYear(), isAnnualized: true };
+    return {
+      annualSavings: 0,
+      annualExpensesFromCashflow: 0,
+      referenceYear: getItalyYear(),
+      isAnnualized: true,
+      incomeSources: [],
+    };
   }
 }
 
