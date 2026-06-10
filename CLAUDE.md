@@ -104,7 +104,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 - Server-side use cases / processors: `lib/server/assetAdminRepository.ts`, `lib/server/dividendUseCase.ts`, `lib/server/dividendProcessor.ts`, `lib/server/monthlyEmailService.ts`
 - Periodic emails: `lib/server/monthlyEmailService.ts`, `lib/server/weeklyBudgetEmailService.ts` (Sunday budget status), `lib/server/emailPeriodComparison.ts` (deterministic period comparison), `app/api/cron/monthly-snapshot/route.ts` (cron Phases 2-6), `app/api/user/monthly-email/send/route.ts` (manual test-send, incl. `weekly-budget`), toggles in `types/assets.ts` + `lib/services/assetAllocationService.ts` + Settings page
 
-**Last updated**: 2026-06-10 (Coupon cron timezone + catch-up fix — see Current Status → Latest.)
+**Last updated**: 2026-06-10 (Prod hotfix: reverted firebase-admin 14→13 for Vercel ESM — see Current Status → Latest.)
 
 ## Design Context
 
