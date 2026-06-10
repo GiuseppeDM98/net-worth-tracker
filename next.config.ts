@@ -31,12 +31,6 @@ const nextConfig: NextConfig = {
   // Standalone mode copies only the files needed to run in production,
   // skipping the full node_modules — cuts Docker image size significantly.
   output: "standalone",
-  // Keep firebase-admin (and its transitive jwks-rsa → jose ESM-only chain) out
-  // of the bundle so it is loaded from node_modules at runtime as real Node
-  // modules. firebase-admin 14 → jwks-rsa 4 → jose 6 is pure ESM and must be
-  // require()-d by a Node runtime that supports require(ESM) (Node ≥ 22.12, see
-  // engines.node), not rewritten by the bundler.
-  serverExternalPackages: ['firebase-admin'],
   allowedDevOrigins: ['192.168.1.114'],
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
