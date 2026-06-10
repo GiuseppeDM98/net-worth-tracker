@@ -7,6 +7,7 @@ import {
 } from '@/lib/services/dividendService';
 import { adminDb } from '@/lib/firebase/admin';
 import { AssetDividendGrowth, DividendGrowthData, TotalReturnAsset, YieldOnCostAsset } from '@/types/dividend';
+import { computeDividendYieldMetrics } from '@/lib/utils/yieldOnCost';
 import {
   assertSameUser,
   getApiAuthErrorResponse,
@@ -316,105 +317,40 @@ export async function GET(request: NextRequest) {
       .map(([month, totalNet]) => ({ month, totalNet }))
       .sort((a, b) => a.month.localeCompare(b.month));
 
-    // Calculate average yield based on TTM (Trailing Twelve Months) dividends
-    // DEPRECATED: Moved to Performance page as Current Yield (uses selected period, not fixed TTM)
-    // Kept for backward compatibility - do not remove until all dependencies are verified
-    let averageYield = 0;
-
-    // 1. Calculate date 12 months ago
+    // YOC, Current Yield & average yield over the Trailing Twelve Months (TTM).
+    // Uses the same per-share engine as the Performance page so both surfaces report a
+    // single consistent number; dividends from fully-sold positions are excluded
+    // (see lib/utils/yieldOnCost.ts).
     const twelveMonthsAgo = new Date();
     twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1);
 
-    // 2. Filter dividends actually received in last 12 months (paymentDate, capped at today)
-    const ttmDividends = allDividends.filter(div => {
-      const paymentDate = toDate(div.paymentDate);
-      return paymentDate >= twelveMonthsAgo && paymentDate <= today;
-    });
+    const ttmMetrics = computeDividendYieldMetrics(allDividends, userAssets, twelveMonthsAgo, today, 12);
 
-    // 3. Calculate total gross dividends TTM
-    const ttmTotalGross = ttmDividends.reduce((sum, div) => sum + div.grossAmount, 0);
+    // averageYield = portfolio current yield (gross dividends on current market value).
+    // DEPRECATED: superseded by the Performance page Current Yield (selected period).
+    const averageYield = ttmMetrics.portfolioCurrentYieldGross ?? 0;
 
-    // 4. Calculate value of assets that paid dividends in TTM period
-    const assetIdsWithDividends = new Set(ttmDividends.map(div => div.assetId));
-    const portfolioValueWithDividends = userAssets
-      .filter(asset => assetIdsWithDividends.has(asset.id) && asset.quantity > 0)
-      .reduce((sum, asset) => sum + (asset.currentPrice * asset.quantity), 0);
-
-    // 5. Calculate yield only if portfolio value > 0
-    if (portfolioValueWithDividends > 0 && ttmTotalGross > 0) {
-      averageYield = (ttmTotalGross / portfolioValueWithDividends) * 100;
-    }
-
-    // Calculate Yield on Cost (YOC) for assets with cost basis
     let portfolioYieldOnCost: number | undefined;
     let totalCostBasis: number | undefined;
     let yieldOnCostAssets: YieldOnCostAsset[] | undefined;
 
-    if (ttmDividends.length > 0) {
-      // 1. Group TTM dividends by asset
-      const ttmByAsset = new Map<string, number>();
-      ttmDividends.forEach(div => {
-        const current = ttmByAsset.get(div.assetId) || 0;
-        ttmByAsset.set(div.assetId, current + div.grossAmount);
-      });
-
-      // 2. Calculate per-asset YOC for assets with cost basis
-      const yocAssetsList: YieldOnCostAsset[] = [];
-
-      userAssets.forEach(asset => {
-        const ttmGross = ttmByAsset.get(asset.id);
-
-        // Only include assets with: averageCost, quantity > 0, and TTM dividends
-        if (
-          asset.averageCost &&
-          asset.averageCost > 0 &&
-          asset.quantity > 0 &&
-          ttmGross &&
-          ttmGross > 0
-        ) {
-          const costBasis = asset.quantity * asset.averageCost;
-          const currentValue = asset.quantity * asset.currentPrice;
-
-          const yocPercentage = (ttmGross / costBasis) * 100;
-          const currentYieldPercentage = currentValue > 0
-            ? (ttmGross / currentValue) * 100
-            : 0;
-          const difference = yocPercentage - currentYieldPercentage;
-
-          yocAssetsList.push({
-            assetId: asset.id,
-            assetTicker: asset.ticker,
-            assetName: asset.name,
-            quantity: asset.quantity,
-            averageCost: asset.averageCost,
-            currentPrice: asset.currentPrice,
-            ttmGrossDividends: ttmGross,
-            yocPercentage,
-            currentYieldPercentage,
-            difference,
-          });
-        }
-      });
-
-      // 3. Calculate portfolio-level YOC if we have valid assets
-      if (yocAssetsList.length > 0) {
-        yocAssetsList.sort((a, b) => b.yocPercentage - a.yocPercentage);
-
-        const portfolioCostBasis = yocAssetsList.reduce(
-          (sum, asset) => sum + (asset.quantity * asset.averageCost),
-          0
-        );
-        const portfolioTtmDividends = yocAssetsList.reduce(
-          (sum, asset) => sum + asset.ttmGrossDividends,
-          0
-        );
-
-        if (portfolioCostBasis > 0) {
-          portfolioYieldOnCost = (portfolioTtmDividends / portfolioCostBasis) * 100;
-          totalCostBasis = portfolioCostBasis;
-          yieldOnCostAssets = yocAssetsList;
-        }
-      }
+    if (ttmMetrics.portfolioYocGross !== null) {
+      yieldOnCostAssets = ttmMetrics.assets
+        .map<YieldOnCostAsset>(a => ({
+          assetId: a.assetId,
+          assetTicker: a.assetTicker,
+          assetName: a.assetName,
+          quantity: a.quantity,
+          averageCost: a.averageCost,
+          currentPrice: a.currentPrice,
+          ttmGrossDividends: a.realizedGross,
+          yocPercentage: a.yocGrossPct,
+          currentYieldPercentage: a.currentYieldGrossPct,
+          difference: a.yocGrossPct - a.currentYieldGrossPct,
+        }))
+        .sort((a, b) => b.yocPercentage - a.yocPercentage);
+      portfolioYieldOnCost = ttmMetrics.portfolioYocGross;
+      totalCostBasis = ttmMetrics.totalCostBasis;
     }
 
     const stats = {

@@ -925,7 +925,7 @@ export default function PerformancePage() {
                 value={metrics.yocNet}
                 format="percentage"
                 subtitle={`Cost Basis: ${formatCurrency(metrics.yocCostBasis)} · Asset: ${metrics.yocAssetCount}`}
-                tooltip="Yield on Cost (YOC) Netto misura il rendimento da dividendi netti (dopo tasse) rispetto al costo originale di acquisto. Formula: (Dividendi Netti Annualizzati / Cost Basis) × 100. Questa metrica mostra quanto effettivamente guadagni (al netto delle ritenute fiscali) rispetto al tuo investimento iniziale. Più realistica dello YOC Lordo perché considera l'impatto fiscale."
+                tooltip="Yield on Cost (YOC) Netto misura il rendimento da dividendi netti (dopo tasse) rispetto al costo medio di acquisto. Formula: (Dividendi Netti Annualizzati / Cost Basis) × 100. Questa metrica mostra quanto effettivamente guadagni (al netto delle ritenute fiscali) rispetto al tuo costo medio di acquisto. Più realistica dello YOC Lordo perché considera l'impatto fiscale. Nota: considera solo gli asset attualmente in portafoglio; i dividendi di asset venduti restano nello storico ma non incidono su YOC e rendimento."
                 badge="Avanzato"
               />
             }
@@ -935,7 +935,7 @@ export default function PerformancePage() {
               value={metrics.yocGross}
               format="percentage"
               description={`Dividendi: ${formatCurrency(metrics.yocDividendsGross)} · Cost Basis: ${formatCurrency(metrics.yocCostBasis)}`}
-              tooltip="Yield on Cost (YOC) Lordo misura il rendimento da dividendi lordi rispetto al costo originale di acquisto (cost basis). Formula: (Dividendi Annualizzati / Cost Basis) × 100. Esempio: Se hai comprato 100 azioni a €50 (cost basis €5.000) e ricevi €300/anno di dividendi lordi, YOC = 6%. A differenza del rendimento corrente (dividendi/prezzo attuale), YOC mostra quanto rende il tuo investimento iniziale. YOC > Rendimento Corrente indica crescita dei dividendi nel tempo. Valori alti (>5-7%) indicano un buon ritorno sull'investimento originale."
+              tooltip="Yield on Cost (YOC) Lordo misura il rendimento da dividendi lordi rispetto al costo medio di acquisto (cost basis). Formula: (Dividendi Annualizzati / Cost Basis) × 100. Esempio: Se hai comprato 100 azioni a €50 (cost basis €5.000) e ricevi €300/anno di dividendi lordi, YOC = 6%. A differenza del rendimento corrente (dividendi/prezzo attuale), YOC mostra quanto rende il tuo costo medio di acquisto. YOC > Rendimento Corrente indica crescita dei dividendi nel tempo. Valori alti (>5-7%) indicano un buon ritorno sul costo di acquisto. Nota: considera solo gli asset attualmente in portafoglio; i dividendi di asset venduti restano nello storico ma non incidono su YOC e rendimento."
               badge="Avanzato"
             />
             <MetricCard
@@ -943,7 +943,7 @@ export default function PerformancePage() {
               value={metrics.currentYield}
               format="percentage"
               description={`Dividendi: ${formatCurrency(metrics.currentYieldDividends)} · Valore: ${formatCurrency(metrics.currentYieldPortfolioValue)}`}
-              tooltip={`Rendimento Corrente Lordo misura il rendimento da dividendi lordi basato sul valore di mercato ATTUALE del portafoglio. Formula: (Dividendi Lordi Annualizzati / Valore Corrente Portafoglio) × 100. A differenza dello YOC (che usa il costo originale), il Rendimento Corrente mostra quanto renderebbe il portafoglio se lo acquistassi oggi ai prezzi correnti.${
+              tooltip={`Rendimento Corrente Lordo misura il rendimento da dividendi lordi basato sul valore di mercato ATTUALE del portafoglio. Formula: (Dividendi Lordi Annualizzati / Valore Corrente Portafoglio) × 100. A differenza dello YOC (che usa il costo medio di acquisto), il Rendimento Corrente mostra quanto renderebbe il portafoglio se lo acquistassi oggi ai prezzi correnti. Nota: considera solo gli asset attualmente in portafoglio; i dividendi di asset venduti non incidono su questa metrica.${
                 metrics.yocGross !== null
                   ? `\n\nConfronto con YOC Lordo (${metrics.yocGross.toFixed(2)}%): ${
                       metrics.currentYield !== null && metrics.currentYield > metrics.yocGross
@@ -960,7 +960,7 @@ export default function PerformancePage() {
               value={metrics.currentYieldNet}
               format="percentage"
               description={`Dividendi: ${formatCurrency(metrics.currentYieldDividendsNet)} · Valore: ${formatCurrency(metrics.currentYieldPortfolioValue)}`}
-              tooltip={`Rendimento Corrente Netto misura il rendimento da dividendi netti (dopo tasse) basato sul valore di mercato ATTUALE del portafoglio. Formula: (Dividendi Netti Annualizzati / Valore Corrente Portafoglio) × 100. Questa è la metrica più realistica perché considera sia il prezzo corrente che l'impatto fiscale sui dividendi. Mostra quanto effettivamente guadagneresti acquistando il portafoglio oggi ai prezzi correnti.${
+              tooltip={`Rendimento Corrente Netto misura il rendimento da dividendi netti (dopo tasse) basato sul valore di mercato ATTUALE del portafoglio. Formula: (Dividendi Netti Annualizzati / Valore Corrente Portafoglio) × 100. Questa è la metrica più realistica perché considera sia il prezzo corrente che l'impatto fiscale sui dividendi. Mostra quanto effettivamente guadagneresti acquistando il portafoglio oggi ai prezzi correnti. Nota: considera solo gli asset attualmente in portafoglio; i dividendi di asset venduti non incidono su questa metrica.${
                 metrics.yocNet !== null
                   ? `\n\nConfronto con YOC Netto (${metrics.yocNet.toFixed(2)}%): ${
                       metrics.currentYieldNet !== null && metrics.currentYieldNet > metrics.yocNet
@@ -1368,7 +1368,10 @@ export default function PerformancePage() {
                     <div>
                       <h4 className="font-semibold mb-1">Yield on Cost (YOC)</h4>
                       <p className="text-muted-foreground">
-                        Rendimento da dividendi rispetto al costo originale di acquisto (average cost), non al prezzo attuale.
+                        Rendimento da dividendi rispetto al costo medio di acquisto (average cost), non al prezzo attuale.
+                        <br /><br />
+                        <strong>Solo portafoglio attuale:</strong> entrano nel calcolo soltanto gli asset che possiedi adesso (quantity &gt; 0).
+                        I dividendi di asset venduti non rientrano in YOC e Rendimento Corrente, ma restano nello storico dividendi come reddito realmente incassato.
                         <br /><br />
                         <strong>Formula:</strong> YOC% = (Dividendi Annualizzati / Cost Basis) × 100
                         <br />

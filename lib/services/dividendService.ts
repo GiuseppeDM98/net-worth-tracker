@@ -619,6 +619,10 @@ export function calculateWithholdingTax(
  * Why: We store only the "next" coupon per bond. On any asset update,
  * we delete the old upcoming coupon and regenerate with new parameters.
  *
+ * Side effect: any cashflow expense linked to a deleted coupon (expenseId) is
+ * removed in the same batch, so re-saving a bond never leaves orphan expenses
+ * behind (which would surface as duplicate "Dividendo …" entries in Cashflow).
+ *
  * @param userId - User ID (security filter)
  * @param assetId - Asset ID to clean up coupons for
  */
@@ -641,7 +645,13 @@ export async function deleteUpcomingCouponsForAsset(
   if (querySnapshot.empty) return;
 
   const batch = adminDb.batch();
-  querySnapshot.docs.forEach(doc => batch.delete(doc.ref));
+  querySnapshot.docs.forEach(doc => {
+    const expenseId = doc.data().expenseId as string | undefined;
+    if (expenseId) {
+      batch.delete(adminDb.collection('expenses').doc(expenseId));
+    }
+    batch.delete(doc.ref);
+  });
   await batch.commit();
 }
 
@@ -649,6 +659,9 @@ export async function deleteUpcomingCouponsForAsset(
  * Deletes all auto-generated finalPremium dividends for an asset.
  * Called before regenerating the final premium when bond details change.
  * No date filter: there is at most one finalPremium per asset.
+ *
+ * Side effect: any cashflow expense linked to a deleted premium (expenseId) is
+ * removed in the same batch, mirroring deleteUpcomingCouponsForAsset.
  */
 export async function deleteUpcomingFinalPremiumForAsset(
   userId: string,
@@ -665,6 +678,12 @@ export async function deleteUpcomingFinalPremiumForAsset(
   if (querySnapshot.empty) return;
 
   const batch = adminDb.batch();
-  querySnapshot.docs.forEach(doc => batch.delete(doc.ref));
+  querySnapshot.docs.forEach(doc => {
+    const expenseId = doc.data().expenseId as string | undefined;
+    if (expenseId) {
+      batch.delete(adminDb.collection('expenses').doc(expenseId));
+    }
+    batch.delete(doc.ref);
+  });
   await batch.commit();
 }

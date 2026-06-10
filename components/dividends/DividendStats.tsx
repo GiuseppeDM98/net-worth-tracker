@@ -250,8 +250,13 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
       (sum, asset) => sum + asset.ttmGrossDividends,
       0
     );
+    // Portfolio current yield weighted by market value, consistent with the per-share
+    // (prospective) YOC engine so the spread compares like with like.
     const currentYieldPortfolio = totalCurrentValue > 0
-      ? (totalTtmDividends / totalCurrentValue) * 100
+      ? stats.yieldOnCostAssets.reduce(
+          (sum, asset) => sum + asset.currentYieldPercentage * (asset.quantity * asset.currentPrice),
+          0
+        ) / totalCurrentValue
       : 0;
 
     return {
@@ -397,7 +402,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between gap-3">
                     <CardTitle className="text-sm font-medium">YOC Portafoglio</CardTitle>
-                    <MetricInfoTooltip content="YOC Portafoglio misura il rendimento da dividendi lordi degli ultimi 12 mesi rispetto al costo storico totale degli asset che hanno dividendi. Lo spread vs rendimento corrente e' la differenza tra questo YOC e il rendimento calcolato sul valore di mercato attuale: positivo significa che il rendimento sul tuo costo storico e' piu' alto di quello sul valore corrente." />
+                    <MetricInfoTooltip content="YOC Portafoglio misura il rendimento da dividendi lordi degli ultimi 12 mesi rispetto al costo medio di acquisto degli asset che hanno dividendi. Lo spread vs rendimento corrente e' la differenza tra questo YOC e il rendimento calcolato sul valore di mercato attuale: positivo significa che il rendimento sul tuo costo e' piu' alto di quello sul valore corrente. Nota: considera solo gli asset attualmente in portafoglio; i dividendi di asset venduti non sono inclusi qui, ma restano visibili nello storico dividendi." />
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -407,7 +412,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                       className="text-3xl font-semibold text-foreground desktop:text-4xl tabular-nums"
                     />
                     <div className="text-right text-xs text-muted-foreground">
-                      <p>TTM lordo su costo storico</p>
+                      <p>TTM lordo su costo medio</p>
                       <p>{yocSummary.coverage} {yocSummary.coverage === 1 ? 'asset coperto' : 'asset coperti'}</p>
                     </div>
                   </div>
