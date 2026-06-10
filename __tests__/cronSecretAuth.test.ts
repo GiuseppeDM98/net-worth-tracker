@@ -30,6 +30,38 @@ vi.mock('@/lib/server/dividendProcessor', () => ({
   runNextCouponScheduling: runNextCouponSchedulingMock,
 }));
 
+// Mocks needed by the monthly-snapshot cron route
+vi.mock('@/lib/services/hallOfFameService.server', () => ({
+  updateHallOfFame: vi.fn(),
+}));
+
+vi.mock('@/lib/server/monthlyEmailService', () => ({
+  isLastDayOfMonthItaly: vi.fn(() => false),
+  isLastDayOfQuarterItaly: vi.fn(() => false),
+  isLastDayOfHalfYearItaly: vi.fn(() => false),
+  isLastDayOfYearItaly: vi.fn(() => false),
+  monthToQuarter: vi.fn(),
+  monthToSemester: vi.fn(),
+  getSettingsAdmin: vi.fn(),
+  buildAndSendForPeriod: vi.fn(),
+  buildAndSendQuarterly: vi.fn(),
+  buildAndSendSemiAnnual: vi.fn(),
+  buildAndSendYearly: vi.fn(),
+}));
+
+vi.mock('@/lib/server/ecbRatesService', () => ({
+  refreshEcbRatesIfStale: vi.fn(),
+}));
+
+vi.mock('@/lib/server/weeklyBudgetEmailService', () => ({
+  isWeeklyBudgetDayItaly: vi.fn(() => false),
+  buildAndSendWeeklyBudget: vi.fn(),
+}));
+
+vi.mock('@/lib/utils/dateHelpers', () => ({
+  getItalyMonthYear: vi.fn(() => ({ month: 4, year: 2026 })),
+}));
+
 function makeRequest(url: string, authHeader?: string): NextRequest {
   return new NextRequest(url, {
     headers: authHeader ? { authorization: authHeader } : {},
@@ -120,5 +152,67 @@ describe('GET /api/cron/daily-dividend-processing auth', () => {
     );
 
     expect(response.status).toBe(401);
+  });
+
+  it('returns 200 with correct secret when no users are present', async () => {
+    const { GET } = await import(
+      '@/app/api/cron/daily-dividend-processing/route'
+    );
+
+    const response = await GET(
+      makeRequest(
+        'http://localhost/api/cron/daily-dividend-processing',
+        'Bearer test-cron-secret'
+      )
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ success: true });
+  });
+});
+
+// ─── Route-level tests for monthly-snapshot ───────────────────────────────
+
+describe('GET /api/cron/monthly-snapshot auth', () => {
+  beforeEach(() => {
+    vi.stubEnv('CRON_SECRET', 'test-cron-secret');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.clearAllMocks();
+  });
+
+  it('returns 401 when no Authorization header is present', async () => {
+    const { GET } = await import('@/app/api/cron/monthly-snapshot/route');
+
+    const response = await GET(
+      makeRequest('http://localhost/api/cron/monthly-snapshot')
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
+  });
+
+  it('returns 401 when the Authorization header carries a wrong secret', async () => {
+    const { GET } = await import('@/app/api/cron/monthly-snapshot/route');
+
+    const response = await GET(
+      makeRequest('http://localhost/api/cron/monthly-snapshot', 'Bearer wrong-secret')
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
+  });
+
+  it('returns 200 with correct secret when no users are present', async () => {
+    const { GET } = await import('@/app/api/cron/monthly-snapshot/route');
+
+    const response = await GET(
+      makeRequest('http://localhost/api/cron/monthly-snapshot', 'Bearer test-cron-secret')
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ success: true });
   });
 });

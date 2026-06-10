@@ -23,7 +23,7 @@ I problemi trovati sono mirati e tutti risolvibili con interventi contenuti:
 | SEC-5 | Whitelist email di registrazione esposta nel bundle JS client (`NEXT_PUBLIC_*`) | MEDIA | S | ✅ implementato — branch `fix/sec-5-server-only-whitelist` |
 | SEC-6 | 8 vulnerabilità moderate transitive (`uuid` via `firebase-admin`) | BASSA | S | ✅ implementato — branch `chore/sec-6-upgrade-firebase-admin` |
 | SEC-7 | Rate limiting assente sugli endpoint AI (difesa in profondità, opzionale) | BASSA | M | ✅ implementato — PR #164 |
-| SEC-8 | Igiene: copertura test cron auth, logging di debug verboso nello scraper | BASSA | S | `chore/sec-8-test-logging-hygiene` |
+| SEC-8 | Igiene: copertura test cron auth, logging di debug verboso nello scraper | BASSA | S | ✅ implementato — PR #165 |
 
 Effort: S = < 1h per un modello AI, M = 1-3h.
 
