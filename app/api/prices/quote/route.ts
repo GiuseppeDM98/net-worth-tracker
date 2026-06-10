@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getQuote } from '@/lib/services/yahooFinanceService';
 import { convertToEur } from '@/lib/services/currencyConversionService';
 import { getApiAuthErrorResponse, requireFirebaseAuth } from '@/lib/server/apiAuth';
+import { tickerSchema, parseOr400 } from '@/lib/server/validation';
 
 /**
  * GET /api/prices/quote
@@ -39,7 +40,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const quote = await getQuote(ticker);
+    const tickerResult = parseOr400(tickerSchema, ticker);
+    if (!tickerResult.ok) return tickerResult.response;
+
+    const quote = await getQuote(tickerResult.data);
 
     // Normalize GBp (pence) → GBP (pounds) for LSE tickers.
     // Yahoo Finance returns prices in pence for UK-listed assets (e.g. SWDA.L: 4874 GBp = 48.74 GBP).

@@ -163,3 +163,4 @@
 
 - Price quote endpoints (Yahoo Finance and Borsa Italiana) now require authentication, preventing unauthorized use as open proxies
 - CRON_SECRET comparison is now timing-safe (constant-time SHA-256 hash prevents side-channel leaks on cron endpoints)
+- API route handlers now validate all user-controlled inputs server-side (ticker format, ISIN format, snapshot year/month range, dividend payload fields) with zod, returning 400 on malformed data before any service call is made; Borsa Italiana scrapers validate ISIN at the service layer and encode it in URLs to prevent parameter injection

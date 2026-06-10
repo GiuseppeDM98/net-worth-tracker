@@ -13,6 +13,7 @@ import {
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
 import { createDividendWithOptionalExpense } from '@/lib/server/dividendUseCase';
+import { dividendDataSchema, parseOr400 } from '@/lib/server/validation';
 
 /**
  * GET /api/dividends
@@ -141,26 +142,20 @@ export async function POST(request: NextRequest) {
   try {
     const decodedToken = await requireFirebaseAuth(request);
     const body = await request.json();
-    const { userId, dividendData } = body as {
-      userId: string;
-      dividendData: DividendFormData;
-    };
 
-    assertSameUser(decodedToken, userId);
-
-    if (!userId || !dividendData) {
+    if (!body.userId || !body.dividendData) {
       return NextResponse.json(
         { error: 'userId and dividendData are required' },
         { status: 400 }
       );
     }
 
-    if (!dividendData.assetId) {
-      return NextResponse.json(
-        { error: 'assetId is required in dividendData' },
-        { status: 400 }
-      );
-    }
+    const userId = body.userId as string;
+    assertSameUser(decodedToken, userId);
+
+    const dividendResult = parseOr400(dividendDataSchema, body.dividendData);
+    if (!dividendResult.ok) return dividendResult.response;
+    const dividendData = dividendResult.data as DividendFormData;
 
     // Fetch asset to get ticker, name, ISIN, and verify ownership
     const assetDoc = await adminDb

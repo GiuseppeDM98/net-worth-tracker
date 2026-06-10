@@ -538,6 +538,47 @@ describe('Private API route auth', () => {
     expect(getBondPriceByIsinMock).toHaveBeenCalledWith('IT0005672024');
   });
 
+  it('returns 400 for price quote with malformed ticker', async () => {
+    const response = await priceQuoteRoute(
+      createJsonRequest('http://localhost/api/prices/quote?ticker=VOO%20ETF%3BDROP', {
+        headers: { Authorization: 'Bearer valid-token' },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ error: 'Invalid request' });
+    expect(getQuoteMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for bond quote with malformed ISIN', async () => {
+    const response = await bondQuoteRoute(
+      createJsonRequest('http://localhost/api/prices/bond-quote?isin=INVALID', {
+        headers: { Authorization: 'Bearer valid-token' },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ error: 'Invalid request' });
+    expect(getBondPriceByIsinMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for snapshot with out-of-range month', async () => {
+    const response = await snapshotRoute(
+      createJsonRequest('http://localhost/api/portfolio/snapshot', {
+        method: 'POST',
+        body: {
+          userId: 'user-1',
+          cronSecret: 'test-cron-secret',
+          month: 13,
+        },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ error: 'Invalid request' });
+    expect(snapshotDocSetMock).not.toHaveBeenCalled();
+  });
+
   it('allows snapshot creation for cron callers using cronSecret without Firebase auth', async () => {
     const response = await snapshotRoute(
       createJsonRequest('http://localhost/api/portfolio/snapshot', {

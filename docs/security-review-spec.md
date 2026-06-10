@@ -18,7 +18,7 @@ I problemi trovati sono mirati e tutti risolvibili con interventi contenuti:
 |----|---------|----------|--------|--------------|
 | SEC-1 | Endpoint prezzi pubblici senza autenticazione (proxy aperto verso Yahoo Finance / Borsa Italiana) | **ALTA** | S | ✅ implementato — branch `fix/sec-1-auth-price-endpoints` |
 | SEC-2 | Confronto `CRON_SECRET` non timing-safe (3 punti) | MEDIA | S | ✅ implementato — branch `fix/sec-2-timing-safe-cron-secret` |
-| SEC-3 | Nessuna validazione server-side dei body/query (zod installato ma inutilizzato lato server); ISIN interpolato in URL senza validazione | MEDIA | M | `fix/sec-3-server-input-validation` |
+| SEC-3 | Nessuna validazione server-side dei body/query (zod installato ma inutilizzato lato server); ISIN interpolato in URL senza validazione | MEDIA | M | ✅ implementato — branch `fix/sec-3-server-input-validation` |
 | SEC-4 | Nessun security header HTTP (CSP, HSTS, X-Frame-Options, ecc.) | MEDIA | S | `fix/sec-4-security-headers` |
 | SEC-5 | Whitelist email di registrazione esposta nel bundle JS client (`NEXT_PUBLIC_*`) | MEDIA | S | `fix/sec-5-server-only-whitelist` |
 | SEC-6 | 8 vulnerabilità moderate transitive (`uuid` via `firebase-admin`) | BASSA | S | `chore/sec-6-upgrade-firebase-admin` |

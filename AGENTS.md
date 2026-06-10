@@ -242,6 +242,13 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 ### Nested Scroll Containers Trap the Wheel (gotcha)
 - A scrollable region (`overflow-y-auto` + `max-h`) placed INSIDE another scrollable sticky container makes the inner (often short) region capture the wheel, so content below it becomes unreachable. Symptom: "can't scroll to see the content", desktop-only. The fix is **one scroll container per region**, not nesting — and a partial fix that only removes the inner `max-h` still fails if two scroll ancestors remain. In the assistant redesign the right-column tab card (`max-h-[380px] overflow-y-auto`) nested inside the sticky `max-h-[calc(100vh-6rem)] overflow-y-auto` column trapped scrolling once a tall period scheda pushed the card below the fold; resolved by moving Conversazioni/Memoria into header→`Sheet` and leaving the column a single natural-height child.
 
+### Server-side Input Validation (SEC-3)
+- `lib/server/validation.ts` (`server-only`) is the canonical source for reusable API boundary schemas: `isinSchema`, `tickerSchema`, `snapshotRequestSchema`, `dividendDataSchema`, and the `parseOr400` helper (returns `{ ok, data }` or a ready-to-return 400 `NextResponse` with `error.flatten()` details).
+- **Apply `parseOr400` in every new route handler** that reads user-controlled query params or request body fields. Do not cast with `as { ... }` without first validating.
+- **Scraper defense**: inputs that originate from Firestore (not the HTTP request) must also be validated at the service-layer entry point — the client-side zod schemas on forms can be bypassed by writing directly to Firestore. `scrapeDividendsByIsin` and `getBondPriceByIsin` both guard at the function entry and use `encodeURIComponent` before URL construction.
+- `z.coerce.date()` is required for date fields in body schemas: JSON serializes dates as ISO strings, not `Date` objects.
+- `dividendDataSchema.partial()` is used for PUT update payloads; the non-empty check precedes schema validation.
+
 ### Private API Authorization
 - Any App Router API route that uses Firebase Admin SDK must authenticate server-side; Firestore rules do not protect Admin SDK calls
 - Private routes must verify the Firebase ID token and bind the request to `decodedToken.uid`, not just a client-supplied `userId`

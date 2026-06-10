@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBondPriceByIsin } from '@/lib/services/borsaItalianaBondScraperService';
 import { getApiAuthErrorResponse, requireFirebaseAuth } from '@/lib/server/apiAuth';
+import { isinSchema, parseOr400 } from '@/lib/server/validation';
 
 /**
  * GET /api/prices/bond-quote?isin=IT0005672024
@@ -35,8 +36,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const isinResult = parseOr400(isinSchema, isin);
+    if (!isinResult.ok) return isinResult.response;
+
     // Call scraper
-    const result = await getBondPriceByIsin(isin);
+    const result = await getBondPriceByIsin(isinResult.data);
 
     return NextResponse.json(result);
   } catch (error) {

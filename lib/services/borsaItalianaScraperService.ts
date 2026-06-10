@@ -111,10 +111,17 @@ export async function scrapeDividendsByIsin(
   isin: string,
   assetType: AssetType = 'stock'
 ): Promise<ScrapedDividend[]> {
+  // Validate ISIN format before URL construction to prevent parameter injection.
+  // Assets are stored by the client and could contain crafted values.
+  const isinPattern = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/;
+  if (!isinPattern.test(isin)) {
+    throw new Error('Invalid ISIN format');
+  }
+
   try {
     // Select correct URL based on asset type
     const baseUrl = assetType === 'etf' ? BORSA_ITALIANA_ETF_URL : BORSA_ITALIANA_STOCK_URL;
-    const url = `${baseUrl}?isin=${isin}&lang=it`;
+    const url = `${baseUrl}?isin=${encodeURIComponent(isin)}&lang=it`;
     console.log(`[Scraper] Fetching URL for ${assetType.toUpperCase()}: ${url}`);
 
     // Fetch HTML

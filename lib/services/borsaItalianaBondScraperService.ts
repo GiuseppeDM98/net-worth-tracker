@@ -56,9 +56,21 @@ function parseItalianNumber(numberString: string): number {
  * @returns Bond price result with price and metadata, or null price on failure
  */
 export async function getBondPriceByIsin(isin: string): Promise<BondPriceResult> {
+  // Validate ISIN before constructing the URL: an invalid ISIN (e.g. containing '/' or '..')
+  // would silently alter the path sent to Borsa Italiana.
+  if (!validateItalianBondIsin(isin)) {
+    return {
+      isin,
+      price: null,
+      currency: 'EUR',
+      priceType: 'ultimo',
+      error: 'Invalid ISIN format',
+    };
+  }
+
   try {
     // Construct URL with -MOTX suffix (confirmed by user as constant for all MOT bonds)
-    const url = `${BORSA_ITALIANA_BOND_BASE_URL}/${isin}-MOTX.html?lang=it`;
+    const url = `${BORSA_ITALIANA_BOND_BASE_URL}/${encodeURIComponent(isin)}-MOTX.html?lang=it`;
     console.log(`[Bond Scraper] Fetching: ${url}`);
 
     // Fetch HTML with timeout

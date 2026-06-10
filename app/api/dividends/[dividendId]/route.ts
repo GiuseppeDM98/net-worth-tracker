@@ -16,6 +16,7 @@ import {
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
+import { dividendDataSchema, parseOr400 } from '@/lib/server/validation';
 
 /**
  * PUT /api/dividends/[dividendId]
@@ -50,14 +51,17 @@ export async function PUT(
     const decodedToken = await requireFirebaseAuth(request);
     const { dividendId } = await params;
     const body = await request.json();
-    const { updates } = body as { updates: Partial<DividendFormData> };
 
-    if (!updates || Object.keys(updates).length === 0) {
+    if (!body.updates || Object.keys(body.updates).length === 0) {
       return NextResponse.json(
         { error: 'No updates provided' },
         { status: 400 }
       );
     }
+
+    const updatesResult = parseOr400(dividendDataSchema.partial(), body.updates);
+    if (!updatesResult.ok) return updatesResult.response;
+    const updates = updatesResult.data as Partial<DividendFormData>;
 
     // Get existing dividend to check for linked expense
     const existingDividend = await getDividendById(dividendId);
