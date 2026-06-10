@@ -21,7 +21,7 @@ I problemi trovati sono mirati e tutti risolvibili con interventi contenuti:
 | SEC-3 | Nessuna validazione server-side dei body/query (zod installato ma inutilizzato lato server); ISIN interpolato in URL senza validazione | MEDIA | M | ✅ implementato — branch `fix/sec-3-server-input-validation` |
 | SEC-4 | Nessun security header HTTP (CSP, HSTS, X-Frame-Options, ecc.) | MEDIA | S | ✅ implementato — branch `fix/sec-4-security-headers` |
 | SEC-5 | Whitelist email di registrazione esposta nel bundle JS client (`NEXT_PUBLIC_*`) | MEDIA | S | ✅ implementato — branch `fix/sec-5-server-only-whitelist` |
-| SEC-6 | 8 vulnerabilità moderate transitive (`uuid` via `firebase-admin`) | BASSA | S | `chore/sec-6-upgrade-firebase-admin` |
+| SEC-6 | 8 vulnerabilità moderate transitive (`uuid` via `firebase-admin`) | BASSA | S | ✅ implementato — branch `chore/sec-6-upgrade-firebase-admin` |
 | SEC-7 | Rate limiting assente sugli endpoint AI (difesa in profondità, opzionale) | BASSA | M | `feat/sec-7-ai-rate-limit` |
 | SEC-8 | Igiene: copertura test cron auth, logging di debug verboso nello scraper | BASSA | S | `chore/sec-8-test-logging-hygiene` |
 
