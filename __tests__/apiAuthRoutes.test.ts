@@ -27,6 +27,8 @@ const {
   snapshotDocSetMock,
   overviewSummaryDocGetMock,
   overviewSummaryDocSetMock,
+  getQuoteMock,
+  getBondPriceByIsinMock,
 } = vi.hoisted(() => ({
   verifyIdTokenMock: vi.fn(),
   getAllDividendsMock: vi.fn(),
@@ -45,6 +47,8 @@ const {
   snapshotDocSetMock: vi.fn(),
   overviewSummaryDocGetMock: vi.fn(),
   overviewSummaryDocSetMock: vi.fn(),
+  getQuoteMock: vi.fn(),
+  getBondPriceByIsinMock: vi.fn(),
 }));
 
 vi.mock('@/lib/firebase/admin', () => ({
@@ -145,6 +149,14 @@ vi.mock('@/lib/helpers/priceUpdater', () => ({
   updateUserAssetPrices: updateUserAssetPricesMock,
 }));
 
+vi.mock('@/lib/services/yahooFinanceService', () => ({
+  getQuote: getQuoteMock,
+}));
+
+vi.mock('@/lib/services/borsaItalianaBondScraperService', () => ({
+  getBondPriceByIsin: getBondPriceByIsinMock,
+}));
+
 // Use importOriginal so any new exports from assetService are included automatically.
 // Only override the functions whose return values matter for the route tests.
 vi.mock('@/lib/services/assetService', async (importOriginal) => {
@@ -178,6 +190,8 @@ vi.mock('@/lib/utils/dateHelpers', async () => {
 import { GET as getDividendsRoute } from '@/app/api/dividends/route';
 import { DELETE as deleteDividendRoute } from '@/app/api/dividends/[dividendId]/route';
 import { POST as updatePricesRoute } from '@/app/api/prices/update/route';
+import { GET as priceQuoteRoute } from '@/app/api/prices/quote/route';
+import { GET as bondQuoteRoute } from '@/app/api/prices/bond-quote/route';
 import { POST as snapshotRoute } from '@/app/api/portfolio/snapshot/route';
 import { GET as dashboardOverviewRoute } from '@/app/api/dashboard/overview/route';
 import { POST as invalidateDashboardOverviewRoute } from '@/app/api/dashboard/overview/invalidate/route';
@@ -461,6 +475,67 @@ describe('Private API route auth', () => {
       }),
       { merge: true }
     );
+  });
+
+  it('returns 401 for price quote route without Authorization header', async () => {
+    const response = await priceQuoteRoute(
+      createJsonRequest('http://localhost/api/prices/quote?ticker=AAPL')
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Missing Authorization bearer token',
+    });
+    expect(getQuoteMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 200 for price quote route with valid token', async () => {
+    getQuoteMock.mockResolvedValue({
+      ticker: 'AAPL',
+      price: 200,
+      currency: 'USD',
+    });
+
+    const response = await priceQuoteRoute(
+      createJsonRequest('http://localhost/api/prices/quote?ticker=AAPL', {
+        headers: { Authorization: 'Bearer valid-token' },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(verifyIdTokenMock).toHaveBeenCalledWith('valid-token');
+    expect(getQuoteMock).toHaveBeenCalledWith('AAPL');
+  });
+
+  it('returns 401 for bond quote route without Authorization header', async () => {
+    const response = await bondQuoteRoute(
+      createJsonRequest('http://localhost/api/prices/bond-quote?isin=IT0005672024')
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Missing Authorization bearer token',
+    });
+    expect(getBondPriceByIsinMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 200 for bond quote route with valid token', async () => {
+    getBondPriceByIsinMock.mockResolvedValue({
+      isin: 'IT0005672024',
+      price: 98.5,
+      currency: 'EUR',
+      priceType: 'ultimo',
+    });
+
+    const response = await bondQuoteRoute(
+      createJsonRequest('http://localhost/api/prices/bond-quote?isin=IT0005672024', {
+        headers: { Authorization: 'Bearer valid-token' },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(verifyIdTokenMock).toHaveBeenCalledWith('valid-token');
+    expect(getBondPriceByIsinMock).toHaveBeenCalledWith('IT0005672024');
   });
 
   it('allows snapshot creation for cron callers using cronSecret without Firebase auth', async () => {

@@ -155,3 +155,7 @@
 - **Portfolio asset table is less cramped on laptops** — the ticker now appears under each asset's name instead of taking its own column, and the three performance columns (Δ this month / year-to-date / since start) are hidden behind a new "Andamento" toggle in the table toolbar, so the default table fits without scrolling sideways at common laptop widths. Turn the toggle on whenever you want the full performance breakdown. All figures in the table are now in a monospaced font for cleaner column alignment
 - **Portfolio summary card is calmer** — the liquid-wealth summary card's heading now names the exact figure it shows ("Patrimonio Liquidabile Netto"), and the detailed "Impatto Fiscale" tax breakdown is collapsed by default, expandable with a tap
 - **"Andamento Strumenti Selezionati" now explains *why* a value moved** — on the Storico "Valore per Strumento" chart, hovering a month now shows the change versus the previous month split into "da prezzo" (market movement) and "da quantità" (your buys and sells). So when a holding's line drops, you can tell at a glance whether the market fell or you simply sold part of the position — instead of guessing
+
+## 🔒 Security
+
+- Price quote endpoints (Yahoo Finance and Borsa Italiana) now require authentication, preventing unauthorized use as open proxies

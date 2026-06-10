@@ -126,10 +126,10 @@ async function fetchMarketPrice(
     let source: string;
 
     if (isBondWithIsin) {
-      response = await fetch(`/api/prices/bond-quote?isin=${encodeURIComponent(isin!.trim())}`);
+      response = await authenticatedFetch(`/api/prices/bond-quote?isin=${encodeURIComponent(isin!.trim())}`);
       source = 'Borsa Italiana';
     } else {
-      response = await fetch(`/api/prices/quote?ticker=${encodeURIComponent(ticker)}`);
+      response = await authenticatedFetch(`/api/prices/quote?ticker=${encodeURIComponent(ticker)}`);
       source = 'Yahoo Finance';
     }
 
