@@ -93,7 +93,7 @@ DOPO LA MIA CONFERMA, insieme al commit: (1) AGGIUNGI a SESSION_NOTES.md una voc
 - Cosa: [cosa hai implementato in questa sessione, con il riferimento al finding SEC e ai file toccati]
 - Perché: [motivazione dietro la decisione]
 - Nota: [gotcha o dettagli importanti, eventuali azioni di deploy post-merge, e l'impatto utente in 1 riga in inglese per le release notes (sezione "## 🔒 Security" di "Draft Release Temp.md") oppure "nessun impatto utente percepibile"]
-(2) aggiorna la riga di questo finding nella tabella Executive Summary di docs/security-review-spec.md con lo stato (es. ✅ implementato — PR #NNN); (3) DOPO IL MERGE in develop, esegui come ULTIMA azione della sessione il "Rituale post-merge" riportato verbatim nella sezione omonima di docs/security-review-spec.md (aggiorna AGENTS.md, CLAUDE.md, Draft Release Temp.md e se serve README.md basandoti su SESSION_NOTES.md, poi elimina SESSION_NOTES.md e fai il commit finale con summary e descrizione in inglese).
+(2) aggiorna la riga di questo finding nella tabella Executive Summary di docs/security-review-spec.md con lo stato (es. ✅ implementato — PR #NNN); (3) PRIMA di creare la PR, sul branch corrente: aggiorna AGENTS.md, CLAUDE.md, Draft Release Temp.md e se serve README.md basandoti su SESSION_NOTES.md; elimina SESSION_NOTES.md; includi tutto in un unico commit insieme al codice (codice + doc nello stesso commit, summary e descrizione in inglese).
 CONSEGNA (solo dopo la mia conferma): branch fix/sec-1-auth-price-endpoints da develop, commit conventional (fix: require Firebase auth on public price endpoints), PR verso develop.
 ```
 
@@ -169,7 +169,7 @@ DOPO LA MIA CONFERMA, insieme al commit: (1) AGGIUNGI a SESSION_NOTES.md una voc
 - Cosa: [cosa hai implementato in questa sessione, con il riferimento al finding SEC e ai file toccati]
 - Perché: [motivazione dietro la decisione]
 - Nota: [gotcha o dettagli importanti, eventuali azioni di deploy post-merge, e l'impatto utente in 1 riga in inglese per le release notes (sezione "## 🔒 Security" di "Draft Release Temp.md") oppure "nessun impatto utente percepibile"]
-(2) aggiorna la riga di questo finding nella tabella Executive Summary di docs/security-review-spec.md con lo stato (es. ✅ implementato — PR #NNN); (3) DOPO IL MERGE in develop, esegui come ULTIMA azione della sessione il "Rituale post-merge" riportato verbatim nella sezione omonima di docs/security-review-spec.md (aggiorna AGENTS.md, CLAUDE.md, Draft Release Temp.md e se serve README.md basandoti su SESSION_NOTES.md, poi elimina SESSION_NOTES.md e fai il commit finale con summary e descrizione in inglese).
+(2) aggiorna la riga di questo finding nella tabella Executive Summary di docs/security-review-spec.md con lo stato (es. ✅ implementato — PR #NNN); (3) PRIMA di creare la PR, sul branch corrente: aggiorna AGENTS.md, CLAUDE.md, Draft Release Temp.md e se serve README.md basandoti su SESSION_NOTES.md; elimina SESSION_NOTES.md; includi tutto in un unico commit insieme al codice (codice + doc nello stesso commit, summary e descrizione in inglese).
 CONSEGNA (solo dopo la mia conferma): branch fix/sec-2-timing-safe-cron-secret da develop, commit conventional (fix: use timing-safe comparison for CRON_SECRET), PR verso develop.
 ```
 
@@ -247,7 +247,7 @@ DOPO LA MIA CONFERMA, insieme al commit: (1) AGGIUNGI a SESSION_NOTES.md una voc
 - Cosa: [cosa hai implementato in questa sessione, con il riferimento al finding SEC e ai file toccati]
 - Perché: [motivazione dietro la decisione]
 - Nota: [gotcha o dettagli importanti, eventuali azioni di deploy post-merge, e l'impatto utente in 1 riga in inglese per le release notes (sezione "## 🔒 Security" di "Draft Release Temp.md") oppure "nessun impatto utente percepibile"]
-(2) aggiorna la riga di questo finding nella tabella Executive Summary di docs/security-review-spec.md con lo stato (es. ✅ implementato — PR #NNN); (3) DOPO IL MERGE in develop, esegui come ULTIMA azione della sessione il "Rituale post-merge" riportato verbatim nella sezione omonima di docs/security-review-spec.md (aggiorna AGENTS.md, CLAUDE.md, Draft Release Temp.md e se serve README.md basandoti su SESSION_NOTES.md, poi elimina SESSION_NOTES.md e fai il commit finale con summary e descrizione in inglese).
+(2) aggiorna la riga di questo finding nella tabella Executive Summary di docs/security-review-spec.md con lo stato (es. ✅ implementato — PR #NNN); (3) PRIMA di creare la PR, sul branch corrente: aggiorna AGENTS.md, CLAUDE.md, Draft Release Temp.md e se serve README.md basandoti su SESSION_NOTES.md; elimina SESSION_NOTES.md; includi tutto in un unico commit insieme al codice (codice + doc nello stesso commit, summary e descrizione in inglese).
 CONSEGNA (solo dopo la mia conferma): branch fix/sec-3-server-input-validation da develop, commit conventional (fix: add server-side zod validation at API boundaries), PR verso develop.
 ```
 
@@ -328,7 +328,7 @@ DOPO LA MIA CONFERMA, insieme al commit: (1) AGGIUNGI a SESSION_NOTES.md una voc
 - Cosa: [cosa hai implementato in questa sessione, con il riferimento al finding SEC e ai file toccati]
 - Perché: [motivazione dietro la decisione]
 - Nota: [gotcha o dettagli importanti, eventuali azioni di deploy post-merge, e l'impatto utente in 1 riga in inglese per le release notes (sezione "## 🔒 Security" di "Draft Release Temp.md") oppure "nessun impatto utente percepibile"]
-(2) aggiorna la riga di questo finding nella tabella Executive Summary di docs/security-review-spec.md con lo stato (es. ✅ implementato — PR #NNN); (3) DOPO IL MERGE in develop, esegui come ULTIMA azione della sessione il "Rituale post-merge" riportato verbatim nella sezione omonima di docs/security-review-spec.md (aggiorna AGENTS.md, CLAUDE.md, Draft Release Temp.md e se serve README.md basandoti su SESSION_NOTES.md, poi elimina SESSION_NOTES.md e fai il commit finale con summary e descrizione in inglese).
+(2) aggiorna la riga di questo finding nella tabella Executive Summary di docs/security-review-spec.md con lo stato (es. ✅ implementato — PR #NNN); (3) PRIMA di creare la PR, sul branch corrente: aggiorna AGENTS.md, CLAUDE.md, Draft Release Temp.md e se serve README.md basandoti su SESSION_NOTES.md; elimina SESSION_NOTES.md; includi tutto in un unico commit insieme al codice (codice + doc nello stesso commit, summary e descrizione in inglese).
 CONSEGNA (solo dopo la mia conferma): branch fix/sec-4-security-headers da develop, commit conventional (feat: add HTTP security headers with report-only CSP), PR verso develop.
 ```
 
@@ -378,7 +378,7 @@ DOPO LA MIA CONFERMA, insieme al commit: (1) AGGIUNGI a SESSION_NOTES.md una voc
 - Cosa: [cosa hai implementato in questa sessione, con il riferimento al finding SEC e ai file toccati]
 - Perché: [motivazione dietro la decisione]
 - Nota: [gotcha o dettagli importanti, eventuali azioni di deploy post-merge, e l'impatto utente in 1 riga in inglese per le release notes (sezione "## 🔒 Security" di "Draft Release Temp.md") oppure "nessun impatto utente percepibile"]
-(2) aggiorna la riga di questo finding nella tabella Executive Summary di docs/security-review-spec.md con lo stato (es. ✅ implementato — PR #NNN); (3) DOPO IL MERGE in develop, esegui come ULTIMA azione della sessione il "Rituale post-merge" riportato verbatim nella sezione omonima di docs/security-review-spec.md (aggiorna AGENTS.md, CLAUDE.md, Draft Release Temp.md e se serve README.md basandoti su SESSION_NOTES.md, poi elimina SESSION_NOTES.md e fai il commit finale con summary e descrizione in inglese).
+(2) aggiorna la riga di questo finding nella tabella Executive Summary di docs/security-review-spec.md con lo stato (es. ✅ implementato — PR #NNN); (3) PRIMA di creare la PR, sul branch corrente: aggiorna AGENTS.md, CLAUDE.md, Draft Release Temp.md e se serve README.md basandoti su SESSION_NOTES.md; elimina SESSION_NOTES.md; includi tutto in un unico commit insieme al codice (codice + doc nello stesso commit, summary e descrizione in inglese).
 CONSEGNA (solo dopo la mia conferma): branch fix/sec-5-server-only-whitelist da develop, commit conventional (fix: move registration whitelist out of the client bundle), PR verso develop.
 ```
 
@@ -416,7 +416,7 @@ DOPO LA MIA CONFERMA, insieme al commit: (1) AGGIUNGI a SESSION_NOTES.md una voc
 - Cosa: [cosa hai implementato in questa sessione, con il riferimento al finding SEC e ai file toccati]
 - Perché: [motivazione dietro la decisione]
 - Nota: [gotcha o dettagli importanti, eventuali azioni di deploy post-merge, e l'impatto utente in 1 riga in inglese per le release notes (sezione "## 🔒 Security" di "Draft Release Temp.md") oppure "nessun impatto utente percepibile"]
-(2) aggiorna la riga di questo finding nella tabella Executive Summary di docs/security-review-spec.md con lo stato (es. ✅ implementato — PR #NNN); (3) DOPO IL MERGE in develop, esegui come ULTIMA azione della sessione il "Rituale post-merge" riportato verbatim nella sezione omonima di docs/security-review-spec.md (aggiorna AGENTS.md, CLAUDE.md, Draft Release Temp.md e se serve README.md basandoti su SESSION_NOTES.md, poi elimina SESSION_NOTES.md e fai il commit finale con summary e descrizione in inglese).
+(2) aggiorna la riga di questo finding nella tabella Executive Summary di docs/security-review-spec.md con lo stato (es. ✅ implementato — PR #NNN); (3) PRIMA di creare la PR, sul branch corrente: aggiorna AGENTS.md, CLAUDE.md, Draft Release Temp.md e se serve README.md basandoti su SESSION_NOTES.md; elimina SESSION_NOTES.md; includi tutto in un unico commit insieme al codice (codice + doc nello stesso commit, summary e descrizione in inglese).
 CONSEGNA (solo dopo la mia conferma): branch chore/sec-6-upgrade-firebase-admin da develop, commit conventional (chore: upgrade firebase-admin to resolve uuid advisories), PR verso develop con il prima/dopo di npm audit nella descrizione.
 ```
 
@@ -460,7 +460,7 @@ DOPO LA MIA CONFERMA, insieme al commit: (1) AGGIUNGI a SESSION_NOTES.md una voc
 - Cosa: [cosa hai implementato in questa sessione, con il riferimento al finding SEC e ai file toccati]
 - Perché: [motivazione dietro la decisione]
 - Nota: [gotcha o dettagli importanti, eventuali azioni di deploy post-merge, e l'impatto utente in 1 riga in inglese per le release notes (sezione "## 🔒 Security" di "Draft Release Temp.md") oppure "nessun impatto utente percepibile"]
-(2) aggiorna la riga di questo finding nella tabella Executive Summary di docs/security-review-spec.md con lo stato (es. ✅ implementato — PR #NNN); (3) DOPO IL MERGE in develop, esegui come ULTIMA azione della sessione il "Rituale post-merge" riportato verbatim nella sezione omonima di docs/security-review-spec.md (aggiorna AGENTS.md, CLAUDE.md, Draft Release Temp.md e se serve README.md basandoti su SESSION_NOTES.md, poi elimina SESSION_NOTES.md e fai il commit finale con summary e descrizione in inglese).
+(2) aggiorna la riga di questo finding nella tabella Executive Summary di docs/security-review-spec.md con lo stato (es. ✅ implementato — PR #NNN); (3) PRIMA di creare la PR, sul branch corrente: aggiorna AGENTS.md, CLAUDE.md, Draft Release Temp.md e se serve README.md basandoti su SESSION_NOTES.md; elimina SESSION_NOTES.md; includi tutto in un unico commit insieme al codice (codice + doc nello stesso commit, summary e descrizione in inglese).
 CONSEGNA (solo dopo la mia conferma): branch feat/sec-7-ai-rate-limit da develop, commit conventional (feat: add in-memory rate limiting to AI endpoints), PR verso develop.
 ```
 
@@ -495,7 +495,7 @@ DOPO LA MIA CONFERMA, insieme al commit: (1) AGGIUNGI a SESSION_NOTES.md una voc
 - Cosa: [cosa hai implementato in questa sessione, con il riferimento al finding SEC e ai file toccati]
 - Perché: [motivazione dietro la decisione]
 - Nota: [gotcha o dettagli importanti, eventuali azioni di deploy post-merge, e l'impatto utente in 1 riga in inglese per le release notes (sezione "## 🔒 Security" di "Draft Release Temp.md") oppure "nessun impatto utente percepibile"]
-(2) aggiorna la riga di questo finding nella tabella Executive Summary di docs/security-review-spec.md con lo stato (es. ✅ implementato — PR #NNN); (3) DOPO IL MERGE in develop, esegui come ULTIMA azione della sessione il "Rituale post-merge" riportato verbatim nella sezione omonima di docs/security-review-spec.md (aggiorna AGENTS.md, CLAUDE.md, Draft Release Temp.md e se serve README.md basandoti su SESSION_NOTES.md, poi elimina SESSION_NOTES.md e fai il commit finale con summary e descrizione in inglese).
+(2) aggiorna la riga di questo finding nella tabella Executive Summary di docs/security-review-spec.md con lo stato (es. ✅ implementato — PR #NNN); (3) PRIMA di creare la PR, sul branch corrente: aggiorna AGENTS.md, CLAUDE.md, Draft Release Temp.md e se serve README.md basandoti su SESSION_NOTES.md; elimina SESSION_NOTES.md; includi tutto in un unico commit insieme al codice (codice + doc nello stesso commit, summary e descrizione in inglese).
 CONSEGNA (solo dopo la mia conferma): branch chore/sec-8-test-logging-hygiene da develop, commit conventional (chore: add cron auth tests and trim scraper debug logging), PR verso develop.
 ```
 
@@ -516,7 +516,7 @@ Una PR per finding, branch da `develop`, merge in `develop` (mai direttamente in
 
 Dipendenze: SEC-3 dopo SEC-1 (stesse route); SEC-8 dopo SEC-2 (stessi test). Tutte le altre sono indipendenti.
 
-Al termine di ogni PR: aggiornare la riga corrispondente nella tabella dell'Executive Summary con lo stato (es. `✅ implementato — PR #NNN`).
+Prima di creare ogni PR: aggiornare la riga corrispondente nella tabella dell'Executive Summary con lo stato (es. `✅ implementato — branch fix/sec-X-...`); aggiornare anche AGENTS.md, CLAUDE.md, Draft Release Temp.md, eliminare SESSION_NOTES.md — tutto nello stesso commit del codice.
 
 ---
 
@@ -541,11 +541,11 @@ Ogni sessione di implementazione si chiude — dopo la conferma dell'utente, ins
 
 Infine aggiornare lo stato del finding nella tabella dell'[Executive Summary](#1-executive-summary).
 
-Se `SESSION_NOTES.md` non esiste (viene eliminato dal rituale post-merge, vedi sotto), crearlo.
+Se `SESSION_NOTES.md` non esiste (viene eliminato dal rituale pre-PR, vedi sotto), crearlo.
 
-### Rituale post-merge (ultima azione obbligatoria dopo ogni merge in develop)
+### Rituale pre-PR (ultima azione obbligatoria prima di creare la PR, sul branch feature)
 
-Dopo il merge del branch SEC in `develop`, eseguire come ultima azione della sessione il prompt standard di chiusura del progetto, riportato qui verbatim:
+Prima di creare la PR, sul branch SEC corrente, eseguire il prompt standard di chiusura del progetto, riportato qui verbatim:
 
 ```text
 Sessione completata. Per favore:
