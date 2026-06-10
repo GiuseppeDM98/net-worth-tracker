@@ -5,7 +5,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic
-- Latest (2026-06-10): **Security review — spec di implementazione in `docs/security-review-spec.md`**. Full static security review (API routes, firestore.rules, secrets, XSS, SSRF/scraping, input validation, HTTP headers, deps, AI endpoints, logging) — no code changes. Outcome: overall posture good (centralized auth helper used by 25/30 routes, default-deny rules, no XSS, no secrets in git — the "committed .env.local" agent report was a verified false positive). 8 findings (SEC-1..SEC-8, 1 high: `/api/prices/quote` + `/api/prices/bond-quote` public without auth), each spec'd with implementation steps, acceptance criteria, required tests and a copy-paste prompt for weaker models; one PR per finding into `develop`, order SEC-1→2→3→5→4→8→6→7. The spec also codifies the session-close ritual (pre-commit confirmation, `SESSION_NOTES.md` Cosa/Perché/Nota entry, post-merge doc-update ritual).
+- Latest (2026-06-10): **SEC-1 implementato** — `GET /api/prices/quote` e `GET /api/prices/bond-quote` ora richiedono autenticazione Firebase (`requireFirebaseAuth`); `AssetDialog` aggiornato a `authenticatedFetch`; 4 test aggiunti in `apiAuthRoutes.test.ts`. Security review completa in `docs/security-review-spec.md` (8 findings, SEC-1 ✅, SEC-2..8 pending); ordine SEC-2→3→5→4→8→6→7.
 
 ## Architecture Snapshot
 - App Router with protected pages under `app/dashboard/*`
