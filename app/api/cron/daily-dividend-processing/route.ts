@@ -6,6 +6,7 @@ import {
   runExpenseCreation,
   runNextCouponScheduling,
 } from '@/lib/server/dividendProcessor';
+import { verifyCronSecret } from '@/lib/server/apiAuth';
 
 /**
  * GET /api/cron/daily-dividend-processing
@@ -24,7 +25,8 @@ import {
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!verifyCronSecret(token)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createHash, timingSafeEqual } from 'crypto';
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { adminAuth } from '@/lib/firebase/admin';
 
@@ -76,6 +77,24 @@ export function assertResourceOwner(
   if (decodedToken.uid !== ownerUserId) {
     throw new ApiAuthError(403, 'Resource does not belong to authenticated user');
   }
+}
+
+/**
+ * Constant-time comparison for the shared cron secret.
+ *
+ * Hashing both sides first makes timingSafeEqual usable with inputs of
+ * different lengths (it throws on length mismatch) without leaking length.
+ * Returns false when the env secret is not configured: a missing secret
+ * must never mean "open access".
+ */
+export function verifyCronSecret(provided: string | null | undefined): boolean {
+  const expected = process.env.CRON_SECRET;
+  if (!expected || !provided) {
+    return false;
+  }
+  const providedHash = createHash('sha256').update(provided).digest();
+  const expectedHash = createHash('sha256').update(expected).digest();
+  return timingSafeEqual(providedHash, expectedHash);
 }
 
 export function getApiAuthErrorResponse(error: unknown): NextResponse | null {

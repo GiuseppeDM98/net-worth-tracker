@@ -162,3 +162,4 @@
 ## 🔒 Security
 
 - Price quote endpoints (Yahoo Finance and Borsa Italiana) now require authentication, preventing unauthorized use as open proxies
+- CRON_SECRET comparison is now timing-safe (constant-time SHA-256 hash prevents side-channel leaks on cron endpoints)

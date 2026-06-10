@@ -17,6 +17,7 @@ import {
 import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
 import { refreshEcbRatesIfStale } from '@/lib/server/ecbRatesService';
 import { isWeeklyBudgetDayItaly, buildAndSendWeeklyBudget } from '@/lib/server/weeklyBudgetEmailService';
+import { verifyCronSecret } from '@/lib/server/apiAuth';
 
 /**
  * GET /api/cron/monthly-snapshot
@@ -58,7 +59,8 @@ export async function GET(request: NextRequest) {
   try {
     // Verify cron secret
     const authHeader = request.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!verifyCronSecret(token)) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }

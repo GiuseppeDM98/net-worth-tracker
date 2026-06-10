@@ -15,6 +15,7 @@ import {
   assertSameUser,
   getApiAuthErrorResponse,
   requireFirebaseAuth,
+  verifyCronSecret,
 } from '@/lib/server/apiAuth';
 import { invalidateDashboardOverviewSummaryServer } from '@/lib/services/dashboardOverviewInvalidation.server';
 
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest) {
     const { userId, year, month, cronSecret } = requestBody;
 
     // Verify cron secret if provided (for scheduled jobs)
-    if (cronSecret && cronSecret !== process.env.CRON_SECRET) {
+    if (cronSecret && !verifyCronSecret(cronSecret)) {
       return NextResponse.json(
         { error: 'Invalid cron secret' },
         { status: 401 }
