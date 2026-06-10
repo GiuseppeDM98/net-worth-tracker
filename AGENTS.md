@@ -265,6 +265,7 @@ For architecture and current product status, see [CLAUDE.md](CLAUDE.md).
 - **Deploy note**: after merging, rename `NEXT_PUBLIC_REGISTRATION_WHITELIST` → `REGISTRATION_WHITELIST` on the hosting platform. Until renamed the whitelist is empty — fail-closed if the whitelist flag is enabled.
 
 ### Private API Authorization
+- **Do NOT bump `firebase-admin` past 13.x.** `firebase-admin@14 → jwks-rsa@4 → jose@6` is pure ESM; Vercel's serverless (Lambda) runtime `require()`-s it and throws `ERR_REQUIRE_ESM`, 500-ing every Admin SDK route (overview, cron). A Node-22 forward-fix (`engines.node` + `serverExternalPackages`) was tried on a fresh Vercel preview and still failed — Vercel does not honor `require(ESM)` and the minor can't be pinned ≥22.12. `13.x` resolves `jwks-rsa@3 → jose@4` (CJS) and works. Revisit only when jwks-rsa ships a CJS-capable jose or Vercel's runtime supports `require(ESM)`. (This reverted SEC-6; the 8 moderate uuid advisories are reopened.)
 - Any App Router API route that uses Firebase Admin SDK must authenticate server-side; Firestore rules do not protect Admin SDK calls
 - Private routes must verify the Firebase ID token and bind the request to `decodedToken.uid`, not just a client-supplied `userId`
 - For record-level mutations on Admin SDK routes, enforce ownership after loading the document (e.g. `dividend.userId`, `asset.userId`)
