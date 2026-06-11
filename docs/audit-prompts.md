@@ -4,8 +4,8 @@ Prompt ottimizzati per `/impeccable audit` — compliance check mirato dopo l'im
 dei P0/P1 emersi da una critique, o come verifica standalone su assi specifici.
 
 **Quando usarli:**
-- Dopo aver implementato P0/P1 strutturali (prima di passare a polish) → verifica che
-  i cambiamenti non abbiano introdotto regressioni nei punti di contatto
+- Dopo aver implementato un redesign (craft + polish già fatti nello stesso passaggio) →
+  gate di compliance: verifica che i cambiamenti non abbiano introdotto regressioni
 - Come check standalone periodico su un asse specifico (es. token compliance dopo
   aver aggiunto un nuovo componente)
 
@@ -33,9 +33,10 @@ Audit è più veloce, non produce score, non sostituisce la critique di verifica
   `aria-label` su bottoni icon-only, `aria-expanded` su collapsible
 - **Skeleton** — ogni sezione async ha uno skeleton strutturalmente isomorfo al layout reale
 
-**Sequenza corretta:**
+**Sequenza corretta (flusso combinato "ripensamento"):**
 ```
-critique → shape (P0/P1) → implementa → audit → polish (P2/P3) → critique di verifica
+critique → shape combinato (blocco A + blocco B) → implementa tutto (craft + polish) →
+audit (gate compliance) → critique di verifica
 ```
 
 ---
@@ -374,11 +375,18 @@ Componenti: components/cashflow/CostCentersTab.tsx,
             components/cashflow/CostCenterDialog.tsx
 
 Assi da verificare (minimum — segnala anche eventuali altri problemi):
-- Token: KPI cards per centro, grafico spesa mensile via `useChartColors()`,
-  tabella transazioni — nessun hardcoded
-- Chart colors: grafico mensile via `useChartColors()`; tooltip via CSS vars
-- ARIA: delete/rename con `aria-label`; CostCenterDialog con `DialogDescription`
-- Breakpoint: CostCenterDetail non overflow su mobile
+- Token: hero totale periodo, lista flat divide-y dei centri + share-bar, detail (hero +
+  chip Δ-vs-precedente + righe flat), budget meter/verdict — nessun hardcoded; lo share-bar
+  e il meter usano token/`color-mix()`, non hex
+- Chart colors: grafico mensile stacked-by-categoria + overlay confronto cross-centro via
+  `useChartColors()`; tooltip via CSS vars; nessun hex diretto
+- Gerarchia: hero periodo con scala corretta; nessun ritorno al vecchio box-grid 2×4 di KPI;
+  lista centri flat divide-y (no card-in-card); Mono Mandate su tutti i valori
+- Periodo: asse `CostCenterPeriod` (Mese/Anno/12 mesi/Storico) derivato in-memory — verifica
+  che lo switch non rifaccia il fetch; lifecycle attivo/dormiente/archiviato coerente
+- ARIA: asse periodo + segmented `role="tablist"`/`role="tab"`; delete/rename con `aria-label`;
+  CostCenterDialog con `DialogDescription`; budget meter con `role="progressbar"` + `aria-valuenow`
+- Breakpoint: CostCenterDetail, composizione categoria e overlay confronto non overflow su mobile
 - Altro: pattern anomali o violazioni non elencate sopra
 
 Contesto:
@@ -688,15 +696,25 @@ Componenti: components/fire-simulations/GoalBasedInvestingTab.tsx,
             components/fire-simulations/GoalsSkeleton.tsx
 
 Assi da verificare (minimum — segnala anche eventuali altri problemi):
-- Token: colore goal personalizzato (color picker) — usato via `color-mix()` per bg/border,
-  nessun override hardcoded; `AllocationComparisonBar` via `useChartColors()` per le 6 classi
-- ARIA: goal list `role="progressbar"` su barra avanzamento, `aria-expanded` su expand row,
+- Token: chip verdetto (In linea/In ritardo/Raggiunto) e priorità via `goalVerdictMeta`
+  (`text-positive`/`text-destructive`/`--chart-3`), NON raw `text-red-600`/`bg-amber-50`;
+  colore identità del goal (color picker) resta grezzo SOLO su pallino/barra/linea proiezione
+  (scelta utente legittima); `AllocationComparisonBar` via `useChartColors()` per le 6 classi
+- Chart colors: `GoalProjectionChart` (glide-path) usa il colore identità del goal per area/linea,
+  `var(--border)`/`var(--muted-foreground)` per griglia/reference, tooltip via CSS vars — nessun hex
+- Gerarchia: hero `GoalsHero` con verdetto (no vanity metric "Progresso Medio"); lista ordinata
+  per urgenza; asset assegnati flat divide-y (NON la vecchia tabella annidata); Mono Mandate sui valori
+- KPI responsive: lista flat divide-y sotto desktop / chip grid al desktop (responsive duplication) —
+  valore allineato a destra senza wrap su 375px; "Non assegnato" espandibile sugli asset liberi
+- ARIA: barra avanzamento `role="progressbar"`, `aria-expanded` su expand row e su "Non assegnato",
   delete 2-click `aria-label` con stato "Conferma eliminazione"
-- `AssetAssignmentDialog`: `trueAvail` (no `excludeGoalId`) per "Nessuna quota libera" —
-  verifica che lo 0% mostri il messaggio corretto
-- Breakpoint: hero + flat list non overflow su 375px; GoalFormDialog color picker
-  touch-friendly (≥ 32px per swatch)
-- Skeleton: `GoalsSkeleton` isomorfo al nuovo layout (hero → flat list)
+- `AssetAssignmentDialog`: `trueAvail` (no `excludeGoalId`) per "Nessuna quota libera" — lo 0% mostra
+  il messaggio corretto
+- Pure layer: la matematica di traiettoria sta in `lib/utils/goalTrajectory.ts` (testata), NON inline
+  nei componenti; i componenti solo fetch/memo/render
+- Breakpoint: hero + lista + planner + timeline non overflow su 375px; GoalFormDialog color picker
+  touch-friendly (≥ 32px per swatch); campo `monthlyContribution` presente nel form
+- Skeleton: `GoalsSkeleton` isomorfo al layout (hero verdetto → KPI → lista)
 - Altro: pattern anomali o violazioni non elencate sopra
 
 Contesto:
@@ -961,7 +979,7 @@ Contesto:
 
 Dalla maggiore probabilità di regressione alla minore:
 
-**Dopo implementazione P0/P1 strutturali (gate prima del polish):**
+**Dopo un redesign implementato (gate di compliance post craft + polish):**
 1. Audit della pagina/tab appena modificata — assi token + chart colors + breakpoint
 2. Cross-cutting dialog audit — se il redesign ha toccato dialog
 

@@ -5,6 +5,13 @@ Prompt ottimizzati per eseguire `/impeccable critique` su ogni sezione dell'app.
 **Come usarli:** copia il blocco del prompt e incollalo nella chat con Claude Code.
 Riesegui dopo ogni redesign per misurare il delta di score.
 
+**Workflow (flusso combinato "ripensamento"):** `critique → shape combinato (blocco A nuova IA
++ blocco B 2-4 nuove feature) → checkpoint approvazione → implementa tutto (craft + polish) →
+test verdi + tsc pulito`. La critique è l'entry point; lo shape e l'implementazione seguono nella
+stessa sessione. L'`audit` (`docs/audit-prompts.md`) resta il gate di compliance dopo l'implementazione.
+I vecchi file `shape-prompts.md` / `polish-prompts.md` sono stati rimossi: lo shape vive inline qui,
+il polish è parte dell'implementazione.
+
 **Formato:** ogni prompt include solo file target, contesto minimo e benchmark di confronto.
 Nessun "focus specifico" — la critique deve essere indipendente e olistica.
 
@@ -54,11 +61,10 @@ Contesto:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha)
 - Leggi CLAUDE.md (stato corrente, known issues)
 
-Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
-servirà come input per il prossimo step:
-- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
-- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
-- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+Al termine: presenta la critique completa, poi proponi lo shape combinato — blocco A (nuovi
+modi di presentare le info GIÀ presenti) + blocco B (2-4 nuove feature/estensioni coerenti) —
+e fermati al checkpoint per approvazione, senza scrivere codice. Dopo l'ok: implementa tutto
+in una volta (craft + polish), con test verdi e tsc pulito.
 ```
 
 ---
@@ -103,11 +109,10 @@ Contesto:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha)
 - Leggi CLAUDE.md (stato corrente, known issues)
 
-Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
-servirà come input per il prossimo step:
-- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
-- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
-- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+Al termine: presenta la critique completa, poi proponi lo shape combinato — blocco A (nuovi
+modi di presentare le info GIÀ presenti) + blocco B (2-4 nuove feature/estensioni coerenti) —
+e fermati al checkpoint per approvazione, senza scrivere codice. Dopo l'ok: implementa tutto
+in una volta (craft + polish), con test verdi e tsc pulito.
 ```
 
 ---
@@ -148,11 +153,10 @@ Contesto:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha)
 - Leggi CLAUDE.md (stato corrente, known issues)
 
-Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
-servirà come input per il prossimo step:
-- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
-- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
-- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+Al termine: presenta la critique completa, poi proponi lo shape combinato — blocco A (nuovi
+modi di presentare le info GIÀ presenti) + blocco B (2-4 nuove feature/estensioni coerenti) —
+e fermati al checkpoint per approvazione, senza scrivere codice. Dopo l'ok: implementa tutto
+in una volta (craft + polish), con test verdi e tsc pulito.
 ```
 
 ### Tab "Tracciamento" *(mobileLabel: "Spese")*
@@ -183,11 +187,10 @@ Contesto:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha)
 - Leggi CLAUDE.md (stato corrente, known issues)
 
-Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
-servirà come input per il prossimo step:
-- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
-- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
-- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+Al termine: presenta la critique completa, poi proponi lo shape combinato — blocco A (nuovi
+modi di presentare le info GIÀ presenti) + blocco B (2-4 nuove feature/estensioni coerenti) —
+e fermati al checkpoint per approvazione, senza scrivere codice. Dopo l'ok: implementa tutto
+in una volta (craft + polish), con test verdi e tsc pulito.
 ```
 
 ### Tab "Budget"
@@ -228,11 +231,10 @@ Contesto:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha)
 - Leggi CLAUDE.md (stato corrente, known issues)
 
-Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
-servirà come input per il prossimo step:
-- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
-- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
-- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+Al termine: presenta la critique completa, poi proponi lo shape combinato — blocco A (nuovi
+modi di presentare le info GIÀ presenti) + blocco B (2-4 nuove feature/estensioni coerenti) —
+e fermati al checkpoint per approvazione, senza scrivere codice. Dopo l'ok: implementa tutto
+in una volta (craft + polish), con test verdi e tsc pulito.
 ```
 
 ### Tab "Centri di Costo" *(visibile solo se costCentersEnabled)*
@@ -245,11 +247,15 @@ Componenti: components/cashflow/CostCentersTab.tsx,
             components/cashflow/CostCenterDetail.tsx,
             components/cashflow/CostCenterDialog.tsx
 
-Questo tab raggruppa le spese per oggetto/progetto (es. "Automobile").
-Ogni centro ha KPI cards, grafico spesa mensile e tabella transazioni collegate.
-Delete e rename cascadano sulle spese via writeBatch.
-Confronta con: GoalBasedInvestingTab (assegnazione risorse a obiettivi — pattern analogo),
-ExpenseTrackingTab (transaction table style).
+Questo tab raggruppa le spese per oggetto/progetto (es. "Automobile"). Panoramica
+Trade-Republic: asse periodo (Mese/Anno/12 mesi/Storico, derivato in-memory) → hero totale
++ lista flat divide-y dei centri ordinata per spesa con share-bar. Detail = hero totale periodo
++ chip Δ-vs-precedente + righe flat, composizione per categoria, grafico mensile stacked-by-categoria.
+Feature: budget ceiling per centro (verdict + meter), costo annuo proiettato (smorzato a inizio anno),
+overlay di confronto cross-centro, lifecycle attivo/dormiente/archiviato. Derivazione pura in
+lib/utils/costCenterUtils.ts. Delete e rename cascadano sulle spese via writeBatch.
+Confronta con: GoalBasedInvestingTab (Panoramica + asse periodo + budget meter — pattern analogo),
+ExpenseTrackingTab (transaction style).
 Design language atteso (vedi DESIGN.md): North Star "Effortless Precision" — Linear/Vercel +
 Trade Republic + Apple, sotto la legge Form Follows Function (onestà, deferenza, inevitabilità:
 ogni proprietà visiva è conseguenza di una funzione, mai decorazione). Scala hero: page hero
@@ -264,11 +270,10 @@ Contesto:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha)
 - Leggi CLAUDE.md (stato corrente, known issues)
 
-Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
-servirà come input per il prossimo step:
-- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
-- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
-- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+Al termine: presenta la critique completa, poi proponi lo shape combinato — blocco A (nuovi
+modi di presentare le info GIÀ presenti) + blocco B (2-4 nuove feature/estensioni coerenti) —
+e fermati al checkpoint per approvazione, senza scrivere codice. Dopo l'ok: implementa tutto
+in una volta (craft + polish), con test verdi e tsc pulito.
 ```
 
 ---
@@ -315,11 +320,10 @@ Contesto:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha)
 - Leggi CLAUDE.md (stato corrente, known issues)
 
-Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
-servirà come input per il prossimo step:
-- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
-- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
-- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+Al termine: presenta la critique completa, poi proponi lo shape combinato — blocco A (nuovi
+modi di presentare le info GIÀ presenti) + blocco B (2-4 nuove feature/estensioni coerenti) —
+e fermati al checkpoint per approvazione, senza scrivere codice. Dopo l'ok: implementa tutto
+in una volta (craft + polish), con test verdi e tsc pulito.
 ```
 
 ---
@@ -357,11 +361,10 @@ Contesto:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha)
 - Leggi CLAUDE.md (stato corrente, known issues)
 
-Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
-servirà come input per il prossimo step:
-- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
-- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
-- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+Al termine: presenta la critique completa, poi proponi lo shape combinato — blocco A (nuovi
+modi di presentare le info GIÀ presenti) + blocco B (2-4 nuove feature/estensioni coerenti) —
+e fermati al checkpoint per approvazione, senza scrivere codice. Dopo l'ok: implementa tutto
+in una volta (craft + polish), con test verdi e tsc pulito.
 ```
 
 ---
@@ -393,11 +396,10 @@ Contesto:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha)
 - Leggi CLAUDE.md (stato corrente, known issues)
 
-Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
-servirà come input per il prossimo step:
-- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
-- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
-- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+Al termine: presenta la critique completa, poi proponi lo shape combinato — blocco A (nuovi
+modi di presentare le info GIÀ presenti) + blocco B (2-4 nuove feature/estensioni coerenti) —
+e fermati al checkpoint per approvazione, senza scrivere codice. Dopo l'ok: implementa tutto
+in una volta (craft + polish), con test verdi e tsc pulito.
 ```
 
 ---
@@ -434,11 +436,10 @@ Contesto:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha)
 - Leggi CLAUDE.md (stato corrente, known issues)
 
-Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
-servirà come input per il prossimo step:
-- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
-- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
-- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+Al termine: presenta la critique completa, poi proponi lo shape combinato — blocco A (nuovi
+modi di presentare le info GIÀ presenti) + blocco B (2-4 nuove feature/estensioni coerenti) —
+e fermati al checkpoint per approvazione, senza scrivere codice. Dopo l'ok: implementa tutto
+in una volta (craft + polish), con test verdi e tsc pulito.
 ```
 
 ---
@@ -471,11 +472,10 @@ Contesto:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha)
 - Leggi CLAUDE.md (stato corrente, known issues)
 
-Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
-servirà come input per il prossimo step:
-- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
-- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
-- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+Al termine: presenta la critique completa, poi proponi lo shape combinato — blocco A (nuovi
+modi di presentare le info GIÀ presenti) + blocco B (2-4 nuove feature/estensioni coerenti) —
+e fermati al checkpoint per approvazione, senza scrivere codice. Dopo l'ok: implementa tutto
+in una volta (craft + polish), con test verdi e tsc pulito.
 ```
 
 ---
@@ -512,11 +512,10 @@ Contesto:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha)
 - Leggi CLAUDE.md (stato corrente, known issues)
 
-Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
-servirà come input per il prossimo step:
-- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
-- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
-- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+Al termine: presenta la critique completa, poi proponi lo shape combinato — blocco A (nuovi
+modi di presentare le info GIÀ presenti) + blocco B (2-4 nuove feature/estensioni coerenti) —
+e fermati al checkpoint per approvazione, senza scrivere codice. Dopo l'ok: implementa tutto
+in una volta (craft + polish), con test verdi e tsc pulito.
 ```
 
 ### Tab "Coast FIRE"
@@ -546,11 +545,10 @@ Contesto:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha)
 - Leggi CLAUDE.md (stato corrente, known issues)
 
-Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
-servirà come input per il prossimo step:
-- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
-- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
-- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+Al termine: presenta la critique completa, poi proponi lo shape combinato — blocco A (nuovi
+modi di presentare le info GIÀ presenti) + blocco B (2-4 nuove feature/estensioni coerenti) —
+e fermati al checkpoint per approvazione, senza scrivere codice. Dopo l'ok: implementa tutto
+in una volta (craft + polish), con test verdi e tsc pulito.
 ```
 
 ### Tab "What If"
@@ -591,11 +589,10 @@ Contesto:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha)
 - Leggi CLAUDE.md (stato corrente, known issues)
 
-Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
-servirà come input per il prossimo step:
-- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
-- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
-- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+Al termine: presenta la critique completa, poi proponi lo shape combinato — blocco A (nuovi
+modi di presentare le info GIÀ presenti) + blocco B (2-4 nuove feature/estensioni coerenti) —
+e fermati al checkpoint per approvazione, senza scrivere codice. Dopo l'ok: implementa tutto
+in una volta (craft + polish), con test verdi e tsc pulito.
 ```
 
 ---
@@ -628,11 +625,10 @@ Contesto:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha)
 - Leggi CLAUDE.md (stato corrente, known issues)
 
-Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
-servirà come input per il prossimo step:
-- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
-- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
-- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+Al termine: presenta la critique completa, poi proponi lo shape combinato — blocco A (nuovi
+modi di presentare le info GIÀ presenti) + blocco B (2-4 nuove feature/estensioni coerenti) —
+e fermati al checkpoint per approvazione, senza scrivere codice. Dopo l'ok: implementa tutto
+in una volta (craft + polish), con test verdi e tsc pulito.
 ```
 
 ### Tab "Obiettivi"
@@ -645,10 +641,17 @@ Componenti: components/fire-simulations/GoalBasedInvestingTab.tsx,
             components/goals/*,
             components/fire-simulations/GoalsSkeleton.tsx
 
-Questo tab mostra il patrimonio allocato agli obiettivi con hero "Patrimonio Allocato",
-flat divide-y goal list con expand inline, GoalDetailCard (2-click delete, role="progressbar"),
-GoalFormDialog con color picker e AssetAssignmentDialog per assegnare quote di asset.
-Confronta con: FIRE Calculator (hero pattern), Allocazione (ActionChip, target%).
+Questo tab è trajectory-led (non solo progress bar). Hero a verdetto (GoalsHero: patrimonio
+allocato + "N in ritardo" + prossima scadenza; KPI chip Da-accantonare/mese + Non-assegnato
+espandibile sugli asset liberi; lista divide-y sotto desktop / chip grid al desktop). Lista
+ordinata per urgenza; ogni riga GoalDetailCard ha chip verdetto (In linea/In ritardo/Raggiunto)
++ ritmo richiesto-vs-pianificato, grafico di proiezione (GoalProjectionChart), asset assegnati
+flat divide-y, colori verdetto/priorità su token (goalVerdictMeta). Feature: contribution planner
+cross-goal (GoalContributionPlanner, gap×priorità), milestone timeline (GoalMilestoneTimeline).
+Layer puro lib/utils/goalTrajectory.ts (contributo richiesto via rendita, data proiettata, verdetto);
+InvestmentGoal ha monthlyContribution opzionale.
+Confronta con: FIRE Calculator (hero pattern), Allocazione (ContributionAllocator, target%),
+Centri di Costo (Panoramica + budget meter).
 Design language atteso (vedi DESIGN.md): North Star "Effortless Precision" — Linear/Vercel +
 Trade Republic + Apple, sotto la legge Form Follows Function (onestà, deferenza, inevitabilità:
 ogni proprietà visiva è conseguenza di una funzione, mai decorazione). Scala hero: page hero
@@ -663,11 +666,10 @@ Contesto:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha)
 - Leggi CLAUDE.md (stato corrente, known issues)
 
-Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
-servirà come input per il prossimo step:
-- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
-- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
-- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+Al termine: presenta la critique completa, poi proponi lo shape combinato — blocco A (nuovi
+modi di presentare le info GIÀ presenti) + blocco B (2-4 nuove feature/estensioni coerenti) —
+e fermati al checkpoint per approvazione, senza scrivere codice. Dopo l'ok: implementa tutto
+in una volta (craft + polish), con test verdi e tsc pulito.
 ```
 
 ---
@@ -710,11 +712,10 @@ Contesto:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha)
 - Leggi CLAUDE.md (stato corrente, known issues)
 
-Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
-servirà come input per il prossimo step:
-- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
-- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
-- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+Al termine: presenta la critique completa, poi proponi lo shape combinato — blocco A (nuovi
+modi di presentare le info GIÀ presenti) + blocco B (2-4 nuove feature/estensioni coerenti) —
+e fermati al checkpoint per approvazione, senza scrivere codice. Dopo l'ok: implementa tutto
+in una volta (craft + polish), con test verdi e tsc pulito.
 ```
 
 ---
@@ -747,11 +748,10 @@ Contesto:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha)
 - Leggi CLAUDE.md (stato corrente, known issues)
 
-Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
-servirà come input per il prossimo step:
-- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
-- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
-- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+Al termine: presenta la critique completa, poi proponi lo shape combinato — blocco A (nuovi
+modi di presentare le info GIÀ presenti) + blocco B (2-4 nuove feature/estensioni coerenti) —
+e fermati al checkpoint per approvazione, senza scrivere codice. Dopo l'ok: implementa tutto
+in una volta (craft + polish), con test verdi e tsc pulito.
 ```
 
 ---
@@ -792,11 +792,10 @@ Contesto:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha)
 - Leggi CLAUDE.md (stato corrente, known issues)
 
-Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
-servirà come input per il prossimo step:
-- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
-- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
-- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+Al termine: presenta la critique completa, poi proponi lo shape combinato — blocco A (nuovi
+modi di presentare le info GIÀ presenti) + blocco B (2-4 nuove feature/estensioni coerenti) —
+e fermati al checkpoint per approvazione, senza scrivere codice. Dopo l'ok: implementa tutto
+in una volta (craft + polish), con test verdi e tsc pulito.
 ```
 
 ---
@@ -829,11 +828,10 @@ Contesto:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha)
 - Leggi CLAUDE.md (stato corrente, known issues)
 
-Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
-servirà come input per il prossimo step:
-- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
-- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
-- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+Al termine: presenta la critique completa, poi proponi lo shape combinato — blocco A (nuovi
+modi di presentare le info GIÀ presenti) + blocco B (2-4 nuove feature/estensioni coerenti) —
+e fermati al checkpoint per approvazione, senza scrivere codice. Dopo l'ok: implementa tutto
+in una volta (craft + polish), con test verdi e tsc pulito.
 ```
 
 ### Login e Register
@@ -863,11 +861,10 @@ Contesto:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha)
 - Leggi CLAUDE.md (stato corrente, known issues)
 
-Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
-servirà come input per il prossimo step:
-- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
-- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
-- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+Al termine: presenta la critique completa, poi proponi lo shape combinato — blocco A (nuovi
+modi di presentare le info GIÀ presenti) + blocco B (2-4 nuove feature/estensioni coerenti) —
+e fermati al checkpoint per approvazione, senza scrivere codice. Dopo l'ok: implementa tutto
+in una volta (craft + polish), con test verdi e tsc pulito.
 ```
 
 ---
@@ -907,11 +904,10 @@ Contesto:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha)
 - Leggi CLAUDE.md (stato corrente, known issues)
 
-Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
-servirà come input per il prossimo step:
-- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
-- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
-- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+Al termine: presenta la critique completa, poi proponi lo shape combinato — blocco A (nuovi
+modi di presentare le info GIÀ presenti) + blocco B (2-4 nuove feature/estensioni coerenti) —
+e fermati al checkpoint per approvazione, senza scrivere codice. Dopo l'ok: implementa tutto
+in una volta (craft + polish), con test verdi e tsc pulito.
 ```
 
 ---
@@ -958,11 +954,10 @@ Contesto:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha)
 - Leggi CLAUDE.md (stato corrente, known issues)
 
-Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
-servirà come input per il prossimo step:
-- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
-- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
-- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+Al termine: presenta la critique completa, poi proponi lo shape combinato — blocco A (nuovi
+modi di presentare le info GIÀ presenti) + blocco B (2-4 nuove feature/estensioni coerenti) —
+e fermati al checkpoint per approvazione, senza scrivere codice. Dopo l'ok: implementa tutto
+in una volta (craft + polish), con test verdi e tsc pulito.
 ```
 
 ---
@@ -1034,11 +1029,10 @@ Contesto:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha)
 - Leggi CLAUDE.md (stato corrente, known issues)
 
-Al termine indica il path esatto del file .impeccable/critique/[slug].md generato —
-servirà come input per il prossimo step:
-- Solo P2/P3 → /impeccable polish (legge il file automaticamente)
-- P0/P1 presenti → /impeccable shape prima, poi /impeccable polish dopo l'implementazione
-- P0/P1 + P2/P3 → shape prima (P0/P1), implementa, poi polish (P2/P3) — i P2/P3 aspettano
+Al termine: presenta la critique completa, poi proponi lo shape combinato — blocco A (nuovi
+modi di presentare le info GIÀ presenti) + blocco B (2-4 nuove feature/estensioni coerenti) —
+e fermati al checkpoint per approvazione, senza scrivere codice. Dopo l'ok: implementa tutto
+in una volta (craft + polish), con test verdi e tsc pulito.
 ```
 
 ---

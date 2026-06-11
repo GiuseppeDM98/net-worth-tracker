@@ -62,6 +62,7 @@ export async function saveGoalData(
       };
       if (g.targetAmount != null) clean.targetAmount = g.targetAmount;
       if (g.targetDate != null) clean.targetDate = g.targetDate;
+      if (g.monthlyContribution != null) clean.monthlyContribution = g.monthlyContribution;
       if (g.recommendedAllocation != null) clean.recommendedAllocation = g.recommendedAllocation;
       if (g.notes != null) clean.notes = g.notes;
       return clean;

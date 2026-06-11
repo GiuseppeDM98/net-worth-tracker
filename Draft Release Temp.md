@@ -36,6 +36,11 @@
 - **Projected annual cost** — each cost center estimates what it will cost for the full year at your current pace, damped early in the year so one big January purchase doesn't blow the estimate up
 - **Compare cost centers over time** — an optional overlay charts your top centers month by month, so you can see when one project overtook another
 - **Archive finished cost centers** — close a center you're done with to tuck it out of the active list (its history is kept and it can be restored anytime); centers with no spending for a while are quietly marked "inactive"
+- **Goals rethought around "will I get there?"** — the Obiettivi tab (FIRE & Simulazioni) no longer just shows a progress bar. The headline now gives a verdict — how many goals are behind and the nearest deadline — instead of a meaningless average. Each goal carries an "In linea / In ritardo / Raggiunto" tag, and the list is sorted by urgency (behind first, then by closest deadline)
+- **Monthly contribution and projection per goal** — set how much you plan to put aside each month for a goal, and the app tells you the contribution it would actually need to hit the target by its date, your projected completion date, and draws a glide-path chart from today's value to the target (with the deadline marked). The expected return is inferred from the goal's recommended asset mix
+- **"Where to put the next deposit"** — enter an amount and it's split across your under-funded goals, weighted by how much each still needs and its priority — the same logic the Allocation page uses for asset classes
+- **Order of achievement timeline** — a sequenced view shows the order in which you'll reach your goals at the current pace (e.g. Auto 2026 → Casa 2029 → Pensione 2041), with reached goals marked done
+- **Free capital, surfaced** — the "Non assegnato" figure now expands to list exactly which holdings still have unassigned value, so you can see what's free to commit to a goal
 
 ## 🐛 Bug Fixes
 
