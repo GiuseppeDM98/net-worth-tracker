@@ -31,6 +31,11 @@
 - **Budget insights** — at a glance: your top spending category this month, how many categories are at risk of going over, your spend versus what you'd usually have spent by this point in the month, and your average daily spend
 - **Budget alerts** — get warned when a category reaches 50%, 75%, 90%, or 100% of its budget, or is forecast to overrun — both in-app and as a section in your monthly summary email. Choose which thresholds you care about
 - **Weekly budget email** — a new opt-in report sent every Sunday with the status and progress of all your monthly and annual budgets, plus a one-line AI summary highlighting what needs attention. Enable it in Settings and send a test copy anytime
+- **Cost Centers rethought** — the Centri di Costo tab is rebuilt around a single Panoramica. A period switch (This month / This year / Last 12 months / All time) drives every figure, a headline shows the total tracked in your cost centers, and the centers themselves are now a single ranked list (highest spend first) with a share bar, instead of a grid of equal cards — so you see where the money goes at a glance. Each center's detail leads with its period total and a change-vs-previous-period chip, breaks the cost down by category (both as a list and a stacked monthly chart), and separates fixed recurring cost from one-off spending
+- **Spending ceilings for cost centers** — give any center a monthly or annual budget and it reports a verdict (spent vs ceiling, with a meter and an "over ceiling" flag), so a project like "Automobile Dacia" can have a target you actually track
+- **Projected annual cost** — each cost center estimates what it will cost for the full year at your current pace, damped early in the year so one big January purchase doesn't blow the estimate up
+- **Compare cost centers over time** — an optional overlay charts your top centers month by month, so you can see when one project overtook another
+- **Archive finished cost centers** — close a center you're done with to tuck it out of the active list (its history is kept and it can be restored anytime); centers with no spending for a while are quietly marked "inactive"
 
 ## 🐛 Bug Fixes
 

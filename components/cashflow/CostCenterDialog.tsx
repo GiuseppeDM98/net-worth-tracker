@@ -14,7 +14,12 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { CostCenter, CostCenterFormData, COST_CENTER_COLORS } from '@/types/costCenters';
+import {
+  CostCenter,
+  CostCenterFormData,
+  CostCenterBudgetPeriod,
+  COST_CENTER_COLORS,
+} from '@/types/costCenters';
 import { createCostCenter, updateCostCenter } from '@/lib/services/costCenterService';
 import {
   Dialog,
@@ -26,6 +31,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -60,6 +66,9 @@ export function CostCenterDialog({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [color, setColor] = useState<string>(COST_CENTER_COLORS[0]);
+  // Optional spending ceiling. Empty string = no budget; the field is opt-in.
+  const [budgetAmount, setBudgetAmount] = useState('');
+  const [budgetPeriod, setBudgetPeriod] = useState<CostCenterBudgetPeriod>('annual');
   const [saving, setSaving] = useState(false);
 
   // Populate fields when editing an existing cost center
@@ -68,20 +77,31 @@ export function CostCenterDialog({
       setName(costCenter.name);
       setDescription(costCenter.description ?? '');
       setColor(costCenter.color ?? COST_CENTER_COLORS[0]);
+      setBudgetAmount(costCenter.budgetAmount != null ? String(costCenter.budgetAmount) : '');
+      setBudgetPeriod(costCenter.budgetPeriod ?? 'annual');
     } else {
       setName('');
       setDescription('');
       setColor(COST_CENTER_COLORS[0]);
+      setBudgetAmount('');
+      setBudgetPeriod('annual');
     }
   }, [costCenter, open]);
 
   const handleSave = async () => {
     if (!user || !name.trim()) return;
 
+    // A non-positive or empty budget input means "no ceiling": persist undefined so
+    // the verdict logic skips it.
+    const parsedBudget = parseFloat(budgetAmount.replace(',', '.'));
+    const hasBudget = Number.isFinite(parsedBudget) && parsedBudget > 0;
+
     const formData: CostCenterFormData = {
       name: name.trim(),
       description: description.trim() || undefined,
       color,
+      budgetAmount: hasBudget ? parsedBudget : undefined,
+      budgetPeriod: hasBudget ? budgetPeriod : undefined,
     };
 
     try {
@@ -169,6 +189,45 @@ export function CostCenterDialog({
                 />
               ))}
             </div>
+          </div>
+
+          {/* Optional spending ceiling (budget). Lets the center report a verdict and
+              compare its projected cost against a target. Leaving the amount empty
+              keeps the center as a pure tracker. */}
+          <div className="space-y-2 border-t border-border/40 pt-4">
+            <Label htmlFor="ccBudget">Tetto di spesa (opzionale)</Label>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="relative flex-1">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                  €
+                </span>
+                <Input
+                  id="ccBudget"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="50"
+                  placeholder="0"
+                  value={budgetAmount}
+                  onChange={(e) => setBudgetAmount(e.target.value)}
+                  className="pl-7 font-mono"
+                />
+              </div>
+              <SegmentedControl<CostCenterBudgetPeriod>
+                options={[
+                  { value: 'monthly', label: 'Mensile' },
+                  { value: 'annual', label: 'Annuale' },
+                ]}
+                value={budgetPeriod}
+                onChange={setBudgetPeriod}
+                aria-label="Periodo del tetto di spesa"
+                className="sm:w-[180px]"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Imposta un limite {budgetPeriod === 'monthly' ? 'mensile' : 'annuale'} per
+              ricevere un avviso quando il centro lo supera.
+            </p>
           </div>
         </div>
 

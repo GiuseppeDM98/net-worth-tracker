@@ -40,12 +40,20 @@ const EXPENSES = 'expenses';
 // --- Converters ---
 
 function docToCostCenter(id: string, data: Record<string, unknown>): CostCenter {
+  // budgetAmount/budgetPeriod are optional and absent on pre-feature documents.
+  // archivedAt is null for active centers; we normalize Firestore null → undefined-ish
+  // by keeping it null so the lifecycle helper can treat it as "not archived".
+  const budgetAmount = data.budgetAmount as number | null | undefined;
+  const archivedAt = data.archivedAt as never;
   return {
     id,
     userId: data.userId as string,
     name: data.name as string,
     description: data.description as string | undefined,
     color: data.color as string | undefined,
+    budgetAmount: budgetAmount ?? undefined,
+    budgetPeriod: (data.budgetPeriod as CostCenter['budgetPeriod']) ?? undefined,
+    archivedAt: archivedAt ? toDate(archivedAt) : null,
     createdAt: toDate(data.createdAt as never),
     updatedAt: toDate(data.updatedAt as never),
   };
@@ -101,6 +109,10 @@ export async function createCostCenter(
     name: formData.name.trim(),
     description: formData.description?.trim() ?? null,
     color: formData.color ?? null,
+    // Budget is opt-in: store null when absent so the field exists and reads cleanly.
+    budgetAmount: formData.budgetAmount ?? null,
+    budgetPeriod: formData.budgetPeriod ?? null,
+    archivedAt: null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
@@ -113,6 +125,9 @@ export async function createCostCenter(
     name: payload.name,
     description: payload.description ?? undefined,
     color: payload.color ?? undefined,
+    budgetAmount: payload.budgetAmount ?? undefined,
+    budgetPeriod: payload.budgetPeriod ?? undefined,
+    archivedAt: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -132,6 +147,8 @@ export async function updateCostCenter(
     name: newName,
     description: formData.description?.trim() ?? null,
     color: formData.color ?? null,
+    budgetAmount: formData.budgetAmount ?? null,
+    budgetPeriod: formData.budgetPeriod ?? null,
     updatedAt: serverTimestamp(),
   });
 
@@ -139,6 +156,26 @@ export async function updateCostCenter(
   if (newName !== costCenter.name) {
     await renameCostCenterInExpenses(costCenter.userId, costCenter.id, newName);
   }
+}
+
+/**
+ * Archives or restores a cost center (lifecycle action, B4).
+ *
+ * Archiving is non-destructive: it only stamps `archivedAt` so the center drops out of
+ * the active list while keeping its history. Restoring clears the stamp. Linked expenses
+ * are untouched.
+ */
+export async function setCostCenterArchived(
+  costCenterId: string,
+  archived: boolean,
+): Promise<Date | null> {
+  const ref = doc(db, COST_CENTERS, costCenterId);
+  const archivedAt = archived ? new Date() : null;
+  await updateDoc(ref, {
+    archivedAt: archived ? archivedAt : null,
+    updatedAt: serverTimestamp(),
+  });
+  return archivedAt;
 }
 
 /**
