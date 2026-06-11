@@ -68,6 +68,7 @@ export function GoalFormDialog({
   const [name, setName] = useState('');
   const [targetAmount, setTargetAmount] = useState('');
   const [targetDate, setTargetDate] = useState('');
+  const [monthlyContribution, setMonthlyContribution] = useState('');
   const [priority, setPriority] = useState<GoalPriority>('media');
   const [color, setColor] = useState(GOAL_COLORS[0]);
   const [notes, setNotes] = useState('');
@@ -81,6 +82,7 @@ export function GoalFormDialog({
       setName(goal.name);
       setTargetAmount(goal.targetAmount?.toString() ?? '');
       setTargetDate(goal.targetDate || '');
+      setMonthlyContribution(goal.monthlyContribution?.toString() ?? '');
       setPriority(goal.priority);
       setColor(goal.color);
       setNotes(goal.notes || '');
@@ -89,6 +91,7 @@ export function GoalFormDialog({
       setName('');
       setTargetAmount('');
       setTargetDate('');
+      setMonthlyContribution('');
       setPriority('media');
       setColor(GOAL_COLORS[0]);
       setNotes('');
@@ -135,11 +138,14 @@ export function GoalFormDialog({
     try {
       const now = new Date();
       const parsedTarget = targetAmount ? parseFloat(targetAmount) : undefined;
+      const parsedContribution = monthlyContribution ? parseFloat(monthlyContribution) : undefined;
       const goalData: InvestmentGoal = {
         id: goal?.id || crypto.randomUUID(),
         name: name.trim(),
         targetAmount: parsedTarget && parsedTarget > 0 ? parsedTarget : undefined,
         targetDate: targetDate || undefined,
+        monthlyContribution:
+          parsedContribution && parsedContribution > 0 ? parsedContribution : undefined,
         priority,
         color,
         recommendedAllocation:
@@ -231,6 +237,24 @@ export function GoalFormDialog({
             />
           </div>
 
+          {/* Monthly contribution */}
+          <div className="space-y-1">
+            <Label htmlFor="goalContribution">Contributo Mensile (opzionale)</Label>
+            <Input
+              id="goalContribution"
+              type="number"
+              min="0"
+              step="50"
+              value={monthlyContribution}
+              onChange={(e) => setMonthlyContribution(e.target.value)}
+              placeholder="es. 500"
+            />
+            <p className="text-xs text-muted-foreground">
+              Quanto pensi di versare ogni mese: serve a stimare quando raggiungerai
+              l&apos;obiettivo.
+            </p>
+          </div>
+
           {/* Priority */}
           <div className="space-y-1">
             <Label>Priorita</Label>
@@ -303,7 +327,7 @@ export function GoalFormDialog({
             {Object.keys(allocation).length > 0 && (
               <p
                 className={`text-xs font-medium ${
-                  isAllocationValid ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'
+                  isAllocationValid ? 'text-positive' : 'text-destructive'
                 }`}
               >
                 Totale: {allocationTotal.toFixed(1)}%

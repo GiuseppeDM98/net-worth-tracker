@@ -25,10 +25,18 @@ import {
   saveGoalData,
   calculateGoalProgress,
   getUnassignedValue,
+  getAvailablePercentage,
   validateAssignments,
   cleanOrphanedAssignments,
 } from '@/lib/services/goalService';
+import { calculateAssetValue } from '@/lib/services/assetService';
 import { GoalBasedInvestingData, InvestmentGoal, GoalAssetAssignment } from '@/types/goals';
+import {
+  computeGoalTrajectory,
+  sortGoalRowsByUrgency,
+  buildGoalsVerdictSummary,
+  type GoalRow,
+} from '@/lib/utils/goalTrajectory';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Settings, Plus, Target, AlertTriangle } from 'lucide-react';
@@ -37,8 +45,9 @@ import { toast } from 'sonner';
 import { GoalDetailCard } from '@/components/goals/GoalDetailCard';
 import { GoalFormDialog } from '@/components/goals/GoalFormDialog';
 import { AssetAssignmentDialog } from '@/components/goals/AssetAssignmentDialog';
-import { useCountUp } from '@/lib/utils/useCountUp';
-import { formatCurrency } from '@/lib/utils/formatters';
+import { GoalsHero, type FreeAsset } from '@/components/goals/GoalsHero';
+import { GoalContributionPlanner } from '@/components/goals/GoalContributionPlanner';
+import { GoalMilestoneTimeline } from '@/components/goals/GoalMilestoneTimeline';
 
 export function GoalBasedInvestingTab() {
   const { user } = useAuth();
@@ -108,22 +117,42 @@ export function GoalBasedInvestingTab() {
     [goalProgressList]
   );
 
-  // Average progress percentage across goals that have a target
-  const avgProgress = useMemo(() => {
-    const withTargets = goalProgressList.filter((p) => p.progressPercentage != null);
-    if (withTargets.length === 0) return null;
-    return (
-      withTargets.reduce((sum, p) => sum + (p.progressPercentage ?? 0), 0) /
-      withTargets.length
-    );
-  }, [goalProgressList]);
+  // Single "now" per render pass so trajectories + ordering stay stable.
+  const now = useMemo(() => new Date(), []);
 
-  // useCountUp must be called before any early return (React hook rules).
-  // Pass null during loading so the animation fires only when real data arrives.
-  const animatedAllocated = useCountUp(
-    loadingSettings || loadingAssets || loadingGoals ? null : allocatedTotal,
-    { duration: 620, once: true, fromPrevious: true }
-  );
+  // Per-goal trajectory (required pace, projected date, verdict), then urgency ordering + hero summary.
+  const goalRows = useMemo<GoalRow[]>(() => {
+    return goals
+      .map((goal) => {
+        const progress = goalProgressList.find((p) => p.goalId === goal.id);
+        if (!progress) return null;
+        const trajectory = computeGoalTrajectory({
+          currentValue: progress.currentValue,
+          targetAmount: goal.targetAmount,
+          targetDate: goal.targetDate,
+          monthlyContribution: goal.monthlyContribution,
+          recommendedAllocation: goal.recommendedAllocation,
+          now,
+        });
+        return { goal, progress, trajectory };
+      })
+      .filter((r): r is GoalRow => r != null);
+  }, [goals, goalProgressList, now]);
+
+  const sortedRows = useMemo(() => sortGoalRowsByUrgency(goalRows), [goalRows]);
+  const verdictSummary = useMemo(() => buildGoalsVerdictSummary(goalRows), [goalRows]);
+
+  // Assets that still have free (unassigned) value — drives the hero's "Non assegnato" panel (A7).
+  const freeAssets = useMemo<FreeAsset[]>(() => {
+    return assets
+      .map((asset) => {
+        const freePct = getAvailablePercentage(asset.id, cleanedAssignments);
+        const freeValue = (calculateAssetValue(asset) * freePct) / 100;
+        return { id: asset.id, name: asset.name, ticker: asset.ticker, freeValue, freePct };
+      })
+      .filter((a) => a.freePct > 0.5 && a.freeValue > 0.5)
+      .sort((a, b) => b.freeValue - a.freeValue);
+  }, [assets, cleanedAssignments]);
 
   // ==================== Goal CRUD ====================
 
@@ -223,41 +252,15 @@ export function GoalBasedInvestingTab() {
 
   return (
     <div className="space-y-6 max-desktop:portrait:pb-20">
-      {/* Hero Block — always visible, anchors the page hierarchy */}
-      <Card className="overflow-hidden">
-        <div className="px-6 py-5 border-b border-border">
-          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/70">
-            Patrimonio Allocato
-          </p>
-          <p className="font-mono text-4xl font-bold tabular-nums leading-none tracking-tight text-foreground mt-1.5">
-            {hasGoals && animatedAllocated != null
-              ? formatCurrency(animatedAllocated)
-              : '--'}
-          </p>
-        </div>
-        <div className="divide-y divide-border">
-          <div className="flex items-center justify-between px-6 py-3.5">
-            <span className="text-sm text-muted-foreground">Obiettivi Attivi</span>
-            <span className="text-sm font-semibold font-mono tabular-nums">
-              {goals.length}
-            </span>
-          </div>
-          <div className="flex items-center justify-between px-6 py-3.5">
-            <span className="text-sm text-muted-foreground">Non Assegnato</span>
-            <span className="text-sm font-semibold font-mono tabular-nums">
-              {hasGoals ? formatCurrency(unassignedValue) : '--'}
-            </span>
-          </div>
-          {avgProgress != null && (
-            <div className="flex items-center justify-between px-6 py-3.5">
-              <span className="text-sm text-muted-foreground">Progresso Medio</span>
-              <span className="text-sm font-semibold font-mono tabular-nums">
-                {avgProgress.toFixed(1)}%
-              </span>
-            </div>
-          )}
-        </div>
-      </Card>
+      {/* Hero — allocated total + verdict + actionable KPIs (A1/A2/A7) */}
+      <GoalsHero
+        allocatedTotal={allocatedTotal}
+        goalCount={goals.length}
+        summary={verdictSummary}
+        unassignedValue={unassignedValue}
+        freeAssets={freeAssets}
+        ready
+      />
 
       {/* Validation warnings */}
       {validationErrors.length > 0 && (
@@ -294,7 +297,10 @@ export function GoalBasedInvestingTab() {
         </Card>
       ) : (
         <>
-          {/* Flat goal list — single Card, all goals as divide-y rows */}
+          {/* Contribution planner — where to direct the next deposit (B3) */}
+          <GoalContributionPlanner goals={goals} progressList={goalProgressList} />
+
+          {/* Flat goal list — single Card, all goals as divide-y rows, sorted by urgency (A4) */}
           <Card className="overflow-hidden">
             <div className="flex flex-col gap-3 desktop:flex-row desktop:items-center desktop:justify-between px-6 py-4 border-b border-border">
               <div>
@@ -302,7 +308,7 @@ export function GoalBasedInvestingTab() {
                   Obiettivi di Investimento
                 </h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Alloca mentalmente il tuo portafoglio verso obiettivi finanziari
+                  Ordinati per urgenza: prima quelli in ritardo, poi per scadenza
                 </p>
               </div>
               <Button
@@ -317,9 +323,7 @@ export function GoalBasedInvestingTab() {
               </Button>
             </div>
             <div className="divide-y divide-border">
-              {goals.map((goal) => {
-                const progress = goalProgressList.find((p) => p.goalId === goal.id);
-                if (!progress) return null;
+              {sortedRows.map(({ goal, progress, trajectory }) => {
                 const goalAssignments = cleanedAssignments.filter(
                   (a) => a.goalId === goal.id
                 );
@@ -328,6 +332,7 @@ export function GoalBasedInvestingTab() {
                     key={goal.id}
                     goal={goal}
                     progress={progress}
+                    trajectory={trajectory}
                     assignments={goalAssignments}
                     assets={assets}
                     onEdit={() => handleEditGoal(goal)}
@@ -341,6 +346,9 @@ export function GoalBasedInvestingTab() {
               })}
             </div>
           </Card>
+
+          {/* Order goals will be reached (B4) */}
+          <GoalMilestoneTimeline rows={sortedRows} />
 
           {/* Allocation-priority explanation — shown only when goal-driven allocation is active */}
           {settings?.goalDrivenAllocationEnabled && (

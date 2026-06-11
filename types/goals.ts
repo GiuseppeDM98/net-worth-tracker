@@ -18,6 +18,7 @@ export interface InvestmentGoal {
   targetDate?: string;             // ISO date string (optional for open-ended goals like retirement)
   priority: GoalPriority;
   color: string;                   // Hex color for charts
+  monthlyContribution?: number;    // Planned monthly contribution (EUR) — drives projection/required-pace (read-compatible, no migration)
   recommendedAllocation?: Partial<Record<AssetClass, number>>; // Suggested asset class mix, values sum to 100
   notes?: string;                  // Free-text notes (max 500 chars)
   createdAt: Date;
