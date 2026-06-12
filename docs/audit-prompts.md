@@ -281,21 +281,30 @@ Contesto:
 
 File: app/dashboard/cashflow/page.tsx
 Componenti: components/dividends/DividendTrackingTab.tsx,
+            components/dividends/DividendStats.tsx,
             components/dividends/DividendCalendar.tsx,
             components/dividends/DividendTable.tsx,
-            components/dividends/DividendDetailsDialog.tsx,
-            components/dividends/DividendStats.tsx,
+            components/dividends/DividendRecordDetailsDialog.tsx,
             components/dividends/DividendDialog.tsx
+Pure layer (logica, non visivo): lib/utils/dividendAnalytics.ts, lib/constants/dividendTypes.ts
 
 Assi da verificare (minimum — segnala anche eventuali altri problemi):
-- Token: calendario (day active, day hover, today highlight) — nessun hardcoded;
-  DividendStats cards — nessun `bg-blue-*` o simili; badge tipo dividendo via CSS var
-- Chart colors: eventuali grafici in DividendStats via `useChartColors()`
-- Gerarchia: hero YOC/totale dividendi presente con la scala corretta (`text-[44px] desktop:text-[54px] font-bold font-mono`)?
-  (se assente è P1 per la critique, non per questo audit)
-- Breakpoint: calendario non overflow su 375px; DividendTable scroll orizzontale su mobile
-- ARIA: calendario con `aria-label` sui giorni, `aria-selected` sul giorno attivo;
-  DividendDetailsDialog con `role="dialog"`, `aria-modal`, focus trap
+- Token: hero net-income, KPI chip grid (`bg-muted/40`), strip income-reliability, leaderboard
+  payer divide-y + share-bar, calendario (day active/hover, today highlight) — nessun hardcoded;
+  colori segno via `getMetricValueColor` (token, non emerald/red); badge tipo dividendo via CSS var
+- Chart colors: sparkline trailing-12m dell'hero + grafici nel Collapsible (e DividendStats) via
+  `useChartColors()`; tooltip via CSS vars — nessun hex diretto
+- Gerarchia: hero net-income con scala corretta (`text-[44px] desktop:text-[54px] font-bold font-mono`)
+  + chip di variazione; leaderboard payer flat divide-y (no card-in-card); Mono Mandate su tutti i valori
+- Periodo: asse `DividendPeriod` (Mese/Anno/12 mesi/Storico) derivato in-memory — verifica che lo
+  switch NON rifaccia il fetch; `DividendStats` ricevono i bound di data del periodo selezionato
+- Progressive disclosure: Table/Calendario via `SegmentedControl`; filtri asset/tipo + day-focus sotto
+  "Filtra"; grafici e analisi avanzata dietro `Collapsible` — stati di default coerenti
+- Breakpoint: calendario non overflow su 375px; DividendTable scroll orizzontale su mobile;
+  leaderboard e strip reliability non debordano
+- ARIA: SegmentedControl + asse periodo `role="tablist"`/`role="tab"`; calendario con `aria-label`
+  sui giorni e `aria-selected` sul giorno attivo; Collapsible con `aria-expanded`;
+  DividendRecordDetailsDialog con `role="dialog"`, `aria-modal`, focus trap
 - Altro: pattern anomali o violazioni non elencate sopra
 
 Contesto:
