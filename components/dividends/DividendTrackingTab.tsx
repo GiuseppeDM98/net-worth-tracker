@@ -40,6 +40,8 @@ import { DividendTable } from './DividendTable';
 import { DividendCalendar } from './DividendCalendar';
 import { DividendStats } from './DividendStats';
 import { DividendRecordDetailsDialog } from './DividendRecordDetailsDialog';
+import { ProvisionalCouponBanner } from './ProvisionalCouponBanner';
+import { InflationRateDialog } from './InflationRateDialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -171,6 +173,8 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
   const [detailDividend, setDetailDividend] = useState<Dividend | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [detailDialogStyle, setDetailDialogStyle] = useState<CSSProperties | undefined>(undefined);
+  const [inflationCoupon, setInflationCoupon] = useState<Dividend | null>(null);
+  const [inflationDialogOpen, setInflationDialogOpen] = useState(false);
   const detailDialogRef = useRef<HTMLDivElement | null>(null);
   const detailTriggerRef = useRef<HTMLElement | null>(null);
 
@@ -200,6 +204,15 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
   const monthlySeries = useMemo(() => buildMonthlyNetSeries(dividends, now), [dividends, now]);
   const yearlySeries = useMemo(() => buildYearlySeries(dividends, now), [dividends, now]);
   const maxPayerNet = payers[0]?.net ?? 0;
+
+  // Future inflation-linked coupons still at the provisional fixed floor (B1 banner).
+  const provisionalCoupons = useMemo(
+    () =>
+      dividends
+        .filter((d) => d.isProvisional && toDate(d.paymentDate) > now)
+        .sort((a, b) => toDate(a.paymentDate).getTime() - toDate(b.paymentDate).getTime()),
+    [dividends, now]
+  );
 
   // Period → date bounds, fed to the server-computed advanced block so it tracks the axis.
   const { startDate: periodStart, endDate: periodEnd } = useMemo(
@@ -454,6 +467,18 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
         aria-label="Periodo"
         className="max-w-md"
       />
+
+      {/* B1 — inflation-linked coupons awaiting their announced FOI rate. */}
+      {provisionalCoupons.length > 0 && (
+        <ProvisionalCouponBanner
+          coupons={provisionalCoupons}
+          isDemo={isDemo}
+          onSelect={(coupon) => {
+            setInflationCoupon(coupon);
+            setInflationDialogOpen(true);
+          }}
+        />
+      )}
 
       {/* HERO — net dividends cashed in the period. */}
       <section>
@@ -714,8 +739,20 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
           if (!open) setDetailDialogStyle(undefined);
         }}
         onEdit={handleEdit}
+        onSetInflationRate={(d) => {
+          setInflationCoupon(d);
+          setInflationDialogOpen(true);
+        }}
         dialogRef={detailDialogRef}
         style={detailDialogStyle}
+      />
+
+      <InflationRateDialog
+        open={inflationDialogOpen}
+        coupon={inflationCoupon}
+        asset={assets.find((a) => a.id === inflationCoupon?.assetId) ?? null}
+        onClose={() => setInflationDialogOpen(false)}
+        onSaved={onRefresh}
       />
     </div>
   );

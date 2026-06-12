@@ -44,6 +44,8 @@ interface DividendRecordDetailsDialogProps {
   dividend: Dividend | null;
   onOpenChange: (open: boolean) => void;
   onEdit: (dividend: Dividend) => void;
+  /** Provisional inflation-linked coupons: opens the FOI-rate dialog from here. */
+  onSetInflationRate?: (dividend: Dividend) => void;
   dialogRef?: RefObject<HTMLDivElement | null>;
   style?: CSSProperties;
 }
@@ -53,6 +55,7 @@ export function DividendRecordDetailsDialog({
   dividend,
   onOpenChange,
   onEdit,
+  onSetInflationRate,
   dialogRef,
   style,
 }: DividendRecordDetailsDialogProps) {
@@ -73,9 +76,16 @@ export function DividendRecordDetailsDialog({
                 {dividend.assetName}
               </DialogDescription>
             </div>
-            <Badge variant="outline" className={dividendTypeBadgeColor[dividend.dividendType]}>
-              {dividendTypeLabels[dividend.dividendType]}
-            </Badge>
+            <div className="flex flex-col items-end gap-1.5">
+              <Badge variant="outline" className={dividendTypeBadgeColor[dividend.dividendType]}>
+                {dividendTypeLabels[dividend.dividendType]}
+              </Badge>
+              {dividend.isProvisional && (
+                <Badge variant="outline" className="border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-400">
+                  Provvisoria
+                </Badge>
+              )}
+            </div>
           </div>
         </DialogHeader>
 
@@ -161,15 +171,27 @@ export function DividendRecordDetailsDialog({
           <p className="text-xs text-muted-foreground">
             Dettaglio contestuale del pagamento selezionato
           </p>
-          <Button
-            variant="outline"
-            onClick={() => {
-              onOpenChange(false);
-              onEdit(dividend);
-            }}
-          >
-            Modifica
-          </Button>
+          <div className="flex gap-2">
+            {dividend.isProvisional && onSetInflationRate && (
+              <Button
+                onClick={() => {
+                  onOpenChange(false);
+                  onSetInflationRate(dividend);
+                }}
+              >
+                Imposta tasso inflazione
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => {
+                onOpenChange(false);
+                onEdit(dividend);
+              }}
+            >
+              Modifica
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -16,8 +16,13 @@ import {
   getNextCouponDate,
   getFollowingCouponDate,
   calculateCouponPerShare,
+  couponFrequencyLabel,
+  findAnnouncedInflationRate,
+  upsertAnnouncedInflationRate,
+  resolveCoupon,
+  buildCouponNote,
 } from '@/lib/utils/couponUtils';
-import type { CouponRateTier } from '@/types/assets';
+import type { CouponRateTier, BondDetails } from '@/types/assets';
 
 // ---------------------------------------------------------------------------
 // Shared fixture for step-up schedule tests
@@ -208,5 +213,137 @@ describe('calculateCouponPerShare', () => {
     // (2.5 / 100 / 2) * 1 = 0.0125
     const result = calculateCouponPerShare(2.5, 1, 'semiannual');
     expect(result).toBeCloseTo(0.0125, 10);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Inflation-linked bonds (BTP Italia Sì)
+// ---------------------------------------------------------------------------
+
+// BTP Italia Sì-style fixture: fixed minimum 1.50% annual, semiannual, nominal 1000.
+const INFLATION_BOND: BondDetails = {
+  couponRate: 1.5,
+  couponFrequency: 'semiannual',
+  issueDate: new Date(2026, 5, 17),    // 17/06/2026
+  maturityDate: new Date(2031, 5, 17), // 17/06/2031
+  nominalValue: 1000,
+  isInflationLinked: true,
+  finalPremiumRate: 0.6,
+};
+// First coupon falls 6 months after issue → 17/12/2026.
+const FIRST_COUPON = new Date(2026, 11, 17);
+
+describe('couponFrequencyLabel', () => {
+  it('maps frequencies to Italian adjectives', () => {
+    expect(couponFrequencyLabel('monthly')).toBe('mensile');
+    expect(couponFrequencyLabel('quarterly')).toBe('trimestrale');
+    expect(couponFrequencyLabel('semiannual')).toBe('semestrale');
+    expect(couponFrequencyLabel('annual')).toBe('annuale');
+  });
+});
+
+describe('findAnnouncedInflationRate', () => {
+  it('returns null for undefined or empty schedules', () => {
+    expect(findAnnouncedInflationRate(undefined, FIRST_COUPON)).toBeNull();
+    expect(findAnnouncedInflationRate([], FIRST_COUPON)).toBeNull();
+  });
+
+  it('matches by year+month, ignoring day-of-month drift', () => {
+    const rates = [{ couponDate: new Date(2026, 11, 17), periodRate: 1.3 }];
+    // Same year+month, different day → still matches (robust to date drift).
+    expect(findAnnouncedInflationRate(rates, new Date(2026, 11, 5))).toBe(1.3);
+  });
+
+  it('returns null when no entry shares the coupon year+month', () => {
+    const rates = [{ couponDate: new Date(2027, 5, 17), periodRate: 0.9 }];
+    expect(findAnnouncedInflationRate(rates, FIRST_COUPON)).toBeNull();
+  });
+});
+
+describe('upsertAnnouncedInflationRate', () => {
+  it('appends to an undefined/empty schedule', () => {
+    expect(upsertAnnouncedInflationRate(undefined, FIRST_COUPON, 1.3)).toEqual([
+      { couponDate: FIRST_COUPON, periodRate: 1.3 },
+    ]);
+  });
+
+  it('replaces an existing entry for the same year+month', () => {
+    const existing = [{ couponDate: new Date(2026, 11, 1), periodRate: 0.9 }];
+    const result = upsertAnnouncedInflationRate(existing, FIRST_COUPON, 1.3);
+    expect(result).toHaveLength(1);
+    expect(result[0].periodRate).toBe(1.3);
+  });
+
+  it('keeps entries for other coupon periods', () => {
+    const existing = [{ couponDate: new Date(2026, 5, 17), periodRate: 0.8 }];
+    const result = upsertAnnouncedInflationRate(existing, FIRST_COUPON, 1.3);
+    expect(result).toHaveLength(2);
+  });
+});
+
+describe('resolveCoupon', () => {
+  it('returns the fixed coupon and not provisional for a plain (non-inflation) bond', () => {
+    const plain: BondDetails = { ...INFLATION_BOND, isInflationLinked: false };
+    const resolved = resolveCoupon(FIRST_COUPON, plain, 1000);
+    expect(resolved.perShare).toBeCloseTo(7.5, 8); // (1.5/100/2)*1000
+    expect(resolved.isProvisional).toBe(false);
+    expect(resolved.inflationPeriodRate).toBeNull();
+  });
+
+  it('is provisional at the fixed floor when the inflation rate is not yet announced', () => {
+    const resolved = resolveCoupon(FIRST_COUPON, INFLATION_BOND, 1000);
+    expect(resolved.perShare).toBeCloseTo(7.5, 8); // only the fixed part
+    expect(resolved.isProvisional).toBe(true);
+    expect(resolved.inflationPeriodRate).toBeNull();
+    expect(resolved.fixedAnnualRate).toBe(1.5);
+  });
+
+  it('adds the announced FOI inflation to the fixed part (official 205€ example)', () => {
+    // fixed 1.50% annual + FOI 1.30% semester on nominal 1000:
+    // (1.5/100/2)*1000 + (1.3/100)*1000 = 7.5 + 13 = 20.5 per unit → 205€ on 10 units.
+    const withRate: BondDetails = {
+      ...INFLATION_BOND,
+      announcedInflationRates: [{ couponDate: FIRST_COUPON, periodRate: 1.3 }],
+    };
+    const resolved = resolveCoupon(FIRST_COUPON, withRate, 1000);
+    expect(resolved.perShare).toBeCloseTo(20.5, 6);
+    expect(resolved.perShare * 10).toBeCloseTo(205, 4);
+    expect(resolved.isProvisional).toBe(false);
+    expect(resolved.inflationPeriodRate).toBe(1.3);
+  });
+
+  it('floors a negative (deflation) announced rate to 0 — fixed stays guaranteed', () => {
+    const withDeflation: BondDetails = {
+      ...INFLATION_BOND,
+      announcedInflationRates: [{ couponDate: FIRST_COUPON, periodRate: -0.5 }],
+    };
+    const resolved = resolveCoupon(FIRST_COUPON, withDeflation, 1000);
+    expect(resolved.perShare).toBeCloseTo(7.5, 8); // only the fixed part
+    expect(resolved.inflationPeriodRate).toBe(0);   // known (not provisional), but floored
+    expect(resolved.isProvisional).toBe(false);
+  });
+});
+
+describe('buildCouponNote', () => {
+  it('keeps the annual-rate phrasing for a plain bond', () => {
+    const plain: BondDetails = { ...INFLATION_BOND, isInflationLinked: false, couponRate: 2.8 };
+    const note = buildCouponNote(resolveCoupon(FIRST_COUPON, plain, 1000), 'semiannual');
+    expect(note).toBe('Cedola semestrale — tasso annuo 2,8%');
+  });
+
+  it('labels a provisional coupon with the fixed-only floor', () => {
+    const note = buildCouponNote(resolveCoupon(FIRST_COUPON, INFLATION_BOND, 1000), 'semiannual');
+    expect(note).toContain('Cedola provvisoria semestrale');
+    expect(note).toContain('solo tasso fisso 0,75%');
+    expect(note).toContain('in attesa');
+  });
+
+  it('shows the fixed + inflation split for a finalized coupon', () => {
+    const withRate: BondDetails = {
+      ...INFLATION_BOND,
+      announcedInflationRates: [{ couponDate: FIRST_COUPON, periodRate: 1.3 }],
+    };
+    const note = buildCouponNote(resolveCoupon(FIRST_COUPON, withRate, 1000), 'semiannual');
+    expect(note).toBe('Cedola semestrale — fisso 0,75% + inflazione FOI 1,3% = 2,05% del nominale');
   });
 });

@@ -299,6 +299,11 @@ export function DividendTable({
               <div className="min-w-0">
                 <div className="font-semibold text-sm">{dividend.assetTicker}</div>
                 <div className="text-xs text-muted-foreground truncate">{dividend.assetName}</div>
+                {dividend.isProvisional && (
+                  <span className="mt-0.5 inline-block text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                    Provvisoria · in attesa tasso FOI
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <Badge variant="outline" className={`text-xs ${dividendTypeBadgeColor[dividend.dividendType]}`}>
@@ -456,9 +461,16 @@ export function DividendTable({
                   />
                 </TableCell>
                 <TableCell>
-                  <Badge variant="outline" className={dividendTypeBadgeColor[dividend.dividendType]}>
-                    {dividendTypeLabels[dividend.dividendType]}
-                  </Badge>
+                  <div className="flex flex-col items-start gap-1">
+                    <Badge variant="outline" className={dividendTypeBadgeColor[dividend.dividendType]}>
+                      {dividendTypeLabels[dividend.dividendType]}
+                    </Badge>
+                    {dividend.isProvisional && (
+                      <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-400">
+                        Provvisoria
+                      </Badge>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center justify-end gap-1">
