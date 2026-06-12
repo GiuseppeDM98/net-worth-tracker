@@ -18,7 +18,7 @@ import {
 import { db } from '@/lib/firebase/config';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
-import { Asset, AssetFormData } from '@/types/assets';
+import { Asset, AssetFormData, BondDetails } from '@/types/assets';
 
 const ASSETS_COLLECTION = 'assets';
 
@@ -290,6 +290,30 @@ export async function updateAsset(
       error: getErrorMessage(error),
     });
     throw new Error(`Failed to update asset ${assetId}`, { cause: error });
+  }
+}
+
+/**
+ * Updates ONLY a bond's bondDetails (and updatedAt).
+ *
+ * Why a dedicated path instead of updateAsset: updateAsset treats an absent
+ * averageCost/taxRate in its partial as a request to DELETE those fields
+ * (undefined → deleteField()). A focused bondDetails update — e.g. the user
+ * announcing an inflation rate from the Dividendi tab — must not touch cost basis.
+ * updateDoc replaces the whole bondDetails map, so the caller must pass the
+ * COMPLETE bondDetails (existing fields + the change), never a partial.
+ */
+export async function updateAssetBondDetails(assetId: string, bondDetails: BondDetails): Promise<void> {
+  try {
+    const assetRef = doc(db, ASSETS_COLLECTION, assetId);
+    await updateDoc(assetRef, { bondDetails, updatedAt: new Date() });
+  } catch (error) {
+    console.error('Failed to update bond details', {
+      assetId,
+      operation: 'updateAssetBondDetails',
+      error: getErrorMessage(error),
+    });
+    throw new Error(`Failed to update bond details for asset ${assetId}`, { cause: error });
   }
 }
 

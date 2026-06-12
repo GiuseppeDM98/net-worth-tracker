@@ -24,24 +24,41 @@ export interface CouponRateTier {
   rate: number;     // Annual coupon rate % for this period
 }
 
+// One announced inflation component for an inflation-linked bond (BTP Italia Sì style).
+// The user enters the FOI inflation rate for a specific coupon period when it is published
+// (shortly before that coupon is paid). It is matched to a coupon by the year+month of couponDate.
+// periodRate is the inflation rate FOR THAT PERIOD (e.g. the semester) — it is already per-period
+// and is NOT divided by the coupon frequency (see resolveCoupon in couponUtils.ts).
+export interface AnnouncedInflationRate {
+  couponDate: Date;   // Payment date of the coupon this rate applies to
+  periodRate: number; // FOI inflation % for that period (negative values are floored to 0 — deflation guarantee)
+}
+
 // Bond-specific details stored alongside the asset.
 // Used to auto-generate the next coupon as a dividend entry.
 //
 // Teacher Note - Coupon Calculation:
-// Gross coupon per payment = (couponRate / 100 / periodsPerYear) * nominalValue * quantity
-// Example: 4% annual rate, quarterly, nominalValue=1000, quantity=5
-//   → (4/100/4) * 1000 * 5 = €50 per quarter
+// Plain/step-up bond: gross per payment = (couponRate / 100 / periodsPerYear) * nominalValue * quantity
+//   Example: 4% annual, quarterly, nominalValue=1000, quantity=5 → (4/100/4) * 1000 * 5 = €50 per quarter
+// Inflation-linked bond (isInflationLinked): the announced per-period inflation is ADDED to the
+//   already-per-period fixed rate, and is NOT divided by frequency:
+//   ((couponRate / 100 / periodsPerYear) + max(0, periodRate) / 100) * nominalValue * quantity
+//   Example: fixed 1.5% annual + FOI 1.3% semester, nominalValue=1000 → (0.75% + 1.3%) * 1000 = €20.50 per unit
 //
-// For step-up bonds: couponRateSchedule overrides couponRate when present.
-// couponRate is used as fallback if no tier matches.
+// For step-up bonds: couponRateSchedule overrides couponRate when present (couponRate is the fallback).
+//
+// WARNING: adding a field here also requires updating buildBondDetailsFromForm, the reset effect
+// (BOTH the edit branch and the new-record branch), and the edit round-trip in components/assets/AssetDialog.tsx.
 export interface BondDetails {
-  couponRate: number;          // Annual coupon rate as percentage (e.g. 4.0 for 4%). Fallback when no schedule.
+  couponRate: number;          // Annual coupon rate %. For inflation-linked bonds: the guaranteed minimum (fixed) annual rate.
   couponFrequency: CouponFrequency;
   issueDate: Date; // Reference date for coupon schedule (first coupon = issueDate + 1 period)
   maturityDate: Date; // Bond redemption date (no coupons generated after this)
   nominalValue?: number;       // Face value per unit in currency (e.g. 1000 for a €1000 bond). Default: 1
   couponRateSchedule?: CouponRateTier[]; // Step-up tiers; overrides couponRate when present
-  finalPremiumRate?: number;   // Bonus % of nominalValue paid at maturity (e.g. 0.8 for BTP Valore 0.8%)
+  finalPremiumRate?: number;   // Bonus % of nominalValue paid at maturity (e.g. 0.8 for BTP Valore, 0.6 for BTP Italia Sì loyalty premium)
+  isInflationLinked?: boolean; // True for additive inflation-linked bonds (BTP Italia Sì): coupon = fixed + announced FOI inflation
+  announcedInflationRates?: AnnouncedInflationRate[]; // User-announced per-period inflation rates, keyed by coupon date
 }
 
 export interface AssetComposition {

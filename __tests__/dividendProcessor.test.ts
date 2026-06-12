@@ -46,8 +46,14 @@ vi.mock('@/lib/utils/dateHelpers', () => ({
 
 vi.mock('@/lib/utils/couponUtils', () => ({
   getFollowingCouponDate: vi.fn(),
-  calculateCouponPerShare: vi.fn(() => 2.5),
-  getApplicableCouponRate: vi.fn(() => 5),
+  // Phase 3 now resolves the coupon via the shared pure layer; mock its output.
+  resolveCoupon: vi.fn(() => ({
+    perShare: 2.5,
+    fixedAnnualRate: 5,
+    inflationPeriodRate: null,
+    isProvisional: false,
+  })),
+  buildCouponNote: vi.fn(() => 'Cedola annuale — tasso annuo 5%'),
 }));
 
 import {

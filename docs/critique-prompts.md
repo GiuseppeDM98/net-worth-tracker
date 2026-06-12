@@ -126,19 +126,26 @@ in una volta (craft + polish), con test verdi e tsc pulito.
 
 File: app/dashboard/cashflow/page.tsx
 Componenti: components/dividends/DividendTrackingTab.tsx,
+            components/dividends/DividendStats.tsx,
             components/dividends/DividendCalendar.tsx,
             components/dividends/DividendTable.tsx,
-            components/dividends/DividendDetailsDialog.tsx,
-            components/dividends/DividendStats.tsx,
+            components/dividends/DividendRecordDetailsDialog.tsx,
             components/dividends/DividendDialog.tsx
+Pure layer: lib/utils/dividendAnalytics.ts, lib/constants/dividendTypes.ts
 
-Questo tab traccia dividendi e cedole obbligazionarie con calendario mensile
-focalizzato, tabella transazioni, statistiche (DPS growth, YOC, total return per asset)
-e dialog di dettaglio per ogni pagamento. Supporta conversione EUR per asset in
-valuta estera e cedole auto-generate per bond.
-Confronta con: Hall of Fame (tabelle flat), Cashflow/Analisi (period-based data).
-Nota: è la sezione meno recentemente redesignata dell'app — valuta il delta
-rispetto al Trade Republic pattern adottato nelle altre pagine.
+Questo tab (redesign "ripensamento" 2026-06-11) traccia dividendi e cedole con IA
+Trade-Republic: asse periodo (DividendPeriod Mese/Anno/12 mesi/Storico, derivato in-memory
+dalla lista — niente refetch sullo switch) → hero net-income (font-mono + chip di variazione
++ sparkline trailing-12m), griglia di KPI chip, strip income-reliability (copertura mensile %
++ concentrazione payer HHI/top-share), leaderboard payer flat divide-y ordinata per netto
+(payer venduti inclusi — assetTicker/assetName denormalizzati per record). Table/Calendario via
+SegmentedControl; filtri secondari asset/tipo + day-focus sotto "Filtra"; grafici e analisi
+avanzata dietro Collapsible. Colori segno via getMetricValueColor. DividendStats è ora solo il
+blocco server-computed YOC/DPS/total-return, alimentato dai bound di data del periodo. Supporta
+conversione EUR per asset in valuta estera e cedole auto-generate per bond.
+Confronta con: Centri di Costo (stesso asse periodo in-memory + hero + leaderboard divide-y),
+Hall of Fame (tabelle flat), Cashflow/Analisi (period-based data).
+Nota: il redesign è stato implementato il 2026-06-11 — rieseguire la critique per misurare il delta.
 Design language atteso (vedi DESIGN.md): North Star "Effortless Precision" — Linear/Vercel +
 Trade Republic + Apple, sotto la legge Form Follows Function (onestà, deferenza, inevitabilità:
 ogni proprietà visiva è conseguenza di una funzione, mai decorazione). Scala hero: page hero
