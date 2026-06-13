@@ -10,22 +10,9 @@ import {
   DividendType,
 } from '@/types/dividend';
 import { convertMultipleToEur, getExchangeRateToEur } from './currencyConversionService';
+import { removeUndefinedDeep as removeUndefinedFields } from '@/lib/utils/firestoreData';
 
 const DIVIDENDS_COLLECTION = 'dividends';
-
-/**
- * Remove undefined fields from an object to prevent Firebase errors
- */
-function removeUndefinedFields<T extends Record<string, any>>(obj: T): Partial<T> {
-  const cleaned: Partial<T> = {};
-  Object.keys(obj).forEach((key) => {
-    const value = obj[key];
-    if (value !== undefined) {
-      cleaned[key as keyof T] = value;
-    }
-  });
-  return cleaned;
-}
 
 /**
  * Get all dividends for a specific user

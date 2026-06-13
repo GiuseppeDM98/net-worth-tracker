@@ -134,7 +134,7 @@ export interface YieldOnCostAsset {
 
 // Per-asset total return combining unrealized capital gain and all-time net dividend income.
 // Both components are expressed as % of the original cost basis (quantity × averageCost).
-// Only computed for assets with averageCost > 0, quantity > 0, and at least one paid dividend.
+// Only computed for assets with averageCost > 0, quantity > 0, and at least one dividend in the current holding.
 export interface TotalReturnAsset {
   assetId: string;
   assetTicker: string;
@@ -144,10 +144,10 @@ export interface TotalReturnAsset {
   currentPrice: number;             // EUR per unit (current market price)
   costBasis: number;                // quantity × averageCost
   currentValue: number;             // quantity × currentPrice
-  allTimeNetDividends: number;      // All-time net dividends in EUR (netAmountEur ?? netAmount)
+  netDividends: number;             // Net dividends in EUR counted for this card (current holding)
   capitalGainAbsolute: number;      // currentValue - costBasis
   capitalGainPercentage: number;    // capitalGainAbsolute / costBasis × 100
-  dividendReturnPercentage: number; // allTimeNetDividends / costBasis × 100
+  dividendReturnPercentage: number; // Σ per-payment (net ÷ cost-at-payment) × 100, current holding
   totalReturnPercentage: number;    // capitalGainPercentage + dividendReturnPercentage
 }
 

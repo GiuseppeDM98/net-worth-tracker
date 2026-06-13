@@ -44,6 +44,11 @@ export interface AssetInput {
   quantity: number;
   averageCost?: number;
   currentPrice: number;
+  // Optional lower date bound for the CURRENT continuous holding. When set, dividends paid
+  // before this date are ignored — this is how a sold-and-rebought instrument (same id) stops
+  // counting dividends from its previous holding against the new cost basis. Derived from the
+  // monthly snapshots (see deriveHoldingStartDates); absent for continuously-held assets.
+  holdingStartDate?: Date;
 }
 
 export interface YieldOnCostAssetMetrics {
@@ -140,6 +145,11 @@ export function computeDividendYieldMetrics(
 
     const asset = assetsMap.get(div.assetId);
     if (!asset || asset.quantity <= 0) continue; // exclude sold / unknown assets
+
+    // Discontinuous-holding guard: when the asset was sold and later rebought (same id),
+    // ignore dividends paid before the current holding began so a pre-gap dividend is not
+    // paired with the new, unrelated cost basis (holdingStartDate is derived from snapshots).
+    if (asset.holdingStartDate && paymentDate < asset.holdingStartDate) continue;
 
     const grossEur = div.grossAmountEur ?? div.grossAmount;
     const netEur = div.netAmountEur ?? div.netAmount;

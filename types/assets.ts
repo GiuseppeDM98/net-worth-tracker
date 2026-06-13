@@ -94,6 +94,11 @@ export interface Asset {
   isPrimaryResidence?: boolean; // Indicates if this real estate is the primary residence (excluded from FIRE calculations based on user setting)
   isin?: string; // ISIN code for dividend scraping (optional)
   bondDetails?: BondDetails; // Optional bond-specific details for coupon scheduling
+  // Start of the CURRENT continuous holding, stamped on (re)purchase — createAsset on ISIN reuse,
+  // or updateAsset when quantity goes 0 → >0. Lets YOC / Current-Yield ignore dividends from a
+  // previous, discontinuous holding of the same instrument. Absent for assets held since before
+  // this field existed; the snapshot-derived fallback (deriveHoldingStartDates) then applies.
+  holdingStartDate?: Date;
   lastPriceUpdate: Date;
   createdAt: Date;
   updatedAt: Date;

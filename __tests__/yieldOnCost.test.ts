@@ -129,4 +129,27 @@ describe('computeDividendYieldMetrics', () => {
     const result = computeDividendYieldMetrics([div], [makeAsset('us', 10, 10)], START, END, 12);
     expect(result.portfolioYocGross).toBeCloseTo(10, 4);
   });
+
+  it('excludes dividends paid before the holding start (rebought instrument)', () => {
+    // ENI paid a dividend in March, but the CURRENT holding only started in June (sold then
+    // rebought) → that pre-gap dividend must not be paired with the new cost basis.
+    const div = makeDividend('eni', new Date(2025, 2, 1), 1, 10);
+    const asset: AssetInput = { ...makeAsset('eni', 10, 10), holdingStartDate: new Date(2025, 5, 1) };
+
+    const result = computeDividendYieldMetrics([div], [asset], START, END, 12);
+
+    expect(result.assetCount).toBe(0);
+    expect(result.portfolioYocGross).toBeNull();
+  });
+
+  it('includes dividends paid on or after the holding start', () => {
+    // Same holding start (June); the dividend is paid in August → counted normally.
+    const div = makeDividend('eni', new Date(2025, 7, 1), 1, 10);
+    const asset: AssetInput = { ...makeAsset('eni', 10, 10), holdingStartDate: new Date(2025, 5, 1) };
+
+    const result = computeDividendYieldMetrics([div], [asset], START, END, 12);
+
+    expect(result.assetCount).toBe(1);
+    expect(result.portfolioYocGross).toBeCloseTo(10, 4); // €1 DPS / €10 cost
+  });
 });

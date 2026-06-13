@@ -7,7 +7,9 @@
  *  - list the months that have a per-asset breakdown,
  *  - sort a month's assets by value,
  *  - sum a user-selected subset for a given month,
- *  - build the cross-month trend of a selected subset's combined value.
+ *  - build the cross-month trend of a selected subset's combined value,
+ *  - derive each asset's current holding-start date from its quantity gaps (consumed by the
+ *    yield-on-cost engine to ignore dividends from a previous, discontinuous holding).
  *
  * No value re-computation happens here — the snapshot is the source of truth.
  */
@@ -236,4 +238,63 @@ export function buildSelectedAssetTrend(
       previousLabel,
     };
   });
+}
+
+/**
+ * Derive, per asset, the start date of its CURRENT continuous holding from the monthly
+ * snapshots — so a yield metric can ignore dividends paid before the holding (re)started.
+ *
+ * WHY: an instrument that is sold and later rebought keeps the same assetId (delete+recreate
+ * by ISIN, or quantity driven 0 → >0 on the same doc). Dividends from the PREVIOUS holding
+ * period stay attached to that id; over a long window the yield engine would pair them with
+ * the new, unrelated cost basis and report a misleading YOC. The snapshots already record each
+ * asset's quantity every month, so the most recent month in which the asset was held at 0 (or
+ * was absent) marks the gap that precedes the current run.
+ *
+ * The holding start is the first day of the month FOLLOWING that gap. An asset is only given a
+ * start date when a real gap is detected — i.e. it was held (quantity > 0), then dropped to
+ * 0/absent, then held again. Two cases deliberately produce NO entry (no restriction, so the
+ * metric is unchanged):
+ *   - never sold (held continuously across the snapshots), and
+ *   - absent only BEFORE its first appearance — this is a first purchase, or simply an asset held
+ *     since before the snapshot history began, which must NOT be mistaken for a gap.
+ *
+ * Granularity is monthly: a sell+rebuy within a single month, or one that happened before any
+ * snapshot existed, is not detected and falls back to the unrestricted behaviour (never a
+ * regression).
+ *
+ * @param snapshots - All user snapshots (any order)
+ * @returns Map assetId → holding-start Date, only for assets with a detected sell→rebuy gap
+ */
+export function deriveHoldingStartDates(snapshots: MonthlySnapshot[]): Map<string, Date> {
+  const ordered = snapshots
+    .filter(hasAssetBreakdown)
+    .slice()
+    .sort((a, b) => (a.year !== b.year ? a.year - b.year : a.month - b.month));
+
+  const holdingStart = new Map<string, Date>();
+  const heldBefore = new Set<string>(); // assets that have appeared with quantity > 0 at least once
+  const inGap = new Set<string>(); // assets currently sold (last seen at 0 / absent after being held)
+
+  for (const snapshot of ordered) {
+    const quantityById = new Map<string, number>();
+    for (const asset of snapshot.byAsset) quantityById.set(asset.assetId, asset.quantity);
+
+    // A previously-held asset that is 0/absent this month enters (or stays in) the gap.
+    for (const assetId of heldBefore) {
+      if ((quantityById.get(assetId) ?? 0) <= 0) inGap.add(assetId);
+    }
+
+    // An asset held this month either continues a run, or — if it was in a gap — starts a new one.
+    for (const [assetId, quantity] of quantityById) {
+      if (quantity <= 0) continue;
+      if (inGap.has(assetId)) {
+        holdingStart.set(assetId, new Date(snapshot.year, snapshot.month - 1, 1));
+        inGap.delete(assetId);
+      }
+      heldBefore.add(assetId);
+    }
+  }
+
+  return holdingStart;
 }

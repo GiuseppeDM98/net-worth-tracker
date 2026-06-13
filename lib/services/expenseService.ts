@@ -32,6 +32,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
+import { removeUndefinedDeep as removeUndefinedFields } from '@/lib/utils/firestoreData';
 import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
 import {
   Expense,
@@ -43,26 +44,6 @@ import {
 import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
 
 const EXPENSES_COLLECTION = 'expenses';
-
-/**
- * Remove undefined fields from an object to prevent Firebase errors
- *
- * Firestore rejects documents with undefined values. This helper ensures
- * only defined fields are included in create/update operations.
- *
- * @param obj - Object with potential undefined values
- * @returns Object with undefined fields removed
- */
-function removeUndefinedFields<T extends Record<string, any>>(obj: T): Partial<T> {
-  const cleaned: Partial<T> = {};
-  Object.keys(obj).forEach((key) => {
-    const value = obj[key];
-    if (value !== undefined) {
-      cleaned[key as keyof T] = value;
-    }
-  });
-  return cleaned;
-}
 
 /**
  * Get all expenses for a specific user

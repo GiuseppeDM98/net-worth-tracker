@@ -6,7 +6,7 @@
  * dividend list in the browser:
  *   - YOC Portafoglio (yield on cost vs current yield)
  *   - Crescita Dividendi per Azione (DPS growth / CAGR)
- *   - Rendimento Totale per Asset (capital gain + lifetime dividends on cost)
+ *   - Rendimento Totale per Asset (capital gain + current-holding dividends on cost)
  *
  * The period totals, KPI grid, payer leaderboard and the by-asset / by-year / monthly
  * charts moved to DividendTrackingTab, where they are derived in memory (dividendAnalytics)
@@ -59,7 +59,7 @@ interface DividendStatsData {
     assetName: string;
     costBasis: number;
     currentValue: number;
-    allTimeNetDividends: number;
+    netDividends: number;
     capitalGainAbsolute: number;
     capitalGainPercentage: number;
     dividendReturnPercentage: number;
@@ -505,7 +505,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
               Rendimento Totale per Asset
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              Plusvalenza non realizzata + dividendi netti storici, sul costo d&apos;acquisto
+              Plusvalenza non realizzata + dividendi netti del possesso attuale, sul costo d&apos;acquisto
             </p>
           </CardHeader>
           <CardContent>
@@ -523,7 +523,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
                     <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Plusval.</span>
                   </div>
                   <div className="hidden sm:flex flex-col items-end w-28">
-                    <span className={`text-sm font-mono tabular-nums ${getMetricValueColor(asset.dividendReturnPercentage, 'percentage')}`} title={formatCurrency(asset.allTimeNetDividends)}>
+                    <span className={`text-sm font-mono tabular-nums ${getMetricValueColor(asset.dividendReturnPercentage, 'percentage')}`} title={formatCurrency(asset.netDividends)}>
                       +{asset.dividendReturnPercentage.toFixed(2)}%
                     </span>
                     <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Dividendi</span>

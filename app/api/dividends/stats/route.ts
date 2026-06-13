@@ -8,6 +8,8 @@ import {
 import { adminDb } from '@/lib/firebase/admin';
 import { AssetDividendGrowth, DividendGrowthData, TotalReturnAsset, YieldOnCostAsset } from '@/types/dividend';
 import { computeDividendYieldMetrics } from '@/lib/utils/yieldOnCost';
+import { getUserSnapshotsAdmin } from '@/lib/server/assetAdminRepository';
+import { deriveHoldingStartDates } from '@/lib/utils/snapshotAssetBreakdown';
 import {
   assertSameUser,
   getApiAuthErrorResponse,
@@ -69,6 +71,10 @@ export async function GET(request: NextRequest) {
       .where('userId', '==', authenticatedUserId)
       .get();
 
+    // Holding-start per asset (from snapshots): lets the per-share engine ignore dividends from a
+    // previous, discontinuous holding when an instrument was sold and later rebought (same id).
+    const holdingStarts = deriveHoldingStartDates(await getUserSnapshotsAdmin(authenticatedUserId));
+
     const userAssets = assetsSnapshot.docs.map(doc => ({
       id: doc.id,
       ticker: doc.data().ticker || '',
@@ -76,6 +82,8 @@ export async function GET(request: NextRequest) {
       quantity: doc.data().quantity || 0,
       currentPrice: doc.data().currentPrice || 0,
       averageCost: doc.data().averageCost,
+      // Prefer the exact start stamped at (re)purchase; fall back to the snapshot-derived value.
+      holdingStartDate: doc.data().holdingStartDate?.toDate() ?? holdingStarts.get(doc.id),
     }));
     const assetsMap = new Map(userAssets.map(a => [a.id, a]));
 
@@ -129,41 +137,42 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Group all-time paid dividends by asset using EUR amounts for multi-currency consistency.
-    // averageCost is always stored in EUR, so dividends must also be in EUR for a meaningful %.
-    // Also group raw records per asset for per-payment historical cost basis (YOC v3 approach).
-    const allTimeNetEurByAsset = new Map<string, number>();
+    // Group raw paid-dividend records per asset, for per-payment contribution using the historical
+    // cost basis (YOC v3 approach). The records are scoped to the current holding in the map below.
     const dividendsByAsset = new Map<string, typeof paidDividends>();
     paidDividends.forEach(div => {
-      const current = allTimeNetEurByAsset.get(div.assetId) || 0;
-      // Prefer EUR-converted amount; fall back to original currency if conversion was not available
-      allTimeNetEurByAsset.set(div.assetId, current + (div.netAmountEur ?? div.netAmount));
-      // Group raw records to compute per-payment contribution using historical cost basis
       const arr = dividendsByAsset.get(div.assetId) ?? [];
       arr.push(div);
       dividendsByAsset.set(div.assetId, arr);
     });
 
-    // Compute total return per asset: unrealized capital gain % + all-time dividend return %.
+    // Compute total return per asset: unrealized capital gain % + dividend return % on cost.
     // Excludes sold assets (quantity = 0) since we don't track the actual realized sell price,
     // and assets without averageCost (e.g. cash) since cost basis is required for % calculation.
+    // Dividends are scoped to the CURRENT holding (paymentDate >= holdingStartDate): a rebought
+    // asset's prior-holding dividends must not be credited to the new position — the capital-gain
+    // term is already current-holding only, so the dividend term must match (consistent with YOC).
     const totalReturnAssets: TotalReturnAsset[] = userAssets
-      .filter(asset =>
-        asset.averageCost &&
-        asset.averageCost > 0 &&
-        asset.quantity > 0 &&
-        (allTimeNetEurByAsset.get(asset.id) ?? 0) > 0
-      )
+      .filter(asset => asset.averageCost && asset.averageCost > 0 && asset.quantity > 0)
       .map(asset => {
+        // Scope to the current holding. holdingStartDate = exact stamp at (re)purchase ?? snapshot-
+        // derived; absent for continuously-held assets (then all dividends count, as before).
+        const assetDividends = (dividendsByAsset.get(asset.id) ?? []).filter(div =>
+          !asset.holdingStartDate || toDate(div.paymentDate) >= asset.holdingStartDate
+        );
+        const netDividends = assetDividends.reduce(
+          (sum, div) => sum + (div.netAmountEur ?? div.netAmount),
+          0
+        );
+        // Dividend-return card: an asset with no dividends in the current holding has no story here.
+        if (netDividends <= 0) return null;
+
         const costBasis = asset.quantity * asset.averageCost!;
         const currentValue = asset.quantity * asset.currentPrice;
-        const allTimeNetDividends = allTimeNetEurByAsset.get(asset.id) ?? 0;
         const capitalGainAbsolute = currentValue - costBasis;
         const capitalGainPercentage = (capitalGainAbsolute / costBasis) * 100;
-        // Use historical cost basis per payment (costPerShare snapshot stored at dividend creation,
-        // YOC v3). Fallback to current averageCost for legacy records without costPerShare.
-        // This prevents dilution: buying new shares after a dividend does not reduce past return %.
-        const assetDividends = dividendsByAsset.get(asset.id) ?? [];
+        // Per-payment historical cost basis (costPerShare snapshot at dividend creation, YOC v3),
+        // fallback to current averageCost for legacy records. Prevents dilution from later buys.
         const dividendReturnPercentage = assetDividends.reduce((sum, div) => {
           const effectiveCostPerShare = div.costPerShare ?? asset.averageCost!;
           const costBasisAtTime = div.quantity * effectiveCostPerShare;
@@ -179,13 +188,14 @@ export async function GET(request: NextRequest) {
           currentPrice: asset.currentPrice,
           costBasis,
           currentValue,
-          allTimeNetDividends,
+          netDividends,
           capitalGainAbsolute,
           capitalGainPercentage,
           dividendReturnPercentage,
           totalReturnPercentage: capitalGainPercentage + dividendReturnPercentage,
         };
       })
+      .filter((asset): asset is TotalReturnAsset => asset !== null)
       .sort((a, b) => b.totalReturnPercentage - a.totalReturnPercentage);
 
     // Compute DPS growth for equity assets only (excludes coupons and finalPremium).

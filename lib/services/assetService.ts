@@ -16,6 +16,7 @@ import {
   runTransaction,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
+import { removeUndefinedDeep as removeUndefinedFields } from '@/lib/utils/firestoreData';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
 import { Asset, AssetFormData, BondDetails } from '@/types/assets';
@@ -40,20 +41,6 @@ export const ASSET_CLASS_ORDER: Record<string, number> = {
 };
 
 /**
- * Remove undefined fields from an object to prevent Firebase errors
- */
-function removeUndefinedFields<T extends Record<string, any>>(obj: T): Partial<T> {
-  const cleaned: Partial<T> = {};
-  Object.keys(obj).forEach((key) => {
-    const value = obj[key];
-    if (value !== undefined) {
-      cleaned[key as keyof T] = value;
-    }
-  });
-  return cleaned;
-}
-
-/**
  * Get all assets for a specific user
  * Assets are sorted by asset class (equity, bonds, realestate, crypto, commodity, cash)
  * and then by name within each class
@@ -74,6 +61,7 @@ export async function getAllAssets(userId: string): Promise<Asset[]> {
       lastPriceUpdate: doc.data().lastPriceUpdate?.toDate() || new Date(),
       createdAt: doc.data().createdAt?.toDate() || new Date(),
       updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+      holdingStartDate: doc.data().holdingStartDate?.toDate(),
     })) as Asset[];
 
     // Sort by asset class first, then by name
@@ -121,6 +109,7 @@ export async function getAssetsWithIsin(userId: string): Promise<Asset[]> {
         lastPriceUpdate: doc.data().lastPriceUpdate?.toDate() || new Date(),
         createdAt: doc.data().createdAt?.toDate() || new Date(),
         updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+        holdingStartDate: doc.data().holdingStartDate?.toDate(),
       }))
       .filter(asset => {
         // Filter out assets without ISIN or with empty ISIN
@@ -157,6 +146,7 @@ export async function getAssetById(assetId: string): Promise<Asset | null> {
       lastPriceUpdate: assetDoc.data().lastPriceUpdate?.toDate() || new Date(),
       createdAt: assetDoc.data().createdAt?.toDate() || new Date(),
       updatedAt: assetDoc.data().updatedAt?.toDate() || new Date(),
+      holdingStartDate: assetDoc.data().holdingStartDate?.toDate(),
     } as Asset;
   } catch (error) {
     console.error('Failed to fetch asset', {
@@ -216,6 +206,10 @@ export async function createAsset(
       lastPriceUpdate: now,
       createdAt: now,
       updatedAt: now,
+      // ISIN reuse means this instrument already had dividends — it was held before and is being
+      // rebought. Stamp the start of the new holding so YOC ignores the previous holding's
+      // dividends. A genuinely new instrument (assetId === null) leaves this undefined (stripped).
+      holdingStartDate: assetId ? now : undefined,
     });
 
     if (assetId) {
@@ -275,6 +269,14 @@ export async function updateAsset(
 
     if (updates.averageCost === undefined) cleanedUpdates.averageCost = deleteField();
     if (updates.taxRate === undefined) cleanedUpdates.taxRate = deleteField();
+
+    // Rebuy on the same doc: quantity goes from 0 (sold but kept) back to > 0. Stamp the new
+    // holding start so YOC ignores the previous holding's dividends (mirrors the ISIN-reuse path
+    // in createAsset). Adding to an existing position (DCA, previous quantity > 0) is NOT a restart.
+    const previousQuantity = existingAsset.data()?.quantity ?? 0;
+    if (previousQuantity <= 0 && typeof updates.quantity === 'number' && updates.quantity > 0) {
+      cleanedUpdates.holdingStartDate = new Date();
+    }
 
     await updateDoc(assetRef, cleanedUpdates);
 

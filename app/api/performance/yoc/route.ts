@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAllDividends } from '@/lib/services/dividendService';
 import { calculateYocMetrics } from '@/lib/services/performanceService';
-import { getUserAssetsAdmin } from '@/lib/server/assetAdminRepository';
+import { getUserAssetsAdmin, getUserSnapshotsAdmin } from '@/lib/server/assetAdminRepository';
+import { deriveHoldingStartDates } from '@/lib/utils/snapshotAssetBreakdown';
 import {
   assertSameUser,
   getApiAuthErrorResponse,
@@ -60,16 +61,27 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch dividends and assets server-side using Firebase Admin SDK
-    const [allDividends, allAssets] = await Promise.all([
+    // Fetch dividends, assets and snapshots server-side using Firebase Admin SDK
+    const [allDividends, allAssets, snapshots] = await Promise.all([
       getAllDividends(authenticatedUserId),
       getUserAssetsAdmin(authenticatedUserId),
+      getUserSnapshotsAdmin(authenticatedUserId),
     ]);
+
+    // Tag each asset with the start of its current holding so the engine ignores dividends from a
+    // previous, discontinuous holding (an instrument sold then rebought keeps the same id).
+    const holdingStarts = deriveHoldingStartDates(snapshots);
+    const assetsWithHolding = allAssets.map(asset => ({
+      ...asset,
+      // Prefer the exact start stamped at (re)purchase; fall back to the snapshot-derived value
+      // for assets rebought before holdingStartDate was recorded.
+      holdingStartDate: asset.holdingStartDate ?? holdingStarts.get(asset.id),
+    }));
 
     // Calculate YOC metrics
     const yocMetrics = calculateYocMetrics(
       allDividends,
-      allAssets,
+      assetsWithHolding,
       startDate,
       dividendEndDate,
       numberOfMonths

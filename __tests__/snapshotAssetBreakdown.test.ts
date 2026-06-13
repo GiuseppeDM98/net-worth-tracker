@@ -13,6 +13,7 @@ import {
   sumSelectedValues,
   buildSelectedAssetTrend,
   attributeSelectedChange,
+  deriveHoldingStartDates,
   type SnapshotAsset,
 } from '@/lib/utils/snapshotAssetBreakdown';
 import type { MonthlySnapshot } from '@/types/assets';
@@ -210,5 +211,66 @@ describe('attributeSelectedChange', () => {
       priceEffect: 200,
       quantityEffect: 0,
     });
+  });
+});
+
+describe('deriveHoldingStartDates', () => {
+  // Every month carries a "cash" asset so byAsset is never empty (an empty breakdown is skipped
+  // by the readers) — this lets a month where the tracked instrument is 0/absent still count.
+  const cash = () => makeAsset({ assetId: 'cash', quantity: 1, totalValue: 1000 });
+
+  it('flags the rebuy month when quantity drops to 0 then returns (same doc)', () => {
+    // Snapshots intentionally out of order to also exercise the chronological sort.
+    const snapshots: MonthlySnapshot[] = [
+      makeSnapshot(2026, 3, [makeAsset({ assetId: 'eni', quantity: 5, totalValue: 60 }), cash()]),
+      makeSnapshot(2026, 1, [makeAsset({ assetId: 'eni', quantity: 10, totalValue: 100 }), cash()]),
+      makeSnapshot(2026, 2, [makeAsset({ assetId: 'eni', quantity: 0, totalValue: 0 }), cash()]),
+    ];
+
+    const starts = deriveHoldingStartDates(snapshots);
+
+    expect(starts.get('eni')).toEqual(new Date(2026, 2, 1)); // first day of March (rebuy month)
+    expect(starts.has('cash')).toBe(false); // never sold → no restriction
+  });
+
+  it('flags the rebuy month when the asset is absent for a month then re-added', () => {
+    const snapshots: MonthlySnapshot[] = [
+      makeSnapshot(2026, 1, [makeAsset({ assetId: 'eni', quantity: 10, totalValue: 100 }), cash()]),
+      makeSnapshot(2026, 2, [cash()]), // eni absent (sold by removal)
+      makeSnapshot(2026, 3, [makeAsset({ assetId: 'eni', quantity: 5, totalValue: 60 }), cash()]),
+    ];
+
+    expect(deriveHoldingStartDates(snapshots).get('eni')).toEqual(new Date(2026, 2, 1));
+  });
+
+  it('gives no start date to a continuously-held asset (held since before the history)', () => {
+    const snapshots: MonthlySnapshot[] = [
+      makeSnapshot(2026, 1, [makeAsset({ assetId: 'eni', quantity: 10, totalValue: 100 }), cash()]),
+      makeSnapshot(2026, 2, [makeAsset({ assetId: 'eni', quantity: 10, totalValue: 110 }), cash()]),
+      makeSnapshot(2026, 3, [makeAsset({ assetId: 'eni', quantity: 12, totalValue: 130 }), cash()]),
+    ];
+
+    expect(deriveHoldingStartDates(snapshots).has('eni')).toBe(false);
+  });
+
+  it('gives no start date when the asset only appears after being absent at the start (first purchase)', () => {
+    // Absence BEFORE the first appearance is not a gap — must not be mistaken for a sell→rebuy.
+    const snapshots: MonthlySnapshot[] = [
+      makeSnapshot(2026, 1, [cash()]),
+      makeSnapshot(2026, 2, [cash()]),
+      makeSnapshot(2026, 3, [makeAsset({ assetId: 'eni', quantity: 5, totalValue: 60 }), cash()]),
+    ];
+
+    expect(deriveHoldingStartDates(snapshots).has('eni')).toBe(false);
+  });
+
+  it('gives no start date to an asset that was sold and never rebought', () => {
+    const snapshots: MonthlySnapshot[] = [
+      makeSnapshot(2026, 1, [makeAsset({ assetId: 'eni', quantity: 10, totalValue: 100 }), cash()]),
+      makeSnapshot(2026, 2, [makeAsset({ assetId: 'eni', quantity: 0, totalValue: 0 }), cash()]),
+      makeSnapshot(2026, 3, [cash()]),
+    ];
+
+    expect(deriveHoldingStartDates(snapshots).has('eni')).toBe(false);
   });
 });

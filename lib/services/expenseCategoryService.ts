@@ -28,6 +28,7 @@ import {
   orderBy
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
+import { removeUndefinedDeep as removeUndefinedFields } from '@/lib/utils/firestoreData';
 import {
   ExpenseCategory,
   ExpenseCategoryFormData,
@@ -41,26 +42,6 @@ import {
 } from './expenseService';
 
 const CATEGORIES_COLLECTION = 'expenseCategories';
-
-/**
- * Remove undefined fields from an object to prevent Firebase errors
- *
- * Firestore rejects documents with undefined values. This helper ensures
- * only defined fields are included in create/update operations.
- *
- * @param obj - Object with potential undefined values
- * @returns Object with undefined fields removed
- */
-function removeUndefinedFields<T extends Record<string, any>>(obj: T): Partial<T> {
-  const cleaned: Partial<T> = {};
-  Object.keys(obj).forEach((key) => {
-    const value = obj[key];
-    if (value !== undefined) {
-      cleaned[key as keyof T] = value;
-    }
-  });
-  return cleaned;
-}
 
 /**
  * Get all categories for a specific user
