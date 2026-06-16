@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 import { Eye, EyeOff, Loader2, ArrowRight, CheckCircle2, FlaskConical } from 'lucide-react';
 import { cardItem, staggerContainer } from '@/lib/utils/motionVariants';
+import { ThemePicker } from '@/components/layout/ThemePicker';
 import { cn } from '@/lib/utils';
 
 type LoginField = 'email' | 'password' | null;
@@ -125,6 +126,11 @@ export default function LoginPage() {
     <div className="flex min-h-screen flex-col bg-background">
       {/* Top editorial accent — matches the border-b separator used in page headers throughout the app */}
       <div className="h-px w-full bg-border" />
+
+      {/* Theme toggle for parity with the landing navbar (circle-reveal). */}
+      <div className="flex justify-end px-6 pt-4">
+        <ThemePicker />
+      </div>
 
       <div className="flex flex-1 items-center justify-center p-6">
         {/* MotionConfig propagates prefers-reduced-motion to all Framer Motion descendants,

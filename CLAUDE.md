@@ -17,7 +17,7 @@ Net Worth Tracker is a Next.js app for Italian investors to track net worth, ass
 
 ## Key Features (Active)
 Each entry = what it is + key file(s). Detailed gotchas/conventions live in AGENTS.md; the aesthetic spec is DESIGN.md.
-- **Demo mode**: `app/page.tsx` public landing (Panoramica preview + "Prova la Demo" auto-login); `useDemoMode()` (`lib/hooks/useDemoMode.ts`) gates every mutation (`disabled={isDemo}`). Credentials baked into the bundle (acceptable for a public demo; empty vars hide the CTA).
+- **Demo mode**: `app/page.tsx` public landing (stacked Panoramica + Cashflow savings-ring previews, proof strip, `ThemePicker` toggle shared with login/register + "Prova la Demo" auto-login); `useDemoMode()` (`lib/hooks/useDemoMode.ts`) gates every mutation (`disabled={isDemo}`). Credentials baked into the bundle (acceptable for a public demo; empty vars hide the CTA). Landing conventions in AGENTS.md → *Public Landing Page Hero*.
 - **AssetDialog**: 2-step create (type picker → type-filtered form), edit reuses the field-visibility logic; `TYPE_TO_CLASS`. `components/assets/AssetDialog.tsx`.
 - **ExpenseDialog**: single-step form + "Impostazioni avanzate" `Collapsible`; `ResponsiveModal` (Drawer ≤768px / Dialog); inline category/subcategory creation. `components/expenses/ExpenseDialog.tsx`.
 - **Multi-theme color system**: 6 themes (`default`/`solar-dusk`/`elegant-luxury`/`midnight-bloom`/`cyberpunk`/`retro-arcade`), persisted in Firestore `userPreferences/{userId}` + localStorage; `ColorThemeContext` sets `data-theme`; charts theme-aware via `useChartColors` (`--chart-1..5`). `contexts/ColorThemeContext.tsx`, `lib/hooks/useChartColors.ts`, `app/globals.css`.

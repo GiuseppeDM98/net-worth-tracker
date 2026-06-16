@@ -16,6 +16,7 @@ import { Eye, EyeOff, Loader2, ArrowRight, CheckCircle2 } from 'lucide-react';
 // - Email validation logic in signUp()
 import { APP_CONFIG } from '@/lib/constants/appConfig';
 import { cardItem, staggerContainer } from '@/lib/utils/motionVariants';
+import { ThemePicker } from '@/components/layout/ThemePicker';
 import { cn } from '@/lib/utils';
 
 type RegisterField = 'displayName' | 'email' | 'password' | 'confirmPassword' | null;
@@ -150,6 +151,9 @@ export default function RegisterPage() {
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <div className="h-px w-full bg-border" />
+        <div className="flex justify-end px-6 pt-4">
+          <ThemePicker />
+        </div>
         <div className="flex flex-1 items-center justify-center p-6">
           <MotionConfig reducedMotion="user">
             <motion.div
@@ -184,6 +188,11 @@ export default function RegisterPage() {
     <div className="flex min-h-screen flex-col bg-background">
       {/* Top editorial accent — matches the border-b separator used in page headers throughout the app */}
       <div className="h-px w-full bg-border" />
+
+      {/* Theme toggle for parity with the landing navbar (circle-reveal). */}
+      <div className="flex justify-end px-6 pt-4">
+        <ThemePicker />
+      </div>
 
       <div className="flex flex-1 items-center justify-center p-6">
         {/* MotionConfig propagates prefers-reduced-motion to all Framer Motion descendants,

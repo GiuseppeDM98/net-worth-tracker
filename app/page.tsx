@@ -24,7 +24,9 @@ import Link from 'next/link';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { ThemePicker } from '@/components/layout/ThemePicker';
 import { NetWorthSparkline } from '@/components/dashboard/NetWorthSparkline';
+import { SavingsRingChart } from '@/components/dashboard/SavingsRingChart';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import {
   BarChart3,
@@ -91,6 +93,28 @@ const PREVIEW_SPARKLINE = [
 const PREVIEW_ROWS: { label: string; mono: string }[] = [
   { label: 'Liquidità', mono: cachedFormatCurrencyEUR(64_900) },
   { label: 'Investito', mono: cachedFormatCurrencyEUR(422_350) },
+];
+
+/**
+ * Illustrative Cashflow data for the second preview card — demonstrates a
+ * second real module (savings rate ring) rather than another text bullet.
+ */
+const PREVIEW_SAVINGS_RATE = 38;
+const PREVIEW_CASHFLOW_ROWS: { label: string; mono: string }[] = [
+  { label: 'Entrate', mono: cachedFormatCurrencyEUR(4_200) },
+  { label: 'Spese', mono: cachedFormatCurrencyEUR(2_604) },
+];
+
+/**
+ * Proof strip — structural facts about the product, set in the system's own
+ * Dominant Value language (Geist Mono value + eyebrow label). Not fabricated
+ * financial figures: these describe the tool itself, so the surface stays honest.
+ */
+const PROOF_STATS: { value: string; label: string }[] = [
+  { value: '6', label: 'classi di asset' },
+  { value: '6', label: 'temi' },
+  { value: '100%', label: 'open source' },
+  { value: 'AI', label: 'assistente Claude' },
 ];
 
 /**
@@ -195,9 +219,16 @@ export default function HomePage() {
             <ShieldCheck className="h-5 w-5 text-foreground" aria-hidden="true" />
             <span className="text-sm font-semibold tracking-tight">Net Worth Tracker</span>
           </div>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/login">Accedi</Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Theme toggle reuses the in-app ThemePicker: the circle-reveal
+                view-transition (themeTransition.ts) showcases that light and
+                dark are equally premium (DESIGN §1). next-themes already wraps
+                the app from the root layout, so no extra wiring is needed. */}
+            <ThemePicker />
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/login">Accedi</Link>
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -214,7 +245,7 @@ export default function HomePage() {
             <div className="max-w-xl">
               <motion.p
                 {...reveal(0)}
-                className="mb-5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
+                className="mb-5 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
               >
                 Open source · per investitori italiani
               </motion.p>
@@ -277,7 +308,8 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* ── Right: Panoramica preview (the product speaking its own language) ── */}
+            {/* ── Right: stacked previews (the product speaking its own language) ── */}
+            <div className="space-y-4">
             <motion.div
               initial={reduce ? false : { opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
@@ -293,7 +325,7 @@ export default function HomePage() {
               </p>
 
               {/* Variation chip — the one place data is allowed to own colour. */}
-              <div className="mt-3 inline-flex items-center gap-1.5 rounded-[9px] bg-positive/10 px-[13px] py-[6px] font-mono text-[15px] font-semibold tracking-[-0.01em] text-positive">
+              <div className="mt-3 inline-flex items-center gap-2 rounded-[9px] bg-positive/10 px-[13px] py-[6px] font-mono text-[15px] font-semibold tracking-[-0.01em] text-positive">
                 <TrendingUp className="h-[13px] w-[13px]" aria-hidden="true" />
                 +{cachedFormatCurrencyEUR(PREVIEW_DELTA_ABS)} (+{PREVIEW_DELTA_PCT.toLocaleString('it-IT', { minimumFractionDigits: 2 })}%)
                 <span className="text-muted-foreground">questo mese</span>
@@ -327,6 +359,53 @@ export default function HomePage() {
                 Dati dimostrativi
               </p>
             </motion.div>
+
+            {/* Second preview: a real Cashflow module (savings-rate ring) — proves
+                breadth with an actual system component instead of another bullet. */}
+            <motion.div
+              initial={reduce ? false : { opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={reduce ? undefined : { duration: 0.7, ease, delay: 0.3 }}
+              aria-label="Anteprima del Cashflow con dati dimostrativi"
+              className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.06)]"
+            >
+              <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                Cashflow · Tasso di Risparmio
+              </p>
+              <div className="mt-3 flex items-center gap-5">
+                <SavingsRingChart rate={PREVIEW_SAVINGS_RATE} size={88} />
+                <div className="min-w-0 flex-1 divide-y divide-border">
+                  {PREVIEW_CASHFLOW_ROWS.map((row) => (
+                    <div key={row.label} className="flex items-center justify-between py-2.5">
+                      <span className="text-[13px] text-muted-foreground">{row.label}</span>
+                      <span className="font-mono text-[13px] tabular-nums">{row.mono}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Proof strip ───────────────────────────────────────────────── */}
+        {/* Structural facts in the system's Dominant Value language (mono value +
+            eyebrow label). border-t/40 is the lighter "chapter" separator. */}
+        <section
+          aria-label="In sintesi"
+          className="border-t border-border/40 px-4 py-12 sm:px-6"
+        >
+          <div className="mx-auto grid max-w-6xl grid-cols-2 gap-px overflow-hidden rounded-2xl border border-border bg-border desktop:grid-cols-4">
+            {PROOF_STATS.map(({ value, label }) => (
+              <div key={label} className="bg-card px-5 py-6 text-center">
+                <p className="font-mono text-[36px] font-bold leading-none tracking-[-0.03em] tabular-nums">
+                  {value}
+                </p>
+                <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                  {label}
+                </p>
+              </div>
+            ))}
           </div>
         </section>
 
