@@ -314,8 +314,10 @@ export function AIAnalysisDialog({
           </div>
         </div>
 
-        {/* Footer */}
-        <DialogFooter className="flex-row justify-between items-center border-t pt-3">
+        {/* Footer — stacks on mobile (disclaimer above full-width buttons), row on desktop.
+            The previous flex-row forced the long disclaimer and the 3 buttons onto one line,
+            pushing the last button off the right edge on narrow screens. */}
+        <DialogFooter className="flex flex-col gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-muted-foreground">
             {generatedAt && (
               <span className="mr-2">
@@ -324,16 +326,16 @@ export function AIAnalysisDialog({
             )}
             L&apos;analisi AI è generata automaticamente e non costituisce consulenza finanziaria.
           </p>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:shrink-0">
             {analysis && !loading && (
               <>
-                <Button variant="outline" onClick={handleCopyAnalysis} className="gap-2">
+                <Button variant="outline" onClick={handleCopyAnalysis} className="w-full gap-2 sm:w-auto">
                   {copied ? <><Check className="h-4 w-4" />Copiato</> : <><Copy className="h-4 w-4" />Copia Analisi</>}
                 </Button>
-                <Button variant="outline" onClick={fetchAnalysis}>Rigenera</Button>
+                <Button variant="outline" onClick={fetchAnalysis} className="w-full sm:w-auto">Rigenera</Button>
               </>
             )}
-            <Button variant="default" onClick={() => onOpenChange(false)}>Chiudi</Button>
+            <Button variant="default" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">Chiudi</Button>
           </div>
         </DialogFooter>
       </DialogContent>

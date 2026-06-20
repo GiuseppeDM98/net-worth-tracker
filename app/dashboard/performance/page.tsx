@@ -7,7 +7,6 @@ import {
   cardItem,
   chartShellSettle,
   periodContentSettle,
-  sectionRefreshPulse,
 } from '@/lib/utils/motionVariants';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
@@ -49,6 +48,7 @@ const AIAnalysisDialog = dynamic<AIAnalysisDialogProps>(
 import { MetricCard } from '@/components/performance/MetricCard';
 import { MetricSection } from '@/components/performance/MetricSection';
 import { HeroMetricBlock } from '@/components/performance/HeroMetricBlock';
+import { PerformanceHero } from '@/components/performance/PerformanceHero';
 import { PerformanceTooltip } from '@/components/performance/PerformanceTooltip';
 import { MonthlyReturnsHeatmap } from '@/components/performance/MonthlyReturnsHeatmap';
 import { UnderwaterDrawdownChart } from '@/components/performance/UnderwaterDrawdownChart';
@@ -57,6 +57,84 @@ import { BenchmarkComparisonSection } from '@/components/performance/BenchmarkCo
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { useBenchmarkReturns } from '@/lib/hooks/useBenchmarkReturns';
+import { BENCHMARKS } from '@/lib/constants/benchmarks';
+import { computeBenchmarkAnnualizedReturn } from '@/lib/utils/benchmarkPeriodReturn';
+import {
+  summarizePerformance,
+  computeBenchmarkDelta,
+  computeReturnConsistency,
+  computeDrawdownStatus,
+} from '@/lib/utils/performanceSummary';
+
+/**
+ * Header action buttons (Periodo Personalizzato / Analizza con AI / Aggiorna).
+ *
+ * Module-level component (React Compiler rule: no component definitions inside render)
+ * so it can be rendered twice with different layouts: inline on desktop (in the PageHeader
+ * actions slot) and stacked full-width on mobile (a bar below the header). The mobile
+ * PageHeader actions slot is a cramped inline row next to a truncating title, which can't
+ * fit three text buttons — hence the dedicated mobile bar.
+ */
+function HeaderActions({
+  stacked,
+  isDemo,
+  aiDisabled,
+  isRefreshing,
+  onCustom,
+  onAI,
+  onRefresh,
+}: {
+  stacked?: boolean;
+  isDemo: boolean;
+  aiDisabled: boolean;
+  isRefreshing: boolean;
+  onCustom: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  onAI: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  onRefresh: () => void;
+}) {
+  const fw = stacked ? 'w-full justify-center' : '';
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={onCustom}
+        disabled={isDemo}
+        title={isDemo ? 'Non disponibile in modalità demo' : 'Periodo Personalizzato'}
+        className={cn('gap-2', fw)}
+      >
+        <CalendarDays className="h-4 w-4" />
+        Periodo Personalizzato
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={onAI}
+        disabled={aiDisabled}
+        title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+        className={cn(
+          'group gap-2 transition-[border-color,color,box-shadow] duration-200 hover:border-[var(--ai-accent)] hover:text-[var(--ai-accent)] hover:shadow-[0_0_14px_color-mix(in_oklch,var(--ai-accent)_40%,transparent)]',
+          fw
+        )}
+      >
+        <Sparkles className="h-4 w-4 transition-transform duration-200 group-hover:rotate-12 group-hover:scale-110" />
+        Analizza con AI
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onRefresh}
+        disabled={isDemo || isRefreshing}
+        title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+        className={cn('text-muted-foreground hover:text-foreground', fw)}
+      >
+        <RefreshCw className={cn('mr-2 h-4 w-4', isRefreshing && 'animate-spin')} />
+        Aggiorna
+      </Button>
+    </>
+  );
+}
 
 const PERIOD_TABS = [
   { value: 'YTD' as TimePeriod, label: 'YTD', mobileLabel: 'YTD' },
@@ -183,15 +261,14 @@ export default function PerformancePage() {
   const [showAIAnalysisDialog, setShowAIAnalysisDialog] = useState(false);
   const [cachedSnapshots, setCachedSnapshots] = useState<MonthlySnapshot[]>([]);
   const [isMethodologyOpen, setIsMethodologyOpen] = useState(false);
+  // Detailed metric sections are collapsed by default — the hero now carries the essentials,
+  // so the full 15-metric breakdown is one click away rather than a wall on arrival (A3).
+  const [isAllMetricsOpen, setIsAllMetricsOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [refreshAnimationTick, setRefreshAnimationTick] = useState(0);
   const [customDialogOrigin, setCustomDialogOrigin] = useState<string | undefined>(undefined);
   const [aiDialogOrigin, setAiDialogOrigin] = useState<string | undefined>(undefined);
   const hasLoadedOnceRef = useRef(false);
 
-  // Guide strip shown once per user; localStorage flag persists across sessions.
-  const STRIP_STORAGE_KEY = 'perf_guide_dismissed';
-  const [showGuideStrip, setShowGuideStrip] = useState(false);
   const periodLabels: Record<Exclude<TimePeriod, 'ROLLING_12M' | 'ROLLING_36M'>, string> = {
     YTD: 'YTD',
     '1Y': '1 Anno',
@@ -203,6 +280,13 @@ export default function PerformancePage() {
 
   const chartColors = useChartColors();
 
+  // Reference benchmark for the hero "vs benchmark" delta — the first model portfolio
+  // (Portafoglio 60/40), the same default the comparison section selects. Fetched lazily
+  // and cached 6h, so the delta pops into the hero shortly after first load.
+  const referenceBenchmark = BENCHMARKS[0];
+  const { data: referenceBenchmarkReturns, isLoading: isBenchmarkLoading } =
+    useBenchmarkReturns(referenceBenchmark.id, true);
+
   // Responsive breakpoints
   const isMobile = useMediaQuery('(max-width: 767px)');
   const isLandscape = useMediaQuery('(min-width: 568px) and (max-height: 500px) and (orientation: landscape)');
@@ -212,16 +296,6 @@ export default function PerformancePage() {
       loadPerformanceData();
     }
   }, [user]);
-
-  // Init guide strip after mount — localStorage is not available during SSR
-  useEffect(() => {
-    if (!localStorage.getItem(STRIP_STORAGE_KEY)) setShowGuideStrip(true);
-  }, []);
-
-  const dismissGuideStrip = () => {
-    localStorage.setItem(STRIP_STORAGE_KEY, '1');
-    setShowGuideStrip(false);
-  };
 
   const calculateDialogOrigin = (element: HTMLElement) => {
     const rect = element.getBoundingClientRect();
@@ -264,7 +338,6 @@ export default function PerformancePage() {
         setLoading(true);
       } else {
         setIsRefreshing(true);
-        setRefreshAnimationTick((currentTick) => currentTick + 1);
       }
 
       // Fetch snapshots once and cache them in component state.
@@ -505,6 +578,30 @@ export default function PerformancePage() {
     return prepareUnderwaterDrawdownData(periodSnapshots, metrics.cashFlows, hasBaseline);
   }, [metrics, periodSnapshots]);
 
+  // ── Hero-synthesis values (pure layer) ──
+  // Benchmark annualized return over the active period, using the SAME indexing+annualize
+  // math as the comparison table (shared util) so the hero delta matches the table exactly.
+  const benchmarkAnnualized = useMemo(() => {
+    if (!metrics || !referenceBenchmarkReturns) return null;
+    return computeBenchmarkAnnualizedReturn(
+      referenceBenchmarkReturns,
+      metrics.startDate,
+      metrics.endDate,
+      metrics.numberOfMonths
+    );
+  }, [metrics, referenceBenchmarkReturns]);
+
+  const benchmarkDelta = computeBenchmarkDelta(metrics?.timeWeightedReturn ?? null, benchmarkAnnualized);
+  const performanceVerdict = metrics
+    ? summarizePerformance({
+        timeWeightedReturn: metrics.timeWeightedReturn,
+        sharpeRatio: metrics.sharpeRatio,
+        riskFreeRate: metrics.riskFreeRate,
+      })
+    : null;
+  const returnConsistency = useMemo(() => computeReturnConsistency(heatmapData), [heatmapData]);
+  const drawdownStatus = useMemo(() => computeDrawdownStatus(underwaterData), [underwaterData]);
+
   // Responsive helper function
   const getChartHeight = () => {
     if (isLandscape) return 300;
@@ -667,87 +764,51 @@ export default function PerformancePage() {
 
   return (
     <PageContainer>
-      {/* Header */}
-      <motion.div
-        key={`header-${refreshAnimationTick}`}
-        variants={sectionRefreshPulse}
-        initial="idle"
-        animate={isRefreshing ? 'pulse' : 'idle'}
-        className="border-b border-border pb-4"
-      >
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Portafoglio</p>
-            <h1 className="text-3xl font-bold tracking-tight">Rendimenti del Portafoglio</h1>
-            <p className="text-muted-foreground mt-1">
-              Analisi dei rendimenti e metriche di rischio-rendimento
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2 sm:justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              aria-label="Periodo Personalizzato"
-              onClick={(event) => {
+      {/* Header — unified PageHeader (A5). Actions render inline top-right on desktop;
+          the wrapper is hidden on mobile so the cramped inline slot stays empty (no title
+          truncation), with a dedicated full-width stacked bar below for mobile. */}
+      <PageHeader
+        label="Portafoglio"
+        title="Rendimenti del Portafoglio"
+        description="Analisi dei rendimenti e metriche di rischio-rendimento"
+        actions={
+          <div className="hidden items-center gap-2 desktop:flex">
+            <HeaderActions
+              isDemo={isDemo}
+              aiDisabled={isDemo || !metrics || metrics.hasInsufficientData}
+              isRefreshing={isRefreshing}
+              onCustom={(event) => {
                 setCustomDialogOrigin(calculateDialogOrigin(event.currentTarget));
                 setShowCustomDateDialog(true);
               }}
-              disabled={isDemo}
-              title={isDemo ? 'Non disponibile in modalità demo' : 'Periodo Personalizzato'}
-            >
-              {isMobile ? <CalendarDays className="h-4 w-4" /> : 'Periodo Personalizzato'}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(event) => {
+              onAI={(event) => {
                 setAiDialogOrigin(calculateDialogOrigin(event.currentTarget));
                 setShowAIAnalysisDialog(true);
               }}
-              disabled={isDemo || !metrics || metrics.hasInsufficientData}
-              title={isDemo ? 'Non disponibile in modalità demo' : undefined}
-              className="group gap-2 transition-[border-color,color,box-shadow] duration-200 hover:border-[var(--ai-accent)] hover:text-[var(--ai-accent)] hover:shadow-[0_0_14px_color-mix(in_oklch,var(--ai-accent)_40%,transparent)]"
-            >
-              <Sparkles className="h-4 w-4 transition-transform duration-200 group-hover:rotate-12 group-hover:scale-110" />
-              Analizza con AI
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={loadPerformanceData}
-              disabled={isDemo || isRefreshing}
-              title={isDemo ? 'Non disponibile in modalità demo' : undefined}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <RefreshCw className={cn('mr-2 h-4 w-4', isRefreshing && 'animate-spin')} />
-              Aggiorna
-            </Button>
+              onRefresh={loadPerformanceData}
+            />
           </div>
-        </div>
-      </motion.div>
+        }
+      />
 
-      {/* Guide strip — outside period selector, shown once per user until dismissed */}
-      {showGuideStrip && (
-        <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-top-2 duration-300">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-          <div className="flex-1 space-y-0.5">
-            <p className="font-medium text-foreground">Come leggere questa pagina</p>
-            <p className="text-muted-foreground">
-              Le metriche sono organizzate in 4 sezioni: Rendimento, Rischio, Contesto e Proventi Finanziari.
-              Tocca l&apos;icona <span className="font-medium">?</span> su ogni riga per la definizione completa.
-              Per formule e metodologia, espandi <span className="font-medium">Note Metodologiche</span> in fondo alla pagina.
-            </p>
-          </div>
-          <button
-            type="button"
-            aria-label="Chiudi guida"
-            onClick={dismissGuideStrip}
-            className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
+      {/* Mobile action bar — full-width stacked buttons (desktop uses the header slot) */}
+      <div className="flex flex-col gap-2 desktop:hidden">
+        <HeaderActions
+          stacked
+          isDemo={isDemo}
+          aiDisabled={isDemo || !metrics || metrics.hasInsufficientData}
+          isRefreshing={isRefreshing}
+          onCustom={(event) => {
+            setCustomDialogOrigin(calculateDialogOrigin(event.currentTarget));
+            setShowCustomDateDialog(true);
+          }}
+          onAI={(event) => {
+            setAiDialogOrigin(calculateDialogOrigin(event.currentTarget));
+            setShowAIAnalysisDialog(true);
+          }}
+          onRefresh={loadPerformanceData}
+        />
+      </div>
 
       {/* Period Selector */}
       <PerformancePeriodSelector
@@ -798,8 +859,75 @@ export default function PerformancePage() {
         )}
       </motion.div>
 
-      {/* ── METRICHE — Trade Republic hierarchy ── */}
-      <div>
+      {/* ── HERO: one answer — TWR + verdict + benchmark/drawdown + vital signs (A1/A2/B1/B3) ── */}
+      {performanceVerdict && (
+        <PerformanceHero
+          timeWeightedReturn={metrics.timeWeightedReturn}
+          periodLabel={periodLabels[selectedPeriod as keyof typeof periodLabels]}
+          verdict={performanceVerdict}
+          benchmarkLabel={referenceBenchmark.name}
+          benchmarkDelta={benchmarkDelta}
+          benchmarkLoading={isBenchmarkLoading}
+          drawdown={drawdownStatus}
+          sharpeRatio={metrics.sharpeRatio}
+          maxDrawdown={metrics.maxDrawdown}
+          netCashFlow={metrics.netCashFlow}
+          yocNet={metrics.yocNet}
+        />
+      )}
+
+      {/* Return consistency strip (B2) — steadiness from the monthly-returns heatmap.
+          NOTE: counts months of investment RETURN (cash-flow-isolated), not net-worth
+          growth months like Storico — a different question, a different number. */}
+      {returnConsistency.totalMonths > 0 && (
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-xl border border-border bg-muted/30 px-4 py-3 text-xs">
+          <span className="text-muted-foreground">
+            <span className="font-mono font-medium tabular-nums text-foreground">
+              {returnConsistency.positiveMonths}/{returnConsistency.totalMonths}
+            </span>{' '}
+            mesi positivi ({formatPercentage(returnConsistency.positiveShare)})
+          </span>
+          {returnConsistency.best && (
+            <span className="text-muted-foreground">
+              Miglior mese{' '}
+              <span className="font-medium text-foreground">{returnConsistency.best.label}</span>{' '}
+              <span className="font-mono font-medium tabular-nums text-positive">
+                {formatPercentage(returnConsistency.best.return)}
+              </span>
+            </span>
+          )}
+          {returnConsistency.worst && (
+            <span className="text-muted-foreground">
+              Peggior mese{' '}
+              <span className="font-medium text-foreground">{returnConsistency.worst.label}</span>{' '}
+              <span className="font-mono font-medium tabular-nums text-destructive">
+                {formatPercentage(returnConsistency.worst.return)}
+              </span>
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* ── METRICHE DETTAGLIATE — collapsed by default; hero carries the essentials (A3) ── */}
+      <Collapsible open={isAllMetricsOpen} onOpenChange={setIsAllMetricsOpen} className="border-t border-border/60 pt-4">
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="group flex w-full items-center justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-md"
+          >
+            <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+              {isAllMetricsOpen ? 'Nascondi metriche dettagliate' : 'Mostra tutte le metriche'}
+            </span>
+            <ChevronDown
+              className={cn(
+                'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none',
+                isAllMetricsOpen && 'rotate-180'
+              )}
+              aria-hidden="true"
+            />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-200">
         {/* RENDIMENTO: TWR hero + flat rows */}
         <MetricSection
           title="Metriche di Rendimento"
@@ -974,7 +1102,8 @@ export default function PerformancePage() {
             />
           </MetricSection>
         )}
-      </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Charts — stagger container propagates hidden→visible to children */}
       <motion.div
@@ -985,11 +1114,20 @@ export default function PerformancePage() {
       >
         <motion.div variants={staggerContainer} initial="hidden" animate="visible">
 
+          {/* Cluster divider: Andamento (A4) — growth-over-time charts */}
+          <motion.div variants={cardItem}>
+            <div className="mt-8 flex items-center gap-3">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                Andamento
+              </span>
+              <div className="h-px flex-1 bg-border/60" aria-hidden="true" />
+            </div>
+          </motion.div>
+
           {/* Evoluzione Patrimonio */}
           <motion.div variants={cardItem}>
             <Card className="mt-6">
               <CardHeader>
-                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60 mb-1">Visualizzazione</p>
                 <CardTitle>Evoluzione Patrimonio</CardTitle>
                 <CardDescription>
                   Area = capitale versato + rendimento generato, linea = patrimonio totale.
@@ -1065,7 +1203,6 @@ export default function PerformancePage() {
           <motion.div variants={cardItem}>
             <Card className="mt-6">
               <CardHeader>
-                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60 mb-1">Metriche Rolling</p>
                 <CardTitle>CAGR Rolling 12 Mesi</CardTitle>
                 <CardDescription>
                   Ogni punto mostra il CAGR degli ultimi 12 mesi; linea tratteggiata = media mobile a 3M.
@@ -1125,6 +1262,16 @@ export default function PerformancePage() {
                 )}
               </CardContent>
             </Card>
+          </motion.div>
+
+          {/* Cluster divider: Rischio (A4) — drawdown & risk-adjusted charts */}
+          <motion.div variants={cardItem}>
+            <div className="mt-8 flex items-center gap-3">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                Rischio
+              </span>
+              <div className="h-px flex-1 bg-border/60" aria-hidden="true" />
+            </div>
           </motion.div>
 
           <motion.div variants={cardItem}>
@@ -1198,7 +1345,6 @@ export default function PerformancePage() {
           <motion.div variants={cardItem}>
             <Card className="mt-6">
               <CardHeader>
-                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60 mb-1">Analisi Drawdown</p>
                 <CardTitle>Heatmap Rendimenti Mensili</CardTitle>
                 <CardDescription>
                   Verde = mese positivo, rosso = negativo; l&apos;intensità cresce con l&apos;ampiezza (±5% soglia).

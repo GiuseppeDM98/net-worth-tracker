@@ -14,6 +14,9 @@ import {
 import { BenchmarkMonthlyReturn, BenchmarkDefinition, FxMonthlyRate, EcbMonthlyRate } from '@/types/benchmarks';
 import { MonthlyReturnHeatmapData } from '@/types/performance';
 import { useChartColors } from '@/lib/hooks/useChartColors';
+// Indexing + annualization live in a shared pure util so the hero's "vs benchmark"
+// delta uses the exact same math as this table (no rounding drift).
+import { buildIndexedSeries, annualizeTWR } from '@/lib/utils/benchmarkPeriodReturn';
 
 interface BenchmarkComparisonChartProps {
   // User portfolio monthly returns (from prepareMonthlyReturnsHeatmap)
@@ -83,36 +86,6 @@ function flattenHeatmap(heatmapData: MonthlyReturnHeatmapData[]): Array<{ year: 
 }
 
 /**
- * Filter a monthly return series to the [startDate, endDate] window and
- * re-index it to 100 at the first included month.
- */
-function buildIndexedSeries(
-  returns: Array<{ year: number; month: number; return: number }>,
-  startDate: Date,
-  endDate: Date
-): Array<{ year: number; month: number; indexed: number }> {
-  const startYear = startDate.getFullYear();
-  const startMonth = startDate.getMonth() + 1;
-  const endYear = endDate.getFullYear();
-  const endMonth = endDate.getMonth() + 1;
-
-  const filtered = returns.filter(r => {
-    if (r.year < startYear || r.year > endYear) return false;
-    if (r.year === startYear && r.month < startMonth) return false;
-    if (r.year === endYear && r.month > endMonth) return false;
-    return true;
-  });
-
-  if (filtered.length === 0) return [];
-
-  let index = 100;
-  return filtered.map(r => {
-    index = index * (1 + r.return);
-    return { year: r.year, month: r.month, indexed: Math.round(index * 100) / 100 };
-  });
-}
-
-/**
  * Convert a USD monthly return series to EUR using end-of-month FX rates.
  *
  * Formula: R_EUR[t] = (1 + R_USD[t]) * (eurPerUsd[t] / eurPerUsd[t-1]) - 1
@@ -142,20 +115,6 @@ function applyFxConversion(
     const returnEur = (1 + r.return) * (currRate / prevRate) - 1;
     return { ...r, return: returnEur };
   });
-}
-
-/**
- * Annualize a cumulative return over a known number of months.
- * Uses the same numberOfMonths denominator as the main performance page so that
- * benchmark TWR values are comparable on an equal-period basis.
- */
-function annualizeTWR(cumulativeIndexed: number, numberOfMonths: number): number | null {
-  if (numberOfMonths <= 0) return null;
-  const cumulativeReturn = cumulativeIndexed / 100; // e.g. 1.5891 for +58.91%
-  const years = numberOfMonths / 12;
-  if (years === 0) return (cumulativeReturn - 1) * 100;
-  const annualized = (Math.pow(cumulativeReturn, 1 / years) - 1) * 100;
-  return isFinite(annualized) ? annualized : null;
 }
 
 /**
