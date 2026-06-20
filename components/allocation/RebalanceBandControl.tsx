@@ -79,29 +79,38 @@ export function RebalanceBandControl({ band, onChange }: RebalanceBandControlPro
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-      <div className="flex items-center gap-1.5">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-          Soglia
-        </span>
-        <Popover>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              className="text-muted-foreground/60 transition-colors hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
-              aria-label="Cosa significa la soglia di ribilanciamento"
-            >
-              <HelpCircle className="h-3.5 w-3.5" />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent side="bottom" align="start" className="max-w-[280px] text-sm leading-relaxed">
-            La soglia decide quando una classe è &quot;fuori target&quot;: oltre lo scostamento
-            indicato scatta COMPRA o VENDI. La regola 5/25 usa 5 punti assoluti oppure il 25%
-            relativo al target, a seconda di quale sia più stringente.
-          </PopoverContent>
-        </Popover>
+    <div className="flex flex-col gap-x-4 gap-y-3 rounded-xl border border-border bg-muted/30 px-4 py-3 desktop:flex-row desktop:items-center desktop:justify-between">
+      {/* Label + what it drives — so the lever that reclassifies the whole page is visible. */}
+      <div className="flex items-start gap-1.5">
+        <div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              Soglia di ribilanciamento
+            </span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="text-muted-foreground/60 transition-colors hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+                  aria-label="Cosa significa la soglia di ribilanciamento"
+                >
+                  <HelpCircle className="h-3.5 w-3.5" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent side="bottom" align="start" className="max-w-[280px] text-sm leading-relaxed">
+                La soglia decide quando una classe è &quot;fuori target&quot;: oltre lo scostamento
+                indicato scatta COMPRA o VENDI. La regola 5/25 usa 5 punti assoluti oppure il 25%
+                relativo al target, a seconda di quale sia più stringente.
+              </PopoverContent>
+            </Popover>
+          </div>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Decide quando una classe diventa COMPRA o VENDI nel verdetto e nel piano.
+          </p>
+        </div>
       </div>
 
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
       <div
         role="tablist"
         aria-label="Soglia di ribilanciamento"
@@ -150,6 +159,7 @@ export function RebalanceBandControl({ band, onChange }: RebalanceBandControlPro
           <span className="text-xs text-muted-foreground">p.p.</span>
         </div>
       )}
+      </div>
     </div>
   );
 }

@@ -27,6 +27,7 @@ import {
   filterSpecificAssets,
   hasSpecificAssetTracking,
   ACTION_CHART_NUMBER,
+  computeBalanceScore,
   summarizeBalance,
   buildRebalancePlan,
   allocateContribution,
@@ -232,6 +233,54 @@ describe('ACTION_CHART_NUMBER', () => {
 
   it('should give each action a distinct slot so the three states stay separable', () => {
     expect(new Set(Object.values(ACTION_CHART_NUMBER)).size).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeBalanceScore
+// ---------------------------------------------------------------------------
+
+describe('computeBalanceScore', () => {
+  it('should score a perfectly on-target portfolio at 100', () => {
+    const result = computeBalanceScore({
+      equity: makeAllocationData({ difference: 0 }),
+      bonds: makeAllocationData({ difference: 0 }),
+    });
+    expect(result.score).toBe(100);
+    expect(result.misallocationPct).toBe(0);
+  });
+
+  it('should equal 100 minus half the total absolute drift (misallocation share)', () => {
+    // equity +8, bonds -8 → Σ|drift| = 16 → 8% misallocated → score 92.
+    const result = computeBalanceScore({
+      equity: makeAllocationData({ difference: 8 }),
+      bonds: makeAllocationData({ difference: -8 }),
+    });
+    expect(result.misallocationPct).toBeCloseTo(8, 5);
+    expect(result.score).toBe(92);
+  });
+
+  it('should be band-independent (ignores action, reads raw difference)', () => {
+    // Same drift classified OK should still lower the score.
+    const result = computeBalanceScore({
+      equity: makeAllocationData({ difference: 6, action: 'OK' }),
+      bonds: makeAllocationData({ difference: -6, action: 'OK' }),
+    });
+    expect(result.score).toBe(94); // Σ|drift| 12 → 6% misallocated
+  });
+
+  it('should clamp a wildly off portfolio to a floor of 0', () => {
+    // 100% in one class vs a spread target → Σ|drift| can exceed 200.
+    const result = computeBalanceScore({
+      equity: makeAllocationData({ difference: 200 }),
+      bonds: makeAllocationData({ difference: -200 }),
+    });
+    expect(result.misallocationPct).toBe(100);
+    expect(result.score).toBe(0);
+  });
+
+  it('should return 100 for an empty portfolio (no drift to penalise)', () => {
+    expect(computeBalanceScore({})).toEqual({ score: 100, misallocationPct: 0 });
   });
 });
 

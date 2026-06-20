@@ -3,20 +3,25 @@
  *
  * Answers one question, in order: "How much do I have, am I in line with my targets,
  * and what should I do?" — then lets the user drill into the detail and look through to
- * real exposure.
+ * real exposure. Two IA zones: a DECISION zone (hero → band → action) and a quieter
+ * DETAIL zone (composition → exposure) under a labeled divider, so the action a user
+ * actually takes never reads at the same weight as reference detail.
  *
  * Narrative (single layout, mobile-first; desktop only widens the hero into two columns):
- *   1. Hero        — total allocated wealth + balance verdict (AllocationHero).
- *   2. Band        — the drift tolerance that defines "off target" (RebalanceBandControl).
- *   3. Plan        — the consolidated, prioritized trade list (RebalancePlan).
- *   4. Contribution— optional no-sell planner for new cash (ContributionAllocator).
- *   5. Breakdown   — one card, inline accordion, asset class → sub-category → targets.
- *   6. Exposure    — true look-through holdings/sectors/issuers (ExposureSection).
+ *   1. Hero    — total allocated wealth + composition shape (left) and the balance
+ *                score gauge + band-dependent verdict (companion) — AllocationHero.
+ *   2. Band    — the drift tolerance that defines "off target" (RebalanceBandControl).
+ *   3. Action  — "Cosa faccio": Ribilancia (trade list) | Versa (no-sell contribution
+ *                planner) behind one segmented switch (ActionPlanner).
+ *   — Dettaglio —
+ *   4. Breakdown — one card, inline accordion, asset class → sub-category → targets.
+ *   5. Exposure  — true look-through holdings/sectors/issuers (ExposureSection).
  *
  * Targets come either from Settings or, when goal-driven allocation is enabled, are
  * derived from the user's goals. The rebalance BAND is session-only view state (default
  * ±2 p.p. = the server's own threshold) and re-classifies every COMPRA/VENDI/OK via
- * `applyRebalanceBand`. The page has no mutations, so there is no demo-mode gating.
+ * `applyRebalanceBand`; the hero balance score is band-INDEPENDENT (absolute distance from
+ * target). The page has no mutations, so there is no demo-mode gating.
  */
 'use client';
 
@@ -40,12 +45,12 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { AllocationPageSkeleton } from '@/components/allocation/AllocationPageSkeleton';
 import { AllocationHero } from '@/components/allocation/AllocationHero';
 import { RebalanceBandControl } from '@/components/allocation/RebalanceBandControl';
-import { RebalancePlan } from '@/components/allocation/RebalancePlan';
-import { ContributionAllocator } from '@/components/allocation/ContributionAllocator';
+import { ActionPlanner } from '@/components/allocation/ActionPlanner';
 import { AllocationBreakdown } from '@/components/allocation/AllocationBreakdown';
 import {
   applyRebalanceBand,
   summarizeBalance,
+  computeBalanceScore,
   buildRebalancePlan,
   DEFAULT_REBALANCE_BAND,
   type RebalanceBand,
@@ -132,6 +137,12 @@ export default function AllocationPage() {
     () => (bandedAllocation ? summarizeBalance(bandedAllocation.byAssetClass) : null),
     [bandedAllocation]
   );
+  // Band-independent "how close to target" score for the hero gauge. Derived from raw
+  // drift, so widening/tightening the band leaves it unchanged (only the verdict reacts).
+  const balanceScore = useMemo(
+    () => (bandedAllocation ? computeBalanceScore(bandedAllocation.byAssetClass) : null),
+    [bandedAllocation]
+  );
   const rebalancePlan = useMemo(
     () => (bandedAllocation ? buildRebalancePlan(bandedAllocation.byAssetClass) : []),
     [bandedAllocation]
@@ -139,7 +150,7 @@ export default function AllocationPage() {
 
   if (loading) return <AllocationPageSkeleton />;
 
-  if (!allocation || !bandedAllocation || !balanceSummary) {
+  if (!allocation || !bandedAllocation || !balanceSummary || !balanceScore) {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="text-muted-foreground">Nessun dato disponibile</div>
@@ -195,33 +206,37 @@ export default function AllocationPage() {
         </div>
       ) : (
         <>
+          {/* DECISION zone: how much / how close to target / what to do. */}
           <AllocationHero
             totalValue={bandedAllocation.totalValue}
+            byAssetClass={bandedAllocation.byAssetClass}
             summary={balanceSummary}
+            balance={balanceScore}
             assetClassCount={assetClassCount}
           />
 
           <RebalanceBandControl band={band} onChange={setBand} />
 
-          <RebalancePlan moves={rebalancePlan} />
-
-          <ContributionAllocator
+          <ActionPlanner
+            moves={rebalancePlan}
             byAssetClass={bandedAllocation.byAssetClass}
             bySubCategory={bandedAllocation.bySubCategory}
           />
 
-          <AllocationBreakdown allocation={bandedAllocation} targets={targets} />
-        </>
-      )}
+          {/* DETAIL zone: quieter reference under a labeled divider (A5 rhythm). */}
+          <div className="space-y-4 pt-2 sm:space-y-6">
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                Dettaglio
+              </span>
+              <div className="h-px flex-1 bg-border/60" aria-hidden="true" />
+            </div>
 
-      {/* Exposure breakdown — lazy loaded; framed as a peer section, not buried chrome. */}
-      {user && (
-        <div className="border-t border-border/40 pt-6">
-          <p className="mb-3 text-xs text-muted-foreground">
-            Guarda dentro i tuoi ETF: le holding, i settori e gli emittenti che possiedi davvero.
-          </p>
-          <ExposureSection userId={user.uid} />
-        </div>
+            <AllocationBreakdown allocation={bandedAllocation} targets={targets} />
+
+            {user && <ExposureSection userId={user.uid} />}
+          </div>
+        </>
       )}
     </PageContainer>
   );

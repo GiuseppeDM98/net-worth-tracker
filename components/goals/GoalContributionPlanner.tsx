@@ -6,7 +6,8 @@
  * get the most. Collapsed by default — it's a tool, not status. Ephemeral, client-side only,
  * safe in demo mode (no mutation).
  *
- * Mirrors the Allocazione page's ContributionAllocator for cross-page consistency.
+ * Mirrors the Allocazione page's contribution planner (ContributionPanel) for cross-page
+ * consistency.
  */
 
 'use client';

@@ -201,6 +201,48 @@ export interface BalanceSummary {
   isBalanced: boolean;
 }
 
+/**
+ * Chart-palette slot for each asset class, so the composition bar (and any future
+ * per-class viz on this page) draw the SAME hue the History page uses for its
+ * "Patrimonio per Asset Class" chart. Resolve the actual color via `useChartColors()`
+ * at this index. Mirrors `acColors` in app/dashboard/history/page.tsx — keep them aligned.
+ */
+export const ASSET_CLASS_CHART_INDEX: Record<string, number> = {
+  equity: 0,
+  bonds: 1,
+  crypto: 2,
+  realestate: 3,
+  cash: 4,
+  commodity: 5,
+};
+
+export interface BalanceScore {
+  /** 0–100, where 100 = every class exactly on target. */
+  score: number;
+  /** Share of the portfolio sitting in the wrong class, in percentage points (0–100). */
+  misallocationPct: number;
+}
+
+/**
+ * A single band-INDEPENDENT "how close to target" score for the hero gauge.
+ *
+ * Deliberately built from each class's raw `difference` (current − target p.p.), NOT from
+ * the banded `action`: the gauge measures absolute distance from target and must stay
+ * stable when the user widens or tightens the rebalance band — only the COMPRA/VENDI/OK
+ * verdict and plan react to the band. Because Σ(current − target) = 0 across classes,
+ * Σ|difference| is exactly twice the portfolio fraction that is misallocated; halving it
+ * gives the intuitive "X% of the portfolio is in the wrong class". The score is its
+ * complement, clamped to [0, 100].
+ */
+export function computeBalanceScore(
+  byAssetClass: Record<string, AllocationData>
+): BalanceScore {
+  let sumAbsDrift = 0;
+  for (const data of Object.values(byAssetClass)) sumAbsDrift += Math.abs(data.difference);
+  const misallocationPct = Math.min(100, sumAbsDrift / 2);
+  return { score: Math.round(100 - misallocationPct), misallocationPct };
+}
+
 /** One-glance verdict for the hero: how many classes are off target and the worst one. */
 export function summarizeBalance(
   byAssetClass: Record<string, AllocationData>,
