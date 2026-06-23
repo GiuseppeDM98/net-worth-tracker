@@ -16,7 +16,7 @@ import { MonthlyReturnHeatmapData } from '@/types/performance';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 // Indexing + annualization live in a shared pure util so the hero's "vs benchmark"
 // delta uses the exact same math as this table (no rounding drift).
-import { buildIndexedSeries, annualizeTWR } from '@/lib/utils/benchmarkPeriodReturn';
+import { buildIndexedSeries, annualizeTWR, applyFxConversion } from '@/lib/utils/benchmarkPeriodReturn';
 
 interface BenchmarkComparisonChartProps {
   // User portfolio monthly returns (from prepareMonthlyReturnsHeatmap)
@@ -83,38 +83,6 @@ function flattenHeatmap(heatmapData: MonthlyReturnHeatmapData[]): Array<{ year: 
     }
   }
   return flat.sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
-}
-
-/**
- * Convert a USD monthly return series to EUR using end-of-month FX rates.
- *
- * Formula: R_EUR[t] = (1 + R_USD[t]) * (eurPerUsd[t] / eurPerUsd[t-1]) - 1
- *
- * Months where the FX rate is unavailable are passed through unchanged (USD return).
- */
-function applyFxConversion(
-  returns: Array<{ year: number; month: number; return: number }>,
-  fxRates: FxMonthlyRate[]
-): Array<{ year: number; month: number; return: number }> {
-  const fxMap = new Map<string, number>(
-    fxRates.map(r => [`${r.year}-${String(r.month).padStart(2, '0')}`, r.eurPerUsd])
-  );
-
-  return returns.map(r => {
-    const currKey = `${r.year}-${String(r.month).padStart(2, '0')}`;
-    const prevDate = new Date(r.year, r.month - 2, 1); // month - 2 because Date month is 0-indexed
-    const prevKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
-
-    const currRate = fxMap.get(currKey);
-    const prevRate = fxMap.get(prevKey);
-
-    if (currRate == null || prevRate == null || prevRate === 0) {
-      return r; // FX data unavailable for this month — pass through unchanged
-    }
-
-    const returnEur = (1 + r.return) * (currRate / prevRate) - 1;
-    return { ...r, return: returnEur };
-  });
 }
 
 /**

@@ -7,9 +7,11 @@ import { describe, it, expect } from 'vitest';
 import {
   buildIndexedSeries,
   annualizeTWR,
+  applyFxConversion,
   computeBenchmarkAnnualizedReturn,
   type MonthlyReturnPoint,
 } from '@/lib/utils/benchmarkPeriodReturn';
+import type { FxMonthlyRate } from '@/types/benchmarks';
 
 const series: MonthlyReturnPoint[] = [
   { year: 2024, month: 11, return: 0.05 }, // outside a 2025 window
@@ -44,6 +46,25 @@ describe('annualizeTWR', () => {
 
   it('should return null for non-positive months', () => {
     expect(annualizeTWR(110, 0)).toBeNull();
+  });
+});
+
+describe('applyFxConversion', () => {
+  // 1 USD = 1.00 EUR in Jan, 1.10 EUR in Feb → USD strengthened 10% vs EUR.
+  const fx: FxMonthlyRate[] = [
+    { year: 2025, month: 1, eurPerUsd: 1.0 },
+    { year: 2025, month: 2, eurPerUsd: 1.1 },
+  ];
+
+  it('should fold the FX move into the EUR return', () => {
+    const usd: MonthlyReturnPoint[] = [{ year: 2025, month: 2, return: 0.05 }];
+    // (1.05) * (1.10 / 1.00) - 1 = 0.155
+    expect(applyFxConversion(usd, fx)[0].return).toBeCloseTo(0.155, 10);
+  });
+
+  it('should pass a month through unchanged when FX data is missing', () => {
+    const usd: MonthlyReturnPoint[] = [{ year: 2025, month: 1, return: 0.05 }]; // no prior month rate
+    expect(applyFxConversion(usd, fx)[0].return).toBe(0.05);
   });
 });
 
