@@ -75,6 +75,7 @@ import {
   getMostRecentCompletedHalfYearEnd,
   getMostRecentCompletedYearEnd,
   computeAssetClassPerformers,
+  aggregateExpenses,
   buildMonthlyEmailData,
   buildPeriodEmailData,
   generateEmailHtml,
@@ -412,6 +413,43 @@ describe('computeAssetClassPerformers', () => {
   });
 });
 
+// ─── aggregateExpenses ────────────────────────────────────────────────────────
+
+// Minimal QueryDocumentSnapshot stub — aggregateExpenses only reads doc.data().
+function makeExpenseDoc(data: Record<string, unknown>) {
+  return { data: () => data } as unknown as FirebaseFirestore.QueryDocumentSnapshot;
+}
+
+describe('aggregateExpenses', () => {
+  it('classifies by type, not by amount sign, so a positive-amount refund still counts as expense', () => {
+    // A refund booked inside an expense category: expense type but POSITIVE amount.
+    // It must land in totalExpenses (matching the in-app Cashflow total), NOT in income.
+    const docs = [
+      makeExpenseDoc({ amount: -100, type: 'variable', categoryName: 'Alimentari' }),
+      makeExpenseDoc({ amount: 76, type: 'variable', categoryName: 'Alimentari' }), // refund
+      makeExpenseDoc({ amount: 2000, type: 'income', categoryName: 'Stipendio' }),
+    ];
+
+    const { totalIncome, totalExpenses } = aggregateExpenses(docs);
+
+    expect(totalExpenses).toBe(176); // 100 + 76 (refund counted as spending via Math.abs)
+    expect(totalIncome).toBe(2000); // refund must NOT inflate income
+  });
+
+  it('skips transfers on both signs', () => {
+    const docs = [
+      makeExpenseDoc({ amount: 500, type: 'transfer', categoryName: 'Giroconto' }),
+      makeExpenseDoc({ amount: -500, type: 'transfer', categoryName: 'Giroconto' }),
+      makeExpenseDoc({ amount: -50, type: 'fixed', categoryName: 'Affitto' }),
+    ];
+
+    const { totalIncome, totalExpenses } = aggregateExpenses(docs);
+
+    expect(totalIncome).toBe(0);
+    expect(totalExpenses).toBe(50);
+  });
+});
+
 // ─── generateEmailHtml ────────────────────────────────────────────────────────
 
 describe('generateEmailHtml', () => {
@@ -689,9 +727,9 @@ describe('buildMonthlyEmailData', () => {
     };
     collectionMocks['expenses'] = {
       docs: [
-        { data: () => ({ amount: 3000, categoryName: 'Stipendio', categoryId: 'cat1' }) },
-        { data: () => ({ amount: -500, categoryName: 'Alimentari', categoryId: 'cat2' }) },
-        { data: () => ({ amount: -300, categoryName: 'Trasporti', categoryId: 'cat3' }) },
+        { data: () => ({ amount: 3000, type: 'income', categoryName: 'Stipendio', categoryId: 'cat1' }) },
+        { data: () => ({ amount: -500, type: 'variable', categoryName: 'Alimentari', categoryId: 'cat2' }) },
+        { data: () => ({ amount: -300, type: 'variable', categoryName: 'Trasporti', categoryId: 'cat3' }) },
       ],
     };
     collectionMocks['dividends'] = { docs: [] };

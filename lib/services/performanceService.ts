@@ -837,8 +837,11 @@ export function getSnapshotsForPeriod(
       return allSnapshots;
     case 'CUSTOM':
       if (!customStartDate || !customEndDate) return [];
-      // Normalize to first day of month in local timezone to align with snapshot storage format
-      startDate = new Date(customStartDate.getFullYear(), customStartDate.getMonth(), 1);
+      // Reach back one month before the range as a baseline, so the FIRST month of
+      // the custom period gets a computed return — parity with YTD/1Y/3Y/5Y. Without
+      // it, the monthly-returns loop (which starts at i=1) would skip the first month.
+      // getMonth() - 1 rolls over to December of the previous year when needed.
+      startDate = new Date(customStartDate.getFullYear(), customStartDate.getMonth() - 1, 1);
       endDate = customEndDate;
       break;
     default:
@@ -1074,7 +1077,7 @@ export async function calculatePerformanceForPeriod(
   // used only as starting value — the actual performance period starts from the second snapshot.
   // Example: YTD in Feb 2026 → snapshots [Dec 2025, Jan 2026, Feb 2026],
   // baseline = Dec (startNW), period = Jan-Feb (2 months, not 3)
-  const hasBaseline = ['YTD', '1Y', '3Y', '5Y'].includes(timePeriod) && sortedSnapshots.length >= 3;
+  const hasBaseline = ['YTD', '1Y', '3Y', '5Y', 'CUSTOM'].includes(timePeriod) && sortedSnapshots.length >= 3;
   const startSnapshot = sortedSnapshots[0];
   const periodStartSnapshot = hasBaseline ? sortedSnapshots[1] : sortedSnapshots[0];
   const endSnapshot = sortedSnapshots[sortedSnapshots.length - 1];

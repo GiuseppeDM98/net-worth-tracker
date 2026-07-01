@@ -80,8 +80,9 @@ function snapshotDoc(totalNetWorth: number) {
   return { data: () => ({ totalNetWorth, isDummy: false }) };
 }
 
-function expenseDoc(amount: number, categoryName: string, categoryId: string) {
-  return { data: () => ({ amount, categoryName, categoryId }) };
+// Classification is by `type` (mirrors the app), so fixtures must carry a realistic type.
+function expenseDoc(amount: number, categoryName: string, categoryId: string, type: string) {
+  return { data: () => ({ amount, categoryName, categoryId, type }) };
 }
 
 /** A baseline period with NW 145000 and three transactions (income 3000, two expenses). */
@@ -90,9 +91,9 @@ function seedBaselinePeriod() {
   collectionMocks['expenses'] = {
     empty: false,
     docs: [
-      expenseDoc(3000, 'Stipendio', 'inc1'),
-      expenseDoc(-700, 'Alimentari', 'c1'),
-      expenseDoc(-500, 'Trasporti', 'c2'),
+      expenseDoc(3000, 'Stipendio', 'inc1', 'income'),
+      expenseDoc(-700, 'Alimentari', 'c1', 'variable'),
+      expenseDoc(-500, 'Trasporti', 'c2', 'variable'),
     ],
   };
 }
@@ -177,7 +178,7 @@ describe('buildPeriodComparison', () => {
 
   it('returns null net worth delta when the baseline snapshot is missing', async () => {
     collectionMocks['monthly-snapshots'] = { empty: true, docs: [] };
-    collectionMocks['expenses'] = { empty: false, docs: [expenseDoc(-700, 'Alimentari', 'c1')] };
+    collectionMocks['expenses'] = { empty: false, docs: [expenseDoc(-700, 'Alimentari', 'c1', 'variable')] };
 
     const result = await buildPeriodComparison('user1', makeEmailData());
 

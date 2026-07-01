@@ -199,9 +199,9 @@ export function MobileFiltersDrawer({
                 <Input
                   value={searchQuery}
                   onChange={e => onSearchChange(e.target.value)}
-                  placeholder="Note, categorie..."
+                  placeholder="Note, categorie, importo..."
                   className="h-9 pl-8 pr-8 text-sm"
-                  aria-label="Cerca nelle note, categoria o sottocategoria"
+                  aria-label="Cerca nelle note, categoria, sottocategoria o importo"
                 />
                 {searchQuery && (
                   <button

@@ -485,15 +485,25 @@ export function ExpenseTrackingTab({
       filtered = filtered.filter((e) => e.subCategoryId === selectedSubCategoryId);
     }
 
-    // Free-text search across notes, category name, and subcategory name
+    // Free-text search across notes, category name, subcategory name — plus amount.
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
-      filtered = filtered.filter(
-        (e) =>
+      // Amount search: normalize the Italian decimal comma to a dot so "76,45" and
+      // "76.45" both work, then substring-match against the absolute amount formatted
+      // with two decimals. So "76" matches 76,45 / 176 / 1276 and "76,45" matches the
+      // exact amount. Amount sign is ignored (Math.abs) — the UI never shows it.
+      const amountQuery = q.replace(',', '.');
+      const isNumericQuery = amountQuery !== '' && !Number.isNaN(Number(amountQuery));
+      filtered = filtered.filter((e) => {
+        if (
           e.notes?.toLowerCase().includes(q) ||
           e.categoryName.toLowerCase().includes(q) ||
-          e.subCategoryName?.toLowerCase().includes(q),
-      );
+          e.subCategoryName?.toLowerCase().includes(q)
+        ) {
+          return true;
+        }
+        return isNumericQuery && Math.abs(e.amount).toFixed(2).includes(amountQuery);
+      });
     }
 
     // Account (conto corrente) filter
@@ -777,9 +787,9 @@ export function ExpenseTrackingTab({
                 <Input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Cerca note, categorie..."
+                  placeholder="Cerca note, categorie, importo..."
                   className="h-9 pr-8 pl-8 text-sm"
-                  aria-label="Cerca nelle note, categoria o sottocategoria"
+                  aria-label="Cerca nelle note, categoria, sottocategoria o importo"
                 />
                 {searchQuery && (
                   <button

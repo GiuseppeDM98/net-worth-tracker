@@ -708,7 +708,10 @@ const EMAIL_EXPENSE_TYPE_ORDER: ExpenseType[] = ['fixed', 'variable', 'debt'];
  * Aggregates a set of expense docs into income/expense totals and per-category /
  * per-type breakdowns plus the largest individual transactions.
  *
- * Transfers (type === 'transfer') are skipped — they are net-zero, not real income/expense.
+ * Classification is by expense TYPE (not by the sign of amount), mirroring the in-app
+ * getMonthlyExpenseSummary/isCountableExpense so the email agrees with the Cashflow page:
+ * type === 'transfer' is skipped (net-zero), type === 'income' is income, everything else
+ * is expense via Math.abs (so a positive-amount refund still counts as spending).
  * Exported for reuse by the period-comparison builder.
  *
  * @param docs              The period's expense documents.
@@ -746,9 +749,14 @@ export function aggregateExpenses(
     // Notes carry the human description; fall back to the category name.
     const description = data.notes?.trim() || categoryName;
 
-    if (amount > 0) {
-      // Skip transfers — net-zero, not real income
-      if (data.type === 'transfer') continue;
+    // Classify by TYPE, not by the sign of amount — this mirrors the in-app
+    // getMonthlyExpenseSummary / isCountableExpense so email and Cashflow agree.
+    // A refund (expense-type row with a POSITIVE amount) must count as expense,
+    // otherwise the email under-reports "Uscite totali" (it was being routed to income).
+    if (data.type === 'transfer') {
+      // Transfers are internal movements — net-zero, not real income/expense.
+      continue;
+    } else if (data.type === 'income') {
       totalIncome += amount;
       if (!incomeCategoryTotals[key]) {
         incomeCategoryTotals[key] = { name: categoryName, amount: 0 };

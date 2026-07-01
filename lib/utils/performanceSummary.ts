@@ -194,7 +194,7 @@ export function computeReturnConsistency(
 // ---------------------------------------------------------------------------
 
 export interface DrawdownStatus {
-  /** true when the latest point is at a fresh all-time high (drawdown ~0). */
+  /** true when the latest point is at a fresh high for the selected period (drawdown ~0). */
   atPeak: boolean;
   /** Current distance below the peak, as a non-positive percentage (e.g. -3.2). */
   current: number;

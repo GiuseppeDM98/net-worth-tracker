@@ -16,7 +16,7 @@ import { MonthlyReturnHeatmapData } from '@/types/performance';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 // Indexing + annualization live in a shared pure util so the hero's "vs benchmark"
 // delta uses the exact same math as this table (no rounding drift).
-import { buildIndexedSeries, annualizeTWR } from '@/lib/utils/benchmarkPeriodReturn';
+import { buildIndexedSeries, annualizeTWR, applyFxConversion } from '@/lib/utils/benchmarkPeriodReturn';
 
 interface BenchmarkComparisonChartProps {
   // User portfolio monthly returns (from prepareMonthlyReturnsHeatmap)
@@ -83,38 +83,6 @@ function flattenHeatmap(heatmapData: MonthlyReturnHeatmapData[]): Array<{ year: 
     }
   }
   return flat.sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
-}
-
-/**
- * Convert a USD monthly return series to EUR using end-of-month FX rates.
- *
- * Formula: R_EUR[t] = (1 + R_USD[t]) * (eurPerUsd[t] / eurPerUsd[t-1]) - 1
- *
- * Months where the FX rate is unavailable are passed through unchanged (USD return).
- */
-function applyFxConversion(
-  returns: Array<{ year: number; month: number; return: number }>,
-  fxRates: FxMonthlyRate[]
-): Array<{ year: number; month: number; return: number }> {
-  const fxMap = new Map<string, number>(
-    fxRates.map(r => [`${r.year}-${String(r.month).padStart(2, '0')}`, r.eurPerUsd])
-  );
-
-  return returns.map(r => {
-    const currKey = `${r.year}-${String(r.month).padStart(2, '0')}`;
-    const prevDate = new Date(r.year, r.month - 2, 1); // month - 2 because Date month is 0-indexed
-    const prevKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
-
-    const currRate = fxMap.get(currKey);
-    const prevRate = fxMap.get(prevKey);
-
-    if (currRate == null || prevRate == null || prevRate === 0) {
-      return r; // FX data unavailable for this month — pass through unchanged
-    }
-
-    const returnEur = (1 + r.return) * (currRate / prevRate) - 1;
-    return { ...r, return: returnEur };
-  });
 }
 
 /**
@@ -370,32 +338,43 @@ export function BenchmarkComparisonChart({
 
     // Benchmark TWR and metrics
     const benchmarkTWRs: Record<string, number | null> = {};
+    const benchmarkFinalIndexed: Record<string, number | null> = {};
     const benchmarkMetrics: Record<string, BenchmarkMetrics> = {};
 
     for (const id of selectedBenchmarkIds) {
-      const finalValue = chartData[chartData.length - 1][id];
-      const twr =
-        finalValue != null && typeof finalValue === 'number'
-          ? annualizeTWR(finalValue, numberOfMonths)
-          : null;
-      benchmarkTWRs[id] = twr;
-
       const raw = benchmarkReturns[id];
-      if (raw) {
-        const converted = convertToEur && fxRates.length > 0 ? applyFxConversion(raw, fxRates) : raw;
-        const filtered = converted
-          .filter(r => {
-            if (r.year < startYear || r.year > endYear) return false;
-            if (r.year === startYear && r.month < startMonth) return false;
-            if (r.year === endYear && r.month > endMonth) return false;
-            return true;
-          })
-          .map(r => r.return);
-        benchmarkMetrics[id] = computeAllMetrics(filtered, twr, effectiveRiskFreeRate);
+      if (!raw) {
+        benchmarkTWRs[id] = null;
+        benchmarkFinalIndexed[id] = null;
+        continue;
       }
+      const converted = convertToEur && fxRates.length > 0 ? applyFxConversion(raw, fxRates) : raw;
+
+      // Final index value = the benchmark's OWN last available month, NOT the portfolio's
+      // last month. When the period ends in the current, still-incomplete month (e.g. today
+      // is July 1), Yahoo has no return for that month yet, so the portfolio-keyed chartData
+      // cell would be null and TWR/Crescita/Sharpe/Sortino/Calmar would all show "–".
+      // Falling back to the benchmark's last available month keeps them populated, matching
+      // the hero's shared computeBenchmarkAnnualizedReturn semantics.
+      const indexedSeries = buildIndexedSeries(converted, startDate, endDate);
+      const finalIndexed =
+        indexedSeries.length > 0 ? indexedSeries[indexedSeries.length - 1].indexed : null;
+      const twr = finalIndexed != null ? annualizeTWR(finalIndexed, numberOfMonths) : null;
+      benchmarkTWRs[id] = twr;
+      benchmarkFinalIndexed[id] = finalIndexed;
+
+      const filtered = converted
+        .filter(r => {
+          if (r.year < startYear || r.year > endYear) return false;
+          if (r.year === startYear && r.month < startMonth) return false;
+          if (r.year === endYear && r.month > endMonth) return false;
+          return true;
+        })
+        .map(r => r.return);
+      benchmarkMetrics[id] = computeAllMetrics(filtered, twr, effectiveRiskFreeRate);
     }
 
-    return { portfolioFinalIndexed, portfolioMetrics, benchmarkTWRs, benchmarkMetrics };
+    return { portfolioFinalIndexed, portfolioMetrics, benchmarkTWRs, benchmarkFinalIndexed, benchmarkMetrics };
   }, [
     chartData,
     selectedBenchmarkIds,
@@ -429,6 +408,81 @@ export function BenchmarkComparisonChart({
     portfolioTWR != null && portfolioVolatility != null && portfolioVolatility !== 0
       ? (portfolioTWR - effectiveRiskFreeRate) / portfolioVolatility
       : portfolioSharpe;
+
+  // Unified rows for the metrics table, sorted by TWR descending so the ranking
+  // (highest TWR first) is visible at a glance. The portfolio is sorted in alongside
+  // the benchmarks — kept visually distinct by its solid marker + bold name — so the
+  // user immediately sees where they stand. Rows with no TWR (benchmark missing the
+  // current incomplete month, etc.) always sort last.
+  type TableRow = {
+    key: string;
+    name: string;
+    color: string;
+    isPortfolio: boolean;
+    twr: number | null;
+    totalGrowth: number | null;
+    volatility: number | null;
+    sharpe: number | null;
+    sortino: number | null;
+    calmar: number | null;
+    maxDrawdown: number | null;
+    bestMonth: number | null;
+    worstMonth: number | null;
+    positiveMonths: number;
+    negativeMonths: number;
+    totalMonths: number;
+  };
+
+  const sortedTableRows: TableRow[] = metricsSummary
+    ? [
+        {
+          key: 'portfolio',
+          name: 'Il Tuo Portafoglio',
+          color: chartColors[0],
+          isPortfolio: true,
+          twr: portfolioTWR,
+          totalGrowth: portfolioTotalGrowth ?? metricsSummary.portfolioFinalIndexed - 100,
+          volatility: portfolioVolatility,
+          sharpe: portfolioSharpeEffective,
+          sortino: metricsSummary.portfolioMetrics.sortino,
+          calmar: metricsSummary.portfolioMetrics.calmar,
+          maxDrawdown: portfolioMaxDrawdown,
+          bestMonth: metricsSummary.portfolioMetrics.bestMonth,
+          worstMonth: metricsSummary.portfolioMetrics.worstMonth,
+          positiveMonths: metricsSummary.portfolioMetrics.positiveMonths,
+          negativeMonths: metricsSummary.portfolioMetrics.negativeMonths,
+          totalMonths: metricsSummary.portfolioMetrics.totalMonths,
+        },
+        ...activeBenchmarks.map((b): TableRow => {
+          const m = metricsSummary.benchmarkMetrics[b.id];
+          const finalIndexed = metricsSummary.benchmarkFinalIndexed[b.id];
+          return {
+            key: b.id,
+            name: b.name,
+            color: b.color,
+            isPortfolio: false,
+            twr: metricsSummary.benchmarkTWRs[b.id] ?? null,
+            totalGrowth: finalIndexed != null ? finalIndexed - 100 : null,
+            volatility: m?.volatility ?? null,
+            sharpe: m?.sharpe ?? null,
+            sortino: m?.sortino ?? null,
+            calmar: m?.calmar ?? null,
+            maxDrawdown: m?.maxDrawdown ?? null,
+            bestMonth: m?.bestMonth ?? null,
+            worstMonth: m?.worstMonth ?? null,
+            positiveMonths: m?.positiveMonths ?? 0,
+            negativeMonths: m?.negativeMonths ?? 0,
+            totalMonths: m?.totalMonths ?? 0,
+          };
+        }),
+      ].sort((a, b) => {
+        // TWR descending; null TWR (missing data) always last.
+        if (a.twr == null && b.twr == null) return 0;
+        if (a.twr == null) return 1;
+        if (b.twr == null) return -1;
+        return b.twr - a.twr;
+      })
+    : [];
 
   const fmtPct = (value: number | null, decimals = 2) => {
     if (value == null) return '–';
@@ -530,113 +584,55 @@ export function BenchmarkComparisonChart({
               </tr>
             </thead>
             <tbody>
-              {/* Portfolio row — TWR/volatility/sharpe/maxDD use pre-computed KPI values */}
-              <tr className="border-b border-border/50">
-                <td className="py-2 pr-3">
-                  <div className="flex items-center gap-2">
-                    <div className="h-2 w-5 rounded-full" style={{ backgroundColor: chartColors[0] }} />
-                    <span className="font-medium whitespace-nowrap">Il Tuo Portafoglio</span>
-                  </div>
-                </td>
-                <td className="text-right py-2 px-2 font-medium tabular-nums">
-                  <span className={colorClass(portfolioTWR)}>{fmtPct(portfolioTWR)}</span>
-                </td>
-                <td className="text-right py-2 px-2 tabular-nums text-muted-foreground hidden sm:table-cell">
-                  {portfolioTotalGrowth != null
-                    ? fmtPct(portfolioTotalGrowth)
-                    : fmtPct(metricsSummary.portfolioFinalIndexed - 100)}
-                </td>
-                <td className="text-right py-2 px-2 tabular-nums text-muted-foreground">
-                  {portfolioVolatility != null ? `${portfolioVolatility.toFixed(1)}%` : '–'}
-                </td>
-                <td className="text-right py-2 px-2 font-medium tabular-nums">
-                  <span className={colorClass(portfolioSharpeEffective)}>{fmtRatio(portfolioSharpeEffective)}</span>
-                </td>
-                <td className="text-right py-2 px-2 font-medium tabular-nums hidden md:table-cell">
-                  <span className={colorClass(metricsSummary.portfolioMetrics.sortino)}>
-                    {fmtRatio(metricsSummary.portfolioMetrics.sortino)}
-                  </span>
-                </td>
-                <td className="text-right py-2 px-2 font-medium tabular-nums hidden md:table-cell">
-                  <span className={colorClass(metricsSummary.portfolioMetrics.calmar)}>
-                    {fmtRatio(metricsSummary.portfolioMetrics.calmar)}
-                  </span>
-                </td>
-                <td className="text-right py-2 px-2 tabular-nums">
-                  <span className={negColorClass(portfolioMaxDrawdown)}>
-                    {fmtPct(portfolioMaxDrawdown)}
-                  </span>
-                </td>
-                <td className="text-right py-2 px-2 tabular-nums hidden sm:table-cell">
-                  <span className="text-positive">
-                    {fmtPct(metricsSummary.portfolioMetrics.bestMonth)}
-                  </span>
-                </td>
-                <td className="text-right py-2 px-2 tabular-nums hidden sm:table-cell">
-                  <span className={negColorClass(metricsSummary.portfolioMetrics.worstMonth)}>
-                    {fmtPct(metricsSummary.portfolioMetrics.worstMonth)}
-                  </span>
-                </td>
-                <td className="text-right py-2 px-2 tabular-nums text-positive">
-                  {fmtInt(metricsSummary.portfolioMetrics.positiveMonths)}
-                  <span className="text-muted-foreground font-normal">/{fmtInt(metricsSummary.portfolioMetrics.totalMonths)}</span>
-                </td>
-                <td className="text-right py-2 pl-2 tabular-nums text-destructive hidden sm:table-cell">
-                  {fmtInt(metricsSummary.portfolioMetrics.negativeMonths)}
-                  <span className="text-muted-foreground font-normal">/{fmtInt(metricsSummary.portfolioMetrics.totalMonths)}</span>
-                </td>
-              </tr>
-
-              {/* Benchmark rows */}
-              {activeBenchmarks.map(b => {
-                const twr = metricsSummary.benchmarkTWRs[b.id];
-                const m = metricsSummary.benchmarkMetrics[b.id];
-                const finalIndexed = chartData[chartData.length - 1][b.id];
-                const totalGrowth = typeof finalIndexed === 'number' ? finalIndexed - 100 : null;
-                return (
-                  <tr key={b.id} className="border-b border-border/50 last:border-0">
-                    <td className="py-2 pr-3">
-                      <div className="flex items-center gap-2">
-                        <div className="h-0.5 w-5 border-t-2 border-dashed shrink-0" style={{ borderColor: b.color }} />
-                        <span className="whitespace-nowrap">{b.name}</span>
-                      </div>
-                    </td>
-                    <td className="text-right py-2 px-2 font-medium tabular-nums">
-                      <span className={colorClass(twr)}>{fmtPct(twr)}</span>
-                    </td>
-                    <td className="text-right py-2 px-2 tabular-nums text-muted-foreground hidden sm:table-cell">
-                      {fmtPct(totalGrowth)}
-                    </td>
-                    <td className="text-right py-2 px-2 tabular-nums text-muted-foreground">
-                      {m?.volatility != null ? `${m.volatility.toFixed(1)}%` : '–'}
-                    </td>
-                    <td className="text-right py-2 px-2 font-medium tabular-nums">
-                      {m ? <span className={colorClass(m.sharpe)}>{fmtRatio(m.sharpe)}</span> : '–'}
-                    </td>
-                    <td className="text-right py-2 px-2 font-medium tabular-nums hidden md:table-cell">
-                      {m ? <span className={colorClass(m.sortino)}>{fmtRatio(m.sortino)}</span> : '–'}
-                    </td>
-                    <td className="text-right py-2 px-2 font-medium tabular-nums hidden md:table-cell">
-                      {m ? <span className={colorClass(m.calmar)}>{fmtRatio(m.calmar)}</span> : '–'}
-                    </td>
-                    <td className="text-right py-2 px-2 tabular-nums">
-                      {m ? <span className={negColorClass(m.maxDrawdown)}>{fmtPct(m.maxDrawdown)}</span> : '–'}
-                    </td>
-                    <td className="text-right py-2 px-2 tabular-nums hidden sm:table-cell">
-                      {m ? <span className="text-positive">{fmtPct(m.bestMonth)}</span> : '–'}
-                    </td>
-                    <td className="text-right py-2 px-2 tabular-nums hidden sm:table-cell">
-                      {m ? <span className={negColorClass(m.worstMonth)}>{fmtPct(m.worstMonth)}</span> : '–'}
-                    </td>
-                    <td className="text-right py-2 px-2 tabular-nums text-positive">
-                      {m ? <>{fmtInt(m.positiveMonths)}<span className="text-muted-foreground font-normal">/{fmtInt(m.totalMonths)}</span></> : '–'}
-                    </td>
-                    <td className="text-right py-2 pl-2 tabular-nums text-destructive hidden sm:table-cell">
-                      {m ? <>{fmtInt(m.negativeMonths)}<span className="text-muted-foreground font-normal">/{fmtInt(m.totalMonths)}</span></> : '–'}
-                    </td>
-                  </tr>
-                );
-              })}
+              {/* One row per portfolio/benchmark, pre-sorted by TWR desc (sortedTableRows).
+                  The portfolio keeps a solid marker + bold name; benchmarks use a dashed marker. */}
+              {sortedTableRows.map(row => (
+                <tr key={row.key} className="border-b border-border/50 last:border-0">
+                  <td className="py-2 pr-3">
+                    <div className="flex items-center gap-2">
+                      {row.isPortfolio ? (
+                        <div className="h-2 w-5 rounded-full shrink-0" style={{ backgroundColor: row.color }} />
+                      ) : (
+                        <div className="h-0.5 w-5 border-t-2 border-dashed shrink-0" style={{ borderColor: row.color }} />
+                      )}
+                      <span className={`whitespace-nowrap${row.isPortfolio ? ' font-medium' : ''}`}>{row.name}</span>
+                    </div>
+                  </td>
+                  <td className="text-right py-2 px-2 font-medium tabular-nums">
+                    {row.twr != null ? <span className={colorClass(row.twr)}>{fmtPct(row.twr)}</span> : '–'}
+                  </td>
+                  <td className="text-right py-2 px-2 tabular-nums text-muted-foreground hidden sm:table-cell">
+                    {fmtPct(row.totalGrowth)}
+                  </td>
+                  <td className="text-right py-2 px-2 tabular-nums text-muted-foreground">
+                    {row.volatility != null ? `${row.volatility.toFixed(1)}%` : '–'}
+                  </td>
+                  <td className="text-right py-2 px-2 font-medium tabular-nums">
+                    {row.sharpe != null ? <span className={colorClass(row.sharpe)}>{fmtRatio(row.sharpe)}</span> : '–'}
+                  </td>
+                  <td className="text-right py-2 px-2 font-medium tabular-nums hidden md:table-cell">
+                    {row.sortino != null ? <span className={colorClass(row.sortino)}>{fmtRatio(row.sortino)}</span> : '–'}
+                  </td>
+                  <td className="text-right py-2 px-2 font-medium tabular-nums hidden md:table-cell">
+                    {row.calmar != null ? <span className={colorClass(row.calmar)}>{fmtRatio(row.calmar)}</span> : '–'}
+                  </td>
+                  <td className="text-right py-2 px-2 tabular-nums">
+                    {row.maxDrawdown != null ? <span className={negColorClass(row.maxDrawdown)}>{fmtPct(row.maxDrawdown)}</span> : '–'}
+                  </td>
+                  <td className="text-right py-2 px-2 tabular-nums hidden sm:table-cell">
+                    {row.bestMonth != null ? <span className="text-positive">{fmtPct(row.bestMonth)}</span> : '–'}
+                  </td>
+                  <td className="text-right py-2 px-2 tabular-nums hidden sm:table-cell">
+                    {row.worstMonth != null ? <span className={negColorClass(row.worstMonth)}>{fmtPct(row.worstMonth)}</span> : '–'}
+                  </td>
+                  <td className="text-right py-2 px-2 tabular-nums text-positive">
+                    {row.totalMonths > 0 ? <>{fmtInt(row.positiveMonths)}<span className="text-muted-foreground font-normal">/{fmtInt(row.totalMonths)}</span></> : '–'}
+                  </td>
+                  <td className="text-right py-2 pl-2 tabular-nums text-destructive hidden sm:table-cell">
+                    {row.totalMonths > 0 ? <>{fmtInt(row.negativeMonths)}<span className="text-muted-foreground font-normal">/{fmtInt(row.totalMonths)}</span></> : '–'}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
           <p className="text-xs text-muted-foreground mt-2">

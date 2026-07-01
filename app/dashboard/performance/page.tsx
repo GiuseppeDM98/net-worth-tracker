@@ -58,8 +58,9 @@ import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useBenchmarkReturns } from '@/lib/hooks/useBenchmarkReturns';
+import { useFxRates } from '@/lib/hooks/useFxRates';
 import { BENCHMARKS } from '@/lib/constants/benchmarks';
-import { computeBenchmarkAnnualizedReturn } from '@/lib/utils/benchmarkPeriodReturn';
+import { computeBenchmarkAnnualizedReturn, applyFxConversion } from '@/lib/utils/benchmarkPeriodReturn';
 import {
   summarizePerformance,
   computeBenchmarkDelta,
@@ -286,6 +287,11 @@ export default function PerformancePage() {
   const referenceBenchmark = BENCHMARKS[0];
   const { data: referenceBenchmarkReturns, isLoading: isBenchmarkLoading } =
     useBenchmarkReturns(referenceBenchmark.id, true);
+  // The portfolio TWR is EUR-denominated, so the hero must compare it against an
+  // EUR-converted benchmark — otherwise the delta mixes currencies (the benchmark's
+  // USD return vs an EUR portfolio). Always fetch FX so the chip matches the comparison
+  // table's "Converti benchmark in EUR" view, not its USD default.
+  const { data: fxRates, isLoading: isFxLoading } = useFxRates(true);
 
   // Responsive breakpoints
   const isMobile = useMediaQuery('(max-width: 767px)');
@@ -560,9 +566,9 @@ export default function PerformancePage() {
   const chartData = useMemo(() => {
     if (!metrics || periodSnapshots.length === 0) return [];
 
-    // YTD/1Y/3Y/5Y periods include an extra baseline snapshot before the range;
+    // YTD/1Y/3Y/5Y/CUSTOM periods include an extra baseline snapshot before the range;
     // skip it so the chart starts at the first actual month of the selected period.
-    const hasBaseline = ['YTD', '1Y', '3Y', '5Y'].includes(metrics.timePeriod);
+    const hasBaseline = ['YTD', '1Y', '3Y', '5Y', 'CUSTOM'].includes(metrics.timePeriod);
     return preparePerformanceChartData(periodSnapshots, metrics.cashFlows, hasBaseline);
   }, [metrics, periodSnapshots]);
 
@@ -574,7 +580,7 @@ export default function PerformancePage() {
   const underwaterData = useMemo(() => {
     if (!metrics || periodSnapshots.length === 0) return [];
 
-    const hasBaseline = ['YTD', '1Y', '3Y', '5Y'].includes(metrics.timePeriod);
+    const hasBaseline = ['YTD', '1Y', '3Y', '5Y', 'CUSTOM'].includes(metrics.timePeriod);
     return prepareUnderwaterDrawdownData(periodSnapshots, metrics.cashFlows, hasBaseline);
   }, [metrics, periodSnapshots]);
 
@@ -583,13 +589,19 @@ export default function PerformancePage() {
   // math as the comparison table (shared util) so the hero delta matches the table exactly.
   const benchmarkAnnualized = useMemo(() => {
     if (!metrics || !referenceBenchmarkReturns) return null;
+    // Convert the benchmark's native (USD) returns to EUR before annualizing, mirroring
+    // the comparison table's FX logic so hero and table report the same number.
+    const eurReturns =
+      fxRates && fxRates.length > 0
+        ? applyFxConversion(referenceBenchmarkReturns, fxRates)
+        : referenceBenchmarkReturns;
     return computeBenchmarkAnnualizedReturn(
-      referenceBenchmarkReturns,
+      eurReturns,
       metrics.startDate,
       metrics.endDate,
       metrics.numberOfMonths
     );
-  }, [metrics, referenceBenchmarkReturns]);
+  }, [metrics, referenceBenchmarkReturns, fxRates]);
 
   const benchmarkDelta = computeBenchmarkDelta(metrics?.timeWeightedReturn ?? null, benchmarkAnnualized);
   const performanceVerdict = metrics
@@ -867,7 +879,7 @@ export default function PerformancePage() {
           verdict={performanceVerdict}
           benchmarkLabel={referenceBenchmark.name}
           benchmarkDelta={benchmarkDelta}
-          benchmarkLoading={isBenchmarkLoading}
+          benchmarkLoading={isBenchmarkLoading || isFxLoading}
           drawdown={drawdownStatus}
           sharpeRatio={metrics.sharpeRatio}
           maxDrawdown={metrics.maxDrawdown}

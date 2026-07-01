@@ -161,7 +161,7 @@ export function PerformanceHero({
           {drawdown && (
             <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs">
               {drawdown.atPeak ? (
-                <span className="font-medium text-positive">Nuovo massimo storico</span>
+                <span className="font-medium text-positive">Massimo del periodo</span>
               ) : (
                 <>
                   <span className="text-muted-foreground">dal massimo</span>

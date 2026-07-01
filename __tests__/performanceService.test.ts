@@ -347,6 +347,31 @@ describe('getSnapshotsForPeriod', () => {
     expect(result.every(s => s.year === 2024)).toBe(true)
   })
 
+  it('should include the month before a CUSTOM range as baseline', () => {
+    // Monthly dataset Nov 2025 → Mar 2026. A custom range Jan→Mar 2026 must reach
+    // back to Dec 2025 as baseline so January gets a computed return (parity with YTD).
+    const monthly: MonthlySnapshot[] = [
+      makeSnapshot(2025, 11, 100000),
+      makeSnapshot(2025, 12, 101000),
+      makeSnapshot(2026, 1, 102000),
+      makeSnapshot(2026, 2, 103000),
+      makeSnapshot(2026, 3, 104000),
+    ]
+    const result = getSnapshotsForPeriod(
+      monthly,
+      'CUSTOM',
+      new Date(2026, 0, 1),
+      new Date(2026, 2, 31)
+    )
+    // Dec 2025 (baseline) + Jan, Feb, Mar 2026
+    expect(result.map(s => `${s.year}-${s.month}`)).toEqual([
+      '2025-12',
+      '2026-1',
+      '2026-2',
+      '2026-3',
+    ])
+  })
+
   it('should return empty array for unknown period', () => {
     expect(getSnapshotsForPeriod(allSnapshots, 'UNKNOWN' as any)).toEqual([])
   })
