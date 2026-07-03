@@ -12,7 +12,7 @@ import { getCategoryById } from '@/lib/services/expenseCategoryService';
 import { getSettings } from '@/lib/services/assetAllocationService';
 import { DividendFormData } from '@/types/dividend';
 import {
-  assertResourceOwner,
+  assertCanAccessAccount,
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
@@ -73,7 +73,7 @@ export async function PUT(
       );
     }
 
-    assertResourceOwner(decodedToken, existingDividend.userId);
+    await assertCanAccessAccount(decodedToken, existingDividend.userId);
 
     // Update dividend
     await updateDividend(dividendId, updates);
@@ -171,7 +171,7 @@ export async function DELETE(
       );
     }
 
-    assertResourceOwner(decodedToken, dividend.userId);
+    await assertCanAccessAccount(decodedToken, dividend.userId);
 
     // If dividend has linked expense, delete it first
     if (dividend.expenseId) {

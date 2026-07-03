@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { updateHallOfFame } from '@/lib/services/hallOfFameService.server';
 import {
-  assertSameUser,
+  assertCanAccessAccount,
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { userId } = body;
 
-    assertSameUser(decodedToken, userId);
+    await assertCanAccessAccount(decodedToken, userId);
 
     // Recalculate Hall of Fame
     await updateHallOfFame(userId);

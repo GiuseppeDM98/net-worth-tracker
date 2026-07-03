@@ -4,7 +4,7 @@ import { calculateCurrentYieldMetrics } from '@/lib/services/performanceService'
 import { getUserAssetsAdmin, getUserSnapshotsAdmin } from '@/lib/server/assetAdminRepository';
 import { deriveHoldingStartDates } from '@/lib/utils/snapshotAssetBreakdown';
 import {
-  assertSameUser,
+  assertCanAccessAccount,
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     const numberOfMonthsStr = searchParams.get('numberOfMonths');
 
     // Validate required parameters
-    assertSameUser(decodedToken, userId);
+    await assertCanAccessAccount(decodedToken, userId);
     const authenticatedUserId = userId as string;
 
     if (!startDateStr || !dividendEndDateStr || !numberOfMonthsStr) {

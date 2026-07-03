@@ -12,7 +12,7 @@ import { createExpenseFromDividend } from '@/lib/services/dividendIncomeService'
 import { DividendFormData } from '@/types/dividend';
 import { isDateOnOrAfter, toDate } from '@/lib/utils/dateHelpers';
 import {
-  assertSameUser,
+  assertCanAccessAccount,
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       assetId: string;
     };
 
-    assertSameUser(decodedToken, userId);
+    await assertCanAccessAccount(decodedToken, userId);
 
     // Validate required fields
     if (!userId || !assetId) {

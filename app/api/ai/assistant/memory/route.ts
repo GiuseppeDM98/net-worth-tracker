@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  assertSameUser,
+  assertCanAccessAccount,
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const decodedToken = await requireFirebaseAuth(request);
     const userId = request.nextUrl.searchParams.get('userId');
 
-    assertSameUser(decodedToken, userId);
+    await assertCanAccessAccount(decodedToken, userId);
 
     const { adminDb } = await import('@/lib/firebase/admin');
 
@@ -70,7 +70,7 @@ export async function PATCH(request: NextRequest) {
       itemId?: string;
     };
 
-    assertSameUser(decodedToken, body.userId);
+    await assertCanAccessAccount(decodedToken, body.userId);
 
     let memory;
 
@@ -174,7 +174,7 @@ export async function DELETE(request: NextRequest) {
       resetAll?: boolean;
     };
 
-    assertSameUser(decodedToken, body.userId);
+    await assertCanAccessAccount(decodedToken, body.userId);
 
     const memory = await deleteAssistantMemoryDocument(body.userId, {
       itemId: body.itemId,

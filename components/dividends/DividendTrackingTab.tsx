@@ -30,6 +30,7 @@ import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
@@ -146,6 +147,7 @@ const TOOLTIP_CONTENT_STYLE = {
 
 export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: DividendTrackingTabProps) {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
   const chartColors = useChartColors();
   const [scraping, setScraping] = useState(false);
@@ -319,7 +321,7 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
   }, [detailDialogOpen]);
 
   const handleScrapeAll = () => {
-    if (!user) return;
+    if (!user || !ownerId) return;
     if (assetsWithIsinCount === 0) {
       toast.error('Nessun asset con ISIN trovato per lo scraping');
       return;
@@ -328,7 +330,7 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
   };
 
   const executeScrapeAll = async () => {
-    if (!user) return;
+    if (!user || !ownerId) return;
     const assetsWithIsin = assets.filter((a) => a.isin && a.isin.trim() !== '');
 
     try {
@@ -341,7 +343,7 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
           const response = await authenticatedFetch('/api/dividends/scrape', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: user.uid, assetId: asset.id }),
+            body: JSON.stringify({ userId: ownerId, assetId: asset.id }),
           });
           if (response.ok) {
             const result = await response.json();

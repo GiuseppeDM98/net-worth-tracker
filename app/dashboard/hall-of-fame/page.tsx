@@ -25,6 +25,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { chapterReveal } from '@/lib/utils/motionVariants';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
@@ -340,6 +341,7 @@ function buildYearlySpotlight(data: HallOfFameData | null): SpotlightSummary {
 
 export default function HallOfFamePage() {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
   const prefersReducedMotion = useReducedMotion();
   const isDesktop = useMediaQuery('(min-width: 1440px)');
@@ -365,8 +367,8 @@ export default function HallOfFamePage() {
   const noteEditDialogRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (user) void loadData();
-  }, [user]);
+    if (user && ownerId) void loadData();
+  }, [user, ownerId]);
 
   useEffect(
     () => buildDialogStyle(noteViewDialogOpen, noteTriggerRect, noteViewDialogRef, setNoteViewDialogStyle),
@@ -393,10 +395,10 @@ export default function HallOfFamePage() {
   const activeConfig = activePeriod === 'monthly' ? activeMonthlyConfig : activeYearlyConfig;
 
   async function loadData() {
-    if (!user) return;
+    if (!user || !ownerId) return;
     try {
       setLoading(true);
-      const hallOfFameData = await getHallOfFameData(user.uid);
+      const hallOfFameData = await getHallOfFameData(ownerId);
       setData(hallOfFameData);
     } catch (error) {
       console.error('Error loading Hall of Fame data:', error);
@@ -406,13 +408,13 @@ export default function HallOfFamePage() {
   }
 
   async function handleRecalculate() {
-    if (!user) return;
+    if (!user || !ownerId) return;
     try {
       setRecalculating(true);
       const response = await authenticatedFetch('/api/hall-of-fame/recalculate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid }),
+        body: JSON.stringify({ userId: ownerId }),
       });
       if (!response.ok) throw new Error('Failed to recalculate Hall of Fame');
       toast.success('Record aggiornati.');
@@ -446,15 +448,15 @@ export default function HallOfFamePage() {
     year: number;
     month?: number;
   }) {
-    if (!user) return;
+    if (!user || !ownerId) return;
     try {
       if (noteData.id) {
-        await updateHallOfFameNote(user.uid, noteData.id, {
+        await updateHallOfFameNote(ownerId, noteData.id, {
           text: noteData.text,
           sections: noteData.sections,
         });
       } else {
-        await addHallOfFameNote(user.uid, {
+        await addHallOfFameNote(ownerId, {
           text: noteData.text,
           sections: noteData.sections,
           year: noteData.year,
@@ -469,9 +471,9 @@ export default function HallOfFamePage() {
   }
 
   async function handleNoteDelete(noteId: string) {
-    if (!user) return;
+    if (!user || !ownerId) return;
     try {
-      await deleteHallOfFameNote(user.uid, noteId);
+      await deleteHallOfFameNote(ownerId, noteId);
       await loadData();
     } catch (error) {
       console.error('Error deleting note:', error);

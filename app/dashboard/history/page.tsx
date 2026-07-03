@@ -13,6 +13,7 @@ import {
   tabPanelSwitch,
 } from '@/lib/utils/motionVariants';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { HistoryPageSkeleton } from '@/components/history/HistoryPageSkeleton';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { useChartColors } from '@/lib/hooks/useChartColors';
@@ -143,6 +144,7 @@ const HISTORY_CHAPTER_SEQUENCE: HistoryChapterId[] = [
 
 export default function HistoryPage() {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const [snapshots, setSnapshots] = useState<MonthlySnapshot[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [targets, setTargets] = useState<AssetAllocationTarget | null>(null);
@@ -205,10 +207,10 @@ export default function HistoryPage() {
   };
 
   useEffect(() => {
-    if (user) {
+    if (user && ownerId) {
       loadData();
     }
-  }, [user]);
+  }, [user, ownerId]);
 
   useEffect(() => {
     if (loading) return;
@@ -237,16 +239,16 @@ export default function HistoryPage() {
    * All four queries run concurrently to minimize loading time.
    */
   const loadData = async () => {
-    if (!user) return;
+    if (!user || !ownerId) return;
 
     try {
       setLoading(true);
       const [snapshotsData, assetsData, targetsData, expensesData, settingsData] = await Promise.all([
-        getUserSnapshots(user.uid),
-        getAllAssets(user.uid),
-        getTargets(user.uid),
-        getAllExpenses(user.uid),
-        getSettings(user.uid),
+        getUserSnapshots(ownerId),
+        getAllAssets(ownerId),
+        getTargets(ownerId),
+        getAllExpenses(ownerId),
+        getSettings(ownerId),
       ]);
 
       setSnapshots(snapshotsData);
@@ -301,9 +303,9 @@ export default function HistoryPage() {
    * writes to Firestore first, then updates local state without re-fetching.
    */
   const handleSaveNote = async (year: number, month: number, note: string) => {
-    if (!user) return;
+    if (!user || !ownerId) return;
 
-    await updateSnapshotNote(user.uid, year, month, note);
+    await updateSnapshotNote(ownerId, year, month, note);
 
     setSnapshots((prevSnapshots) =>
       prevSnapshots.map((s) =>
@@ -1464,7 +1466,7 @@ export default function HistoryPage() {
       <CreateManualSnapshotModal
         open={showManualSnapshotModal}
         onOpenChange={setShowManualSnapshotModal}
-        userId={user?.uid || ''}
+        userId={ownerId || ''}
         onSuccess={loadData}
       />
 

@@ -5,6 +5,7 @@ import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import {
   ExpenseCategory,
   ExpenseCategoryFormData,
@@ -390,6 +391,7 @@ export function CategoryManagementDialog({
   initialSubCategoryName,
 }: Readonly<CategoryManagementDialogProps>) {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const isMobile = useMediaQuery('(max-width: 768px)');
 
   const [subCategories, setSubCategories] = useState<ExpenseSubCategory[]>([]);
@@ -451,9 +453,9 @@ export function CategoryManagementDialog({
   };
 
   const handleRemoveSubCategory = async (subCategoryId: string) => {
-    if (category && user) {
+    if (category && user && ownerId) {
       try {
-        const expenseCount = await getExpenseCountBySubCategoryId(category.id, subCategoryId, user.uid);
+        const expenseCount = await getExpenseCountBySubCategoryId(category.id, subCategoryId, ownerId);
         if (expenseCount > 0) {
           const subCat = subCategories.find((s) => s.id === subCategoryId);
           if (subCat) {
@@ -474,18 +476,18 @@ export function CategoryManagementDialog({
   };
 
   const handleConfirmSubCategoryDelete = async (newCategoryId?: string, newSubCategoryId?: string) => {
-    if (!category || !subCategoryToDelete || !user) return;
+    if (!category || !subCategoryToDelete || !user || !ownerId) return;
     try {
       if (newCategoryId) {
         await reassignExpensesSubCategory(
-          category.id, subCategoryToDelete.id, user.uid,
+          category.id, subCategoryToDelete.id, ownerId,
           newSubCategoryId,
           newSubCategoryId ? subCategories.find((s) => s.id === newSubCategoryId)?.name : undefined
         );
         setSubCategories(subCategories.filter((s) => s.id !== subCategoryToDelete.id));
         toast.success('Spese riassegnate e sottocategoria rimossa');
       } else {
-        await reassignExpensesSubCategory(category.id, subCategoryToDelete.id, user.uid);
+        await reassignExpensesSubCategory(category.id, subCategoryToDelete.id, ownerId);
         setSubCategories(subCategories.filter((s) => s.id !== subCategoryToDelete.id));
         toast.success(`Sottocategoria "${subCategoryToDelete.name}" eliminata. Le spese rimarranno nella categoria senza sottocategoria.`);
       }
@@ -499,15 +501,15 @@ export function CategoryManagementDialog({
   };
 
   const handleMoveSubCategory = async (subCategoryId: string) => {
-    if (!category || !user) return;
+    if (!category || !user || !ownerId) return;
     try {
-      const expenseCount = await getExpenseCountBySubCategoryId(category.id, subCategoryId, user.uid);
+      const expenseCount = await getExpenseCountBySubCategoryId(category.id, subCategoryId, ownerId);
       if (expenseCount === 0) {
         const subCat = subCategories.find((s) => s.id === subCategoryId);
         toast.warning(`La sottocategoria "${subCat?.name}" non ha transazioni da spostare`);
         return;
       }
-      const categories = await getAllCategories(user.uid);
+      const categories = await getAllCategories(ownerId);
       const subCat = subCategories.find((s) => s.id === subCategoryId);
       if (subCat) {
         setSubCategoryToMove(subCat);
@@ -522,7 +524,7 @@ export function CategoryManagementDialog({
   };
 
   const handleConfirmMoveSubCategory = async (newCategoryId: string, newSubCategoryId?: string) => {
-    if (!category || !subCategoryToMove || !user) return;
+    if (!category || !subCategoryToMove || !user || !ownerId) return;
     try {
       const newCategory = allCategoriesForMove.find((cat) => cat.id === newCategoryId);
       if (!newCategory) { toast.error('Categoria di destinazione non trovata'); return; }
@@ -535,7 +537,7 @@ export function CategoryManagementDialog({
       const movedCount = await moveExpensesFromSubCategory(
         category.id, subCategoryToMove.id, category.type,
         newCategoryId, newCategory.name, newCategory.type,
-        user.uid, newSubCategoryId, resolvedSubName
+        ownerId, newSubCategoryId, resolvedSubName
       );
       const destLabel = resolvedSubName ? `${newCategory.name} \u2192 ${resolvedSubName}` : newCategory.name;
       toast.success(`${movedCount} ${movedCount === 1 ? 'transazione spostata' : 'transazioni spostate'} da "${category.name} \u2192 ${subCategoryToMove.name}" a "${destLabel}"`);
@@ -549,7 +551,7 @@ export function CategoryManagementDialog({
   };
 
   const onSubmit = async (data: CategoryFormValues) => {
-    if (!user) { toast.error('Devi essere autenticato'); return; }
+    if (!user || !ownerId) { toast.error('Devi essere autenticato'); return; }
     try {
       const categoryData: ExpenseCategoryFormData = {
         name: data.name.trim(),
@@ -559,10 +561,10 @@ export function CategoryManagementDialog({
         subCategories,
       };
       if (category) {
-        await updateCategory(category.id, categoryData, user.uid);
+        await updateCategory(category.id, categoryData, ownerId);
         toast.success('Categoria aggiornata');
       } else {
-        await createCategory(user.uid, categoryData);
+        await createCategory(ownerId, categoryData);
         toast.success('Categoria creata');
       }
       onSuccess?.();

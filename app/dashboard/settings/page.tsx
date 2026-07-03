@@ -33,6 +33,7 @@ import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import {
@@ -55,7 +56,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Save, RotateCcw, Plus, Trash2, ChevronDown, ChevronUp, Edit, Receipt, FlaskConical, Coins, ArrowRightLeft, Settings, PieChart, Palette, Mail, X, Send } from 'lucide-react';
+import { Save, RotateCcw, Plus, Trash2, ChevronDown, ChevronUp, Edit, Receipt, FlaskConical, Coins, ArrowRightLeft, Settings, PieChart, Palette, Mail, X, Send, Users } from 'lucide-react';
+import { AccountSharingSection } from '@/components/settings/AccountSharingSection';
 import { useColorTheme, ColorTheme } from '@/contexts/ColorThemeContext';
 import { TabsContent } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -128,11 +130,13 @@ const SETTINGS_TABS: TabDef[] = [
   { value: 'generale',    label: 'Preferenze',  icon: Settings },
   { value: 'spese',       label: 'Spese',       icon: Receipt  },
   { value: 'dividendi',   label: 'Dividendi',   icon: Coins    },
+  { value: 'condivisione', label: 'Condivisione', icon: Users   },
   { value: 'aspetto',     label: 'Aspetto',     icon: Palette  },
 ];
 
 export default function SettingsPage() {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -210,8 +214,8 @@ export default function SettingsPage() {
   const enableTestSnapshots = process.env.NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS === 'true';
 
   // Tab navigation — lazy-loading pattern (same as Assets/Cashflow pages)
-  type SettingsTabId = 'generale' | 'allocazione' | 'spese' | 'dividendi' | 'aspetto';
-  const VALID_TABS: SettingsTabId[] = ['generale', 'allocazione', 'spese', 'dividendi', 'aspetto'];
+  type SettingsTabId = 'generale' | 'allocazione' | 'spese' | 'dividendi' | 'condivisione' | 'aspetto';
+  const VALID_TABS: SettingsTabId[] = ['generale', 'allocazione', 'spese', 'dividendi', 'condivisione', 'aspetto'];
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -254,14 +258,14 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    if (user) {
+    if (user && ownerId) {
       loadTargets();
       loadExpenseCategories();
-      getAllAssets(user.uid).then((assets) =>
+      getAllAssets(ownerId).then((assets) =>
         setCashAssets(assets.filter((a) => a.assetClass === 'cash'))
       );
     }
-  }, [user]);
+  }, [user, ownerId]);
 
   // Auto-calculate equity and bonds percentages when age or risk-free rate changes
   useEffect(() => {
@@ -358,11 +362,11 @@ export default function SettingsPage() {
   ]);
 
   const loadTargets = async () => {
-    if (!user) return;
+    if (!user || !ownerId) return;
 
     try {
       setLoading(true);
-      const settingsData = await getSettings(user.uid);
+      const settingsData = await getSettings(ownerId);
       const targets = settingsData?.targets || getDefaultTargets();
 
       // Load user age and risk-free rate if available
@@ -533,11 +537,11 @@ export default function SettingsPage() {
   };
 
   const loadExpenseCategories = async () => {
-    if (!user) return;
+    if (!user || !ownerId) return;
 
     try {
       setLoadingCategories(true);
-      const categories = await getAllCategories(user.uid);
+      const categories = await getAllCategories(ownerId);
       setExpenseCategories(categories);
     } catch (error) {
       console.error('Error loading expense categories:', error);
@@ -562,11 +566,11 @@ export default function SettingsPage() {
     categoryName: string,
     triggerOrigin?: string
   ) => {
-    if (!user) return;
+    if (!user || !ownerId) return;
 
     try {
       // Check if there are expenses associated with this category
-      const expenseCount = await getExpenseCountByCategoryId(categoryId, user.uid);
+      const expenseCount = await getExpenseCountByCategoryId(categoryId, ownerId);
 
       if (expenseCount > 0) {
         // Show reassignment dialog
@@ -597,7 +601,7 @@ export default function SettingsPage() {
     newCategoryId?: string,
     newSubCategoryId?: string
   ) => {
-    if (!categoryToDelete || !user) return;
+    if (!categoryToDelete || !user || !ownerId) return;
 
     try {
       // If no new category ID provided, delete without reassignment
@@ -605,7 +609,7 @@ export default function SettingsPage() {
         // Clear category assignment from expenses (set to "Senza categoria")
         const clearedCount = await clearExpensesCategoryAssignment(
           categoryToDelete.id,
-          user.uid
+          ownerId
         );
 
         // Delete the category
@@ -644,7 +648,7 @@ export default function SettingsPage() {
         categoryToDelete.id,
         newCategoryId,
         newCategory.name,
-        user.uid,
+        ownerId,
         newSubCategoryId,
         newSubCategoryName
       );
@@ -688,10 +692,10 @@ export default function SettingsPage() {
     categoryName: string,
     triggerOrigin?: string
   ) => {
-    if (!user) return;
+    if (!user || !ownerId) return;
 
     try {
-      const expenseCount = await getExpenseCountByCategoryId(categoryId, user.uid);
+      const expenseCount = await getExpenseCountByCategoryId(categoryId, ownerId);
 
       if (expenseCount === 0) {
         toast.warning(`La categoria "${categoryName}" non ha transazioni da spostare`);
@@ -715,7 +719,7 @@ export default function SettingsPage() {
     newCategoryId: string,
     newSubCategoryId?: string
   ) => {
-    if (!categoryToMove || !user) return;
+    if (!categoryToMove || !user || !ownerId) return;
 
     try {
       const newCategory = await getCategoryById(newCategoryId);
@@ -742,7 +746,7 @@ export default function SettingsPage() {
         newCategoryId,
         newCategory.name,
         newCategory.type,
-        user.uid,
+        ownerId,
         newSubCategoryId,
         newSubCategoryName
       );
@@ -772,14 +776,14 @@ export default function SettingsPage() {
 
   // Dividend settings handlers
   const handleSaveDividendSettings = async () => {
-    if (!user) return;
+    if (!user || !ownerId) return;
 
     try {
       setSaving(true);
-      const settingsData = await getSettings(user.uid);
+      const settingsData = await getSettings(ownerId);
       const targets = settingsData?.targets || getDefaultTargets();
 
-      await setSettings(user.uid, {
+      await setSettings(ownerId, {
         userAge,
         riskFreeRate,
         // Preserve FIRE settings (Bug #1 & #5 fix)
@@ -802,7 +806,7 @@ export default function SettingsPage() {
   };
 
   const handleSyncDividends = async () => {
-    if (!user) return;
+    if (!user || !ownerId) return;
 
     if (!dividendIncomeCategoryId) {
       toast.error('Seleziona prima una categoria per le entrate da dividendi');
@@ -842,7 +846,7 @@ export default function SettingsPage() {
       }
 
       // Fetch all dividends for this user
-      const response = await authenticatedFetch(`/api/dividends?userId=${user.uid}`);
+      const response = await authenticatedFetch(`/api/dividends?userId=${ownerId}`);
       if (!response.ok) {
         throw new Error('Errore nel caricamento dei dividendi');
       }
@@ -856,7 +860,7 @@ export default function SettingsPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId: user.uid,
+          userId: ownerId,
           dividends,
           categoryId: dividendIncomeCategoryId,
           categoryName: category.name,
@@ -917,7 +921,7 @@ export default function SettingsPage() {
   };
 
   const handleSave = async () => {
-    if (!user) return;
+    if (!user || !ownerId) return;
 
     // Auto-cleanup empty subcategory rows before validation (Bug #8 fix)
     assetClasses.forEach(assetClass => {
@@ -1001,7 +1005,7 @@ export default function SettingsPage() {
       setSaving(true);
 
       // Fetch current settings to preserve FIRE fields
-      const settingsData = await getSettings(user.uid);
+      const settingsData = await getSettings(ownerId);
 
       const targets: AssetAllocationTarget = {};
 
@@ -1047,7 +1051,7 @@ export default function SettingsPage() {
         }
       });
 
-      await setSettings(user.uid, {
+      await setSettings(ownerId, {
         userAge,
         riskFreeRate,
         // Persist the toggle state explicitly so disabling it survives a page reload.
@@ -2934,6 +2938,13 @@ export default function SettingsPage() {
           </TabsContent>
         )}
 
+        {/* Tab: Condivisione account */}
+        {mountedTabs.has('condivisione') && (
+          <TabsContent value="condivisione" className="mt-6 space-y-4 sm:space-y-6">
+            <AccountSharingSection disabled={isDemo} />
+          </TabsContent>
+        )}
+
         {/* Tab: Aspetto */}
         {mountedTabs.has('aspetto') && (
           <TabsContent value="aspetto" className="mt-6 space-y-4 sm:space-y-6">
@@ -3123,7 +3134,7 @@ export default function SettingsPage() {
         <CreateDummySnapshotModal
           open={dummySnapshotModalOpen}
           onOpenChange={setDummySnapshotModalOpen}
-          userId={user?.uid || ''}
+          userId={ownerId || ''}
         />
       )}
 
@@ -3132,7 +3143,7 @@ export default function SettingsPage() {
         <DeleteDummyDataDialog
           open={deleteDummyDataDialogOpen}
           onOpenChange={setDeleteDummyDataDialogOpen}
-          userId={user?.uid || ''}
+          userId={ownerId || ''}
           onDeleted={() => {
             // Refresh page or data after deletion
             window.location.reload();

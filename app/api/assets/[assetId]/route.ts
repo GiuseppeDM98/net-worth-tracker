@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { Timestamp } from 'firebase-admin/firestore';
 import {
-  assertSameUser,
+  assertCanAccessAccount,
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
@@ -58,7 +58,7 @@ export async function DELETE(
     // Get userId from request body
     const body = await request.json();
     const { userId } = body;
-    assertSameUser(decodedToken, userId);
+    await assertCanAccessAccount(decodedToken, userId);
 
     // Verify asset exists and belongs to user
     const assetDoc = await adminDb.collection('assets').doc(assetId).get();

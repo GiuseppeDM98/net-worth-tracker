@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { syncDividendExpenses } from '@/lib/services/dividendIncomeService';
 import { Dividend } from '@/types/dividend';
 import {
-  assertSameUser,
+  assertCanAccessAccount,
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { userId, dividends, categoryId, categoryName, subCategoryId, subCategoryName } = body;
 
-    assertSameUser(decodedToken, userId);
+    await assertCanAccessAccount(decodedToken, userId);
 
     if (!dividends || !categoryId || !categoryName) {
       return NextResponse.json(

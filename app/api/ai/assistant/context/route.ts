@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  assertSameUser,
+  assertCanAccessAccount,
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get('userId');
     const mode = searchParams.get('mode') ?? 'month_analysis';
 
-    const authError = getApiAuthErrorResponse(assertSameUser(decodedToken, userId));
+    const authError = getApiAuthErrorResponse(await assertCanAccessAccount(decodedToken, userId));
     if (authError) return authError;
 
     if (!userId) {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { updateUserAssetPrices } from '@/lib/helpers/priceUpdater';
 import {
-  assertSameUser,
+  assertCanAccessAccount,
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { userId } = body;
 
-    assertSameUser(decodedToken, userId);
+    await assertCanAccessAccount(decodedToken, userId);
 
     // Update prices using the shared helper function
     const result = await updateUserAssetPrices(userId);

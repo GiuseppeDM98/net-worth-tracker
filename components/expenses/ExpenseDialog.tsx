@@ -22,6 +22,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import {
   Expense,
   ExpenseFormData,
@@ -877,6 +878,7 @@ function ExpenseFormBody({
 
 export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<ExpenseDialogProps>) {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 768px)');
 
@@ -952,7 +954,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
   // Guard with a ref to avoid re-fetching if the user toggles type back and forth.
   const transferCategoryIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (selectedType === 'transfer' && user && open && !isEdit) {
+    if (selectedType === 'transfer' && user && ownerId && open && !isEdit) {
       if (transferCategoryIdRef.current) {
         // Already fetched in this dialog session — reuse cached ID
         setValue('categoryId', transferCategoryIdRef.current);
@@ -966,7 +968,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
         setValue('categoryId', existingTransferCat.id);
         return;
       }
-      ensureTransferCategory(user.uid).then((catId) => {
+      ensureTransferCategory(ownerId).then((catId) => {
         transferCategoryIdRef.current = catId;
         setValue('categoryId', catId);
         loadCategories();
@@ -975,10 +977,10 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
   }, [selectedType, user, open, isEdit, setValue, categories]);
 
   const loadCategories = async () => {
-    if (!user) return;
+    if (!user || !ownerId) return;
     try {
       setLoadingCategories(true);
-      const allCategories = await getAllCategories(user.uid);
+      const allCategories = await getAllCategories(ownerId);
       setCategories(allCategories);
     } catch (error) {
       console.error('Error loading categories:', error);
@@ -989,12 +991,12 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
   };
 
   const loadCashAssets = async () => {
-    if (!user) return;
+    if (!user || !ownerId) return;
     try {
       const [allAssets, settings, centers] = await Promise.all([
-        getAllAssets(user.uid),
-        getSettings(user.uid),
-        getCostCenters(user.uid),
+        getAllAssets(ownerId),
+        getSettings(ownerId),
+        getCostCenters(ownerId),
       ]);
       setCashAssets(allAssets.filter((a) => a.assetClass === 'cash'));
       const debitId = settings?.defaultDebitCashAssetId || '__none__';
@@ -1137,7 +1139,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
   };
 
   const onSubmit = async (data: ExpenseFormValues) => {
-    if (!user) {
+    if (!user || !ownerId) {
       toast.error('Devi essere autenticato');
       return;
     }
@@ -1234,14 +1236,14 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
         }
 
         if (assetUpdated) {
-          queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
-          queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(user.uid) });
+          queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
+          queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(ownerId) });
         }
 
         toast.success(data.type === 'transfer' ? 'Trasferimento aggiornato con successo' : 'Spesa aggiornata con successo');
       } else {
         const result = await createExpense(
-          user.uid,
+          ownerId,
           expenseData,
           category.name,
           subCategoryName
@@ -1255,8 +1257,8 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
             amount: Math.abs(data.amount),
           });
           if (transferUpdated) {
-            queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
-            queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(user.uid) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(ownerId) });
           }
           toast.success('Trasferimento creato con successo');
         } else if (linkedCashAssetId) {
@@ -1289,8 +1291,8 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
           }
 
           await reconcileSingleCreate({ linkedAssetId: linkedCashAssetId, signedAmount: firstSignedAmount });
-          queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
-          queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(user.uid) });
+          queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
+          queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(ownerId) });
         }
 
         // Non-transfer success toast — after balances are reconciled.
@@ -1317,7 +1319,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
       // so any create/edit (including adding, changing, or clearing a cost center)
       // must invalidate the shared ['cost-centers', userId] cache. Always fired —
       // an edit may move a transaction out of a center just as easily as into one.
-      queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(user.uid) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(ownerId) });
 
       onSuccess?.();
       onClose();

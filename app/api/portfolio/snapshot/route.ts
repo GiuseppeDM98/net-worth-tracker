@@ -12,7 +12,7 @@ import {
 import { calculateCurrentAllocation } from '@/lib/services/assetAllocationService';
 import { updateUserAssetPrices } from '@/lib/helpers/priceUpdater';
 import {
-  assertSameUser,
+  assertCanAccessAccount,
   getApiAuthErrorResponse,
   requireFirebaseAuth,
   verifyCronSecret,
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
     // a Firebase ID token that matches the requested userId.
     if (!cronSecret) {
       const decodedToken = await requireFirebaseAuth(request);
-      assertSameUser(decodedToken, userId);
+      await assertCanAccessAccount(decodedToken, userId);
     } else if (!userId) {
       return NextResponse.json(
         { error: 'User ID is required' },

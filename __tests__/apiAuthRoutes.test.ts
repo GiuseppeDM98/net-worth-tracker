@@ -27,6 +27,7 @@ const {
   snapshotDocSetMock,
   overviewSummaryDocGetMock,
   overviewSummaryDocSetMock,
+  accountAccessDocGetMock,
   getQuoteMock,
   getBondPriceByIsinMock,
 } = vi.hoisted(() => ({
@@ -47,6 +48,7 @@ const {
   snapshotDocSetMock: vi.fn(),
   overviewSummaryDocGetMock: vi.fn(),
   overviewSummaryDocSetMock: vi.fn(),
+  accountAccessDocGetMock: vi.fn(),
   getQuoteMock: vi.fn(),
   getBondPriceByIsinMock: vi.fn(),
 }));
@@ -105,6 +107,16 @@ vi.mock('@/lib/firebase/admin', () => ({
           doc: vi.fn(() => ({
             get: overviewSummaryDocGetMock,
             set: overviewSummaryDocSetMock,
+          })),
+        };
+      }
+
+      // Delegated-access lookup performed by assertCanAccessAccount when the
+      // caller's uid differs from the requested owner.
+      if (name === 'account-access') {
+        return {
+          doc: vi.fn(() => ({
+            get: accountAccessDocGetMock,
           })),
         };
       }
@@ -224,6 +236,9 @@ describe('Private API route auth', () => {
     process.env.CRON_SECRET = 'test-cron-secret';
 
     verifyIdTokenMock.mockResolvedValue({ uid: 'user-1' });
+    // Default: no delegated-access grant exists, so a caller acting on another
+    // user's account is denied (403) unless a test opts into membership.
+    accountAccessDocGetMock.mockResolvedValue({ exists: false, data: () => undefined });
     getAllDividendsMock.mockResolvedValue([]);
     getDividendByIdMock.mockResolvedValue(null);
     updateUserAssetPricesMock.mockResolvedValue({
@@ -287,7 +302,7 @@ describe('Private API route auth', () => {
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
-      error: 'Authenticated user does not match requested user',
+      error: 'Authenticated user does not have access to requested account',
     });
     expect(verifyIdTokenMock).toHaveBeenCalledWith('valid-token');
     expect(getAllDividendsMock).not.toHaveBeenCalled();
@@ -408,7 +423,7 @@ describe('Private API route auth', () => {
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
-      error: 'Resource does not belong to authenticated user',
+      error: 'Authenticated user does not have access to requested account',
     });
     expect(deleteDividendMock).not.toHaveBeenCalled();
     expect(deleteExpenseForDividendMock).not.toHaveBeenCalled();
@@ -448,7 +463,7 @@ describe('Private API route auth', () => {
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
-      error: 'Authenticated user does not match requested user',
+      error: 'Authenticated user does not have access to requested account',
     });
     expect(updateUserAssetPricesMock).not.toHaveBeenCalled();
   });

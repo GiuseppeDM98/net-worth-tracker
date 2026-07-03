@@ -9,6 +9,7 @@ import {
   springLayoutTransition,
 } from '@/lib/utils/motionVariants';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { updateHallOfFame } from '@/lib/services/hallOfFameService';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -90,6 +91,7 @@ const signChipClass = (value: number): string =>
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
   const prefersReducedMotion = useReducedMotion();
 
@@ -102,9 +104,9 @@ export default function DashboardPage() {
     return { label, subtitle: result.subtitle };
   }, [user?.displayName]);
 
-  const { data: overview, isLoading: loadingOverview } = useDashboardOverview(user?.uid);
-  const { data: expenseCategories = [] } = useExpenseCategories(user?.uid);
-  const createSnapshotMutation = useCreateSnapshot(user?.uid || '');
+  const { data: overview, isLoading: loadingOverview } = useDashboardOverview(ownerId);
+  const { data: expenseCategories = [] } = useExpenseCategories(ownerId);
+  const createSnapshotMutation = useCreateSnapshot(ownerId || '');
 
   const loading = loadingOverview;
 
@@ -200,7 +202,7 @@ export default function DashboardPage() {
 
   // ─── Snapshot handlers ────────────────────────────────────────────────────────
   const handleCreateSnapshot = async () => {
-    if (!user) return;
+    if (!user || !ownerId) return;
     try {
       if (overview?.flags.currentMonthSnapshotExists) {
         setShowConfirmDialog(true);
@@ -214,7 +216,7 @@ export default function DashboardPage() {
   };
 
   const createSnapshot = async () => {
-    if (!user) return;
+    if (!user || !ownerId) return;
     try {
       setCreatingSnapshot(true);
       setShowConfirmDialog(false);
@@ -223,7 +225,7 @@ export default function DashboardPage() {
       toast.dismiss('snapshot-creation');
       toast.success(result.message);
       try {
-        await updateHallOfFame(user.uid);
+        await updateHallOfFame(ownerId);
       } catch {
         /* non-critical */
       }

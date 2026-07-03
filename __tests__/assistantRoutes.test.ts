@@ -18,6 +18,7 @@ const {
   appendAssistantMessageMock,
   updateAssistantThreadMetadataMock,
   streamAssistantResponseMock,
+  accountAccessDocGetMock,
 } = vi.hoisted(() => ({
   verifyIdTokenMock: vi.fn(),
   buildAssistantMonthContextMock: vi.fn(),
@@ -35,6 +36,7 @@ const {
   appendAssistantMessageMock: vi.fn(),
   updateAssistantThreadMetadataMock: vi.fn(),
   streamAssistantResponseMock: vi.fn(),
+  accountAccessDocGetMock: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -47,6 +49,16 @@ vi.mock('@/lib/server/rateLimit', () => ({
 vi.mock('@/lib/firebase/admin', () => ({
   adminAuth: {
     verifyIdToken: verifyIdTokenMock,
+  },
+  adminDb: {
+    collection: vi.fn((name: string) => {
+      // Delegated-access lookup performed by assertCanAccessAccount when the
+      // caller's uid differs from the requested owner.
+      if (name === 'account-access') {
+        return { doc: vi.fn(() => ({ get: accountAccessDocGetMock })) };
+      }
+      throw new Error(`Unexpected collection: ${name}`);
+    }),
   },
 }));
 
@@ -113,6 +125,8 @@ describe('Assistant private API routes', () => {
     process.env.ANTHROPIC_API_KEY = 'test-key';
 
     verifyIdTokenMock.mockResolvedValue({ uid: 'user-1' });
+    // Default: no delegated-access grant, so cross-account calls are denied (403).
+    accountAccessDocGetMock.mockResolvedValue({ exists: false, data: () => undefined });
     buildAssistantMonthContextMock.mockResolvedValue({
       selector: { year: 2026, month: 3 },
       currentSnapshot: null,
@@ -271,7 +285,7 @@ describe('Assistant private API routes', () => {
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
-      error: 'Authenticated user does not match requested user',
+      error: 'Authenticated user does not have access to requested account',
     });
     expect(listAssistantThreadsMock).not.toHaveBeenCalled();
   });
@@ -493,7 +507,7 @@ describe('Assistant private API routes', () => {
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
-      error: 'Authenticated user does not match requested user',
+      error: 'Authenticated user does not have access to requested account',
     });
   });
 });

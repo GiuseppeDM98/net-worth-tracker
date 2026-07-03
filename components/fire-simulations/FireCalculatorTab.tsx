@@ -22,6 +22,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import {
@@ -114,6 +115,7 @@ function calculateDisplayedRunwayDelta(
 
 export function FireCalculatorTab() {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
   const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 767px)');
@@ -125,14 +127,14 @@ export function FireCalculatorTab() {
   const [howItWorksOpen, setHowItWorksOpen] = useState<boolean>(false);
 
   const { data: settings, isLoading: isLoadingSettings } = useQuery<Settings | null>({
-    queryKey: ['settings', user?.uid],
+    queryKey: ['settings', ownerId],
     queryFn: () => getSettings(user!.uid),
     enabled: !!user,
     staleTime: 300000,
   });
 
   const { data: assets, isLoading: isLoadingAssets } = useQuery({
-    queryKey: ['assets', user?.uid],
+    queryKey: ['assets', ownerId],
     queryFn: () => getAllAssets(user!.uid),
     enabled: !!user,
     staleTime: 300000,
@@ -144,7 +146,7 @@ export function FireCalculatorTab() {
   const illiquidNetWorth = assets ? calculateIlliquidFIRENetWorth(assets, includePrimaryResidence) : 0;
 
   const { data: fireData, isLoading: isLoadingFIRE } = useQuery({
-    queryKey: ['fireData', user?.uid, currentNetWorth, withdrawalRate, includePrimaryResidence],
+    queryKey: ['fireData', ownerId, currentNetWorth, withdrawalRate, includePrimaryResidence],
     queryFn: () => getFIREData(user!.uid, currentNetWorth, withdrawalRate, includePrimaryResidence),
     enabled: !!user && !!assets && currentNetWorth > 0,
     staleTime: 300000,
@@ -266,7 +268,7 @@ export function FireCalculatorTab() {
       }),
     onSuccess: () => {
       toast.success('Impostazioni FIRE salvate con successo');
-      queryClient.invalidateQueries({ queryKey: ['settings', user?.uid] });
+      queryClient.invalidateQueries({ queryKey: ['settings', ownerId] });
     },
     onError: (error) => {
       console.error('Error saving FIRE settings:', error);
@@ -298,11 +300,11 @@ export function FireCalculatorTab() {
   return (
     <div className="space-y-6">
       {/* Conditional banner — guards on fireMetrics (saved WR) to avoid false positives during preview */}
-      {fireMetrics && user && (
+      {fireMetrics && user && ownerId && (
         <FireReachedBanner
           currentNetWorth={currentNetWorth}
           fireNumber={fireMetrics.fireNumber}
-          userId={user.uid}
+          userId={ownerId}
           currentNetWorthFormatted={formatCurrency(currentNetWorth)}
           fireNumberFormatted={formatCurrency(fireMetrics.fireNumber)}
         />

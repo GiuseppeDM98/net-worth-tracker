@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import {
   Sidebar,
   SidebarContent,
@@ -43,6 +44,8 @@ import {
   ChevronsUpDown,
   PanelLeftClose,
   PanelLeftOpen,
+  Check,
+  Users,
 } from 'lucide-react';
 
 function NavItems({ items }: { items: NavItem[] }) {
@@ -87,6 +90,8 @@ function NavItems({ items }: { items: NavItem[] }) {
 
 export function AppSidebar() {
   const { user } = useAuth();
+  const { ownerId, accessibleAccounts, switchAccount, isSharedView } =
+    useActiveAccount();
   const { isMobile, setOpenMobile, toggleSidebar, state } = useSidebar();
   const { confirmLogout, setConfirmLogout, handleSignOut } = useLogout();
   const pathname = usePathname();
@@ -96,6 +101,14 @@ export function AppSidebar() {
   };
 
   const { displayName, initials } = getDisplayInfo(user);
+
+  // Human label for an accessible account: own account and named/emailed shares.
+  const accountLabel = (account: (typeof accessibleAccounts)[number]) =>
+    account.isOwn
+      ? 'Il mio account'
+      : account.displayName || account.email || 'Account condiviso';
+  const activeAccount = accessibleAccounts.find((a) => a.ownerId === ownerId);
+
   const showAssistant = process.env.NEXT_PUBLIC_ASSISTANT_AI_ENABLED !== 'false';
   const isAssistantActive =
     pathname === '/dashboard/assistant' || pathname.startsWith('/dashboard/assistant/');
@@ -222,13 +235,47 @@ export function AppSidebar() {
                     </Avatar>
                     <div className="grid flex-1 overflow-hidden text-left text-sm leading-tight">
                       <span className="truncate font-medium text-sidebar-foreground">{displayName}</span>
-                      {/* text-sidebar-foreground/50: footer sits on --sidebar, not --background */}
-                      <span className="truncate text-xs text-sidebar-foreground/50">{user?.email}</span>
+                      {/* When viewing a shared account, surface WHOSE data is active
+                          instead of the viewer's own email — otherwise the account
+                          being edited is invisible. */}
+                      {isSharedView && activeAccount ? (
+                        <span className="truncate text-xs text-primary">
+                          Vedi: {accountLabel(activeAccount)}
+                        </span>
+                      ) : (
+                        /* text-sidebar-foreground/50: footer sits on --sidebar, not --background */
+                        <span className="truncate text-xs text-sidebar-foreground/50">{user?.email}</span>
+                      )}
                     </div>
                     <ChevronsUpDown className="ml-auto size-4 shrink-0 text-sidebar-foreground/50" />
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent side="top" align="end" className="w-52">
+                <DropdownMenuContent side="top" align="end" className="w-56">
+                  {/* Account switcher — only when the viewer can reach >1 account */}
+                  {accessibleAccounts.length > 1 && (
+                    <>
+                      <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">
+                        Account
+                      </DropdownMenuLabel>
+                      <DropdownMenuGroup>
+                        {accessibleAccounts.map((account) => (
+                          <DropdownMenuItem
+                            key={account.ownerId}
+                            onSelect={() => switchAccount(account.ownerId)}
+                          >
+                            <Users className="size-4" />
+                            <span className="flex-1 truncate">
+                              {accountLabel(account)}
+                            </span>
+                            {account.ownerId === ownerId && (
+                              <Check className="ml-auto size-4 shrink-0 text-primary" />
+                            )}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuGroup>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
                   <DropdownMenuGroup>
                     <DropdownMenuItem asChild>
                       <Link href="/dashboard/settings" onClick={closeMobile}>

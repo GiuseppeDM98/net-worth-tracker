@@ -20,6 +20,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { TrendingUp, ChevronRight, HelpCircle } from 'lucide-react';
@@ -162,6 +163,7 @@ function AdvancedSkeleton() {
 
 export function DividendStats({ startDate, endDate, assetId }: DividendStatsProps) {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const [stats, setStats] = useState<DividendStatsData | null>(null);
   const [loading, setLoading] = useState(true);
   type DpsAsset = NonNullable<DividendStatsData['dividendGrowthData']>['byAsset'][number];
@@ -199,18 +201,18 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
   }, [stats]);
 
   useEffect(() => {
-    if (user) {
+    if (user && ownerId) {
       loadStats();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, startDate, endDate, assetId]);
+  }, [user, ownerId, startDate, endDate, assetId]);
 
   const loadStats = async () => {
-    if (!user) return;
+    if (!user || !ownerId) return;
     try {
       setLoading(true);
       const params = new URLSearchParams();
-      params.append('userId', user.uid);
+      params.append('userId', ownerId);
       if (startDate) params.append('startDate', startDate.toISOString());
       if (endDate) params.append('endDate', endDate.toISOString());
       if (assetId) params.append('assetId', assetId);

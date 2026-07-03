@@ -5,7 +5,7 @@ import { it } from 'date-fns/locale';
 import { formatTimePeriodLabel } from '@/lib/utils/formatters';
 import { PerformanceMetrics, TimePeriod } from '@/types/performance';
 import {
-  assertSameUser,
+  assertCanAccessAccount,
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
     const requestBody = await request.json();
     const { userId, metrics: performanceMetrics, timePeriod } = requestBody;
 
-    assertSameUser(decodedToken, userId);
+    await assertCanAccessAccount(decodedToken, userId);
 
     const rateLimitResult = checkRateLimit(
       `${userId}:analyze`,
