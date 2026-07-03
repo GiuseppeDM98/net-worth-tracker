@@ -229,7 +229,7 @@ export async function generateWeeklyBudgetComment(data: WeeklyBudgetData): Promi
       .filter(Boolean)
       .join('\n');
 
-    const prompt = `Sei un assistente finanziario personale italiano. Questo è lo stato dei budget dell'utente a fine settimana (anno trascorso ${Math.round(data.yearElapsedPct)}%):\n\n${lines}\n\nScrivi UNA sola frase in italiano (massimo 25 parole) che evidenzia la cosa più importante: un budget vicino o oltre il limite, oppure un buon andamento. Niente elenchi, niente saluti, niente premesse.`;
+    const prompt = `Sei un assistente finanziario personale italiano. Stato dei budget dell'utente a fine settimana (anno trascorso al ${Math.round(data.yearElapsedPct)}%):\n\n${lines}\n\nScrivi UNA sola frase in italiano (massimo 25 parole) che evidenzia il fatto più rilevante — un budget vicino o oltre il limite, oppure un buon andamento — usando solo i numeri sopra, senza inventarne altri. Niente elenchi, saluti o premesse.`;
 
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });

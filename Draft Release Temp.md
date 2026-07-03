@@ -192,6 +192,7 @@
 - **One consistent movements list on every screen** — desktop and mobile now share the same transaction feed grouped by day (Oggi / Ieri / date), so a movement reads and behaves the same everywhere. Tap any row for a detail sheet with edit and delete. On desktop a Feed / Tabella switch lets you flip to the dense sortable table whenever you prefer it
 - **Search Cashflow by amount** — the Cashflow search box now also matches transaction amounts, not just notes and category names. Type "76" to find every transaction around that figure (76,45 · 176 · 1276…), or "76,45" for an exact match — the Italian decimal comma is understood
 - **Model-portfolio comparison table sorted by return** — the "Confronto con Portafogli Modello" table on the Rendimenti page is now ordered by annualized TWR, highest first — with your own portfolio ranked in alongside the model portfolios — so you can see at a glance who's ahead
+- **More precise AI Assistant and email answers** — the AI Assistant and the AI comment in your summary emails now share a more detailed set of instructions: Italian financial terms specific to this app (YOC, TWR, bollo, PAC, inflation-linked BTP Italia coupons, cost centers…) are defined explicitly instead of left to guesswork, web search is used only for market/macro context and never to invent reasons for your personal income or expense changes, and answers distinguish clearly between what's stated in your data and what's a reasonable inference
 
 ## 🔒 Security
 

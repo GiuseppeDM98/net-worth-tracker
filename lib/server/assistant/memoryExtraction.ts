@@ -144,7 +144,11 @@ Estrai i fatti memorizzabili dall'input dell'UTENTE. Formato: [{"category":"..."
     const response = await anthropicClient.messages.create({
       model: EXTRACTION_MODEL,
       max_tokens: 512,
-      system: systemPrompt,
+      // Static across every call — cache_control lets back-to-back extractions (one per
+      // completed assistant turn, across users) share the cached prefix. Below the Haiku
+      // 4.5 minimum cacheable prefix (4096 tokens) today, so this is a safe no-op rather
+      // than a guaranteed hit — harmless to leave on, and correct if the prompt grows.
+      system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: userContent }],
     });
 

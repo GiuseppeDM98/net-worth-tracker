@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { AssistantMemoryItem, AssistantMessage, AssistantMode, AssistantMonthContextBundle, AssistantMonthSelectorValue, AssistantPreferences } from '@/types/assistant';
 import {
+  AssistantPromptParts,
   buildChatPrompt,
   buildHistoryAnalysisPrompt,
   buildMonthAnalysisPrompt,
@@ -38,6 +39,10 @@ interface StreamAssistantResponseArgs {
  * For month_analysis: uses the full structured bundle so Claude has reliable
  * numbers and knows exactly what data is/isn't available.
  * For chat: uses a lighter prompt without numeric context.
+ *
+ * Returns { system, userContent } — system is the cacheable static block
+ * (role, domain, guardrails, this mode's output contract); userContent is
+ * everything specific to this request.
  */
 function buildPrompt(
   mode: AssistantMode,
@@ -45,9 +50,8 @@ function buildPrompt(
   contextBundle: AssistantMonthContextBundle | null,
   month: AssistantMonthSelectorValue | null | undefined,
   preferences: AssistantPreferences,
-  memoryItems: AssistantMemoryItem[] = [],
-  enableWebSearch = false
-): string {
+  memoryItems: AssistantMemoryItem[] = []
+): AssistantPromptParts {
   const MONTH_NAMES = [
     'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
     'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
@@ -80,7 +84,7 @@ function buildPrompt(
 
   // Chat mode: pass the bundle when available so Claude has real numbers.
   // The prompt builder uses it without forcing a fixed response structure.
-  return buildChatPrompt(prompt, preferences, monthLabel, memoryItems, contextBundle, enableWebSearch);
+  return buildChatPrompt(prompt, preferences, monthLabel, memoryItems, contextBundle);
 }
 
 /**
@@ -135,9 +139,13 @@ export async function streamAssistantResponse({
     // is naturally longer — raise the cap to avoid mid-sentence truncation.
     const isStructuredAnalysis = ['month_analysis', 'year_analysis', 'ytd_analysis', 'history_analysis', 'quarter_analysis'].includes(mode);
     const chatMaxTokens = enableWebSearch ? 5000 : 3000;
+    const { system, userContent } = buildPrompt(mode, prompt, contextBundle, month, preferences, memoryItems);
     const stream = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: isStructuredAnalysis ? 7000 : chatMaxTokens,
+      // Static role/domain/guardrail/format instructions, identical for every user and
+      // every request of this mode — cached so repeat turns don't re-pay for it in full.
+      system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
       ...(isStructuredAnalysis
         ? { thinking: { type: 'enabled', budget_tokens: 4000 } }
         : {}),
@@ -152,11 +160,7 @@ export async function streamAssistantResponse({
             ],
           }
         : {}),
-      messages: buildMessagesArray(
-        mode,
-        buildPrompt(mode, prompt, contextBundle, month, preferences, memoryItems, enableWebSearch),
-        conversationHistory
-      ),
+      messages: buildMessagesArray(mode, userContent, conversationHistory),
       stream: true,
     });
 

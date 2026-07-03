@@ -19,7 +19,13 @@ import { MONTH_NAMES } from '@/lib/constants/months';
 import { AssetAllocationSettings } from '@/types/assets';
 import { getDefaultAssistantPreferences } from '@/lib/server/assistant/webSearchPolicy';
 import { getAssistantMemoryDocument } from '@/lib/server/assistant/store';
-import { formatMemoryForPrompt, buildResponseStyleInstruction } from '@/lib/server/assistant/prompts';
+import {
+  formatMemoryForPrompt,
+  buildResponseStyleInstruction,
+  ASSISTANT_SYSTEM_CORE,
+  EMAIL_PERIODIC_FORMAT_CONTRACT,
+  type AssistantPromptParts,
+} from '@/lib/server/assistant/prompts';
 import type { AssistantMemoryItem, AssistantPreferences } from '@/types/assistant';
 import { buildPeriodComparison } from '@/lib/server/emailPeriodComparison';
 import type { PeriodComparison, MetricDelta, ComparisonSet } from '@/lib/server/emailPeriodComparison';
@@ -448,14 +454,21 @@ function formatComparisonForPrompt(title: string, set: ComparisonSet): string {
  * Deliberately independent from the interactive assistant's mode-specific prompt builders:
  * the email needs a comparison-driven structure (vs previous period + YoY + cause analysis)
  * and a period label that includes the semi-annual case, neither of which the shared
- * builders provide. All figures come from `emailData` + the deterministic `comparison`.
+ * builders provide. Reuses ASSISTANT_SYSTEM_CORE for the role/domain/guardrail text so the
+ * two surfaces don't drift, plus its own EMAIL_PERIODIC_FORMAT_CONTRACT for the 5-section
+ * structure. All figures come from `emailData` + the deterministic `comparison`.
+ *
+ * Returns { system, userContent }: system is byte-identical across every user's email in
+ * a given cron run (role, domain, guardrails, format contract) — cache_control on it lets
+ * the run's many back-to-back calls share one cached prefix instead of re-paying for it
+ * per user. userContent carries the period label, comparison data, and memory.
  */
 function buildEmailAiPrompt(
   emailData: MonthlyEmailData,
   comparison: PeriodComparison,
   preferences: AssistantPreferences,
   memoryItems: AssistantMemoryItem[]
-): string {
+): AssistantPromptParts {
   const label = periodTitle(emailData);
   const savedAmount = emailData.totalIncome - emailData.totalExpenses;
   const savingsRate =
@@ -510,18 +523,8 @@ function buildEmailAiPrompt(
     ? formatMemoryForPrompt(memoryItems)
     : 'Non fare affidamento su memoria persistente; usa solo il contesto esplicito di questo messaggio.';
 
-  // Yearly: the previous period and the same period one year earlier coincide.
-  const yoySectionInstruction = comparison.previousEqualsYoy
-    ? '3. **Confronto con l\'anno precedente** — per il periodo annuale coincide con il punto 2: unisci i due confronti in un\'unica sezione e dillo esplicitamente.'
-    : '3. **Rispetto allo stesso periodo dell\'anno precedente** — confronto anno su anno, citando i numeri del blocco di confronto con l\'anno precedente.';
-
-  const sections: string[] = [
-    "Sei l'Assistente AI di Net Worth Tracker per un investitore italiano self-directed.",
-    'Rispondi sempre in italiano.',
+  const userContent = [
     buildResponseStyleInstruction(preferences.responseStyle),
-    // Web search is scoped: only to explain market-driven net-worth moves, never to invent
-    // causes for personal income/expense changes (those come from the category data below).
-    'Hai accesso a ricerche web recenti: usale SOLO per spiegare i movimenti di mercato del patrimonio (decisioni delle banche centrali, mercati, geopolitica) con date precise. Massimo 3 ricerche. Le cause delle variazioni di entrate e spese vanno dedotte esclusivamente dai dati per categoria forniti.',
     memoryBlock,
     '',
     `Stai redigendo il commento di riepilogo per: ${label}.`,
@@ -548,22 +551,9 @@ function buildEmailAiPrompt(
     '',
     '--- SPESE PIÙ RILEVANTI DEL PERIODO (categoria › sottocategoria — nota) ---',
     topExpenseDetailLines,
-    '',
-    'Struttura la risposta in markdown con queste sezioni:',
-    `1. **In sintesi** — 2-3 frasi sul risultato complessivo del periodo${hallOfFameLine ? '; se presente, cita il piazzamento Hall of Fame indicato nei dati (non inventare la posizione)' : ''}`,
-    `2. **Rispetto al ${comparison.vsPrevious.baselineLabel}** — cosa è cambiato rispetto al periodo precedente, citando i numeri forniti`,
-    yoySectionInstruction,
-    '4. **Entrate e spese: di quanto e perché** — quantifica di quanto sono aumentate o diminuite entrate e spese e ipotizza le probabili cause basandoti sui dati per categoria; commenta anche il mix per tipo (Fisse/Variabili/Debiti) quando rilevante; per il patrimonio puoi citare il contesto macro di mercato',
-    "5. **Azioni o attenzioni** — 1-2 osservazioni pratiche per l'investitore",
-    '',
-    'Rispetta questi vincoli:',
-    '- Massimo 500 parole',
-    '- Usa solo i numeri presenti nei blocchi dati; non inventarne',
-    '- Se un dato è N/D, dillo senza speculare sul suo valore',
-    '- Markdown semplice (grassetto, elenchi puntati); niente tabelle',
-  ];
+  ].join('\n');
 
-  return sections.join('\n');
+  return { system: `${ASSISTANT_SYSTEM_CORE}\n\n${EMAIL_PERIODIC_FORMAT_CONTRACT}`, userContent };
 }
 
 /**
@@ -597,7 +587,7 @@ async function generateEmailAiComment(
       // Memory load is non-critical — proceed with defaults
     }
 
-    const prompt = buildEmailAiPrompt(emailData, comparison, preferences, memoryItems);
+    const { system, userContent } = buildEmailAiPrompt(emailData, comparison, preferences, memoryItems);
 
     // Lazy import so a module-level `new Anthropic()` never breaks test environments
     // where ANTHROPIC_API_KEY is absent (same pattern as memoryExtraction).
@@ -607,6 +597,10 @@ async function generateEmailAiComment(
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 5000,
+      // Same static block for every user's email in this cron run — cached so the
+      // run's many back-to-back calls share one cached prefix instead of paying for
+      // it per user (see buildEmailAiPrompt's doc comment).
+      system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
       tools: [
         {
           type: 'web_search_20250305',
@@ -614,7 +608,7 @@ async function generateEmailAiComment(
           max_uses: 3,
         } as any,
       ],
-      messages: [{ role: 'user', content: prompt }],
+      messages: [{ role: 'user', content: userContent }],
     });
 
     // Concatenate the text blocks of the (non-streamed) response (skips thinking/tool blocks).

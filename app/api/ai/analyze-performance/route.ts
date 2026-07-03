@@ -260,6 +260,8 @@ Fornisci un'analisi concisa e actionable (massimo 350 parole) che:
 5. Identifica aree di miglioramento o rischi da considerare
 6. Se appropriato, offri 1-2 suggerimenti concreti
 
+Usa solo le metriche fornite sopra; non inventare cifre. Se una metrica è "n/a", dillo senza speculare sul suo valore.
+
 Usa un tono professionale ma accessibile. Rispondi in italiano con formattazione markdown (grassetto per concetti chiave, bullet points per elenchi).`;
 }
 
